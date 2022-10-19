@@ -1,0 +1,86 @@
+using System;
+
+struct NestedTest
+{
+  int W;
+
+  void PrintW()
+  {
+    Console.Log(this.W);
+  };
+}
+
+struct XD
+{
+  int V;
+  NestedTest N;
+
+  void Method()
+  {
+    this.V ++;
+    Console.Log("method");
+    foo();
+  };
+
+  void Method2()
+  {
+    Console.Log(this.V);
+  };
+
+  void Nest()
+  {
+    NestedTest n = this.N;
+    n.PrintW();
+  };
+}
+
+[CodeEntry]
+void Start()
+{  
+  Console.Log("Start");
+
+  var xd = new XD;
+  // xd.Method2();
+  // xd.Method();
+  // xd.Method2();
+  // xd.V += 5;
+  // xd.Method2();
+
+  xd.N = new NestedTest;
+  xd.Nest();
+
+  NestedTest nestedField = xd.N;
+  nestedField.PrintW();
+  nestedField.W += 5;
+  xd.Nest();
+  nestedField.PrintW();
+  xd.N = nestedField;
+  xd.Nest();
+
+  /*
+  for (int i = 0; i < 100; i++) {
+    Console.Log(i);
+  };
+
+  // app.Init();
+  */
+}
+
+[Catch("update")]
+void Update() {
+  TimeSpan t;
+  t = Time.Now();
+  Console.Log(t.secs);
+}
+
+[Catch("end")]
+void End()
+{
+  Console.Log("end");
+  // app.Close();
+}
+
+void foo()
+{
+  Console.Log("foo");
+}

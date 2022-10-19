@@ -1,0 +1,56 @@
+namespace Console
+{
+  [Builtin("conlog")]
+  void Log(string message);
+  
+  [Builtin("conerr")]
+  void LogError(string message);
+  
+  [Builtin("conwarn")]
+  void LogWarning(string message);
+  
+  [Builtin("conin")]
+  string Input(string promt);
+}
+
+struct TimeSpan
+{
+  int hours;
+  int mins;
+  int secs;
+  
+  string ToTimeSpanString()
+  {
+	return this.hours + ":" + this.minutes + ":" + this.secs;
+  };
+}
+
+namespace Time
+{
+  [Builtin("tmnw")]
+  string tmnw();
+
+  TimeSpan Now()
+  {
+	string[] nowSplitted;
+	string now = tmnw();
+	nowSplitted = now.Split(":");
+	TimeSpan t = new TimeSpan;
+	t.hours = nowSplitted[0];
+	t.mins = nowSplitted[1];
+	t.secs = nowSplitted[2];
+	return t;
+  }
+}
+
+string ToString(this int v)
+{ return v; }
+
+[Builtin("sleep")]
+void Sleep(int ms);
+
+[Builtin("splitstring")]
+string[] splitstring(string a, string b);
+
+string[] Split(this string v, string separator)
+{ return splitstring(v, separator); }

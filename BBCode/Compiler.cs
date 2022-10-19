@@ -1429,13 +1429,17 @@ namespace IngameCoding.BBCode
                     prevIfJumpOffset = compiledCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
+                    int variableCount = CompileVariables(partIf);
+
                     AddInstruction(Opcode.COMMENT, "IF Statements");
                     for (int i = 0; i < partIf.statements.Count; i++)
                     {
                         GenerateCodeForStatement(partIf.statements[i]);
                     }
 
-                    AddInstruction(Opcode.COMMENT, "IF Jump Back");
+                    ClearVariables(variableCount);
+
+                    AddInstruction(Opcode.COMMENT, "IF Jump to End");
                     conditionJumpOffsets.Add(compiledCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
@@ -1448,12 +1452,17 @@ namespace IngameCoding.BBCode
                     prevIfJumpOffset = compiledCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
+                    int variableCount = CompileVariables(partElseif);
+
                     AddInstruction(Opcode.COMMENT, "ELSEIF Statements");
                     for (int i = 0; i < partElseif.statements.Count; i++)
                     {
                         GenerateCodeForStatement(partElseif.statements[i]);
                     }
 
+                    ClearVariables(variableCount);
+
+                    AddInstruction(Opcode.COMMENT, "IF Jump to End");
                     conditionJumpOffsets.Add(compiledCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
@@ -1463,10 +1472,15 @@ namespace IngameCoding.BBCode
                 {
 
                     AddInstruction(Opcode.COMMENT, "ELSE Statements");
+
+                    int variableCount = CompileVariables(partElse);
+
                     for (int i = 0; i < partElse.statements.Count; i++)
                     {
                         GenerateCodeForStatement(partElse.statements[i]);
                     }
+
+                    ClearVariables(variableCount);
 
                     compiledCode[prevIfJumpOffset].parameter = compiledCode.Count - prevIfJumpOffset;
                 }
@@ -1522,6 +1536,10 @@ namespace IngameCoding.BBCode
 
         void GenerateCodeForStatement(Statement st)
         {
+            int variableCount = 0;
+            if (st is StatementParent statementParent)
+            { variableCount = CompileVariables(statementParent); }
+
             if (st is Statement_NewVariable newVariable)
             { GenerateCodeForStatement(newVariable); }
             else if (st is Statement_FunctionCall functionCall)
@@ -1547,6 +1565,33 @@ namespace IngameCoding.BBCode
             { GenerateCodeForStatement(newStruct); }
             else if (st is Statement_StructField structField)
             { GenerateCodeForStatement(structField); }
+
+            if (st is StatementParent)
+            { ClearVariables(variableCount); }
+        }
+
+        int CompileVariables(StatementParent statement, bool addComments = true)
+        {
+            if (addComments) AddInstruction(Opcode.COMMENT, "Variables");
+            int variableCount = 0;
+            foreach (var s in statement.statements)
+            {
+                GenerateCodeForVariable(s, out int newVariableCount);
+                variableCount += newVariableCount;
+            }
+            return variableCount;
+        }
+        void ClearVariables(int variableCount, bool addComments = true)
+        {
+            if (variableCount > 0)
+            {
+                if (addComments) AddInstruction(Opcode.COMMENT, "Clear variables");
+                compiledVariables.Remove(compiledVariables.Last().Key);
+                for (int x = 0; x < variableCount; x++)
+                {
+                    AddInstruction(Opcode.POP_VALUE);
+                }
+            }
         }
 
         #endregion
@@ -1834,15 +1879,6 @@ namespace IngameCoding.BBCode
                 }
             }
 
-            if (st is StatementParent parent)
-            {
-                for (int i = 0; i < parent.statements.Count; i++)
-                {
-                    GenerateCodeForVariable(parent.statements[i], out int newVariableCount2);
-                    variableCount += newVariableCount2;
-                }
-            }
-
             variablesAdded = variableCount;
         }
 
@@ -1850,8 +1886,8 @@ namespace IngameCoding.BBCode
         {
             this.isStructMethod = isMethod;
 
+            // Compile attributes
             Dictionary<string, AttributeValues> attributes = new();
-
             foreach (var attribute in function.Value.attributes)
             {
                 AttributeValues newAttribute = new()
@@ -1901,8 +1937,6 @@ namespace IngameCoding.BBCode
             compiledVariables.Clear();
             returnInstructions.Clear();
 
-            int variableCount = 0;
-
             if (isMethod)
             {
                 compiledStructs[compiledStructs.Last().Key].methodOffsets.Add(function.Value.FullName, compiledCode.Count);
@@ -1912,6 +1946,7 @@ namespace IngameCoding.BBCode
                 functionOffsets.Add(function.Value.FullName, compiledCode.Count);
             }
 
+            // Compile parameters
             int paramIndex = 0;
             foreach (ParameterDefinition parameter in function.Value.parameters)
             {
@@ -1919,6 +1954,8 @@ namespace IngameCoding.BBCode
                 parameters.Add(parameter.name, new Parameter(paramIndex, parameter.name, parameter.withRefKeyword, function.Value.parameters.Count, parameter.type.ToString()));
             }
 
+            // Search for variables
+            int variableCount = 0;
             AddInstruction(Opcode.COMMENT, "Variables");
             foreach (var statement in function.Value.statements)
             {
@@ -1926,6 +1963,7 @@ namespace IngameCoding.BBCode
                 variableCount += newVariableCount;
             }
 
+            // Compile statements
             AddInstruction(Opcode.COMMENT, "Statements");
             foreach (Statement statement in function.Value.statements)
             {
@@ -1938,6 +1976,7 @@ namespace IngameCoding.BBCode
                 compiledCode[returnCommandJumpInstructionIndex].parameter = cleanupCodeOffset - returnCommandJumpInstructionIndex;
             }
 
+            // Clear variables
             if (variableCount > 0)
             {
                 AddInstruction(Opcode.COMMENT, "Clear variables");

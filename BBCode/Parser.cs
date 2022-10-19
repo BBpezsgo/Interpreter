@@ -896,7 +896,6 @@ namespace IngameCoding.BBCode
                 return returnValue;
             }
         }
-        List<string> Callstack = new();
 
         List<Warning> Warnings;
 
@@ -906,9 +905,6 @@ namespace IngameCoding.BBCode
         public List<Statement_NewVariable> GlobalVariables = new();
         public List<string> Usings = new();
         // === ===
-
-        void CsAdd(string v) => Callstack.Add(v);
-        void CsPop() => Callstack.RemoveAt(Callstack.Count - 1);
 
         public Parser()
         {
@@ -952,7 +948,6 @@ namespace IngameCoding.BBCode
 
         public void Parse(Token[] _tokens, List<Warning> warnings)
         {
-            CsAdd("Parse");
             Warnings = warnings;
             tokens.Clear();
             tokens.AddRange(_tokens);
@@ -969,7 +964,6 @@ namespace IngameCoding.BBCode
                 endlessSafe++;
                 if (endlessSafe > 500) { throw new EndlessLoopException(); }
             }
-            CsPop();
         }
 
         public string PrettyPrint()
@@ -1003,12 +997,11 @@ namespace IngameCoding.BBCode
 
         bool ExpectUsing(out string @namespace)
         {
-            CsAdd("Expect Using");
             @namespace = string.Empty;
 
             Token usingT = ExpectIdentifier("using");
             if (usingT == null)
-            { CsPop(); return false; }
+            {  return false; }
             usingT.subtype = TokenSubtype.Keyword;
 
             List<Token> tokens = new();
@@ -1037,35 +1030,30 @@ namespace IngameCoding.BBCode
             if (@namespace == string.Empty)
             { throw new SyntaxException("Expected library name after 'using'", usingT); }
 
-            CsPop();
+            
             return true;
         }
 
         void ParseCodeHeader()
         {
-            CsAdd("Parse Code Header");
             while (ExpectUsing(out var usingNamespace))
             {
                 Usings.Add(usingNamespace);
-            }
-            CsPop();
+            }            
         }
 
         void ParseCodeBlock()
         {
-            CsAdd("Parse Code Block");
             if (ExpectNamespaceDefinition()) { }
             else if (ExpectStructDefinition()) { }
             else if (ExpectFunctionDefinition()) { }
             else if (ExpectGlobalVariable()) { }
             else
             { throw new SyntaxException("Expected global variable or namespace/struct/function definition", CurrentToken); }
-            CsPop();
-        }
+                    }
 
         bool ExpectGlobalVariable()
         {
-            CsAdd("Expect Global Variable");
             var possibleVariable = ExpectVariableDeclaration(false);
             if (possibleVariable != null)
             {
@@ -1073,17 +1061,15 @@ namespace IngameCoding.BBCode
 
                 if (ExpectOperator(";") == null)
                 { throw new SyntaxException("Expected ';' at end of statement", new Position(CurrentToken.lineNumber)); }
-                CsPop();
+                
                 return true;
             }
-
-            CsPop();
+            
             return false;
         }
 
         bool ExpectFunctionDefinition()
         {
-            CsAdd("Expect Function Definition");
             int parseStart = currentTokenIndex;
 
             List<FunctionDefinition.Attribute> attributes = new();
@@ -1108,14 +1094,14 @@ namespace IngameCoding.BBCode
 
             Type possibleType = ExceptType(false);
             if (possibleType == null)
-            { currentTokenIndex = parseStart; CsPop(); return false; }
+            { currentTokenIndex = parseStart;  return false; }
 
             Token possibleNameT = ExpectIdentifier();
             if (possibleNameT == null)
-            { currentTokenIndex = parseStart; CsPop(); return false; }
+            { currentTokenIndex = parseStart;  return false; }
 
             if (ExpectOperator("(") == null)
-            { currentTokenIndex = parseStart; CsPop(); return false; }
+            { currentTokenIndex = parseStart;  return false; }
 
             FunctionDefinition function = new(CurrentNamespace, possibleNameT.text)
             {
@@ -1177,15 +1163,14 @@ namespace IngameCoding.BBCode
             function.statements = statements;
 
             Functions.Add(function.FullName, function);
-            CsPop();
+            
             return true;
         }
 
         bool ExpectNamespaceDefinition()
         {
-            CsAdd("Expect Namespace Definition");
             if (ExpectIdentifier("namespace", out var possibleNamespaceIdentifier) == null)
-            { CsPop(); return false; }
+            {  return false; }
 
             possibleNamespaceIdentifier.subtype = TokenSubtype.Keyword;
 
@@ -1208,7 +1193,7 @@ namespace IngameCoding.BBCode
                         }
                     }
                     CurrentNamespace.RemoveAt(CurrentNamespace.Count - 1);
-                    CsPop();
+                    
                     return true;
                 }
                 { throw new SyntaxException("Expected { after namespace name", possibleName); }
@@ -1219,7 +1204,6 @@ namespace IngameCoding.BBCode
 
         bool ExpectStructDefinition()
         {
-            CsAdd("Expect Struct Definition");
             int startTokenIndex = currentTokenIndex;
 
             List<FunctionDefinition.Attribute> attributes = new();
@@ -1244,7 +1228,7 @@ namespace IngameCoding.BBCode
 
             Token possibleType = ExpectIdentifier("struct");
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex; CsPop(); return false; }
+            { currentTokenIndex = startTokenIndex;  return false; }
 
             Token possibleStructName = ExpectIdentifier();
             if (possibleStructName == null)
@@ -1290,16 +1274,14 @@ namespace IngameCoding.BBCode
             }
 
             Structs.Add(structDefinition.FullName, structDefinition);
-
-            CsPop();
+                        
             return true;
         }
 
         Statement_Variable ExpectReference()
         {
-            CsAdd("Expect Reference");
             if (ExpectIdentifier("ref", out var refKeyword) == null)
-            { CsPop(); return null; }
+            {  return null; }
 
             refKeyword.subtype = TokenSubtype.Keyword;
 
@@ -1329,8 +1311,7 @@ namespace IngameCoding.BBCode
 
             variableName.subtype = TokenSubtype.VariableName;
 
-            CsPop();
-            return variableNameStatement;
+                        return variableNameStatement;
         }
 
         #endregion
@@ -1361,8 +1342,6 @@ namespace IngameCoding.BBCode
         /// </returns>
         Statement ExpectOneValue()
         {
-            CsAdd("Expect One Value");
-
             int savedToken = currentTokenIndex;
 
             if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
@@ -1377,7 +1356,7 @@ namespace IngameCoding.BBCode
                 floatLiteralStatement.position.Extend(CurrentToken.Position.AbsolutePosition);
 
                 currentTokenIndex++;
-                CsPop();
+                
                 return floatLiteralStatement;
             }
             else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
@@ -1392,7 +1371,7 @@ namespace IngameCoding.BBCode
                 integerLiteralStatement.position.Extend(CurrentToken.Position.AbsolutePosition);
 
                 currentTokenIndex++;
-                CsPop();
+                
                 return integerLiteralStatement;
             }
             else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
@@ -1407,7 +1386,7 @@ namespace IngameCoding.BBCode
                 stringLiteralStatement.position.Extend(CurrentToken.startOffsetTotal - 1, CurrentToken.endOffsetTotal + 1);
 
                 currentTokenIndex++;
-                CsPop();
+                
                 return stringLiteralStatement;
             }
             else if (ExpectIdentifier("true", out var tTrue) != null)
@@ -1422,8 +1401,7 @@ namespace IngameCoding.BBCode
 
                 literal.position.Line = tTrue.lineNumber;
                 literal.position.Extend(tTrue.Position.AbsolutePosition);
-
-                CsPop();
+                                
                 return literal;
             }
             else if (ExpectIdentifier("false", out var tFalse) != null)
@@ -1438,8 +1416,7 @@ namespace IngameCoding.BBCode
 
                 literal.position.Line = tFalse.lineNumber;
                 literal.position.Extend(tFalse.Position.AbsolutePosition);
-
-                CsPop();
+                                
                 return literal;
             }
             else if (ExpectOperator("(", out var braceletT) != null)
@@ -1453,7 +1430,7 @@ namespace IngameCoding.BBCode
 
                 if (ExpectOperator(")") == null)
                 { throw new SyntaxException("Unbalanced '('", braceletT); }
-                CsPop();
+                
                 return statement1;
             }
             else if (ExpectIdentifier("new", out Token newIdentifier) != null)
@@ -1501,8 +1478,7 @@ namespace IngameCoding.BBCode
                 structFieldCallStatement.position.Extend(possibleStructName.Position.AbsolutePosition);
 
                 possibleStructName.subtype = TokenSubtype.Struct;
-
-                CsPop();
+                                
                 return structFieldCallStatement;
             }
             else if (ExpectIdentifier(out Token variableName) != null)
@@ -1542,8 +1518,7 @@ namespace IngameCoding.BBCode
                                 {
                                     variableName.subtype = TokenSubtype.VariableName;
                                 }
-
-                                CsPop();
+                                                                
                                 return structMethodCallStatement;
                             }
 
@@ -1580,8 +1555,7 @@ namespace IngameCoding.BBCode
                                         }
                                     }
                                 }
-
-                                CsPop();
+                                                                
                                 return structFieldCallStatement;
                             }
                         }
@@ -1627,24 +1601,22 @@ namespace IngameCoding.BBCode
                     if (ExpectMethodCall(out var method))
                     {
                         method.parameters.Insert(0, variableNameStatement);
-                        CsPop();
+                        
                         return method;
                     }
 
-                    CsPop();
+                    
                     return variableNameStatement;
                 }
             }
-
-            CsPop();
+                        
             return ExpectFunctionCall();
         }
 
         List<Statement> ParseFunctionBody()
         {
-            CsAdd("Parse Function Body");
             if (ExpectOperator("{") == null)
-            { CsPop(); return null; }
+            {  return null; }
 
             List<Statement> statements = new();
 
@@ -1688,18 +1660,16 @@ namespace IngameCoding.BBCode
                 if (endlessSafe > 500) throw new EndlessLoopException();
             }
             VariableNames.Clear();
-
-            CsPop();
+                        
             return statements;
         }
 
         Statement_NewVariable ExpectVariableDeclaration(bool enableRefKeyword)
         {
-            CsAdd("Expect Variable Declaration");
             int startTokenIndex = currentTokenIndex;
             Type possibleType = ExceptType(out var structNotFoundWarning);
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex; CsPop(); return null; }
+            { currentTokenIndex = startTokenIndex;  return null; }
 
             bool IsRef = false;
             if (ExpectIdentifier("ref") != null)
@@ -1715,7 +1685,7 @@ namespace IngameCoding.BBCode
 
             Token possibleVariableName = ExpectIdentifier();
             if (possibleVariableName == null)
-            { currentTokenIndex = startTokenIndex; CsPop(); return null; }
+            { currentTokenIndex = startTokenIndex;  return null; }
 
             possibleVariableName.subtype = TokenSubtype.VariableName;
 
@@ -1746,16 +1716,14 @@ namespace IngameCoding.BBCode
                 if (possibleType.type == BuiltinType.AUTO)
                 { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Position); }
             }
-
-            CsPop();
+                        
             return statement;
         }
 
         Statement_ForLoop ExpectForStatement()
         {
-            CsAdd("Expect For Statement");
             if (ExpectIdentifier("for", out Token tokenFor) == null)
-            { CsPop(); return null; }
+            {  return null; }
 
             tokenFor.subtype = TokenSubtype.Statement;
 
@@ -1814,16 +1782,14 @@ namespace IngameCoding.BBCode
                     throw new EndlessLoopException();
                 }
             }
-
-            CsPop();
+                        
             return forStatement;
         }
 
         Statement_WhileLoop ExpectWhileStatement()
         {
-            CsAdd("Expect While Statement");
             if (ExpectIdentifier("while", out Token tokenWhile) == null)
-            { CsPop(); return null; }
+            {  return null; }
 
             tokenWhile.subtype = TokenSubtype.Statement;
 

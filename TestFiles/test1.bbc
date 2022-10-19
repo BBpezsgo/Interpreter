@@ -1,0 +1,17 @@
+﻿using System;
+
+[CodeEntry]
+void Start()
+{
+  int a = 0;
+  if (true) {
+    int b = 2;
+    b = 2;
+    if (true) {
+      a = 10;
+      b = 5;
+    };
+    Console.Log(b);
+  };
+  Console.Log(a);
+}

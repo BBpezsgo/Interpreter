@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BBCode": {
+      "commandName": "Project",
+      "hotReloadEnabled": false
+    }
+  }
+}

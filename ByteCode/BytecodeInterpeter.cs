@@ -2205,7 +2205,7 @@ namespace IngameCoding.Bytecode
     public class BytecodeInterpeter
     {
         const int ClockCyclesPerUpdate = 2;
-        const int InstructionLimit = 1280;
+        const int InstructionLimit = 1024;
         const int StackMaxSize = 128;
 
         CentralProcessingUnit CPU;

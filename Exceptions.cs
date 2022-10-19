@@ -138,15 +138,9 @@ namespace IngameCoding
     [System.Serializable]
     public class SyntaxException : Exception
     {
-        public readonly string[] CompilerCallstack;
-
         public SyntaxException(string message) : base(message, new Position(-1)) { }
         public SyntaxException(string message, Position pos) : base(message, pos) { }
         public SyntaxException(string message, BaseToken token) : base(message, token) { }
-
-        public SyntaxException(string message, string[] compilerCallstack) : base(message, new Position(-1)) { this.CompilerCallstack = compilerCallstack; }
-        public SyntaxException(string message, Position pos, string[] compilerCallstack) : base(message, pos) { this.CompilerCallstack = compilerCallstack; }
-        public SyntaxException(string message, BaseToken token, string[] compilerCallstack) : base(message, token) { this.CompilerCallstack = compilerCallstack; }
 
         protected SyntaxException(
           System.Runtime.Serialization.SerializationInfo info,

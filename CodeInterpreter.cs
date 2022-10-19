@@ -415,7 +415,15 @@ namespace IngameCoding
                 new BBCode.Type("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
-                this.printCallback(parameters[0].ToStringValue(), TerminalInterpreter.LogType.Normal);
+                if (parameters[0].type == Stack.Item.Type.LIST)
+                {
+                    var list = parameters[0].ValueList;
+                    this.printCallback($"[ {string.Join(", ", list.items)} ]", TerminalInterpreter.LogType.Normal);
+                }
+                else
+                {
+                    this.printCallback(parameters[0].ToStringValue(), TerminalInterpreter.LogType.Normal);
+                }
             });
             AddBuiltinFunction("conerr", new BBCode.Type[] {
                 new BBCode.Type("any", BuiltinType.ANY)

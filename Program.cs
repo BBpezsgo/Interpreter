@@ -2,7 +2,7 @@
 {
     internal class Program
     {
-        static readonly bool HandleErrors = true;
+        static readonly bool HandleErrors = false;
 
         static void Main(string[] args)
         {
@@ -13,7 +13,7 @@
             else
             {
 #if true
-                RunFile("D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test1.bbc");
+                RunFile("D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test2.bbc");
 #else
                 ConsoleColor.WriteLine("Wrong number of arguments was passed!", System.ConsoleColor.Red);
 #endif

@@ -430,22 +430,70 @@ namespace IngameCoding.BBCode
         bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
             if (compiledFunctions.TryGetValue(functionCallStatement.FunctionName, out compiledFunction))
+            { return true; }
+
+            if (compiledFunctions.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
+            { return true; }
+
+            var xd = TryGetFunctionNamespacePath(functionCallStatement);
+
+            if (compiledFunctions.TryGetValue(xd + functionCallStatement.FunctionName, out compiledFunction))
             {
+                if (xd.EndsWith("."))
+                { xd = xd[..^1]; }
+                functionCallStatement.IsMethodCall = false;
+                functionCallStatement.NamespacePathPrefix = xd;
+                functionCallStatement.PrevStatement = null;
                 return true;
             }
-            else if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
+
+            if (compiledFunctions.TryGetValue(xd + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
             {
+                if (xd.EndsWith("."))
+                { xd = xd[..^1]; }
+                functionCallStatement.IsMethodCall = false;
+                functionCallStatement.NamespacePathPrefix = xd;
+                functionCallStatement.PrevStatement = null;
                 return true;
             }
-            else if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
-            {
-                return true;
-            }
-            else if (compiledFunctions.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
-            {
-                return true;
-            }
+
+            if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
+            { return true; }
+
+            if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out compiledFunction))
+            { return true; }
+
             return false;
+        }
+
+        string TryGetFunctionNamespacePath(Statement_FunctionCall functionCallStatement)
+        {
+            string[]? Get(Statement statement)
+            {
+                if (statement is Statement_Variable s1)
+                { return new string[] { s1.variableName }; }
+                if (statement is Statement_Field s2)
+                {
+                    var prev_ = Get(s2.PrevStatement);
+                    if (prev_ == null) { return null; }
+
+                    var prev = prev_.ToList();
+                    prev.Insert(0, s2.FieldName);
+                    return prev.ToArray();
+                }
+                return null;
+            }
+
+            if (functionCallStatement.PrevStatement != null)
+            {
+                var path = Get(functionCallStatement.PrevStatement);
+                if (path == null) return "";
+                return string.Join(".", path) + ".";
+            }
+            else
+            {
+                return "";
+            }
         }
 
         public bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
@@ -957,7 +1005,7 @@ namespace IngameCoding.BBCode
             }
             else if (GetCompiledFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                if (functionCall.parameters.Count != compiledFunction.ParameterCount)
+                if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
                 { throw new ParserException("Wrong number of parameters passed to '" + functionCall.FunctionName + "'", functionCall.position); }
 
                 if (functionCall.IsMethodCall != compiledFunction.IsMethod)
@@ -967,10 +1015,8 @@ namespace IngameCoding.BBCode
                 {
                     if (builtinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
                     {
-                        if (functionCall.parameters.Count != builtinFunction.ParameterCount)
-                        {
-                            throw new ParserException("Function '" + functionCall.TargetNamespacePathPrefix + functionCall.FunctionName + "' requies " + builtinFunction.ParameterCount + " parameters", functionCall.position);
-                        }
+                        if (functionCall.PrevStatement != null)
+                        { GenerateCodeForStatement(functionCall.PrevStatement); }
 
                         foreach (var param in functionCall.parameters)
                         {
@@ -989,12 +1035,10 @@ namespace IngameCoding.BBCode
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, GenerateInitialValue(compiledFunction.type)) { tag = "return value" });
                     }
 
-                    if (functionCall.parameters.Count != compiledFunction.ParameterCount)
-                    {
-                        throw new ParserException("Function '" + functionCall.FunctionName + "' requies " + compiledFunction.ParameterCount + "", new Position(functionCall.position.Line));
-                    }
+                    if (functionCall.PrevStatement != null)
+                    { GenerateCodeForStatement(functionCall.PrevStatement); }
 
-                    foreach (IngameCoding.BBCode.Statement param in functionCall.parameters)
+                    foreach (Statement param in functionCall.parameters)
                     {
                         GenerateCodeForStatement(param);
                         compiledCode.Last().tag = "param";
@@ -1008,6 +1052,9 @@ namespace IngameCoding.BBCode
                     {
                         AddInstruction(Opcode.POP_VALUE);
                     }
+
+                    if (functionCall.PrevStatement != null)
+                    { AddInstruction(Opcode.POP_VALUE); }
                 }
             }
             else
@@ -1285,6 +1332,30 @@ namespace IngameCoding.BBCode
                         throw new ParserException("Unknown variable '" + structField.variableName + "'", new Position(structField.position.Line));
                     }
                 }
+                else if (@operator.Left is Statement_Field field)
+                {
+                    if (field.PrevStatement is Statement_Variable variable1)
+                    {
+                        if (GetCompiledVariable(variable1.variableName, out CompiledVariable valueMemoryIndex, out var isGlob))
+                        {
+                            GenerateCodeForStatement(@operator.Right);
+                            AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, valueMemoryIndex.offset, field.FieldName);
+                        }
+                        else if (variable1.variableName == "this")
+                        {
+                            GenerateCodeForStatement(@operator.Right);
+                            AddInstruction(Opcode.STORE_THIS_FIELD, 0, field.FieldName);
+                        }
+                        else
+                        {
+                            throw new ParserException("Unknown variable '" + variable1.variableName + "'", new Position(field.position.Line));
+                        }
+                    }
+                    else
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
                 else
                 {
                     throw new ParserException("Unexpected statement", new Position(@operator.Left.position.Line));
@@ -1533,6 +1604,12 @@ namespace IngameCoding.BBCode
                 throw new ParserException("Unknown variable '" + structField.variableName + "'", new Position(structField.position.Line));
             }
         }
+        void GenerateCodeForStatement(Statement_Index indexStatement)
+        {
+            GenerateCodeForStatement(indexStatement.PrevStatement);
+            GenerateCodeForStatement(indexStatement.indexStatement);
+            AddInstruction(new Instruction(Opcode.LIST_INDEX));
+        }
 
         void GenerateCodeForStatement(Statement st)
         {
@@ -1565,6 +1642,8 @@ namespace IngameCoding.BBCode
             { GenerateCodeForStatement(newStruct); }
             else if (st is Statement_StructField structField)
             { GenerateCodeForStatement(structField); }
+            else if (st is Statement_Index indexStatement)
+            { GenerateCodeForStatement(indexStatement); }
 
             if (st is StatementParent)
             { ClearVariables(variableCount); }

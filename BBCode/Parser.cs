@@ -398,12 +398,25 @@ namespace IngameCoding.BBCode
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_FunctionCall : Statement
     {
-        readonly string[] namespacePath;
+        string[] namespacePath;
         readonly string[] targetNamespacePath;
         internal Token functionNameT;
         internal string FunctionName => functionNameT.text;
         internal List<Statement> parameters = new();
         internal bool IsMethodCall;
+        internal Statement? PrevStatement;
+
+        internal Statement[] MethodParameters
+        {
+            get
+            {
+                if (PrevStatement == null)
+                { return parameters.ToArray(); }
+                var newList = new List<Statement>(parameters.ToArray());
+                newList.Insert(0, PrevStatement);
+                return newList.ToArray();
+            }
+        }
 
         /// <returns> "[library].[...].[library]." </returns>
         public string NamespacePathPrefix
@@ -427,6 +440,12 @@ namespace IngameCoding.BBCode
                     val += ".";
                 }
                 return val;
+            }
+            set
+            {
+                if (value.Length == 0) { this.namespacePath = new string[0]; }
+                if (!value.Contains(".")) { this.namespacePath = new string[1] { value }; }
+                this.namespacePath = value.Split(".");
             }
         }
         /// <returns> "[library].[...].[library]." </returns>
@@ -841,6 +860,44 @@ namespace IngameCoding.BBCode
             return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{structName}()";
         }
     }
+    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_Index : Statement
+    {
+        readonly internal Statement indexStatement;
+        internal Statement PrevStatement;
+
+        public Statement_Index(Statement indexStatement)
+        {
+            this.indexStatement = indexStatement;
+        }
+
+        public override string ToString()
+        {
+            return $"[{indexStatement}]";
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"[{indexStatement.PrettyPrint()}]";
+        }
+    }
+    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_Field : Statement
+    {
+        internal string FieldName;
+        internal Statement PrevStatement;
+
+        public override string ToString()
+        {
+            return $"{PrevStatement}.{FieldName}";
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"{PrevStatement.PrettyPrint()}.{FieldName}";
+        }
+    }
+
 
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_MethodCall : Statement_FunctionCall
@@ -1001,7 +1058,7 @@ namespace IngameCoding.BBCode
 
             Token usingT = ExpectIdentifier("using");
             if (usingT == null)
-            {  return false; }
+            { return false; }
             usingT.subtype = TokenSubtype.Keyword;
 
             List<Token> tokens = new();
@@ -1030,7 +1087,7 @@ namespace IngameCoding.BBCode
             if (@namespace == string.Empty)
             { throw new SyntaxException("Expected library name after 'using'", usingT); }
 
-            
+
             return true;
         }
 
@@ -1039,7 +1096,7 @@ namespace IngameCoding.BBCode
             while (ExpectUsing(out var usingNamespace))
             {
                 Usings.Add(usingNamespace);
-            }            
+            }
         }
 
         void ParseCodeBlock()
@@ -1050,7 +1107,7 @@ namespace IngameCoding.BBCode
             else if (ExpectGlobalVariable()) { }
             else
             { throw new SyntaxException("Expected global variable or namespace/struct/function definition", CurrentToken); }
-                    }
+        }
 
         bool ExpectGlobalVariable()
         {
@@ -1061,10 +1118,10 @@ namespace IngameCoding.BBCode
 
                 if (ExpectOperator(";") == null)
                 { throw new SyntaxException("Expected ';' at end of statement", new Position(CurrentToken.lineNumber)); }
-                
+
                 return true;
             }
-            
+
             return false;
         }
 
@@ -1094,14 +1151,14 @@ namespace IngameCoding.BBCode
 
             Type possibleType = ExceptType(false);
             if (possibleType == null)
-            { currentTokenIndex = parseStart;  return false; }
+            { currentTokenIndex = parseStart; return false; }
 
             Token possibleNameT = ExpectIdentifier();
             if (possibleNameT == null)
-            { currentTokenIndex = parseStart;  return false; }
+            { currentTokenIndex = parseStart; return false; }
 
             if (ExpectOperator("(") == null)
-            { currentTokenIndex = parseStart;  return false; }
+            { currentTokenIndex = parseStart; return false; }
 
             FunctionDefinition function = new(CurrentNamespace, possibleNameT.text)
             {
@@ -1163,14 +1220,14 @@ namespace IngameCoding.BBCode
             function.statements = statements;
 
             Functions.Add(function.FullName, function);
-            
+
             return true;
         }
 
         bool ExpectNamespaceDefinition()
         {
             if (ExpectIdentifier("namespace", out var possibleNamespaceIdentifier) == null)
-            {  return false; }
+            { return false; }
 
             possibleNamespaceIdentifier.subtype = TokenSubtype.Keyword;
 
@@ -1193,7 +1250,7 @@ namespace IngameCoding.BBCode
                         }
                     }
                     CurrentNamespace.RemoveAt(CurrentNamespace.Count - 1);
-                    
+
                     return true;
                 }
                 { throw new SyntaxException("Expected { after namespace name", possibleName); }
@@ -1228,7 +1285,7 @@ namespace IngameCoding.BBCode
 
             Token possibleType = ExpectIdentifier("struct");
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex;  return false; }
+            { currentTokenIndex = startTokenIndex; return false; }
 
             Token possibleStructName = ExpectIdentifier();
             if (possibleStructName == null)
@@ -1274,14 +1331,14 @@ namespace IngameCoding.BBCode
             }
 
             Structs.Add(structDefinition.FullName, structDefinition);
-                        
+
             return true;
         }
 
         Statement_Variable ExpectReference()
         {
             if (ExpectIdentifier("ref", out var refKeyword) == null)
-            {  return null; }
+            { return null; }
 
             refKeyword.subtype = TokenSubtype.Keyword;
 
@@ -1311,12 +1368,122 @@ namespace IngameCoding.BBCode
 
             variableName.subtype = TokenSubtype.VariableName;
 
-                        return variableNameStatement;
+            return variableNameStatement;
         }
 
         #endregion
 
         #region Parse low level
+
+        bool ExpectLiteral(out Statement_Literal statement)
+        {
+            int savedToken = currentTokenIndex;
+
+            if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
+            {
+                Statement_Literal literal = new()
+                {
+                    value = CurrentToken.text,
+                    type = new Type("float", BuiltinType.FLOAT)
+                };
+
+                literal.position.Line = CurrentToken.lineNumber;
+                literal.position.Extend(CurrentToken.Position.AbsolutePosition);
+
+                currentTokenIndex++;
+
+                statement = literal;
+                return true;
+            }
+            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
+            {
+                Statement_Literal literal = new()
+                {
+                    value = CurrentToken.text,
+                    type = new Type("int", BuiltinType.INT)
+                };
+
+                literal.position.Line = CurrentToken.lineNumber;
+                literal.position.Extend(CurrentToken.Position.AbsolutePosition);
+
+                currentTokenIndex++;
+
+                statement = literal;
+                return true;
+            }
+            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
+            {
+                Statement_Literal literal = new()
+                {
+                    value = CurrentToken.text,
+                    type = new Type("string", BuiltinType.STRING)
+                };
+
+                literal.position.Line = CurrentToken.lineNumber;
+                literal.position.Extend(CurrentToken.startOffsetTotal - 1, CurrentToken.endOffsetTotal + 1);
+
+                currentTokenIndex++;
+
+                statement = literal;
+                return true;
+            }
+            else if (ExpectIdentifier("true", out var tTrue) != null)
+            {
+                Statement_Literal literal = new()
+                {
+                    value = "true",
+                    type = new Type("bool", BuiltinType.BOOLEAN)
+                };
+
+                tTrue.subtype = TokenSubtype.Keyword;
+
+                literal.position.Line = tTrue.lineNumber;
+                literal.position.Extend(tTrue.Position.AbsolutePosition);
+
+                statement = literal;
+                return true;
+            }
+            else if (ExpectIdentifier("false", out var tFalse) != null)
+            {
+                Statement_Literal literal = new()
+                {
+                    value = "false",
+                    type = new Type("bool", BuiltinType.BOOLEAN)
+                };
+
+                tFalse.subtype = TokenSubtype.Keyword;
+
+                literal.position.Line = tFalse.lineNumber;
+                literal.position.Extend(tFalse.Position.AbsolutePosition);
+
+                statement = literal;
+                return true;
+            }
+
+            currentTokenIndex = savedToken;
+
+            statement = null;
+            return false;
+        }
+
+        bool ExpectIndex(out Statement_Index statement)
+        {
+            if (ExpectOperator("[", out var token0) != null)
+            {
+                var st = ExpectOneValue();
+                if (ExpectOperator("]") != null)
+                {
+                    statement = new Statement_Index(st);
+                    return true;
+                }
+                else
+                {
+                    throw new SyntaxException("Unbalanced [", token0);
+                }
+            }
+            statement = null;
+            return false;
+        }
 
         /// <returns>
         /// <list type="bullet">
@@ -1344,104 +1511,35 @@ namespace IngameCoding.BBCode
         {
             int savedToken = currentTokenIndex;
 
-            if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
+            Statement returnStatement = null;
+
+            if (ExpectLiteral(out var literal))
             {
-                Statement_Literal floatLiteralStatement = new()
-                {
-                    value = CurrentToken.text,
-                    type = new Type("float", BuiltinType.FLOAT)
-                };
-
-                floatLiteralStatement.position.Line = CurrentToken.lineNumber;
-                floatLiteralStatement.position.Extend(CurrentToken.Position.AbsolutePosition);
-
-                currentTokenIndex++;
-                
-                return floatLiteralStatement;
-            }
-            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
-            {
-                Statement_Literal integerLiteralStatement = new()
-                {
-                    value = CurrentToken.text,
-                    type = new Type("int", BuiltinType.INT)
-                };
-
-                integerLiteralStatement.position.Line = CurrentToken.lineNumber;
-                integerLiteralStatement.position.Extend(CurrentToken.Position.AbsolutePosition);
-
-                currentTokenIndex++;
-                
-                return integerLiteralStatement;
-            }
-            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
-            {
-                Statement_Literal stringLiteralStatement = new()
-                {
-                    value = CurrentToken.text,
-                    type = new Type("string", BuiltinType.STRING)
-                };
-
-                stringLiteralStatement.position.Line = CurrentToken.lineNumber;
-                stringLiteralStatement.position.Extend(CurrentToken.startOffsetTotal - 1, CurrentToken.endOffsetTotal + 1);
-
-                currentTokenIndex++;
-                
-                return stringLiteralStatement;
-            }
-            else if (ExpectIdentifier("true", out var tTrue) != null)
-            {
-                Statement_Literal literal = new()
-                {
-                    value = "true",
-                    type = new Type("bool", BuiltinType.BOOLEAN)
-                };
-
-                tTrue.subtype = TokenSubtype.Keyword;
-
-                literal.position.Line = tTrue.lineNumber;
-                literal.position.Extend(tTrue.Position.AbsolutePosition);
-                                
-                return literal;
-            }
-            else if (ExpectIdentifier("false", out var tFalse) != null)
-            {
-                Statement_Literal literal = new()
-                {
-                    value = "false",
-                    type = new Type("bool", BuiltinType.BOOLEAN)
-                };
-
-                tFalse.subtype = TokenSubtype.Keyword;
-
-                literal.position.Line = tFalse.lineNumber;
-                literal.position.Extend(tFalse.Position.AbsolutePosition);
-                                
-                return literal;
+                returnStatement = literal;
             }
             else if (ExpectOperator("(", out var braceletT) != null)
             {
-                var statement1 = ExpectExpression();
-                if (statement1 == null)
+                var expression = ExpectExpression();
+                if (expression == null)
                 { throw new SyntaxException("Expected expression after '('", braceletT); }
 
-                if (statement1 is Statement_Operator operation)
+                if (expression is Statement_Operator operation)
                 { operation.InsideBracelet = true; }
 
                 if (ExpectOperator(")") == null)
                 { throw new SyntaxException("Unbalanced '('", braceletT); }
-                
-                return statement1;
+
+                returnStatement = expression;
             }
             else if (ExpectIdentifier("new", out Token newIdentifier) != null)
             {
                 newIdentifier.subtype = TokenSubtype.Keyword;
 
-                Token possibleStructName = ExpectIdentifier();
-                if (possibleStructName == null)
+                Token structName = ExpectIdentifier();
+                if (structName == null)
                 { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
 
-                possibleStructName.subtype = TokenSubtype.Struct;
+                structName.subtype = TokenSubtype.Struct;
 
                 List<string> targetLibraryPath = new();
                 List<Token> targetLibraryPathTokens = new();
@@ -1451,122 +1549,44 @@ namespace IngameCoding.BBCode
                     Token libraryToken = ExpectIdentifier();
                     if (libraryToken == null)
                     {
-                        throw new SyntaxException("Expected namespace, class, method, or field identifier", dotToken);
+                        throw new SyntaxException("Expected namespace or class identifier", dotToken);
                     }
                     else
                     {
-                        targetLibraryPath.Add(possibleStructName.text);
-                        targetLibraryPathTokens.Add(possibleStructName);
-                        possibleStructName = libraryToken;
+                        targetLibraryPath.Add(structName.text);
+                        targetLibraryPathTokens.Add(structName);
+                        structName = libraryToken;
                     }
                 }
 
                 foreach (var token in targetLibraryPathTokens)
                 { token.subtype = TokenSubtype.Library; }
 
-                if (possibleStructName == null)
+                if (structName == null)
                 { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
 
-                possibleStructName.subtype = TokenSubtype.Struct;
+                structName.subtype = TokenSubtype.Struct;
 
-                Statement_NewStruct structFieldCallStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
+                Statement_NewStruct newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                 {
-                    structName = possibleStructName.text
+                    structName = structName.text
                 };
 
-                structFieldCallStatement.position.Line = possibleStructName.lineNumber;
-                structFieldCallStatement.position.Extend(possibleStructName.Position.AbsolutePosition);
+                newStructStatement.position.Line = structName.lineNumber;
+                newStructStatement.position.Extend(structName.Position.AbsolutePosition);
 
-                possibleStructName.subtype = TokenSubtype.Struct;
-                                
-                return structFieldCallStatement;
+                returnStatement = newStructStatement;
             }
             else if (ExpectIdentifier(out Token variableName) != null)
             {
                 if (variableName.text == "this" && !enableThisKeyword)
                 { throw new ParserException("The keyword 'this' does not avaiable in the current context", variableName); }
 
-                // This is function
                 if (ExpectOperator("(") != null)
-                { currentTokenIndex = savedToken; }
-
-                // This is field/method
-                else if (ExpectOperator(".") != null)
                 {
-                    if (VariableNames.Contains(variableName.text) || GlobalVariableNames.Contains(variableName.text) || variableName.text == "this")
-                    {
-                        int tokenIndexBeforeMethod = currentTokenIndex;
-                        Token possibleMethodOrFieldName = ExpectIdentifier();
-                        if (possibleMethodOrFieldName != null)
-                        {
-                            // This is method
-                            if (ExpectOperator("(") != null)
-                            {
-                                currentTokenIndex = tokenIndexBeforeMethod;
-
-                                var structMethodCallStatement = ExpectStructMethodCall();
-                                structMethodCallStatement.variableNameToken = variableName;
-
-                                structMethodCallStatement.position.Line = variableName.lineNumber;
-                                structMethodCallStatement.position.Extend(variableName.Position.AbsolutePosition);
-
-                                if (variableName.text == "this")
-                                {
-                                    variableName.subtype = TokenSubtype.Keyword;
-                                }
-                                else
-                                {
-                                    variableName.subtype = TokenSubtype.VariableName;
-                                }
-                                                                
-                                return structMethodCallStatement;
-                            }
-
-                            // This is field
-                            else
-                            {
-                                Statement_StructField structFieldCallStatement = new()
-                                {
-                                    variableName = variableName.text,
-                                    fieldName = possibleMethodOrFieldName.text
-                                };
-
-                                structFieldCallStatement.position.Line = variableName.lineNumber;
-                                structFieldCallStatement.position.Extend(variableName.Position.AbsolutePosition);
-
-                                if (variableName.text == "this")
-                                {
-                                    variableName.subtype = TokenSubtype.Keyword;
-                                }
-                                else
-                                {
-                                    variableName.subtype = TokenSubtype.VariableName;
-
-                                    if (ExpectOperator("[", out var token0) != null)
-                                    {
-                                        var listIndex = ExpectOneValue();
-                                        if (ExpectOperator("]") != null)
-                                        {
-                                            structFieldCallStatement.listIndex = listIndex;
-                                        }
-                                        else
-                                        {
-                                            throw new SyntaxException("Unbalanced [", token0);
-                                        }
-                                    }
-                                }
-                                                                
-                                return structFieldCallStatement;
-                            }
-                        }
-                        else
-                        { currentTokenIndex = savedToken; }
-                    }
-                    else
-                    { currentTokenIndex = savedToken; }
+                    currentTokenIndex = savedToken;
+                    returnStatement = ExpectFunctionCall();
                 }
-
-                // This is variable
                 else
                 {
                     Statement_Variable variableNameStatement = new()
@@ -1578,45 +1598,63 @@ namespace IngameCoding.BBCode
                     variableNameStatement.position.Extend(variableName.Position.AbsolutePosition);
 
                     if (variableName.text == "this")
+                    { variableName.subtype = TokenSubtype.Keyword; }
+                    else
+                    { variableName.subtype = TokenSubtype.VariableName; }
+
+                    returnStatement = variableNameStatement;
+                }
+            }
+
+            while (true)
+            {
+                if (ExpectOperator(".", out var tokenDot) != null)
+                {
+                    if (ExpectMethodCall(false, out var methodCall))
                     {
-                        variableName.subtype = TokenSubtype.Keyword;
+                        methodCall.PrevStatement = returnStatement;
+                        returnStatement = methodCall;
                     }
                     else
                     {
-                        if (ExpectOperator("[", out var token0) != null)
+                        var fieldName = ExpectIdentifier();
+                        if (fieldName == null)
+                        { throw new SyntaxException("Expected field or method", tokenDot); }
+
+                        var fieldStatement = new Statement_Field()
                         {
-                            var listIndex = ExpectOneValue();
-                            if (ExpectOperator("]") != null)
+                            FieldName = fieldName.text,
+                            position = new Statement.Position()
                             {
-                                variableNameStatement.listIndex = listIndex;
-                            }
-                            else
-                            {
-                                throw new SyntaxException("Unbalanced [", token0);
-                            }
-                        }
-                        variableName.subtype = TokenSubtype.VariableName;
+                                AbsolutePosition = fieldName.Position.AbsolutePosition,
+                                Line = fieldName.Position.Line
+                            },
+                            PrevStatement = returnStatement
+                        };
+                        returnStatement = fieldStatement;
                     }
 
-                    if (ExpectMethodCall(out var method))
-                    {
-                        method.parameters.Insert(0, variableNameStatement);
-                        
-                        return method;
-                    }
-
-                    
-                    return variableNameStatement;
+                    continue;
                 }
+
+                if (ExpectIndex(out var statementIndex))
+                {
+                    statementIndex.PrevStatement = returnStatement;
+                    returnStatement = statementIndex;
+
+                    continue;
+                }
+
+                break;
             }
-                        
-            return ExpectFunctionCall();
+
+            return returnStatement;
         }
 
         List<Statement> ParseFunctionBody()
         {
             if (ExpectOperator("{") == null)
-            {  return null; }
+            { return null; }
 
             List<Statement> statements = new();
 
@@ -1660,7 +1698,7 @@ namespace IngameCoding.BBCode
                 if (endlessSafe > 500) throw new EndlessLoopException();
             }
             VariableNames.Clear();
-                        
+
             return statements;
         }
 
@@ -1669,7 +1707,7 @@ namespace IngameCoding.BBCode
             int startTokenIndex = currentTokenIndex;
             Type possibleType = ExceptType(out var structNotFoundWarning);
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex;  return null; }
+            { currentTokenIndex = startTokenIndex; return null; }
 
             bool IsRef = false;
             if (ExpectIdentifier("ref") != null)
@@ -1685,7 +1723,7 @@ namespace IngameCoding.BBCode
 
             Token possibleVariableName = ExpectIdentifier();
             if (possibleVariableName == null)
-            { currentTokenIndex = startTokenIndex;  return null; }
+            { currentTokenIndex = startTokenIndex; return null; }
 
             possibleVariableName.subtype = TokenSubtype.VariableName;
 
@@ -1716,14 +1754,14 @@ namespace IngameCoding.BBCode
                 if (possibleType.type == BuiltinType.AUTO)
                 { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Position); }
             }
-                        
+
             return statement;
         }
 
         Statement_ForLoop ExpectForStatement()
         {
             if (ExpectIdentifier("for", out Token tokenFor) == null)
-            {  return null; }
+            { return null; }
 
             tokenFor.subtype = TokenSubtype.Statement;
 
@@ -1735,14 +1773,14 @@ namespace IngameCoding.BBCode
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
             if (ExpectOperator(";") == null)
-            { throw new SyntaxException("Expected ';' at end of statement", variableDeclaration.position); }
+            { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.position); }
 
             Statement condition = ExpectExpression();
             if (condition == null)
             { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel.Position); }
 
             if (ExpectOperator(";") == null)
-            { throw new SyntaxException("Expected ';' at end of statement", variableDeclaration.position); }
+            { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.position); }
 
             Statement expression = ExpectExpression();
             if (expression == null)
@@ -1782,14 +1820,14 @@ namespace IngameCoding.BBCode
                     throw new EndlessLoopException();
                 }
             }
-                        
+
             return forStatement;
         }
 
         Statement_WhileLoop ExpectWhileStatement()
         {
             if (ExpectIdentifier("while", out Token tokenWhile) == null)
-            {  return null; }
+            { return null; }
 
             tokenWhile.subtype = TokenSubtype.Statement;
 
@@ -1979,13 +2017,17 @@ namespace IngameCoding.BBCode
             return statement;
         }
 
-        bool ExpectMethodCall(out Statement_FunctionCall methodCall)
+        bool ExpectMethodCall(bool expectDot, out Statement_FunctionCall methodCall)
         {
             int startTokenIndex = currentTokenIndex;
 
             methodCall = null;
-            if (ExpectOperator(".") == null)
-            { currentTokenIndex = startTokenIndex; return false; }
+
+            if (expectDot)
+            {
+                if (ExpectOperator(".") == null)
+                { currentTokenIndex = startTokenIndex; return false; }
+            }
 
             if (ExpectIdentifier(out var possibleFunctionName) == null)
             { currentTokenIndex = startTokenIndex; return false; }
@@ -2279,7 +2321,7 @@ namespace IngameCoding.BBCode
             return functionCall;
         }
 
-        Statement_MethodCall ExpectStructMethodCall()
+        Statement_MethodCall ExpectMethodCall()
         {
             int startTokenIndex = currentTokenIndex;
 

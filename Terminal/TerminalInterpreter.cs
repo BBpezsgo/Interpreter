@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace IngameCoding.Terminal
+﻿namespace IngameCoding.Terminal
 {
     public class TerminalInterpreter
     {
@@ -13,7 +7,6 @@ namespace IngameCoding.Terminal
             Normal,
             Warning,
             Error,
-            DebugError,
             Debug,
         }
     }

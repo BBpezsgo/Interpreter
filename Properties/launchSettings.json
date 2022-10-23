@@ -1,8 +1,7 @@
 {
   "profiles": {
     "BBCode": {
-      "commandName": "Project",
-      "hotReloadEnabled": false
+      "commandName": "Project"
     }
   }
 }

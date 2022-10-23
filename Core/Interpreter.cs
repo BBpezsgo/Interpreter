@@ -1,63 +1,61 @@
 ﻿using IngameCoding.BBCode;
 using IngameCoding.Bytecode;
+using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
-#pragma warning disable CS8604 // Possible null reference argument.
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-
-namespace IngameCoding
+namespace IngameCoding.Core
 {
-    public struct InstructionOffsets
+    [System.Serializable]
+    class Interpreter
     {
-        public enum Kind
-        {
-            CodeEntry,
-            CodeEnd,
-            Update,
-            ClearGlobalVariables,
-            SetGlobalVariables,
-        }
+        public bool IsExecutingCode => currentlyRunningCode;
 
-        public Dictionary<Kind, int> Offsets;
-
-        public int Get(Kind kind) => Offsets[kind];
-        public bool TryGet(Kind kind) => TryGet(kind, out _);
-        public bool TryGet(Kind kind, out int offset)
+        struct InstructionOffsets
         {
-            offset = -1;
-            if (Offsets.TryGetValue(kind, out int offset_))
+            public enum Kind
             {
-                if (offset_ > -1)
+                CodeEntry,
+                CodeEnd,
+                Update,
+                ClearGlobalVariables,
+                SetGlobalVariables,
+            }
+
+            public Dictionary<Kind, int> Offsets;
+
+            public int Get(Kind kind) => Offsets[kind];
+            public bool TryGet(Kind kind) => TryGet(kind, out _);
+            public bool TryGet(Kind kind, out int offset)
+            {
+                offset = -1;
+                if (Offsets.TryGetValue(kind, out int offset_))
                 {
-                    offset = offset_;
-                    return true;
+                    if (offset_ > -1)
+                    {
+                        offset = offset_;
+                        return true;
+                    }
+                    return false;
                 }
                 return false;
             }
-            return false;
-        }
-        public void Set(Kind kind, int offset)
-        {
-            if (Offsets.ContainsKey(kind))
+            public void Set(Kind kind, int offset)
             {
-                Offsets[kind] = offset;
-            }
-            else
-            {
-                Offsets.Add(kind, offset);
+                if (Offsets.ContainsKey(kind))
+                {
+                    Offsets[kind] = offset;
+                }
+                else
+                {
+                    Offsets.Add(kind, offset);
+                }
             }
         }
-    }
 
-
-    [System.Serializable]
-    public class CodeInterpeter
-    {
         readonly Dictionary<string, Compiler.BuiltinFunction> builtinFunctions = new();
-        private readonly Dictionary<string, System.Func<Stack.IStruct>> builtinStructs = new();
+        readonly Dictionary<string, System.Func<Stack.IStruct>> builtinStructs = new();
 
-        public bool currentlyRunningCode = false;
+        bool currentlyRunningCode = false;
 
         BytecodeInterpeter bytecodeInterpeter;
         System.Action<string, TerminalInterpreter.LogType> printCallback;
@@ -65,10 +63,14 @@ namespace IngameCoding
         System.Action<bool> onDone;
         System.Action<Stack.Item> onInput = null;
 
+        int result = 0;
+
         bool pauseCode = false;
 
         /// <summary> In ms </summary>
         float pauseCodeFor = 0f;
+
+        DateTime LastTime = DateTime.Now;
 
         int waitForUpdatesCounter;
         System.Action waitForUpdatesCallback;
@@ -81,7 +83,7 @@ namespace IngameCoding
 
         InstructionOffsets instructionOffsets;
 
-        void RunCode(Instruction[] compiledCode, System.Action<string, TerminalInterpreter.LogType> printCallback)
+        void RunCode(Instruction[] compiledCode)
         {
             codeStartedTimespan = System.DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions);
@@ -114,13 +116,13 @@ namespace IngameCoding
             return true;
         }
 
-        Instruction[] CompileCode(string code, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback)
+        Instruction[] CompileCode(string code, DirectoryInfo directory, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback)
         {
             var compiler = Compiler.CompileCode(
                 code,
                 builtinFunctions,
                 builtinStructs,
-                new DirectoryInfo("D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles"),
+                directory,
                 out var compiledFunctions,
                 out var compiledCode,
                 out _,
@@ -187,7 +189,7 @@ namespace IngameCoding
             return compiledCode;
         }
 
-        public void RunCode_BBCode(string code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput, bool HandleErrors = true)
+        internal void RunCode_BBCode(string code, DirectoryInfo directory, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput, bool HandleErrors = true)
         {
             if (!PrepareRunCode(onDone, printCallback, onNeedInput, out onInput)) return;
 
@@ -196,10 +198,10 @@ namespace IngameCoding
                 List<Warning> warnings = new();
                 try
                 {
-                    var compiledCode = CompileCode(code, warnings, printCallback);
-                    RunCode(compiledCode, this.printCallback);
+                    var compiledCode = CompileCode(code, directory, warnings, printCallback);
+                    RunCode(compiledCode);
                 }
-                catch (Exception error)
+                catch (Errors.Exception error)
                 {
                     this.onDone(false);
                     bytecodeInterpeter = null;
@@ -209,9 +211,9 @@ namespace IngameCoding
                     { this.printCallback?.Invoke(warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     this.printCallback?.Invoke(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                    Debug.LogException(error);
+                    Debug.Debug.LogError(error);
 
-                    System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace(error);
+                    System.Diagnostics.StackTrace stackTrace = new(error);
                     var stackFrames = stackTrace.GetFrames();
 
                     string StackTraceString = "";
@@ -223,8 +225,8 @@ namespace IngameCoding
                             StackTraceString += "  " + method.Name + "()\n";
                         }
                     }
-                    printCallback?.Invoke("Stack Trace:\n" + StackTraceString, TerminalInterpreter.LogType.DebugError);
-                    printCallback?.Invoke($"Code cannot be compiled", TerminalInterpreter.LogType.Debug);
+                    printCallback?.Invoke("Stack Trace:\n" + StackTraceString, TerminalInterpreter.LogType.Error);
+                    printCallback?.Invoke($"Code cannot be compiled", TerminalInterpreter.LogType.Error);
                 }
                 catch (System.Exception error)
                 {
@@ -236,16 +238,16 @@ namespace IngameCoding
                     { this.printCallback?.Invoke(warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     this.printCallback?.Invoke($"InternalException ({error.GetType().Name}): {error.Message}", TerminalInterpreter.LogType.Error);
-                    Debug.LogException(error);
+                    Terminal.Output.LogError(error);
 
-                    printCallback?.Invoke($"Code cannot be compiled", TerminalInterpreter.LogType.Debug);
+                    printCallback?.Invoke($"Code cannot be compiled", TerminalInterpreter.LogType.Error);
                 }
             }
             else
             {
                 List<Warning> warnings = new();
-                var compiledCode = CompileCode(code, warnings, printCallback);
-                RunCode(compiledCode, this.printCallback);
+                var compiledCode = CompileCode(code, directory, warnings, printCallback);
+                RunCode(compiledCode);
             }
         }
 
@@ -336,8 +338,8 @@ namespace IngameCoding
             this.printCallback = printCallback;
 
             AddBuiltins();
-            AddBuiltinFunction("conin", new IngameCoding.BBCode.Type[] {
-                new IngameCoding.BBCode.Type("any", IngameCoding.BBCode.BuiltinType.ANY)
+            AddBuiltinFunction("conin", new IngameCoding.Code.Type[] {
+                new IngameCoding.Code.Type("any", IngameCoding.Code.BuiltinType.ANY)
             }, (IngameCoding.Bytecode.Stack.Item[] parameters) =>
             {
                 pauseCode = true;
@@ -358,7 +360,7 @@ namespace IngameCoding
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                Debug.LogException(error);
+                Debug.LogError(error);
             }
             catch (System.Exception error)
             {
@@ -367,22 +369,22 @@ namespace IngameCoding
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.Message, TerminalInterpreter.LogType.Error);
-                Debug.LogException(error);
+                Debug.LogError(error);
             }
         }
 
         public void CompileExe(string Code, FileSystem.File file, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone)
         {
             AddBuiltins();
-            AddBuiltinFunction("conin", new IngameCoding.BBCode.Type[] {
-                new IngameCoding.BBCode.Type("any", IngameCoding.BBCode.BuiltinType.ANY)
+            AddBuiltinFunction("conin", new IngameCoding.Code.Type[] {
+                new IngameCoding.Code.Type("any", IngameCoding.Code.BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             { }, (_) => { });
 
             try
             {
-                IngameCoding.BBCode.Compiler.CompileCode(Code, builtinFunctions, os.drivers[0].Folder.GetFolder("Namespaces"), out var compiledFunctions, out var compiledCode, out var compiledStructs);
-                IngameCoding.BBCode.Compiler.SaveExe(file, compiledFunctions, compiledStructs, compiledCode);
+                IngameCoding.Code.Compiler.CompileCode(Code, builtinFunctions, os.drivers[0].Folder.GetFolder("Namespaces"), out var compiledFunctions, out var compiledCode, out var compiledStructs);
+                IngameCoding.Code.Compiler.SaveExe(file, compiledFunctions, compiledStructs, compiledCode);
                 onDone(true);
             }
             catch (IngameCoding.Exception error)
@@ -392,7 +394,7 @@ namespace IngameCoding
                 currentlyRunningCode = false;
 
                 printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                Debug.LogException(error);
+                Debug.LogError(error);
             }
             catch (System.Exception error)
             {
@@ -401,7 +403,7 @@ namespace IngameCoding
                 currentlyRunningCode = false;
 
                 printCallback(error.GetType().Name + ": " + error.Message, TerminalInterpreter.LogType.Error);
-                Debug.LogException(error);
+                Debug.LogError(error);
             }
         }
 
@@ -488,9 +490,9 @@ namespace IngameCoding
             pauseCode = false;
         }
 
-        double GetGoodNumber(double val) => System.Math.Round(val * 100) / 100;
+        static double GetGoodNumber(double val) => System.Math.Round(val * 100) / 100;
 
-        string GetEllapsedTime(double ms)
+        static string GetEllapsedTime(double ms)
         {
             var val = ms;
 
@@ -529,8 +531,15 @@ namespace IngameCoding
         bool startCalled = false;
         bool globalVariablesDisposed = false;
 
+        public void Update()
+        {
+            Update((float)(DateTime.Now - LastTime).TotalMilliseconds);
+        }
+
         public void Update(float deltaTime)
         {
+            LastTime = DateTime.Now;
+
             if (pauseCodeFor > 0f)
             {
                 pauseCodeFor -= deltaTime;
@@ -564,7 +573,7 @@ namespace IngameCoding
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
-                    Debug.LogException(error);
+                    Terminal.Output.LogError(error);
                 }
                 catch (System.Exception error)
                 {
@@ -572,11 +581,11 @@ namespace IngameCoding
 
                     onDone(false);
                     var elapsedMilliseconds = (System.DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    printCallback("Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -2", TerminalInterpreter.LogType.Normal);
+                    printCallback("Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.Normal);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
-                    Debug.LogException(error);
+                    Terminal.Output.LogError(error);
                 }
 
                 if (bytecodeInterpeter != null && !bytecodeInterpeter.IsRunning)
@@ -594,7 +603,7 @@ namespace IngameCoding
 
                         startCalled = true;
                         if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
-                        { throw new ParserException("Function with attribute 'CodeEntry' not found"); }
+                        { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
 
                         bytecodeInterpeter.Call(offset);
                     }
@@ -627,7 +636,7 @@ namespace IngameCoding
                     }
                     else
                     {
-                        OnCodeExecuted(0);
+                        OnCodeExecuted(result);
                     }
                 }
             }
@@ -642,18 +651,16 @@ namespace IngameCoding
                 function.RaiseReturnEvent(result);
             });
 
-            if (!builtinFunctions.Keys.Contains(name))
+            if (!builtinFunctions.ContainsKey(name))
             {
                 builtinFunctions.Add(name, function);
             }
             else
             {
                 builtinFunctions[name] = function;
-                Debug.LogWarning($"Builtin function '{name}'() already defined");
+                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
-        void AddBuiltinFunction(string name, System.Action callback, System.Action<Stack.Item> returnCallback)
-        { AddBuiltinFunction(name, new BBCode.Type[0], (p) => { callback?.Invoke(); }, returnCallback); }
 
         void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, System.Func<Stack.Item[], Stack.Item> callback)
         {
@@ -670,7 +677,7 @@ namespace IngameCoding
             else
             {
                 builtinFunctions[name] = function;
-                Debug.LogWarning($"Builtin function '{name}'() already defined");
+                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
 
@@ -680,34 +687,123 @@ namespace IngameCoding
             {
                 var x = callback();
                 this.bytecodeInterpeter.AddValueToStack(x);
-            }), new BBCode.Type[0], true);
+            }), Array.Empty<BBCode.Type>(), true);
 
-            if (!builtinFunctions.Keys.Contains(name))
+            if (!builtinFunctions.ContainsKey(name))
             {
                 builtinFunctions.Add(name, function);
             }
             else
             {
                 builtinFunctions[name] = function;
-                Debug.LogWarning($"Builtin function '{name}'() already defined");
+                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
         void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, System.Action<Stack.Item[]> callback)
         {
             Compiler.BuiltinFunction function = new((parameters) => { callback(parameters); }, parameterTypes);
 
-            if (!builtinFunctions.Keys.Contains(name))
+            if (!builtinFunctions.ContainsKey(name))
             {
                 builtinFunctions.Add(name, function);
             }
             else
             {
                 builtinFunctions[name] = function;
-                Debug.LogWarning($"Builtin function '{name}'() already defined");
+                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+            }
+        }
+    }
+
+    class EasyInterpreter
+    {
+        public static void Run(string path, bool HandleErrors = true)
+        {
+            if (!File.Exists(path))
+            {
+                Terminal.Output.LogError("File does not exists!");
+                return;
+            }
+
+            var file = new FileInfo(path);
+            Terminal.Output.LogDebug($"Run file '{file.FullName}'");
+            var code = File.ReadAllText(file.FullName);
+            var codeInterpreter = new Core.Interpreter();
+            Action<Bytecode.Stack.Item> onInputDone = null;
+            codeInterpreter.RunCode_BBCode(code, file.Directory, (message, logType) =>
+            {
+                switch (logType)
+                {
+                    case Terminal.TerminalInterpreter.LogType.Normal:
+                        Terminal.Output.Log(message);
+                        break;
+                    case Terminal.TerminalInterpreter.LogType.Warning:
+                        Terminal.Output.LogWarning(message);
+                        break;
+                    case Terminal.TerminalInterpreter.LogType.Error:
+                        Terminal.Output.LogError(message);
+                        break;
+                    case Terminal.TerminalInterpreter.LogType.Debug:
+                        Terminal.Output.LogDebug(message);
+                        break;
+                }
+            }, (success) =>
+            {
+                if (!success)
+                {
+                    Terminal.Output.LogError("Failed to execute the code");
+                }
+            }, (msg) =>
+            {
+                Console.WriteLine(msg);
+                var input = Console.ReadLine();
+                onInputDone?.Invoke(new Bytecode.Stack.Item(msg, "Console Input"));
+            }, out onInputDone, HandleErrors);
+
+            while (codeInterpreter.IsExecutingCode)
+            {
+                if (HandleErrors)
+                {
+                    try
+                    {
+                        codeInterpreter.Update();
+                    }
+                    catch (ParserException error)
+                    {
+                        Terminal.Output.LogError($"ParserException: {error.MessageAll}");
+                    }
+                    catch (RuntimeException error)
+                    {
+                        Terminal.Output.LogError($"RuntimeException: {error.MessageAll}");
+                    }
+                    catch (EndlessLoopException)
+                    {
+                        Terminal.Output.LogError($"Endless loop!!!");
+                    }
+                    catch (InternalException error)
+                    {
+                        Terminal.Output.LogError($"InternalException: {error.Message}");
+                    }
+                }
+                else
+                {
+                    codeInterpreter.Update();
+                }
             }
         }
 
-        void AddBuiltinFunction(string name, System.Action callback)
-        { AddBuiltinFunction(name, new BBCode.Type[0], (p) => { callback?.Invoke(); }); }
+        public static void Run(params string[] args)
+        {
+            if (args.Length == 0)
+            {
+                Output.LogError("Wrong number of arguments was passed!");
+                return;
+            }
+
+            bool ThrowErrors = args.Contains("-throw-errors");
+            string File = args.Last();
+
+            Run(File, !ThrowErrors);
+        }
     }
 }

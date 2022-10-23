@@ -10,4 +10,5 @@ void Main()
 {
   Console.Log((0).Add(5).Add(2).ToString());
   Console.Log(Time.tmnw().Split(":")[2]);
+  var xd = 0;
 }

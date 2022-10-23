@@ -1,19 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-#pragma warning disable CS8629 // Nullable value type may be null.
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-#pragma warning disable CS8765 // Nullability of type of parameter doesn't match overridden member (possibly because of nullability attributes).
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-#pragma warning disable CS8604 // Possible null reference argument.
+﻿using IngameCoding.Errors;
 
 namespace IngameCoding.Bytecode
 {
-    public static class ItemEx
+    using Debug;
+
+    using IngameCoding.Core;
+
+    static class ItemEx
     {
         public static string[] ToStringArray(this IngameCoding.Bytecode.Stack.Item[] items)
         {
@@ -194,9 +187,9 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOGIC_NOT:
                     return LOGIC_NOT();
                 case Opcode.UNKNOWN:
-                    throw new SystemException("Unknown command");
+                    throw new Errors.SystemException("Unknown command");
                 default:
-                    throw new SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
+                    throw new Errors.SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
             }
         }
 
@@ -859,7 +852,7 @@ namespace IngameCoding.Bytecode
         public void Step(int num) => CodePointer += num;
     }
 
-    public class Stack
+    class Stack
     {
         public Stack()
         { stack = new List<Item>(); }
@@ -1447,7 +1440,7 @@ namespace IngameCoding.Bytecode
                 }
                 else
                 {
-                    throw new Exception($"Unknown type {value.GetType().FullName}", new Position(-1));
+                    throw new Errors.Exception($"Unknown type {value.GetType().FullName}", new Position(-1));
                 }
             }
 
@@ -2202,7 +2195,7 @@ namespace IngameCoding.Bytecode
         public Item Get(int index) => this.stack[index];
     }
 
-    public class BytecodeInterpeter
+    class BytecodeInterpeter
     {
         const int ClockCyclesPerUpdate = 2;
         const int InstructionLimit = 1024;

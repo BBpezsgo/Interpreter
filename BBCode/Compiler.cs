@@ -1,16 +1,9 @@
-﻿using IngameCoding.Bytecode;
+﻿using IngameCoding.BBCode.Parser;
+using IngameCoding.BBCode.Parser.Statements;
+using IngameCoding.Bytecode;
+using IngameCoding.Core;
+using IngameCoding.Errors;
 using IngameCoding.Terminal;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-
-#pragma warning disable CS8601 // Possible null reference assignment.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
 
 namespace IngameCoding.BBCode
 {
@@ -56,7 +49,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public struct AttributeValues
+        internal struct AttributeValues
         {
             public List<Literal> parameters;
 
@@ -106,7 +99,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public struct Literal
+        internal struct Literal
         {
             public enum Type
             {
@@ -193,7 +186,7 @@ namespace IngameCoding.BBCode
         }
 
         [System.Serializable]
-        public struct CompiledFunction
+        internal struct CompiledFunction
         {
             public Type[] parameters;
 
@@ -260,7 +253,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public class BuiltinFunction
+        internal class BuiltinFunction
         {
             public Type[] parameters;
 
@@ -310,7 +303,7 @@ namespace IngameCoding.BBCode
                 }
             }
         }
-        public struct CompiledVariable
+        internal struct CompiledVariable
         {
             public int offset;
             public BuiltinType type;
@@ -346,7 +339,7 @@ namespace IngameCoding.BBCode
             }
         }
         [System.Serializable]
-        public class CompiledStruct
+        internal class CompiledStruct
         {
             public System.Func<Stack.IStruct> CreateBuiltinStruct;
             public bool IsBuiltin => CreateBuiltinStruct != null;
@@ -466,9 +459,9 @@ namespace IngameCoding.BBCode
             return false;
         }
 
-        string TryGetFunctionNamespacePath(Statement_FunctionCall functionCallStatement)
+        static string TryGetFunctionNamespacePath(Statement_FunctionCall functionCallStatement)
         {
-            string[]? Get(Statement statement)
+            static string[] Get(Statement statement)
             {
                 if (statement is Statement_Variable s1)
                 { return new string[] { s1.variableName }; }
@@ -496,7 +489,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
+        internal bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
         {
             if (functionOffsets.TryGetValue(functionCallStatement.FunctionName, out functionOffset))
             {
@@ -517,7 +510,7 @@ namespace IngameCoding.BBCode
             functionOffset = -1;
             return false;
         }
-        public bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
+        internal bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
         {
             if (GetCompiledVariable(methodCallStatement.VariableName, out CompiledVariable compiledVariable, out _))
             {
@@ -555,7 +548,7 @@ namespace IngameCoding.BBCode
             return false;
         }
 
-        public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
+        internal bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
         {
             if (functionOffsets.TryGetValue(functionCallStatement.Name, out functionOffset))
             {
@@ -1467,7 +1460,7 @@ namespace IngameCoding.BBCode
             AddInstruction(Opcode.COMMENT, "Statements");
             for (int i = 0; i < forLoop.statements.Count; i++)
             {
-                IngameCoding.BBCode.Statement currStatement = forLoop.statements[i];
+                IngameCoding.BBCode.Parser.Statements.Statement currStatement = forLoop.statements[i];
                 GenerateCodeForStatement(currStatement);
             }
 
@@ -2505,7 +2498,7 @@ namespace IngameCoding.BBCode
             return compiledCode.ToArray();
         }
 
-        static Parser ParseCode(string code, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback = null)
+        static Parser.Parser ParseCode(string code, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             var (tokens, _) = Tokenizer.Parse(code, printCallback);
 
@@ -2517,7 +2510,7 @@ namespace IngameCoding.BBCode
                 sw.Start();
             }
 
-            Parser parser = new();
+            Parser.Parser parser = new();
             parser.Parse(tokens, warnings);
 
             if (sw != null)
@@ -2527,7 +2520,7 @@ namespace IngameCoding.BBCode
             return parser;
         }
 
-        public static Compiler CompileCode(
+        internal static Compiler CompileCode(
             string code,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, System.Func<Stack.IStruct>> builtinStructs,
@@ -2540,7 +2533,7 @@ namespace IngameCoding.BBCode
             List<Warning> warnings,
             System.Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            Parser parser = ParseCode(code, warnings, printCallback);
+            Parser.Parser parser = ParseCode(code, warnings, printCallback);
 
             //UnityEngine.Debug.Log("===RESULT===\n" + parser.PrettyPrint());
 
@@ -2553,10 +2546,10 @@ namespace IngameCoding.BBCode
             for (int i = 0; i < parser.Usings.Count; i++)
             {
                 string usingItem = parser.Usings[i];
-                if (File.Exists(namespacesFolder.FullName + "\\" + usingItem + "." + OperatingSystem.Extensions.Code))
+                if (File.Exists(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code))
                 {
                     printCallback?.Invoke($"Parse usings ({i + 1}/{parser.Usings.Count})...", TerminalInterpreter.LogType.Debug);
-                    Parser parser2 = ParseCode(File.ReadAllText(namespacesFolder.FullName + "\\" + usingItem + "." + OperatingSystem.Extensions.Code), warnings);
+                    Parser.Parser parser2 = ParseCode(File.ReadAllText(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings);
 
                     foreach (var func in parser2.Functions)
                     {
@@ -2581,7 +2574,7 @@ namespace IngameCoding.BBCode
                     }
                 }
                 else
-                { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + OperatingSystem.Extensions.Code}\")"); }
+                { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")"); }
             }
 
             System.Diagnostics.Stopwatch sw = null;

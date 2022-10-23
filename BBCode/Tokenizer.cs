@@ -1,17 +1,9 @@
-﻿using IngameCoding.Terminal;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+﻿using IngameCoding.Core;
+using IngameCoding.Terminal;
 
 namespace IngameCoding.BBCode
 {
-    public enum TokenType
+    enum TokenType
     {
         WHITESPACE,
         IDENTIFIER,
@@ -31,7 +23,18 @@ namespace IngameCoding.BBCode
         COMMENT_MULTILINE,
     }
 
-    public class Token : BaseToken
+    class BaseToken
+    {
+        public int startOffset;
+        public int endOffset;
+        public int lineNumber;
+
+        public int startOffsetTotal;
+        public int endOffsetTotal;
+        public Position Position => new(lineNumber, startOffset, new Interval(startOffsetTotal, endOffsetTotal));
+    }
+
+    class Token : BaseToken
     {
         public TokenType type = TokenType.WHITESPACE;
         public string text = "";
@@ -49,7 +52,7 @@ namespace IngameCoding.BBCode
         }
     }
 
-    public class Tokenizer
+    class Tokenizer
     {
         /// <returns>(tokens, tokens with comments)</returns>
         public static (Token[], Token[]) Parse(string program, System.Action<string, TerminalInterpreter.LogType> printCallback = null)
@@ -108,7 +111,7 @@ namespace IngameCoding.BBCode
                         't' => "\t",
                         '\\' => "\\",
                         '"' => "\"",
-                        _ => throw new SyntaxException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", currentToken),
+                        _ => throw new Errors.SyntaxException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", currentToken),
                     };
                     currentToken.type = TokenType.LITERAL_STRING;
                     continue;

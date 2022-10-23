@@ -29,8 +29,7 @@ struct XD
 
   void Nest()
   {
-    NestedTest n = this.N;
-    n.PrintW();
+    this.N.PrintW();
   };
 }
 
@@ -49,7 +48,8 @@ void Start()
   xd.N = new NestedTest;
   xd.Nest();
 
-  NestedTest nestedField = xd.N;
+  NestedTest nestedField;
+  nestedField = xd.N;
   nestedField.PrintW();
   nestedField.W += 5;
   xd.Nest();

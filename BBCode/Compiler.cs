@@ -1585,7 +1585,15 @@ namespace IngameCoding.BBCode
         {
             if (field.PrevStatement is Statement_Variable prevVariable)
             {
-                if (prevVariable.variableName == "this")
+                if (GetCompiledVariable(prevVariable.variableName, out CompiledVariable variable, out var isGlob))
+                {
+                    AddInstruction(isGlob ? Opcode.LOAD_FIELD : Opcode.LOAD_FIELD_BR, variable.offset, field.FieldName);
+                }
+                else if (parameters.TryGetValue(prevVariable.variableName, out Parameter param))
+                {
+                    AddInstruction(Opcode.LOAD_FIELD_BR, param.RealIndex, field.FieldName);
+                }
+                else if (prevVariable.variableName == "this")
                 {
                     AddInstruction(Opcode.LOAD_THIS_FIELD, 0, field.FieldName);
                     return;

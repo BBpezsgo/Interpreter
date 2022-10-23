@@ -13,3 +13,6 @@ This program parses the given source code, creates a list of instructions and ex
 When you've created a source file, just run it with the executable. Or run the exe file with an argument where you specify the path to the source code.<br>
 The argument syntax looks like this: `[-throw-errors] <path>`<br>
 The `-throw-errors` argument causes the program to crash on any syntax, parser, runtime, or internal exception.
+
+## Hello World program:
+https://github.com/BBpezsgo/Interpreter/blob/32a5cb93a041a326dbf46774ca7dceb3945ad24d/TestFiles/helloworld.bbc#L1-L14

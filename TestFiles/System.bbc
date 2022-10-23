@@ -21,7 +21,7 @@ struct TimeSpan
   
   string ToTimeSpanString()
   {
-	return this.hours + ":" + this.minutes + ":" + this.secs;
+	return this.hours + ":" + this.mins + ":" + this.secs;
   };
 }
 

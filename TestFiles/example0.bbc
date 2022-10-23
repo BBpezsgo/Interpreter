@@ -1,0 +1,14 @@
+// This imports the local System.bbc file along with its functions and structures.
+using System;
+
+// Namespaces can only be used to organize code
+namespace Program
+{
+    //The program needs a function with the [CodeEntry] attribute. This function will be executed when the file is run.
+    [CodeEntry]
+    void Main()
+    {
+        // Print a message to the console
+        Console.Log("Hello world");
+    }
+}

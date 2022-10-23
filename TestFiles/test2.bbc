@@ -8,7 +8,7 @@ int Add(this int a, int b)
 [CodeEntry]
 void Main()
 {
-  Console.Log((0).Add(5).Add(2).ToString());
-  Console.Log(Time.tmnw().Split(":")[2]);
-  var xd = 0;
+  // Console.Log((0).Add(5).Add(2).ToString());
+  // Console.Log(Time.tmnw().Split(":")[2]);
+  Console.Log(Time.Now().ToTimeSpanString());
 }

@@ -192,7 +192,7 @@ namespace IngameCoding.BBCode
 
             public FunctionDefinition functionDefinition;
 
-            public int ParameterCount { get { return parameters.Length; } }
+            public int ParameterCount => parameters.Length;
             public bool returnSomething;
 
             /// <summary>
@@ -1029,7 +1029,10 @@ namespace IngameCoding.BBCode
                     }
 
                     if (functionCall.PrevStatement != null)
-                    { GenerateCodeForStatement(functionCall.PrevStatement); }
+                    {
+                        GenerateCodeForStatement(functionCall.PrevStatement);
+                        AddInstruction(Opcode.SET_THIS_POINTER);
+                    }
 
                     foreach (Statement param in functionCall.parameters)
                     {
@@ -1578,6 +1581,18 @@ namespace IngameCoding.BBCode
                 throw new ParserException("Unknown struct '" + newStruct.structName + "'", new Position(newStruct.position.Line));
             }
         }
+        void GenerateCodeForStatement(Statement_Field field)
+        {
+            if (field.PrevStatement is Statement_Variable prevVariable)
+            {
+                if (prevVariable.variableName == "this")
+                {
+                    AddInstruction(Opcode.LOAD_THIS_FIELD, 0, field.FieldName);
+                    return;
+                }
+            }
+            throw new NotImplementedException();
+        }
         void GenerateCodeForStatement(Statement_StructField structField)
         {
             if (GetCompiledVariable(structField.variableName, out CompiledVariable structMemoryAddress1, out var isGlob2))
@@ -1637,6 +1652,12 @@ namespace IngameCoding.BBCode
             { GenerateCodeForStatement(structField); }
             else if (st is Statement_Index indexStatement)
             { GenerateCodeForStatement(indexStatement); }
+            else if (st is Statement_Field field)
+            { GenerateCodeForStatement(field); }
+            else
+            {
+                Debug.Debug.Log("[Compiler]: Unimplemented statement " + st.GetType().Name);
+            }
 
             if (st is StatementParent)
             { ClearVariables(variableCount); }
@@ -2011,6 +2032,7 @@ namespace IngameCoding.BBCode
 
             if (isMethod)
             {
+                functionOffsets.Add(function.Value.FullName, compiledCode.Count);
                 compiledStructs[compiledStructs.Last().Key].methodOffsets.Add(function.Value.FullName, compiledCode.Count);
             }
             else
@@ -2129,11 +2151,11 @@ namespace IngameCoding.BBCode
             }
 
             return new CompiledFunction(
-                    function.Value.parameters.ToArray(),
-                    function.Value.type.type != BuiltinType.VOID,
-                    (function.Value.parameters.Count > 0) && function.Value.parameters.First().withThisKeyword,
-                    function.Value.type.Clone()
-                    )
+                function.Value.parameters.ToArray(),
+                function.Value.type.type != BuiltinType.VOID,
+                (function.Value.parameters.Count > 0) && function.Value.parameters.First().withThisKeyword,
+                function.Value.type.Clone()
+                )
             { attributes = attributes, functionDefinition = function.Value };
         }
 
@@ -2208,7 +2230,12 @@ namespace IngameCoding.BBCode
 
             foreach (var method in @struct.Value.methods)
             {
-                this.compiledFunctions.Add(method.Value.FullName, CompileFunction(method, true));
+                var compiledMethod_ = CompileFunction(method, true);
+                compiledMethod_.IsMethod = true;
+                var methodParams = compiledMethod_.parameters.ToList();
+                methodParams.Insert(0, @struct.Value.type);
+                compiledMethod_.parameters = methodParams.ToArray();
+                this.compiledFunctions.Add(method.Value.FullName, compiledMethod_);
 
                 AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + "(...) {");
                 var compiledMethod = GenerateCodeForFunction(method, true);

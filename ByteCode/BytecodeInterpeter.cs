@@ -3,8 +3,9 @@
 namespace IngameCoding.Bytecode
 {
     using Debug;
-
     using IngameCoding.Core;
+
+    using System.Diagnostics;
 
     static class ItemEx
     {
@@ -378,9 +379,9 @@ namespace IngameCoding.Bytecode
                 { parameters.Add(MU.Stack.Pop()); }
                 if (builtinFunction.returnSomething)
                 {
-                    System.Action<Stack.Item> returnValue = new((returnVal) =>
+                    Action<Stack.Item> returnValue = new((returnVal) =>
                     {
-                        Debug.Log(returnVal.ToString());
+                        IngameCoding.Debug.Debug.Log(returnVal.ToString());
                         MU.Stack.Add(returnVal, "return v");
                     });
                     builtinFunction.Callback(parameters.ToArray());
@@ -857,7 +858,7 @@ namespace IngameCoding.Bytecode
         public Stack()
         { stack = new List<Item>(); }
 
-        [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+        [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
         public struct Item
         {
             const int MaxReferenceDepth = 16;
@@ -2029,7 +2030,7 @@ namespace IngameCoding.Bytecode
 
             public override int GetHashCode()
             {
-                System.HashCode hash = new();
+                HashCode hash = new();
                 hash.Add(type);
                 hash.Add(valueInt);
                 hash.Add(valueFloat);
@@ -2294,7 +2295,7 @@ namespace IngameCoding.Bytecode
 
                 if (lastInstrPointer == CPU.CodePointer)
                 {
-                    Debug.LogWarning($"Possible endless loop! Instruction: " + CPU.MU.CurrentInstruction.ToString());
+                    IngameCoding.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + CPU.MU.CurrentInstruction.ToString());
                 }
 
                 lastInstrPointer = CPU.CodePointer;

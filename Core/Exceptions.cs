@@ -1,9 +1,11 @@
 ﻿using IngameCoding.BBCode;
 using IngameCoding.Core;
 
+using System.Runtime.Serialization;
+
 namespace IngameCoding.Errors
 {
-    [System.Serializable]
+    [Serializable]
     class Exception : System.Exception
     {
         public Position Position;
@@ -41,11 +43,11 @@ namespace IngameCoding.Errors
 
         public Exception(string message, System.Exception inner) : base(message, inner) { }
         protected Exception(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+          SerializationInfo info,
+          StreamingContext context) : base(info, context) { }
     }
 
-    [System.Serializable]
+    [Serializable]
     class ParserException : Exception
     {
         public ParserException(string message) : base(message, new Position(-1)) { }
@@ -53,11 +55,11 @@ namespace IngameCoding.Errors
         public ParserException(string message, BaseToken token) : base(message, token) { }
 
         protected ParserException(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+          SerializationInfo info,
+          StreamingContext context) : base(info, context) { }
     }
 
-    [System.Serializable]
+    [Serializable]
     class SyntaxException : Exception
     {
         public SyntaxException(string message) : base(message, new Position(-1)) { }
@@ -65,11 +67,11 @@ namespace IngameCoding.Errors
         public SyntaxException(string message, BaseToken token) : base(message, token) { }
 
         protected SyntaxException(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+          SerializationInfo info,
+          StreamingContext context) : base(info, context) { }
     }
 
-    [System.Serializable]
+    [Serializable]
     class RuntimeException : Exception
     {
         public RuntimeException(string message) : base(message, new Position(-1)) { }
@@ -81,10 +83,10 @@ namespace IngameCoding.Errors
             base.Position = pos;
         }
 
-        protected RuntimeException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+        protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    [System.Serializable]
+    [Serializable]
     class SystemException : System.Exception
     {
         public SystemException() : base() { }
@@ -94,11 +96,11 @@ namespace IngameCoding.Errors
         public SystemException(string message, System.Exception inner) : base(message, inner) { }
 
         protected SystemException(
-            System.Runtime.Serialization.SerializationInfo info,
-            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+            SerializationInfo info,
+            StreamingContext context) : base(info, context) { }
     }
 
-    [System.Serializable]
+    [Serializable]
     class InternalException : System.Exception
     {
         public InternalException() : base() { }
@@ -108,8 +110,8 @@ namespace IngameCoding.Errors
         public InternalException(string message, System.Exception inner) : base(message, inner) { }
 
         protected InternalException(
-            System.Runtime.Serialization.SerializationInfo info,
-            System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
+            SerializationInfo info,
+            StreamingContext context) : base(info, context) { }
     }
 
     class EndlessLoopException : InternalException

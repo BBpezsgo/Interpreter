@@ -16,7 +16,7 @@
         {
             internal static void LogDebug(string msg)
             {
-                LogColor(msg, System.ConsoleColor.DarkGray);
+                LogColor(msg, ConsoleColor.DarkGray);
             }
 
             internal static void Log(string msg)
@@ -26,25 +26,25 @@
 
             internal static void LogError(string msg)
             {
-                LogColor(msg, System.ConsoleColor.Red);
+                LogColor(msg, ConsoleColor.Red);
             }
 
             internal static void LogError(Errors.Exception error)
             {
-                LogColor(error.MessageAll, System.ConsoleColor.Red);
+                LogColor(error.MessageAll, ConsoleColor.Red);
             }
 
             internal static void LogError(System.Exception error)
             {
-                LogColor(error.ToString(), System.ConsoleColor.Red);
+                LogColor(error.ToString(), ConsoleColor.Red);
             }
 
             internal static void LogWarning(string msg)
             {
-                LogColor(msg, System.ConsoleColor.DarkYellow);
+                LogColor(msg, ConsoleColor.DarkYellow);
             }
 
-            static void LogColor(string message, System.ConsoleColor color)
+            static void LogColor(string message, ConsoleColor color)
             {
                 Console.ForegroundColor = color;
                 Console.WriteLine(message);

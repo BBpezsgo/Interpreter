@@ -1,6 +1,8 @@
 ﻿using IngameCoding.Core;
 using IngameCoding.Terminal;
 
+using System.Diagnostics;
+
 namespace IngameCoding.BBCode
 {
     enum TokenType
@@ -55,9 +57,9 @@ namespace IngameCoding.BBCode
     class Tokenizer
     {
         /// <returns>(tokens, tokens with comments)</returns>
-        public static (Token[], Token[]) Parse(string program, System.Action<string, TerminalInterpreter.LogType> printCallback = null)
+        public static (Token[], Token[]) Parse(string program, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            System.Diagnostics.Stopwatch sw = null;
+            Stopwatch sw = null;
             if (printCallback != null)
             {
                 printCallback("Tokenizing Code...", TerminalInterpreter.LogType.Debug);

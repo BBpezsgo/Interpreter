@@ -5,6 +5,8 @@ using IngameCoding.Core;
 using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
+using System.Diagnostics;
+
 namespace IngameCoding.BBCode
 {
     public class Compiler
@@ -185,7 +187,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        [System.Serializable]
+        [Serializable]
         internal struct CompiledFunction
         {
             public Type[] parameters;
@@ -257,7 +259,7 @@ namespace IngameCoding.BBCode
         {
             public Type[] parameters;
 
-            readonly System.Action<Stack.Item[]> callback;
+            readonly Action<Stack.Item[]> callback;
 
             public delegate void ReturnEventHandler(Stack.Item returnValue);
             public event ReturnEventHandler ReturnEvent;
@@ -277,7 +279,7 @@ namespace IngameCoding.BBCode
             /// Function without return value
             /// </summary>
             /// <param name="callback">Callback when the machine process this function</param>
-            public BuiltinFunction(System.Action<IngameCoding.Bytecode.Stack.Item[]> callback, Type[] parameters, bool returnSomething = false)
+            public BuiltinFunction(Action<IngameCoding.Bytecode.Stack.Item[]> callback, Type[] parameters, bool returnSomething = false)
             {
                 this.parameters = parameters;
                 this.callback = callback;
@@ -338,10 +340,10 @@ namespace IngameCoding.BBCode
                 }
             }
         }
-        [System.Serializable]
+        [Serializable]
         internal class CompiledStruct
         {
-            public System.Func<Stack.IStruct> CreateBuiltinStruct;
+            public Func<Stack.IStruct> CreateBuiltinStruct;
             public bool IsBuiltin => CreateBuiltinStruct != null;
             public string name;
             public ParameterDefinition[] fields;
@@ -2167,7 +2169,7 @@ namespace IngameCoding.BBCode
             { attributes = attributes, functionDefinition = function.Value };
         }
 
-        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, System.Func<Stack.IStruct>> builtinStructs)
+        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<Stack.IStruct>> builtinStructs)
         {
             if (compiledFunctions.ContainsKey(@struct.Value.FullName))
             { throw new ParserException($"Struct with name '{@struct.Value.FullName}' already exist"); }
@@ -2263,227 +2265,18 @@ namespace IngameCoding.BBCode
             this.compiledCode = new();
         }
 
-#if false
-            /// <param name="OnDone">(compiledCode, compiledFunctions, compiledStructs, clearGlobalVariablesInstruction, setGlobalVariablesInstruction)</param>
-            System.Collections.IEnumerator AssembleCodeAsync(
-                Dictionary<string, FunctionDefinition> functions,
-                Dictionary<string, StructDefinition> structs,
-                List<Statement_NewVariable> globalVariables,
-                Dictionary<string, BuiltinFunction> builtinFunctions,
-                Dictionary<string, System.Func<Stack.IStruct>> builtinStructs,
-                System.Action<string> OnProgress,
-                System.Action<Instruction[], Dictionary<string, CompiledFunction>, Dictionary<string, CompiledStruct>, int, int> OnDone,
-                bool addCommentsToCode = true)
-            {
-                OnProgress?.Invoke("Compile Code... (Initialize)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                this.AddCommentsToCode = addCommentsToCode;
-
-                Init();
-                this.builtinFunctions = builtinFunctions;
-
-                foreach (var function in functions)
-                { this.compiledFunctions.Add(function.Value.FullName, CompileFunction(function)); }
-
-                OnProgress?.Invoke("Compile Code... (Structs)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                foreach (var @struct in structs)
-                { GenerateCodeForStruct(@struct, builtinStructs); }
-
-                OnProgress?.Invoke("Compile Code... (Set global variables)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                var setGlobalVariablesInstruction = compiledCode.Count;
-                AddInstruction(new Instruction(Opcode.COMMENT, "Global variables"));
-                int globalVariableCount = 0;
-                foreach (var globalVariable in globalVariables)
-                {
-                    GenerateCodeForGlobalVariable(globalVariable, out int x);
-                    globalVariableCount += x;
-                }
-                AddInstruction(new Instruction(Opcode.EXIT));
-
-                OnProgress?.Invoke("Compile Code... (Functions)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                foreach (KeyValuePair<string, FunctionDefinition> function in functions)
-                {
-                    AddInstruction(new Instruction(Opcode.COMMENT, function.Value.FullName + "(...) {" + ((function.Value.statements.Count > 0) ? "" : " }")));
-                    this.compiledFunctions[function.Value.FullName] = GenerateCodeForFunction(function, false);
-                    if (function.Value.statements.Count > 0) AddInstruction(new Instruction(Opcode.COMMENT, "}"));
-                }
-
-                OnProgress?.Invoke("Compile Code... (Clear global variables)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                var clearGlobalVariablesInstruction = compiledCode.Count;
-                AddInstruction(new Instruction(Opcode.COMMENT, "Clear global variables"));
-                for (int i = 0; i < globalVariableCount; i++)
-                { AddInstruction(new Instruction(Opcode.POP_VALUE)); }
-                AddInstruction(new Instruction(Opcode.EXIT));
-
-                OnProgress?.Invoke("Compile Code... (Finishing)");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                foreach (var item in undefinedFunctionOffsets)
-                {
-                    if (GetFunctionOffset(item.functionCallStatement, out var functionCallOffset))
-                    { compiledCode[item.callInstructionIndex].parameter = functionCallOffset - item.callInstructionIndex; }
-                    else
-                    { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.functionName}' offset not found"); }
-                }
-
-                var compiledFunctions = this.compiledFunctions;
-                var compiledStructs = this.compiledStructs;
-                var instructions = compiledCode.ToArray();
-
-                OnDone?.Invoke(instructions, compiledFunctions, compiledStructs, clearGlobalVariablesInstruction, setGlobalVariablesInstruction);
-            }
-
-            static System.Collections.IEnumerator ParseCodeAsync(
-                string code,
-                System.Action<string> OnProgress,
-                System.Action<bool, Parser, SyntaxException> OnDone)
-            {
-                OnProgress?.Invoke("Tokenizing...");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                Tokenizer tokenizer = new();
-                var (tokens, _) = tokenizer.Parse(code, null);
-
-                OnProgress?.Invoke("Parsing...");
-                yield return new UnityEngine.WaitForFixedUpdate();
-
-                SyntaxException syntaxException = null;
-                bool parseSucceed = false;
-
-                Parser parser = new();
-                try
-                {
-                    parser.Parse(tokens);
-                    parseSucceed = true;
-                }
-                catch (SyntaxException err)
-                {
-                    syntaxException = err;
-                }
-
-                OnDone?.Invoke(parseSucceed, parser, syntaxException);
-            }
-
-            public static System.Collections.IEnumerator CompileCodeAsync(
-                string code,
-                Dictionary<string, BuiltinFunction> builtinFunctions,
-                Dictionary<string, System.Func<Stack.IStruct>> builtinStructs,
-                OperatingSystem.FileSystem.Folder namespacesFolder,
-                /*
-                out Dictionary<string, CompiledFunction> compiledFunctions,
-                out Instruction[] compiledCode,
-                out Dictionary<string, CompiledStruct> compiledStructs,
-                out int clearGlobalVariablesInstruction,
-                out int setGlobalVariablesInstruction,
-                */
-                System.Action<string> OnProgress,
-                System.Action<Compiler, Dictionary<string, CompiledFunction>, Instruction[], Dictionary<string, CompiledStruct>, int, int> OnDone,
-                System.Action<string, TerminalInterpreter.LogType> printCallback = null)
-            {
-                bool parseSucceed = false;
-                Parser parser = null;
-                SyntaxException syntaxException = null;
-
-                yield return ParseCodeAsync(code,OnProgress,
-                    (a,b,c) =>
-                    {
-                        parseSucceed = a;
-                        parser = b;
-                        syntaxException = c;
-                    });
-
-                if (syntaxException != null)
-                { throw syntaxException; }
-                if (parseSucceed == false)
-                { throw new InternalException("Parse failed with no expection"); }
-
-                Dictionary<string, FunctionDefinition> Functions = new();
-                Dictionary<string, StructDefinition> Structs = new();
-
-                if (parser.Usings.Count > 0)
-                { printCallback?.Invoke("Import usings...", TerminalInterpreter.LogType.Debug); }
-
-                for (int i = 0; i < parser.Usings.Count; i++)
-                {
-                    string usingItem = parser.Usings[i];
-                    if (namespacesFolder.FileExist(usingItem + "." + OperatingSystem.Extensions.Code, out OperatingSystem.FileSystem.File file))
-                    {
-                        printCallback?.Invoke($"Parse usings ({i + 1}/{parser.Usings.Count})...", TerminalInterpreter.LogType.Debug);
-                        (bool parseSucceed2, Parser parser2) = ParseCode(file.Read(), out SyntaxException syntaxException2);
-
-                        if (parseSucceed2 == false)
-                        { throw syntaxException2; }
-
-                        foreach (var func in parser2.Functions)
-                        {
-                            if (Functions.ContainsKey(func.Key))
-                            { throw new ParserException($"Function '{func.Value.type.name} {func.Value.FullName}(...)' already exists"); }
-                            else
-                            {
-                                Functions.Add(func.Key, func.Value);
-                            }
-                        }
-
-                        foreach (var @struct in parser2.Structs)
-                        {
-                            if (Structs.ContainsKey(@struct.Key))
-                            {
-                                throw new ParserException($"Struct '{@struct.Value.FullName}' already exists");
-                            }
-                            else
-                            {
-                                Structs.Add(@struct.Key, @struct.Value);
-                            }
-                        }
-                    }
-                    else
-                    { throw new ParserException($"Namespace file '{usingItem}' not found"); }
-                }
-
-                foreach (var func in parser.Functions)
-                {
-                    Functions.Add(func.Key, func.Value);
-                }
-                foreach (var @struct in parser.Structs)
-                {
-                    Structs.Add(@struct.Key, @struct.Value);
-                }
-
-                Compiler compiler = new();
-                
-                yield return compiler.AssembleCodeAsync(Functions, Structs, parser.GlobalVariables, builtinFunctions, builtinStructs, OnProgress,
-                    (a,b,c,d,e) =>
-                    {
-                        OnDone?.Invoke(compiler, b, a, c, d, e);
-                    });
-            }
-            
-#endif
-
         Instruction[] AssembleCode(
             Dictionary<string, FunctionDefinition> functions,
             Dictionary<string, StructDefinition> structs,
             List<Statement_NewVariable> globalVariables,
             Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, System.Func<Stack.IStruct>> builtinStructs,
+            Dictionary<string, Func<Stack.IStruct>> builtinStructs,
             out Dictionary<string, CompiledFunction> compiledFunctions,
             out Dictionary<string, CompiledStruct> compiledStructs,
             out int clearGlobalVariablesInstruction,
             out int setGlobalVariablesInstruction,
             bool addCommentsToCode = true)
         {
-            // System.Diagnostics.Stopwatch sw = new();
-            // sw.Start();
-
             this.AddCommentsToCode = addCommentsToCode;
 
             Init();
@@ -2526,18 +2319,16 @@ namespace IngameCoding.BBCode
                 { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName}' offset not found"); }
             }
 
-            // sw.Stop();
-
             compiledFunctions = this.compiledFunctions;
             compiledStructs = this.compiledStructs;
             return compiledCode.ToArray();
         }
 
-        static Parser.Parser ParseCode(string code, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback = null)
+        static Parser.Parser ParseCode(string code, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             var (tokens, _) = Tokenizer.Parse(code, printCallback);
 
-            System.Diagnostics.Stopwatch sw = null;
+            Stopwatch sw = null;
             if (printCallback != null)
             {
                 printCallback("Parsing Code...", TerminalInterpreter.LogType.Debug);
@@ -2558,7 +2349,7 @@ namespace IngameCoding.BBCode
         internal static Compiler CompileCode(
             string code,
             Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, System.Func<Stack.IStruct>> builtinStructs,
+            Dictionary<string, Func<Stack.IStruct>> builtinStructs,
             DirectoryInfo namespacesFolder,
             out Dictionary<string, CompiledFunction> compiledFunctions,
             out Instruction[] compiledCode,
@@ -2566,11 +2357,9 @@ namespace IngameCoding.BBCode
             out int clearGlobalVariablesInstruction,
             out int setGlobalVariablesInstruction,
             List<Warning> warnings,
-            System.Action<string, TerminalInterpreter.LogType> printCallback = null)
+            Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             Parser.Parser parser = ParseCode(code, warnings, printCallback);
-
-            //UnityEngine.Debug.Log("===RESULT===\n" + parser.PrettyPrint());
 
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -2612,7 +2401,7 @@ namespace IngameCoding.BBCode
                 { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")"); }
             }
 
-            System.Diagnostics.Stopwatch sw = null;
+            Stopwatch sw = null;
             if (printCallback != null)
             {
                 printCallback("Compiling Code...", TerminalInterpreter.LogType.Debug);

@@ -3,9 +3,11 @@ using IngameCoding.Bytecode;
 using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
+using System.Diagnostics;
+
 namespace IngameCoding.Core
 {
-    [System.Serializable]
+    [Serializable]
     class Interpreter
     {
         public bool IsExecutingCode => currentlyRunningCode;
@@ -53,15 +55,15 @@ namespace IngameCoding.Core
         }
 
         readonly Dictionary<string, Compiler.BuiltinFunction> builtinFunctions = new();
-        readonly Dictionary<string, System.Func<Stack.IStruct>> builtinStructs = new();
+        readonly Dictionary<string, Func<Stack.IStruct>> builtinStructs = new();
 
         bool currentlyRunningCode = false;
 
         BytecodeInterpeter bytecodeInterpeter;
-        System.Action<string, TerminalInterpreter.LogType> printCallback;
-        System.TimeSpan codeStartedTimespan;
-        System.Action<bool> onDone;
-        System.Action<Stack.Item> onInput = null;
+        Action<string, TerminalInterpreter.LogType> printCallback;
+        TimeSpan codeStartedTimespan;
+        Action<bool> onDone;
+        Action<Stack.Item> onInput = null;
 
         int result = 0;
 
@@ -73,8 +75,8 @@ namespace IngameCoding.Core
         DateTime LastTime = DateTime.Now;
 
         int waitForUpdatesCounter;
-        System.Action waitForUpdatesCallback;
-        void WaitForUpdates(int count, System.Action callback)
+        Action waitForUpdatesCallback;
+        void WaitForUpdates(int count, Action callback)
         {
             pauseCode = true;
             waitForUpdatesCounter = count;
@@ -85,13 +87,13 @@ namespace IngameCoding.Core
 
         void RunCode(Instruction[] compiledCode)
         {
-            codeStartedTimespan = System.DateTime.Now.TimeOfDay;
+            codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions);
 
             this.printCallback?.Invoke("Start Code", TerminalInterpreter.LogType.Normal);
         }
 
-        bool PrepareRunCode(Action<bool> onDone, Action<string, TerminalInterpreter.LogType> printCallback, Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput)
+        bool PrepareRunCode(Action<bool> onDone, Action<string, TerminalInterpreter.LogType> printCallback, Action<string> onNeedInput, out Action<IngameCoding.Bytecode.Stack.Item> onInput)
         {
             this.onDone = onDone;
             onInput = OnInput;
@@ -116,7 +118,7 @@ namespace IngameCoding.Core
             return true;
         }
 
-        Instruction[] CompileCode(string code, DirectoryInfo directory, List<Warning> warnings, System.Action<string, TerminalInterpreter.LogType> printCallback)
+        Instruction[] CompileCode(string code, DirectoryInfo directory, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback)
         {
             var compiler = Compiler.CompileCode(
                 code,
@@ -189,7 +191,7 @@ namespace IngameCoding.Core
             return compiledCode;
         }
 
-        internal void RunCode_BBCode(string code, DirectoryInfo directory, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput, bool HandleErrors = true)
+        internal void RunCode_BBCode(string code, DirectoryInfo directory, Action<string, TerminalInterpreter.LogType> printCallback, Action<bool> onDone, Action<string> onNeedInput, out Action<IngameCoding.Bytecode.Stack.Item> onInput, bool HandleErrors = true)
         {
             if (!PrepareRunCode(onDone, printCallback, onNeedInput, out onInput)) return;
 
@@ -213,7 +215,7 @@ namespace IngameCoding.Core
                     this.printCallback?.Invoke(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
                     Debug.Debug.LogError(error);
 
-                    System.Diagnostics.StackTrace stackTrace = new(error);
+                    StackTrace stackTrace = new(error);
                     var stackFrames = stackTrace.GetFrames();
 
                     string StackTraceString = "";
@@ -322,7 +324,7 @@ namespace IngameCoding.Core
             }
         }
 
-        /*
+#if false
 
         public void RunExe(string Code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput)
         {
@@ -407,7 +409,7 @@ namespace IngameCoding.Core
             }
         }
 
-        */
+#endif
 
         void AddBuiltins()
         {
@@ -452,7 +454,7 @@ namespace IngameCoding.Core
 
             AddBuiltinFunction("tmnw", () =>
             {
-                return new Stack.Item(System.DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
+                return new Stack.Item(DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
             });
 
             #endregion
@@ -490,7 +492,7 @@ namespace IngameCoding.Core
             pauseCode = false;
         }
 
-        static double GetGoodNumber(double val) => System.Math.Round(val * 100) / 100;
+        static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
 
         static string GetEllapsedTime(double ms)
         {
@@ -520,7 +522,7 @@ namespace IngameCoding.Core
         void OnCodeExecuted(int result)
         {
             onDone(true);
-            var elapsedMilliseconds = (System.DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+            var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
             printCallback("Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of " + result.ToString(), TerminalInterpreter.LogType.Normal);
             bytecodeInterpeter = null;
             currentlyRunningCode = false;
@@ -568,7 +570,7 @@ namespace IngameCoding.Core
                     printCallback("Runtime Error: " + error.MessageAll, TerminalInterpreter.LogType.Error);
 
                     onDone(false);
-                    var elapsedMilliseconds = (System.DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
                     printCallback("Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.Normal);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
@@ -580,7 +582,7 @@ namespace IngameCoding.Core
                     printCallback("Internal Error: " + error.Message, TerminalInterpreter.LogType.Error);
 
                     onDone(false);
-                    var elapsedMilliseconds = (System.DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
                     printCallback("Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.Normal);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
@@ -642,11 +644,11 @@ namespace IngameCoding.Core
             }
         }
 
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, System.Action<Stack.Item[]> callback, System.Action<IngameCoding.Bytecode.Stack.Item> returnCallback)
+        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Action<Stack.Item[]> callback, Action<IngameCoding.Bytecode.Stack.Item> returnCallback)
         {
             Compiler.BuiltinFunction function = new(callback, parameterTypes, true);
 
-            returnCallback += new System.Action<Stack.Item>((result) =>
+            returnCallback += new Action<Stack.Item>((result) =>
             {
                 function.RaiseReturnEvent(result);
             });
@@ -662,7 +664,7 @@ namespace IngameCoding.Core
             }
         }
 
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, System.Func<Stack.Item[], Stack.Item> callback)
+        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
         {
             Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((p) =>
             {
@@ -681,9 +683,9 @@ namespace IngameCoding.Core
             }
         }
 
-        void AddBuiltinFunction(string name, System.Func<Stack.Item> callback)
+        void AddBuiltinFunction(string name, Func<Stack.Item> callback)
         {
-            Compiler.BuiltinFunction function = new(new System.Action<Stack.Item[]>((_) =>
+            Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((_) =>
             {
                 var x = callback();
                 this.bytecodeInterpeter.AddValueToStack(x);
@@ -699,7 +701,7 @@ namespace IngameCoding.Core
                 Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, System.Action<Stack.Item[]> callback)
+        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Action<Stack.Item[]> callback)
         {
             Compiler.BuiltinFunction function = new((parameters) => { callback(parameters); }, parameterTypes);
 

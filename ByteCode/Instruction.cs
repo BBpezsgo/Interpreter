@@ -1,4 +1,6 @@
-﻿using System.Diagnostics;
+﻿#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace IngameCoding.Bytecode
 {
@@ -112,8 +114,10 @@ namespace IngameCoding.Bytecode
         UNKNOWN,
     }
 
-    [System.Serializable]
+    [Serializable]
+#if DEBUG
     [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
+#endif
     public class Instruction
     {
         public Opcode opcode;

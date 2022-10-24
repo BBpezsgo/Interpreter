@@ -1,10 +1,12 @@
 ﻿using IngameCoding.Core;
 
+using System.Diagnostics;
+
 namespace IngameCoding.BBCode.Parser.Statements
 {
     abstract class Statement
     {
-        [System.Diagnostics.DebuggerBrowsable(System.Diagnostics.DebuggerBrowsableState.Never)]
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public Position position;
 
         public override string ToString()
@@ -22,7 +24,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         public abstract override string PrettyPrint(int ident = 0);
     }
 
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_NewVariable : Statement
     {
         internal Type type;
@@ -68,7 +70,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}{type.name}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_FunctionCall : Statement
     {
         string[] namespacePath;
@@ -168,7 +170,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}{TargetNamespacePathPrefix}{FunctionName}({(string.Join(", ", parameters))})";
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Operator : Statement
     {
         internal readonly string Operator;
@@ -256,7 +258,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Literal : Statement
     {
         internal Type type;
@@ -279,7 +281,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Variable : Statement
     {
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
@@ -302,7 +304,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             this.listIndex = null;
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_WhileLoop : StatementParent
     {
         internal string name;
@@ -326,7 +328,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_ForLoop : StatementParent
     {
         internal string name;
@@ -370,7 +372,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     abstract class Statement_If_Part : StatementParent
     {
         public IfPart partType;
@@ -448,7 +450,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_StructField : Statement
     {
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
@@ -473,7 +475,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             this.fieldName = null;
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_NewStruct : Statement
     {
         readonly string[] namespacePath;
@@ -545,7 +547,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{structName}()";
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Index : Statement
     {
         readonly internal Statement indexStatement;
@@ -566,7 +568,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"[{indexStatement.PrettyPrint()}]";
         }
     }
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Field : Statement
     {
         internal string FieldName;
@@ -584,7 +586,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
 
 
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_MethodCall : Statement_FunctionCall
     {
         internal Token variableNameToken;

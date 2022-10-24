@@ -31,7 +31,7 @@ namespace IngameCoding.BBCode
         ANY,
     }
 
-    [System.Serializable]
+    [Serializable]
     internal class Type
     {
         public string name;
@@ -94,7 +94,7 @@ namespace IngameCoding.BBCode
     {
         using Statements;
 
-        [System.Serializable]
+        [Serializable]
         class ParameterDefinition
         {
             public string name;
@@ -1095,7 +1095,7 @@ namespace IngameCoding.BBCode
                 {
                     if (enableRefKeyword)
                     {
-                        throw new System.NotImplementedException();
+                        throw new NotImplementedException();
                         // IsRef = true;
                     }
                     else

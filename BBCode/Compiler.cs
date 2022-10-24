@@ -5,8 +5,6 @@ using IngameCoding.Core;
 using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
-using System.Diagnostics;
-
 namespace IngameCoding.BBCode
 {
     public class Compiler
@@ -2328,20 +2326,15 @@ namespace IngameCoding.BBCode
         {
             var (tokens, _) = Tokenizer.Parse(code, printCallback);
 
-            Stopwatch sw = null;
+            DateTime parseStarted = DateTime.Now;
             if (printCallback != null)
-            {
-                printCallback("Parsing Code...", TerminalInterpreter.LogType.Debug);
-                sw = new();
-                sw.Start();
-            }
+            { printCallback?.Invoke("Parsing Code...", TerminalInterpreter.LogType.Debug); }
 
             Parser.Parser parser = new();
             parser.Parse(tokens, warnings);
 
-            if (sw != null)
-            { sw.Stop(); }
-            printCallback?.Invoke($"Code parsed in {sw.ElapsedMilliseconds} ms", TerminalInterpreter.LogType.Debug);
+            if (printCallback != null)
+            { printCallback?.Invoke($"Code parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
             return parser;
         }
@@ -2401,13 +2394,9 @@ namespace IngameCoding.BBCode
                 { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")"); }
             }
 
-            Stopwatch sw = null;
+            DateTime compileStarted = DateTime.Now;
             if (printCallback != null)
-            {
-                printCallback("Compiling Code...", TerminalInterpreter.LogType.Debug);
-                sw = new();
-                sw.Start();
-            }
+            { printCallback?.Invoke("Compiling Code...", TerminalInterpreter.LogType.Debug); }
 
             foreach (var func in parser.Functions)
             {
@@ -2425,9 +2414,8 @@ namespace IngameCoding.BBCode
             compiledStructs = s;
             compiledCode = compiledCode_;
 
-            if (sw != null)
-            { sw.Stop(); }
-            printCallback?.Invoke($"Code compiled in {sw.ElapsedMilliseconds} ms", TerminalInterpreter.LogType.Debug);
+            if (printCallback != null)
+            { printCallback?.Invoke($"Code compiled in {(DateTime.Now - compileStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
             return compiler;
         }

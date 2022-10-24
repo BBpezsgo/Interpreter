@@ -1,8 +1,6 @@
 ﻿using IngameCoding.Core;
 using IngameCoding.Terminal;
 
-using System.Diagnostics;
-
 namespace IngameCoding.BBCode
 {
     enum TokenType
@@ -59,13 +57,9 @@ namespace IngameCoding.BBCode
         /// <returns>(tokens, tokens with comments)</returns>
         public static (Token[], Token[]) Parse(string program, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            Stopwatch sw = null;
+            DateTime tokenizingStarted = DateTime.Now;
             if (printCallback != null)
-            {
-                printCallback("Tokenizing Code...", TerminalInterpreter.LogType.Debug);
-                sw = new();
-                sw.Start();
-            }
+            { printCallback?.Invoke("Tokenizing Code...", TerminalInterpreter.LogType.Debug); }
 
             List<Token> tokens = new();
             List<Token> tokensWithComments = new();
@@ -394,11 +388,8 @@ namespace IngameCoding.BBCode
 
             EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
 
-            if (sw != null)
-            {
-                sw.Stop();
-            }
-            printCallback?.Invoke($"Code tokenized in {sw.ElapsedMilliseconds} ms", TerminalInterpreter.LogType.Debug);
+            if (printCallback != null)
+            { printCallback?.Invoke($"Code tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
             return (tokens.ToArray(), tokensWithComments.ToArray());
         }

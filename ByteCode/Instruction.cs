@@ -81,9 +81,6 @@ namespace IngameCoding.Bytecode
         /// STORE_FIELD_BASEPOINTER_RELATIVE
         /// </summary>
         STORE_FIELD_BR,
-
-        LOAD_THIS_FIELD,
-        STORE_THIS_FIELD,
         // === ===
 
         // === Lists ===

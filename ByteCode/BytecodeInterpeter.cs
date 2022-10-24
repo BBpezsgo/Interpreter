@@ -156,10 +156,6 @@ namespace IngameCoding.Bytecode
                     return LOGIC_MTEQ();
                 case Opcode.LOGIC_XOR:
                     return LOGIC_XOR();
-                case Opcode.LOAD_THIS_FIELD:
-                    return LOAD_THIS_FIELD();
-                case Opcode.STORE_THIS_FIELD:
-                    return STORE_THIS_FIELD();
                 case Opcode.COMMENT:
                     MU.Step();
                     return 1;
@@ -320,49 +316,6 @@ namespace IngameCoding.Bytecode
             MU.Step();
 
             return 4;
-        }
-
-        int STORE_THIS_FIELD()
-        {
-            if (MU.CurrentInstruction.additionParameter.Length == 0)
-            { throw new InternalException("No field name given"); }
-
-            var valueToSet = MU.Stack.Pop();
-            var fieldToSet = MU.CurrentInstruction.additionParameter;
-            var structItem = MU.Stack.Get(MU.ThisPointer).ValueStruct;
-
-            if (!structItem.HaveField(fieldToSet))
-            { throw new RuntimeException("Field " + fieldToSet + " doesn't exists in this struct."); }
-
-            structItem.SetField(fieldToSet, structItem.GetField(fieldToSet).TrySet(valueToSet));
-            MU.Stack.Set(MU.ThisPointer, new Stack.Item(structItem, "this pointer"));
-            MU.Step();
-
-            return 7;
-        }
-        int LOAD_THIS_FIELD()
-        {
-            var structItem = MU.Stack.Get(MU.ThisPointer).ValueStruct;
-
-            if (string.IsNullOrEmpty(MU.CurrentInstruction.additionParameter))
-            { MU.Stack.Add(structItem, "struct.this"); }
-            else
-            {
-                if (!structItem.HaveField(MU.CurrentInstruction.additionParameter))
-                { throw new RuntimeException("Field " + MU.CurrentInstruction.additionParameter + " doesn't exists in this struct."); }
-                MU.Stack.Add(structItem.GetField(MU.CurrentInstruction.additionParameter), "struct.this." + MU.CurrentInstruction.additionParameter);
-            }
-            MU.Step();
-
-            return 3;
-        }
-
-        int SET_THIS_POINTER()
-        {
-            MU.ThisPointer = MU.Stack.Count - 1;
-            MU.Step();
-
-            return 2;
         }
 
         int CALL_BUILTIN()
@@ -836,7 +789,7 @@ namespace IngameCoding.Bytecode
 
         internal int CodePointer;
         internal int BasePointer;
-        internal int ThisPointer;
+        
         internal Instruction CurrentInstruction => Code[CodePointer];
 
         public MemoryUnit(Stack stack, Instruction[] code)
@@ -1360,7 +1313,7 @@ namespace IngameCoding.Bytecode
                 this.valueList = null;
                 this.valueRef = null;
 
-                switch (type1.type)
+                switch (type1.typeName)
                 {
                     case BBCode.BuiltinType.INT:
                         this.type = Type.INT;

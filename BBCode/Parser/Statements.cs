@@ -271,7 +271,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            if (type.type == BuiltinType.STRING)
+            if (type.typeName == BuiltinType.STRING)
             {
                 return $"{" ".Repeat(ident)}\"{value}\"";
             }

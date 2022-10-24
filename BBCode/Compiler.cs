@@ -596,7 +596,7 @@ namespace IngameCoding.BBCode
             }
             else
             {
-                return type.type switch
+                return type.typeName switch
                 {
                     BuiltinType.INT => 0,
                     BuiltinType.AUTO => throw new ParserException("Undefined type"),
@@ -843,7 +843,7 @@ namespace IngameCoding.BBCode
 
         void GenerateCodeForStatement(Statement_NewVariable newVariable)
         {
-            switch (newVariable.type.type)
+            switch (newVariable.type.typeName)
             {
                 case BuiltinType.AUTO:
                     if (newVariable.initialValue != null)
@@ -1334,7 +1334,7 @@ namespace IngameCoding.BBCode
         }
         void GenerateCodeForStatement(Statement_Literal literal)
         {
-            switch (literal.type.type)
+            switch (literal.type.typeName)
             {
                 case BuiltinType.INT:
                     AddInstruction(Opcode.PUSH_VALUE, int.Parse(literal.value));
@@ -1650,7 +1650,7 @@ namespace IngameCoding.BBCode
 
             if (st is Statement_NewVariable newVariable)
             {
-                switch (newVariable.type.type)
+                switch (newVariable.type.typeName)
                 {
                     case BuiltinType.INT:
                         object initialValue1 = 0;
@@ -1666,7 +1666,7 @@ namespace IngameCoding.BBCode
                                 { initialValue1 = int.Parse(literal.value); }
                             }
                         }
-                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.type, newVariable.type.isList));
+                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue1) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1680,11 +1680,11 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == BuiltinType.FLOAT || literal.type.type == IngameCoding.BBCode.BuiltinType.INT)
+                                if (literal.type.typeName == BuiltinType.FLOAT || literal.type.typeName == IngameCoding.BBCode.BuiltinType.INT)
                                 { initialValue2 = float.Parse(literal.value); }
                             }
                         }
-                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.type, newVariable.type.isList));
+                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue2) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1698,11 +1698,11 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == BuiltinType.STRING)
+                                if (literal.type.typeName == BuiltinType.STRING)
                                 { initialValue3 = literal.value; }
                             }
                         }
-                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.type, newVariable.type.isList));
+                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue3) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1720,7 +1720,7 @@ namespace IngameCoding.BBCode
                                 { initialValue4 = bool.Parse(literal.value); }
                             }
                         }
-                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.type, newVariable.type.isList));
+                        compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue4) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1747,11 +1747,11 @@ namespace IngameCoding.BBCode
                             }
                             else if (newVariable.initialValue is Statement_NewStruct newStruct)
                             {
-                                newVariable.type.type = BuiltinType.STRUCT;
+                                newVariable.type.typeName = BuiltinType.STRUCT;
                                 newVariable.type.text = newStruct.structName;
                             }
                         }
-                        if (newVariable.type.type == BuiltinType.AUTO)
+                        if (newVariable.type.typeName == BuiltinType.AUTO)
                         { throw new InternalException("Invalid or unimplemented initial value"); }
                         GenerateCodeForGlobalVariable(newVariable, out _);
                         variableCount++;
@@ -1768,7 +1768,7 @@ namespace IngameCoding.BBCode
 
             if (st is Statement_NewVariable newVariable)
             {
-                switch (newVariable.type.type)
+                switch (newVariable.type.typeName)
                 {
                     case BuiltinType.INT:
                         object initialValue1 = 0;
@@ -1786,7 +1786,7 @@ namespace IngameCoding.BBCode
                                 }
                             }
                         }
-                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.type, newVariable.type.isList));
+                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue1) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1800,13 +1800,13 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == BuiltinType.FLOAT || literal.type.type == BuiltinType.INT)
+                                if (literal.type.typeName == BuiltinType.FLOAT || literal.type.typeName == BuiltinType.INT)
                                 {
                                     initialValue2 = float.Parse(literal.value);
                                 }
                             }
                         }
-                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.type, newVariable.type.isList));
+                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue2) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1820,13 +1820,13 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == BuiltinType.STRING)
+                                if (literal.type.typeName == BuiltinType.STRING)
                                 {
                                     initialValue3 = literal.value;
                                 }
                             }
                         }
-                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.type, newVariable.type.isList));
+                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue3) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1846,7 +1846,7 @@ namespace IngameCoding.BBCode
                                 }
                             }
                         }
-                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.type, newVariable.type.isList));
+                        compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.typeName, newVariable.type.isList));
                         AddInstruction(new Instruction(Opcode.PUSH_VALUE, initialValue4) { tag = "var." + newVariable.variableName });
                         variableCount++;
                         break;
@@ -1883,7 +1883,7 @@ namespace IngameCoding.BBCode
                             }
                             else if (newVariable.initialValue is Statement_NewStruct newStruct)
                             {
-                                newVariable.type.type = BuiltinType.STRUCT;
+                                newVariable.type.typeName = BuiltinType.STRUCT;
                                 newVariable.type.text = newStruct.structName;
                             }
                             else
@@ -1948,7 +1948,7 @@ namespace IngameCoding.BBCode
                         {
                             if (builtinFunction.Value.ParameterCount != function.Value.parameters.Count)
                             { throw new ParserException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'"); }
-                            if (builtinFunction.Value.returnSomething != (function.Value.type.type != BuiltinType.VOID))
+                            if (builtinFunction.Value.returnSomething != (function.Value.type.typeName != BuiltinType.VOID))
                             { throw new ParserException("Wrong type definied for builtin function '" + builtinFunction.Key + "'"); }
 
                             return new CompiledFunction()
@@ -2030,7 +2030,7 @@ namespace IngameCoding.BBCode
 
             return new CompiledFunction(
                     function.Value.parameters.ToArray(),
-                    function.Value.type.type != BuiltinType.VOID,
+                    function.Value.type.typeName != BuiltinType.VOID,
                     (function.Value.parameters.Count > 0) && function.Value.parameters.First().withThisKeyword,
                     function.Value.type.Clone()
                     )
@@ -2072,7 +2072,7 @@ namespace IngameCoding.BBCode
                         {
                             if (builtinFunction.Value.ParameterCount != function.Value.parameters.Count + (isStructMethod ? 1 : 0))
                             { throw new ParserException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'"); }
-                            if (builtinFunction.Value.returnSomething != (function.Value.type.type != BuiltinType.VOID))
+                            if (builtinFunction.Value.returnSomething != (function.Value.type.typeName != BuiltinType.VOID))
                             { throw new ParserException("Wrong type definied for builtin function '" + builtinFunction.Key + "'"); }
 
                             return new CompiledFunction()
@@ -2091,7 +2091,7 @@ namespace IngameCoding.BBCode
 
             return new CompiledFunction(
                 function.Value.parameters.ToArray(),
-                function.Value.type.type != BuiltinType.VOID,
+                function.Value.type.typeName != BuiltinType.VOID,
                 (function.Value.parameters.Count > 0) && function.Value.parameters.First().withThisKeyword,
                 function.Value.type.Clone()
                 )

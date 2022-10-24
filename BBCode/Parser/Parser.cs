@@ -34,9 +34,7 @@ namespace IngameCoding.BBCode
     [Serializable]
     internal class TypeToken : Token
     {
-        public BuiltinType type;
-        /// <summary>Struct only!</summary>
-        public List<TypeToken> types;
+        public BuiltinType typeName;
         public bool isList;
 
         public override string ToString()
@@ -47,12 +45,12 @@ namespace IngameCoding.BBCode
         public TypeToken(string name, BuiltinType type)
         {
             this.text = name;
-            this.type = type;
+            this.typeName = type;
         }
 
         public new TypeToken Clone()
         {
-            return new TypeToken(this.text, this.type)
+            return new TypeToken(this.text, this.typeName)
             {
                 endOffset = this.endOffset,
                 startOffset = this.startOffset,
@@ -61,7 +59,6 @@ namespace IngameCoding.BBCode
                 isList = this.isList,
                 lineNumber = this.lineNumber,
                 subtype = this.subtype,
-                types = this.types,
             };
         }
     }
@@ -1108,7 +1105,7 @@ namespace IngameCoding.BBCode
                 {
                     if (IsRef)
                     { throw new SyntaxException("Initial value for reference variable declaration is requied"); }
-                    if (possibleType.type == BuiltinType.AUTO)
+                    if (possibleType.typeName == BuiltinType.AUTO)
                     { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Position); }
                 }
 

@@ -18,11 +18,11 @@ struct TimeSpan
   int hours;
   int mins;
   int secs;
+}
   
-  string ToTimeSpanString()
-  {
-	return this.hours + ":" + this.mins + ":" + this.secs;
-  };
+string ToTimeSpanString(this TimeSpan self)
+{
+	return self.hours + ":" + self.mins + ":" + self.secs;
 }
 
 namespace Time

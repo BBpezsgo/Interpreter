@@ -27,7 +27,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_NewVariable : Statement
     {
-        internal Type type;
+        internal TypeToken type;
         internal string variableName;
         /// <summary>
         /// <b>The value is:</b>
@@ -62,12 +62,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{type.name}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
+            return $"{type.text}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{type.name}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{type.text}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -261,7 +261,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Literal : Statement
     {
-        internal Type type;
+        internal TypeToken type;
         internal string value;
 
         public override string ToString()
@@ -448,31 +448,6 @@ namespace IngameCoding.BBCode.Parser.Statements
 
             x += $"{" ".Repeat(ident)}}}";
             return x;
-        }
-    }
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_StructField : Statement
-    {
-        /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
-        public Statement listIndex;
-        internal string variableName;
-        internal string fieldName;
-
-        public override string ToString()
-        {
-            return $"{variableName}.{fieldName}{((listIndex != null) ? "[...]" : "")}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{variableName}.{fieldName}{((listIndex != null) ? $"[{listIndex.PrettyPrint()}]" : "")}";
-        }
-
-        public Statement_StructField()
-        {
-            this.listIndex = null;
-            this.variableName = null;
-            this.fieldName = null;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

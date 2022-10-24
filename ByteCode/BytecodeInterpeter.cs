@@ -160,8 +160,6 @@ namespace IngameCoding.Bytecode
                     return LOAD_THIS_FIELD();
                 case Opcode.STORE_THIS_FIELD:
                     return STORE_THIS_FIELD();
-                case Opcode.SET_THIS_POINTER:
-                    return SET_THIS_POINTER();
                 case Opcode.COMMENT:
                     MU.Step();
                     return 1;
@@ -1348,7 +1346,7 @@ namespace IngameCoding.Bytecode
 
                 this.Tag = tag;
             }
-            public Item(BBCode.Type type1, string tag)
+            public Item(BBCode.TypeToken type1, string tag)
             {
                 this.type = Type.INT;
 

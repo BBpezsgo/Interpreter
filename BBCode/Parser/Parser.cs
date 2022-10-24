@@ -32,61 +32,37 @@ namespace IngameCoding.BBCode
     }
 
     [Serializable]
-    internal class Type
+    internal class TypeToken : Token
     {
-        public string name;
         public BuiltinType type;
         /// <summary>Struct only!</summary>
-        public List<Type> types;
+        public List<TypeToken> types;
         public bool isList;
-
-        public int startOffset;
-        public int endOffset;
-        public int startOffsetTotal;
-        public int endOffsetTotal;
-        public int lineNumber;
-
-        public Position Position
-        {
-            get
-            {
-                return new Position(lineNumber, startOffset, new Interval(startOffsetTotal, endOffsetTotal));
-            }
-        }
 
         public override string ToString()
         {
-            return name + (isList ? "[]" : "");
+            return this.text + (isList ? "[]" : "");
         }
 
-        public Type(string name, BuiltinType type)
+        public TypeToken(string name, BuiltinType type)
         {
-            this.name = name;
+            this.text = name;
             this.type = type;
         }
 
-        public void AddTokenProperties(Token token)
+        public new TypeToken Clone()
         {
-            startOffset = token.startOffset;
-            endOffset = token.endOffset;
-            startOffsetTotal = token.startOffsetTotal;
-            endOffsetTotal = token.endOffsetTotal;
-            lineNumber = token.lineNumber;
-        }
-
-        public Type Clone()
-        {
-            Type newType = new(name, type)
+            return new TypeToken(this.text, this.type)
             {
-                types = types,
-                startOffset = startOffset,
-                endOffset = endOffset,
-                startOffsetTotal = startOffsetTotal,
-                endOffsetTotal = endOffsetTotal,
-                lineNumber = lineNumber,
-                isList = isList
+                endOffset = this.endOffset,
+                startOffset = this.startOffset,
+                endOffsetTotal = this.endOffsetTotal,
+                startOffsetTotal = this.startOffsetTotal,
+                isList = this.isList,
+                lineNumber = this.lineNumber,
+                subtype = this.subtype,
+                types = this.types,
             };
-            return newType;
         }
     }
 
@@ -98,7 +74,7 @@ namespace IngameCoding.BBCode
         class ParameterDefinition
         {
             public string name;
-            public Type type;
+            public TypeToken type;
 
             internal bool withRefKeyword;
             internal bool withThisKeyword;
@@ -133,7 +109,7 @@ namespace IngameCoding.BBCode
             }
             public List<ParameterDefinition> parameters;
             public List<Statement> statements;
-            public Type type;
+            public TypeToken type;
             public readonly string[] namespacePath;
             string NamespacePathPrefix
             {
@@ -179,7 +155,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"{this.type.name} {this.FullName}" + (this.parameters.Count > 0 ? "(...)" : "()") + " " + (this.statements.Count > 0 ? "{...}" : "{}");
+                return $"{this.type.text} {this.FullName}" + (this.parameters.Count > 0 ? "(...)" : "()") + " " + (this.statements.Count > 0 ? "{...}" : "{}");
             }
 
             public string PrettyPrint(int ident = 0)
@@ -196,7 +172,7 @@ namespace IngameCoding.BBCode
                     statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}{this.type.name} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+                return $"{" ".Repeat(ident)}{this.type.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
             }
         }
 
@@ -213,7 +189,7 @@ namespace IngameCoding.BBCode
             }
             public List<ParameterDefinition> parameters;
             public List<Statement> statements;
-            public Type type;
+            public TypeToken type;
             public readonly string[] namespacePath;
             string NamespacePathPrefix
             {
@@ -317,7 +293,7 @@ namespace IngameCoding.BBCode
                 get { return (currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null; }
             }
 
-            readonly Dictionary<string, Type> types = new();
+            readonly Dictionary<string, TypeToken> types = new();
             readonly Dictionary<string, int> operators = new();
             bool enableThisKeyword = false;
             readonly List<string> CurrentNamespace = new();
@@ -346,11 +322,11 @@ namespace IngameCoding.BBCode
 
             public Parser()
             {
-                types.Add("int", new Type("int", BuiltinType.INT));
-                types.Add("string", new Type("string", BuiltinType.STRING));
-                types.Add("void", new Type("void", BuiltinType.VOID));
-                types.Add("float", new Type("float", BuiltinType.FLOAT));
-                types.Add("bool", new Type("bool", BuiltinType.BOOLEAN));
+                types.Add("int", new TypeToken("int", BuiltinType.INT));
+                types.Add("string", new TypeToken("string", BuiltinType.STRING));
+                types.Add("void", new TypeToken("void", BuiltinType.VOID));
+                types.Add("float", new TypeToken("float", BuiltinType.FLOAT));
+                types.Add("bool", new TypeToken("bool", BuiltinType.BOOLEAN));
 
                 operators.Add("|", 4);
                 operators.Add("&", 4);
@@ -530,7 +506,7 @@ namespace IngameCoding.BBCode
                     { throw new ParserException("Attribute '" + attr + "' already applied to the function"); }
                 }
 
-                Type possibleType = ExceptType(false);
+                TypeToken possibleType = ExceptTypeToken(false);
                 if (possibleType == null)
                 { currentTokenIndex = parseStart; return false; }
 
@@ -563,7 +539,7 @@ namespace IngameCoding.BBCode
                     Token referenceKeywordT = ExpectIdentifier("ref");
                     if (referenceKeywordT != null) referenceKeywordT.subtype = TokenSubtype.Keyword;
 
-                    Type possibleParameterType = ExceptType(false, true);
+                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -765,7 +741,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new Type("float", BuiltinType.FLOAT)
+                        type = new TypeToken("float", BuiltinType.FLOAT)
                     };
 
                     literal.position.Line = CurrentToken.lineNumber;
@@ -781,7 +757,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new Type("int", BuiltinType.INT)
+                        type = new TypeToken("int", BuiltinType.INT)
                     };
 
                     literal.position.Line = CurrentToken.lineNumber;
@@ -797,7 +773,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new Type("string", BuiltinType.STRING)
+                        type = new TypeToken("string", BuiltinType.STRING)
                     };
 
                     literal.position.Line = CurrentToken.lineNumber;
@@ -813,7 +789,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = "true",
-                        type = new Type("bool", BuiltinType.BOOLEAN)
+                        type = new TypeToken("bool", BuiltinType.BOOLEAN)
                     };
 
                     tTrue.subtype = TokenSubtype.Keyword;
@@ -829,7 +805,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = "false",
-                        type = new Type("bool", BuiltinType.BOOLEAN)
+                        type = new TypeToken("bool", BuiltinType.BOOLEAN)
                     };
 
                     tFalse.subtype = TokenSubtype.Keyword;
@@ -1086,7 +1062,7 @@ namespace IngameCoding.BBCode
             Statement_NewVariable ExpectVariableDeclaration(bool enableRefKeyword)
             {
                 int startTokenIndex = currentTokenIndex;
-                Type possibleType = ExceptType(out var structNotFoundWarning);
+                TypeToken possibleType = ExceptTypeToken(out var structNotFoundWarning);
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
@@ -1866,7 +1842,7 @@ namespace IngameCoding.BBCode
                     { throw new ParserException("Attribute '" + attr + "' already applied to the method"); }
                 }
 
-                Type possibleType = ExceptType(false);
+                TypeToken possibleType = ExceptTypeToken(false);
                 if (possibleType == null)
                 { currentTokenIndex = parseStart; return null; }
 
@@ -1877,6 +1853,8 @@ namespace IngameCoding.BBCode
                 Token possibleOperator = ExpectOperator("(");
                 if (possibleOperator == null)
                 { currentTokenIndex = parseStart; return null; }
+
+                throw new Errors.Exception("Methods are not supported", possibleType.Position);
 
                 FunctionDefinition methodDefinition = new(new string[0], possibleName.text)
                 {
@@ -1889,7 +1867,15 @@ namespace IngameCoding.BBCode
                 var expectParameter = false;
                 while (ExpectOperator(")") == null || expectParameter)
                 {
-                    Type possibleParameterType = ExceptType(false, true);
+                    Token thisKeywordT = ExpectIdentifier("this");
+                    if (thisKeywordT != null)
+                    {
+                        thisKeywordT.subtype = TokenSubtype.Keyword;
+                        if (methodDefinition.parameters.Count > 0)
+                        { throw new ParserException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
+                    }
+
+                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
                     if (possibleParameterType == null)
                         throw new SyntaxException("Expected parameter type", possibleOperator);
 
@@ -1902,7 +1888,8 @@ namespace IngameCoding.BBCode
                     ParameterDefinition parameterDefinition = new()
                     {
                         type = possibleParameterType,
-                        name = possibleParameterName.text
+                        name = possibleParameterName.text,
+                        withThisKeyword = thisKeywordT != null
                     };
                     methodDefinition.parameters.Add(parameterDefinition);
 
@@ -1938,7 +1925,7 @@ namespace IngameCoding.BBCode
             ParameterDefinition ExpectField()
             {
                 int startTokenIndex = currentTokenIndex;
-                Type possibleType = ExceptType();
+                TypeToken possibleType = ExceptTypeToken();
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
@@ -2073,7 +2060,7 @@ namespace IngameCoding.BBCode
                 return returnToken;
             }
 
-            Type ExceptType(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
+            TypeToken ExceptTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
             {
                 warning = null;
                 Token possibleType = ExpectIdentifier();
@@ -2081,29 +2068,29 @@ namespace IngameCoding.BBCode
 
                 possibleType.subtype = TokenSubtype.Keyword;
 
-                bool typeFound = types.TryGetValue(possibleType.text, out Type foundtype);
+                bool typeFound = types.TryGetValue(possibleType.text, out TypeToken foundtype);
 
-                Type newType = null;
+                TypeToken newType = null;
 
                 if (typeFound == false)
                 {
                     if (newType == null && possibleType.text == "any")
                     {
                         if (allowAnyKeyword)
-                        { newType = new Type("any", BuiltinType.ANY); }
+                        { newType = new TypeToken("any", BuiltinType.ANY); }
                         else
                         {
-                            throw new ParserException($"Type '{possibleType.text}' is not valid in the current context");
+                            throw new ParserException($"TypeToken '{possibleType.text}' is not valid in the current context");
                         }
                     }
 
                     if (newType == null && possibleType.text == "var")
                     {
                         if (allowVarKeyword)
-                        { newType = new Type("var", BuiltinType.AUTO); }
+                        { newType = new TypeToken("var", BuiltinType.AUTO); }
                         else
                         {
-                            throw new ParserException($"Type '{possibleType.text}' is not valid in the current context");
+                            throw new ParserException($"TypeToken '{possibleType.text}' is not valid in the current context");
                         }
                     }
 
@@ -2111,12 +2098,12 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.text, out var s))
                         {
-                            newType = new Type(s.FullName, BuiltinType.STRUCT);
+                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT);
                             possibleType.subtype = TokenSubtype.Struct;
                         }
                         else
                         {
-                            newType = new Type(possibleType.text, BuiltinType.STRUCT);
+                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT);
                             possibleType.subtype = TokenSubtype.None;
                             warning = new Warning()
                             {
@@ -2132,8 +2119,6 @@ namespace IngameCoding.BBCode
                 else
                 { newType = foundtype.Clone(); }
 
-                newType.AddTokenProperties(possibleType);
-
                 if (ExpectOperator("[") != null)
                 {
                     if (ExpectOperator("]") != null)
@@ -2144,7 +2129,7 @@ namespace IngameCoding.BBCode
                 return newType;
             }
 
-            Type ExceptType(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExceptType(out Warning _, allowVarKeyword, allowAnyKeyword);
+            TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExceptTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
 
             bool TryGetStruct(string structName, out StructDefinition @struct)
             {

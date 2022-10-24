@@ -84,8 +84,6 @@ namespace IngameCoding.Bytecode
 
         LOAD_THIS_FIELD,
         STORE_THIS_FIELD,
-
-        SET_THIS_POINTER,
         // === ===
 
         // === Lists ===

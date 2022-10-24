@@ -107,8 +107,8 @@ namespace IngameCoding.Core
             this.printCallback = printCallback;
 
             AddBuiltins();
-            AddBuiltinFunction("conin", new BBCode.Type[] {
-                new BBCode.Type("any", BuiltinType.ANY)
+            AddBuiltinFunction("conin", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
                 pauseCode = true;
@@ -415,8 +415,8 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            AddBuiltinFunction("conlog", new BBCode.Type[] {
-                new BBCode.Type("any", BuiltinType.ANY)
+            AddBuiltinFunction("conlog", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
                 if (parameters[0].type == Stack.Item.Type.LIST)
@@ -429,20 +429,20 @@ namespace IngameCoding.Core
                     this.printCallback(parameters[0].ToStringValue(), TerminalInterpreter.LogType.Normal);
                 }
             });
-            AddBuiltinFunction("conerr", new BBCode.Type[] {
-                new BBCode.Type("any", BuiltinType.ANY)
+            AddBuiltinFunction("conerr", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
                 this.printCallback(parameters[0].ToStringValue(), TerminalInterpreter.LogType.Error);
             });
-            AddBuiltinFunction("conwarn", new BBCode.Type[] {
-                new BBCode.Type("any", BuiltinType.ANY)
+            AddBuiltinFunction("conwarn", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
                 this.printCallback(parameters[0].ToStringValue(), TerminalInterpreter.LogType.Warning);
             });
-            AddBuiltinFunction("sleep", new BBCode.Type[] {
-                new BBCode.Type("any", BuiltinType.ANY)
+            AddBuiltinFunction("sleep", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("any", BuiltinType.ANY)
             }, (Stack.Item[] parameters) =>
             {
                 pauseCodeFor = parameters[0].ValueInt;
@@ -461,9 +461,9 @@ namespace IngameCoding.Core
 
             #region Other
 
-            AddBuiltinFunction("splitstring", new BBCode.Type[] {
-                new BBCode.Type("string", BuiltinType.STRING),
-                new BBCode.Type("string", BuiltinType.STRING)
+            AddBuiltinFunction("splitstring", new BBCode.TypeToken[] {
+                new BBCode.TypeToken("string", BuiltinType.STRING),
+                new BBCode.TypeToken("string", BuiltinType.STRING)
             }, (Stack.Item[] parameters) =>
             {
                 var splitCharacter = parameters[0].ValueString;
@@ -644,7 +644,7 @@ namespace IngameCoding.Core
             }
         }
 
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Action<Stack.Item[]> callback, Action<IngameCoding.Bytecode.Stack.Item> returnCallback)
+        void AddBuiltinFunction(string name, BBCode.TypeToken[] parameterTypes, Action<Stack.Item[]> callback, Action<IngameCoding.Bytecode.Stack.Item> returnCallback)
         {
             Compiler.BuiltinFunction function = new(callback, parameterTypes, true);
 
@@ -664,7 +664,7 @@ namespace IngameCoding.Core
             }
         }
 
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
+        void AddBuiltinFunction(string name, BBCode.TypeToken[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
         {
             Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((p) =>
             {
@@ -689,7 +689,7 @@ namespace IngameCoding.Core
             {
                 var x = callback();
                 this.bytecodeInterpeter.AddValueToStack(x);
-            }), Array.Empty<BBCode.Type>(), true);
+            }), Array.Empty<BBCode.TypeToken>(), true);
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -701,7 +701,7 @@ namespace IngameCoding.Core
                 Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
-        void AddBuiltinFunction(string name, BBCode.Type[] parameterTypes, Action<Stack.Item[]> callback)
+        void AddBuiltinFunction(string name, BBCode.TypeToken[] parameterTypes, Action<Stack.Item[]> callback)
         {
             Compiler.BuiltinFunction function = new((parameters) => { callback(parameters); }, parameterTypes);
 

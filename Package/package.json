@@ -1,5 +1,5 @@
 {
-  "name": "com.bb.bbcode",
+  "name": "com.bb.bbcodeinterpreter",
   "version": "0.1.0",
   "displayName": "BBCode",
   "description": "BBCode compiler and interpreter",

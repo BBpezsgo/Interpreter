@@ -1,10 +1,12 @@
-﻿using IngameCoding.Core;
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Collections.Generic;
+using System;
 
 namespace IngameCoding.BBCode.Parser.Statements
 {
-    abstract class Statement
+    using Core;
+
+    public abstract class Statement
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         public Position position;
@@ -25,7 +27,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_NewVariable : Statement
+    public class Statement_NewVariable : Statement
     {
         internal TypeToken type;
         internal string variableName;
@@ -71,7 +73,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_FunctionCall : Statement
+    public class Statement_FunctionCall : Statement
     {
         string[] namespacePath;
         readonly string[] targetNamespacePath;
@@ -562,7 +564,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_MethodCall : Statement_FunctionCall
+    public class Statement_MethodCall : Statement_FunctionCall
     {
         internal Token variableNameToken;
         internal string VariableName => variableNameToken.text;

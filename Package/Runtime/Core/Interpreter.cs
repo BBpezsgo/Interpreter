@@ -1,12 +1,16 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.Bytecode;
-using IngameCoding.Errors;
-using IngameCoding.Terminal;
-
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace IngameCoding.Core
 {
+    using BBCode;
+    using Bytecode;
+    using Errors;
+    using Terminal;
+
     [Serializable]
     class Interpreter
     {
@@ -223,7 +227,7 @@ namespace IngameCoding.Core
                     { OnOutput?.Invoke(this,warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                    Debug.Debug.LogError(error);
+                    Output.Debug.Debug.LogError(error);
 
                     StackTrace stackTrace = new(error);
                     var stackFrames = stackTrace.GetFrames();
@@ -250,7 +254,7 @@ namespace IngameCoding.Core
                     { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", TerminalInterpreter.LogType.Error);
-                    Terminal.Output.LogError(error);
+                    Output.Terminal.Output.LogError(error);
 
                     OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
                 }
@@ -585,7 +589,7 @@ namespace IngameCoding.Core
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
-                    Terminal.Output.LogError(error);
+                    Output.Terminal.Output.LogError(error);
                 }
                 catch (System.Exception error)
                 {
@@ -597,7 +601,7 @@ namespace IngameCoding.Core
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
-                    Terminal.Output.LogError(error);
+                    Output.Terminal.Output.LogError(error);
                 }
 
                 if (bytecodeInterpeter != null && !bytecodeInterpeter.IsRunning)
@@ -669,7 +673,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
 
@@ -688,7 +692,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<Stack.Item[]> callback, bool ReturnSomething = false)
@@ -702,7 +706,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
     }
@@ -713,12 +717,12 @@ namespace IngameCoding.Core
         {
             if (!File.Exists(path))
             {
-                Output.LogError("File does not exists!");
+                Output.Terminal.Output.LogError("File does not exists!");
                 return;
             }
 
             var file = new FileInfo(path);
-            Output.LogDebug($"Run file '{file.FullName}'");
+            Output.Terminal.Output.LogDebug($"Run file '{file.FullName}'");
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
 
@@ -727,16 +731,16 @@ namespace IngameCoding.Core
                 switch (logType)
                 {
                     case TerminalInterpreter.LogType.Normal:
-                        Output.Log(message);
+                        Output.Terminal.Output.Log(message);
                         break;
                     case TerminalInterpreter.LogType.Warning:
-                        Output.LogWarning(message);
+                        Output.Terminal.Output.LogWarning(message);
                         break;
                     case TerminalInterpreter.LogType.Error:
-                        Output.LogError(message);
+                        Output.Terminal.Output.LogError(message);
                         break;
                     case TerminalInterpreter.LogType.Debug:
-                        Output.LogDebug(message);
+                        Output.Terminal.Output.LogDebug(message);
                         break;
                 }
             };
@@ -760,19 +764,19 @@ namespace IngameCoding.Core
                     }
                     catch (ParserException error)
                     {
-                        Output.LogError($"ParserException: {error.MessageAll}");
+                        Output.Terminal.Output.LogError($"ParserException: {error.MessageAll}");
                     }
                     catch (RuntimeException error)
                     {
-                        Output.LogError($"RuntimeException: {error.MessageAll}");
+                        Output.Terminal.Output.LogError($"RuntimeException: {error.MessageAll}");
                     }
                     catch (EndlessLoopException)
                     {
-                        Output.LogError($"Endless loop!!!");
+                        Output.Terminal.Output.LogError($"Endless loop!!!");
                     }
                     catch (InternalException error)
                     {
-                        Output.LogError($"InternalException: {error.Message}");
+                        Output.Terminal.Output.LogError($"InternalException: {error.Message}");
                     }
                 }
                 else
@@ -786,7 +790,7 @@ namespace IngameCoding.Core
         {
             if (args.Length == 0)
             {
-                Output.LogError("Wrong number of arguments was passed!");
+                Output.Terminal.Output.LogError("Wrong number of arguments was passed!");
                 return;
             }
 

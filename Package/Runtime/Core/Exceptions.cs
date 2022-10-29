@@ -1,12 +1,13 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.Core;
-
-using System.Runtime.Serialization;
+﻿using System.Runtime.Serialization;
+using System;
 
 namespace IngameCoding.Errors
 {
+    using Core;
+    using BBCode;
+
     [Serializable]
-    class Exception : System.Exception
+    public class Exception : System.Exception
     {
         public Position Position;
         public BaseToken Token;
@@ -48,7 +49,7 @@ namespace IngameCoding.Errors
     }
 
     [Serializable]
-    class ParserException : Exception
+    public class ParserException : Exception
     {
         public ParserException(string message) : base(message, new Position(-1)) { }
         public ParserException(string message, Position pos) : base(message, pos) { }
@@ -60,7 +61,7 @@ namespace IngameCoding.Errors
     }
 
     [Serializable]
-    class SyntaxException : Exception
+    public class SyntaxException : Exception
     {
         public SyntaxException(string message) : base(message, new Position(-1)) { }
         public SyntaxException(string message, Position pos) : base(message, pos) { }
@@ -72,7 +73,7 @@ namespace IngameCoding.Errors
     }
 
     [Serializable]
-    class RuntimeException : Exception
+    public class RuntimeException : Exception
     {
         public RuntimeException(string message) : base(message, new Position(-1)) { }
 
@@ -101,7 +102,7 @@ namespace IngameCoding.Errors
     }
 
     [Serializable]
-    class InternalException : System.Exception
+    public class InternalException : System.Exception
     {
         public InternalException() : base() { }
 
@@ -114,12 +115,12 @@ namespace IngameCoding.Errors
             StreamingContext context) : base(info, context) { }
     }
 
-    class EndlessLoopException : InternalException
+    public class EndlessLoopException : InternalException
     {
         public EndlessLoopException() : base("Endless loop") { }
     }
 
-    class Warning
+    public class Warning
     {
         public Position Position;
         public string Message;

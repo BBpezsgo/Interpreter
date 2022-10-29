@@ -1,8 +1,12 @@
-﻿using IngameCoding.Core;
-using IngameCoding.Errors;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace IngameCoding.BBCode
 {
+    using Errors;
+    using Core;
+
     public enum TokenSubtype
     {
         None,
@@ -32,7 +36,7 @@ namespace IngameCoding.BBCode
     }
 
     [Serializable]
-    internal class TypeToken : Token
+    public class TypeToken : Token
     {
         public BuiltinType typeName;
         public bool isList;
@@ -68,7 +72,7 @@ namespace IngameCoding.BBCode
         using Statements;
 
         [Serializable]
-        class ParameterDefinition
+        public class ParameterDefinition
         {
             public string name;
             public TypeToken type;
@@ -87,7 +91,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        class FunctionDefinition
+        public class FunctionDefinition
         {
             public class Attribute
             {
@@ -173,7 +177,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        class StructDefinition
+        public class StructDefinition
         {
             public FunctionDefinition.Attribute[] attributes;
             readonly string name;
@@ -280,7 +284,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        class Parser
+        public class Parser
         {
             int currentTokenIndex;
             readonly List<Token> tokens = new();

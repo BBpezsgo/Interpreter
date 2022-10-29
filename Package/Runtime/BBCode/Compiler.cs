@@ -5,10 +5,14 @@ using IngameCoding.Core;
 using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
-using System.Dynamic;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace IngameCoding.BBCode
 {
+    using System;
+
     public class Compiler
     {
         #region Fields
@@ -22,7 +26,7 @@ namespace IngameCoding.BBCode
         Dictionary<string, CompiledVariable> compiledGlobalVariables;
         readonly Dictionary<string, Parameter> parameters = new();
         readonly Dictionary<string, CompiledVariable> compiledVariables = new();
-        List<Warning> warnings;
+        public List<Warning> warnings;
 
         readonly List<int> returnInstructions = new();
         readonly List<List<int>> breakInstructions = new();
@@ -51,7 +55,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        internal struct AttributeValues
+        public struct AttributeValues
         {
             public List<Literal> parameters;
 
@@ -101,7 +105,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        internal struct Literal
+        public struct Literal
         {
             public enum Type
             {
@@ -188,7 +192,7 @@ namespace IngameCoding.BBCode
         }
 
         [Serializable]
-        internal struct CompiledFunction
+        public struct CompiledFunction
         {
             public TypeToken[] parameters;
 
@@ -255,7 +259,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        internal class BuiltinFunction
+        public class BuiltinFunction
         {
             public TypeToken[] parameters;
 
@@ -341,7 +345,7 @@ namespace IngameCoding.BBCode
             }
         }
         [Serializable]
-        internal class CompiledStruct
+        public class CompiledStruct
         {
             public Func<Stack.IStruct> CreateBuiltinStruct;
             public bool IsBuiltin => CreateBuiltinStruct != null;
@@ -491,7 +495,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        internal bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
+        public bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
         {
             if (functionOffsets.TryGetValue(functionCallStatement.FunctionName, out functionOffset))
             {
@@ -512,7 +516,7 @@ namespace IngameCoding.BBCode
             functionOffset = -1;
             return false;
         }
-        internal bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
+        public bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
         {
             if (GetCompiledVariable(methodCallStatement.VariableName, out CompiledVariable compiledVariable, out _))
             {
@@ -550,7 +554,7 @@ namespace IngameCoding.BBCode
             return false;
         }
 
-        internal bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
+        public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
         {
             if (functionOffsets.TryGetValue(functionCallStatement.Name, out functionOffset))
             {
@@ -1617,7 +1621,7 @@ namespace IngameCoding.BBCode
             { GenerateCodeForStatement(field); }
             else
             {
-                Debug.Debug.Log("[Compiler]: Unimplemented statement " + st.GetType().Name);
+                Output.Debug.Debug.Log("[Compiler]: Unimplemented statement " + st.GetType().Name);
             }
 
             if (st is StatementParent)
@@ -2197,7 +2201,7 @@ namespace IngameCoding.BBCode
             this.compiledCode = new();
         }
 
-        Instruction[] AssembleCode(
+        public Instruction[] AssembleCode(
             Dictionary<string, FunctionDefinition> functions,
             Dictionary<string, StructDefinition> structs,
             List<Statement_NewVariable> globalVariables,
@@ -2256,7 +2260,7 @@ namespace IngameCoding.BBCode
             return compiledCode.ToArray();
         }
 
-        static Parser.Parser ParseCode(string code, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback = null)
+        public static Parser.Parser ParseCode(string code, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             var (tokens, _) = Tokenizer.Parse(code, printCallback);
 
@@ -2273,7 +2277,7 @@ namespace IngameCoding.BBCode
             return parser;
         }
 
-        internal static Compiler CompileCode(
+        public static Compiler CompileCode(
             string code,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<Stack.IStruct>> builtinStructs,

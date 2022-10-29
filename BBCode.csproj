@@ -23,6 +23,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Package\**\*.meta" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="icon.ico" />
   </ItemGroup>
 

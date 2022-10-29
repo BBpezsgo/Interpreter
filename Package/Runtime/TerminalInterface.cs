@@ -1,4 +1,6 @@
-﻿namespace IngameCoding
+﻿using System;
+
+namespace IngameCoding.Output
 {
     namespace Debug
     {

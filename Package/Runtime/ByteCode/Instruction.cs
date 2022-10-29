@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using System.Diagnostics;
 #endif
+using System;
 
 namespace IngameCoding.Bytecode
 {

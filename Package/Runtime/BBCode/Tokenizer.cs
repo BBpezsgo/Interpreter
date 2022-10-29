@@ -1,9 +1,13 @@
-﻿using IngameCoding.Core;
-using IngameCoding.Terminal;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace IngameCoding.BBCode
 {
-    enum TokenType
+    using Core;
+    using Terminal;
+
+    public enum TokenType
     {
         WHITESPACE,
         IDENTIFIER,
@@ -23,7 +27,7 @@ namespace IngameCoding.BBCode
         COMMENT_MULTILINE,
     }
 
-    class BaseToken
+    public class BaseToken
     {
         public int startOffset;
         public int endOffset;
@@ -34,7 +38,7 @@ namespace IngameCoding.BBCode
         public Position Position => new(lineNumber, startOffset, new Interval(startOffsetTotal, endOffsetTotal));
     }
 
-    class Token : BaseToken
+    public class Token : BaseToken
     {
         public TokenType type = TokenType.WHITESPACE;
         public string text = "";
@@ -52,7 +56,7 @@ namespace IngameCoding.BBCode
         }
     }
 
-    class Tokenizer
+    public class Tokenizer
     {
         /// <returns>(tokens, tokens with comments)</returns>
         public static (Token[], Token[]) Parse(string program, Action<string, TerminalInterpreter.LogType> printCallback = null)

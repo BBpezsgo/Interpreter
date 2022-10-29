@@ -1,10 +1,12 @@
-﻿using IngameCoding.Errors;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System;
+using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
-    using IngameCoding.Core;
-
-    using System.Diagnostics;
+    using Core;
+    using Errors;
 
     static class ItemEx
     {
@@ -331,7 +333,7 @@ namespace IngameCoding.Bytecode
                 {
                     Action<Stack.Item> returnValue = new((returnVal) =>
                     {
-                        IngameCoding.Debug.Debug.Log(returnVal.ToString());
+                        Output.Debug.Debug.Log(returnVal.ToString());
                         MU.Stack.Add(returnVal, "return v");
                     });
                     builtinFunction.Callback(parameters.ToArray());
@@ -803,7 +805,7 @@ namespace IngameCoding.Bytecode
         public void Step(int num) => CodePointer += num;
     }
 
-    class Stack
+    public class Stack
     {
         public Stack()
         { stack = new List<Item>(); }
@@ -2146,13 +2148,13 @@ namespace IngameCoding.Bytecode
         public Item Get(int index) => this.stack[index];
     }
 
-    struct BytecodeInterpreterSettings
+    public struct BytecodeInterpreterSettings
     {
         internal int ClockCyclesPerUpdate;
         internal int InstructionLimit;
         internal int StackMaxSize;
 
-        internal static BytecodeInterpreterSettings Default => new()
+        public static BytecodeInterpreterSettings Default => new()
         {
             ClockCyclesPerUpdate = 2,
             InstructionLimit = 1024,
@@ -2160,7 +2162,7 @@ namespace IngameCoding.Bytecode
         };
     }
 
-    class BytecodeInterpeter
+    public class BytecodeInterpeter
     {
         BytecodeInterpreterSettings settings;
 
@@ -2259,7 +2261,7 @@ namespace IngameCoding.Bytecode
 
                 if (lastInstrPointer == CPU.CodePointer)
                 {
-                    IngameCoding.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + CPU.MU.CurrentInstruction.ToString());
+                    Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + CPU.MU.CurrentInstruction.ToString());
                 }
 
                 lastInstrPointer = CPU.CodePointer;

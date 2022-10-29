@@ -1,5 +1,5 @@
 ﻿{
-    "name": "bb.bbcode",
+    "name": "bb.bbcodeinterpreter",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],

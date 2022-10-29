@@ -1,8 +1,8 @@
 {
-  "name": "com.bb.bbcodeinterpreter",
+  "name": "com.bb.bbcode-interpreter",
   "version": "0.1.0",
   "displayName": "BBCode",
-  "description": "BBCode compiler and interpreter",
+  "description": "BBCode parser and interpreter",
   "unity": "2019.1",
   "unityRelease": "0b5",
   "documentationUrl": "https://github.com/BBpezsgo/Interpreter",

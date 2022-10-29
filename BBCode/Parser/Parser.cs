@@ -1738,7 +1738,7 @@ namespace IngameCoding.BBCode
             }
 
             /// <summary> return, break, continue, etc. </summary>
-            Statement_FunctionCall ExpectKeywordCall(string name, bool haveParameters = false)
+            Statement_FunctionCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -1759,15 +1759,17 @@ namespace IngameCoding.BBCode
                 functionCall.position.Line = possibleFunctionName.lineNumber;
                 functionCall.position.Extend(possibleFunctionName.Position.AbsolutePosition);
 
-                if (haveParameters)
+                if (canHaveParameters)
                 {
                     Statement parameter = ExpectExpression();
-                    if (parameter == null)
-                        throw new SyntaxException("Expected expression as parameter", functionCall.position);
+                    if (parameter == null && needParameters)
+                    { throw new SyntaxException("Expected expression as parameter", functionCall.position); }
 
-                    functionCall.position.Extend(parameter.position.AbsolutePosition);
-
-                    functionCall.parameters.Add(parameter);
+                    if (parameter != null)
+                    {
+                        functionCall.position.Extend(parameter.position.AbsolutePosition);
+                        functionCall.parameters.Add(parameter);
+                    }
                 }
                 return functionCall;
             }

@@ -2,7 +2,6 @@
 
 namespace IngameCoding.Bytecode
 {
-    using Debug;
     using IngameCoding.Core;
 
     using System.Diagnostics;
@@ -2147,11 +2146,23 @@ namespace IngameCoding.Bytecode
         public Item Get(int index) => this.stack[index];
     }
 
+    struct BytecodeInterpreterSettings
+    {
+        internal int ClockCyclesPerUpdate;
+        internal int InstructionLimit;
+        internal int StackMaxSize;
+
+        internal static BytecodeInterpreterSettings Default => new()
+        {
+            ClockCyclesPerUpdate = 2,
+            InstructionLimit = 1024,
+            StackMaxSize = 128,
+        };
+    }
+
     class BytecodeInterpeter
     {
-        const int ClockCyclesPerUpdate = 2;
-        const int InstructionLimit = 1024;
-        const int StackMaxSize = 128;
+        BytecodeInterpreterSettings settings;
 
         CentralProcessingUnit CPU;
         int[] arguments;
@@ -2162,14 +2173,16 @@ namespace IngameCoding.Bytecode
         public bool IsRunning => currentlyRunning;
         bool destroyed = false;
         bool IsCall = false;
-        int remainingClockCycles = ClockCyclesPerUpdate;
+        int remainingClockCycles;
 
         // Safely
         int lastInstrPointer = -1;
         int endlessSafe = 0;
 
-        public BytecodeInterpeter(Instruction[] code, Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions)
+        public BytecodeInterpeter(Instruction[] code, Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
         {
+            this.settings = settings;
+
             CPU = new CentralProcessingUnit(code, 0, builtinFunctions);
 
             arguments = new int[0];
@@ -2178,7 +2191,7 @@ namespace IngameCoding.Bytecode
             currentlyRunning = false;
             destroyed = false;
             IsCall = false;
-            remainingClockCycles = ClockCyclesPerUpdate;
+            remainingClockCycles = this.settings.ClockCyclesPerUpdate;
 
             endlessSafe = 0;
             lastInstrPointer = -1;
@@ -2220,13 +2233,13 @@ namespace IngameCoding.Bytecode
         {
             if (destroyed) return;
 
-            if (endlessSafe > InstructionLimit)
+            if (endlessSafe > settings.InstructionLimit)
             {
                 CPU.MU.CodePointer = CPU.MU.Code.Length;
                 throw new RuntimeException("Instruction limit reached!");
             }
 
-            if (CPU.MU.Stack.Count > StackMaxSize)
+            if (CPU.MU.Stack.Count > settings.StackMaxSize)
             {
                 throw new RuntimeException("Stack overflow!");
             }
@@ -2296,7 +2309,7 @@ namespace IngameCoding.Bytecode
         public void Tick()
         {
             if (!enable || destroyed) return;
-            remainingClockCycles = Math.Min(remainingClockCycles + ClockCyclesPerUpdate, ClockCyclesPerUpdate);
+            remainingClockCycles = Math.Min(remainingClockCycles + settings.ClockCyclesPerUpdate, settings.ClockCyclesPerUpdate);
             ExecuteNext();
         }
 

@@ -605,7 +605,7 @@ namespace IngameCoding.BBCode
                     BuiltinType.STRING => "",
                     BuiltinType.BOOLEAN => false,
                     BuiltinType.STRUCT => new Stack.Item.UnassignedStruct(),
-                    _ => throw new InternalException($"initial value for type {type.type} is unimplemented"),
+                    _ => throw new InternalException($"initial value for type {type.typeName} is unimplemented"),
                 };
             }
         }
@@ -743,7 +743,7 @@ namespace IngameCoding.BBCode
         }
         string FindStatementType(Statement_Literal literal)
         {
-            return literal.type.type switch
+            return literal.type.typeName switch
             {
                 BuiltinType.INT => BuiltinType.INT.ToString().ToLower(),
                 BuiltinType.FLOAT => BuiltinType.FLOAT.ToString().ToLower(),
@@ -956,20 +956,26 @@ namespace IngameCoding.BBCode
                 case BuiltinType.VOID:
                 case BuiltinType.ANY:
                 default:
-                    throw new InternalException($"Unknown variable type '{newVariable.type.type}'");
+                    throw new InternalException($"Unknown variable type '{newVariable.type.typeName}'");
             }
         }
         void GenerateCodeForStatement(Statement_FunctionCall functionCall)
         {
             if (functionCall.FunctionName == "return")
             {
-                if (functionCall.parameters.Count != 1)
+                if (functionCall.parameters.Count > 1)
                 { throw new ParserException("Wrong number of parameters passed to 'return'", functionCall.position); }
+                else if (functionCall.parameters.Count == 1)
+                {
+                    GenerateCodeForStatement(functionCall.parameters[0]);
+                    AddInstruction(Opcode.STORE_VALUE_BR, -2 - parameters.Count - ((isStructMethod) ? 1 : 0));
+                }
 
-                GenerateCodeForStatement(functionCall.parameters[0]);
-                AddInstruction(Opcode.STORE_VALUE_BR, -2 - parameters.Count - ((isStructMethod) ? 1 : 0));
+
                 returnInstructions.Add(compiledCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
+
+                
 
                 return;
             }
@@ -1662,7 +1668,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == newVariable.type.type)
+                                if (literal.type.typeName == newVariable.type.typeName)
                                 { initialValue1 = int.Parse(literal.value); }
                             }
                         }
@@ -1716,7 +1722,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == newVariable.type.type)
+                                if (literal.type.typeName == newVariable.type.typeName)
                                 { initialValue4 = bool.Parse(literal.value); }
                             }
                         }
@@ -1743,7 +1749,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                newVariable.type.type = literal.type.type;
+                                newVariable.type.typeName = literal.type.typeName;
                             }
                             else if (newVariable.initialValue is Statement_NewStruct newStruct)
                             {
@@ -1780,7 +1786,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == newVariable.type.type)
+                                if (literal.type.typeName == newVariable.type.typeName)
                                 {
                                     initialValue1 = int.Parse(literal.value);
                                 }
@@ -1840,7 +1846,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                if (literal.type.type == newVariable.type.type)
+                                if (literal.type.typeName == newVariable.type.typeName)
                                 {
                                     initialValue4 = bool.Parse(literal.value);
                                 }
@@ -1879,7 +1885,7 @@ namespace IngameCoding.BBCode
                         {
                             if (newVariable.initialValue is Statement_Literal literal)
                             {
-                                newVariable.type.type = literal.type.type;
+                                newVariable.type.typeName = literal.type.typeName;
                             }
                             else if (newVariable.initialValue is Statement_NewStruct newStruct)
                             {
@@ -1907,7 +1913,7 @@ namespace IngameCoding.BBCode
                     case BuiltinType.VOID:
                     case BuiltinType.ANY:
                     default:
-                        throw new ParserException($"Unknown variable type '{newVariable.type.type}'", new Position(newVariable.position.Line));
+                        throw new ParserException($"Unknown variable type '{newVariable.type.typeName}'", new Position(newVariable.position.Line));
                 }
             }
 

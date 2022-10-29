@@ -7,7 +7,7 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG
-            EasyInterpreter.Run("-throw-errors", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test2.bbc");
+            EasyInterpreter.Run("-throw-errors", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test4.bbc");
 #else
             EasyInterpreter.Run(args);
 #endif

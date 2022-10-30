@@ -4,7 +4,7 @@ using System;
 namespace IngameCoding.Errors
 {
     using Core;
-    using BBCode;
+    using Tokenizer;
 
     [Serializable]
     public class Exception : System.Exception

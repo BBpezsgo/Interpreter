@@ -1,14 +1,17 @@
-﻿using System.Diagnostics;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
 namespace IngameCoding.Core
 {
     using BBCode;
+
     using Bytecode;
+
     using Errors;
+
     using Terminal;
 
     [Serializable]
@@ -23,6 +26,7 @@ namespace IngameCoding.Core
         public delegate void OnInputEventHandler(Interpreter sender, string message);
         public event OnInputEventHandler OnNeedInput;
 
+        bool OnlyHaveCode = true;
         public bool IsExecutingCode => currentlyRunningCode;
 
         struct InstructionOffsets
@@ -95,7 +99,7 @@ namespace IngameCoding.Core
 
         InstructionOffsets instructionOffsets;
 
-        void RunCode(Instruction[] compiledCode)
+        internal void RunCode(Instruction[] compiledCode)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, BytecodeInterpreterSettings.Default);
@@ -103,39 +107,10 @@ namespace IngameCoding.Core
             OnOutput?.Invoke(this, "Start Code", TerminalInterpreter.LogType.Normal);
         }
 
-        bool BeforeInitialize()
-        {
-            if (currentlyRunningCode)
-            {
-                OnOutput?.Invoke(this, "Can't run the program: currently running another", TerminalInterpreter.LogType.Warning);
-                return false;
-            }
-            this.currentlyRunningCode = true;
-
-            AddBuiltins();
-            AddBuiltinFunction("conin", new BBCode.TypeToken[] {
-                new TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
-            {
-                pauseCode = true;
-                if (OnNeedInput == null)
-                {
-                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", TerminalInterpreter.LogType.Warning);
-                    OnInput("");
-                }
-                else
-                {
-                    OnNeedInput?.Invoke(this, parameters[0].ToStringValue());
-                }
-            }, true);
-
-            return true;
-        }
-
-        Instruction[] CompileCode(string code, DirectoryInfo directory, List<Warning> warnings)
+        Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, List<Warning> warnings)
         {
             var compiler = Compiler.CompileCode(
-                code,
+                sourceCode,
                 builtinFunctions,
                 builtinStructs,
                 directory,
@@ -151,6 +126,8 @@ namespace IngameCoding.Core
             { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
             OnOutput?.Invoke(this, "Initializing bytecode interpreter...", TerminalInterpreter.LogType.Debug);
+
+            OnlyHaveCode = false;
 
             instructionOffsets = new() { Offsets = new() };
 
@@ -205,26 +182,52 @@ namespace IngameCoding.Core
             return compiledCode;
         }
 
-        internal void Initialize(string code, DirectoryInfo directory, bool HandleErrors = true)
+        internal bool Initialize()
         {
-            if (!BeforeInitialize()) return;
+            if (currentlyRunningCode)
+            {
+                OnOutput?.Invoke(this, "Can't run the program: currently running another", TerminalInterpreter.LogType.Warning);
+                return false;
+            }
+            this.currentlyRunningCode = true;
 
+            AddBuiltins();
+            AddBuiltinFunction("conin", new BBCode.TypeToken[] {
+                new TypeToken("any", BuiltinType.ANY)
+            }, (Stack.Item[] parameters) =>
+            {
+                pauseCode = true;
+                if (OnNeedInput == null)
+                {
+                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", TerminalInterpreter.LogType.Warning);
+                    OnInput("");
+                }
+                else
+                {
+                    OnNeedInput?.Invoke(this, parameters[0].ToStringValue());
+                }
+            }, true);
+
+            return true;
+        }
+
+        internal Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, bool HandleErrors = true)
+        {
             if (HandleErrors)
             {
                 List<Warning> warnings = new();
                 try
                 {
-                    var compiledCode = CompileCode(code, directory, warnings);
-                    RunCode(compiledCode);
+                    return CompileCode(sourceCode, directory, warnings);
                 }
-                catch (Errors.Exception error)
+                catch (Exception error)
                 {
                     OnDone?.Invoke(this, false);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
                     foreach (var warning in warnings)
-                    { OnOutput?.Invoke(this,warning.MessageAll, TerminalInterpreter.LogType.Warning); }
+                    { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
                     Output.Debug.Debug.LogError(error);
@@ -243,6 +246,7 @@ namespace IngameCoding.Core
                     }
                     OnOutput?.Invoke(this, "Stack Trace:\n" + StackTraceString, TerminalInterpreter.LogType.Error);
                     OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
+                    return null;
                 }
                 catch (System.Exception error)
                 {
@@ -257,13 +261,13 @@ namespace IngameCoding.Core
                     Output.Terminal.Output.LogError(error);
 
                     OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
+                    return null;
                 }
             }
             else
             {
                 List<Warning> warnings = new();
-                var compiledCode = CompileCode(code, directory, warnings);
-                RunCode(compiledCode);
+                return CompileCode(sourceCode, directory, warnings);
             }
         }
 
@@ -547,11 +551,7 @@ namespace IngameCoding.Core
         bool startCalled = false;
         bool globalVariablesDisposed = false;
 
-        public void Update()
-        {
-            Update((float)(DateTime.Now - LastTime).TotalMilliseconds);
-        }
-
+        public void Update() => Update((float)(DateTime.Now - LastTime).TotalMilliseconds);
         public void Update(float deltaTime)
         {
             LastTime = DateTime.Now;
@@ -606,53 +606,60 @@ namespace IngameCoding.Core
 
                 if (bytecodeInterpeter != null && !bytecodeInterpeter.IsRunning)
                 {
-                    if (!globalVariablesCreated)
+                    if (OnlyHaveCode)
                     {
-                        OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
-
-                        globalVariablesCreated = true;
-                        bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
+                        OnCodeExecuted(result);
                     }
-                    else if (!startCalled)
+                    else
                     {
-                        OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
-
-                        startCalled = true;
-                        if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
-                        { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
-
-                        bytecodeInterpeter.Call(offset);
-                    }
-                    else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
-                    {
-                        WaitForUpdates(10, () =>
+                        if (!globalVariablesCreated)
                         {
+                            OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
+
+                            globalVariablesCreated = true;
+                            bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
+                        }
+                        else if (!startCalled)
+                        {
+                            OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
+
+                            startCalled = true;
+                            if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
+                            { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
+
+                            bytecodeInterpeter.Call(offset);
+                        }
+                        else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
+                        {
+                            WaitForUpdates(10, () =>
+                            {
+                                if (bytecodeInterpeter != null)
+                                {
+                                    bytecodeInterpeter.Call(offset);
+                                }
+                            });
+                        }
+                        else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
+                        {
+                            OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
+
+                            exitCalled = true;
                             if (bytecodeInterpeter != null)
                             {
                                 bytecodeInterpeter.Call(offset);
                             }
-                        });
-                    }
-                    else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
-                    {
-                        OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
-
-                        exitCalled = true;
-                        if (bytecodeInterpeter != null)
-                        {
-                            bytecodeInterpeter.Call(offset);
                         }
-                    }
-                    else if (!globalVariablesDisposed)
-                    {
-                        OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
+                        else if (!globalVariablesDisposed)
+                        {
+                            OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
 
-                        globalVariablesDisposed = true;
-                        bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
-                    }
-                    else
-                    {
-                        OnCodeExecuted(result);
+                            globalVariablesDisposed = true;
+                            bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
+                        }
+                        else
+                        {
+                            OnCodeExecuted(result);
+                        }
                     }
                 }
             }
@@ -676,7 +683,6 @@ namespace IngameCoding.Core
                 Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
             }
         }
-
         void AddBuiltinFunction(string name, Func<Stack.Item> callback)
         {
             Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((_) =>
@@ -752,7 +758,27 @@ namespace IngameCoding.Core
                 sender.OnInput(input);
             };
 
-            codeInterpreter.Initialize(code, file.Directory, HandleErrors);
+            if (codeInterpreter.Initialize())
+            {
+                Instruction[] compiledCode;
+
+                if (file.Extension.ToLower() == ".bcc")
+                {
+                    var tokens = BCCode.Tokenizer.Parse(code);
+
+                    var parser = new BCCode.Parser();
+                    var (statements, labels) = parser.Parse(tokens);
+
+                    compiledCode = BCCode.Parser.GenerateCode(statements, labels);
+                }
+                else
+                {
+                    compiledCode = codeInterpreter.CompileCode(code, file.Directory, HandleErrors);
+                }
+
+                if (compiledCode != null)
+                { codeInterpreter.RunCode(compiledCode); }
+            }
 
             while (codeInterpreter.IsExecutingCode)
             {

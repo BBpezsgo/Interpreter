@@ -5,11 +5,14 @@ using System.Linq;
 namespace IngameCoding.BBCode
 {
     using Core;
+    using IngameCoding.Tokenizer;
     using Terminal;
 
     public enum TokenType
     {
         WHITESPACE,
+        LINEBREAK,
+
         IDENTIFIER,
 
         LITERAL_NUMBER,
@@ -27,15 +30,20 @@ namespace IngameCoding.BBCode
         COMMENT_MULTILINE,
     }
 
-    public class BaseToken
+    public struct TokenizerSettings
     {
-        public int startOffset;
-        public int endOffset;
-        public int lineNumber;
+        /// <summary> The Tokenizer will produce <see cref="TokenType.WHITESPACE"/> </summary>
+        public bool TokenizeWhitespaces;
+        /// <summary> The Tokenizer will produce <see cref="TokenType.LINEBREAK"/> </summary>
+        public bool DistinguishBetweenSpacesAndNewlines;
+        public bool JoinLinebreaks;
 
-        public int startOffsetTotal;
-        public int endOffsetTotal;
-        public Position Position => new(lineNumber, startOffset, new Interval(startOffsetTotal, endOffsetTotal));
+        public static TokenizerSettings Default => new()
+        {
+            TokenizeWhitespaces = false,
+            DistinguishBetweenSpacesAndNewlines = false,
+            JoinLinebreaks = true,
+        };
     }
 
     public class Token : BaseToken
@@ -45,21 +53,14 @@ namespace IngameCoding.BBCode
 
         public TokenSubtype subtype = TokenSubtype.None;
 
-        public Token Clone()
-        {
-            return (Token)MemberwiseClone();
-        }
-
-        public override string ToString()
-        {
-            return type.ToString() + " { text: \"" + text.ToString() + "\" }";
-        }
+        public Token Clone() => (Token)MemberwiseClone();
+        public override string ToString() => type.ToString() + " \"" + text.ToString() + "\"";
     }
 
     public class Tokenizer
     {
         /// <returns>(tokens, tokens with comments)</returns>
-        public static (Token[], Token[]) Parse(string program, Action<string, TerminalInterpreter.LogType> printCallback = null)
+        public static (Token[], Token[]) Parse(string sourceCode, TokenizerSettings settings, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             DateTime tokenizingStarted = DateTime.Now;
             if (printCallback != null)
@@ -75,13 +76,14 @@ namespace IngameCoding.BBCode
             };
 
             char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
+            char[] banned = new char[] { '\r', '\u200B' };
 
             int cursorPosition = 0;
             int cursorPositionTotal = 0;
 
-            foreach (var currChar in program)
+            foreach (var currChar in sourceCode)
             {
-                if (currChar == '\r')
+                if (banned.Contains(currChar))
                 {
                     cursorPositionTotal++;
                     continue;
@@ -89,18 +91,12 @@ namespace IngameCoding.BBCode
 
                 if (currChar == '\n' && currentToken.type == TokenType.COMMENT_MULTILINE)
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.text = "";
                     currentToken.type = TokenType.COMMENT_MULTILINE;
                 }
 
-                cursorPosition = (currChar == '\n') ? 1 : cursorPosition + 1;
-                cursorPositionTotal++;
-
-                if (currChar == '\u200B')
-                {
-                    continue;
-                }
+                cursorPosition = currChar == '\n' ? 1 : cursorPosition + 1;
 
                 if (currentToken.type == TokenType.STRING_ESCAPE_SEQUENCE)
                 {
@@ -123,7 +119,7 @@ namespace IngameCoding.BBCode
                     {
                         currentToken.text += currChar;
                     }
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     continue;
                 }
                 else if (currentToken.type == TokenType.COMMENT && currChar != '\n')
@@ -141,7 +137,7 @@ namespace IngameCoding.BBCode
                 {
                     currentToken.text += currChar;
                     currentToken.type = TokenType.COMMENT_MULTILINE;
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     continue;
                 }
 
@@ -162,7 +158,7 @@ namespace IngameCoding.BBCode
                 if (currentToken.type == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
                 {
                     currentToken.type = TokenType.OPERATOR;
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                 }
 
                 if (int.TryParse(currChar.ToString(), out _))
@@ -172,7 +168,7 @@ namespace IngameCoding.BBCode
                     else if (currentToken.type == TokenType.POTENTIAL_FLOAT)
                         currentToken.type = TokenType.LITERAL_FLOAT;
                     else if (currentToken.type == TokenType.OPERATOR)
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.text += currChar;
                 }
                 else if (currChar == '.')
@@ -189,10 +185,10 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                 }
                 else if (currChar == '/')
@@ -204,31 +200,31 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.POTENTIAL_COMMENT;
                         currentToken.text += currChar;
                     }
                 }
                 else if (bracelets.Contains(currChar))
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                 }
                 else if (currChar == ';')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                 }
                 else if (currChar == ',')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                 }
                 else if (currChar == '=')
                 {
@@ -236,11 +232,11 @@ namespace IngameCoding.BBCode
                     if (strings.Contains(currentToken.text))
                     {
                         currentToken.text += currChar;
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
                     }
@@ -250,11 +246,11 @@ namespace IngameCoding.BBCode
                     if (currentToken.text == "-")
                     {
                         currentToken.text += currChar;
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
                     }
@@ -264,11 +260,11 @@ namespace IngameCoding.BBCode
                     if (currentToken.text == "+")
                     {
                         currentToken.text += currChar;
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
                     }
@@ -282,80 +278,84 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
                     }
                 }
                 else if (currChar == '<')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '>')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '%')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '!')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '&')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '|')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == '^')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     currentToken.type = TokenType.OPERATOR;
                     currentToken.text += currChar;
                 }
                 else if (currChar == ' ' || currChar == '\t')
                 {
-                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                    EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
+                    currentToken.type = TokenType.WHITESPACE;
+                    currentToken.text = currChar.ToString();
                 }
-                else if (currChar == '\r' || currChar == '\n')
+                else if (currChar == '\n')
                 {
                     if (currentToken.type == TokenType.COMMENT_MULTILINE)
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.COMMENT_MULTILINE;
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
+                        currentToken.type = settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
+                        currentToken.text = currChar.ToString();
                     }
-                    if (currChar == '\n') currentToken.lineNumber++;
+                    currentToken.lineNumber++;
                 }
                 else if (currChar == '"')
                 {
                     if (currentToken.type != TokenType.LITERAL_STRING)
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.LITERAL_STRING;
                     }
                     else if (currentToken.type == TokenType.LITERAL_STRING)
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                 }
                 else if (currChar == '\\')
@@ -366,10 +366,10 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.OPERATOR;
                         currentToken.text += currChar;
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                 }
                 else
@@ -379,7 +379,7 @@ namespace IngameCoding.BBCode
                         currentToken.type == TokenType.LITERAL_FLOAT ||
                         currentToken.type == TokenType.OPERATOR)
                     {
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = TokenType.IDENTIFIER;
                         currentToken.text += currChar;
                     }
@@ -390,15 +390,15 @@ namespace IngameCoding.BBCode
                 }
             }
 
-            EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal);
+            EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
 
             if (printCallback != null)
             { printCallback?.Invoke($"Code tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
-            return (tokens.ToArray(), tokensWithComments.ToArray());
+            return (NormalizeTokens(tokens, settings).ToArray(), NormalizeTokens(tokensWithComments, settings).ToArray());
         }
 
-        static void EndToken(Token token, List<Token> tokens, List<Token> tokensWithComments, int cursorPosition, int cursorPositionTotal)
+        static void EndToken(Token token, List<Token> tokens, List<Token> tokensWithComments, int cursorPosition, int cursorPositionTotal, TokenizerSettings settings)
         {
             token.endOffset = cursorPosition - 1;
             token.startOffset = cursorPosition - token.text.Length;
@@ -412,6 +412,11 @@ namespace IngameCoding.BBCode
                 {
                     tokens.Add(token.Clone());
                 }
+            }
+            else if (!string.IsNullOrEmpty(token.text) && settings.TokenizeWhitespaces)
+            {
+                tokensWithComments.Add(token.Clone());
+                tokens.Add(token.Clone());
             }
 
             if (token.type == TokenType.POTENTIAL_FLOAT)
@@ -428,6 +433,41 @@ namespace IngameCoding.BBCode
 
             token.type = TokenType.WHITESPACE;
             token.text = "";
+        }
+    
+        static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+        {
+            List<Token> result = new();
+
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                var token = tokens[i];
+                
+                if (result.Count == 0)
+                {
+                    result.Add(token);
+                    continue;
+                }
+
+                var lastToken = result.Last();
+
+                if (token.type == TokenType.WHITESPACE && lastToken.type == TokenType.WHITESPACE)
+                {
+                    lastToken.text += token.text;
+                    continue;
+                }
+
+                if (token.type == TokenType.LINEBREAK && lastToken.type == TokenType.LINEBREAK && settings.JoinLinebreaks)
+                {
+                    lastToken.text += token.text;
+                    continue;
+                }
+
+
+                result.Add(token);
+            }
+
+            return result;
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using IngameCoding.Core;
+using System;
 
 namespace TheProgram
 {
@@ -7,7 +8,7 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG
-            EasyInterpreter.Run("-throw-errors", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test4.bbc");
+            EasyInterpreter.Run("-throw-errors", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test0.bcc");
 #else
             EasyInterpreter.Run(args);
 #endif

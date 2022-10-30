@@ -2262,7 +2262,7 @@ namespace IngameCoding.BBCode
 
         public static Parser.Parser ParseCode(string code, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            var (tokens, _) = Tokenizer.Parse(code, printCallback);
+            var (tokens, _) = Tokenizer.Parse(code, TokenizerSettings.Default, printCallback);
 
             DateTime parseStarted = DateTime.Now;
             if (printCallback != null)

@@ -325,7 +325,7 @@ namespace IngameCoding.Core
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                Debug.LogException(error);
+                Debug.LogError(error.ToString());
             }
         }
 

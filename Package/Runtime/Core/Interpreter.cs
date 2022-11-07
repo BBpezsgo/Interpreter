@@ -12,10 +12,12 @@ namespace IngameCoding.Core
 
     using Errors;
 
+    using System.Data.SqlTypes;
+
     using Terminal;
 
     [Serializable]
-    class Interpreter
+    public class Interpreter
     {
         public delegate void OnDoneEventHandler(Interpreter sender, bool success);
         public event OnDoneEventHandler OnDone;
@@ -99,7 +101,7 @@ namespace IngameCoding.Core
 
         InstructionOffsets instructionOffsets;
 
-        internal void RunCode(Instruction[] compiledCode)
+        public void RunCode(Instruction[] compiledCode)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, BytecodeInterpreterSettings.Default);
@@ -107,7 +109,7 @@ namespace IngameCoding.Core
             OnOutput?.Invoke(this, "Start Code", TerminalInterpreter.LogType.Normal);
         }
 
-        Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, List<Warning> warnings)
+        public Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, List<Warning> warnings)
         {
             var compiler = Compiler.CompileCode(
                 sourceCode,
@@ -182,7 +184,7 @@ namespace IngameCoding.Core
             return compiledCode;
         }
 
-        internal bool Initialize()
+        public bool Initialize()
         {
             if (currentlyRunningCode)
             {
@@ -211,7 +213,7 @@ namespace IngameCoding.Core
             return true;
         }
 
-        internal Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, bool HandleErrors = true)
+        public Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, bool HandleErrors = true)
         {
             if (HandleErrors)
             {
@@ -680,7 +682,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
         void AddBuiltinFunction(string name, Func<Stack.Item> callback)
@@ -698,7 +700,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<Stack.Item[]> callback, bool ReturnSomething = false)
@@ -712,8 +714,188 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"Builtin function '{name}'() already defined");
+                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
+        }
+
+        public void AddBuiltinFunction(string name, Action callback)
+        {
+            var types = new TypeToken[0];
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                callback?.Invoke();
+            });
+        }
+        public void AddBuiltinFunction<T0>(string name, Action<T0> callback)
+        {
+            var types = GetTypes<T0>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                callback?.Invoke((T0)args[0].Value());
+            });
+        }
+        public void AddBuiltinFunction<T0, T1>(string name, Action<T0, T1> callback)
+        {
+            var types = GetTypes<T0, T1>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value());
+            });
+        }
+        public void AddBuiltinFunction<T0, T1, T2>(string name, Action<T0, T1, T2> callback)
+        {
+            var types = GetTypes<T0, T1, T2>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value());
+            });
+        }
+
+        public void AddBuiltinFunction(string name, Func<object> callback)
+        {
+            var types = new TypeToken[0];
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                return new Stack.Item(callback?.Invoke(), $"{name}() result");
+            });
+        }
+        public void AddBuiltinFunction<T0>(string name, Func<T0, object> callback)
+        {
+            var types = GetTypes<T0>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                return new Stack.Item(callback?.Invoke((T0)args[0].Value()), $"{name}() result");
+            });
+        }
+        public void AddBuiltinFunction<T0, T1>(string name, Func<T0, T1, object> callback)
+        {
+            var types = GetTypes<T0, T1>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                return new Stack.Item(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value()), $"{name}() result");
+            });
+        }
+        public void AddBuiltinFunction<T0, T1, T2>(string name, Func<T0, T1, T2, object> callback)
+        {
+            var types = GetTypes<T0, T1, T2>();
+
+            AddBuiltinFunction(name, types, (args) =>
+            {
+                CheckParameters(name, types, args);
+                return new Stack.Item(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value()), $"{name}() result");
+            });
+        }
+
+        void CheckParameters(string functionName, TypeToken[] requied, Stack.Item[] passed)
+        {
+            if (passed.Length != requied.Length) throw new System.Exception($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
+
+            for (int i = 0; i < requied.Length; i++)
+            {
+                if (!passed[i].EqualType(requied[i].typeName)) throw new System.Exception($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].typeName.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
+            }
+        }
+
+        TypeToken[] GetTypes<T0>() => new TypeToken[1]
+        {
+            GetType<T0>(),
+        };
+        TypeToken[] GetTypes<T0, T1>() => new TypeToken[2]
+        {
+            GetType<T0>(),
+            GetType<T1>(),
+        };
+        TypeToken[] GetTypes<T0, T1, T2>() => new TypeToken[3]
+        {
+            GetType<T0>(),
+            GetType<T1>(),
+            GetType<T2>(),
+        };
+        TypeToken[] GetTypes<T0, T1, T2, T3>() => new TypeToken[4]
+        {
+            GetType<T0>(),
+            GetType<T1>(),
+            GetType<T2>(),
+            GetType<T3>(),
+        };
+        TypeToken[] GetTypes<T0, T1, T2, T3, T4>() => new TypeToken[5]
+        {
+            GetType<T0>(),
+            GetType<T1>(),
+            GetType<T2>(),
+            GetType<T3>(),
+            GetType<T4>(),
+        };
+        TypeToken[] GetTypes<T0, T1, T2, T3, T4, T5>() => new TypeToken[6]
+        {
+            GetType<T0>(),
+            GetType<T1>(),
+            GetType<T2>(),
+            GetType<T3>(),
+            GetType<T4>(),
+            GetType<T5>(),
+        };
+
+        TypeToken GetType<T>()
+        {
+            var type_ = typeof(T);
+
+            if (type_ == typeof(int))
+            { return new TypeToken("int", BuiltinType.INT); }
+            if (type_ == typeof(float))
+            { return new TypeToken("float", BuiltinType.FLOAT); }
+            if (type_ == typeof(bool))
+            { return new TypeToken("bool", BuiltinType.BOOLEAN); }
+            if (type_ == typeof(string))
+            { return new TypeToken("string", BuiltinType.STRING); }
+
+            return null;
+        }
+    }
+
+    static class StackItemExtension
+    {
+        public static object Value(this Stack.Item item) => item.type switch
+        {
+            Stack.Item.Type.INT => item.ValueInt,
+            Stack.Item.Type.FLOAT => item.ValueFloat,
+            Stack.Item.Type.STRING => item.ValueString,
+            Stack.Item.Type.BOOLEAN => item.ValueBoolean,
+            _ => null,
+        };
+
+        public static bool EqualType(this Stack.Item item, BuiltinType type)
+        {
+            switch (item.type)
+            {
+                case Stack.Item.Type.INT:
+                    if (type == BuiltinType.INT) return true;
+                    break;
+                case Stack.Item.Type.FLOAT:
+                    if (type == BuiltinType.FLOAT) return true;
+                    break;
+                case Stack.Item.Type.STRING:
+                    if (type == BuiltinType.STRING) return true;
+                    break;
+                case Stack.Item.Type.BOOLEAN:
+                    if (type == BuiltinType.BOOLEAN) return true;
+                    break;
+            }
+            return false;
         }
     }
 

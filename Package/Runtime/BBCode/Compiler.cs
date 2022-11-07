@@ -2085,6 +2085,14 @@ namespace IngameCoding.BBCode
                             if (builtinFunction.Value.returnSomething != (function.Value.type.typeName != BuiltinType.VOID))
                             { throw new ParserException("Wrong type definied for builtin function '" + builtinFunction.Key + "'"); }
 
+                            for (int i = 0; i < builtinFunction.Value.parameters.Length; i++)
+                            {
+                                if (builtinFunction.Value.parameters[i].typeName == BuiltinType.ANY) continue;
+
+                                if (builtinFunction.Value.parameters[i].typeName != function.Value.parameters[i].type.typeName)
+                                { throw new ParserException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.parameters[i].typeName.ToString().ToLower()} Passed: {function.Value.parameters[i].type.typeName.ToString().ToLower()}"); }
+                            }
+
                             return new CompiledFunction()
                             {
                                 parameters = builtinFunction.Value.parameters,

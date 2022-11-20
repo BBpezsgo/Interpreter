@@ -1,5 +1,4 @@
-﻿using IngameCoding.Core;
-using System;
+﻿using System;
 
 namespace TheProgram
 {
@@ -8,11 +7,12 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG
-            EasyInterpreter.Run("-throw-errors", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test0.bcc");
+            // IngameCoding.Core.EasyInterpreter.Run("-throw-errors", "-c-print-instructions", "true", "-p-print-info", "true", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test1.bbc");
+            IngameCoding.Core.EasyInterpreter.Run("-throw-errors", "-hide-debug", "-hide-system", "D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\test1.bbc");
 #else
-            EasyInterpreter.Run(args);
+            IngameCoding.Core.EasyInterpreter.Run(args);
 #endif
-            Console.WriteLine("\n\nPress any key to exit");
+            Console.WriteLine("\n\r\n\rPress any key to exit");
             Console.ReadKey();
         }
     }

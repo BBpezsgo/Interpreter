@@ -57,14 +57,34 @@ namespace IngameCoding.BBCode
         public override string ToString() => type.ToString() + " \"" + text.ToString() + "\"";
     }
 
+    /// <summary>
+    /// The tokenizer for the BBCode language
+    /// </summary>
     public class Tokenizer
     {
-        /// <returns>(tokens, tokens with comments)</returns>
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <param name="settings">
+        /// Tokenizer settings<br/>
+        /// Use <see cref="TokenizerSettings.Default"/> if you don't know
+        /// </param>
+        /// <param name="printCallback">
+        /// Optional: Print callback
+        /// </param>
+        /// <returns>
+        /// Two token arrays: the first without, the second with the comments
+        /// (tokens, tokens with comments)
+        /// </returns>
+        /// <exception cref="Errors.SyntaxException"/>
         public static (Token[], Token[]) Parse(string sourceCode, TokenizerSettings settings, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             DateTime tokenizingStarted = DateTime.Now;
             if (printCallback != null)
-            { printCallback?.Invoke("Tokenizing Code...", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke("Tokenizing...", TerminalInterpreter.LogType.Debug); }
 
             List<Token> tokens = new();
             List<Token> tokensWithComments = new();
@@ -393,7 +413,7 @@ namespace IngameCoding.BBCode
             EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
 
             if (printCallback != null)
-            { printCallback?.Invoke($"Code tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
             return (NormalizeTokens(tokens, settings).ToArray(), NormalizeTokens(tokensWithComments, settings).ToArray());
         }

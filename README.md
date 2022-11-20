@@ -11,10 +11,19 @@ This program parses the given source code, creates a list of instructions and ex
 
 ## How to run a file?
 When you've created a source file, just run it with the executable. Or run the exe file with an argument where you specify the path to the source code.<br>
-The argument syntax looks like this: `[-throw-errors] <path>`<br>
-The `-throw-errors` argument causes the program to crash on any syntax, parser, runtime, or internal exception.
+### Arguments:
+- `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
+- `-hide-debug` Hides the debug logs
+- `-hide-system` Hides the system logs
+- `-p-print-info [bool]` Prints the parser info
+- `-c-generate-comments [bool]` Generates comment instructions
+- `-c-remove-unused-functions [byte]` Remove unused instructions iterations
+- `-c-print-instructions [bool]` Prints the generated instructions
+- `-bc-clock [int]` Sets the interperter *clock cycles/update*
+- `-bc-instruction-limit [int]` Sets the interperter *instruction limit*
+- `-bc-stack-size [int]` Sets the interperter *stack size*
 
-## [Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
+### [Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
 
 ## Hello World program:
 https://github.com/BBpezsgo/Interpreter/blob/32a5cb93a041a326dbf46774ca7dceb3945ad24d/TestFiles/helloworld.bbc#L1-L14
@@ -56,15 +65,15 @@ int Add(this int v)
 13.Add();
 ```
 ### Events
-Two events can be caught:<br>
-`update` and `end`.<br>
-`update` is called every tick.<br>
-`end` is called when the program finishes executing.
 
 > **NOTE:**
 > If you listen to the `update` event, the program will run until you manually close it.
 
-You can listen to an event with the `Catch` attribute.
+You can listen to an event with the `Catch` attribute.<br>
+Two events can be caught:<br>
+`update` and `end`.<br>
+`update` is called every tick.<br>
+`end` is called when the program finishes executing.
 ```
 [Catch("update")]
 void Update() { }

@@ -7,28 +7,39 @@ using System.Linq;
 namespace IngameCoding.Core
 {
     using BBCode;
-
     using Bytecode;
-
     using Errors;
-
-    using System.Data.SqlTypes;
-
     using Terminal;
 
+    /// <summary>
+    /// This compiles and runs the code
+    /// </summary>
     [Serializable]
     public class Interpreter
     {
         public delegate void OnDoneEventHandler(Interpreter sender, bool success);
+        /// <summary>
+        /// Will be invoked when the code is completed
+        /// </summary>
         public event OnDoneEventHandler OnDone;
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, TerminalInterpreter.LogType logType);
+        /// <summary>
+        /// Will be invoked when the code has output
+        /// </summary>
         public event OnOutputEventHandler OnOutput;
 
         public delegate void OnInputEventHandler(Interpreter sender, string message);
+        /// <summary>
+        /// Will be invoked when the code needs input<br/>
+        /// Call <see cref="OnInput(string)"/> after this invoked
+        /// </summary>
         public event OnInputEventHandler OnNeedInput;
 
         bool OnlyHaveCode = true;
+        /// <summary>
+        /// True if the interpreter is running some code
+        /// </summary>
         public bool IsExecutingCode => currentlyRunningCode;
 
         struct InstructionOffsets
@@ -101,28 +112,56 @@ namespace IngameCoding.Core
 
         InstructionOffsets instructionOffsets;
 
-        public void RunCode(Instruction[] compiledCode)
+        /// <summary>
+        /// It prepares the interpreter to run some code
+        /// </summary>
+        /// <param name="compiledCode"></param>
+        public void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
-            bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, BytecodeInterpreterSettings.Default);
+            bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
 
-            OnOutput?.Invoke(this, "Start Code", TerminalInterpreter.LogType.Normal);
+            OnOutput?.Invoke(this, "Start code ...", TerminalInterpreter.LogType.Debug);
         }
 
-        public Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, List<Warning> warnings)
+        /// <summary>
+        /// Compiles the source code into msg list of instructions<br/>
+        /// <lv>WARNING:</lv> This will throw exceptions when they occur! To automatically print errors, use <see cref="CompileCode(string, DirectoryInfo, bool)"/> instead.
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <param name="directory">
+        /// The directory where the source code file is located
+        /// </param>
+        /// <param name="warnings">
+        /// A list that the compiler can fill with warnings
+        /// </param>
+        /// <returns>
+        /// A list of instructions
+        /// </returns>
+        public Instruction[] CompileCode(
+            string sourceCode,
+            DirectoryInfo directory,
+            List<Warning> warnings,
+            Compiler.CompilerSettings compilerSettings,
+            BBCode.Parser.ParserSettings parserSettings)
         {
-            var compiler = Compiler.CompileCode(
-                sourceCode,
+            OnOutput?.Invoke(this, $"Parse code: The main source code ...", TerminalInterpreter.LogType.Debug);
+
+            var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings, (msg, lv) => OnOutput?.Invoke(this, $"  {msg}", lv));
+            var compilerResult = Compiler.CompileCode(
+                parserResult,
                 builtinFunctions,
                 builtinStructs,
                 directory,
-                out var compiledFunctions,
-                out var compiledCode,
-                out _,
-                out var cg,
-                out var sg,
                 warnings,
+                compilerSettings,
+                parserSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b));
+
+            if (compilerSettings.PrintInstructions)
+            { compilerResult.WriteToConsole(); }
 
             foreach (var warning in warnings)
             { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
@@ -133,16 +172,16 @@ namespace IngameCoding.Core
 
             instructionOffsets = new() { Offsets = new() };
 
-            instructionOffsets.Set(InstructionOffsets.Kind.SetGlobalVariables, sg);
-            instructionOffsets.Set(InstructionOffsets.Kind.ClearGlobalVariables, cg);
+            instructionOffsets.Set(InstructionOffsets.Kind.SetGlobalVariables, compilerResult.setGlobalVariablesInstruction);
+            instructionOffsets.Set(InstructionOffsets.Kind.ClearGlobalVariables, compilerResult.clearGlobalVariablesInstruction);
 
-            foreach (var compiledFunction in compiledFunctions)
+            foreach (var compiledFunction in compilerResult.compiledFunctions)
             {
                 if (compiledFunction.Value.attributes.TryGetValue("CodeEntry", out var attriute))
                 {
                     if (attriute.parameters.Count != 0)
                     { throw new ParserException("Attribute 'CodeEntry' requies 0 parameter"); }
-                    if (compiler.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                    if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
                     {
                         instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
                     }
@@ -157,7 +196,7 @@ namespace IngameCoding.Core
                     {
                         if (value == "update")
                         {
-                            if (compiler.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                             }
@@ -166,7 +205,7 @@ namespace IngameCoding.Core
                         }
                         else if (value == "end")
                         {
-                            if (compiler.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                             }
@@ -181,9 +220,19 @@ namespace IngameCoding.Core
                 }
             }
 
-            return compiledCode;
+            return compilerResult.compiledCode;
         }
 
+        /// <summary>
+        /// Initializes the compiler
+        /// <list type="bullet">
+        /// <item>It checks if any code is running</item>
+        /// <item>Adds built-in functions</item>
+        /// </list>
+        /// </summary>
+        /// <returns>
+        /// True, if you can run some code
+        /// </returns>
         public bool Initialize()
         {
             if (currentlyRunningCode)
@@ -213,14 +262,34 @@ namespace IngameCoding.Core
             return true;
         }
 
-        public Instruction[] CompileCode(string sourceCode, DirectoryInfo directory, bool HandleErrors = true)
+        /// <summary>
+        /// Compiles the source code into msg list of instructions
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <param name="directory">
+        /// The directory where the source code file is located
+        /// </param>
+        /// <param name="HandleErrors">
+        /// Throw or print exceptions?
+        /// </param>
+        /// <returns>
+        /// A list of instructions
+        /// </returns>
+        public Instruction[] CompileCode(
+            string sourceCode,
+            DirectoryInfo directory,
+            Compiler.CompilerSettings compilerSettings,
+            BBCode.Parser.ParserSettings parserSettings,
+            bool HandleErrors = true)
         {
             if (HandleErrors)
             {
                 List<Warning> warnings = new();
                 try
                 {
-                    return CompileCode(sourceCode, directory, warnings);
+                    return CompileCode(sourceCode, directory, warnings, compilerSettings, parserSettings);
                 }
                 catch (Exception error)
                 {
@@ -269,7 +338,7 @@ namespace IngameCoding.Core
             else
             {
                 List<Warning> warnings = new();
-                return CompileCode(sourceCode, directory, warnings);
+                return CompileCode(sourceCode, directory, warnings, compilerSettings, parserSettings);
             }
         }
 
@@ -431,6 +500,13 @@ namespace IngameCoding.Core
 
 #endif
 
+        /// <summary>
+        /// Provides input to the interpreter<br/>
+        /// <lv>WARNING:</lv> Call it only after <see cref="OnNeedInput"/> invoked!
+        /// </summary>
+        /// <param name="inputValue">
+        /// The input value
+        /// </param>
         public void OnInput(string inputValue)
         {
             bytecodeInterpeter.AddValueToStack(new Stack.Item(inputValue, "Console Input"));
@@ -543,7 +619,7 @@ namespace IngameCoding.Core
         {
             OnDone?.Invoke(this, true);
             var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-            OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of " + result.ToString(), TerminalInterpreter.LogType.Normal);
+            OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of " + result.ToString(), TerminalInterpreter.LogType.System);
             bytecodeInterpeter = null;
             currentlyRunningCode = false;
         }
@@ -553,7 +629,16 @@ namespace IngameCoding.Core
         bool startCalled = false;
         bool globalVariablesDisposed = false;
 
+        /// <summary>
+        /// Interpret the next instructions
+        /// </summary>
         public void Update() => Update((float)(DateTime.Now - LastTime).TotalMilliseconds);
+        /// <summary>
+        /// Interpret the next instructions
+        /// </summary>
+        /// <param name="deltaTime">
+        /// Time since last <c>Update()</c>
+        /// </param>
         public void Update(float deltaTime)
         {
             LastTime = DateTime.Now;
@@ -587,7 +672,7 @@ namespace IngameCoding.Core
 
                     OnDone?.Invoke(this, false);
                     var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.Normal);
+                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
@@ -599,7 +684,7 @@ namespace IngameCoding.Core
 
                     OnDone?.Invoke(this, false);
                     var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.Normal);
+                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
                     bytecodeInterpeter = null;
                     currentlyRunningCode = false;
 
@@ -666,6 +751,8 @@ namespace IngameCoding.Core
                 }
             }
         }
+
+        #region AddBuiltinFunction()
 
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
         {
@@ -800,6 +887,8 @@ namespace IngameCoding.Core
             });
         }
 
+        #endregion
+
         void CheckParameters(string functionName, TypeToken[] requied, Stack.Item[] passed)
         {
             if (passed.Length != requied.Length) throw new System.Exception($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
@@ -809,6 +898,8 @@ namespace IngameCoding.Core
                 if (!passed[i].EqualType(requied[i].typeName)) throw new System.Exception($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].typeName.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
             }
         }
+
+        #region GetTypes<>()
 
         TypeToken[] GetTypes<T0>() => new TypeToken[1]
         {
@@ -865,6 +956,8 @@ namespace IngameCoding.Core
 
             return null;
         }
+
+        #endregion
     }
 
     static class StackItemExtension
@@ -899,9 +992,30 @@ namespace IngameCoding.Core
         }
     }
 
+    /// <summary>
+    /// A simpler form of <see cref="Interpreter"/><br/>
+    /// Just call <see cref="Run(string, bool)"/> and that's it
+    /// </summary>
     class EasyInterpreter
     {
-        public static void Run(string path, bool HandleErrors = true)
+        /// <summary>
+        /// Compiles and interprets source code
+        /// </summary>
+        /// <param name="path">
+        /// The path to the source code file
+        /// </param>
+        /// <param name="HandleErrors">
+        /// Throw or print exceptions?
+        /// </param>
+        public static void Run(
+            string path,
+            BBCode.Parser.ParserSettings parserSettings,
+            Compiler.CompilerSettings compilerSettings,
+            BytecodeInterpreterSettings bytecodeInterpreterSettings,
+            bool LogDebug = true,
+            bool LogSystem = true,
+            bool HandleErrors = true
+            )
         {
             if (!File.Exists(path))
             {
@@ -910,7 +1024,7 @@ namespace IngameCoding.Core
             }
 
             var file = new FileInfo(path);
-            Output.Terminal.Output.LogDebug($"Run file '{file.FullName}'");
+            if (LogDebug) Output.Terminal.Output.LogDebug($"Run file '{file.FullName}'");
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
 
@@ -918,6 +1032,9 @@ namespace IngameCoding.Core
             {
                 switch (logType)
                 {
+                    case TerminalInterpreter.LogType.System:
+                        if (LogSystem) Output.Terminal.Output.Log(message);
+                        break;
                     case TerminalInterpreter.LogType.Normal:
                         Output.Terminal.Output.Log(message);
                         break;
@@ -928,7 +1045,7 @@ namespace IngameCoding.Core
                         Output.Terminal.Output.LogError(message);
                         break;
                     case TerminalInterpreter.LogType.Debug:
-                        Output.Terminal.Output.LogDebug(message);
+                        if (LogDebug) Output.Terminal.Output.LogDebug(message);
                         break;
                 }
             };
@@ -955,11 +1072,11 @@ namespace IngameCoding.Core
                 }
                 else
                 {
-                    compiledCode = codeInterpreter.CompileCode(code, file.Directory, HandleErrors);
+                    compiledCode = codeInterpreter.CompileCode(code, file.Directory, compilerSettings, parserSettings, HandleErrors);
                 }
 
                 if (compiledCode != null)
-                { codeInterpreter.RunCode(compiledCode); }
+                { codeInterpreter.RunCode(compiledCode, bytecodeInterpreterSettings); }
             }
 
             while (codeInterpreter.IsExecutingCode)
@@ -994,6 +1111,105 @@ namespace IngameCoding.Core
             }
         }
 
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out  BBCode.Parser.ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        {
+            ThrowErrors = false;
+            LogDebugs = true;
+            LogSystem = true;
+            compilerSettings = Compiler.CompilerSettings.Default;
+            parserSettings = BBCode.Parser.ParserSettings.Default;
+            bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
+
+            if (args.Length > 1)
+            {
+                int i = 0;
+                while (i < args.Length - 1)
+                {
+                    if (args[i] == "-throw-errors")
+                    {
+                        ThrowErrors = true;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-hide-debug")
+                    {
+                        LogDebugs = false;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-hide-system")
+                    {
+                        LogSystem = false;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-c-generate-comments")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out compilerSettings.GenerateComments))
+                        { throw new ArgumentException("Expected bool value after argument '-c-generate-comments'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-c-remove-unused-functions")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out compilerSettings.RemoveUnusedFunctionsIterations))
+                        { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-bc-clock")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.ClockCyclesPerUpdate))
+                        { throw new ArgumentException("Expected int value after argument '-bc-clock'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-bc-instruction-limit")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.InstructionLimit))
+                        { throw new ArgumentException("Expected int value after argument '-bc-instruction-limit'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-bc-stack-size")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.StackMaxSize))
+                        { throw new ArgumentException("Expected int value after argument '-bc-stack-size'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-c-print-instructions")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out compilerSettings.PrintInstructions))
+                        { throw new ArgumentException("Expected bool value after argument '-c-print-instructions'"); }
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-p-print-info")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out parserSettings.PrintInfo))
+                        { throw new ArgumentException("Expected bool value after argument '-p-print-info'"); }
+                        goto ArgParseDone;
+                    }
+
+                    throw new ArgumentException($"Unknown argument '{args[i]}'");
+
+                ArgParseDone:
+                    i++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Don't
+        /// </summary>
         public static void Run(params string[] args)
         {
             if (args.Length == 0)
@@ -1002,10 +1218,26 @@ namespace IngameCoding.Core
                 return;
             }
 
-            bool ThrowErrors = args.Contains("-throw-errors");
             string File = args.Last();
 
-            Run(File, !ThrowErrors);
+            BBCode.Parser.ParserSettings parserSettings = BBCode.Parser.ParserSettings.Default;
+            Compiler.CompilerSettings compilerSettings = Compiler.CompilerSettings.Default;
+            BytecodeInterpreterSettings bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
+            bool ThrowErrors = false;
+            bool LogDebugs = true;
+            bool LogSystem = true;
+
+            try
+            {
+                ParseArgs(args, out ThrowErrors, out LogDebugs, out LogSystem, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+            }
+            catch (ArgumentException error)
+            {
+                Output.Terminal.Output.LogError(error.Message);
+                return;
+            }
+
+            Run(File, parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebugs, LogSystem, !ThrowErrors);
         }
     }
 }

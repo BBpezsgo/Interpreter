@@ -4,7 +4,6 @@ using System.Linq;
 namespace IngameCoding.BCCode
 {
     using Core;
-
     using Errors;
 
     public enum TokenSubtype

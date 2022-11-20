@@ -1,17 +1,20 @@
-﻿using IngameCoding.BBCode.Parser;
-using IngameCoding.BBCode.Parser.Statements;
-using IngameCoding.Bytecode;
-using IngameCoding.Core;
-using IngameCoding.Errors;
-using IngameCoding.Terminal;
-
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 namespace IngameCoding.BBCode
 {
-    using System;
+    using BBCode.Parser;
+    using BBCode.Parser.Statements;
+
+    using Bytecode;
+
+    using Core;
+
+    using Errors;
+
+    using Terminal;
 
     public class Compiler
     {
@@ -24,8 +27,8 @@ namespace IngameCoding.BBCode
 
         Dictionary<string, BuiltinFunction> builtinFunctions;
         Dictionary<string, CompiledVariable> compiledGlobalVariables;
-        readonly Dictionary<string, Parameter> parameters = new();
         readonly Dictionary<string, CompiledVariable> compiledVariables = new();
+        readonly Dictionary<string, Parameter> parameters = new();
         public List<Warning> warnings;
 
         readonly List<int> returnInstructions = new();
@@ -192,11 +195,13 @@ namespace IngameCoding.BBCode
         }
 
         [Serializable]
-        public struct CompiledFunction
+        public class CompiledFunction
         {
             public TypeToken[] parameters;
 
             public FunctionDefinition functionDefinition;
+
+            public int TimesUsed = 0;
 
             public int ParameterCount => parameters.Length;
             public bool returnSomething;
@@ -232,6 +237,10 @@ namespace IngameCoding.BBCode
 
             public TypeToken type;
 
+            public CompiledFunction()
+            {
+
+            }
             public CompiledFunction(TypeToken[] parameters, bool returnSomething, bool isMethod, TypeToken type)
             {
                 this.parameters = parameters;
@@ -979,7 +988,7 @@ namespace IngameCoding.BBCode
                 returnInstructions.Add(compiledCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
-                
+
 
                 return;
             }
@@ -1138,6 +1147,7 @@ namespace IngameCoding.BBCode
 
                             foreach (Statement param in structMethodCall.parameters)
                             { GenerateCodeForStatement(param); }
+
                             if (compiledStruct.methodOffsets.TryGetValue(structMethodCall.FunctionName, out var methodCallOffset))
                             { AddInstruction(Opcode.CALL, methodCallOffset - compiledCode.Count); }
                             else
@@ -1395,6 +1405,7 @@ namespace IngameCoding.BBCode
         }
         void GenerateCodeForStatement(Statement_WhileLoop whileLoop)
         {
+            AddInstruction(Opcode.COMMENT, "while (...) {");
             AddInstruction(Opcode.COMMENT, "Condition");
             int conditionOffset = compiledCode.Count;
             GenerateCodeForStatement(whileLoop.condition);
@@ -1404,14 +1415,18 @@ namespace IngameCoding.BBCode
 
             breakInstructions.Add(new List<int>());
 
-            AddInstruction(Opcode.COMMENT, "Statements");
+            AddInstruction(Opcode.COMMENT, "Statements {");
             for (int i = 0; i < whileLoop.statements.Count; i++)
             {
                 GenerateCodeForStatement(whileLoop.statements[i]);
             }
 
+            AddInstruction(Opcode.COMMENT, "}");
+
             AddInstruction(Opcode.COMMENT, "Jump Back");
             AddInstruction(Opcode.JUMP_BY, conditionOffset - compiledCode.Count);
+
+            AddInstruction(Opcode.COMMENT, "}");
 
             compiledCode[conditionJumpOffset].parameter = compiledCode.Count - conditionJumpOffset;
             foreach (var breakInstruction in breakInstructions.Last())
@@ -1422,6 +1437,8 @@ namespace IngameCoding.BBCode
         }
         void GenerateCodeForStatement(Statement_ForLoop forLoop)
         {
+            AddInstruction(Opcode.COMMENT, "for (...) {");
+
             AddInstruction(Opcode.COMMENT, "FOR Declaration");
             // Index variable
             GenerateCodeForVariable(forLoop.variableDeclaration, out int variablesAdded);
@@ -1438,12 +1455,14 @@ namespace IngameCoding.BBCode
             GenerateCodeForStatement(forLoop.expression);
             List<int> breakInstructionsFor = new();
 
-            AddInstruction(Opcode.COMMENT, "Statements");
+            AddInstruction(Opcode.COMMENT, "Statements {");
             for (int i = 0; i < forLoop.statements.Count; i++)
             {
-                IngameCoding.BBCode.Parser.Statements.Statement currStatement = forLoop.statements[i];
+                Statement currStatement = forLoop.statements[i];
                 GenerateCodeForStatement(currStatement);
             }
+
+            AddInstruction(Opcode.COMMENT, "}");
 
             AddInstruction(Opcode.COMMENT, "Jump back");
             AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - compiledCode.Count);
@@ -1459,6 +1478,8 @@ namespace IngameCoding.BBCode
             {
                 AddInstruction(Opcode.POP_VALUE);
             }
+
+            AddInstruction(Opcode.COMMENT, "}");
         }
         void GenerateCodeForStatement(Statement_If @if)
         {
@@ -1469,6 +1490,8 @@ namespace IngameCoding.BBCode
             {
                 if (ifSegment is Statement_If_If partIf)
                 {
+                    AddInstruction(Opcode.COMMENT, "if (...) {");
+
                     AddInstruction(Opcode.COMMENT, "IF Condition");
                     GenerateCodeForStatement(partIf.condition);
                     prevIfJumpOffset = compiledCode.Count;
@@ -1488,10 +1511,15 @@ namespace IngameCoding.BBCode
                     conditionJumpOffsets.Add(compiledCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
+                    AddInstruction(Opcode.COMMENT, "}");
+
                     compiledCode[prevIfJumpOffset].parameter = compiledCode.Count - prevIfJumpOffset;
+
                 }
                 else if (ifSegment is Statement_If_ElseIf partElseif)
                 {
+                    AddInstruction(Opcode.COMMENT, "elseif (...) {");
+
                     AddInstruction(Opcode.COMMENT, "ELSEIF Condition");
                     GenerateCodeForStatement(partElseif.condition);
                     prevIfJumpOffset = compiledCode.Count;
@@ -1511,10 +1539,13 @@ namespace IngameCoding.BBCode
                     conditionJumpOffsets.Add(compiledCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
+                    AddInstruction(Opcode.COMMENT, "}");
+
                     compiledCode[prevIfJumpOffset].parameter = compiledCode.Count - prevIfJumpOffset;
                 }
                 else if (ifSegment is Statement_If_Else partElse)
                 {
+                    AddInstruction(Opcode.COMMENT, "else {");
 
                     AddInstruction(Opcode.COMMENT, "ELSE Statements");
 
@@ -1526,6 +1557,8 @@ namespace IngameCoding.BBCode
                     }
 
                     ClearVariables(variableCount);
+
+                    AddInstruction(Opcode.COMMENT, "}");
 
                     compiledCode[prevIfJumpOffset].parameter = compiledCode.Count - prevIfJumpOffset;
                 }
@@ -1653,6 +1686,8 @@ namespace IngameCoding.BBCode
         }
 
         #endregion
+
+        #region GenerateCodeFor...
 
         void GenerateCodeForGlobalVariable(Statement st, out int globalVariableSadded)
         {
@@ -1924,70 +1959,19 @@ namespace IngameCoding.BBCode
             variablesAdded = variableCount;
         }
 
-        CompiledFunction GenerateCodeForFunction(KeyValuePair<string, FunctionDefinition> function, bool isMethod)
+        void GenerateCodeForFunction(KeyValuePair<string, FunctionDefinition> function, bool isMethod)
         {
             this.isStructMethod = isMethod;
 
-            // Compile attributes
-            Dictionary<string, AttributeValues> attributes = new();
-            foreach (var attribute in function.Value.attributes)
-            {
-                AttributeValues newAttribute = new()
-                {
-                    parameters = new()
-                };
-                if (attribute.Parameters != null)
-                {
-                    foreach (var parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-                attributes.Add(attribute.Name, newAttribute);
-            }
-
-            if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
-            {
-                if (attributeBuiltin.parameters.Count != 1)
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
-                if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
-                {
-                    foreach (var builtinFunction in builtinFunctions)
-                    {
-                        if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
-                        {
-                            if (builtinFunction.Value.ParameterCount != function.Value.parameters.Count)
-                            { throw new ParserException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'"); }
-                            if (builtinFunction.Value.returnSomething != (function.Value.type.typeName != BuiltinType.VOID))
-                            { throw new ParserException("Wrong type definied for builtin function '" + builtinFunction.Key + "'"); }
-
-                            return new CompiledFunction()
-                            {
-                                parameters = builtinFunction.Value.parameters,
-                                returnSomething = builtinFunction.Value.returnSomething,
-                                attributes = attributes,
-                            };
-                        }
-                    }
-                    throw new ParserException("'Builtin' function '" + paramBuiltinName.ToLower() + "' not found");
-                }
-                else
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
-            }
+            if (GetFunctionInfo(function, isMethod).IsBuiltin) return;
 
             parameters.Clear();
             compiledVariables.Clear();
             returnInstructions.Clear();
 
+            functionOffsets.Add(function.Value.FullName, compiledCode.Count);
             if (isMethod)
-            {
-                functionOffsets.Add(function.Value.FullName, compiledCode.Count);
-                compiledStructs[compiledStructs.Last().Key].methodOffsets.Add(function.Value.FullName, compiledCode.Count);
-            }
-            else
-            {
-                functionOffsets.Add(function.Value.FullName, compiledCode.Count);
-            }
+            { compiledStructs[compiledStructs.Last().Key].methodOffsets.Add(function.Value.FullName, compiledCode.Count); }
 
             // Compile parameters
             int paramIndex = 0;
@@ -2005,15 +1989,21 @@ namespace IngameCoding.BBCode
                 GenerateCodeForVariable(statement, out int newVariableCount);
                 variableCount += newVariableCount;
             }
+            if (variableCount == 0 && AddCommentsToCode)
+            { compiledCode.RemoveAt(compiledCode.Count - 1); }
 
             // Compile statements
-            AddInstruction(Opcode.COMMENT, "Statements");
-            foreach (Statement statement in function.Value.statements)
+            if (function.Value.statements.Count > 0)
             {
-                GenerateCodeForStatement(statement);
+                AddInstruction(Opcode.COMMENT, "Statements");
+                foreach (Statement statement in function.Value.statements)
+                {
+                    GenerateCodeForStatement(statement);
+                }
             }
 
             int cleanupCodeOffset = compiledCode.Count;
+
             foreach (var returnCommandJumpInstructionIndex in returnInstructions)
             {
                 compiledCode[returnCommandJumpInstructionIndex].parameter = cleanupCodeOffset - returnCommandJumpInstructionIndex;
@@ -2037,21 +2027,320 @@ namespace IngameCoding.BBCode
             returnInstructions.Clear();
 
             this.isStructMethod = false;
-
-            return new CompiledFunction(
-                    function.Value.parameters.ToArray(),
-                    function.Value.type.typeName != BuiltinType.VOID,
-                    (function.Value.parameters.Count > 0) && function.Value.parameters.First().withThisKeyword,
-                    function.Value.type.Clone()
-                    )
-            { attributes = attributes, functionDefinition = function.Value };
         }
 
-        CompiledFunction CompileFunction(KeyValuePair<string, FunctionDefinition> function, bool isStructMethod = false)
+        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<Stack.IStruct>> builtinStructs)
         {
-            if (compiledFunctions.ContainsKey(function.Key))
-            { throw new ParserException($"Function with name '{function.Key}' already defined"); }
+            if (compiledFunctions.ContainsKey(@struct.Value.FullName))
+            { throw new ParserException($"Struct with name '{@struct.Value.FullName}' already exist"); }
 
+            Dictionary<string, AttributeValues> attributes = new();
+
+            foreach (var attribute in @struct.Value.attributes)
+            {
+                AttributeValues newAttribute = new()
+                {
+                    parameters = new()
+                };
+                if (attribute.Parameters != null)
+                {
+                    foreach (var parameter in attribute.Parameters)
+                    {
+                        newAttribute.parameters.Add(new Literal(parameter));
+                    }
+                }
+                attributes.Add(attribute.Name, newAttribute);
+            }
+
+            if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
+            {
+                if (attributeBuiltin.parameters.Count != 1)
+                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
+                if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
+                {
+                    foreach (var builtinStruct in builtinStructs)
+                    {
+                        if (builtinStruct.Key.ToLower() == paramBuiltinName.ToLower())
+                        {
+                            this.compiledStructs.Add(@struct.Key, new CompiledStruct(
+                                @struct.Key,
+                                @struct.Value.fields,
+                                new Dictionary<string, CompiledFunction>()
+                                )
+                            {
+                                attributes = attributes,
+                                CreateBuiltinStruct = builtinStruct.Value
+                            });
+
+                            foreach (var method in @struct.Value.methods)
+                            {
+                                if (compiledFunctions.ContainsKey(method.Key))
+                                { throw new ParserException($"Function with name '{method.Key}' already defined"); }
+
+                                var methodInfo = GetFunctionInfo(method, true);
+
+                                this.compiledFunctions.Add(method.Value.FullName, methodInfo);
+
+                                AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + ((method.Value.parameters.Count > 0) ? "(...)" : "()") + " {");
+                                GenerateCodeForFunction(method, true);
+                                AddInstruction(Opcode.COMMENT, "}");
+                                this.compiledStructs.Last().Value.methods.Add(method.Key, methodInfo);
+                            }
+
+                            return;
+                        }
+                    }
+                    throw new ParserException("'Builtin' struct '" + paramBuiltinName.ToLower() + "' not found");
+                }
+                else
+                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
+            }
+
+            this.compiledStructs.Add(@struct.Key, new CompiledStruct(
+                @struct.Key,
+                @struct.Value.fields,
+                new Dictionary<string, CompiledFunction>()
+                )
+            { attributes = attributes });
+
+            foreach (var method in @struct.Value.methods)
+            {
+                if (compiledFunctions.ContainsKey(method.Key))
+                { throw new ParserException($"Function with name '{method.Key}' already defined"); }
+
+                var methodInfo = GetFunctionInfo(method, true);
+                methodInfo.IsMethod = true;
+                this.compiledFunctions.Add(method.Value.FullName, methodInfo);
+
+                AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + ((method.Value.parameters.Count > 0) ? "(...)" : "()") + " {");
+                GenerateCodeForFunction(method, true);
+                AddInstruction(Opcode.COMMENT, "}");
+                this.compiledStructs.Last().Value.methods.Add(method.Key, methodInfo);
+            }
+        }
+
+        #endregion
+
+        #region Result Structs
+
+        public struct CompilerResult
+        {
+            public Instruction[] compiledCode;
+
+            public Dictionary<string, CompiledFunction> compiledFunctions;
+            public Dictionary<string, CompiledStruct> compiledStructs;
+            internal Dictionary<string, CompiledVariable> compiledGlobalVariables;
+            internal Dictionary<string, CompiledVariable> compiledVariables;
+
+            public Dictionary<string, int> functionOffsets;
+            public int clearGlobalVariablesInstruction;
+            public int setGlobalVariablesInstruction;
+
+            bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable, out bool isGlobal)
+            {
+                isGlobal = false;
+                if (compiledVariables.TryGetValue(variableName, out compiledVariable))
+                {
+                    return true;
+                }
+                else if (compiledGlobalVariables.TryGetValue(variableName, out compiledVariable))
+                {
+                    isGlobal = true;
+                    return true;
+                }
+                return false;
+            }
+
+            bool GetCompiledStruct(string structName, out CompiledStruct compiledStruct)
+            { return compiledStructs.TryGetValue(structName, out compiledStruct); }
+
+            public bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
+            {
+                if (functionOffsets.TryGetValue(functionCallStatement.FunctionName, out functionOffset))
+                {
+                    return true;
+                }
+                else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
+                {
+                    return true;
+                }
+                else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
+                {
+                    return true;
+                }
+                else if (functionOffsets.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
+                {
+                    return true;
+                }
+                functionOffset = -1;
+                return false;
+            }
+            public bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
+            {
+                if (GetCompiledVariable(methodCallStatement.VariableName, out CompiledVariable compiledVariable, out _))
+                {
+                    bool IsStructMethodCall = true;
+                    if (!GetCompiledStruct(compiledVariable.structName, out _))
+                    { IsStructMethodCall = false; }
+                    else
+                    {
+                        if (!compiledStructs[compiledVariable.structName].methods.ContainsKey(methodCallStatement.FunctionName))
+                        { IsStructMethodCall = false; }
+                    }
+
+                    if (!IsStructMethodCall)
+                    {
+                        if (functionOffsets.TryGetValue(methodCallStatement.FunctionName, out functionOffset))
+                        {
+                            return true;
+                        }
+                        else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
+                        {
+                            return true;
+                        }
+                        else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
+                        {
+                            return true;
+                        }
+                        else if (functionOffsets.TryGetValue(methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                functionOffset = -1;
+                return false;
+            }
+
+            public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
+            {
+                if (functionOffsets.TryGetValue(functionCallStatement.Name, out functionOffset))
+                {
+                    return true;
+                }
+                else if (functionOffsets.TryGetValue(functionCallStatement.FullName, out functionOffset))
+                {
+                    return true;
+                }
+                functionOffset = -1;
+                return false;
+            }
+
+            internal void WriteToConsole()
+            {
+                Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
+                int indent = 0;
+
+                for (int i = 0; i < this.compiledCode.Length; i++)
+                {
+                    if (this.clearGlobalVariablesInstruction == i)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                        Console.WriteLine("ClearGlobalVariables:");
+                        Console.ResetColor();
+                    }
+                    if (this.setGlobalVariablesInstruction == i)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                        Console.WriteLine("SetGlobalVariables:");
+                        Console.ResetColor();
+                    }
+
+                    Instruction instruction = this.compiledCode[i];
+                    if (instruction.opcode == Opcode.COMMENT)
+                    {
+                        if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("}"))
+                        {
+                            indent--;
+                        }
+
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.parameter}");
+                        Console.ResetColor();
+
+                        if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("{"))
+                        {
+                            indent++;
+                        }
+
+                        continue;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
+                    Console.Write($" ");
+
+                    if (instruction.parameter is int || instruction.parameter is float)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write($"{instruction.parameter}");
+                        Console.Write($" ");
+                    }
+                    else if (instruction.parameter is bool)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.Write($"{instruction.parameter}");
+                        Console.Write($" ");
+                    }
+                    else if (instruction.parameter is string)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write($"\"{instruction.parameter}\"");
+                        Console.Write($" ");
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write($"{instruction.parameter}");
+                        Console.Write($" ");
+                    }
+
+                    if (!string.IsNullOrEmpty(instruction.additionParameter))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write($"\"{instruction.additionParameter}\"");
+                        Console.Write($" ");
+                    }
+
+                    if (instruction.additionParameter2 != -1)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write($"{instruction.additionParameter2}");
+                        Console.Write($" ");
+                    }
+
+                    if (!string.IsNullOrEmpty(instruction.tag))
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"{instruction.tag}");
+                    }
+
+                    Console.Write("\n\r");
+
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("\n\r === ===\n\r");
+            }
+        }
+
+        public struct CodeGeneratorResult
+        {
+            public Instruction[] compiledCode;
+
+            public Dictionary<string, CompiledFunction> compiledFunctions;
+            public Dictionary<string, CompiledStruct> compiledStructs;
+
+            public int clearGlobalVariablesInstruction;
+            public int setGlobalVariablesInstruction;
+        }
+
+        #endregion
+
+
+        CompiledFunction GetFunctionInfo(KeyValuePair<string, FunctionDefinition> function, bool isStructMethod = false)
+        {
             Dictionary<string, AttributeValues> attributes = new();
 
             foreach (var attribute in function.Value.attributes)
@@ -2116,123 +2405,151 @@ namespace IngameCoding.BBCode
             { attributes = attributes, functionDefinition = function.Value };
         }
 
-        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<Stack.IStruct>> builtinStructs)
-        {
-            if (compiledFunctions.ContainsKey(@struct.Value.FullName))
-            { throw new ParserException($"Struct with name '{@struct.Value.FullName}' already exist"); }
 
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in @struct.Value.attributes)
-            {
-                AttributeValues newAttribute = new()
-                {
-                    parameters = new()
-                };
-                if (attribute.Parameters != null)
-                {
-                    foreach (var parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-                attributes.Add(attribute.Name, newAttribute);
-            }
-
-            if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
-            {
-                if (attributeBuiltin.parameters.Count != 1)
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
-                if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
-                {
-                    foreach (var builtinStruct in builtinStructs)
-                    {
-                        if (builtinStruct.Key.ToLower() == paramBuiltinName.ToLower())
-                        {
-                            this.compiledStructs.Add(@struct.Key, new CompiledStruct(
-                                @struct.Key,
-                                @struct.Value.fields,
-                                new Dictionary<string, CompiledFunction>()
-                                )
-                            {
-                                attributes = attributes,
-                                CreateBuiltinStruct = builtinStruct.Value
-                            });
-
-                            foreach (var method in @struct.Value.methods)
-                            {
-                                this.compiledFunctions.Add(method.Value.FullName, CompileFunction(method, true));
-
-                                AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + "(...) {");
-                                var compiledMethod = GenerateCodeForFunction(method, true);
-                                AddInstruction(Opcode.COMMENT, "}");
-                                this.compiledStructs.Last().Value.methods.Add(method.Key, compiledMethod);
-                            }
-
-                            return;
-                        }
-                    }
-                    throw new ParserException("'Builtin' struct '" + paramBuiltinName.ToLower() + "' not found");
-                }
-                else
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter"); }
-            }
-
-            this.compiledStructs.Add(@struct.Key, new CompiledStruct(
-                @struct.Key,
-                @struct.Value.fields,
-                new Dictionary<string, CompiledFunction>()
-                )
-            { attributes = attributes });
-
-            foreach (var method in @struct.Value.methods)
-            {
-                var compiledMethod_ = CompileFunction(method, true);
-                compiledMethod_.IsMethod = true;
-                this.compiledFunctions.Add(method.Value.FullName, compiledMethod_);
-
-                AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + "(...) {");
-                var compiledMethod = GenerateCodeForFunction(method, true);
-                AddInstruction(Opcode.COMMENT, "}");
-                this.compiledStructs.Last().Value.methods.Add(method.Key, compiledMethod);
-            }
-        }
-
-        void Init()
+        int AnalyzeFunctions(Dictionary<string, FunctionDefinition> functions, Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
             this.compiledFunctions = new();
-            this.compiledStructs = new();
-            this.compiledGlobalVariables = new();
 
-            this.functionOffsets = new();
+            foreach (var function in functions)
+            {
+                if (this.compiledFunctions.ContainsKey(function.Key))
+                { throw new ParserException($"Function with name '{function.Key}' already defined"); }
 
-            this.compiledCode = new();
+                this.compiledFunctions.Add(function.Value.FullName, GetFunctionInfo(function));
+            }
+
+            // Remove unused functions
+            {
+                void AnalyzeStatements(List<Statement> statements)
+                {
+                    foreach (var st in statements)
+                    {
+                        AnalyzeStatement(st);
+                        if (st is StatementParent pr)
+                        {
+                            AnalyzeStatements(pr.statements);
+                        }
+                    }
+                }
+
+                void AnalyzeStatement(Statement st)
+                {
+                    if (st is Statement_ForLoop st0)
+                    {
+                        AnalyzeStatement(st0.variableDeclaration);
+                        AnalyzeStatement(st0.condition);
+                        AnalyzeStatement(st0.expression);
+                    }
+                    else if (st is Statement_If st1)
+                    {
+                        foreach (var st2 in st1.parts)
+                        { AnalyzeStatement(st2); }
+                    }
+                    else if (st is Statement_If_If st2)
+                    {
+                        AnalyzeStatement(st2.condition);
+                    }
+                    else if (st is Statement_If_ElseIf st3)
+                    {
+                        AnalyzeStatement(st3.condition);
+                    }
+                    else if (st is Statement_Index st4)
+                    {
+                        AnalyzeStatement(st4.indexStatement);
+                    }
+                    else if (st is Statement_NewVariable st5)
+                    {
+                        if (st5.initialValue != null) AnalyzeStatement(st5.initialValue);
+                    }
+                    else if (st is Statement_Operator st6)
+                    {
+                        if (st6.Left != null) AnalyzeStatement(st6.Left);
+                        if (st6.Right != null) AnalyzeStatement(st6.Right);
+                    }
+                    else if (st is Statement_WhileLoop st7)
+                    {
+                        AnalyzeStatement(st7.condition);
+                    }
+                    else if (st is Statement_FunctionCall st8)
+                    {
+                        if (GetCompiledFunction(st8, out var cf))
+                        { cf.TimesUsed++; }
+
+                        foreach (var st9 in st8.parameters)
+                        { AnalyzeStatement(st9); }
+                    }
+                }
+
+                foreach (var f in functions)
+                {
+                    AnalyzeStatements(f.Value.statements);
+                }
+            }
+
+            int functionsRemoved = 0;
+
+            for (int i = functions.Count - 1; i >= 0; i--)
+            {
+                if (!this.compiledFunctions.TryGetValue(functions.ElementAt(i).Value.FullName, out var f)) continue;
+                if (f.TimesUsed > 0) continue;
+                foreach (var attr in f.attributes)
+                {
+                    if (attr.Key == "CodeEntry") goto JumpOut;
+                    if (attr.Key == "Catch") goto JumpOut;
+                }
+
+                functions.Remove(functions.ElementAt(i).Key);
+                functionsRemoved++;
+
+            JumpOut:;
+            }
+
+            return functionsRemoved;
         }
 
-        public Instruction[] AssembleCode(
+        public struct CompilerSettings
+        {
+            public bool GenerateComments;
+            public byte RemoveUnusedFunctionsIterations;
+            public bool PrintInstructions;
+
+            public static CompilerSettings Default => new()
+            {
+                GenerateComments = true,
+                RemoveUnusedFunctionsIterations = 4,
+                PrintInstructions = false,
+            };
+        }
+
+        public CodeGeneratorResult GenerateCode(
             Dictionary<string, FunctionDefinition> functions,
             Dictionary<string, StructDefinition> structs,
             List<Statement_NewVariable> globalVariables,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<Stack.IStruct>> builtinStructs,
-            out Dictionary<string, CompiledFunction> compiledFunctions,
-            out Dictionary<string, CompiledStruct> compiledStructs,
-            out int clearGlobalVariablesInstruction,
-            out int setGlobalVariablesInstruction,
-            bool addCommentsToCode = true)
+            CompilerSettings settings,
+            Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            this.AddCommentsToCode = addCommentsToCode;
-
-            Init();
+            this.AddCommentsToCode = settings.GenerateComments;
+            this.compiledStructs = new();
+            this.compiledGlobalVariables = new();
+            this.functionOffsets = new();
+            this.compiledCode = new();
             this.builtinFunctions = builtinFunctions;
 
-            foreach (var function in functions)
-            { this.compiledFunctions.Add(function.Value.FullName, CompileFunction(function)); }
+            int iterations = settings.RemoveUnusedFunctionsIterations;
+
+            for (int iteration = 0; iteration < iterations; iteration++)
+            {
+                int functionsRemoved = AnalyzeFunctions(functions, printCallback);
+                if (printCallback != null)
+                { printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", TerminalInterpreter.LogType.Debug); }
+            }
 
             foreach (var @struct in structs)
             { GenerateCodeForStruct(@struct, builtinStructs); }
 
-            setGlobalVariablesInstruction = compiledCode.Count;
+            var setGlobalVariablesInstruction = compiledCode.Count;
             AddInstruction(Opcode.COMMENT, "Global variables");
             int globalVariableCount = 0;
             foreach (var globalVariable in globalVariables)
@@ -2244,12 +2561,12 @@ namespace IngameCoding.BBCode
 
             foreach (KeyValuePair<string, FunctionDefinition> function in functions)
             {
-                AddInstruction(Opcode.COMMENT, function.Value.FullName + "(...) {" + ((function.Value.statements.Count > 0) ? "" : " }"));
-                this.compiledFunctions[function.Value.FullName] = GenerateCodeForFunction(function, false);
+                AddInstruction(Opcode.COMMENT, function.Value.FullName + ((function.Value.parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Value.statements.Count > 0) ? "" : " }"));
+                GenerateCodeForFunction(function, false);
                 if (function.Value.statements.Count > 0) AddInstruction(Opcode.COMMENT, "}");
             }
 
-            clearGlobalVariablesInstruction = compiledCode.Count;
+            var clearGlobalVariablesInstruction = compiledCode.Count;
             AddInstruction(Opcode.COMMENT, "Clear global variables");
             for (int i = 0; i < globalVariableCount; i++)
             { AddInstruction(Opcode.POP_VALUE); }
@@ -2263,68 +2580,82 @@ namespace IngameCoding.BBCode
                 { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName}' offset not found"); }
             }
 
-            compiledFunctions = this.compiledFunctions;
-            compiledStructs = this.compiledStructs;
-            return compiledCode.ToArray();
+            return new CodeGeneratorResult()
+            {
+                compiledCode = compiledCode.ToArray(),
+
+                compiledFunctions = this.compiledFunctions,
+                compiledStructs = this.compiledStructs,
+
+                clearGlobalVariablesInstruction = clearGlobalVariablesInstruction,
+                setGlobalVariablesInstruction = setGlobalVariablesInstruction
+            };
         }
 
-        public static Parser.Parser ParseCode(string code, List<Warning> warnings, Action<string, TerminalInterpreter.LogType> printCallback = null)
-        {
-            var (tokens, _) = Tokenizer.Parse(code, TokenizerSettings.Default, printCallback);
-
-            DateTime parseStarted = DateTime.Now;
-            if (printCallback != null)
-            { printCallback?.Invoke("Parsing Code...", TerminalInterpreter.LogType.Debug); }
-
-            Parser.Parser parser = new();
-            parser.Parse(tokens, warnings);
-
-            if (printCallback != null)
-            { printCallback?.Invoke($"Code parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
-
-            return parser;
-        }
-
-        public static Compiler CompileCode(
-            string code,
+        /// <summary>
+        /// Compiles the source code into a list of instructions
+        /// </summary>
+        /// <param name="code">
+        /// The source code
+        /// </param>
+        /// <param name="namespacesFolder">
+        /// The directory where the source code file is located
+        /// </param>
+        /// <param name="result">
+        /// The compiler result
+        /// </param>
+        /// <param name="warnings">
+        /// A list that this can fill with warnings
+        /// </param>
+        /// <param name="printCallback">
+        /// Optional: Print callback
+        /// </param>
+        /// <exception cref="EndlessLoopException"/>
+        /// <exception cref="SyntaxException"/>
+        /// <exception cref="ParserException"/>
+        /// <exception cref="Exception"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="System.Exception"/>
+        public static CompilerResult CompileCode(
+            ParserResult parserResult,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<Stack.IStruct>> builtinStructs,
             DirectoryInfo namespacesFolder,
-            out Dictionary<string, CompiledFunction> compiledFunctions,
-            out Instruction[] compiledCode,
-            out Dictionary<string, CompiledStruct> compiledStructs,
-            out int clearGlobalVariablesInstruction,
-            out int setGlobalVariablesInstruction,
             List<Warning> warnings,
+            CompilerSettings settings,
+            ParserSettings parserSettings,
             Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
-            Parser.Parser parser = ParseCode(code, warnings, printCallback);
-
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
 
-            if (parser.Usings.Count > 0)
-            { printCallback?.Invoke("Import usings...", TerminalInterpreter.LogType.Debug); }
+            if (parserResult.Usings.Count > 0)
+            { printCallback?.Invoke("Parse usings...", TerminalInterpreter.LogType.Debug); }
 
-            for (int i = 0; i < parser.Usings.Count; i++)
+            for (int i = 0; i < parserResult.Usings.Count; i++)
             {
-                string usingItem = parser.Usings[i];
+                string usingItem = parserResult.Usings[i];
                 if (File.Exists(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code))
                 {
-                    printCallback?.Invoke($"Parse usings ({i + 1}/{parser.Usings.Count})...", TerminalInterpreter.LogType.Debug);
-                    Parser.Parser parser2 = ParseCode(File.ReadAllText(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings);
+                    printCallback?.Invoke($"Parse code: {usingItem} ...", TerminalInterpreter.LogType.Debug);
+                    var parserResult2 = Parser.Parser.Parse(File.ReadAllText(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
+                        (msg, lv) => { printCallback?.Invoke($"  {msg}", lv); });
 
-                    foreach (var func in parser2.Functions)
+                    if (parserSettings.PrintInfo)
+                    { parserResult2.WriteToConsole($"PARSER INFO FOR '{usingItem}'"); }
+
+                    foreach (var func in parserResult2.Functions)
                     {
                         if (Functions.ContainsKey(func.Key))
-                        { throw new ParserException($"Function '{func.Value.type.text} {func.Value.FullName}(...)' already exists"); }
+                        { throw new ParserException($"Function '{func.Value.type.text} {func.Value.FullName}" + ((func.Value.parameters.Count > 0) ? "(...)" : "()") + "' already exists"); }
                         else
                         {
                             Functions.Add(func.Key, func.Value);
                         }
                     }
 
-                    foreach (var @struct in parser2.Structs)
+                    foreach (var @struct in parserResult2.Structs)
                     {
                         if (Structs.ContainsKey(@struct.Key))
                         {
@@ -2340,30 +2671,42 @@ namespace IngameCoding.BBCode
                 { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")"); }
             }
 
+            if (parserSettings.PrintInfo)
+            { parserResult.WriteToConsole(); }
+
             DateTime compileStarted = DateTime.Now;
             if (printCallback != null)
-            { printCallback?.Invoke("Compiling Code...", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke("Compiling...", TerminalInterpreter.LogType.Debug); }
 
-            foreach (var func in parser.Functions)
+            foreach (var func in parserResult.Functions)
             {
                 Functions.Add(func.Key, func.Value);
             }
-            foreach (var @struct in parser.Structs)
+            foreach (var @struct in parserResult.Structs)
             {
                 Structs.Add(@struct.Key, @struct.Value);
             }
 
             Compiler compiler = new()
             { warnings = warnings };
-            var compiledCode_ = compiler.AssembleCode(Functions, Structs, parser.GlobalVariables, builtinFunctions, builtinStructs, out var f, out var s, out clearGlobalVariablesInstruction, out setGlobalVariablesInstruction);
-            compiledFunctions = f;
-            compiledStructs = s;
-            compiledCode = compiledCode_;
+            var codeGeneratorResult = compiler.GenerateCode(Functions, Structs, parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
 
             if (printCallback != null)
-            { printCallback?.Invoke($"Code compiled in {(DateTime.Now - compileStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke($"Compiled in {(DateTime.Now - compileStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug); }
 
-            return compiler;
+            return new CompilerResult()
+            {
+                compiledCode = codeGeneratorResult.compiledCode,
+
+                compiledStructs = codeGeneratorResult.compiledStructs,
+                compiledFunctions = codeGeneratorResult.compiledFunctions,
+                compiledGlobalVariables = compiler.compiledGlobalVariables,
+                compiledVariables = compiler.compiledVariables,
+
+                clearGlobalVariablesInstruction = codeGeneratorResult.clearGlobalVariablesInstruction,
+                setGlobalVariablesInstruction = codeGeneratorResult.setGlobalVariablesInstruction,
+                functionOffsets = compiler.functionOffsets,
+            };
         }
     }
 }

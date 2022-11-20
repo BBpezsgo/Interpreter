@@ -1,6 +1,6 @@
-﻿using System.Diagnostics;
+﻿using System;
 using System.Collections.Generic;
-using System;
+using System.Diagnostics;
 
 namespace IngameCoding.BBCode.Parser.Statements
 {
@@ -15,6 +15,9 @@ namespace IngameCoding.BBCode.Parser.Statements
         { return this.GetType().Name; }
 
         public abstract string PrettyPrint(int ident = 0);
+
+        public virtual object TryGetValue()
+        { return null; }
     }
 
     abstract class StatementParent : Statement
@@ -56,6 +59,9 @@ namespace IngameCoding.BBCode.Parser.Statements
         /// </item>
         /// <item>
         ///  <seealso cref="Statement_Operator"></seealso>
+        /// </item>
+        /// <item>
+        ///  <c>null</c>
         /// </item>
         /// </list>
         /// </summary>
@@ -259,6 +265,94 @@ namespace IngameCoding.BBCode.Parser.Statements
                 return $"{" ".Repeat(ident)}{v}";
             }
         }
+
+        public override object TryGetValue()
+        {
+            switch (this.Operator)
+            {
+                case "+":
+                    { 
+                        if (Left == null) return null;
+                        if (Right == null) return null;
+
+                        var leftVal = Left.TryGetValue();
+                        if (leftVal == null) return null;
+
+                        var rightVal = Right.TryGetValue();
+                        if (rightVal == null) return null;
+
+                        if (leftVal is int leftInt && rightVal is int rightInt)
+                        { return leftInt + rightInt; }
+
+                        if (leftVal is float leftFloat && rightVal is float rightFloat)
+                        { return leftFloat + rightFloat; }
+
+                        if (leftVal is string leftStr && rightVal is string rightStr)
+                        { return leftStr + rightStr; }
+                    }
+
+                    return null;
+                case "-":
+                    {
+                        if (Left == null) return null;
+                        if (Right == null) return null;
+
+                        var leftVal = Left.TryGetValue();
+                        if (leftVal == null) return null;
+
+                        var rightVal = Right.TryGetValue();
+                        if (rightVal == null) return null;
+
+                        if (leftVal is int leftInt && rightVal is int rightInt)
+                        { return leftInt - rightInt; }
+
+                        if (leftVal is float leftFloat && rightVal is float rightFloat)
+                        { return leftFloat - rightFloat; }
+                    }
+
+                    return null;
+                case "*":
+                    {
+                        if (Left == null) return null;
+                        if (Right == null) return null;
+
+                        var leftVal = Left.TryGetValue();
+                        if (leftVal == null) return null;
+
+                        var rightVal = Right.TryGetValue();
+                        if (rightVal == null) return null;
+
+                        if (leftVal is int leftInt && rightVal is int rightInt)
+                        { return leftInt * rightInt; }
+
+                        if (leftVal is float leftFloat && rightVal is float rightFloat)
+                        { return leftFloat * rightFloat; }
+                    }
+
+                    return null;
+                case "/":
+                    {
+                        if (Left == null) return null;
+                        if (Right == null) return null;
+
+                        var leftVal = Left.TryGetValue();
+                        if (leftVal == null) return null;
+
+                        var rightVal = Right.TryGetValue();
+                        if (rightVal == null) return null;
+
+                        if (leftVal is int leftInt && rightVal is int rightInt)
+                        { return leftInt / rightInt; }
+
+                        if (leftVal is float leftFloat && rightVal is float rightFloat)
+                        { return leftFloat / rightFloat; }
+                    }
+
+                    return null;
+                default:
+                    return null;
+            }
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Literal : Statement
@@ -281,6 +375,20 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 return $"{" ".Repeat(ident)}{value}";
             }
+        }
+
+        public override object TryGetValue()
+        {
+            if (type.isList) return null;
+
+            return type.typeName switch
+            {
+                BuiltinType.INT => int.Parse(value),
+                BuiltinType.FLOAT => float.Parse(value),
+                BuiltinType.STRING => value,
+                BuiltinType.BOOLEAN => bool.Parse(value),
+                _ => null,
+            };
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -527,7 +635,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     class Statement_Index : Statement
     {
-        readonly internal Statement indexStatement;
+        internal readonly Statement indexStatement;
         internal Statement PrevStatement;
 
         public Statement_Index(Statement indexStatement)

@@ -4,8 +4,9 @@ using System.Linq;
 
 namespace IngameCoding.BBCode
 {
-    using Errors;
     using Core;
+
+    using Errors;
 
     public enum TokenSubtype
     {
@@ -70,6 +71,16 @@ namespace IngameCoding.BBCode
     namespace Parser
     {
         using Statements;
+
+        public struct ParserSettings
+        {
+            public bool PrintInfo;
+
+            public static ParserSettings Default => new()
+            {
+                PrintInfo = false,
+            };
+        }
 
         [Serializable]
         public class ParameterDefinition
@@ -284,15 +295,292 @@ namespace IngameCoding.BBCode
             }
         }
 
+        public struct ParserResult
+        {
+            public readonly Dictionary<string, FunctionDefinition> Functions;
+            public readonly Dictionary<string, StructDefinition> Structs;
+            public readonly List<Statement_NewVariable> GlobalVariables;
+            public readonly List<string> Usings;
+
+            public ParserResult(Dictionary<string, FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<string> usings)
+            {
+                Functions = functions;
+                GlobalVariables = globalVariables;
+                Structs = structs;
+                Usings = usings;
+            }
+
+            /// <summary>
+            /// Converts the parsed AST into text
+            /// </summary>
+            public string PrettyPrint()
+            {
+                var x = "";
+
+                foreach (var @using in Usings)
+                {
+                    x += "using " + @using + ";\n";
+                }
+
+                foreach (var globalVariable in GlobalVariables)
+                {
+                    x += globalVariable.PrettyPrint() + ";\n";
+                }
+
+                foreach (var @struct in Structs)
+                {
+                    x += @struct.Value.PrettyPrint() + "\n";
+                }
+
+                foreach (var function in Functions)
+                {
+                    x += function.Value.PrettyPrint() + "\n";
+                }
+
+                return x;
+            }
+
+            public void WriteToConsole(string title = "PARSER INFO")
+            {
+                Console.WriteLine($"\n\r === {title} ===\n\r");
+                int indent = 0;
+
+                void Comment(string comment)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"{"  ".Repeat(indent)}{comment}");
+                    Console.ResetColor();
+                }
+                void Attribute(FunctionDefinition.Attribute attribute)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("[");
+                    Console.ForegroundColor = ConsoleColor.DarkGreen;
+                    Console.Write(attribute.Name);
+                    if (attribute.Parameters != null && attribute.Parameters.Length > 0)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write("(");
+                        for (int i = 0; i < attribute.Parameters.Length; i++)
+                        {
+                            if (i > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                Console.Write($", ");
+                            }
+                            Console.ForegroundColor = ConsoleColor.White;
+                            Value(attribute.Parameters[i]);
+                        }
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write(")");
+                    }
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("]");
+                    Console.Write("\n\r");
+                    Console.ResetColor();
+                }
+                void Value(object v)
+                {
+                    if (v is int || v is float)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                        Console.Write(v);
+                    }
+                    else if (v is bool)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.Write(v);
+                    }
+                    else if (v is string)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkYellow;
+                        Console.Write($"\"{v}\"");
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write(v);
+                    }
+                }
+
+                Console.WriteLine("");
+
+                foreach (var item in Usings)
+                {
+                    Console.ForegroundColor = ConsoleColor.Blue;
+                    Console.Write("using ");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"{item}");
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("");
+
+                foreach (var item in this.GlobalVariables)
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"{item.type} ");
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"{item.variableName}");
+
+                    Console.Write("\n\r");
+
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("");
+
+                foreach (var item in this.Structs)
+                {
+                    foreach (var attr in item.Value.attributes)
+                    { Attribute(attr); }
+
+                    Console.ForegroundColor = ConsoleColor.Blue;
+                    Console.Write("struct ");
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write($"{item.Key} ");
+                    Console.Write("\n\r");
+
+                    foreach (var field in item.Value.fields)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.Write($"  {field.type} ");
+
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write($"{field.name}");
+
+                        Console.Write("\n\r");
+                    }
+
+                    Console.Write("\n\r");
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("");
+
+                foreach (var item in this.Functions)
+                {
+                    foreach (var attr in item.Value.attributes)
+                    { Attribute(attr); }
+
+                    Console.ForegroundColor = ConsoleColor.Blue;
+                    if (item.Value.type.typeName == BuiltinType.STRUCT)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                    }
+                    Console.Write($"{item.Value.type} ");
+
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.Write($"{item.Key}");
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("(");
+                    for (int i = 0; i < item.Value.parameters.Count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            Console.ForegroundColor = ConsoleColor.DarkGray;
+                            Console.Write($", ");
+                        }
+
+                        ParameterDefinition param = item.Value.parameters[i];
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        if (param.withThisKeyword)
+                        { Console.Write("this "); }
+                        if (param.withRefKeyword)
+                        { Console.Write("ref "); }
+                        if (param.type.typeName == BuiltinType.STRUCT)
+                        { Console.ForegroundColor = ConsoleColor.Green; }
+                        Console.Write($"{param.type} ");
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write($"{param.name}");
+                    }
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write(")");
+
+                    if (item.Value.statements.Count > 0)
+                    {
+                        int statementCount = 0;
+                        void AddStatement(Statement st)
+                        {
+                            statementCount++;
+                            if (st is Statement_ForLoop st0)
+                            {
+                                AddStatement(st0.condition);
+                                AddStatement(st0.variableDeclaration);
+                                AddStatement(st0.expression);
+                            }
+                            else if (st is Statement_WhileLoop st1)
+                            {
+                                AddStatement(st1.condition);
+                            }
+                            else if (st is Statement_FunctionCall st2)
+                            {
+                                foreach (var st3 in st2.parameters)
+                                {
+                                    AddStatement(st3);
+                                }
+                            }
+                            else if (st is Statement_If_If st3)
+                            {
+                                AddStatement(st3.condition);
+                            }
+                            else if (st is Statement_If_ElseIf st4)
+                            {
+                                AddStatement(st4.condition);
+                            }
+                            else if (st is Statement_Index st5)
+                            {
+                                AddStatement(st5.indexStatement);
+                                statementCount++;
+                            }
+                            else if (st is Statement_NewVariable st6)
+                            {
+                                if (st6.initialValue != null) AddStatement(st6.initialValue);
+                            }
+                            else if (st is Statement_Operator st7)
+                            {
+                                if (st7.Left != null) AddStatement(st7.Left);
+                                if (st7.Right != null) AddStatement(st7.Right);
+                            }
+
+                            if (st is StatementParent st8)
+                            {
+                                foreach (var item in st8.statements)
+                                {
+                                    AddStatement(st);
+                                }
+                            }
+                        }
+                        foreach (var st in item.Value.statements)
+                        {
+                            AddStatement(st);
+                        }
+
+                        Console.Write($"\n\r{{ {statementCount} statements }}\n\r");
+                    }
+                    else
+                    {
+                        Console.Write("\n\r");
+                    }
+
+                    Console.Write("\n\r");
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("\n\r === ===\n\r");
+            }
+        }
+
+        /// <summary>
+        /// The parser for the BBCode language
+        /// </summary>
         public class Parser
         {
             int currentTokenIndex;
             readonly List<Token> tokens = new();
 
-            Token CurrentToken
-            {
-                get { return (currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null; }
-            }
+            Token CurrentToken => (currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
 
             readonly Dictionary<string, TypeToken> types = new();
             readonly Dictionary<string, int> operators = new();
@@ -315,10 +603,10 @@ namespace IngameCoding.BBCode
             List<Warning> Warnings;
 
             // === Result ===
-            public Dictionary<string, FunctionDefinition> Functions = new();
-            public Dictionary<string, StructDefinition> Structs = new();
-            public List<Statement_NewVariable> GlobalVariables = new();
-            public List<string> Usings = new();
+            readonly Dictionary<string, FunctionDefinition> Functions = new();
+            readonly Dictionary<string, StructDefinition> Structs = new();
+            readonly List<Statement_NewVariable> GlobalVariables = new();
+            readonly List<string> Usings = new();
             // === ===
 
             public Parser()
@@ -361,7 +649,24 @@ namespace IngameCoding.BBCode
                 operators.Add("--", 40);
             }
 
-            public void Parse(Token[] _tokens, List<Warning> warnings)
+            /// <summary>
+            /// Parses tokens into AST
+            /// </summary>
+            /// <param name="_tokens">
+            /// The list of tokens<br/>
+            /// This should be generated using <see cref="IngameCoding.BBCode.Tokenizer"/>
+            /// </param>
+            /// <param name="warnings">
+            /// A list that the parser can fill with warnings
+            /// </param>
+            /// <exception cref="EndlessLoopException"/>
+            /// <exception cref="SyntaxException"/>
+            /// <exception cref="ParserException"/>
+            /// <exception cref="Exception"/>
+            /// <returns>
+            /// The generated AST
+            /// </returns>
+            public ParserResult Parse(Token[] _tokens, List<Warning> warnings)
             {
                 Warnings = warnings;
                 tokens.Clear();
@@ -379,33 +684,47 @@ namespace IngameCoding.BBCode
                     endlessSafe++;
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
+
+                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings);
             }
 
-            public string PrettyPrint()
+            /// <summary>
+            /// This will call the <see cref="Tokenizer.Parse"/> and the <see cref="Parser.Parse"/>
+            /// </summary>
+            /// <param name="code">
+            /// The source code
+            /// </param>
+            /// <param name="warnings">
+            /// A list that the tokenizer and the parser can fill with warnings
+            /// </param>
+            /// <param name="printCallback">
+            /// Optional: Print callback
+            /// </param>
+            /// <exception cref="EndlessLoopException"/>
+            /// <exception cref="SyntaxException"/>
+            /// <exception cref="ParserException"/>
+            /// <exception cref="Exception"/>
+            /// <exception cref="InternalException"/>
+            /// <exception cref="NotImplementedException"/>
+            /// <exception cref="System.Exception"/>
+            /// <returns>
+            /// The AST
+            /// </returns>
+            public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Terminal.TerminalInterpreter.LogType> printCallback = null)
             {
-                var x = "";
+                var (tokens, _) = Tokenizer.Parse(code, TokenizerSettings.Default, printCallback);
 
-                foreach (var @using in Usings)
-                {
-                    x += "using " + @using + ";\n";
-                }
+                DateTime parseStarted = DateTime.Now;
+                if (printCallback != null)
+                { printCallback?.Invoke("Parsing...", Terminal.TerminalInterpreter.LogType.Debug); }
 
-                foreach (var globalVariable in GlobalVariables)
-                {
-                    x += globalVariable.PrettyPrint() + ";\n";
-                }
+                Parser parser = new();
+                var result = parser.Parse(tokens, warnings);
 
-                foreach (var @struct in Structs)
-                {
-                    x += @struct.Value.PrettyPrint() + "\n";
-                }
+                if (printCallback != null)
+                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Terminal.TerminalInterpreter.LogType.Debug); }
 
-                foreach (var function in Functions)
-                {
-                    x += function.Value.PrettyPrint() + "\n";
-                }
-
-                return x;
+                return result;
             }
 
             #region Parse top level

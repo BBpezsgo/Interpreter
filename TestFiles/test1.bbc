@@ -1,5 +1,10 @@
 ﻿using System;
 
+void Xd2()
+{
+    Console.Log("ahan");
+}
+
 [CodeEntry]
 void Start()
 {
@@ -14,4 +19,10 @@ void Start()
     Console.Log(b);
   };
   Console.Log(a);
+  Xd();
+}
+
+void Xd()
+{
+  Xd2();
 }

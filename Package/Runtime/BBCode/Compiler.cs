@@ -1334,6 +1334,11 @@ namespace IngameCoding.BBCode
                             GenerateCodeForStatement(@operator.Right);
                             AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, valueMemoryIndex.offset, field.FieldName);
                         }
+                        else if (GetParameter(variable1.variableName, out Parameter parameter))
+                        {
+                            GenerateCodeForStatement(@operator.Right);
+                            AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, parameter.RealIndex, field.FieldName);
+                        }
                         else
                         {
                             throw new ParserException("Unknown variable '" + variable1.variableName + "'", new Position(field.position.Line));
@@ -1615,6 +1620,8 @@ namespace IngameCoding.BBCode
         void GenerateCodeForStatement(Statement_Index indexStatement)
         {
             GenerateCodeForStatement(indexStatement.PrevStatement);
+            if (indexStatement.indexStatement == null)
+            { throw new ParserException($"Index statement for indexer is requied", indexStatement.position); }
             GenerateCodeForStatement(indexStatement.indexStatement);
             AddInstruction(new Instruction(Opcode.LIST_INDEX));
         }

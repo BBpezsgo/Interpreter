@@ -1,0 +1,18 @@
+﻿using System;
+
+struct Node
+{
+  int Value;
+}
+
+struct Heap
+{
+  Node[] nodes;
+}
+
+[CodeEntry]
+void Start()
+{
+  Heap heap = new Heap;
+  heap.nodes = new Node[];
+}

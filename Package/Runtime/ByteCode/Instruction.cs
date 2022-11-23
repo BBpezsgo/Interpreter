@@ -104,6 +104,11 @@ namespace IngameCoding.Bytecode
         LIST_REMOVE_ITEM,
         // === ===
 
+        // === HEAP ===
+        HEAP_GET,
+        HEAP_SET,
+        // === ===
+
         TYPE_GET,
 
         COMMENT,

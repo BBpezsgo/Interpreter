@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
-using System;
 using System.Linq;
 
 namespace IngameCoding.Bytecode
@@ -42,7 +42,11 @@ namespace IngameCoding.Bytecode
             }
             this.builtinFunctions = builtinFunctions;
 
-            MU = new(new Stack() { cpu = this }, code)
+            MU = new(
+                new Stack() { cpu = this },
+                new HEAP(),
+                code
+            )
             {
                 BasePointer = basePointer,
                 ReturnAddressStack = new List<int>(),
@@ -183,13 +187,35 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOGIC_NOT:
                     return LOGIC_NOT();
                 case Opcode.UNKNOWN:
-                    throw new Errors.SystemException("Unknown command");
+                    throw new SystemException("Unknown command");
+                case Opcode.HEAP_GET:
+                    return HEAP_GET();
+                case Opcode.HEAP_SET:
+                    return HEAP_SET();
                 default:
-                    throw new Errors.SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
+                    throw new SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
             }
         }
 
         #region Commands
+
+        int HEAP_GET()
+        {
+            var v = MU.Heap[(int)MU.CurrentInstruction.parameter];
+            MU.Stack.Add(v);
+            MU.Step();
+
+            return 2;
+        }
+
+        int HEAP_SET()
+        {
+            var v = MU.Stack.Pop();
+            MU.Heap[(int)MU.CurrentInstruction.parameter] = v;
+            MU.Step();
+
+            return 2;
+        }
 
         int LOGIC_NOT()
         {
@@ -785,18 +811,20 @@ namespace IngameCoding.Bytecode
     internal class MemoryUnit
     {
         internal Stack Stack;
+        internal HEAP Heap;
         internal List<int> ReturnAddressStack;
         internal Instruction[] Code;
 
         internal int CodePointer;
         internal int BasePointer;
-        
+
         internal Instruction CurrentInstruction => Code[CodePointer];
 
-        public MemoryUnit(Stack stack, Instruction[] code)
+        public MemoryUnit(Stack stack, HEAP heap, Instruction[] code)
         {
             Stack = stack;
             Code = code;
+            Heap = heap;
         }
 
         public int End() => Code.Length;
@@ -2146,6 +2174,22 @@ namespace IngameCoding.Bytecode
         }
         /// <returns>A specific item</returns>
         public Item Get(int index) => this.stack[index];
+    }
+    internal class HEAP
+    {
+        Stack.Item[] heap;
+
+        internal HEAP(int size = 0)
+        {
+            this.heap = new Stack.Item[size];
+        }
+
+        internal int Size => this.heap.Length;
+        internal Stack.Item this[int i]
+        {
+            get => heap[i];
+            set => heap[i] = value;
+        }
     }
 
     public struct BytecodeInterpreterSettings

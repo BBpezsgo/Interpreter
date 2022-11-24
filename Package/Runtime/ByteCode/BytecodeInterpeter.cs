@@ -2174,6 +2174,8 @@ namespace IngameCoding.Bytecode
         }
         /// <returns>A specific item</returns>
         public Item Get(int index) => this.stack[index];
+
+        internal Item[] ToArray() => this.stack.ToArray();
     }
     internal class HEAP
     {
@@ -2208,6 +2210,20 @@ namespace IngameCoding.Bytecode
 
     public class BytecodeInterpeter
     {
+        internal class InterpeterDetails
+        {
+            BytecodeInterpeter bytecodeInterpeter;
+            public int CodePointer => bytecodeInterpeter.CPU.CodePointer;
+            public int BasePointer => bytecodeInterpeter.CPU.MU.BasePointer;
+            public int[] ReturnAddressStack => bytecodeInterpeter.CPU.MU.ReturnAddressStack.ToArray();
+            public Stack.Item[] Stack => bytecodeInterpeter.CPU.MU.Stack.ToArray();
+
+            public InterpeterDetails(BytecodeInterpeter bytecodeInterpeter)
+            {
+                this.bytecodeInterpeter = bytecodeInterpeter;
+            }
+        }
+
         BytecodeInterpreterSettings settings;
 
         CentralProcessingUnit CPU;
@@ -2225,6 +2241,9 @@ namespace IngameCoding.Bytecode
         int lastInstrPointer = -1;
         int endlessSafe = 0;
 
+        readonly InterpeterDetails details;
+        internal InterpeterDetails Details => details;
+
         public BytecodeInterpeter(Instruction[] code, Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
         {
             this.settings = settings;
@@ -2241,6 +2260,8 @@ namespace IngameCoding.Bytecode
 
             endlessSafe = 0;
             lastInstrPointer = -1;
+
+            details = new InterpeterDetails(this);
         }
 
         public void Jump(int instructionOffset)

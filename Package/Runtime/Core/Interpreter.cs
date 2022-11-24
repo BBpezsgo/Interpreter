@@ -7,8 +7,11 @@ using System.Linq;
 namespace IngameCoding.Core
 {
     using BBCode;
+
     using Bytecode;
+
     using Errors;
+
     using Terminal;
 
     /// <summary>
@@ -17,6 +20,30 @@ namespace IngameCoding.Core
     [Serializable]
     public class Interpreter
     {
+        internal enum State
+        {
+            Initialized,
+            Destroyed,
+            SetGlobalVariables,
+            CallCodeEntry,
+            CallUpdate,
+            CallCodeEnd,
+            DisposeGlobalVariables,
+            CodeExecuted
+        }
+
+        public class InterpreterDetails
+        {
+            internal Compiler.CompilerResult CompilerResult;
+            internal InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
+            internal BytecodeInterpeter Interpeter => interpreter.bytecodeInterpeter;
+            internal State State => interpreter.state;
+
+            readonly Interpreter interpreter;
+
+            public InterpreterDetails(Interpreter interpreter) => this.interpreter = interpreter;
+        }
+
         public delegate void OnDoneEventHandler(Interpreter sender, bool success);
         /// <summary>
         /// Will be invoked when the code is completed
@@ -42,7 +69,7 @@ namespace IngameCoding.Core
         /// </summary>
         public bool IsExecutingCode => currentlyRunningCode;
 
-        struct InstructionOffsets
+        internal struct InstructionOffsets
         {
             public enum Kind
             {
@@ -87,6 +114,11 @@ namespace IngameCoding.Core
         readonly Dictionary<string, Compiler.BuiltinFunction> builtinFunctions = new();
         readonly Dictionary<string, Func<Stack.IStruct>> builtinStructs = new();
 
+        InterpreterDetails details;
+        public InterpreterDetails Details => details;
+
+        State state;
+
         bool currentlyRunningCode = false;
 
         BytecodeInterpeter bytecodeInterpeter;
@@ -120,6 +152,8 @@ namespace IngameCoding.Core
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
+
+            state = State.SetGlobalVariables;
 
             OnOutput?.Invoke(this, "Start code ...", TerminalInterpreter.LogType.Debug);
         }
@@ -159,6 +193,8 @@ namespace IngameCoding.Core
                 compilerSettings,
                 parserSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b));
+
+            details.CompilerResult = compilerResult;
 
             if (compilerSettings.PrintInstructions)
             { compilerResult.WriteToConsole(); }
@@ -258,6 +294,10 @@ namespace IngameCoding.Core
                     OnNeedInput?.Invoke(this, parameters[0].ToStringValue());
                 }
             }, true);
+
+            details = new InterpreterDetails(this);
+
+            state = State.Initialized;
 
             return true;
         }
@@ -411,6 +451,8 @@ namespace IngameCoding.Core
                 bytecodeInterpeter.Destroy();
                 bytecodeInterpeter = null;
             }
+
+            state = State.Destroyed;
         }
 
 #if false
@@ -622,6 +664,8 @@ namespace IngameCoding.Core
             OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of " + result.ToString(), TerminalInterpreter.LogType.System);
             bytecodeInterpeter = null;
             currentlyRunningCode = false;
+
+            state = State.CodeExecuted;
         }
 
         bool exitCalled = false;
@@ -705,6 +749,8 @@ namespace IngameCoding.Core
 
                             globalVariablesCreated = true;
                             bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
+
+                            state = State.CallCodeEntry;
                         }
                         else if (!startCalled)
                         {
@@ -715,6 +761,19 @@ namespace IngameCoding.Core
                             { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
 
                             bytecodeInterpeter.Call(offset);
+
+                            if (instructionOffsets.Offsets.ContainsKey(InstructionOffsets.Kind.Update))
+                            {
+                                state = State.CallUpdate;
+                            }
+                            else if (instructionOffsets.Offsets.ContainsKey(InstructionOffsets.Kind.CodeEnd) && !exitCalled)
+                            {
+                                state = State.CallCodeEnd;
+                            }
+                            else
+                            {
+                                state = State.DisposeGlobalVariables;
+                            }
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
                         {
@@ -735,6 +794,8 @@ namespace IngameCoding.Core
                             {
                                 bytecodeInterpeter.Call(offset);
                             }
+
+                            state = State.DisposeGlobalVariables;
                         }
                         else if (!globalVariablesDisposed)
                         {
@@ -1111,7 +1172,7 @@ namespace IngameCoding.Core
             }
         }
 
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out  BBCode.Parser.ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out BBCode.Parser.ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
@@ -1125,6 +1186,11 @@ namespace IngameCoding.Core
                 int i = 0;
                 while (i < args.Length - 1)
                 {
+                    if (args[i] == "-debug")
+                    {
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-throw-errors")
                     {
                         ThrowErrors = true;
@@ -1220,12 +1286,12 @@ namespace IngameCoding.Core
 
             string File = args.Last();
 
-            BBCode.Parser.ParserSettings parserSettings = BBCode.Parser.ParserSettings.Default;
-            Compiler.CompilerSettings compilerSettings = Compiler.CompilerSettings.Default;
-            BytecodeInterpreterSettings bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
-            bool ThrowErrors = false;
-            bool LogDebugs = true;
-            bool LogSystem = true;
+            BBCode.Parser.ParserSettings parserSettings;
+            Compiler.CompilerSettings compilerSettings;
+            BytecodeInterpreterSettings bytecodeInterpreterSettings;
+            bool ThrowErrors;
+            bool LogDebugs;
+            bool LogSystem;
 
             try
             {
@@ -1237,7 +1303,19 @@ namespace IngameCoding.Core
                 return;
             }
 
-            Run(File, parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebugs, LogSystem, !ThrowErrors);
+            if (args.Contains("-debug"))
+            {
+                ConsoleGUI.ConsoleGUI gui = new();
+                gui.FilledElement = new ConsoleGUI.InterpeterElement(File, compilerSettings, parserSettings, bytecodeInterpreterSettings, !ThrowErrors)
+                {
+                    Rect = new System.Drawing.Rectangle(0, 0, Console.WindowWidth - 1, Console.WindowHeight - 1),
+                    CanDrag = false
+                };
+            }
+            else
+            {
+                Run(File, parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebugs, LogSystem, !ThrowErrors);
+            }
         }
     }
 }

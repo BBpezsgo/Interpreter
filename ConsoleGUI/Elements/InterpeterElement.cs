@@ -341,7 +341,7 @@ namespace ConsoleGUI
 
                 if (this.Interpreter.Details.Interpeter.Details.BasePointer == i)
                 {
-                    BackgroundColor = CharColors.BgMagenta;
+                    BackgroundColor = CharColors.BgGray;
                 }
 
                 switch (item.type)
@@ -384,6 +384,11 @@ namespace ConsoleGUI
                     AddText($" ");
                     ForegroundColor = CharColors.FgGray;
                     AddText(item.Tag);
+                }
+
+                if (this.Interpreter.Details.Interpeter.Details.BasePointer == i && ForegroundColor == CharColors.FgGray)
+                {
+                    ForegroundColor = CharColors.FgBlack;
                 }
 
                 BackgroundColor = CharColors.BgBlack;
@@ -533,14 +538,14 @@ namespace ConsoleGUI
 
                 if (instruction.additionParameter2 != -1)
                 {
-                    ForegroundColor = CharColors.FgCyan;
+                    ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgCyan;
                     AddText($"{instruction.additionParameter2}");
                     AddText($" ");
                 }
 
                 if (!string.IsNullOrEmpty(instruction.tag))
                 {
-                    ForegroundColor = CharColors.FgGray;
+                    ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgGray;
                     AddText($"{instruction.tag}");
                 }
 

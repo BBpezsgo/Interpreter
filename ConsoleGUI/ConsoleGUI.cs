@@ -32,6 +32,11 @@ namespace ConsoleGUI
             aTimer.Interval = 500;
             aTimer.Enabled = true;
 
+            System.Timers.Timer bTimer = new();
+            bTimer.Elapsed += BTimer_Elapsed;
+            bTimer.Interval = 5000;
+            bTimer.Enabled = true;
+
             SetupConsole();
 
             ConsoleListener.MouseEvent += MouseEvent;
@@ -53,15 +58,14 @@ namespace ConsoleGUI
             RefreshConsole();
         }
 
+        private void BTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            ResizeElements = true;
+        }
+
         private void WindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r)
         {
             ResizeElements = true;
-
-            width = (short)Console.WindowWidth;
-            height = (short)Console.WindowHeight;
-
-            ConsoleBuffer = new CharInfo[width * height];
-            ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
         }
 
         void RefreshConsole()
@@ -70,6 +74,12 @@ namespace ConsoleGUI
 
             if (ResizeElements)
             {
+                width = (short)Console.WindowWidth;
+                height = (short)Console.WindowHeight;
+
+                ConsoleBuffer = new CharInfo[width * height];
+                ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
+
                 ResizeElements = false;
                 foreach (var Element in Elements) Element.RefreshSize();
                 if (FilledElement != null)

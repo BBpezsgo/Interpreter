@@ -13,12 +13,16 @@ namespace TheProgram
             // IngameCoding.Core.EasyInterpreter.Run("-throw-errors", "-c-print-instructions", "true", "-p-print-info", "true", projectFolder + "\\TestFiles\\test1.bbc");
             // IngameCoding.Core.EasyInterpreter.Run("-throw-errors", "-hide-debug", "-hide-system", projectFolder + "\\TestFiles\\test6.bbc");
             // IngameCoding.Core.EasyInterpreter.Run("-debug", projectFolder + "\\TestFiles\\test5.bbc");
-            DebugTest.Run(projectFolder + "\\TestFiles\\test50.bbc");
+            DebugTest.Run(args);
+            return;
 #else
-            IngameCoding.Core.EasyInterpreter.Run(args);
+            var settings = ArgumentParser.Parse(args);
+            if (!settings.HasValue) return;
+            IngameCoding.Core.EasyInterpreter.Run(settings.Value);
 #endif
-            // Console.WriteLine("\n\r\n\rPress any key to exit");
-            // Console.ReadKey();
+        OnExit:
+            Console.WriteLine("\n\r\n\rPress any key to exit");
+            Console.ReadKey();
         }
     }
 }

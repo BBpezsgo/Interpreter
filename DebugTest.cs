@@ -11,15 +11,14 @@ namespace TheProgram
 {
     internal static class DebugTest
     {
-        public static void Run(string filePath)
+        public static void Run(params string[] args)
         {
+            var settings = ArgumentParser.Parse(args).Value;
+            settings.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
+
             var ipc = new IPC();
 
-            var file = new FileInfo(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var projectFolder = file.Directory.Parent.Parent.Parent.FullName;
-
-            var fileInfo = new FileInfo(projectFolder + "\\TestFiles\\test5.bbc");
-            var code = File.ReadAllText(filePath);
+            var code = File.ReadAllText(settings.File.FullName);
             var interpreter = new Interpreter();
 
             ipc.OnRecived += (manager, message) =>
@@ -66,16 +65,11 @@ namespace TheProgram
 
             if (interpreter.Initialize())
             {
-                var compiledCode = interpreter.CompileCode(code, fileInfo.Directory, Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default);
+                var compiledCode = interpreter.CompileCode(code, settings.File.Directory, settings.compilerSettings, settings.parserSettings);
 
                 if (compiledCode != null)
                 {
-                    interpreter.RunCode(compiledCode, new BytecodeInterpreterSettings()
-                    {
-                        ClockCyclesPerUpdate = 1,
-                        InstructionLimit = BytecodeInterpreterSettings.Default.InstructionLimit,
-                        StackMaxSize = BytecodeInterpreterSettings.Default.StackMaxSize,
-                    });
+                    interpreter.RunCode(compiledCode, settings.bytecodeInterpreterSettings);
                 }
             }
 

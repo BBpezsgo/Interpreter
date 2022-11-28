@@ -221,7 +221,9 @@ namespace ConsoleGUI
         Left,
     }
 
+#if NET6_0
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+#endif
     struct Character
     {
         public char Char;

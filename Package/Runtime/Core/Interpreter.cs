@@ -153,7 +153,7 @@ namespace IngameCoding.Core
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
 
-            state = State.SetGlobalVariables;
+            state = State.Initialized;
 
             OnOutput?.Invoke(this, "Start code ...", TerminalInterpreter.LogType.Debug);
         }
@@ -745,15 +745,15 @@ namespace IngameCoding.Core
                     {
                         if (!globalVariablesCreated)
                         {
+                            state = State.SetGlobalVariables;
                             OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
 
                             globalVariablesCreated = true;
                             bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
-
-                            state = State.CallCodeEntry;
                         }
                         else if (!startCalled)
                         {
+                            state = State.CallCodeEntry;
                             OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
 
                             startCalled = true;
@@ -761,22 +761,10 @@ namespace IngameCoding.Core
                             { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
 
                             bytecodeInterpeter.Call(offset);
-
-                            if (instructionOffsets.Offsets.ContainsKey(InstructionOffsets.Kind.Update))
-                            {
-                                state = State.CallUpdate;
-                            }
-                            else if (instructionOffsets.Offsets.ContainsKey(InstructionOffsets.Kind.CodeEnd) && !exitCalled)
-                            {
-                                state = State.CallCodeEnd;
-                            }
-                            else
-                            {
-                                state = State.DisposeGlobalVariables;
-                            }
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
                         {
+                            state = State.CallUpdate;
                             WaitForUpdates(10, () =>
                             {
                                 if (bytecodeInterpeter != null)
@@ -787,6 +775,7 @@ namespace IngameCoding.Core
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
                         {
+                            state = State.CallCodeEnd;
                             OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
 
                             exitCalled = true;
@@ -794,11 +783,10 @@ namespace IngameCoding.Core
                             {
                                 bytecodeInterpeter.Call(offset);
                             }
-
-                            state = State.DisposeGlobalVariables;
                         }
                         else if (!globalVariablesDisposed)
                         {
+                            state = State.DisposeGlobalVariables;
                             OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
 
                             globalVariablesDisposed = true;

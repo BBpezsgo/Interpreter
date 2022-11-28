@@ -149,7 +149,7 @@ namespace TheProgram
         {
             ClearGlobalVariablesInstruction = v.clearGlobalVariablesInstruction;
             SetGlobalVariablesInstruction = v.setGlobalVariablesInstruction;
-            CompiledCode = v.compiledCode.ToData(v => new Data_Instruction(v));
+            CompiledCode = (v.compiledCode == null) ? Array.Empty<Data_Instruction>() : v.compiledCode.ToData(v => new Data_Instruction(v));
         }
     }
 

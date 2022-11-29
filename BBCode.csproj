@@ -9,6 +9,11 @@
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
     <ErrorReport>send</ErrorReport>
+    <IsPublishable>False</IsPublishable>
+    <PackageId>bb.bbcode-interpreter</PackageId>
+    <Title>BBCode Interpreter</Title>
+    <Authors>BB</Authors>
+    <Product>BBCode Interpreter</Product>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

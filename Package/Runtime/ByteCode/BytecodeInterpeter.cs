@@ -115,8 +115,12 @@ namespace IngameCoding.Bytecode
                     return STORE_VALUE();
                 case Opcode.LOAD_VALUE_BR:
                     return LOAD_VALUE_BR();
+                case Opcode.LOAD_VALUE_R:
+                    return LOAD_VALUE_R();
                 case Opcode.STORE_VALUE_BR:
                     return STORE_VALUE_BR();
+                case Opcode.STORE_VALUE_R:
+                    return STORE_VALUE_R();
                 case Opcode.LOAD_FIELD:
                     return LOAD_FIELD();
                 case Opcode.STORE_FIELD:
@@ -509,6 +513,26 @@ namespace IngameCoding.Bytecode
         int LOAD_VALUE_BR()
         {
             MU.Stack.Add(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer), MU.CurrentInstruction.tag);
+
+            MU.Step();
+
+            return 3;
+        }
+
+        int STORE_VALUE_R()
+        {
+            var index = (int)MU.CurrentInstruction.parameter + MU.Stack.Count;
+            var itemToSet = MU.Stack.Get(index).TrySet(MU.Stack.Last());
+            MU.Stack.Set(index, itemToSet);
+
+            MU.Stack.Pop();
+            MU.Step();
+
+            return 5;
+        }
+        int LOAD_VALUE_R()
+        {
+            MU.Stack.Add(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count), MU.CurrentInstruction.tag);
 
             MU.Step();
 
@@ -1982,8 +2006,8 @@ namespace IngameCoding.Bytecode
                     Type.FLOAT => (IsReference ? "ref " : "") + ValueFloat.ToString().Replace(',', '.'),
                     Type.STRING => (IsReference ? "ref " : "") + ValueString,
                     Type.BOOLEAN => (IsReference ? "ref " : "") + ValueBoolean.ToString(),
-                    Type.STRUCT => (IsReference ? "ref " : "") + "{...}",
-                    Type.LIST => (IsReference ? "ref " : "") + "[...]",
+                    Type.STRUCT => (IsReference ? "ref " : "") + "{ ... }",
+                    Type.LIST => (IsReference ? "ref " : "") + "[ ... ]",
                     _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
                 };
                 return retStr;

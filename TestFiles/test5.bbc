@@ -1,6 +1,7 @@
 ﻿using System;
 
 [CodeEntry]
-void Start() {
+void Start()
+{
     Console.Log(5 + 10);
 }

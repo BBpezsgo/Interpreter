@@ -23,9 +23,17 @@ namespace IngameCoding.Bytecode
         /// </summary>
         LOAD_VALUE_BR,
         /// <summary>
+        /// LOAD_VALUE_RELATIVE
+        /// </summary>
+        LOAD_VALUE_R,
+        /// <summary>
         /// STORE_VALUE_BASEPOINTER_RELATIVE
         /// </summary>
         STORE_VALUE_BR,
+        /// <summary>
+        /// STORE_VALUE_RELATIVE
+        /// </summary>
+        STORE_VALUE_R,
 
         LOAD_VALUE_AS_REF,
         STORE_VALUE_AS_REF,
@@ -122,6 +130,19 @@ namespace IngameCoding.Bytecode
     public class Instruction
     {
         public Opcode opcode;
+        /// <summary>
+        /// Can be:
+        /// <list type="bullet">
+        /// <item><see cref="null"/></item>
+        /// <item><see cref="int"/></item>
+        /// <item><see cref="bool"/></item>
+        /// <item><see cref="float"/></item>
+        /// <item><see cref="string"/></item>
+        /// <item><see cref="Stack.IStruct"/></item>
+        /// <item><see cref="Stack.Item.Struct"/></item>
+        /// <item><see cref="Stack.Item.List"/></item>
+        /// </list>
+        /// </summary>
         public object parameter;
         /// <summary>
         /// Used for:

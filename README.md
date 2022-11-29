@@ -19,9 +19,9 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-c-generate-comments [bool]` Generates comment instructions
 - `-c-remove-unused-functions [byte]` Remove unused instructions iterations
 - `-c-print-instructions [bool]` Prints the generated instructions
-- `-bc-clock [int]` Sets the interperter *clock cycles/update*
-- `-bc-instruction-limit [int]` Sets the interperter *instruction limit*
-- `-bc-stack-size [int]` Sets the interperter *stack size*
+- `-bc-clock [int]` Sets the interpreter *clock cycles/update*
+- `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
+- `-bc-stack-size [int]` Sets the interpreter *stack size*
 - `-debug` <b>(Experimental feature)</b> This will start another thing that you might be able to use for debugging. You must manually jump to the next instruction with the TAB key.
 
 ## [Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
@@ -49,6 +49,19 @@ struct Foo
 
 Foo x = new Foo;
 ```
+### Lists
+There are also lists... What should I say?
+```
+// Define a list:
+int[] var0;
+
+// Define a list literal:
+[0, 1, 2, 3];
+
+// Combined: (Define a list with an initial value)
+int[] var2 = [0, 1, 2, 3];
+```
+> The `Console.Log` function prints all items in the list
 ### Method like functions
 You can create a function that looks like a method.
 Put the `this` keyword before the first parameter and you're done.<br>
@@ -67,6 +80,7 @@ int Add(this int v)
 
 13.Add();
 ```
+> If `Console.Log` is called with a parameter of type `Struct`, it will print `{ ... }`
 ### Events
 
 > **NOTE:**

@@ -16,6 +16,50 @@ namespace IngameCoding.BBCode
 
     using Terminal;
 
+    static class Extensions
+    {
+        public static Stack.Item.Type Convert(this BuiltinType v)
+        {
+            switch (v)
+            {
+                case BuiltinType.INT:
+                    return Stack.Item.Type.INT;
+                case BuiltinType.FLOAT:
+                    return Stack.Item.Type.FLOAT;
+                case BuiltinType.STRING:
+                    return Stack.Item.Type.STRING;
+                case BuiltinType.BOOLEAN:
+                    return Stack.Item.Type.BOOLEAN;
+                case BuiltinType.STRUCT:
+                    return Stack.Item.Type.STRUCT;
+                default:
+                    return Stack.Item.Type.RUNTIME;
+            }
+        }
+        public static BuiltinType Convert(this Stack.Item.Type v)
+        {
+            switch (v)
+            {
+                case Stack.Item.Type.INT:
+                    return BuiltinType.INT;
+                case Stack.Item.Type.FLOAT:
+                    return BuiltinType.FLOAT;
+                case Stack.Item.Type.STRING:
+                    return BuiltinType.STRUCT;
+                case Stack.Item.Type.BOOLEAN:
+                    return BuiltinType.BOOLEAN;
+                case Stack.Item.Type.STRUCT:
+                    return BuiltinType.STRUCT;
+                case Stack.Item.Type.LIST:
+                    return BuiltinType.RUNTIME;
+                case Stack.Item.Type.RUNTIME:
+                    return BuiltinType.RUNTIME;
+                default:
+                    return BuiltinType.ANY;
+            }
+        }
+    }
+
     public class Compiler
     {
         #region Fields
@@ -634,6 +678,10 @@ namespace IngameCoding.BBCode
         }
         void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
         void AddInstruction(Opcode opcode, object param0) => AddInstruction(new Instruction(opcode, param0));
+        void AddInstruction(Opcode opcode, string param0) => AddInstruction(new Instruction(opcode, param0));
+        void AddInstruction(Opcode opcode, int param0) => AddInstruction(new Instruction(opcode, param0));
+        void AddInstruction(Opcode opcode, bool param0) => AddInstruction(new Instruction(opcode, param0));
+        void AddInstruction(Opcode opcode, float param0) => AddInstruction(new Instruction(opcode, param0));
         void AddInstruction(Opcode opcode, object param0, string param1) => AddInstruction(new Instruction(opcode, param0, param1));
 
         #endregion
@@ -1680,6 +1728,33 @@ namespace IngameCoding.BBCode
             GenerateCodeForStatement(indexStatement.indexStatement);
             AddInstruction(new Instruction(Opcode.LIST_INDEX));
         }
+        void GenerateCodeForStatement(Statement_ListValue listValue)
+        {
+            Stack.Item.Type listType = Stack.Item.Type.RUNTIME;
+            for (int i = 0; i < listValue.Size; i++)
+            {
+                if (listValue.Values[i] is not Statement_Literal literal)
+                { throw new ParserException("Only literals are supported in list value"); }
+                if (i == 0)
+                {
+                    listType = literal.type.typeName.Convert();
+                    if (listType == Stack.Item.Type.RUNTIME)
+                    { throw new ParserException($"Unknown literal type {listType}"); }
+                }
+                if (literal.type.typeName.Convert() != listType)
+                { throw new ParserException($"Wrong literal type {literal.type.typeName}. Expected {listType}"); }
+            }
+            Stack.Item newList = new(new Stack.Item.List(listType), null);
+            AddInstruction(Opcode.COMMENT, "Generate List {");
+            AddInstruction(Opcode.PUSH_VALUE, newList);
+            for (int i = 0; i < listValue.Size; i++)
+            {
+                AddInstruction(Opcode.LOAD_VALUE_R, -1);
+                GenerateCodeForStatement(listValue.Values[i]);
+                AddInstruction(Opcode.LIST_PUSH_ITEM);
+            }
+            AddInstruction(Opcode.COMMENT, "}");
+        }
 
         void GenerateCodeForStatement(Statement st)
         {
@@ -1687,7 +1762,9 @@ namespace IngameCoding.BBCode
             if (st is StatementParent statementParent)
             { variableCount = CompileVariables(statementParent); }
 
-            if (st is Statement_NewVariable newVariable)
+            if (st is Statement_ListValue listValue)
+            { GenerateCodeForStatement(listValue); }
+            else if (st is Statement_NewVariable newVariable)
             { GenerateCodeForStatement(newVariable); }
             else if (st is Statement_FunctionCall functionCall)
             {

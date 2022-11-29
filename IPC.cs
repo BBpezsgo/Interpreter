@@ -9,6 +9,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
+using TheProgram;
+
 namespace Communicating
 {
     public class IPC
@@ -20,6 +22,13 @@ namespace Communicating
 
         public delegate void OnRecivedEventHandler(IPC sender, IPCMessage<object> message);
         public event OnRecivedEventHandler OnRecived;
+
+        public readonly bool IgnoreACK = false;
+
+        public IPC(bool IgnoreACK = false)
+        {
+            this.IgnoreACK = IgnoreACK;
+        }
 
         public void Start()
         {
@@ -93,11 +102,34 @@ namespace Communicating
 
         void TrySendNext()
         {
-            if (AwaitingAck) return;
+            if (AwaitingAck && !IgnoreACK) return;
             if (OutgoingMessages.Count == 0) return;
             AwaitingAck = true;
 
-            Console.WriteLine(JsonSerializer.Serialize(OutgoingMessages[0]));
+            try
+            {
+                Console.WriteLine(JsonSerializer.Serialize(OutgoingMessages[0]));
+            }
+            catch (IngameCoding.Errors.RuntimeException)
+            {
+                if (OutgoingMessages[0].data is Data_CompilerResult data0)
+                {
+                    for (int i = 0; i < data0.CompiledCode.Length; i++)
+                    {
+                        if (data0.CompiledCode[i].Opcode == Opcode.COMMENT.ToString()) continue;
+                        if (data0.CompiledCode[i].Parameter is int) continue;
+                        if (data0.CompiledCode[i].Parameter is float) continue;
+                        if (data0.CompiledCode[i].Parameter is string) continue;
+                        if (data0.CompiledCode[i].Parameter is bool) continue;
+                        Console.WriteLine(data0.CompiledCode[i].Parameter.GetType().Name);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine(OutgoingMessages[0].data);
+                }
+                throw;
+            }
 
             if (OutgoingMessages[0].type == "ack")
             {

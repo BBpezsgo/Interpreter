@@ -1,19 +1,19 @@
-﻿using Communicating;
-
-using IngameCoding.BBCode;
-using IngameCoding.Bytecode;
-using IngameCoding.Core;
-
-using System;
+﻿using System;
 using System.IO;
 
 namespace TheProgram
 {
+    using Communicating;
+
+    using IngameCoding.BBCode;
+    using IngameCoding.Bytecode;
+    using IngameCoding.Core;
+
     internal static class DebugTest
     {
-        public static void Run(params string[] args)
+        public static void Run(ArgumentParser.Settings settings_)
         {
-            var settings = ArgumentParser.Parse(args).Value;
+            ArgumentParser.Settings settings = settings_;
             settings.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
 
             var ipc = new IPC();
@@ -21,7 +21,7 @@ namespace TheProgram
             var code = File.ReadAllText(settings.File.FullName);
             var interpreter = new Interpreter();
 
-            ipc.OnRecived += (manager, message) =>
+            ipc.OnRecived += async (manager, message) =>
             {
                 if (interpreter == null) return;
 
@@ -65,7 +65,7 @@ namespace TheProgram
 
             if (interpreter.Initialize())
             {
-                var compiledCode = interpreter.CompileCode(code, settings.File.Directory, settings.compilerSettings, settings.parserSettings);
+                var compiledCode = interpreter.CompileCode(code, settings.File.Directory, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
 
                 if (compiledCode != null)
                 {
@@ -128,13 +128,14 @@ namespace TheProgram
     public class Data_StackItem : Data_Serializable<Stack.Item>
     {
         public string Type { get; set; }
-        public object Value { get; set; }
+        public string Value { get; set; }
         public string Tag { get; set; }
 
         public Data_StackItem(Stack.Item v) : base(v)
         {
+            var v_v = v.Value();
             Type = v.type.ToString();
-            Value = v.Value();
+            Value = v_v == null ? "null" : v_v.ToString();
             Tag = v.Tag;
         }
     }
@@ -159,11 +160,59 @@ namespace TheProgram
         public string AdditionParameter { get; set; }
         public string Tag { get; set; }
         public object Parameter { get; set; }
+        public bool ParameterIsComplicated { get; set; }
         public string Opcode { get; set; }
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
-            Parameter = v.parameter;
+            if (v.parameter is Stack.IStruct)
+            {
+                Parameter = "IStruct { ... }";
+                ParameterIsComplicated = true;
+            }
+            else if (v.parameter is Stack.Item.List)
+            {
+                Parameter = "[ ... ]";
+                ParameterIsComplicated = true;
+            }
+            else if (v.parameter is Stack.Item.Struct)
+            {
+                Parameter = "{ ... }";
+                ParameterIsComplicated = true;
+            }
+            else if (v.parameter is Stack.Item v2)
+            {
+                switch (v2.type)
+                {
+                    case Stack.Item.Type.INT:
+                        Parameter = "INT";
+                        break;
+                    case Stack.Item.Type.FLOAT:
+                        Parameter = "FLOAT";
+                        break;
+                    case Stack.Item.Type.STRING:
+                        Parameter = "STRING";
+                        break;
+                    case Stack.Item.Type.BOOLEAN:
+                        Parameter = "BOOLEAN";
+                        break;
+                    case Stack.Item.Type.STRUCT:
+                        Parameter = "{ ... }";
+                        break;
+                    case Stack.Item.Type.LIST:
+                        Parameter = "[ ... ]";
+                        break;
+                    case Stack.Item.Type.RUNTIME:
+                        Parameter = "RUNTIME";
+                        break;
+                }
+                ParameterIsComplicated = true;
+            }
+            else
+            {
+                Parameter = v.parameter;
+                ParameterIsComplicated = false;
+            }
             Tag = v.tag;
             AdditionParameter = v.additionParameter;
             AdditionParameter2 = v.additionParameter2;

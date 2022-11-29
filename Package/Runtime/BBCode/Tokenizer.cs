@@ -5,7 +5,9 @@ using System.Linq;
 namespace IngameCoding.BBCode
 {
     using Core;
+
     using IngameCoding.Tokenizer;
+
     using Terminal;
 
     public enum TokenType
@@ -184,11 +186,20 @@ namespace IngameCoding.BBCode
                 if (int.TryParse(currChar.ToString(), out _))
                 {
                     if (currentToken.type == TokenType.WHITESPACE)
-                        currentToken.type = TokenType.LITERAL_NUMBER;
+                    { currentToken.type = TokenType.LITERAL_NUMBER; }
                     else if (currentToken.type == TokenType.POTENTIAL_FLOAT)
-                        currentToken.type = TokenType.LITERAL_FLOAT;
+                    { currentToken.type = TokenType.LITERAL_FLOAT; }
                     else if (currentToken.type == TokenType.OPERATOR)
-                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
+                    {
+                        if (currentToken.text != "-")
+                        {
+                            EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
+                        }
+                        else
+                        {
+                            currentToken.type = TokenType.LITERAL_NUMBER;
+                        }
+                    }
                     currentToken.text += currChar;
                 }
                 else if (currChar == '.')
@@ -454,7 +465,7 @@ namespace IngameCoding.BBCode
             token.type = TokenType.WHITESPACE;
             token.text = "";
         }
-    
+
         static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
         {
             List<Token> result = new();
@@ -462,7 +473,7 @@ namespace IngameCoding.BBCode
             for (int i = 0; i < tokens.Count; i++)
             {
                 var token = tokens[i];
-                
+
                 if (result.Count == 0)
                 {
                     result.Add(token);

@@ -324,7 +324,8 @@ namespace IngameCoding.Core
             BBCode.Parser.ParserSettings parserSettings,
             bool HandleErrors = true)
         {
-            if (HandleErrors)
+            this.HandleErrors = HandleErrors;
+            if (this.HandleErrors)
             {
                 List<Warning> warnings = new();
                 try
@@ -672,6 +673,7 @@ namespace IngameCoding.Core
         bool globalVariablesCreated = false;
         bool startCalled = false;
         bool globalVariablesDisposed = false;
+        bool HandleErrors = true;
 
         /// <summary>
         /// Interpret the next instructions
@@ -706,33 +708,40 @@ namespace IngameCoding.Core
 
             if (bytecodeInterpeter != null && !pauseCode)
             {
-                try
+                if (HandleErrors)
+                {
+                    try
+                    {
+                        bytecodeInterpeter.Tick();
+                    }
+                    catch (RuntimeException error)
+                    {
+                        OnOutput?.Invoke(this, "Runtime Error: " + error.MessageAll, TerminalInterpreter.LogType.Error);
+
+                        OnDone?.Invoke(this, false);
+                        var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                        OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
+                        bytecodeInterpeter = null;
+                        currentlyRunningCode = false;
+
+                        Output.Terminal.Output.LogError(error);
+                    }
+                    catch (System.Exception error)
+                    {
+                        OnOutput?.Invoke(this, "Internal Error: " + error.Message, TerminalInterpreter.LogType.Error);
+
+                        OnDone?.Invoke(this, false);
+                        var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                        OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
+                        bytecodeInterpeter = null;
+                        currentlyRunningCode = false;
+
+                        Output.Terminal.Output.LogError(error);
+                    }
+                }
+                else
                 {
                     bytecodeInterpeter.Tick();
-                }
-                catch (RuntimeException error)
-                {
-                    OnOutput?.Invoke(this, "Runtime Error: " + error.MessageAll, TerminalInterpreter.LogType.Error);
-
-                    OnDone?.Invoke(this, false);
-                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
-                    bytecodeInterpeter = null;
-                    currentlyRunningCode = false;
-
-                    Output.Terminal.Output.LogError(error);
-                }
-                catch (System.Exception error)
-                {
-                    OnOutput?.Invoke(this, "Internal Error: " + error.Message, TerminalInterpreter.LogType.Error);
-
-                    OnDone?.Invoke(this, false);
-                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
-                    bytecodeInterpeter = null;
-                    currentlyRunningCode = false;
-
-                    Output.Terminal.Output.LogError(error);
                 }
 
                 if (bytecodeInterpeter != null && !bytecodeInterpeter.IsRunning)

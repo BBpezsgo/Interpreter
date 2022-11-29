@@ -120,6 +120,7 @@ namespace TheProgram
             public Compiler.CompilerSettings compilerSettings;
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
+            public bool HandleErrors => !ThrowErrors;
             public bool LogDebugs;
             public bool LogSystem;
             public bool Debug;

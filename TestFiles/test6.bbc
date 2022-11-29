@@ -1,18 +1,12 @@
 ﻿using System;
 
-struct Node
-{
-  int Value;
-}
-
-struct Heap
-{
-  Node[] nodes;
-}
-
 [CodeEntry]
 void Start()
 {
-  Heap heap = new Heap;
-  heap.nodes = new Node[];
+  int[] list = [6,5,4,3,2,1,0,-1];
+  for (int i = 0; i < 11; i++)
+  {
+    list.Push(i);
+  };
+  Console.Log(list);
 }

@@ -30,6 +30,18 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_ListValue : Statement
+    {
+        public List<Statement> Values;
+        public int Size => Values.Count;
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"{" ".Repeat(ident)}[{string.Join(", ", Values)}]";
+        }
+    }
+
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_NewVariable : Statement
     {
         internal TypeToken type;
@@ -70,12 +82,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{type.text}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
+            return $"{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{type.text}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

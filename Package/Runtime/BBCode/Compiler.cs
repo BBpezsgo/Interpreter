@@ -1015,6 +1015,61 @@ namespace IngameCoding.BBCode
                 return;
             }
 
+            if (functionCall.IsMethodCall)
+            {
+                if (functionCall.PrevStatement is Statement_Variable prevVar)
+                {
+                    if (GetCompiledVariable(prevVar.variableName, out var prevVarInfo, out bool isGlobal))
+                    {
+                        if (prevVarInfo.isList)
+                        {
+                            AddInstruction(isGlobal ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, prevVarInfo.offset);
+
+                            if (functionCall.FunctionName == "Push")
+                            {
+                                if (functionCall.parameters.Count != 1)
+                                { throw new ParserException("Wrong number of parameters passed to '<list>.Push'", new Position(functionCall.position.Line)); }
+                                GenerateCodeForStatement(functionCall.parameters[0]);
+
+                                AddInstruction(Opcode.LIST_PUSH_ITEM);
+
+                                return;
+                            }
+                            else if (functionCall.FunctionName == "Pull")
+                            {
+                                if (functionCall.parameters.Count != 0)
+                                { throw new ParserException("Wrong number of parameters passed to '<list>.Pull'", new Position(functionCall.position.Line)); }
+
+                                AddInstruction(Opcode.LIST_PULL_ITEM);
+
+                                return;
+                            }
+                            else if (functionCall.FunctionName == "Add")
+                            {
+                                if (functionCall.parameters.Count != 2)
+                                { throw new ParserException("Wrong number of parameters passed to '<list>.Add'", new Position(functionCall.position.Line)); }
+                                GenerateCodeForStatement(functionCall.parameters[0]);
+                                GenerateCodeForStatement(functionCall.parameters[1]);
+
+                                AddInstruction(Opcode.LIST_ADD_ITEM);
+
+                                return;
+                            }
+                            else if (functionCall.FunctionName == "Remove")
+                            {
+                                if (functionCall.parameters.Count != 1)
+                                { throw new ParserException("Wrong number of parameters passed to '<list>.Remove'", new Position(functionCall.position.Line)); }
+                                GenerateCodeForStatement(functionCall.parameters[0]);
+
+                                AddInstruction(Opcode.LIST_REMOVE_ITEM);
+
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+
             if (!GetCompiledFunction(functionCall, out CompiledFunction compiledFunction))
             { throw new ParserException("Unknown function '" + functionCall.FunctionName + "'", new Position(functionCall.position.Line)); }
 

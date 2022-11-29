@@ -1052,6 +1052,43 @@ namespace IngameCoding.BBCode
 
             #region Parse low level
 
+            bool ExpectListValue(out Statement_ListValue listValue)
+            {
+                listValue = null;
+
+                if (ExpectOperator("[", out var o0) == null)
+                { return false; }
+
+                listValue = new Statement_ListValue()
+                {
+                    Values = new List<Statement>()
+                };
+
+                int endlessSafe = 0;
+                while (true)
+                {
+                    var v = ExpectExpression();
+                    if (v == null)
+                    { throw new SyntaxException("Expected expression", CurrentToken); }
+
+                    listValue.Values.Add(v);
+
+                    if (ExpectOperator(",") == null)
+                    {
+                        if (ExpectOperator("]") == null)
+                        {
+                            throw new SyntaxException("Unbalanced '['", o0);
+                        }
+                        break;
+                    }
+
+                    endlessSafe++;
+                    if (endlessSafe >= 50) { throw new EndlessLoopException(); }
+                }
+
+                return true;
+            }
+
             bool ExpectLiteral(out Statement_Literal statement)
             {
                 int savedToken = currentTokenIndex;
@@ -1190,7 +1227,11 @@ namespace IngameCoding.BBCode
 
                 Statement returnStatement = null;
 
-                if (ExpectLiteral(out var literal))
+                if (ExpectListValue(out var listValue))
+                {
+                    returnStatement = listValue;
+                }
+                else if (ExpectLiteral(out var literal))
                 {
                     returnStatement = literal;
                 }
@@ -1420,8 +1461,6 @@ namespace IngameCoding.BBCode
 
                 if (ExpectOperator("=", out var eqT) != null)
                 {
-                    if (possibleType.isList)
-                    { throw new SyntaxException("Initial value for list is not supported", eqT); }
                     statement.initialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
                 }
                 else
@@ -1794,6 +1833,15 @@ namespace IngameCoding.BBCode
                     Statement statement = ExpectOneValue();
                     if (statement == null)
                     { throw new SyntaxException("Expected value or expression after '!' operator", tNotOperator); }
+
+                    return new Statement_Operator("!", statement);
+                }
+
+                if (ExpectOperator("-", out var tMinusOperator) != null)
+                {
+                    Statement statement = ExpectOneValue();
+                    if (statement == null)
+                    { throw new SyntaxException("Expected value or expression after '-' operator", tMinusOperator); }
 
                     return new Statement_Operator("!", statement);
                 }

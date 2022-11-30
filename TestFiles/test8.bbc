@@ -1,0 +1,39 @@
+﻿using System;
+
+struct Foo
+{
+  Foo2 f;
+}
+
+struct Foo2
+{
+  int f;
+}
+
+Foo Xy()
+{
+  return new Foo;
+}
+
+[CodeEntry]
+void Start()
+{
+  None("");
+  None(8);
+  None(3.7);
+  None(false);
+
+  var v0 = "";
+  None(v0);
+  None(5 + 2);
+  var v1 = true;
+  None(!v1);
+  None(new Foo);
+  Foo v2;
+  v2 = new Foo;
+  None(v2.f);
+  None(Xy().f);
+  None([false, true, true, false][5]);
+}
+
+void None(any p) { }

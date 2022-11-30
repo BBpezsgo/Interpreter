@@ -6,6 +6,7 @@ using System.Linq;
 namespace IngameCoding.Bytecode
 {
     using Core;
+
     using Errors;
 
     static class ItemEx
@@ -125,6 +126,8 @@ namespace IngameCoding.Bytecode
                     return LOAD_FIELD();
                 case Opcode.STORE_FIELD:
                     return STORE_FIELD();
+                case Opcode.LOAD_FIELD_R:
+                    return LOAD_FIELD_R();
                 case Opcode.LOAD_FIELD_BR:
                     return LOAD_FIELD_BR();
                 case Opcode.STORE_FIELD_BR:
@@ -388,7 +391,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide > rightSide, "result");
+            MU.Stack.Add(leftSide > rightSide);
 
             MU.Step();
 
@@ -399,7 +402,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide == rightSide, "result");
+            MU.Stack.Add(leftSide == rightSide);
 
             MU.Step();
 
@@ -410,7 +413,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide != rightSide, "result");
+            MU.Stack.Add(leftSide != rightSide);
 
             MU.Step();
 
@@ -421,7 +424,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide | rightSide, "result");
+            MU.Stack.Add(leftSide | rightSide);
 
             MU.Step();
 
@@ -432,7 +435,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide ^ rightSide, "result");
+            MU.Stack.Add(leftSide ^ rightSide);
 
             MU.Step();
 
@@ -443,7 +446,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide <= rightSide, "result");
+            MU.Stack.Add(leftSide <= rightSide);
 
             MU.Step();
 
@@ -454,7 +457,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide >= rightSide, "result");
+            MU.Stack.Add(leftSide >= rightSide);
 
             MU.Step();
 
@@ -465,7 +468,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide & rightSide, "result");
+            MU.Stack.Add(leftSide & rightSide);
 
             MU.Step();
 
@@ -491,7 +494,7 @@ namespace IngameCoding.Bytecode
         }
         int CALL()
         {
-            MU.Stack.Add(MU.BasePointer, "base pointer");
+            MU.Stack.Add(MU.BasePointer, "saved base pointer");
             MU.ReturnAddressStack.Add(MU.CodePointer + 1);
             MU.BasePointer = MU.Stack.Count;
             MU.Step((int)MU.CurrentInstruction.parameter);
@@ -623,6 +626,26 @@ namespace IngameCoding.Bytecode
             return 3;
         }
 
+        int LOAD_FIELD_R()
+        {
+            if (MU.CurrentInstruction.additionParameter.Length == 0)
+            { throw new InternalException("No field name given"); }
+
+            var structItem = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count).ValueStruct;
+            MU.Stack.Pop();
+
+            if (!structItem.HaveField(MU.CurrentInstruction.additionParameter))
+            { throw new RuntimeException("Field " + MU.CurrentInstruction.additionParameter + " doesn't exists in this struct."); }
+
+            var fieldValue = structItem.GetField(MU.CurrentInstruction.additionParameter);
+
+            MU.Stack.Add(fieldValue, "field." + MU.CurrentInstruction.additionParameter);
+
+            MU.Step();
+
+            return 4;
+        }
+
         int STORE_FIELD()
         {
             if (MU.CurrentInstruction.additionParameter.Length == 0)
@@ -665,7 +688,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide < rightSide, "result");
+            MU.Stack.Add(leftSide < rightSide);
 
             MU.Step();
 
@@ -686,7 +709,7 @@ namespace IngameCoding.Bytecode
             Stack.Item rightSide = MU.Stack.Pop();
             Stack.Item leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide + rightSide, "result");
+            MU.Stack.Add(leftSide + rightSide);
 
             MU.Step();
 
@@ -705,7 +728,7 @@ namespace IngameCoding.Bytecode
             Stack.Item rightSide = MU.Stack.Pop();
             Stack.Item leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide / rightSide, "result");
+            MU.Stack.Add(leftSide / rightSide);
 
             MU.Step();
 
@@ -717,7 +740,7 @@ namespace IngameCoding.Bytecode
             Stack.Item rightSide = MU.Stack.Pop();
             Stack.Item leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide - rightSide, "result");
+            MU.Stack.Add(leftSide - rightSide);
 
             MU.Step();
 
@@ -729,7 +752,7 @@ namespace IngameCoding.Bytecode
             Stack.Item rightSide = MU.Stack.Pop();
             Stack.Item leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide * rightSide, "result");
+            MU.Stack.Add(leftSide * rightSide);
 
             MU.Step();
 
@@ -741,7 +764,7 @@ namespace IngameCoding.Bytecode
             Stack.Item rightSide = MU.Stack.Pop();
             Stack.Item leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide % rightSide, "result");
+            MU.Stack.Add(leftSide % rightSide);
 
             MU.Step();
 
@@ -859,6 +882,54 @@ namespace IngameCoding.Bytecode
 
     public class Stack
     {
+        internal int UsedVirtualMemory
+        {
+            get
+            {
+                static int CalculateItemSize(Item item)
+                {
+                    switch (item.type)
+                    {
+                        case Item.Type.INT:
+                            return 4;
+                        case Item.Type.FLOAT:
+                            return 4;
+                        case Item.Type.STRING:
+                            return 4 + System.Text.ASCIIEncoding.ASCII.GetByteCount(item.ValueString);
+                        case Item.Type.BOOLEAN:
+                            return 1;
+                        case Item.Type.STRUCT:
+                            if (item.ValueStruct is Item.Struct valStruct)
+                            {
+                                int result = 0;
+                                foreach (var field in valStruct.fields)
+                                {
+                                    result += System.Text.ASCIIEncoding.ASCII.GetByteCount(field.Key);
+                                    result += CalculateItemSize(field.Value);
+                                }
+                                result += 4;
+                                return result;
+                            }
+                            break;
+                        case Item.Type.LIST:
+                            {
+                                var result = 0;
+                                foreach (var element in item.ValueList.items)
+                                { result += CalculateItemSize(element); }
+                                result += 4;
+                                return result;
+                            }
+                    }
+                    return 0;
+                }
+
+                int result = 0;
+                for (int i = 0; i < stack.Count; i++)
+                { result += CalculateItemSize(stack[i]); }
+                return result;
+            }
+        }
+
         public Stack()
         { stack = new List<Item>(); }
 
@@ -878,7 +949,7 @@ namespace IngameCoding.Bytecode
 
             public class Struct : IStruct
             {
-                readonly Dictionary<string, Item> fields = new();
+                internal readonly Dictionary<string, Item> fields = new();
 
                 public Struct(Dictionary<string, Item> fields)
                 {
@@ -2241,6 +2312,7 @@ namespace IngameCoding.Bytecode
             public int BasePointer => bytecodeInterpeter.CPU.MU.BasePointer;
             public int[] ReturnAddressStack => bytecodeInterpeter.CPU.MU.ReturnAddressStack.ToArray();
             public Stack.Item[] Stack => bytecodeInterpeter.CPU.MU.Stack.ToArray();
+            public int StackMemorySize => bytecodeInterpeter.CPU.MU.Stack.UsedVirtualMemory;
 
             public InterpeterDetails(BytecodeInterpeter bytecodeInterpeter)
             {
@@ -2315,7 +2387,7 @@ namespace IngameCoding.Bytecode
             CPU.MU.Stack.Add(0, "return value");
             CPU.MU.Stack.AddRange(this.arguments, "arg");
 
-            CPU.MU.Stack.Add(0, "base pointer");
+            CPU.MU.Stack.Add(0, "saved base pointer");
             CPU.MU.ReturnAddressStack.Add(CPU.MU.End());
             CPU.MU.BasePointer = CPU.MU.Stack.Count;
         }

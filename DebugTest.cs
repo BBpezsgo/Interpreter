@@ -113,12 +113,14 @@ namespace TheProgram
     {
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
+        public int StackMemorySize { get; set; }
         public Data_StackItem[] Stack { get; set; }
 
         internal Data_BytecodeInterpeterDetails(BytecodeInterpeter.InterpeterDetails v) : base(v)
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
+            StackMemorySize = v.StackMemorySize;
             Stack = v.Stack.ToData(v => new Data_StackItem(v));
         }
 

@@ -1,0 +1,17 @@
+﻿using System;
+
+[CodeEntry]
+void Start()
+{
+  Console.Log(Foo(0));
+}
+
+int Foo(int p)
+{
+  string v = "szia";
+  return 2;
+  if (p == 1)
+  {
+    string v2 = "hello";
+  };
+}

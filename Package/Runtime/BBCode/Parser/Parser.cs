@@ -297,12 +297,12 @@ namespace IngameCoding.BBCode
 
         public struct ParserResult
         {
-            public readonly Dictionary<string, FunctionDefinition> Functions;
+            public readonly List<FunctionDefinition> Functions;
             public readonly Dictionary<string, StructDefinition> Structs;
             public readonly List<Statement_NewVariable> GlobalVariables;
             public readonly List<string> Usings;
 
-            public ParserResult(Dictionary<string, FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<string> usings)
+            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<string> usings)
             {
                 Functions = functions;
                 GlobalVariables = globalVariables;
@@ -334,7 +334,7 @@ namespace IngameCoding.BBCode
 
                 foreach (var function in Functions)
                 {
-                    x += function.Value.PrettyPrint() + "\n";
+                    x += function.PrettyPrint() + "\n";
                 }
 
                 return x;
@@ -461,21 +461,21 @@ namespace IngameCoding.BBCode
 
                 foreach (var item in this.Functions)
                 {
-                    foreach (var attr in item.Value.attributes)
+                    foreach (var attr in item.attributes)
                     { Attribute(attr); }
 
                     Console.ForegroundColor = ConsoleColor.Blue;
-                    if (item.Value.type.typeName == BuiltinType.STRUCT)
+                    if (item.type.typeName == BuiltinType.STRUCT)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
-                    Console.Write($"{item.Value.type} ");
+                    Console.Write($"{item.type} ");
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write($"{item.Key}");
+                    Console.Write($"{item.FullName}");
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write("(");
-                    for (int i = 0; i < item.Value.parameters.Count; i++)
+                    for (int i = 0; i < item.parameters.Count; i++)
                     {
                         if (i > 0)
                         {
@@ -483,7 +483,7 @@ namespace IngameCoding.BBCode
                             Console.Write($", ");
                         }
 
-                        ParameterDefinition param = item.Value.parameters[i];
+                        ParameterDefinition param = item.parameters[i];
                         Console.ForegroundColor = ConsoleColor.Blue;
                         if (param.withThisKeyword)
                         { Console.Write("this "); }
@@ -498,7 +498,7 @@ namespace IngameCoding.BBCode
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write(")");
 
-                    if (item.Value.statements.Count > 0)
+                    if (item.statements.Count > 0)
                     {
                         int statementCount = 0;
                         void AddStatement(Statement st)
@@ -552,7 +552,7 @@ namespace IngameCoding.BBCode
                                 }
                             }
                         }
-                        foreach (var st in item.Value.statements)
+                        foreach (var st in item.statements)
                         {
                             AddStatement(st);
                         }
@@ -603,7 +603,7 @@ namespace IngameCoding.BBCode
             List<Warning> Warnings;
 
             // === Result ===
-            readonly Dictionary<string, FunctionDefinition> Functions = new();
+            readonly List<FunctionDefinition> Functions = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly List<Statement_NewVariable> GlobalVariables = new();
             readonly List<string> Usings = new();
@@ -859,7 +859,7 @@ namespace IngameCoding.BBCode
                     Token referenceKeywordT = ExpectIdentifier("ref");
                     if (referenceKeywordT != null) referenceKeywordT.subtype = TokenSubtype.Keyword;
 
-                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
+                    TypeToken possibleParameterType = ExceptTypeToken(false, false);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -896,7 +896,7 @@ namespace IngameCoding.BBCode
 
                 function.statements = statements;
 
-                Functions.Add(function.FullName, function);
+                Functions.Add(function);
 
                 return true;
             }

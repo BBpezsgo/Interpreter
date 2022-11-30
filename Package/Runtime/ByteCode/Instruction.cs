@@ -82,6 +82,8 @@ namespace IngameCoding.Bytecode
         LOAD_FIELD,
         STORE_FIELD,
 
+        LOAD_FIELD_R,
+
         /// <summary>
         /// LOAD_FIELD_BASEPOINTER_RELATIVE
         /// </summary>

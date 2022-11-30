@@ -62,6 +62,8 @@ int[] var0;
 int[] var2 = [0, 1, 2, 3];
 ```
 > The `Console.Log` function prints all items in the list
+### Function overloading
+Well, this is a test feature, so I don't recommend using function overloading.
 ### Method like functions
 You can create a function that looks like a method.
 Put the `this` keyword before the first parameter and you're done.<br>

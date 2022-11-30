@@ -283,7 +283,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             switch (this.Operator)
             {
                 case "+":
-                    { 
+                    {
                         if (Left == null) return null;
                         if (Right == null) return null;
 

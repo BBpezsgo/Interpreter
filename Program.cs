@@ -9,7 +9,7 @@ namespace TheProgram
 #if DEBUG
 
 #if false
-            var file = "test6.bbc";
+            var file = "test9.bbc";
             IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse("-throw-errors", ProjectFolder() + "\\TestFiles\\" + file).Value);
 #else
             DebugTest.Run(ArgumentParser.Parse(args).Value);

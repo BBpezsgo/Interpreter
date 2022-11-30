@@ -1,0 +1,27 @@
+﻿using System;
+
+void Foo()
+{
+  Console.Log("none");
+}
+void Foo(int p)
+{
+  Console.Log("int");
+}
+void Foo(bool p)
+{
+  Console.Log("str");
+}
+void Foo(int p1, int p2)
+{
+  Console.Log("int int");
+}
+
+[CodeEntry]
+void Start()
+{
+  Foo();
+  Foo(0);
+  Foo(true);
+  Foo(0, 0);
+}

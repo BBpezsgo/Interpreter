@@ -374,6 +374,7 @@ namespace IngameCoding.BBCode
                         EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                         currentToken.type = settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
                         currentToken.text = currChar.ToString();
+                        EndToken(currentToken, tokens, tokensWithComments, cursorPosition, cursorPositionTotal, settings);
                     }
                     currentToken.lineNumber++;
                 }

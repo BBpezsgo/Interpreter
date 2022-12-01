@@ -30,6 +30,11 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-code-editor")
+                    {
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-throw-errors")
                     {
                         ThrowErrors = true;
@@ -124,6 +129,7 @@ namespace TheProgram
             public bool LogDebugs;
             public bool LogSystem;
             public bool Debug;
+            public bool CodeEditor;
         }
 
         public static Settings? Parse(params string[] args)
@@ -160,7 +166,8 @@ namespace TheProgram
                 LogDebugs = LogDebugs,
                 LogSystem = LogSystem,
                 File = new System.IO.FileInfo(args.Last()),
-                Debug = args.Contains("-debug")
+                Debug = args.Contains("-debug"),
+                CodeEditor = args.Contains("-code-editor")
             };
         }
     }

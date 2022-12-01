@@ -76,7 +76,7 @@ namespace Communicating
                 return;
             }
 
-            Send("ack");
+            Send("ack", $"'{message.type}'");
 
             if (message.type == "greeting")
             {

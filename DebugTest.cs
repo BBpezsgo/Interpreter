@@ -21,7 +21,7 @@ namespace TheProgram
             var code = File.ReadAllText(settings.File.FullName);
             var interpreter = new Interpreter();
 
-            ipc.OnRecived += async (manager, message) =>
+            ipc.OnRecived += (manager, message) =>
             {
                 if (interpreter == null) return;
 

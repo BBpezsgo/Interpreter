@@ -8,9 +8,9 @@ namespace TheProgram
         {
 #if DEBUG
 
-#if false
-            var file = "test9.bbc";
-            IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse("-throw-errors", ProjectFolder() + "\\TestFiles\\" + file).Value);
+#if true
+            var file = "test10.bbc";
+            IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse("-throw-errors", "-c-print-instructions", "true", ProjectFolder() + "\\TestFiles\\" + file).Value);
 #else
             var settings = ArgumentParser.Parse(args).Value;
             if (settings.Debug)

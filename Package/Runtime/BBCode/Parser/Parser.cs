@@ -859,7 +859,7 @@ namespace IngameCoding.BBCode
                     Token referenceKeywordT = ExpectIdentifier("ref");
                     if (referenceKeywordT != null) referenceKeywordT.subtype = TokenSubtype.Keyword;
 
-                    TypeToken possibleParameterType = ExceptTypeToken(false, false);
+                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -1924,17 +1924,33 @@ namespace IngameCoding.BBCode
                         if (rightmostStatement is Statement_Operator rightmostOperator)
                         {
                             Statement_Operator operatorCall = new(op.text, rightmostOperator.Right, rightStatement);
+
+                            operatorCall.position = op.Position;
+                            operatorCall.position.Extend(rightmostOperator.Right.position.AbsolutePosition);
+                            operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+
+
                             rightmostOperator.Right = operatorCall;
                         }
                         else
                         {
                             Statement_Operator operatorCall = new(op.text, leftStatement, rightStatement);
+
+                            operatorCall.position = op.Position;
+                            operatorCall.position.Extend(leftStatement.position.AbsolutePosition);
+                            operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+
                             leftStatement = operatorCall;
                         }
                     }
                     else
                     {
                         Statement_Operator operatorCall = new(op.text, leftStatement, rightStatement);
+
+                        operatorCall.position = op.Position;
+                        operatorCall.position.Extend(leftStatement.position.AbsolutePosition);
+                        operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+
                         leftStatement = operatorCall;
                     }
                 }

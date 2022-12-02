@@ -23,6 +23,7 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
 - `-bc-stack-size [int]` Sets the interpreter *stack size*
 - `-debug` <b>(Experimental feature)</b> This will start another thing that you might be able to use for debugging. You must manually jump to the next instruction with the TAB key.
+- `-dont-optimize` Disables basic code optimization
 
 ## [Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
 

@@ -6,6 +6,7 @@ namespace TheProgram
     using Communicating;
 
     using IngameCoding.BBCode;
+    using IngameCoding.BBCode.Compiler;
     using IngameCoding.Bytecode;
     using IngameCoding.Core;
 

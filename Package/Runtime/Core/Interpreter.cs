@@ -12,6 +12,8 @@ namespace IngameCoding.Core
 
     using Errors;
 
+    using IngameCoding.BBCode.Compiler;
+
     using Terminal;
 
     /// <summary>
@@ -111,7 +113,7 @@ namespace IngameCoding.Core
             }
         }
 
-        readonly Dictionary<string, Compiler.BuiltinFunction> builtinFunctions = new();
+        readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
         readonly Dictionary<string, Func<Stack.IStruct>> builtinStructs = new();
 
         InterpreterDetails details;
@@ -199,8 +201,13 @@ namespace IngameCoding.Core
             if (compilerSettings.PrintInstructions)
             { compilerResult.WriteToConsole(); }
 
+            List<string> printedWarnings = new();
             foreach (var warning in warnings)
-            { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
+            {
+                if (printedWarnings.Contains(warning.MessageAll)) continue;
+                printedWarnings.Add(warning.MessageAll);
+                OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning);
+            }
 
             OnOutput?.Invoke(this, "Initializing bytecode interpreter...", TerminalInterpreter.LogType.Debug);
 
@@ -814,7 +821,7 @@ namespace IngameCoding.Core
 
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
         {
-            Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((p) =>
+            BuiltinFunction function = new(new Action<Stack.Item[]>((p) =>
             {
                 var x = callback(p);
                 this.bytecodeInterpeter.AddValueToStack(x);
@@ -832,7 +839,7 @@ namespace IngameCoding.Core
         }
         void AddBuiltinFunction(string name, Func<Stack.Item> callback)
         {
-            Compiler.BuiltinFunction function = new(new Action<Stack.Item[]>((_) =>
+            BuiltinFunction function = new(new Action<Stack.Item[]>((_) =>
             {
                 var x = callback();
                 this.bytecodeInterpeter.AddValueToStack(x);
@@ -850,7 +857,7 @@ namespace IngameCoding.Core
         }
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<Stack.Item[]> callback, bool ReturnSomething = false)
         {
-            Compiler.BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
+            BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
 
             if (!builtinFunctions.ContainsKey(name))
             {

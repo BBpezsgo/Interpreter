@@ -16,7 +16,7 @@ namespace ConsoleGUI
 
         string ConsoleText = "";
 
-        public InterpeterElement(string file, IngameCoding.BBCode.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
+        public InterpeterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
         {
             ClearBuffer();
             this.File = file;
@@ -124,8 +124,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpeter() => SetupInterpeter(IngameCoding.BBCode.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
-        void SetupInterpeter(IngameCoding.BBCode.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
+        void SetupInterpeter() => SetupInterpeter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
+        void SetupInterpeter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
             var fileInfo = new FileInfo(File);
             var code = System.IO.File.ReadAllText(fileInfo.FullName);

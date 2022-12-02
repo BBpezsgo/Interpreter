@@ -8,6 +8,7 @@ namespace TheProgram
     using IngameCoding.Bytecode;
     using IngameCoding;
     using IngameCoding.Output.Terminal;
+    using IngameCoding.BBCode.Compiler;
 
     internal static class ArgumentParser
     {
@@ -53,6 +54,12 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-dont-optimize")
+                    {
+                        compilerSettings.DontOptimize = true;
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-c-generate-comments")
                     {
                         i++;
@@ -64,7 +71,7 @@ namespace TheProgram
                     if (args[i] == "-c-remove-unused-functions")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out compilerSettings.RemoveUnusedFunctionsIterations))
+                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out compilerSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
                         goto ArgParseDone;
                     }

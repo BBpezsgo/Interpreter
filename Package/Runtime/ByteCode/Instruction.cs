@@ -121,6 +121,11 @@ namespace IngameCoding.Bytecode
 
         TYPE_GET,
 
+        /// <summary>
+        /// Sets the last stack item's tag
+        /// </summary>
+        DEBUG_SET_TAG,
+
         COMMENT,
         UNKNOWN,
     }

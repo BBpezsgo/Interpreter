@@ -199,12 +199,24 @@ namespace IngameCoding.Bytecode
                     return HEAP_GET();
                 case Opcode.HEAP_SET:
                     return HEAP_SET();
+                case Opcode.DEBUG_SET_TAG:
+                    return DEBUG_SET_TAG();
                 default:
                     throw new SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
             }
         }
 
         #region Commands
+
+        int DEBUG_SET_TAG()
+        {
+            var last = MU.Stack.Last();
+            last.Tag = MU.CurrentInstruction.parameter.ToString();
+            MU.Stack.Set(MU.Stack.Count - 1, last, true);
+            MU.Step();
+
+            return 1;
+        }
 
         int HEAP_GET()
         {

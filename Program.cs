@@ -8,8 +8,8 @@ namespace TheProgram
         {
 #if DEBUG
 
-#if true
-            var file = "test10.bbc";
+#if false
+            var file = "test-for.bbc";
             IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse("-throw-errors", "-c-print-instructions", "true", ProjectFolder() + "\\TestFiles\\" + file).Value);
 #else
             var settings = ArgumentParser.Parse(args).Value;

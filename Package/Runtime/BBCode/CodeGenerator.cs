@@ -867,7 +867,6 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var param in functionCall.parameters)
                 {
                     GenerateCodeForStatement(param);
-                    compiledCode.Last().tag = "param";
                 }
                 AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount, compiledFunction.BuiltinName);
 
@@ -878,13 +877,19 @@ namespace IngameCoding.BBCode.Compiler
             { AddInstruction(new Instruction(Opcode.PUSH_VALUE, GenerateInitialValue(compiledFunction.type)) { tag = "return value" }); }
 
             if (functionCall.PrevStatement != null)
-            { GenerateCodeForStatement(functionCall.PrevStatement); }
-
-            foreach (Statement param in functionCall.parameters)
             {
+                GenerateCodeForStatement(functionCall.PrevStatement);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
+            }
+
+            for (int i = 0; i < functionCall.parameters.Count; i++)
+            {
+                Statement param = functionCall.parameters[i];
+                ParameterDefinition definedParam = compiledFunction.functionDefinition.parameters[i];
+
                 AddInstruction(Opcode.COMMENT, $"param:");
                 GenerateCodeForStatement(param);
-                compiledCode.Last().tag = "param";
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.name);
             }
 
             if (!GetFunctionOffset(functionCall, out var functionCallOffset))
@@ -1312,9 +1317,6 @@ namespace IngameCoding.BBCode.Compiler
             AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
             int conditionJumpOffsetFor = compiledCode.Count - 1;
 
-            AddInstruction(Opcode.COMMENT, "FOR Expression");
-            // Index expression
-            GenerateCodeForStatement(forLoop.expression);
             List<int> breakInstructionsFor = new();
 
             AddInstruction(Opcode.COMMENT, "Statements {");
@@ -1325,6 +1327,10 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             AddInstruction(Opcode.COMMENT, "}");
+
+            AddInstruction(Opcode.COMMENT, "FOR Expression");
+            // Index expression
+            GenerateCodeForStatement(forLoop.expression);
 
             AddInstruction(Opcode.COMMENT, "Jump back");
             AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - compiledCode.Count);

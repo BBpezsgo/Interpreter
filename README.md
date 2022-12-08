@@ -53,6 +53,7 @@ struct Foo
 
 Foo x = new Foo;
 ```
+> If `Console.Log` is called with a parameter of type `Struct`, it will print `{ ... }`
 ### Lists
 There are also lists... What should I say?
 ```
@@ -86,11 +87,7 @@ int Add(this int v)
 
 13.Add();
 ```
-> If `Console.Log` is called with a parameter of type `Struct`, it will print `{ ... }`
 ### Events
-
-> **NOTE:**
-> If you listen to the `update` event, the program will run until you manually close it.
 
 You can listen to an event with the `Catch` attribute.<br>
 Two events can be caught:<br>
@@ -101,3 +98,5 @@ Two events can be caught:<br>
 [Catch("update")]
 void Update() { }
 ```
+> **NOTE:**
+> If you listen to the `update` event, the program will run until you manually close it.

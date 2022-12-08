@@ -114,24 +114,24 @@ namespace IngameCoding.Core
         }
 
         readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
-        readonly Dictionary<string, Func<Stack.IStruct>> builtinStructs = new();
+        readonly Dictionary<string, Func<IStruct>> builtinStructs = new();
 
         InterpreterDetails details;
         public InterpreterDetails Details => details;
 
         State state;
 
-        bool currentlyRunningCode = false;
+        bool currentlyRunningCode;
 
         BytecodeInterpeter bytecodeInterpeter;
         TimeSpan codeStartedTimespan;
 
-        int result = 0;
+        int result;
 
-        bool pauseCode = false;
+        bool pauseCode;
 
         /// <summary> In ms </summary>
-        float pauseCodeFor = 0f;
+        float pauseCodeFor;
 
         DateTime LastTime = DateTime.Now;
 
@@ -288,7 +288,7 @@ namespace IngameCoding.Core
             AddBuiltins();
             AddBuiltinFunction("conin", new BBCode.TypeToken[] {
                 new TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
                 pauseCode = true;
                 if (OnNeedInput == null)
@@ -392,7 +392,7 @@ namespace IngameCoding.Core
 
 #if false
 
-        public void RunCode_Bytecode(string code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput, VmWindow window)
+        public void RunCode_Bytecode(string code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Item> onInput, VmWindow window)
         {
             this.onDone = onDone;
             onInput = OnInput;
@@ -411,7 +411,7 @@ namespace IngameCoding.Core
             AddBuiltins();
             AddBuiltinFunction("conin", new BBCode.Type[] {
                 new BBCode.Type("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (Item[] parameters) =>
             {
                 pauseCode = true;
                 onNeedInput(parameters[0].ToStringValue());
@@ -465,7 +465,7 @@ namespace IngameCoding.Core
 
 #if false
 
-        public void RunExe(string Code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Stack.Item> onInput)
+        public void RunExe(string Code, System.Action<string, TerminalInterpreter.LogType> printCallback, System.Action<bool> onDone, System.Action<string> onNeedInput, out System.Action<IngameCoding.Bytecode.Item> onInput)
         {
             this.onDone = onDone;
             onInput = OnInput;
@@ -481,7 +481,7 @@ namespace IngameCoding.Core
             AddBuiltins();
             AddBuiltinFunction("conin", new IngameCoding.Code.Type[] {
                 new IngameCoding.Code.Type("any", IngameCoding.Code.BuiltinType.ANY)
-            }, (IngameCoding.Bytecode.Stack.Item[] parameters) =>
+            }, (IngameCoding.Bytecode.Item[] parameters) =>
             {
                 pauseCode = true;
                 onNeedInput(parameters[0].ToStringValue());
@@ -519,7 +519,7 @@ namespace IngameCoding.Core
             AddBuiltins();
             AddBuiltinFunction("conin", new IngameCoding.Code.Type[] {
                 new IngameCoding.Code.Type("any", IngameCoding.Code.BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (Item[] parameters) =>
             { }, (_) => { });
 
             try
@@ -559,7 +559,7 @@ namespace IngameCoding.Core
         /// </param>
         public void OnInput(string inputValue)
         {
-            bytecodeInterpeter.AddValueToStack(new Stack.Item(inputValue, "Console Input"));
+            bytecodeInterpeter.AddValueToStack(new DataItem(inputValue, "Console Input"));
             pauseCode = false;
         }
 
@@ -569,9 +569,9 @@ namespace IngameCoding.Core
 
             AddBuiltinFunction("conlog", new BBCode.TypeToken[] {
                 new BBCode.TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
-                if (parameters[0].type == Stack.Item.Type.LIST)
+                if (parameters[0].type == DataItem.Type.LIST)
                 {
                     var list = parameters[0].ValueList;
                     OnOutput?.Invoke(this, $"[ {string.Join(", ", list.items)} ]", TerminalInterpreter.LogType.Normal);
@@ -583,19 +583,19 @@ namespace IngameCoding.Core
             });
             AddBuiltinFunction("conerr", new BBCode.TypeToken[] {
                 new BBCode.TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
                 OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Error);
             });
             AddBuiltinFunction("conwarn", new BBCode.TypeToken[] {
                 new BBCode.TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
                 OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Warning);
             });
             AddBuiltinFunction("sleep", new BBCode.TypeToken[] {
                 new BBCode.TypeToken("any", BuiltinType.ANY)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
                 pauseCodeFor = parameters[0].ValueInt;
             });
@@ -606,7 +606,7 @@ namespace IngameCoding.Core
 
             AddBuiltinFunction("tmnw", () =>
             {
-                return new Stack.Item(DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
+                return new DataItem(DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
             });
 
             #endregion
@@ -616,19 +616,19 @@ namespace IngameCoding.Core
             AddBuiltinFunction("splitstring", new BBCode.TypeToken[] {
                 new BBCode.TypeToken("string", BuiltinType.STRING),
                 new BBCode.TypeToken("string", BuiltinType.STRING)
-            }, (Stack.Item[] parameters) =>
+            }, (DataItem[] parameters) =>
             {
                 var splitCharacter = parameters[0].ValueString;
                 var stringToSplit = parameters[1].ValueString;
 
                 var splitResult = stringToSplit.Split(splitCharacter, StringSplitOptions.None);
 
-                var newList = new Stack.Item.List(Stack.Item.Type.STRING);
+                var newList = new DataItem.List(DataItem.Type.STRING);
                 foreach (var item in splitResult)
                 {
-                    newList.Add(new Stack.Item(item, ""));
+                    newList.Add(new DataItem(item, ""));
                 }
-                return new Stack.Item(newList, "");
+                return new DataItem(newList, "");
             });
 
             #endregion
@@ -676,10 +676,10 @@ namespace IngameCoding.Core
             state = State.CodeExecuted;
         }
 
-        bool exitCalled = false;
-        bool globalVariablesCreated = false;
-        bool startCalled = false;
-        bool globalVariablesDisposed = false;
+        bool exitCalled;
+        bool globalVariablesCreated;
+        bool startCalled;
+        bool globalVariablesDisposed;
         bool HandleErrors = true;
 
         /// <summary>
@@ -819,9 +819,9 @@ namespace IngameCoding.Core
 
         #region AddBuiltinFunction()
 
-        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Func<Stack.Item[], Stack.Item> callback)
+        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Func<DataItem[], DataItem> callback)
         {
-            BuiltinFunction function = new(new Action<Stack.Item[]>((p) =>
+            BuiltinFunction function = new(new Action<DataItem[]>((p) =>
             {
                 var x = callback(p);
                 this.bytecodeInterpeter.AddValueToStack(x);
@@ -837,9 +837,9 @@ namespace IngameCoding.Core
                 Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
-        void AddBuiltinFunction(string name, Func<Stack.Item> callback)
+        void AddBuiltinFunction(string name, Func<DataItem> callback)
         {
-            BuiltinFunction function = new(new Action<Stack.Item[]>((_) =>
+            BuiltinFunction function = new(new Action<DataItem[]>((_) =>
             {
                 var x = callback();
                 this.bytecodeInterpeter.AddValueToStack(x);
@@ -855,7 +855,7 @@ namespace IngameCoding.Core
                 Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
-        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<Stack.Item[]> callback, bool ReturnSomething = false)
+        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
         {
             BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
 
@@ -872,7 +872,7 @@ namespace IngameCoding.Core
 
         public void AddBuiltinFunction(string name, Action callback)
         {
-            var types = new TypeToken[0];
+            var types = Array.Empty<TypeToken>();
 
             AddBuiltinFunction(name, types, (args) =>
             {
@@ -913,12 +913,12 @@ namespace IngameCoding.Core
 
         public void AddBuiltinFunction(string name, Func<object> callback)
         {
-            var types = new TypeToken[0];
+            var types = Array.Empty<TypeToken>();
 
             AddBuiltinFunction(name, types, (args) =>
             {
                 CheckParameters(name, types, args);
-                return new Stack.Item(callback?.Invoke(), $"{name}() result");
+                return new DataItem(callback?.Invoke(), $"{name}() result");
             });
         }
         public void AddBuiltinFunction<T0>(string name, Func<T0, object> callback)
@@ -928,7 +928,7 @@ namespace IngameCoding.Core
             AddBuiltinFunction(name, types, (args) =>
             {
                 CheckParameters(name, types, args);
-                return new Stack.Item(callback?.Invoke((T0)args[0].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke((T0)args[0].Value()), $"{name}() result");
             });
         }
         public void AddBuiltinFunction<T0, T1>(string name, Func<T0, T1, object> callback)
@@ -938,7 +938,7 @@ namespace IngameCoding.Core
             AddBuiltinFunction(name, types, (args) =>
             {
                 CheckParameters(name, types, args);
-                return new Stack.Item(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value()), $"{name}() result");
             });
         }
         public void AddBuiltinFunction<T0, T1, T2>(string name, Func<T0, T1, T2, object> callback)
@@ -948,13 +948,13 @@ namespace IngameCoding.Core
             AddBuiltinFunction(name, types, (args) =>
             {
                 CheckParameters(name, types, args);
-                return new Stack.Item(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value()), $"{name}() result");
             });
         }
 
         #endregion
 
-        void CheckParameters(string functionName, TypeToken[] requied, Stack.Item[] passed)
+        static void CheckParameters(string functionName, TypeToken[] requied, DataItem[] passed)
         {
             if (passed.Length != requied.Length) throw new System.Exception($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
 
@@ -966,29 +966,29 @@ namespace IngameCoding.Core
 
         #region GetTypes<>()
 
-        TypeToken[] GetTypes<T0>() => new TypeToken[1]
+        static TypeToken[] GetTypes<T0>() => new TypeToken[1]
         {
             GetType<T0>(),
         };
-        TypeToken[] GetTypes<T0, T1>() => new TypeToken[2]
+        static TypeToken[] GetTypes<T0, T1>() => new TypeToken[2]
         {
             GetType<T0>(),
             GetType<T1>(),
         };
-        TypeToken[] GetTypes<T0, T1, T2>() => new TypeToken[3]
+        static TypeToken[] GetTypes<T0, T1, T2>() => new TypeToken[3]
         {
             GetType<T0>(),
             GetType<T1>(),
             GetType<T2>(),
         };
-        TypeToken[] GetTypes<T0, T1, T2, T3>() => new TypeToken[4]
+        static TypeToken[] GetTypes<T0, T1, T2, T3>() => new TypeToken[4]
         {
             GetType<T0>(),
             GetType<T1>(),
             GetType<T2>(),
             GetType<T3>(),
         };
-        TypeToken[] GetTypes<T0, T1, T2, T3, T4>() => new TypeToken[5]
+        static TypeToken[] GetTypes<T0, T1, T2, T3, T4>() => new TypeToken[5]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -996,7 +996,7 @@ namespace IngameCoding.Core
             GetType<T3>(),
             GetType<T4>(),
         };
-        TypeToken[] GetTypes<T0, T1, T2, T3, T4, T5>() => new TypeToken[6]
+        static TypeToken[] GetTypes<T0, T1, T2, T3, T4, T5>() => new TypeToken[6]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -1006,7 +1006,7 @@ namespace IngameCoding.Core
             GetType<T5>(),
         };
 
-        TypeToken GetType<T>()
+        static TypeToken GetType<T>()
         {
             var type_ = typeof(T);
 
@@ -1027,29 +1027,29 @@ namespace IngameCoding.Core
 
     static class StackItemExtension
     {
-        public static object Value(this Stack.Item item) => item.type switch
+        public static object Value(this DataItem item) => item.type switch
         {
-            Stack.Item.Type.INT => item.ValueInt,
-            Stack.Item.Type.FLOAT => item.ValueFloat,
-            Stack.Item.Type.STRING => item.ValueString,
-            Stack.Item.Type.BOOLEAN => item.ValueBoolean,
+            DataItem.Type.INT => item.ValueInt,
+            DataItem.Type.FLOAT => item.ValueFloat,
+            DataItem.Type.STRING => item.ValueString,
+            DataItem.Type.BOOLEAN => item.ValueBoolean,
             _ => null,
         };
 
-        public static bool EqualType(this Stack.Item item, BuiltinType type)
+        public static bool EqualType(this DataItem item, BuiltinType type)
         {
             switch (item.type)
             {
-                case Stack.Item.Type.INT:
+                case DataItem.Type.INT:
                     if (type == BuiltinType.INT) return true;
                     break;
-                case Stack.Item.Type.FLOAT:
+                case DataItem.Type.FLOAT:
                     if (type == BuiltinType.FLOAT) return true;
                     break;
-                case Stack.Item.Type.STRING:
+                case DataItem.Type.STRING:
                     if (type == BuiltinType.STRING) return true;
                     break;
-                case Stack.Item.Type.BOOLEAN:
+                case DataItem.Type.BOOLEAN:
                     if (type == BuiltinType.BOOLEAN) return true;
                     break;
             }

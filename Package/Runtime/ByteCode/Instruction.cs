@@ -146,8 +146,8 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="float"/></item>
         /// <item><see cref="string"/></item>
         /// <item><see cref="Stack.IStruct"/></item>
-        /// <item><see cref="Stack.Item.Struct"/></item>
-        /// <item><see cref="Stack.Item.List"/></item>
+        /// <item><see cref="DataItem.Struct"/></item>
+        /// <item><see cref="DataItem.List"/></item>
         /// </list>
         /// </summary>
         public object parameter;

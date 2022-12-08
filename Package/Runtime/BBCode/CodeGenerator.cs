@@ -36,7 +36,7 @@ namespace IngameCoding.BBCode.Compiler
 
         #region Fields
 
-        bool BlockCodeGeneration = false;
+        bool BlockCodeGeneration;
 
         internal Dictionary<string, CompiledStruct> compiledStructs;
         internal Dictionary<string, CompiledFunction> compiledFunctions;
@@ -119,7 +119,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (compiledFunctions.TryGetValue(xd + functionCallStatement.FunctionName + callID, out compiledFunction))
             {
-                if (xd.EndsWith("."))
+                if (xd.EndsWith(".", StringComparison.InvariantCulture))
                 { xd = xd[..^1]; }
                 functionCallStatement.IsMethodCall = false;
                 functionCallStatement.NamespacePathPrefix = xd;
@@ -129,7 +129,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (compiledFunctions.TryGetValue(xd + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
             {
-                if (xd.EndsWith("."))
+                if (xd.EndsWith(".", StringComparison.InvariantCulture))
                 { xd = xd[..^1]; }
                 functionCallStatement.IsMethodCall = false;
                 functionCallStatement.NamespacePathPrefix = xd;
@@ -290,7 +290,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (type.isList)
             {
-                return new Stack.Item.List(Stack.Item.Type.INT);
+                return new DataItem.List(DataItem.Type.INT);
             }
             else
             {
@@ -302,7 +302,7 @@ namespace IngameCoding.BBCode.Compiler
                     BuiltinType.VOID => throw new ParserException("Invalid type"),
                     BuiltinType.STRING => "",
                     BuiltinType.BOOLEAN => false,
-                    BuiltinType.STRUCT => new Stack.Item.UnassignedStruct(),
+                    BuiltinType.STRUCT => new DataItem.UnassignedStruct(),
                     _ => throw new InternalException($"initial value for type {type.typeName} is unimplemented"),
                 };
             }
@@ -444,7 +444,7 @@ namespace IngameCoding.BBCode.Compiler
             else
             { throw new ParserException($"Unknown operator '{@operator.Operator}'"); }
         }
-        string FindStatementType(Statement_Literal literal)
+        static string FindStatementType(Statement_Literal literal)
         {
             return literal.type.typeName switch
             {
@@ -457,7 +457,7 @@ namespace IngameCoding.BBCode.Compiler
         }
         string FindStatementType(Statement_Variable variable)
         {
-            if (GetCompiledVariable(variable.variableName, out CompiledVariable val, out var isGlob_))
+            if (GetCompiledVariable(variable.variableName, out CompiledVariable val, out _))
             {
                 if (variable.listIndex != null)
                 {
@@ -498,7 +498,7 @@ namespace IngameCoding.BBCode.Compiler
                 throw new ParserException("Unknown struct '" + newStruct.structName + "'", new Position(newStruct.position.Line));
             }
         }
-        string FindStatementType(TypeToken type)
+        static string FindStatementType(TypeToken type)
         {
             if (type.typeName == BuiltinType.STRUCT)
             { return type.text; }
@@ -555,14 +555,14 @@ namespace IngameCoding.BBCode.Compiler
         #endregion
 
         #region PredictStatementValue()
-        static Stack.Item? PredictStatementValue(Statement_Operator @operator)
+        static DataItem? PredictStatementValue(Statement_Operator @operator)
         {
             var leftValue = PredictStatementValue(@operator.Left);
             if (!leftValue.HasValue) return null;
 
             if (@operator.Operator == "!")
             {
-                return new Stack.Item(!leftValue, null);
+                return new DataItem(!leftValue, null);
             }
 
             if (@operator.Right != null)
@@ -578,34 +578,34 @@ namespace IngameCoding.BBCode.Compiler
                     "/" => leftValue / rightValue,
                     "%" => leftValue % rightValue,
 
-                    "<" => new Stack.Item(leftValue < rightValue, null),
-                    ">" => new Stack.Item(leftValue > rightValue, null),
-                    "==" => new Stack.Item(leftValue == rightValue, null),
-                    "!=" => new Stack.Item(leftValue != rightValue, null),
-                    "&" => new Stack.Item(leftValue & rightValue, null),
-                    "|" => new Stack.Item(leftValue | rightValue, null),
-                    "^" => new Stack.Item(leftValue ^ rightValue, null),
-                    "<=" => new Stack.Item(leftValue <= rightValue, null),
-                    ">=" => new Stack.Item(leftValue >= rightValue, null),
+                    "<" => new DataItem(leftValue < rightValue, null),
+                    ">" => new DataItem(leftValue > rightValue, null),
+                    "==" => new DataItem(leftValue == rightValue, null),
+                    "!=" => new DataItem(leftValue != rightValue, null),
+                    "&" => new DataItem(leftValue & rightValue, null),
+                    "|" => new DataItem(leftValue | rightValue, null),
+                    "^" => new DataItem(leftValue ^ rightValue, null),
+                    "<=" => new DataItem(leftValue <= rightValue, null),
+                    ">=" => new DataItem(leftValue >= rightValue, null),
                     _ => null,
                 };
             }
             else
             { return leftValue; }
         }
-        static Stack.Item? PredictStatementValue(Statement_Literal literal)
+        static DataItem? PredictStatementValue(Statement_Literal literal)
         {
             return literal.type.typeName switch
             {
-                BuiltinType.INT => new Stack.Item(int.Parse(literal.value), null),
-                BuiltinType.FLOAT => new Stack.Item(float.Parse(literal.value), null),
-                BuiltinType.STRING => new Stack.Item(literal.value, null),
-                BuiltinType.BOOLEAN => new Stack.Item(bool.Parse(literal.value), null),
-                BuiltinType.STRUCT => new Stack.Item(new Stack.Item.UnassignedStruct(), null),
+                BuiltinType.INT => new DataItem(int.Parse(literal.value), null),
+                BuiltinType.FLOAT => new DataItem(float.Parse(literal.value), null),
+                BuiltinType.STRING => new DataItem(literal.value, null),
+                BuiltinType.BOOLEAN => new DataItem(bool.Parse(literal.value), null),
+                BuiltinType.STRUCT => new DataItem(new DataItem.UnassignedStruct(), null),
                 _ => null,
             };
         }
-        static Stack.Item? PredictStatementValue(Statement st)
+        static DataItem? PredictStatementValue(Statement st)
         {
             if (st is Statement_Literal literal)
             { return PredictStatementValue(literal); }
@@ -1068,23 +1068,23 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (OptimizeCode)
             {
-                Stack.Item? predictedValueN = PredictStatementValue(@operator);
+                DataItem? predictedValueN = PredictStatementValue(@operator);
                 if (predictedValueN.HasValue)
                 {
                     var predictedValue = predictedValueN.Value;
 
                     switch (predictedValue.type)
                     {
-                        case Stack.Item.Type.INT:
+                        case DataItem.Type.INT:
                             AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueInt);
                             return;
-                        case Stack.Item.Type.BOOLEAN:
+                        case DataItem.Type.BOOLEAN:
                             AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueBoolean);
                             return;
-                        case Stack.Item.Type.FLOAT:
+                        case DataItem.Type.FLOAT:
                             AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueFloat);
                             return;
-                        case Stack.Item.Type.STRING:
+                        case DataItem.Type.STRING:
                             AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueString);
                             return;
                     }
@@ -1457,12 +1457,12 @@ namespace IngameCoding.BBCode.Compiler
                 }
                 else
                 {
-                    Dictionary<string, Stack.Item> fields = new();
+                    Dictionary<string, DataItem> fields = new();
                     foreach (ParameterDefinition structDefFieldDefinition in structDefinition.fields)
                     {
-                        fields.Add(structDefFieldDefinition.name, new Stack.Item(structDefFieldDefinition.type, null));
+                        fields.Add(structDefFieldDefinition.name, new DataItem(structDefFieldDefinition.type, null));
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, new Stack.Item.Struct(fields));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields));
                 }
             }
             else
@@ -1502,7 +1502,7 @@ namespace IngameCoding.BBCode.Compiler
         }
         void GenerateCodeForStatement(Statement_ListValue listValue)
         {
-            Stack.Item.Type listType = Stack.Item.Type.RUNTIME;
+            DataItem.Type listType = DataItem.Type.RUNTIME;
             for (int i = 0; i < listValue.Size; i++)
             {
                 if (listValue.Values[i] is not Statement_Literal literal)
@@ -1510,13 +1510,13 @@ namespace IngameCoding.BBCode.Compiler
                 if (i == 0)
                 {
                     listType = literal.type.typeName.Convert();
-                    if (listType == Stack.Item.Type.RUNTIME)
+                    if (listType == DataItem.Type.RUNTIME)
                     { throw new ParserException($"Unknown literal type {listType}"); }
                 }
                 if (literal.type.typeName.Convert() != listType)
                 { throw new ParserException($"Wrong literal type {literal.type.typeName}. Expected {listType}"); }
             }
-            Stack.Item newList = new(new Stack.Item.List(listType), null);
+            DataItem newList = new(new DataItem.List(listType), null);
             AddInstruction(Opcode.COMMENT, "Generate List {");
             AddInstruction(Opcode.PUSH_VALUE, newList);
             for (int i = 0; i < listValue.Size; i++)
@@ -1615,7 +1615,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue1 = 0;
                         if (newVariable.type.isList)
                         {
-                            initialValue1 = new Stack.Item.List(Stack.Item.Type.INT);
+                            initialValue1 = new DataItem.List(DataItem.Type.INT);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1633,7 +1633,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue2 = 0;
                         if (newVariable.type.isList)
                         {
-                            initialValue2 = new Stack.Item.List(Stack.Item.Type.FLOAT);
+                            initialValue2 = new DataItem.List(DataItem.Type.FLOAT);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1651,7 +1651,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue3 = "";
                         if (newVariable.type.isList)
                         {
-                            initialValue3 = new Stack.Item.List(Stack.Item.Type.STRING);
+                            initialValue3 = new DataItem.List(DataItem.Type.STRING);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1669,7 +1669,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue4 = false;
                         if (newVariable.type.isList)
                         {
-                            initialValue4 = new Stack.Item.List(Stack.Item.Type.BOOLEAN);
+                            initialValue4 = new DataItem.List(DataItem.Type.BOOLEAN);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1736,7 +1736,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue1 = 0;
                         if (newVariable.type.isList)
                         {
-                            initialValue1 = new Stack.Item.List(IngameCoding.Bytecode.Stack.Item.Type.INT);
+                            initialValue1 = new DataItem.List(IngameCoding.Bytecode.DataItem.Type.INT);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1756,7 +1756,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue2 = 0;
                         if (newVariable.type.isList)
                         {
-                            initialValue2 = new Stack.Item.List(Stack.Item.Type.FLOAT);
+                            initialValue2 = new DataItem.List(DataItem.Type.FLOAT);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1776,7 +1776,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue3 = "";
                         if (newVariable.type.isList)
                         {
-                            initialValue3 = new Stack.Item.List(Stack.Item.Type.STRING);
+                            initialValue3 = new DataItem.List(DataItem.Type.STRING);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1796,7 +1796,7 @@ namespace IngameCoding.BBCode.Compiler
                         object initialValue4 = false;
                         if (newVariable.type.isList)
                         {
-                            initialValue4 = new Stack.Item.List(Stack.Item.Type.BOOLEAN);
+                            initialValue4 = new DataItem.List(DataItem.Type.BOOLEAN);
                         }
                         else if (newVariable.initialValue != null)
                         {
@@ -1832,7 +1832,7 @@ namespace IngameCoding.BBCode.Compiler
                         else
                         {
                             compiledVariables.Add(newVariable.variableName, new CompiledVariable(compiledVariables.Count, newVariable.type.text, newVariable.type.isList));
-                            AddInstruction(new Instruction(Opcode.PUSH_VALUE, new Stack.Item.UnassignedStruct()) { tag = "var." + newVariable.variableName });
+                            AddInstruction(new Instruction(Opcode.PUSH_VALUE, new DataItem.UnassignedStruct()) { tag = "var." + newVariable.variableName });
                         }
                         variableCount++;
                         break;
@@ -1912,9 +1912,8 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             // Search for variables
-            int variableCount = 0;
             AddInstruction(Opcode.COMMENT, "Variables");
-            GenerateCodeForVariable(function.Value.statements, out variableCount);
+            GenerateCodeForVariable(function.Value.statements, out int variableCount);
             if (variableCount == 0 && AddCommentsToCode)
             { compiledCode.RemoveAt(compiledCode.Count - 1); }
 
@@ -1955,7 +1954,7 @@ namespace IngameCoding.BBCode.Compiler
             this.isStructMethod = false;
         }
 
-        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<Stack.IStruct>> builtinStructs)
+        void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<IStruct>> builtinStructs)
         {
             if (Keywords.Contains(@struct.Key))
             { throw new ParserException($"Illegal struct name '{@struct.Value.FullName}'"); }
@@ -2295,7 +2294,7 @@ namespace IngameCoding.BBCode.Compiler
             Dictionary<string, StructDefinition> structs,
             List<Statement_NewVariable> globalVariables,
             Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, Func<Stack.IStruct>> builtinStructs,
+            Dictionary<string, Func<IStruct>> builtinStructs,
             Compiler.CompilerSettings settings,
             Action<string, TerminalInterpreter.LogType> printCallback = null)
         {

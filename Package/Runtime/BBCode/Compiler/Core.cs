@@ -13,46 +13,26 @@ namespace IngameCoding.BBCode.Compiler
 
     static class Extensions
     {
-        public static Stack.Item.Type Convert(this BuiltinType v)
+        public static DataItem.Type Convert(this BuiltinType v) => v switch
         {
-            switch (v)
-            {
-                case BuiltinType.INT:
-                    return Stack.Item.Type.INT;
-                case BuiltinType.FLOAT:
-                    return Stack.Item.Type.FLOAT;
-                case BuiltinType.STRING:
-                    return Stack.Item.Type.STRING;
-                case BuiltinType.BOOLEAN:
-                    return Stack.Item.Type.BOOLEAN;
-                case BuiltinType.STRUCT:
-                    return Stack.Item.Type.STRUCT;
-                default:
-                    return Stack.Item.Type.RUNTIME;
-            }
-        }
-        public static BuiltinType Convert(this Stack.Item.Type v)
+            BuiltinType.INT => DataItem.Type.INT,
+            BuiltinType.FLOAT => DataItem.Type.FLOAT,
+            BuiltinType.STRING => DataItem.Type.STRING,
+            BuiltinType.BOOLEAN => DataItem.Type.BOOLEAN,
+            BuiltinType.STRUCT => DataItem.Type.STRUCT,
+            _ => DataItem.Type.RUNTIME,
+        };
+        public static BuiltinType Convert(this DataItem.Type v) => v switch
         {
-            switch (v)
-            {
-                case Stack.Item.Type.INT:
-                    return BuiltinType.INT;
-                case Stack.Item.Type.FLOAT:
-                    return BuiltinType.FLOAT;
-                case Stack.Item.Type.STRING:
-                    return BuiltinType.STRUCT;
-                case Stack.Item.Type.BOOLEAN:
-                    return BuiltinType.BOOLEAN;
-                case Stack.Item.Type.STRUCT:
-                    return BuiltinType.STRUCT;
-                case Stack.Item.Type.LIST:
-                    return BuiltinType.RUNTIME;
-                case Stack.Item.Type.RUNTIME:
-                    return BuiltinType.RUNTIME;
-                default:
-                    return BuiltinType.ANY;
-            }
-        }
+            DataItem.Type.INT => BuiltinType.INT,
+            DataItem.Type.FLOAT => BuiltinType.FLOAT,
+            DataItem.Type.STRING => BuiltinType.STRUCT,
+            DataItem.Type.BOOLEAN => BuiltinType.BOOLEAN,
+            DataItem.Type.STRUCT => BuiltinType.STRUCT,
+            DataItem.Type.LIST => BuiltinType.RUNTIME,
+            DataItem.Type.RUNTIME => BuiltinType.RUNTIME,
+            _ => BuiltinType.ANY,
+        };
     }
 
     internal static class FunctionID
@@ -306,9 +286,9 @@ namespace IngameCoding.BBCode.Compiler
     {
         public TypeToken[] parameters;
 
-        readonly Action<Stack.Item[]> callback;
+        readonly Action<DataItem[]> callback;
 
-        public delegate void ReturnEventHandler(Stack.Item returnValue);
+        public delegate void ReturnEventHandler(DataItem returnValue);
         public event ReturnEventHandler ReturnEvent;
 
         public int ParameterCount { get { return parameters.Length; } }
@@ -316,7 +296,7 @@ namespace IngameCoding.BBCode.Compiler
 
         // Wrap the event in a protected virtual method
         // to enable derived classes to raise the event.
-        public void RaiseReturnEvent(Stack.Item returnValue)
+        public void RaiseReturnEvent(DataItem returnValue)
         {
             // Raise the event in a thread-safe manner using the ?. operator.
             ReturnEvent?.Invoke(returnValue);
@@ -326,14 +306,14 @@ namespace IngameCoding.BBCode.Compiler
         /// Function without return value
         /// </summary>
         /// <param name="callback">Callback when the machine process this function</param>
-        public BuiltinFunction(Action<IngameCoding.Bytecode.Stack.Item[]> callback, TypeToken[] parameters, bool returnSomething = false)
+        public BuiltinFunction(Action<IngameCoding.Bytecode.DataItem[]> callback, TypeToken[] parameters, bool returnSomething = false)
         {
             this.parameters = parameters;
             this.callback = callback;
             this.returnSomething = returnSomething;
         }
 
-        public void Callback(Stack.Item[] parameters)
+        public void Callback(DataItem[] parameters)
         {
             if (returnSomething)
             {
@@ -390,7 +370,7 @@ namespace IngameCoding.BBCode.Compiler
     [Serializable]
     public class CompiledStruct
     {
-        public Func<Stack.IStruct> CreateBuiltinStruct;
+        public Func<IStruct> CreateBuiltinStruct;
         public bool IsBuiltin => CreateBuiltinStruct != null;
         public string name;
         public ParameterDefinition[] fields;

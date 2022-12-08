@@ -151,7 +151,7 @@ namespace IngameCoding.BBCode
             {
                 parameters = new List<ParameterDefinition>();
                 statements = new List<Statement>();
-                attributes = new Attribute[] { };
+                attributes = Array.Empty<Attribute>();
                 this.namespacePath = namespacePath;
                 this.Name = name;
             }
@@ -160,7 +160,7 @@ namespace IngameCoding.BBCode
             {
                 parameters = new List<ParameterDefinition>();
                 statements = new List<Statement>();
-                attributes = new Attribute[0];
+                attributes = Array.Empty<Attribute>();
                 this.namespacePath = namespacePath.ToArray();
                 this.Name = name;
             }
@@ -254,7 +254,7 @@ namespace IngameCoding.BBCode
                 this.name = name;
                 this.fields = new List<ParameterDefinition>();
                 this.methods = new Dictionary<string, FunctionDefinition>();
-                this.attributes = new FunctionDefinition.Attribute[] { };
+                this.attributes = Array.Empty<FunctionDefinition.Attribute>();
                 this.namespacePath = namespacePath;
                 this.parameters = new List<ParameterDefinition>();
                 this.statements = new List<Statement>();
@@ -265,7 +265,7 @@ namespace IngameCoding.BBCode
                 this.name = name;
                 this.fields = new List<ParameterDefinition>();
                 this.methods = new Dictionary<string, FunctionDefinition>();
-                this.attributes = new FunctionDefinition.Attribute[] { };
+                this.attributes = Array.Empty<FunctionDefinition.Attribute>();
                 this.namespacePath = namespacePath.ToArray();
                 this.parameters = new List<ParameterDefinition>();
                 this.statements = new List<Statement>();
@@ -584,7 +584,7 @@ namespace IngameCoding.BBCode
 
             readonly Dictionary<string, TypeToken> types = new();
             readonly Dictionary<string, int> operators = new();
-            bool enableThisKeyword = false;
+            bool enableThisKeyword;
             readonly List<string> CurrentNamespace = new();
             readonly List<string> VariableNames = new();
             List<string> GlobalVariableNames
@@ -1753,7 +1753,7 @@ namespace IngameCoding.BBCode
 
                 possibleFunctionName.subtype = TokenSubtype.MethodName;
 
-                methodCall = new(CurrentNamespace.ToArray(), new string[0], true)
+                methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>(), true)
                 {
                     functionNameT = possibleFunctionName,
                 };
@@ -2078,7 +2078,7 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("(") == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                Statement_MethodCall methodCall = new(CurrentNamespace.ToArray(), new string[0])
+                Statement_MethodCall methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>())
                 {
                     functionNameT = possibleMethodName
                 };
@@ -2138,7 +2138,7 @@ namespace IngameCoding.BBCode
 
                 possibleFunctionName.subtype = TokenSubtype.Statement;
 
-                Statement_FunctionCall functionCall = new(new string[0], new string[0])
+                Statement_FunctionCall functionCall = new(Array.Empty<string>(), Array.Empty<string>())
                 {
                     functionNameT = possibleFunctionName
                 };
@@ -2242,7 +2242,7 @@ namespace IngameCoding.BBCode
 
                 throw new Errors.Exception("Methods are not supported", possibleType.Position);
 
-                FunctionDefinition methodDefinition = new(new string[0], possibleName.text)
+                FunctionDefinition methodDefinition = new(Array.Empty<string>(), possibleName.text)
                 {
                     type = possibleType,
                     attributes = attributes.ToArray()

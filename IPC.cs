@@ -16,14 +16,14 @@ namespace Communicating
     public class IPC
     {
         readonly List<IPCMessage<object>> OutgoingMessages = new();
-        bool AwaitingAck = false;
+        bool AwaitingAck;
 
         Thread ThreadListener;
 
         public delegate void OnRecivedEventHandler(IPC sender, IPCMessage<object> message);
         public event OnRecivedEventHandler OnRecived;
 
-        public readonly bool IgnoreACK = false;
+        public readonly bool IgnoreACK;
 
         public IPC(bool IgnoreACK = false)
         {

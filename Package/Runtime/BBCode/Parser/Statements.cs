@@ -487,7 +487,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 x += $"{part.PrettyPrint(ident)}\n";
             }
-            if (x.EndsWith("\n"))
+            if (x.EndsWith("\n", StringComparison.InvariantCulture))
             {
                 x = x[..^1];
             }

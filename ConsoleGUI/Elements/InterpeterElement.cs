@@ -11,7 +11,7 @@ namespace ConsoleGUI
     internal class InterpeterElement : BaseWindowElement
     {
         public string File;
-        int Scroll = 0;
+        int Scroll;
         Interpreter Interpreter;
 
         string ConsoleText = "";
@@ -346,30 +346,30 @@ namespace ConsoleGUI
 
                 switch (item.type)
                 {
-                    case IngameCoding.Bytecode.Stack.Item.Type.INT:
+                    case IngameCoding.Bytecode.DataItem.Type.INT:
                         ForegroundColor = CharColors.FgCyan;
                         AddText($"{item.ValueInt}");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.FLOAT:
+                    case IngameCoding.Bytecode.DataItem.Type.FLOAT:
                         ForegroundColor = CharColors.FgCyan;
                         AddText($"{item.ValueFloat}");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.STRING:
+                    case IngameCoding.Bytecode.DataItem.Type.STRING:
                         ForegroundColor = CharColors.FgYellow;
                         AddText($"\"{item.ValueString}\"");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.BOOLEAN:
+                    case IngameCoding.Bytecode.DataItem.Type.BOOLEAN:
                         ForegroundColor = CharColors.FgDarkBlue;
                         AddText($"{item.ValueBoolean}");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.STRUCT:
+                    case IngameCoding.Bytecode.DataItem.Type.STRUCT:
                         ForegroundColor = CharColors.FgWhite;
                         AddText("{ ... }");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.LIST:
+                    case IngameCoding.Bytecode.DataItem.Type.LIST:
                         AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
                         break;
-                    case IngameCoding.Bytecode.Stack.Item.Type.RUNTIME:
+                    case IngameCoding.Bytecode.DataItem.Type.RUNTIME:
                         ForegroundColor = CharColors.FgGray;
                         AddText("<runtime>");
                         break;

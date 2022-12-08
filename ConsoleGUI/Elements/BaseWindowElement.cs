@@ -12,7 +12,7 @@ namespace ConsoleGUI
 
         internal bool CanDrag = true;
 
-        internal BaseInlineElement[] Elements = new BaseInlineElement[0];
+        internal BaseInlineElement[] Elements = System.Array.Empty<BaseInlineElement>();
 
         internal override void BeforeDraw()
         {
@@ -24,7 +24,7 @@ namespace ConsoleGUI
             }
         }
 
-        Character DrawElement(BaseInlineElement Element, int X, int Y)
+        static Character DrawElement(BaseInlineElement Element, int X, int Y)
         {
             if (Element.Rect.Top == Y)
             {

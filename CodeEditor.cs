@@ -19,7 +19,7 @@ namespace TheProgram
 
             var ipc = new IPC();
 
-            ipc.OnRecived += async (manager, message) =>
+            ipc.OnRecived += (manager, message) =>
             {
                 switch (message.type)
                 {

@@ -128,13 +128,13 @@ namespace TheProgram
         public static Data_BytecodeInterpeterDetails Make(BytecodeInterpeter.InterpeterDetails v) => new(v);
     }
 
-    public class Data_StackItem : Data_Serializable<Stack.Item>
+    public class Data_StackItem : Data_Serializable<DataItem>
     {
         public string Type { get; set; }
         public string Value { get; set; }
         public string Tag { get; set; }
 
-        public Data_StackItem(Stack.Item v) : base(v)
+        public Data_StackItem(DataItem v) : base(v)
         {
             var v_v = v.Value();
             Type = v.type.ToString();
@@ -168,44 +168,44 @@ namespace TheProgram
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
-            if (v.parameter is Stack.IStruct)
+            if (v.parameter is IStruct)
             {
                 Parameter = "IStruct { ... }";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is Stack.Item.List)
+            else if (v.parameter is DataItem.List)
             {
                 Parameter = "[ ... ]";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is Stack.Item.Struct)
+            else if (v.parameter is DataItem.Struct)
             {
                 Parameter = "{ ... }";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is Stack.Item v2)
+            else if (v.parameter is DataItem v2)
             {
                 switch (v2.type)
                 {
-                    case Stack.Item.Type.INT:
+                    case DataItem.Type.INT:
                         Parameter = "INT";
                         break;
-                    case Stack.Item.Type.FLOAT:
+                    case DataItem.Type.FLOAT:
                         Parameter = "FLOAT";
                         break;
-                    case Stack.Item.Type.STRING:
+                    case DataItem.Type.STRING:
                         Parameter = "STRING";
                         break;
-                    case Stack.Item.Type.BOOLEAN:
+                    case DataItem.Type.BOOLEAN:
                         Parameter = "BOOLEAN";
                         break;
-                    case Stack.Item.Type.STRUCT:
+                    case DataItem.Type.STRUCT:
                         Parameter = "{ ... }";
                         break;
-                    case Stack.Item.Type.LIST:
+                    case DataItem.Type.LIST:
                         Parameter = "[ ... ]";
                         break;
-                    case Stack.Item.Type.RUNTIME:
+                    case DataItem.Type.RUNTIME:
                         Parameter = "RUNTIME";
                         break;
                 }

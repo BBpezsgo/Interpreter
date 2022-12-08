@@ -11,7 +11,7 @@ namespace IngameCoding.Bytecode
 
     static class ItemEx
     {
-        public static string[] ToStringArray(this IngameCoding.Bytecode.Stack.Item[] items)
+        public static string[] ToStringArray(this DataItem[] items)
         {
             string[] strings = new string[items.Length];
             for (int i = 0; i < items.Length; i++)
@@ -61,19 +61,19 @@ namespace IngameCoding.Bytecode
             return CU.Process();
         }
 
-        internal static string GetTypeText(Stack.Item.Type type)
+        internal static string GetTypeText(DataItem.Type type)
         {
             return type switch
             {
-                Stack.Item.Type.INT => "int",
-                Stack.Item.Type.FLOAT => "float",
-                Stack.Item.Type.STRING => "string",
-                Stack.Item.Type.BOOLEAN => "bool",
-                Stack.Item.Type.STRUCT => "complex",
+                DataItem.Type.INT => "int",
+                DataItem.Type.FLOAT => "float",
+                DataItem.Type.STRING => "string",
+                DataItem.Type.BOOLEAN => "bool",
+                DataItem.Type.STRUCT => "complex",
                 _ => "",
             };
         }
-        internal static string GetTypeText(Stack.Item val) => GetTypeText(val.ValueList.itemTypes) + (val.type == Stack.Item.Type.LIST ? "[]" : "");
+        internal static string GetTypeText(DataItem val) => GetTypeText(val.ValueList.itemTypes) + (val.type == DataItem.Type.LIST ? "[]" : "");
 
         public void Destroy()
         {
@@ -301,7 +301,7 @@ namespace IngameCoding.Bytecode
         {
             var newItem = MU.Stack.Pop();
             var listValue = MU.Stack.Pop();
-            if (listValue.type == Stack.Item.Type.LIST)
+            if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Add(newItem); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -314,7 +314,7 @@ namespace IngameCoding.Bytecode
             var indexValue = MU.Stack.Pop();
             var newItem = MU.Stack.Pop();
             var listValue = MU.Stack.Pop();
-            if (listValue.type == Stack.Item.Type.LIST)
+            if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Add(newItem, indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -325,7 +325,7 @@ namespace IngameCoding.Bytecode
         int LIST_PULL_ITEM()
         {
             var listValue = MU.Stack.Pop();
-            if (listValue.type == Stack.Item.Type.LIST)
+            if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Remove(); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -337,7 +337,7 @@ namespace IngameCoding.Bytecode
         {
             var indexValue = MU.Stack.Pop();
             var listValue = MU.Stack.Pop();
-            if (listValue.type == Stack.Item.Type.LIST)
+            if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Remove(indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -351,7 +351,7 @@ namespace IngameCoding.Bytecode
             var indexValue = MU.Stack.Pop();
             var listValue = MU.Stack.Pop();
 
-            if (listValue.type == Stack.Item.Type.LIST)
+            if (listValue.type == DataItem.Type.LIST)
             {
                 if (listValue.ValueList.items.Count <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
@@ -371,12 +371,12 @@ namespace IngameCoding.Bytecode
 
             if (CPU.builtinFunctions.TryGetValue(MU.CurrentInstruction.additionParameter, out IngameCoding.BBCode.Compiler.BuiltinFunction builtinFunction))
             {
-                List<Stack.Item> parameters = new();
+                List<DataItem> parameters = new();
                 for (int i = 0; i < (int)MU.CurrentInstruction.parameter; i++)
                 { parameters.Add(MU.Stack.Pop()); }
                 if (builtinFunction.returnSomething)
                 {
-                    Action<Stack.Item> returnValue = new((returnVal) =>
+                    Action<DataItem> returnValue = new((returnVal) =>
                     {
                         Output.Debug.Debug.Log(returnVal.ToString());
                         MU.Stack.Add(returnVal, "return v");
@@ -568,7 +568,7 @@ namespace IngameCoding.Bytecode
 
             structItem.SetField(fieldToSet, structItem.GetField(fieldToSet).TrySet(valueToSet));
 
-            MU.Stack.Set((int)MU.CurrentInstruction.parameter + MU.BasePointer, new Stack.Item(structItem, null));
+            MU.Stack.Set((int)MU.CurrentInstruction.parameter + MU.BasePointer, new DataItem(structItem, null));
 
             MU.Step();
 
@@ -663,7 +663,7 @@ namespace IngameCoding.Bytecode
             if (MU.CurrentInstruction.additionParameter.Length == 0)
             { throw new InternalException("No field name given"); }
 
-            Stack.Item valueToSet = MU.Stack.Pop();
+            DataItem valueToSet = MU.Stack.Pop();
             string fieldToSet = MU.CurrentInstruction.additionParameter;
             var structItem = MU.Stack.Get((int)MU.CurrentInstruction.parameter).ValueStruct;
 
@@ -672,7 +672,7 @@ namespace IngameCoding.Bytecode
 
             structItem.SetField(fieldToSet, structItem.GetField(fieldToSet).TrySet(valueToSet));
 
-            MU.Stack.Set((int)MU.CurrentInstruction.parameter, new Stack.Item(structItem, null));
+            MU.Stack.Set((int)MU.CurrentInstruction.parameter, new DataItem(structItem, null));
 
             MU.Step();
 
@@ -718,8 +718,8 @@ namespace IngameCoding.Bytecode
 
         int MATH_ADD()
         {
-            Stack.Item rightSide = MU.Stack.Pop();
-            Stack.Item leftSide = MU.Stack.Pop();
+            DataItem rightSide = MU.Stack.Pop();
+            DataItem leftSide = MU.Stack.Pop();
 
             MU.Stack.Add(leftSide + rightSide);
 
@@ -737,8 +737,8 @@ namespace IngameCoding.Bytecode
 
         int MATH_DIV()
         {
-            Stack.Item rightSide = MU.Stack.Pop();
-            Stack.Item leftSide = MU.Stack.Pop();
+            DataItem rightSide = MU.Stack.Pop();
+            DataItem leftSide = MU.Stack.Pop();
 
             MU.Stack.Add(leftSide / rightSide);
 
@@ -749,8 +749,8 @@ namespace IngameCoding.Bytecode
 
         int MATH_SUB()
         {
-            Stack.Item rightSide = MU.Stack.Pop();
-            Stack.Item leftSide = MU.Stack.Pop();
+            DataItem rightSide = MU.Stack.Pop();
+            DataItem leftSide = MU.Stack.Pop();
 
             MU.Stack.Add(leftSide - rightSide);
 
@@ -761,8 +761,8 @@ namespace IngameCoding.Bytecode
 
         int MATH_MULT()
         {
-            Stack.Item rightSide = MU.Stack.Pop();
-            Stack.Item leftSide = MU.Stack.Pop();
+            DataItem rightSide = MU.Stack.Pop();
+            DataItem leftSide = MU.Stack.Pop();
 
             MU.Stack.Add(leftSide * rightSide);
 
@@ -773,8 +773,8 @@ namespace IngameCoding.Bytecode
 
         int MATH_MOD()
         {
-            Stack.Item rightSide = MU.Stack.Pop();
-            Stack.Item leftSide = MU.Stack.Pop();
+            DataItem rightSide = MU.Stack.Pop();
+            DataItem leftSide = MU.Stack.Pop();
 
             MU.Stack.Add(leftSide % rightSide);
 
@@ -898,20 +898,20 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                static int CalculateItemSize(Item item)
+                static int CalculateItemSize(DataItem item)
                 {
                     switch (item.type)
                     {
-                        case Item.Type.INT:
+                        case DataItem.Type.INT:
                             return 4;
-                        case Item.Type.FLOAT:
+                        case DataItem.Type.FLOAT:
                             return 4;
-                        case Item.Type.STRING:
+                        case DataItem.Type.STRING:
                             return 4 + System.Text.ASCIIEncoding.ASCII.GetByteCount(item.ValueString);
-                        case Item.Type.BOOLEAN:
+                        case DataItem.Type.BOOLEAN:
                             return 1;
-                        case Item.Type.STRUCT:
-                            if (item.ValueStruct is Item.Struct valStruct)
+                        case DataItem.Type.STRUCT:
+                            if (item.ValueStruct is DataItem.Struct valStruct)
                             {
                                 int result = 0;
                                 foreach (var field in valStruct.fields)
@@ -923,7 +923,7 @@ namespace IngameCoding.Bytecode
                                 return result;
                             }
                             break;
-                        case Item.Type.LIST:
+                        case DataItem.Type.LIST:
                             {
                                 var result = 0;
                                 foreach (var element in item.ValueList.items)
@@ -943,1216 +943,9 @@ namespace IngameCoding.Bytecode
         }
 
         public Stack()
-        { stack = new List<Item>(); }
-
-        [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-        public struct Item
-        {
-            const int MaxReferenceDepth = 16;
-
-            public class UnassignedStruct : IStruct
-            {
-                public bool HaveField(string field) => throw new RuntimeException("Struct is null");
-                public void SetField(string field, Item value) => throw new RuntimeException("Struct is null");
-                public Item GetField(string field) => throw new RuntimeException("Struct is null");
-
-                public override string ToString() => "struct {...}";
-            }
-
-            public class Struct : IStruct
-            {
-                internal readonly Dictionary<string, Item> fields = new();
-
-                public Struct(Dictionary<string, Item> fields)
-                {
-                    this.fields = fields;
-                }
-
-                public bool HaveField(string field) => fields.ContainsKey(field);
-                public void SetField(string field, Item value) => fields[field] = value;
-                public Item GetField(string field) => fields[field];
-
-                public override string ToString() => "struct {...}";
-            }
-
-            public class List
-            {
-                public Type itemTypes;
-                public List<Item> items = new();
-
-                public List(Type type)
-                {
-                    this.itemTypes = type;
-                }
-
-                internal void Add(Item newItem)
-                {
-                    if (itemTypes == newItem.type)
-                    {
-                        items.Add(newItem);
-                    }
-                    else
-                    {
-                        throw new RuntimeException($"Wrong type ({newItem.type}) of item pushed to the list with type {itemTypes}");
-                    }
-                }
-
-                internal void Add(Item newItem, int i)
-                {
-                    if (itemTypes == newItem.type)
-                    {
-                        items.Insert(i, newItem);
-                    }
-                    else
-                    {
-                        throw new RuntimeException($"Wrong type ({newItem.type}) of item added to the list with type {itemTypes}");
-                    }
-                }
-
-                internal void Remove()
-                {
-                    if (items.Count > 0)
-                    {
-                        items.RemoveAt(items.Count - 1);
-                    }
-                }
-
-                internal void Remove(int i)
-                {
-                    items.RemoveAt(i);
-                }
-
-                public override string ToString()
-                {
-                    return $"[{(int)itemTypes}]";
-                }
-
-                public List(string raw)
-                {
-                    var num = raw[1..^1];
-                    this.itemTypes = (Type)(int.Parse(num));
-                }
-            }
-
-            public enum Type
-            {
-                INT,
-                FLOAT,
-                STRING,
-                BOOLEAN,
-                STRUCT,
-                LIST,
-                RUNTIME,
-            }
-
-            public Type type;
-
-            #region Value Fields
-
-            int? valueInt;
-            float? valueFloat;
-            string valueString;
-            bool? valueBoolean;
-            IStruct valueStruct;
-            List valueList;
-            int? valueRef;
-
-            #endregion
-
-            bool IsReference;
-
-            public Stack stack;
-
-            #region Value Properties
-
-            public int ValueInt
-            {
-                get
-                {
-                    if (type == Type.INT)
-                    { return GetRef().valueInt.Value; }
-
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to INT");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public float ValueFloat
-            {
-                get
-                {
-                    if (type == Type.FLOAT)
-                    {
-                        return valueFloat.Value;
-                    }
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to FLOAT");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public string ValueString
-            {
-                get
-                {
-                    if (type == Type.STRING)
-                    {
-                        return valueString;
-                    }
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to STRING");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public bool ValueBoolean
-            {
-                get
-                {
-                    if (type == Type.BOOLEAN)
-                    {
-                        return valueBoolean.Value;
-                    }
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to BOOLEAN");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public IStruct ValueStruct
-            {
-                get
-                {
-                    if (type == Type.STRUCT)
-                    {
-                        return valueStruct;
-                    }
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to STRUCT");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public List ValueList
-            {
-                get
-                {
-                    if (type == Type.LIST)
-                    {
-                        return valueList;
-                    }
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to LIST");
-                }
-                set
-                {
-                    SetRef(value);
-                }
-            }
-            public int ValueRef
-            {
-                get
-                {
-                    if (IsReference) return valueRef.Value;
-                    throw new RuntimeException("Can't cast " + type.ToString() + " to REF");
-                }
-                set
-                {
-                    this.IsReference = true;
-
-                    this.valueInt = null;
-                    this.valueFloat = null;
-                    this.valueString = null;
-                    this.valueBoolean = null;
-                    this.valueStruct = null;
-                    this.valueList = null;
-                    this.valueRef = value;
-                }
-            }
-
-            #endregion
-
-            #region Get/Set Ref
-
-            Item GetRef(int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    return stack.Get(ValueRef).GetRef(currentDepth + 1);
-                }
-                else
-                {
-                    return this;
-                }
-            }
-            void SetRef(int value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.INT;
-                    this.valueInt = value;
-                    this.valueFloat = null;
-                    this.valueString = null;
-                    this.valueBoolean = null;
-                    this.valueStruct = null;
-                    this.valueList = null;
-                    this.valueRef = null;
-                }
-            }
-            void SetRef(float value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.FLOAT;
-                    this.valueInt = null;
-                    this.valueFloat = value;
-                    this.valueString = null;
-                    this.valueBoolean = null;
-                    this.valueStruct = null;
-                    this.valueList = null;
-                    this.valueRef = null;
-                }
-            }
-            void SetRef(string value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.STRING;
-                    this.valueInt = null;
-                    this.valueFloat = null;
-                    this.valueString = value;
-                    this.valueBoolean = null;
-                    this.valueStruct = null;
-                    this.valueList = null;
-                    this.valueRef = null;
-                }
-            }
-            void SetRef(bool value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.BOOLEAN;
-                    this.valueInt = null;
-                    this.valueFloat = null;
-                    this.valueString = null;
-                    this.valueBoolean = value;
-                    this.valueStruct = null;
-                    this.valueList = null;
-                    this.valueRef = null;
-                }
-            }
-            void SetRef(IStruct value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.STRUCT;
-                    this.valueInt = null;
-                    this.valueFloat = null;
-                    this.valueString = null;
-                    this.valueBoolean = null;
-                    this.valueStruct = value;
-                    this.valueList = null;
-                    this.valueRef = null;
-                }
-            }
-            void SetRef(List value, int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    stack.stack[ValueRef].SetRef(value, currentDepth + 1);
-                }
-                else
-                {
-                    this.type = Type.LIST;
-                    this.valueInt = null;
-                    this.valueFloat = null;
-                    this.valueString = null;
-                    this.valueBoolean = null;
-                    this.valueStruct = null;
-                    this.valueList = value;
-                    this.valueRef = null;
-                }
-            }
-
-            #endregion
-
-            /// <summary>Only for debugging</summary>
-            public string Tag { get; internal set; }
-
-            #region Constructors
-
-            public Item(int value, string tag)
-            {
-                this.type = Type.INT;
-
-                this.IsReference = false;
-
-                this.valueInt = value;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(float value, string tag)
-            {
-                this.type = Type.FLOAT;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = value;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(string value, string tag)
-            {
-                this.type = Type.STRING;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = value;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(bool value, string tag)
-            {
-                this.type = Type.BOOLEAN;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = value;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(IStruct value, string tag)
-            {
-                this.type = Type.STRUCT;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = value;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(List value, string tag)
-            {
-                this.type = Type.LIST;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = value;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(BBCode.TypeToken type1, string tag)
-            {
-                this.type = Type.INT;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                switch (type1.typeName)
-                {
-                    case BBCode.BuiltinType.INT:
-                        this.type = Type.INT;
-                        this.valueInt = 0;
-                        break;
-                    case BBCode.BuiltinType.FLOAT:
-                        this.type = Type.FLOAT;
-                        this.valueFloat = 0f;
-                        break;
-                    case BBCode.BuiltinType.STRING:
-                        this.type = Type.STRING;
-                        this.valueString = "";
-                        break;
-                    case BBCode.BuiltinType.BOOLEAN:
-                        this.type = Type.BOOLEAN;
-                        this.valueBoolean = false;
-                        break;
-                    case BBCode.BuiltinType.STRUCT:
-                        // TODO: Ezt tesztelni:
-                        this.type = Type.STRUCT;
-                        this.valueStruct = new UnassignedStruct();
-                        break;
-                }
-
-                this.stack = null;
-
-                this.Tag = tag;
-            }
-            public Item(object value, string tag)
-            {
-                this.type = Type.INT;
-
-                this.IsReference = false;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-
-                this.stack = null;
-
-                this.Tag = tag;
-
-                if (value is int a)
-                {
-                    this.type = Type.INT;
-                    this.valueInt = a;
-                }
-                else if (value is float b)
-                {
-                    this.type = Type.FLOAT;
-                    this.valueFloat = b;
-                }
-                else if (value is string c)
-                {
-                    this.type = Type.STRING;
-                    this.valueString = c;
-                }
-                else if (value is bool d)
-                {
-                    this.type = Type.BOOLEAN;
-                    this.valueBoolean = d;
-                }
-                else if (value is IStruct e)
-                {
-                    this.type = Type.STRUCT;
-                    this.valueStruct = e;
-                }
-                else if (value is List f)
-                {
-                    this.type = Type.LIST;
-                    this.ValueList = f;
-                }
-                else
-                {
-                    throw new Errors.Exception($"Unknown type {value.GetType().FullName}", new Position(-1));
-                }
-            }
-
-            #endregion
-
-            #region TrySet()
-
-            public Item TrySet(Item value)
-            {
-                switch (type)
-                {
-                    case Type.INT:
-                        switch (value.type)
-                        {
-                            case Type.INT:
-                                return new Item(value.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(Math.Round(value.ValueFloat), null);
-                            case Type.STRING:
-                                return new Item(int.Parse(value.ValueString), null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (value.type)
-                        {
-                            case Type.INT:
-                                return new Item(value.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(value.ValueFloat, null);
-                        }
-                        break;
-                    case Type.STRING:
-                        switch (value.type)
-                        {
-                            case Type.INT:
-                                return new Item(value.ValueInt.ToString(), null);
-                            case Type.FLOAT:
-                                return new Item(value.ValueFloat.ToString(), null);
-                            case Type.STRING:
-                                return new Item(value.ValueString, null);
-                            case Type.BOOLEAN:
-                                return new Item(value.ValueBoolean.ToString(), null);
-                        }
-                        break;
-                    case Type.BOOLEAN:
-                        switch (value.type)
-                        {
-                            case Type.BOOLEAN:
-                                return new Item(value.ValueBoolean, null);
-                        }
-                        break;
-                    case Type.STRUCT:
-                        switch (value.type)
-                        {
-                            case Type.STRUCT:
-                                return new Item(value.ValueStruct, null);
-                        }
-                        break;
-                    case Type.LIST:
-                        switch (value.type)
-                        {
-                            case Type.LIST:
-                                return new Item(value.ValueList, null);
-                        }
-                        break;
-                    case Type.RUNTIME:
-                        return value;
-                }
-                throw new RuntimeException("Can't cast from " + value.type.ToString() + " to " + type.ToString());
-            }
-            public Item TrySet(int value)
-            {
-                return type switch
-                {
-                    Type.INT => new Item(value, null),
-                    Type.FLOAT => new Item(value, null),
-                    Type.STRING => new Item(value.ToString(), null),
-                    _ => throw new RuntimeException("Can't cast from " + "INT" + " to " + type.ToString()),
-                };
-            }
-            public Item TrySet(float value)
-            {
-                return type switch
-                {
-                    Type.INT => new Item(Math.Round(value), null),
-                    Type.FLOAT => new Item(value, null),
-                    Type.STRING => new Item(value.ToString(), null),
-                    _ => throw new RuntimeException("Can't cast from " + "FLOAT" + " to " + type.ToString()),
-                };
-            }
-            public Item TrySet(bool value)
-            {
-                return type switch
-                {
-                    Type.STRING => new Item(value.ToString(), null),
-                    Type.BOOLEAN => new Item(value, null),
-                    _ => throw new RuntimeException("Can't cast from " + "BOOLEAN" + " to " + type.ToString()),
-                };
-            }
-            public Item TrySet(string value)
-            {
-                return type switch
-                {
-                    Type.STRING => new Item(value, null),
-                    Type.INT => new Item(int.Parse(value), null),
-                    _ => throw new RuntimeException("Can't cast from " + "STRING" + " to " + type.ToString()),
-                };
-            }
-            public Item TrySet(IStruct value)
-            {
-                return type switch
-                {
-                    Type.STRUCT => new Item(value, null),
-                    _ => throw new RuntimeException("Can't cast from " + "STRUCT" + " to " + type.ToString()),
-                };
-            }
-            public Item TrySet(List value)
-            {
-                return type switch
-                {
-                    Type.LIST => new Item(value, null),
-                    _ => throw new RuntimeException("Can't cast from " + "LIST" + " to " + type.ToString()),
-                };
-            }
-
-            #endregion
-
-            #region Operators
-
-            public static Item operator +(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueInt + rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueInt + rightSide.ValueFloat, null);
-                            case Type.STRING:
-                                return new Item(leftSide.ToStringValue() + rightSide.ValueString, null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueFloat + rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueFloat + rightSide.ValueFloat, null);
-                            case Type.STRING:
-                                return new Item(leftSide.ToStringValue() + rightSide.ValueString, null);
-                        }
-                        break;
-                    case Type.STRING:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueString + rightSide.ToStringValue(), null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueString + rightSide.ToStringValue(), null);
-                            case Type.STRING:
-                                return new Item(leftSide.ValueString + rightSide.ValueString, null);
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do + operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static Item operator -(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueInt - rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueInt - rightSide.ValueFloat, null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueFloat - rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueFloat - rightSide.ValueFloat, null);
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do - operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-
-            public static Item operator *(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueInt * rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueInt * rightSide.ValueFloat, null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueFloat * rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueFloat * rightSide.ValueFloat, null);
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do * operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static Item operator /(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueInt / rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueInt / rightSide.ValueFloat, null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueFloat / rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueFloat / rightSide.ValueFloat, null);
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do / operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static Item operator %(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueInt % rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueInt % rightSide.ValueFloat, null);
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return new Item(leftSide.ValueFloat % rightSide.ValueInt, null);
-                            case Type.FLOAT:
-                                return new Item(leftSide.ValueFloat % rightSide.ValueFloat, null);
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do % operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-
-            public static bool operator <(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt < rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt < rightSide.ValueFloat;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat < rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat < rightSide.ValueFloat;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do < operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static bool operator >(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt > rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt > rightSide.ValueFloat;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat > rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat > rightSide.ValueFloat;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do > operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-
-            public static bool operator <=(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt <= rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt <= rightSide.ValueFloat;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat <= rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat <= rightSide.ValueFloat;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do <= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static bool operator >=(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt >= rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt >= rightSide.ValueFloat;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat >= rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat >= rightSide.ValueFloat;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do >= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-
-            public static bool operator ==(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt == rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt == rightSide.ValueFloat;
-                            case Type.STRING:
-                                return leftSide.ValueInt.ToString() == rightSide.ValueString;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat == rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat == rightSide.ValueFloat;
-                            case Type.STRING:
-                                return leftSide.ValueFloat.ToString() == rightSide.ValueString;
-                        }
-                        break;
-                    case Type.STRING:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueString == rightSide.ValueInt.ToString();
-                            case Type.FLOAT:
-                                return leftSide.ValueString == rightSide.ValueFloat.ToString();
-                            case Type.STRING:
-                                return leftSide.ValueString == rightSide.ValueString;
-                        }
-                        break;
-                    case Type.BOOLEAN:
-                        if (rightSide.type == Type.BOOLEAN)
-                        {
-                            return leftSide.ValueBoolean == rightSide.ValueBoolean;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do == operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-            public static bool operator !=(Item leftSide, Item rightSide)
-            {
-                switch (leftSide.type)
-                {
-                    case Type.INT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueInt != rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueInt != rightSide.ValueFloat;
-                            case Type.STRING:
-                                return leftSide.ValueInt.ToString() != rightSide.ValueString;
-                        }
-                        break;
-                    case Type.FLOAT:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueFloat != rightSide.ValueInt;
-                            case Type.FLOAT:
-                                return leftSide.ValueFloat != rightSide.ValueFloat;
-                            case Type.STRING:
-                                return leftSide.ValueFloat.ToString() != rightSide.ValueString;
-                        }
-                        break;
-                    case Type.STRING:
-                        switch (rightSide.type)
-                        {
-                            case Type.INT:
-                                return leftSide.ValueString != rightSide.ValueInt.ToString();
-                            case Type.FLOAT:
-                                return leftSide.ValueString != rightSide.ValueFloat.ToString();
-                            case Type.STRING:
-                                return leftSide.ValueString != rightSide.ValueString;
-                        }
-                        break;
-                    case Type.BOOLEAN:
-                        if (rightSide.type == Type.BOOLEAN)
-                        {
-                            return leftSide.ValueBoolean != rightSide.ValueBoolean;
-                        }
-                        break;
-                }
-
-                throw new RuntimeException("Can't do != operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
-            }
-
-            public static bool operator ==(Item leftSide, int rightSide) => (leftSide == new Item(rightSide, null));
-            public static bool operator !=(Item leftSide, int rightSide) => (leftSide != new Item(rightSide, null));
-
-            public static bool operator ==(Item leftSide, bool rightSide) => (leftSide == new Item(rightSide, null));
-            public static bool operator !=(Item leftSide, bool rightSide) => (leftSide != new Item(rightSide, null));
-
-            public static bool operator !(Item leftSide)
-            {
-                if (leftSide.type == Type.BOOLEAN)
-                {
-                    return !leftSide.ValueBoolean;
-                }
-                throw new RuntimeException("Can't do ! operation with type " + leftSide.type.ToString());
-            }
-            public static bool operator |(Item leftSide, Item rightSide)
-            {
-                if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
-                {
-                    return (leftSide.ValueBoolean | rightSide.ValueBoolean);
-                }
-                throw new RuntimeException("Can't do | operation with type " + leftSide.type.ToString() + " and BOOLEAN");
-            }
-            public static bool operator &(Item leftSide, Item rightSide)
-            {
-                if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
-                {
-                    return (leftSide.ValueBoolean & rightSide.ValueBoolean);
-                }
-                throw new RuntimeException("Can't do & operation with type " + leftSide.type.ToString() + " and BOOLEAN");
-            }
-            public static bool operator ^(Item leftSide, Item rightSide)
-            {
-                if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
-                {
-                    return (leftSide.ValueBoolean ^ rightSide.ValueBoolean);
-                }
-                throw new RuntimeException("Can't do ^ operation with type " + leftSide.type.ToString() + " and BOOLEAN");
-            }
-
-            public static bool operator true(Item leftSide)
-            {
-                if (leftSide.type == Type.BOOLEAN)
-                {
-                    return leftSide.ValueBoolean;
-                }
-                throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
-            }
-            public static bool operator false(Item leftSide)
-            {
-                if (leftSide.type == Type.BOOLEAN)
-                {
-                    return leftSide.ValueBoolean;
-                }
-                throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
-            }
-
-            #endregion
-
-            public int GetRefIndex(int currentDepth = 0)
-            {
-                if (currentDepth >= MaxReferenceDepth)
-                { throw new RuntimeException("Reference depth exceeded"); }
-
-                if (IsReference)
-                {
-                    var x = stack.Get(ValueRef).GetRefIndex(currentDepth + 1);
-                    if (x == -1)
-                    { return ValueRef; }
-                    else
-                    { throw new RuntimeException("Reference not found"); }
-                }
-                else
-                { return -1; }
-            }
-
-            public string ToStringValue()
-            {
-                string retStr = type switch
-                {
-                    Type.INT => (IsReference ? "ref " : "") + ValueInt.ToString(),
-                    Type.FLOAT => (IsReference ? "ref " : "") + ValueFloat.ToString().Replace(',', '.'),
-                    Type.STRING => (IsReference ? "ref " : "") + ValueString,
-                    Type.BOOLEAN => (IsReference ? "ref " : "") + ValueBoolean.ToString(),
-                    Type.STRUCT => (IsReference ? "ref " : "") + "{ ... }",
-                    Type.LIST => (IsReference ? "ref " : "") + "[ ... ]",
-                    _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
-                };
-                return retStr;
-            }
-
-            public override string ToString()
-            {
-                string retStr = type switch
-                {
-                    Type.INT => IsReference ? $"ref <{ValueRef}>" : ValueInt.ToString(),
-                    Type.FLOAT => IsReference ? $"ref <{ValueRef}>" : ValueFloat.ToString().Replace(',', '.') + "f",
-                    Type.STRING => IsReference ? $"ref <{ValueRef}>" : $"\"{ValueString}\"",
-                    Type.BOOLEAN => IsReference ? $"ref <{ValueRef}>" : ValueBoolean.ToString(),
-                    Type.STRUCT => IsReference ? $"ref <{ValueRef}>" : $"{ValueStruct.GetType().Name} {{...}}",
-                    Type.LIST => IsReference ? $"ref <{ValueRef}>" : "[...]",
-                    _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
-                };
-                if (!string.IsNullOrEmpty(this.Tag))
-                {
-                    retStr = retStr + " #" + this.Tag;
-                }
-                return retStr;
-            }
-
-            public override int GetHashCode()
-            {
-                HashCode hash = new();
-                hash.Add(type);
-                hash.Add(valueInt);
-                hash.Add(valueFloat);
-                hash.Add(valueString);
-                hash.Add(valueBoolean);
-                hash.Add(valueStruct);
-                hash.Add(valueList);
-                hash.Add(valueRef);
-                hash.Add(IsReference);
-                return hash.ToHashCode();
-            }
-
-            public override bool Equals(object obj)
-            {
-                return obj is Item item &&
-                       type == item.type &&
-                       valueInt == item.valueInt &&
-                       valueFloat == item.valueFloat &&
-                       valueString == item.valueString &&
-                       valueBoolean == item.valueBoolean &&
-                       EqualityComparer<IStruct>.Default.Equals(valueStruct, item.valueStruct) &&
-                       EqualityComparer<List>.Default.Equals(valueList, item.valueList) &&
-                       valueRef == item.valueRef &&
-                       IsReference == item.IsReference;
-            }
-        }
-
-        public interface IStruct
-        {
-            public bool HaveField(string field);
-            public void SetField(string field, Item value);
-            public Item GetField(string field);
-        }
-
-        readonly List<Item> stack;
+        { stack = new List<DataItem>(); }
+        
+        readonly List<DataItem> stack;
         internal CentralProcessingUnit cpu;
 
         public void Destroy() => stack.Clear();
@@ -2161,21 +954,21 @@ namespace IngameCoding.Bytecode
         /// Gives the last item, and then remove
         /// </summary>
         /// <returns>The last item</returns>
-        public Item Pop()
+        public DataItem Pop()
         {
-            Item val = this.stack[^1];
+            DataItem val = this.stack[^1];
             this.stack.RemoveAt(this.stack.Count - 1);
             return val;
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(Item value)
+        public void Add(DataItem value)
         {
             var item = value;
             item.stack = this;
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(Item value, string tag)
+        public void Add(DataItem value, string tag)
         {
             var item = value;
             item.stack = this;
@@ -2183,49 +976,49 @@ namespace IngameCoding.Bytecode
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(int value, string tag = null) => Add(new Item(value, tag));
+        public void Add(int value, string tag = null) => Add(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(float value, string tag = null) => Add(new Item(value, tag));
+        public void Add(float value, string tag = null) => Add(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(string value, string tag = null) => Add(new Item(value, tag));
+        public void Add(string value, string tag = null) => Add(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(bool value, string tag = null) => Add(new Item(value, tag));
+        public void Add(bool value, string tag = null) => Add(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(IStruct value, string tag = null) => Add(new Item(value, tag));
+        public void Add(IStruct value, string tag = null) => Add(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
         public void Add(object value, string tag = null)
         {
             if (value is int @int)
             {
-                Add(new Item(@int, tag));
+                Add(new DataItem(@int, tag));
                 return;
             }
             else if (value is float @float)
             {
-                Add(new Item(@float, tag));
+                Add(new DataItem(@float, tag));
                 return;
             }
             else if (value is string @string)
             {
-                Add(new Item(@string, tag));
+                Add(new DataItem(@string, tag));
                 return;
             }
             else if (value is bool boolean)
             {
-                Add(new Item(boolean, tag));
+                Add(new DataItem(boolean, tag));
                 return;
             }
             else if (value is IStruct @struct)
             {
-                Add(new Item(@struct, tag));
+                Add(new DataItem(@struct, tag));
                 return;
             }
-            else if (value is Item.List list)
+            else if (value is DataItem.List list)
             {
-                Add(new Item(list, tag));
+                Add(new DataItem(list, tag));
                 return;
             }
-            else if (value is Item item)
+            else if (value is DataItem item)
             {
                 Add(item);
                 return;
@@ -2237,21 +1030,21 @@ namespace IngameCoding.Bytecode
         /// <returns>The number of items</returns>
         public int Count => this.stack.Count;
         /// <summary>Adds a list to the end</summary>
-        public void AddRange(List<Item> list) => AddRange(list.ToArray());
+        public void AddRange(List<DataItem> list) => AddRange(list.ToArray());
         /// <summary>Adds a list to the end</summary>
         public void AddRange(List<int> list)
         {
-            var newList = new List<Item>();
+            var newList = new List<DataItem>();
             for (int i = 0; i < list.Count; i++)
             {
-                newList.Add(new Item(list[i], null));
+                newList.Add(new DataItem(list[i], null));
             }
             AddRange(newList);
         }
         /// <summary>Adds an array to the end</summary>
-        public void AddRange(Item[] list)
+        public void AddRange(DataItem[] list)
         {
-            foreach (Item item in list)
+            foreach (DataItem item in list)
             {
                 Add(item);
             }
@@ -2259,19 +1052,19 @@ namespace IngameCoding.Bytecode
         /// <summary>Adds a list to the end</summary>
         public void AddRange(int[] list, string tag = "")
         {
-            var newList = new List<Item>();
+            var newList = new List<DataItem>();
             for (int i = 0; i < list.Length; i++)
             {
-                newList.Add(new Item(list[i], (tag.Length > 0) ? tag : null));
+                newList.Add(new DataItem(list[i], (tag.Length > 0) ? tag : null));
             }
             AddRange(newList);
         }
         /// <returns>The last item</returns>
-        public Item Last() => this.stack.Last();
+        public DataItem Last() => this.stack.Last();
         /// <summary>Sets a specific item's value</summary>
-        public void Set(int index, Item val, bool overrideTag = false)
+        public void Set(int index, DataItem val, bool overrideTag = false)
         {
-            Item item = val;
+            DataItem item = val;
             item.stack = this;
             if (!overrideTag)
             {
@@ -2280,25 +1073,1238 @@ namespace IngameCoding.Bytecode
             this.stack[index] = item;
         }
         /// <returns>A specific item</returns>
-        public Item Get(int index) => this.stack[index];
+        public DataItem Get(int index) => this.stack[index];
 
-        internal Item[] ToArray() => this.stack.ToArray();
+        internal DataItem[] ToArray() => this.stack.ToArray();
+
+        public DataItem this[int i]
+        {
+            get => this.stack[i];
+            set => this.stack[i] = value;
+        }
     }
     internal class HEAP
     {
-        Stack.Item[] heap;
+        readonly DataItem[] heap;
 
         internal HEAP(int size = 0)
         {
-            this.heap = new Stack.Item[size];
+            this.heap = new DataItem[size];
         }
 
         internal int Size => this.heap.Length;
-        internal Stack.Item this[int i]
+        internal DataItem this[int i]
         {
             get => heap[i];
             set => heap[i] = value;
         }
+    }
+
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public struct DataItem
+    {
+        const int MaxReferenceDepth = 16;
+
+        public class UnassignedStruct : IStruct
+        {
+            public bool HaveField(string field) => throw new RuntimeException("Struct is null");
+            public void SetField(string field, DataItem value) => throw new RuntimeException("Struct is null");
+            public DataItem GetField(string field) => throw new RuntimeException("Struct is null");
+
+            public override string ToString() => "struct {...}";
+        }
+
+        public class Struct : IStruct
+        {
+            internal readonly Dictionary<string, DataItem> fields = new();
+
+            public Struct(Dictionary<string, DataItem> fields)
+            {
+                this.fields = fields;
+            }
+
+            public bool HaveField(string field) => fields.ContainsKey(field);
+            public void SetField(string field, DataItem value) => fields[field] = value;
+            public DataItem GetField(string field) => fields[field];
+
+            public override string ToString() => "struct {...}";
+        }
+
+        public class List
+        {
+            public Type itemTypes;
+            public List<DataItem> items = new();
+
+            public List(Type type)
+            {
+                this.itemTypes = type;
+            }
+
+            internal void Add(DataItem newItem)
+            {
+                if (itemTypes == newItem.type)
+                {
+                    items.Add(newItem);
+                }
+                else
+                {
+                    throw new RuntimeException($"Wrong type ({newItem.type}) of item pushed to the list with type {itemTypes}");
+                }
+            }
+
+            internal void Add(DataItem newItem, int i)
+            {
+                if (itemTypes == newItem.type)
+                {
+                    items.Insert(i, newItem);
+                }
+                else
+                {
+                    throw new RuntimeException($"Wrong type ({newItem.type}) of item added to the list with type {itemTypes}");
+                }
+            }
+
+            internal void Remove()
+            {
+                if (items.Count > 0)
+                {
+                    items.RemoveAt(items.Count - 1);
+                }
+            }
+
+            internal void Remove(int i)
+            {
+                items.RemoveAt(i);
+            }
+
+            public override string ToString()
+            {
+                return $"[{(int)itemTypes}]";
+            }
+
+            public List(string raw)
+            {
+                var num = raw[1..^1];
+                this.itemTypes = (Type)int.Parse(num);
+            }
+        }
+
+        public enum Type
+        {
+            INT,
+            FLOAT,
+            STRING,
+            BOOLEAN,
+            STRUCT,
+            LIST,
+            RUNTIME,
+        }
+
+        public Type type;
+
+        #region Value Fields
+
+        int? valueInt;
+        float? valueFloat;
+        string valueString;
+        bool? valueBoolean;
+        IStruct valueStruct;
+        List valueList;
+        int? valueRef;
+
+        #endregion
+
+        bool IsReference;
+
+        public Stack stack;
+
+        #region Value Properties
+
+        public int ValueInt
+        {
+            get
+            {
+                if (type == Type.INT)
+                { return GetRef().valueInt.Value; }
+
+                throw new RuntimeException("Can't cast " + type.ToString() + " to INT");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public float ValueFloat
+        {
+            get
+            {
+                if (type == Type.FLOAT)
+                {
+                    return valueFloat.Value;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString() + " to FLOAT");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public string ValueString
+        {
+            get
+            {
+                if (type == Type.STRING)
+                {
+                    return valueString;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString() + " to STRING");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public bool ValueBoolean
+        {
+            get
+            {
+                if (type == Type.BOOLEAN)
+                {
+                    return valueBoolean.Value;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString() + " to BOOLEAN");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public IStruct ValueStruct
+        {
+            get
+            {
+                if (type == Type.STRUCT)
+                {
+                    return valueStruct;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString() + " to STRUCT");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public List ValueList
+        {
+            get
+            {
+                if (type == Type.LIST)
+                {
+                    return valueList;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString() + " to LIST");
+            }
+            set
+            {
+                SetRef(value);
+            }
+        }
+        public int ValueRef
+        {
+            get
+            {
+                if (IsReference) return valueRef.Value;
+                throw new RuntimeException("Can't cast " + type.ToString() + " to REF");
+            }
+            set
+            {
+                this.IsReference = true;
+
+                this.valueInt = null;
+                this.valueFloat = null;
+                this.valueString = null;
+                this.valueBoolean = null;
+                this.valueStruct = null;
+                this.valueList = null;
+                this.valueRef = value;
+            }
+        }
+
+        #endregion
+
+        #region Get/Set Ref
+
+        DataItem GetRef(int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                return stack.Get(ValueRef).GetRef(currentDepth + 1);
+            }
+            else
+            {
+                return this;
+            }
+        }
+        void SetRef(int value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.INT;
+                this.valueInt = value;
+                this.valueFloat = null;
+                this.valueString = null;
+                this.valueBoolean = null;
+                this.valueStruct = null;
+                this.valueList = null;
+                this.valueRef = null;
+            }
+        }
+        void SetRef(float value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.FLOAT;
+                this.valueInt = null;
+                this.valueFloat = value;
+                this.valueString = null;
+                this.valueBoolean = null;
+                this.valueStruct = null;
+                this.valueList = null;
+                this.valueRef = null;
+            }
+        }
+        void SetRef(string value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.STRING;
+                this.valueInt = null;
+                this.valueFloat = null;
+                this.valueString = value;
+                this.valueBoolean = null;
+                this.valueStruct = null;
+                this.valueList = null;
+                this.valueRef = null;
+            }
+        }
+        void SetRef(bool value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.BOOLEAN;
+                this.valueInt = null;
+                this.valueFloat = null;
+                this.valueString = null;
+                this.valueBoolean = value;
+                this.valueStruct = null;
+                this.valueList = null;
+                this.valueRef = null;
+            }
+        }
+        void SetRef(IStruct value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.STRUCT;
+                this.valueInt = null;
+                this.valueFloat = null;
+                this.valueString = null;
+                this.valueBoolean = null;
+                this.valueStruct = value;
+                this.valueList = null;
+                this.valueRef = null;
+            }
+        }
+        void SetRef(List value, int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                stack[ValueRef].SetRef(value, currentDepth + 1);
+            }
+            else
+            {
+                this.type = Type.LIST;
+                this.valueInt = null;
+                this.valueFloat = null;
+                this.valueString = null;
+                this.valueBoolean = null;
+                this.valueStruct = null;
+                this.valueList = value;
+                this.valueRef = null;
+            }
+        }
+
+        #endregion
+
+        /// <summary>Only for debugging</summary>
+        public string Tag { get; internal set; }
+
+        #region Constructors
+
+        public DataItem(int value, string tag)
+        {
+            this.type = Type.INT;
+
+            this.IsReference = false;
+
+            this.valueInt = value;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(float value, string tag)
+        {
+            this.type = Type.FLOAT;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = value;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(string value, string tag)
+        {
+            this.type = Type.STRING;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = value;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(bool value, string tag)
+        {
+            this.type = Type.BOOLEAN;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = value;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(IStruct value, string tag)
+        {
+            this.type = Type.STRUCT;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = value;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(List value, string tag)
+        {
+            this.type = Type.LIST;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = value;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(BBCode.TypeToken type1, string tag)
+        {
+            this.type = Type.INT;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            switch (type1.typeName)
+            {
+                case BBCode.BuiltinType.INT:
+                    this.type = Type.INT;
+                    this.valueInt = 0;
+                    break;
+                case BBCode.BuiltinType.FLOAT:
+                    this.type = Type.FLOAT;
+                    this.valueFloat = 0f;
+                    break;
+                case BBCode.BuiltinType.STRING:
+                    this.type = Type.STRING;
+                    this.valueString = "";
+                    break;
+                case BBCode.BuiltinType.BOOLEAN:
+                    this.type = Type.BOOLEAN;
+                    this.valueBoolean = false;
+                    break;
+                case BBCode.BuiltinType.STRUCT:
+                    // TODO: Ezt tesztelni:
+                    this.type = Type.STRUCT;
+                    this.valueStruct = new UnassignedStruct();
+                    break;
+            }
+
+            this.stack = null;
+
+            this.Tag = tag;
+        }
+        public DataItem(object value, string tag)
+        {
+            this.type = Type.INT;
+
+            this.IsReference = false;
+
+            this.valueInt = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+            this.valueRef = null;
+
+            this.stack = null;
+
+            this.Tag = tag;
+
+            if (value is int a)
+            {
+                this.type = Type.INT;
+                this.valueInt = a;
+            }
+            else if (value is float b)
+            {
+                this.type = Type.FLOAT;
+                this.valueFloat = b;
+            }
+            else if (value is string c)
+            {
+                this.type = Type.STRING;
+                this.valueString = c;
+            }
+            else if (value is bool d)
+            {
+                this.type = Type.BOOLEAN;
+                this.valueBoolean = d;
+            }
+            else if (value is IStruct e)
+            {
+                this.type = Type.STRUCT;
+                this.valueStruct = e;
+            }
+            else if (value is List f)
+            {
+                this.type = Type.LIST;
+                this.ValueList = f;
+            }
+            else
+            {
+                throw new Errors.Exception($"Unknown type {value.GetType().FullName}", new Position(-1));
+            }
+        }
+
+        #endregion
+
+        #region TrySet()
+
+        public DataItem TrySet(DataItem value)
+        {
+            switch (type)
+            {
+                case Type.INT:
+                    switch (value.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(value.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(Math.Round(value.ValueFloat), null);
+                        case Type.STRING:
+                            return new DataItem(int.Parse(value.ValueString), null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (value.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(value.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(value.ValueFloat, null);
+                    }
+                    break;
+                case Type.STRING:
+                    switch (value.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(value.ValueInt.ToString(), null);
+                        case Type.FLOAT:
+                            return new DataItem(value.ValueFloat.ToString(), null);
+                        case Type.STRING:
+                            return new DataItem(value.ValueString, null);
+                        case Type.BOOLEAN:
+                            return new DataItem(value.ValueBoolean.ToString(), null);
+                    }
+                    break;
+                case Type.BOOLEAN:
+                    switch (value.type)
+                    {
+                        case Type.BOOLEAN:
+                            return new DataItem(value.ValueBoolean, null);
+                    }
+                    break;
+                case Type.STRUCT:
+                    switch (value.type)
+                    {
+                        case Type.STRUCT:
+                            return new DataItem(value.ValueStruct, null);
+                    }
+                    break;
+                case Type.LIST:
+                    switch (value.type)
+                    {
+                        case Type.LIST:
+                            return new DataItem(value.ValueList, null);
+                    }
+                    break;
+                case Type.RUNTIME:
+                    return value;
+            }
+            throw new RuntimeException("Can't cast from " + value.type.ToString() + " to " + type.ToString());
+        }
+        public DataItem TrySet(int value)
+        {
+            return type switch
+            {
+                Type.INT => new DataItem(value, null),
+                Type.FLOAT => new DataItem(value, null),
+                Type.STRING => new DataItem(value.ToString(), null),
+                _ => throw new RuntimeException("Can't cast from " + "INT" + " to " + type.ToString()),
+            };
+        }
+        public DataItem TrySet(float value)
+        {
+            return type switch
+            {
+                Type.INT => new DataItem(Math.Round(value), null),
+                Type.FLOAT => new DataItem(value, null),
+                Type.STRING => new DataItem(value.ToString(), null),
+                _ => throw new RuntimeException("Can't cast from " + "FLOAT" + " to " + type.ToString()),
+            };
+        }
+        public DataItem TrySet(bool value)
+        {
+            return type switch
+            {
+                Type.STRING => new DataItem(value.ToString(), null),
+                Type.BOOLEAN => new DataItem(value, null),
+                _ => throw new RuntimeException("Can't cast from " + "BOOLEAN" + " to " + type.ToString()),
+            };
+        }
+        public DataItem TrySet(string value)
+        {
+            return type switch
+            {
+                Type.STRING => new DataItem(value, null),
+                Type.INT => new DataItem(int.Parse(value), null),
+                _ => throw new RuntimeException("Can't cast from " + "STRING" + " to " + type.ToString()),
+            };
+        }
+        public DataItem TrySet(IStruct value)
+        {
+            return type switch
+            {
+                Type.STRUCT => new DataItem(value, null),
+                _ => throw new RuntimeException("Can't cast from " + "STRUCT" + " to " + type.ToString()),
+            };
+        }
+        public DataItem TrySet(List value)
+        {
+            return type switch
+            {
+                Type.LIST => new DataItem(value, null),
+                _ => throw new RuntimeException("Can't cast from " + "LIST" + " to " + type.ToString()),
+            };
+        }
+
+        #endregion
+
+        #region Operators
+
+        public static DataItem operator +(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueInt + rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueInt + rightSide.ValueFloat, null);
+                        case Type.STRING:
+                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueFloat + rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueFloat + rightSide.ValueFloat, null);
+                        case Type.STRING:
+                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
+                    }
+                    break;
+                case Type.STRING:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
+                        case Type.STRING:
+                            return new DataItem(leftSide.ValueString + rightSide.ValueString, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do + operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static DataItem operator -(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueInt - rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueInt - rightSide.ValueFloat, null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueFloat - rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueFloat - rightSide.ValueFloat, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do - operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
+        public static DataItem operator *(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueInt * rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueInt * rightSide.ValueFloat, null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueFloat * rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueFloat * rightSide.ValueFloat, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do * operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static DataItem operator /(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueInt / rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueInt / rightSide.ValueFloat, null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueFloat / rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueFloat / rightSide.ValueFloat, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do / operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static DataItem operator %(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueInt % rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueInt % rightSide.ValueFloat, null);
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return new DataItem(leftSide.ValueFloat % rightSide.ValueInt, null);
+                        case Type.FLOAT:
+                            return new DataItem(leftSide.ValueFloat % rightSide.ValueFloat, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do % operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
+        public static bool operator <(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt < rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt < rightSide.ValueFloat;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat < rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat < rightSide.ValueFloat;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do < operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static bool operator >(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt > rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt > rightSide.ValueFloat;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat > rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat > rightSide.ValueFloat;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do > operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
+        public static bool operator <=(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt <= rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt <= rightSide.ValueFloat;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat <= rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat <= rightSide.ValueFloat;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do <= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static bool operator >=(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt >= rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt >= rightSide.ValueFloat;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat >= rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat >= rightSide.ValueFloat;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do >= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
+        public static bool operator ==(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt == rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt == rightSide.ValueFloat;
+                        case Type.STRING:
+                            return leftSide.ValueInt.ToString() == rightSide.ValueString;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat == rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat == rightSide.ValueFloat;
+                        case Type.STRING:
+                            return leftSide.ValueFloat.ToString() == rightSide.ValueString;
+                    }
+                    break;
+                case Type.STRING:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueString == rightSide.ValueInt.ToString();
+                        case Type.FLOAT:
+                            return leftSide.ValueString == rightSide.ValueFloat.ToString();
+                        case Type.STRING:
+                            return leftSide.ValueString == rightSide.ValueString;
+                    }
+                    break;
+                case Type.BOOLEAN:
+                    if (rightSide.type == Type.BOOLEAN)
+                    {
+                        return leftSide.ValueBoolean == rightSide.ValueBoolean;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do == operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static bool operator !=(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case Type.INT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueInt != rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueInt != rightSide.ValueFloat;
+                        case Type.STRING:
+                            return leftSide.ValueInt.ToString() != rightSide.ValueString;
+                    }
+                    break;
+                case Type.FLOAT:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueFloat != rightSide.ValueInt;
+                        case Type.FLOAT:
+                            return leftSide.ValueFloat != rightSide.ValueFloat;
+                        case Type.STRING:
+                            return leftSide.ValueFloat.ToString() != rightSide.ValueString;
+                    }
+                    break;
+                case Type.STRING:
+                    switch (rightSide.type)
+                    {
+                        case Type.INT:
+                            return leftSide.ValueString != rightSide.ValueInt.ToString();
+                        case Type.FLOAT:
+                            return leftSide.ValueString != rightSide.ValueFloat.ToString();
+                        case Type.STRING:
+                            return leftSide.ValueString != rightSide.ValueString;
+                    }
+                    break;
+                case Type.BOOLEAN:
+                    if (rightSide.type == Type.BOOLEAN)
+                    {
+                        return leftSide.ValueBoolean != rightSide.ValueBoolean;
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do != operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
+        public static bool operator ==(DataItem leftSide, int rightSide) => (leftSide == new DataItem(rightSide, null));
+        public static bool operator !=(DataItem leftSide, int rightSide) => (leftSide != new DataItem(rightSide, null));
+
+        public static bool operator ==(DataItem leftSide, bool rightSide) => (leftSide == new DataItem(rightSide, null));
+        public static bool operator !=(DataItem leftSide, bool rightSide) => (leftSide != new DataItem(rightSide, null));
+
+        public static bool operator !(DataItem leftSide)
+        {
+            if (leftSide.type == Type.BOOLEAN)
+            {
+                return !leftSide.ValueBoolean;
+            }
+            throw new RuntimeException("Can't do ! operation with type " + leftSide.type.ToString());
+        }
+        public static bool operator |(DataItem leftSide, DataItem rightSide)
+        {
+            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            {
+                return (leftSide.ValueBoolean | rightSide.ValueBoolean);
+            }
+            throw new RuntimeException("Can't do | operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+        }
+        public static bool operator &(DataItem leftSide, DataItem rightSide)
+        {
+            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            {
+                return (leftSide.ValueBoolean & rightSide.ValueBoolean);
+            }
+            throw new RuntimeException("Can't do & operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+        }
+        public static bool operator ^(DataItem leftSide, DataItem rightSide)
+        {
+            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            {
+                return (leftSide.ValueBoolean ^ rightSide.ValueBoolean);
+            }
+            throw new RuntimeException("Can't do ^ operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+        }
+
+        public static bool operator true(DataItem leftSide)
+        {
+            if (leftSide.type == Type.BOOLEAN)
+            {
+                return leftSide.ValueBoolean;
+            }
+            throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
+        }
+        public static bool operator false(DataItem leftSide)
+        {
+            if (leftSide.type == Type.BOOLEAN)
+            {
+                return leftSide.ValueBoolean;
+            }
+            throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
+        }
+
+        #endregion
+
+        public int GetRefIndex(int currentDepth = 0)
+        {
+            if (currentDepth >= MaxReferenceDepth)
+            { throw new RuntimeException("Reference depth exceeded"); }
+
+            if (IsReference)
+            {
+                var x = stack.Get(ValueRef).GetRefIndex(currentDepth + 1);
+                if (x == -1)
+                { return ValueRef; }
+                else
+                { throw new RuntimeException("Reference not found"); }
+            }
+            else
+            { return -1; }
+        }
+
+        public string ToStringValue()
+        {
+            string retStr = type switch
+            {
+                Type.INT => (IsReference ? "ref " : "") + ValueInt.ToString(),
+                Type.FLOAT => (IsReference ? "ref " : "") + ValueFloat.ToString().Replace(',', '.'),
+                Type.STRING => (IsReference ? "ref " : "") + ValueString,
+                Type.BOOLEAN => (IsReference ? "ref " : "") + ValueBoolean.ToString(),
+                Type.STRUCT => (IsReference ? "ref " : "") + "{ ... }",
+                Type.LIST => (IsReference ? "ref " : "") + "[ ... ]",
+                _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
+            };
+            return retStr;
+        }
+
+        public override string ToString()
+        {
+            string retStr = type switch
+            {
+                Type.INT => IsReference ? $"ref <{ValueRef}>" : ValueInt.ToString(),
+                Type.FLOAT => IsReference ? $"ref <{ValueRef}>" : ValueFloat.ToString().Replace(',', '.') + "f",
+                Type.STRING => IsReference ? $"ref <{ValueRef}>" : $"\"{ValueString}\"",
+                Type.BOOLEAN => IsReference ? $"ref <{ValueRef}>" : ValueBoolean.ToString(),
+                Type.STRUCT => IsReference ? $"ref <{ValueRef}>" : $"{ValueStruct.GetType().Name} {{...}}",
+                Type.LIST => IsReference ? $"ref <{ValueRef}>" : "[...]",
+                _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
+            };
+            if (!string.IsNullOrEmpty(this.Tag))
+            {
+                retStr = retStr + " #" + this.Tag;
+            }
+            return retStr;
+        }
+
+        public override int GetHashCode()
+        {
+            HashCode hash = new();
+            hash.Add(type);
+            hash.Add(valueInt);
+            hash.Add(valueFloat);
+            hash.Add(valueString);
+            hash.Add(valueBoolean);
+            hash.Add(valueStruct);
+            hash.Add(valueList);
+            hash.Add(valueRef);
+            hash.Add(IsReference);
+            return hash.ToHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is DataItem item &&
+                   type == item.type &&
+                   valueInt == item.valueInt &&
+                   valueFloat == item.valueFloat &&
+                   valueString == item.valueString &&
+                   valueBoolean == item.valueBoolean &&
+                   EqualityComparer<IStruct>.Default.Equals(valueStruct, item.valueStruct) &&
+                   EqualityComparer<List>.Default.Equals(valueList, item.valueList) &&
+                   valueRef == item.valueRef &&
+                   IsReference == item.IsReference;
+        }
+    }
+
+    public interface IStruct
+    {
+        public bool HaveField(string field);
+        public void SetField(string field, DataItem value);
+        public DataItem GetField(string field);
     }
 
     public struct BytecodeInterpreterSettings
@@ -2319,11 +2325,11 @@ namespace IngameCoding.Bytecode
     {
         internal class InterpeterDetails
         {
-            BytecodeInterpeter bytecodeInterpeter;
+            readonly BytecodeInterpeter bytecodeInterpeter;
             public int CodePointer => bytecodeInterpeter.CPU.CodePointer;
             public int BasePointer => bytecodeInterpeter.CPU.MU.BasePointer;
             public int[] ReturnAddressStack => bytecodeInterpeter.CPU.MU.ReturnAddressStack.ToArray();
-            public Stack.Item[] Stack => bytecodeInterpeter.CPU.MU.Stack.ToArray();
+            public DataItem[] Stack => bytecodeInterpeter.CPU.MU.Stack.ToArray();
             public int StackMemorySize => bytecodeInterpeter.CPU.MU.Stack.UsedVirtualMemory;
 
             public InterpeterDetails(BytecodeInterpeter bytecodeInterpeter)
@@ -2488,7 +2494,7 @@ namespace IngameCoding.Bytecode
             ExecuteNext();
         }
 
-        public void AddValueToStack(Stack.Item value)
+        public void AddValueToStack(DataItem value)
         {
             if (destroyed) return;
             CPU.MU.Stack.Add(value);

@@ -98,8 +98,8 @@ namespace ConsoleGUI
             Console.CursorVisible = false;
         }
 
-        [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern SafeFileHandle CreateFile(
+        [DllImport("Kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        internal static extern SafeFileHandle CreateFile(
             string fileName,
             [MarshalAs(UnmanagedType.U4)] uint fileAccess,
             [MarshalAs(UnmanagedType.U4)] uint fileShare,
@@ -109,7 +109,7 @@ namespace ConsoleGUI
             IntPtr template);
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        public static extern bool WriteConsoleOutputW(
+        internal static extern bool WriteConsoleOutputW(
           SafeFileHandle hConsoleOutput,
           CharInfo[] lpBuffer,
           Coord dwBufferSize,
@@ -246,13 +246,13 @@ namespace ConsoleGUI
 
         public static class ConsoleListener
         {
-            public static event ConsoleMouseEvent MouseEvent;
+            internal static event ConsoleMouseEvent MouseEvent;
 
-            public static event ConsoleKeyEvent KeyEvent;
+            internal static event ConsoleKeyEvent KeyEvent;
 
-            public static event ConsoleWindowBufferSizeEvent WindowBufferSizeEvent;
+            internal static event ConsoleWindowBufferSizeEvent WindowBufferSizeEvent;
 
-            private static bool Run = false;
+            private static bool Run;
 
 
             public static void Start()
@@ -296,18 +296,17 @@ namespace ConsoleGUI
             public static void Stop() => Run = false;
 
 
-            public delegate void ConsoleMouseEvent(MOUSE_EVENT_RECORD r);
+            internal delegate void ConsoleMouseEvent(MOUSE_EVENT_RECORD r);
 
-            public delegate void ConsoleKeyEvent(KEY_EVENT_RECORD r);
+            internal delegate void ConsoleKeyEvent(KEY_EVENT_RECORD r);
 
-            public delegate void ConsoleWindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r);
-
+            internal delegate void ConsoleWindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r);
         }
 
 
         public static class NativeMethods
         {
-            public struct COORD
+            internal struct COORD
             {
                 public short X;
                 public short Y;
@@ -320,7 +319,7 @@ namespace ConsoleGUI
             }
 
             [StructLayout(LayoutKind.Explicit)]
-            public struct INPUT_RECORD
+            internal struct INPUT_RECORD
             {
                 public const ushort KEY_EVENT = 0x0001,
                     MOUSE_EVENT = 0x0002,
@@ -341,7 +340,7 @@ namespace ConsoleGUI
                  */
             }
 
-            public struct MOUSE_EVENT_RECORD
+            internal struct MOUSE_EVENT_RECORD
             {
                 public COORD dwMousePosition;
 
@@ -371,7 +370,7 @@ namespace ConsoleGUI
             }
 
             [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
-            public struct KEY_EVENT_RECORD
+            internal struct KEY_EVENT_RECORD
             {
                 [FieldOffset(0)]
                 public bool bKeyDown;
@@ -399,37 +398,37 @@ namespace ConsoleGUI
                 public uint dwControlKeyState;
             }
 
-            public struct WINDOW_BUFFER_SIZE_RECORD
+            internal struct WINDOW_BUFFER_SIZE_RECORD
             {
                 public COORD dwSize;
             }
 
-            public const uint STD_INPUT_HANDLE = unchecked((uint)-10),
+            internal const uint STD_INPUT_HANDLE = unchecked((uint)-10),
                 STD_OUTPUT_HANDLE = unchecked((uint)-11),
                 STD_ERROR_HANDLE = unchecked((uint)-12);
 
             [DllImport("kernel32.dll")]
-            public static extern IntPtr GetStdHandle(uint nStdHandle);
+            internal static extern IntPtr GetStdHandle(uint nStdHandle);
 
 
-            public const uint ENABLE_MOUSE_INPUT = 0x0010,
+            internal const uint ENABLE_MOUSE_INPUT = 0x0010,
                 ENABLE_QUICK_EDIT_MODE = 0x0040,
                 ENABLE_EXTENDED_FLAGS = 0x0080,
                 ENABLE_ECHO_INPUT = 0x0004,
                 ENABLE_WINDOW_INPUT = 0x0008; //more
 
             [DllImportAttribute("kernel32.dll")]
-            public static extern bool GetConsoleMode(IntPtr hConsoleInput, ref uint lpMode);
+            internal static extern bool GetConsoleMode(IntPtr hConsoleInput, ref uint lpMode);
 
             [DllImportAttribute("kernel32.dll")]
-            public static extern bool SetConsoleMode(IntPtr hConsoleInput, uint dwMode);
+            internal static extern bool SetConsoleMode(IntPtr hConsoleInput, uint dwMode);
 
 
             [DllImportAttribute("kernel32.dll", CharSet = CharSet.Unicode)]
-            public static extern bool ReadConsoleInput(IntPtr hConsoleInput, [Out] INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsRead);
+            internal static extern bool ReadConsoleInput(IntPtr hConsoleInput, [Out] INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsRead);
 
             [DllImportAttribute("kernel32.dll", CharSet = CharSet.Unicode)]
-            public static extern bool WriteConsoleInput(IntPtr hConsoleInput, INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsWritten);
+            internal static extern bool WriteConsoleInput(IntPtr hConsoleInput, INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsWritten);
 
         }
     }

@@ -8,7 +8,7 @@ namespace ConsoleGUI
     {
         internal Rectangle Rect;
 
-        internal Character[] DrawBuffer = new Character[0];
+        internal Character[] DrawBuffer = System.Array.Empty<Character>();
 
         internal virtual Character OnDrawContent(int X, int Y)
         {

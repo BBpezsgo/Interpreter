@@ -14,15 +14,18 @@
     <Title>BBCode Interpreter</Title>
     <Authors>BB</Authors>
     <Product>BBCode Interpreter</Product>
+    <AnalysisLevel>latest-Recommended</AnalysisLevel>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DebugType>none</DebugType>
-    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+	  <DebugType>none</DebugType>
+	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

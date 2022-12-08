@@ -262,7 +262,7 @@ namespace IngameCoding.BBCode.Compiler
         public static CompilerResult CompileCode(
             ParserResult parserResult,
             Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, Func<Stack.IStruct>> builtinStructs,
+            Dictionary<string, Func<IStruct>> builtinStructs,
             DirectoryInfo namespacesFolder,
             List<Warning> warnings,
             CompilerSettings settings,

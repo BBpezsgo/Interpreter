@@ -1,0 +1,19 @@
+﻿using System;
+
+struct Foo
+{
+  int v;
+}
+
+[CodeEntry]
+void Start()
+{
+  Foo foo = new Foo;
+  foo.Func();
+  Console.Log(foo.v);
+}
+
+void Func(this Foo p)
+{
+  p.v = 5;
+}

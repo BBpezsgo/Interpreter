@@ -2,6 +2,11 @@ namespace Console
 {
   [Builtin("conlog")]
   void Log(string message);
+
+  void Log(int message)
+  {
+    Log(message.ToString());
+  }
   
   [Builtin("conerr")]
   void LogError(string message);

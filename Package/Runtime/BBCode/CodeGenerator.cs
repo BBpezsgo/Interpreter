@@ -24,6 +24,16 @@ namespace IngameCoding.BBCode.Compiler
             "type",
         };
 
+        static readonly string[] Keywords = new string[]
+        {
+            "int",
+            "struct",
+            "bool",
+            "string",
+            "float",
+            "void"
+        };
+
         #region Fields
 
         bool BlockCodeGeneration = false;
@@ -893,7 +903,7 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             if (!GetFunctionOffset(functionCall, out var functionCallOffset))
-            { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall)); }
+            { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray())); }
 
             AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
 
@@ -1036,7 +1046,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             if (!GetFunctionOffset(structMethodCall, out var functionCallOffset))
                             {
-                                undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, structMethodCall));
+                                undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, structMethodCall, parameters.ToArray(), compiledVariables.ToArray()));
                             }
                             AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
                             AddInstruction(Opcode.POP_VALUE);
@@ -1596,6 +1606,9 @@ namespace IngameCoding.BBCode.Compiler
 
             if (st is Statement_NewVariable newVariable)
             {
+                if (Keywords.Contains(newVariable.variableName))
+                { throw new ParserException($"Illegal variable name '{newVariable.variableName}'", st.position); }
+                
                 switch (newVariable.type.typeName)
                 {
                     case BuiltinType.INT:
@@ -1678,7 +1691,7 @@ namespace IngameCoding.BBCode.Compiler
                                 if (newStruct.structName == newVariable.type.text)
                                 { GenerateCodeForStatement(newStruct); }
                                 else
-                                { throw new ParserException("Can't cast " + newStruct.structName + " to " + newVariable.type.text, new Position(newStruct.position.Line)); }
+                                { throw new ParserException("Can't cast " + newStruct.structName + " to " + newVariable.type.text, newStruct.position); }
                             }
                         }
                         compiledGlobalVariables.Add(newVariable.variableName, new CompiledVariable(variableCount, newVariable.type.text, newVariable.type.isList));
@@ -1714,6 +1727,9 @@ namespace IngameCoding.BBCode.Compiler
 
             if (st is Statement_NewVariable newVariable)
             {
+                if (Keywords.Contains(newVariable.variableName))
+                { throw new ParserException($"Illegal variable name '{newVariable.variableName}'", st.position); }
+
                 switch (newVariable.type.typeName)
                 {
                     case BuiltinType.INT:
@@ -1809,7 +1825,7 @@ namespace IngameCoding.BBCode.Compiler
                                 }
                                 else
                                 {
-                                    throw new ParserException("Can't cast " + literal.structName + " to " + newVariable.type.text, new Position(literal.position.Line));
+                                    throw new ParserException("Can't cast " + literal.structName + " to " + newVariable.type.text, literal.position);
                                 }
                             }
                         }
@@ -1853,7 +1869,7 @@ namespace IngameCoding.BBCode.Compiler
                     case BuiltinType.VOID:
                     case BuiltinType.ANY:
                     default:
-                        throw new ParserException($"Unknown variable type '{newVariable.type.typeName}'", new Position(newVariable.position.Line));
+                        throw new ParserException($"Unknown variable type '{newVariable.type.typeName}'", newVariable.type);
                 }
             }
 
@@ -1872,6 +1888,9 @@ namespace IngameCoding.BBCode.Compiler
 
         void GenerateCodeForFunction(KeyValuePair<string, FunctionDefinition> function, bool isMethod)
         {
+            if (Keywords.Contains(function.Value.Name))
+            { throw new ParserException($"Illegal function name '{function.Value.Name}'"); }
+
             this.isStructMethod = isMethod;
 
             if (GetFunctionInfo(function, isMethod).IsBuiltin) return;
@@ -1938,7 +1957,10 @@ namespace IngameCoding.BBCode.Compiler
 
         void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<Stack.IStruct>> builtinStructs)
         {
-            if (compiledFunctions.ContainsKey(@struct.Value.FullName))
+            if (Keywords.Contains(@struct.Key))
+            { throw new ParserException($"Illegal struct name '{@struct.Value.FullName}'"); }
+
+            if (compiledStructs.ContainsKey(@struct.Value.FullName))
             { throw new ParserException($"Struct with name '{@struct.Value.FullName}' already exist"); }
 
             Dictionary<string, AttributeValues> attributes = new();
@@ -2241,8 +2263,6 @@ namespace IngameCoding.BBCode.Compiler
                         parameters.Add(parameter.name, new Parameter(-1, parameter.name, parameter.withRefKeyword, -1, parameter.type.ToString()));
                     }
 
-
-
                     AnalyzeStatements(f.Value.statements);
 
                     parameters.Clear();
@@ -2279,6 +2299,8 @@ namespace IngameCoding.BBCode.Compiler
             Compiler.CompilerSettings settings,
             Action<string, TerminalInterpreter.LogType> printCallback = null)
         {
+            BlockCodeGeneration = true;
+
             this.AddCommentsToCode = settings.GenerateComments;
             this.compiledStructs = new();
             this.compiledGlobalVariables = new();
@@ -2286,6 +2308,17 @@ namespace IngameCoding.BBCode.Compiler
             this.compiledCode = new();
             this.builtinFunctions = builtinFunctions;
             this.OptimizeCode = !settings.DontOptimize;
+
+            #region Compile Structs
+
+            BlockCodeGeneration = false;
+
+            foreach (var @struct in structs)
+            { GenerateCodeForStruct(@struct, builtinStructs); }
+
+            BlockCodeGeneration = true;
+
+            #endregion
 
             int iterations = settings.RemoveUnusedFunctionsMaxIterations;
 
@@ -2300,9 +2333,6 @@ namespace IngameCoding.BBCode.Compiler
             #region Code Generation
 
             BlockCodeGeneration = false;
-
-            foreach (var @struct in structs)
-            { GenerateCodeForStruct(@struct, builtinStructs); }
 
             var setGlobalVariablesInstruction = compiledCode.Count;
             AddInstruction(Opcode.COMMENT, "Global variables");
@@ -2333,10 +2363,18 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var item in undefinedFunctionOffsets)
             {
+                foreach (var pair in item.currentParameters)
+                { parameters.Add(pair.Key, pair.Value); }
+                foreach (var pair in item.currentVariables)
+                { compiledVariables.Add(pair.Key, pair.Value); }
+
                 if (GetFunctionOffset(item.functionCallStatement, out var functionCallOffset))
                 { compiledCode[item.callInstructionIndex].parameter = functionCallOffset - item.callInstructionIndex; }
                 else
                 { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName}' offset not found"); }
+
+                parameters.Clear();
+                compiledVariables.Clear();
             }
 
             return new CodeGeneratorResult()

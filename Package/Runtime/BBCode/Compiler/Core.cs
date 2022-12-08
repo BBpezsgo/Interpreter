@@ -63,7 +63,8 @@ namespace IngameCoding.BBCode.Compiler
             for (int i = 0; i < function.parameters.Count; i++)
             {
                 var param = function.parameters[i];
-                result += "," + param.type.typeName.ToString().ToLower() + (param.type.isList ? "[]" : "");
+                var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
+                result += "," + paramType + (param.type.isList ? "[]" : "");
             }
             return result;
         }
@@ -73,11 +74,21 @@ namespace IngameCoding.BBCode.Compiler
     {
         public int callInstructionIndex;
         public Statement_FunctionCall functionCallStatement;
+        public Dictionary<string, Parameter> currentParameters;
+        public Dictionary<string, CompiledVariable> currentVariables;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement)
+        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, KeyValuePair<string, Parameter>[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables)
         {
             this.callInstructionIndex = callInstructionIndex;
             this.functionCallStatement = functionCallStatement;
+
+            this.currentParameters = new();
+            this.currentVariables = new();
+
+            foreach (var item in currentParameters)
+            { this.currentParameters.Add(item.Key, item.Value); }
+            foreach (var item in currentVariables)
+            { this.currentVariables.Add(item.Key, item.Value); }
         }
     }
 

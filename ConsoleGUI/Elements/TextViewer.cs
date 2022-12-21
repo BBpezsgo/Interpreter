@@ -6,7 +6,7 @@ namespace ConsoleGUI
     internal class TextViewer : BaseWindowElement
     {
         public string Text;
-        int Scroll = 0;
+        int Scroll;
         Character[] buf;
 
         public TextViewer() : base()
@@ -14,12 +14,7 @@ namespace ConsoleGUI
             ClearBuffer();
         }
 
-        bool first = true;
-
-        void ClearBuffer()
-        {
-            buf = new Character[Rect.Width * Rect.Height];
-        }
+        void ClearBuffer() => buf = new Character[Rect.Width * Rect.Height];
 
         internal override void BeforeDraw()
         {
@@ -102,7 +97,7 @@ namespace ConsoleGUI
             Final:
 
                 BufferIndex++;
-                if (BufferIndex >= buf.Length) { first = false; return; }
+                if (BufferIndex >= buf.Length) { return; }
 
                 AddSpace(Rect.Width - 2);
 
@@ -124,8 +119,6 @@ namespace ConsoleGUI
                     }
                 }
             }
-
-            first = false;
         }
 
         internal override Character OnDrawContent(int X, int Y) => buf[X + (Y * Rect.Width)];

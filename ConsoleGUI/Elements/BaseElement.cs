@@ -13,7 +13,7 @@ namespace ConsoleGUI
         internal virtual Character OnDrawContent(int X, int Y)
         {
             int i = X + (Y * Rect.Width);
-            if (i < 0 || i >= DrawBuffer.Length) return ' '.Details();
+            if (i < 0 || i >= DrawBuffer.Length) return ConsoleGUI.NullCharacter;
             return DrawBuffer[i];
         }
 
@@ -29,7 +29,7 @@ namespace ConsoleGUI
             Side.Bottom => '━'.Details(),
             Side.BottomLeft => '┕'.Details(),
             Side.Left => '│'.Details(),
-            _ => ' '.Details(),
+            _ => ConsoleGUI.NullCharacter,
         };
 
         public bool Contains(int X, int Y) => Rect.Contains(X, Y) || Rect.Contains(X - 1, Y - 1) || Rect.Contains(X - 1, Y) || Rect.Contains(X, Y - 1);

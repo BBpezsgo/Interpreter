@@ -202,7 +202,7 @@ namespace ConsoleGUI
             return Side.None;
         }
 
-        internal static Character Details(this char v) => new Character()
+        internal static Character Details(this char v) => new()
         {
             Char = v,
             Color = CharColors.FgDefault,

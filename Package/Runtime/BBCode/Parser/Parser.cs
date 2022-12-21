@@ -343,14 +343,16 @@ namespace IngameCoding.BBCode
             public void WriteToConsole(string title = "PARSER INFO")
             {
                 Console.WriteLine($"\n\r === {title} ===\n\r");
-                int indent = 0;
+                // int indent = 0;
 
+                /*
                 void Comment(string comment)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.WriteLine($"{"  ".Repeat(indent)}{comment}");
                     Console.ResetColor();
                 }
+                */
                 void Attribute(FunctionDefinition.Attribute attribute)
                 {
                     Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -1406,7 +1408,15 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        statements.Add(statement);
+                        if (statement is StatementWithReturnValue statementWithReturnValue)
+                        {
+                            statementWithReturnValue.SaveValue = false;
+                            statements.Add(statementWithReturnValue);
+                        }
+                        else
+                        {
+                            statements.Add(statement);
+                        }
 
                         if (ExpectOperator(";") == null)
                         { throw new SyntaxException("Expected ';' at end of statement", statement.position); }

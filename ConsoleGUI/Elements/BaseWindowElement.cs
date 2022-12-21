@@ -11,7 +11,7 @@ namespace ConsoleGUI
         Point MouseDragStartPos = Point.Empty;
 
         internal bool CanDrag = true;
-
+        internal bool HasBorder = true;
         internal BaseInlineElement[] Elements = System.Array.Empty<BaseInlineElement>();
 
         internal override void BeforeDraw()
@@ -24,28 +24,31 @@ namespace ConsoleGUI
             }
         }
 
-        static Character DrawElement(BaseInlineElement Element, int X, int Y)
+        Character DrawElement(BaseInlineElement Element, int X, int Y)
         {
-            if (Element.Rect.Top == Y)
+            if (HasBorder)
             {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Left == X)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Bottom == Y)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Right == X)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else
-            {
+                if (Element.Rect.Top == Y)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Left == X)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Bottom == Y)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Right == X)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+
                 return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
             }
+
+            return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
         }
 
         internal override Character OnDrawContent(int X, int Y)
@@ -59,7 +62,7 @@ namespace ConsoleGUI
                 return DrawElement(element, X, Y);
             }
 
-            if (i < 0 || i >= DrawBuffer.Length) return ' '.Details();
+            if (i < 0 || i >= DrawBuffer.Length) return ConsoleGUI.NullCharacter;
 
             return DrawBuffer[i];
         }

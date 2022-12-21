@@ -563,6 +563,17 @@ namespace IngameCoding.Core
             pauseCode = false;
         }
 
+        public void LoadDLL(string path)
+        {
+            var dll = System.Reflection.Assembly.LoadFile(path);
+            var exportedTypes = dll.GetExportedTypes();
+
+            foreach (Type type in exportedTypes)
+            {
+                Debug.WriteLine(type.FullName);
+            }
+        }
+
         void AddBuiltins()
         {
             #region Console
@@ -629,6 +640,19 @@ namespace IngameCoding.Core
                     newList.Add(new DataItem(item, ""));
                 }
                 return new DataItem(newList, "");
+            });
+
+            #endregion
+
+            #region Net.Http
+
+            AddBuiltinFunction<string>("http-get", (url) =>
+            {
+                System.Net.Http.HttpClient httpClient = new();
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
+                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(url).Result;
+                string res = result.Content.ReadAsStringAsync().Result;
+                return res;
             });
 
             #endregion
@@ -956,11 +980,11 @@ namespace IngameCoding.Core
 
         static void CheckParameters(string functionName, TypeToken[] requied, DataItem[] passed)
         {
-            if (passed.Length != requied.Length) throw new System.Exception($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
+            if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
 
             for (int i = 0; i < requied.Length; i++)
             {
-                if (!passed[i].EqualType(requied[i].typeName)) throw new System.Exception($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].typeName.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
+                if (!passed[i].EqualType(requied[i].typeName)) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].typeName.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
             }
         }
 

@@ -1,0 +1,5 @@
+﻿namespace Http
+{
+  [Builtin("http-get")]
+  string Get(string url);
+}

@@ -1683,7 +1683,7 @@ namespace IngameCoding.Bytecode
             }
             else
             {
-                throw new Errors.Exception($"Unknown type {value.GetType().FullName}", new Position(-1));
+                throw new Errors.Exception($"Unknown type {value.GetType().FullName}", Position.UnknownPosition);
             }
         }
 
@@ -2344,16 +2344,16 @@ namespace IngameCoding.Bytecode
         int[] arguments;
 
         // Running control
-        bool enable = false;
-        bool currentlyRunning = false;
+        bool enable;
+        bool currentlyRunning;
         public bool IsRunning => currentlyRunning;
-        bool destroyed = false;
-        bool IsCall = false;
+        bool destroyed;
+        bool IsCall;
         int remainingClockCycles;
 
         // Safely
         int lastInstrPointer = -1;
-        int endlessSafe = 0;
+        int endlessSafe;
 
         readonly InterpeterDetails details;
         internal InterpeterDetails Details => details;
@@ -2364,7 +2364,7 @@ namespace IngameCoding.Bytecode
 
             CPU = new CentralProcessingUnit(code, 0, builtinFunctions);
 
-            arguments = new int[0];
+            arguments = Array.Empty<int>();
 
             enable = false;
             currentlyRunning = false;

@@ -20,12 +20,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
 	  <DebugType>none</DebugType>
 	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304</NoWarn>
+	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
 	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304</NoWarn>
+	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

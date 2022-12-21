@@ -556,13 +556,9 @@ namespace ConsoleGUI
             }
         }
 
-        bool first = true;
-
         internal override void BeforeDraw()
         {
             base.BeforeDraw();
-
-            first = false;
         }
 
         internal override void OnMouseEvent(MouseInfo mouse)

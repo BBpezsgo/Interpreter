@@ -20,6 +20,11 @@ namespace IngameCoding.BBCode.Parser.Statements
         { return null; }
     }
 
+    public abstract class StatementWithReturnValue : Statement
+    {
+        public bool SaveValue = true;
+    }
+
     abstract class StatementParent : Statement
     {
         public List<Statement> statements;
@@ -30,7 +35,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_ListValue : Statement
+    public class Statement_ListValue : StatementWithReturnValue
     {
         public List<Statement> Values;
         public int Size => Values.Count;
@@ -91,7 +96,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_FunctionCall : Statement
+    public class Statement_FunctionCall : StatementWithReturnValue
     {
         string[] namespacePath;
         readonly string[] targetNamespacePath;
@@ -191,7 +196,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Operator : Statement
+    class Statement_Operator : StatementWithReturnValue
     {
         internal readonly string Operator;
         internal readonly Statement Left;
@@ -367,7 +372,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Literal : Statement
+    class Statement_Literal : StatementWithReturnValue
     {
         internal TypeToken type;
         internal string value;
@@ -404,7 +409,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Variable : Statement
+    class Statement_Variable : StatementWithReturnValue
     {
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
         public Statement listIndex;
@@ -573,7 +578,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_NewStruct : Statement
+    class Statement_NewStruct : StatementWithReturnValue
     {
         readonly string[] namespacePath;
         readonly string[] targetNamespacePath;
@@ -645,7 +650,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Index : Statement
+    class Statement_Index : StatementWithReturnValue
     {
         internal readonly Statement indexStatement;
         internal Statement PrevStatement;
@@ -666,7 +671,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Field : Statement
+    class Statement_Field : StatementWithReturnValue
     {
         internal string FieldName;
         internal Statement PrevStatement;

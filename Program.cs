@@ -9,8 +9,13 @@ namespace TheProgram
 #if DEBUG
 
 #if true
-            var file = "test-heap.bbc";
-            IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse("-throw-errors", /*"-c-print-instructions", "true",*/ ProjectFolder() + "\\TestFiles\\" + file).Value);
+            var file = "test-net.bbc";
+            IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse(
+                // "-throw-errors",
+                // "-c-print-instructions",
+                // "true",
+                ProjectFolder() + "\\TestFiles\\" + file
+            ).Value);
 #else
             var settings = ArgumentParser.Parse(args).Value;
             if (settings.Debug)

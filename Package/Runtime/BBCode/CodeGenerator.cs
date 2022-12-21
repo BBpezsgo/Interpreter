@@ -870,7 +870,6 @@ namespace IngameCoding.BBCode.Compiler
                 if (!builtinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
                 { throw new ParserException($"Builtin function '{compiledFunction.BuiltinName}' doesn't exists", functionCall.position); }
 
-
                 if (functionCall.PrevStatement != null)
                 { GenerateCodeForStatement(functionCall.PrevStatement); }
 
@@ -879,6 +878,9 @@ namespace IngameCoding.BBCode.Compiler
                     GenerateCodeForStatement(param);
                 }
                 AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount, compiledFunction.BuiltinName);
+
+                if (compiledFunction.returnSomething && !functionCall.SaveValue)
+                { AddInstruction(Opcode.POP_VALUE); }
 
                 return;
             }
@@ -911,6 +913,9 @@ namespace IngameCoding.BBCode.Compiler
             { AddInstruction(Opcode.POP_VALUE); }
 
             if (functionCall.PrevStatement != null)
+            { AddInstruction(Opcode.POP_VALUE); }
+
+            if (compiledFunction.returnSomething && !functionCall.SaveValue)
             { AddInstruction(Opcode.POP_VALUE); }
         }
         void GenerateCodeForStatement(Statement_MethodCall structMethodCall)
@@ -1865,7 +1870,6 @@ namespace IngameCoding.BBCode.Compiler
                             else
                             { throw new ParserException("Expected literal or new struct as initial value for variable", new Position(newVariable.position.Line)); }
                         }
-                        break;
                     case BuiltinType.VOID:
                     case BuiltinType.ANY:
                     default:

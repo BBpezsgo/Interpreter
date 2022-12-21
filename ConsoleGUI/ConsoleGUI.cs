@@ -12,8 +12,16 @@ namespace ConsoleGUI
 
     internal class ConsoleGUI
     {
+        internal static Character NullCharacter => new()
+        {
+            Char = ' ',
+            Color = CharColors.BgGray
+        };
+
         internal List<BaseWindowElement> Elements = new();
         readonly SafeFileHandle ConsoleHandle;
+
+        bool DebugLogs;
 
         short width;
         short height;
@@ -21,12 +29,22 @@ namespace ConsoleGUI
         SmallRect ConsoleRect;
 
         MouseInfo Mouse;
-        internal InterpeterElement FilledElement;
+        internal BaseWindowElement FilledElement;
 
-        bool ResizeElements = false;
+        bool ResizeElements;
 
-        internal ConsoleGUI()
+        void Log(string message)
         {
+            if (!DebugLogs) return;
+            Console.WriteLine(message);
+            System.Diagnostics.Debug.WriteLine(message);
+        }
+
+        internal ConsoleGUI(bool DebugLogs = false)
+        {
+            this.DebugLogs = DebugLogs;
+
+            Log("Setup timers");
             System.Timers.Timer aTimer = new();
             aTimer.Elapsed += TimerElapsed;
             aTimer.Interval = 500;
@@ -37,6 +55,7 @@ namespace ConsoleGUI
             bTimer.Interval = 5000;
             bTimer.Enabled = true;
 
+            Log("Setup console");
             SetupConsole();
 
             ConsoleListener.MouseEvent += MouseEvent;
@@ -45,17 +64,39 @@ namespace ConsoleGUI
 
             Mouse = new MouseInfo();
 
+            Log("Start console listener");
             ConsoleListener.Start();
 
+            Log("Setup console handler");
             ConsoleHandle = CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, System.IO.FileMode.Open, 0, IntPtr.Zero);
 
             width = (short)Console.WindowWidth;
             height = (short)Console.WindowHeight;
 
-            ConsoleBuffer = new CharInfo[width * height];
-            ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
+            Start();
+        }
 
+        internal void Start()
+        {
+            Clear();
+
+            Log("Refresh elements size");
+            RefreshElementsSize(true);
+
+            Log("Refresh console");
             RefreshConsole();
+        }
+
+        void Clear()
+        {
+            Log("Clear console");
+
+            ConsoleBuffer = new CharInfo[width * height];
+            for (int i = 0; i < ConsoleBuffer.Length; i++)
+            {
+                ConsoleBuffer[i].Char.UnicodeChar = ' ';
+            }
+            ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
         }
 
         private void BTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -68,17 +109,14 @@ namespace ConsoleGUI
             ResizeElements = true;
         }
 
-        void RefreshConsole()
+        void RefreshElementsSize(bool Force = false)
         {
-            if (ConsoleHandle.IsInvalid) return;
-
-            if (ResizeElements)
+            if (ResizeElements || Force)
             {
                 width = (short)Console.WindowWidth;
                 height = (short)Console.WindowHeight;
 
-                ConsoleBuffer = new CharInfo[width * height];
-                ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
+                Clear();
 
                 ResizeElements = false;
                 foreach (var Element in Elements) Element.RefreshSize();
@@ -88,19 +126,32 @@ namespace ConsoleGUI
                     FilledElement.RefreshSize();
                 }
             }
+        }
+
+        void RefreshConsole()
+        {
+            if (ConsoleHandle.IsInvalid)
+            {
+                Log("Console handler is invalid");
+                return;
+            }
+
+            RefreshElementsSize();
 
             foreach (var Element in Elements) Element.BeforeDraw();
-            if (FilledElement != null) FilledElement.BeforeDraw();
+            FilledElement?.BeforeDraw();
 
+            /*
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 int X = i % width;
                 int Y = i / width;
-                Character chr = ' '.Details();
+                Character chr = '-'.Details();
 
                 ConsoleBuffer[i].Attributes = (short)chr.Color;
                 ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
             }
+            */
 
             if (FilledElement != null)
             {
@@ -117,28 +168,30 @@ namespace ConsoleGUI
             WriteConsole(ref ConsoleRect);
         }
 
-        Character DrawElement(BaseWindowElement Element, int X, int Y)
+        static Character DrawElement(BaseWindowElement Element, int X, int Y)
         {
-            if (Element.Rect.Top == Y)
+            if (Element.HasBorder)
             {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Left == X)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Bottom == Y)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else if (Element.Rect.Right == X)
-            {
-                return Element.OnDrawBorder(X, Y);
-            }
-            else
-            {
+                if (Element.Rect.Top == Y)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Left == X)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Bottom == Y)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+                else if (Element.Rect.Right == X)
+                {
+                    return Element.OnDrawBorder(X, Y);
+                }
+
                 return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
             }
+            return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
         }
         void DrawElement(BaseWindowElement Element, bool IsFilled = false)
         {
@@ -165,11 +218,24 @@ namespace ConsoleGUI
             }
         }
 
-        void WriteConsole(ref SmallRect rect) => WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
+        void WriteConsole(ref SmallRect rect)
+        {
+            if (ConsoleHandle.IsInvalid)
+            {
+                System.Diagnostics.Debug.Fail("Console handle is invalid");
+                return;
+            }
+            if (ConsoleHandle.IsClosed)
+            {
+                System.Diagnostics.Debug.Fail("Console handle is closed");
+                return;
+            }
+
+            WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
                 new Coord() { X = (short)Console.WindowWidth, Y = (short)Console.WindowHeight },
                 new Coord() { X = 0, Y = 0 },
                 ref rect);
-
+        }
         void KeyEvent(KEY_EVENT_RECORD e)
         {
             if (!e.bKeyDown)

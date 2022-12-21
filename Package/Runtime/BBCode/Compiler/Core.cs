@@ -215,7 +215,7 @@ namespace IngameCoding.BBCode.Compiler
 
         public FunctionDefinition functionDefinition;
 
-        public int TimesUsed = 0;
+        public int TimesUsed;
 
         public int ParameterCount => parameters.Length;
         public bool returnSomething;

@@ -36,6 +36,8 @@ namespace IngameCoding.Core
 
     public struct Position
     {
+        public static Position UnknownPosition => new(-1);
+
         readonly bool unknown;
         int line;
         readonly int col;

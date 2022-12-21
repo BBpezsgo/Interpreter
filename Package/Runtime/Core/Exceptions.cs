@@ -51,7 +51,7 @@ namespace IngameCoding.Errors
     [Serializable]
     public class ParserException : Exception
     {
-        public ParserException(string message) : base(message, new Position(-1)) { }
+        public ParserException(string message) : base(message, Position.UnknownPosition) { }
         public ParserException(string message, Position pos) : base(message, pos) { }
         public ParserException(string message, BaseToken token) : base(message, token) { }
 
@@ -63,7 +63,7 @@ namespace IngameCoding.Errors
     [Serializable]
     public class SyntaxException : Exception
     {
-        public SyntaxException(string message) : base(message, new Position(-1)) { }
+        public SyntaxException(string message) : base(message, Position.UnknownPosition) { }
         public SyntaxException(string message, Position pos) : base(message, pos) { }
         public SyntaxException(string message, BaseToken token) : base(message, token) { }
 
@@ -75,7 +75,7 @@ namespace IngameCoding.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        public RuntimeException(string message) : base(message, new Position(-1)) { }
+        public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
 
         public RuntimeException(string message, Position pos) : base(message, pos) { }
 

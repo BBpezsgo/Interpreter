@@ -27,7 +27,7 @@ struct TimeSpan
   
 string ToTimeSpanString(this TimeSpan self)
 {
-	return self.hours + ":" + self.mins + ":" + self.secs;
+    return self.hours + ":" + self.mins + ":" + self.secs;
 }
 
 namespace Time
@@ -37,14 +37,14 @@ namespace Time
 
   TimeSpan Now()
   {
-	string[] nowSplitted;
-	string now = tmnw();
-	nowSplitted = now.Split(":");
-	TimeSpan t = new TimeSpan;
-	t.hours = nowSplitted[0];
-	t.mins = nowSplitted[1];
-	t.secs = nowSplitted[2];
-	return t;
+    string[] nowSplitted;
+    string now = tmnw();
+    nowSplitted = now.Split(":");
+    TimeSpan t = new TimeSpan;
+    t.hours = nowSplitted[0];
+    t.mins = nowSplitted[1];
+    t.secs = nowSplitted[2];
+    return t;
   }
 }
 
@@ -59,3 +59,97 @@ string[] splitstring(string a, string b);
 
 string[] Split(this string v, string separator)
 { return splitstring(v, separator); }
+
+namespace Math
+{
+  int Pow(int a, int b)
+  {
+    if (b == 0) { return 1; };
+    if (b < 0)
+    { return 1 / Pow(a, Abs(b)); };
+    int answer = 1;
+    for (int i = 1; i <= b; i++)
+    { answer = answer * a; };
+    return answer;
+  }
+
+  int Abs(int v)
+  {
+    if (v < 0) { return v * -1; };
+    return v;
+  }
+
+  int Min(int a, int b)
+  {
+    if (a < b) { return a; };
+    return b;
+  }
+
+  int Max(int a, int b)
+  {
+    if (a > b) { return a; };
+    return b;
+  }
+}
+
+
+string Substring(this string v, int start)
+{
+  string newV = "";
+  for (int i = start; i < v.Length; i++)
+  {
+    newV += v[i];
+  };
+  return newV;
+}
+
+string Reverse(this string v)
+{
+  string newV = "";
+  for (int i = 0; i < v.Length; i++)
+  {
+    newV += v[(v.Length - 1 - i)];
+  };
+  return newV;
+}
+
+string Substring(this string v, int start, int length)
+{
+  string newV = "";
+  for (int i = start; i < Math.Min(v.Length, start + length); i++)
+  {
+    newV += v[i];
+  };
+  return newV;
+}
+
+int ParseInt(string v)
+{
+  bool IsNegative = (v[0] == "-");
+  string parsing = v;
+  if (IsNegative) { parsing = parsing.Substring(1); };
+  parsing = parsing.Reverse();
+  int result = 0;
+  for (int i = 0; i < parsing.Length; i++)
+  {
+    string digit = parsing[i];
+    result += (Math.Pow(10, i) * ParseDigit(digit));
+  };
+  if (IsNegative)
+  { result *= -1; };
+  return result;
+}
+
+int ParseDigit(string digit)
+{
+  if (digit == "0") { return 0; }
+  elseif (digit == "1") { return 1; }
+  elseif (digit == "2") { return 2; }
+  elseif (digit == "3") { return 3; }
+  elseif (digit == "4") { return 4; }
+  elseif (digit == "5") { return 5; }
+  elseif (digit == "6") { return 6; }
+  elseif (digit == "7") { return 7; }
+  elseif (digit == "8") { return 8; }
+  elseif (digit == "9") { return 9; };
+}

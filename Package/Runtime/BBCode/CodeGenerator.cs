@@ -509,6 +509,14 @@ namespace IngameCoding.BBCode.Compiler
         {
             var prevStatementType = FindStatementType(field.PrevStatement);
 
+            if (prevStatementType == "string")
+            {
+                if (field.FieldName == "Length")
+                {
+                    return "int";
+                }
+            }
+
             foreach (var strct in compiledStructs)
             {
                 if (strct.Key != prevStatementType) continue;
@@ -548,7 +556,15 @@ namespace IngameCoding.BBCode.Compiler
                 return type + "[]";
             }
             else if (st is Statement_Index index)
-            { return FindStatementType(index.PrevStatement)[..^2]; }
+            {
+                var type = FindStatementType(index.PrevStatement);
+                if (type.EndsWith("[]"))
+                { return type[..^2]; }
+                else if (type == "string")
+                { return "string"; }
+
+                throw new NotImplementedException();
+            }
 
             throw new NotImplementedException();
         }
@@ -897,7 +913,7 @@ namespace IngameCoding.BBCode.Compiler
             for (int i = 0; i < functionCall.parameters.Count; i++)
             {
                 Statement param = functionCall.parameters[i];
-                ParameterDefinition definedParam = compiledFunction.functionDefinition.parameters[i];
+                ParameterDefinition definedParam = compiledFunction.functionDefinition.parameters[compiledFunction.IsMethod ? (i + 1) : i];
 
                 AddInstruction(Opcode.COMMENT, $"param:");
                 GenerateCodeForStatement(param);
@@ -1324,6 +1340,7 @@ namespace IngameCoding.BBCode.Compiler
             AddInstruction(Opcode.COMMENT, "FOR Declaration");
             // Index variable
             GenerateCodeForVariable(forLoop.variableDeclaration, out int variablesAdded);
+            GenerateCodeForStatement(forLoop.variableDeclaration);
 
             AddInstruction(Opcode.COMMENT, "FOR Condition");
             // Index condition
@@ -1613,7 +1630,7 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (Keywords.Contains(newVariable.variableName))
                 { throw new ParserException($"Illegal variable name '{newVariable.variableName}'", st.position); }
-                
+
                 switch (newVariable.type.typeName)
                 {
                     case BuiltinType.INT:
@@ -2210,10 +2227,16 @@ namespace IngameCoding.BBCode.Compiler
                     else if (st is Statement_If_If st2)
                     {
                         AnalyzeStatement(st2.condition);
+                        AnalyzeStatements(st2.statements);
                     }
                     else if (st is Statement_If_ElseIf st3)
                     {
                         AnalyzeStatement(st3.condition);
+                        AnalyzeStatements(st3.statements);
+                    }
+                    else if (st is Statement_If_Else st3a)
+                    {
+                        AnalyzeStatements(st3a.statements);
                     }
                     else if (st is Statement_Index st4)
                     {
@@ -2234,14 +2257,14 @@ namespace IngameCoding.BBCode.Compiler
                     }
                     else if (st is Statement_FunctionCall st8)
                     {
+                        foreach (var st9 in st8.parameters)
+                        { AnalyzeStatement(st9); }
+
                         if (st8.FunctionName == "return")
                         { return; }
 
                         if (GetCompiledFunction(st8, out var cf))
                         { cf.TimesUsed++; }
-
-                        foreach (var st9 in st8.parameters)
-                        { AnalyzeStatement(st9); }
                     }
                     else if (st is Statement_Field st9)
                     { AnalyzeStatement(st9.PrevStatement); }
@@ -2328,7 +2351,11 @@ namespace IngameCoding.BBCode.Compiler
             for (int iteration = 0; iteration < iterations; iteration++)
             {
                 int functionsRemoved = AnalyzeFunctions(functions, globalVariables, printCallback);
-                if (functionsRemoved == 0) break;
+                if (functionsRemoved == 0)
+                {
+                    printCallback?.Invoke($"  Deletion of unused functions is complete", TerminalInterpreter.LogType.Debug);
+                    break;
+                }
 
                 printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", TerminalInterpreter.LogType.Debug);
             }

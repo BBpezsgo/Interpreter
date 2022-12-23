@@ -357,8 +357,14 @@ namespace IngameCoding.Bytecode
                 { throw new RuntimeException("Index was out of range!"); }
                 MU.Stack.Add(listValue.ValueList.items[indexValue.ValueInt]);
             }
+            if (listValue.type == DataItem.Type.STRING)
+            {
+                if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
+                { throw new RuntimeException("Index was out of range!"); }
+                MU.Stack.Add(listValue.ValueString[indexValue.ValueInt].ToString());
+            }
             else
-            { throw new RuntimeException("The variable type is not list!"); }
+            { throw new RuntimeException("The variable type is not list or string!"); }
             MU.Step();
 
             return 4;
@@ -579,12 +585,31 @@ namespace IngameCoding.Bytecode
             if (MU.CurrentInstruction.additionParameter.Length == 0)
             { throw new InternalException("No field name given"); }
 
-            var structItem = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer).ValueStruct;
+            var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer);
+            var field = MU.CurrentInstruction.additionParameter;
 
-            if (!structItem.HaveField(MU.CurrentInstruction.additionParameter))
-            { throw new RuntimeException("Field " + MU.CurrentInstruction.additionParameter + " doesn't exists in this struct."); }
+            if (item.type == DataItem.Type.STRING)
+            {
+                var value = item.ValueString;
 
-            MU.Stack.Add(structItem.GetField(MU.CurrentInstruction.additionParameter), MU.CurrentInstruction.tag);
+                if (field == "Length")
+                {
+                    MU.Stack.Add(value.Length, MU.CurrentInstruction.tag);
+                }
+                else
+                { throw new RuntimeException("Type string does not have field " + field); }
+            }
+            else if (item.type == DataItem.Type.STRUCT)
+            {
+                var value = item.ValueStruct;
+
+                if (!value.HaveField(field))
+                { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
+
+                MU.Stack.Add(value.GetField(field), MU.CurrentInstruction.tag);
+            }
+            else
+            { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
 
             MU.Step();
 
@@ -944,7 +969,7 @@ namespace IngameCoding.Bytecode
 
         public Stack()
         { stack = new List<DataItem>(); }
-        
+
         readonly List<DataItem> stack;
         internal CentralProcessingUnit cpu;
 

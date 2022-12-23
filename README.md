@@ -100,3 +100,30 @@ void Update() { }
 ```
 > **NOTE:**
 > If you listen to the `update` event, the program will run until you manually close it.
+
+## Builtin Functions
+
+### System.bbc
+
+`Console.Log(message)` Prints `message` to the console<br>
+`Console.LogWarning(message)` Prints `message` in yellow on the console<br>
+`Console.LogError(message)` Prints `message` in red on the console<br>
+`Console.Input(promt)` Prints the "prompt" to the console and waits for user input<br>
+
+`Sleep(ms)` Pauses the code execution for `ms` milliseconds<br>
+
+`Time.Now()` Returns the current time<br>
+
+`<string>.Reverse()` Returns the reverse of the string<br>
+`<string>.Substring(start)` Returns the string after `start`<br>
+`<string>.Substring(start, length)` Returns the `length` long strings after `start`<br>
+`<string>.Split(sep)` Splits the text at the specified (`sep`) separators<br>
+
+`Math.Pow(a, b)` Returns `a` to the power of `b`<br>
+`Math.Abs(v)` Returns the absolute value of `v`<br>
+`Math.Min(a, b)` Returns the smaller of `a` and `b`<br>
+`Math.Max(a, b)` Returns the larger of `a` and `b`<br>
+
+### System.Net.bbc
+
+`Http.Get(url)` Sends a HTTP GET request to `url`

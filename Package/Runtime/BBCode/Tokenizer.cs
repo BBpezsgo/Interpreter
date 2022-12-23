@@ -259,7 +259,7 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == '=')
                 {
-                    string[] strings = new string[] { "+", "-", "*", "%", "=", "!", "|", "&", "^" };
+                    string[] strings = new string[] { "+", "-", "*", "%", "=", "!", "|", "&", "^", "<", ">" };
                     if (strings.Contains(currentToken.text))
                     {
                         currentToken.text += currChar;

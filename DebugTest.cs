@@ -66,7 +66,7 @@ namespace TheProgram
 
             if (interpreter.Initialize())
             {
-                var compiledCode = interpreter.CompileCode(code, settings.File.Directory, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
+                var compiledCode = interpreter.CompileCode(code, settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
 
                 if (compiledCode != null)
                 {

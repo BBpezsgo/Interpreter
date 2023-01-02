@@ -4,12 +4,9 @@
 
     public class BaseToken
     {
-        public int startOffset;
-        public int endOffset;
-        public int lineNumber;
+        public Range<SinglePosition> Position;
+        public Range<int> AbsolutePosition;
 
-        public int startOffsetTotal;
-        public int endOffsetTotal;
-        public Position Position => new(lineNumber, startOffset, new Interval(startOffsetTotal, endOffsetTotal));
+        public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
     }
 }

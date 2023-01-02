@@ -78,7 +78,7 @@ namespace IngameCoding.BBCode.Compiler
                     { IsStructMethodCall = false; }
                     else
                     {
-                        if (!compiledStructs[compiledVariable.structName].methods.ContainsKey(methodCallStatement.FunctionName))
+                        if (!compiledStructs[compiledVariable.structName].CompiledMethods.ContainsKey(methodCallStatement.FunctionName))
                         { IsStructMethodCall = false; }
                     }
 
@@ -109,7 +109,7 @@ namespace IngameCoding.BBCode.Compiler
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
             {
-                if (functionOffsets.TryGetValue(functionCallStatement.Name, out functionOffset))
+                if (functionOffsets.TryGetValue(functionCallStatement.Name.text, out functionOffset))
                 {
                     return true;
                 }
@@ -217,6 +217,42 @@ namespace IngameCoding.BBCode.Compiler
 
                 Console.WriteLine("\n\r === ===\n\r");
             }
+
+            public void CheckFilePaths(System.Action<string> NotSetCallback)
+            {
+                foreach (var func_ in compiledFunctions)
+                {
+                    var func = func_.Value;
+                    if (string.IsNullOrEmpty(func.FilePath))
+                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {func} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {func} : {func}"); }
+                }
+                foreach (var var_ in compiledGlobalVariables)
+                {
+                    var @var = var_.Value;
+                    if (string.IsNullOrEmpty(@var.Declaration.FilePath))
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.Declaration.FilePath}"); }
+                }
+                foreach (var var_ in compiledVariables)
+                {
+                    var @var = var_.Value;
+                    if (string.IsNullOrEmpty(@var.Declaration.FilePath))
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.Declaration.FilePath}"); }
+                }
+                foreach (var struct_ in compiledStructs)
+                {
+                    var @struct = struct_.Value;
+                    if (string.IsNullOrEmpty(@struct.FilePath))
+                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {@struct} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {@struct} : {@struct.FilePath}"); }
+                }
+            }
         }
 
         public struct CompilerSettings
@@ -240,14 +276,17 @@ namespace IngameCoding.BBCode.Compiler
         /// <param name="code">
         /// The source code
         /// </param>
-        /// <param name="namespacesFolder">
-        /// The directory where the source code file is located
+        /// <param name="file">
+        /// The source code file
         /// </param>
         /// <param name="result">
         /// The codeGenerator result
         /// </param>
         /// <param name="warnings">
         /// A list that this can fill with warnings
+        /// </param>
+        /// <param name="errors">
+        /// A list that this can fill with errors
         /// </param>
         /// <param name="printCallback">
         /// Optional: Print callback
@@ -263,8 +302,9 @@ namespace IngameCoding.BBCode.Compiler
             ParserResult parserResult,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<IStruct>> builtinStructs,
-            DirectoryInfo namespacesFolder,
+            FileInfo file,
             List<Warning> warnings,
+            List<Error> errors,
             CompilerSettings settings,
             ParserSettings parserSettings,
             Action<string, TerminalInterpreter.LogType> printCallback = null)
@@ -273,17 +313,17 @@ namespace IngameCoding.BBCode.Compiler
             Dictionary<string, StructDefinition> Structs = new();
 
             if (parserResult.Usings.Count > 0)
-            { printCallback?.Invoke("Parse usings...", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
 
             for (int i = 0; i < parserResult.Usings.Count; i++)
             {
-                string usingItem = parserResult.Usings[i];
-                if (File.Exists(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code))
+                string usingItem = parserResult.Usings[i].PathString;
+                if (File.Exists(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code))
                 {
                     printCallback?.Invoke($"Parse code: {usingItem} ...", TerminalInterpreter.LogType.Debug);
-                    var parserResult2 = Parser.Parse(File.ReadAllText(namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
+                    var parserResult2 = Parser.Parse(File.ReadAllText(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
                         (msg, lv) => { printCallback?.Invoke($"  {msg}", lv); });
-
+                    parserResult2.SetFile(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code);
                     if (parserSettings.PrintInfo)
                     { parserResult2.WriteToConsole($"PARSER INFO FOR '{usingItem}'"); }
 
@@ -292,7 +332,7 @@ namespace IngameCoding.BBCode.Compiler
                         var id = func.ID();
 
                         if (Functions.ContainsKey(id))
-                        { throw new ParserException($"Function '{id}' already exists"); }
+                        { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
 
                         Functions.Add(id, func);
                     }
@@ -301,7 +341,7 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         if (Structs.ContainsKey(@struct.Key))
                         {
-                            throw new ParserException($"Struct '{@struct.Value.FullName}' already exists");
+                            errors.Add(new Error($"Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
                         }
                         else
                         {
@@ -310,7 +350,7 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
                 else
-                { throw new ParserException($"Namespace file '{usingItem}' not found (\"{namespacesFolder.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")"); }
+                { errors.Add(new Error($"Namespace file '{usingItem}' not found (\"{file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")")); }
             }
 
             if (parserSettings.PrintInfo)
@@ -321,7 +361,7 @@ namespace IngameCoding.BBCode.Compiler
                 var id = func.ID();
 
                 if (Functions.ContainsKey(id))
-                { throw new ParserException($"Function '{id}' already exists"); }
+                { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
 
                 Functions.Add(id, func);
             }
@@ -331,11 +371,11 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             DateTime codeGenerationStarted = DateTime.Now;
-            printCallback?.Invoke("Generating code...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke("Generating code ...", TerminalInterpreter.LogType.Debug);
 
             CodeGenerator codeGenerator = new()
-            { warnings = warnings };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
+            { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, parserResult.Hashes, parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug);
 

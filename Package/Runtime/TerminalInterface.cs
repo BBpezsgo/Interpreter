@@ -54,4 +54,14 @@ namespace IngameCoding.Output
             }
         }
     }
+
+    public static class File
+    {
+        static readonly string Path = "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\out.log";
+
+        public static void Log(string msg)
+        {
+            System.IO.File.AppendAllText(Path, msg + "\n");
+        }
+    }
 }

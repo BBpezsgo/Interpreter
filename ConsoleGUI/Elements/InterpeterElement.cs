@@ -142,7 +142,7 @@ namespace ConsoleGUI
 
             if (Interpreter.Initialize())
             {
-                var compiledCode = Interpreter.CompileCode(code, fileInfo.Directory, compilerSettings, parserSettings, handleErrors);
+                var compiledCode = Interpreter.CompileCode(code, fileInfo, compilerSettings, parserSettings, handleErrors);
 
                 if (compiledCode != null)
                 {

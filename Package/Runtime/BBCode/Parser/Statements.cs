@@ -6,6 +6,98 @@ namespace IngameCoding.BBCode.Parser.Statements
 {
     using Core;
 
+    using System.Security.Cryptography;
+
+    public static class StatementFinder
+    {
+        static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
+        {
+            if (st == null) return false;
+            if (callback == null) return false;
+
+            if (callback?.Invoke(st) == true) return true;
+
+            if (st is StatementParent statementParent)
+            { if (GetAllStatement(statementParent.statements, callback)) return true; }
+
+            if (st is Statement_ListValue listValue)
+            { return GetAllStatement(listValue.Values, callback); }
+            else if (st is Statement_NewVariable newVariable)
+            { if (newVariable.initialValue != null) return GetAllStatement(newVariable.initialValue, callback); }
+            else if (st is Statement_FunctionCall functionCall)
+            {
+                if (GetAllStatement(functionCall.PrevStatement, callback)) return true;
+
+                return GetAllStatement(functionCall.parameters, callback);
+            }
+            else if (st is Statement_Operator @operator)
+            {
+                if (@operator.Right != null) if (GetAllStatement(@operator.Right, callback)) return true;
+                if (@operator.Left != null) return GetAllStatement(@operator.Left, callback);
+            }
+            else if (st is Statement_Literal literal)
+            { }
+            else if (st is Statement_Variable variable)
+            { if (variable.listIndex != null) return GetAllStatement(variable.listIndex, callback); }
+            else if (st is Statement_WhileLoop whileLoop)
+            { return GetAllStatement(whileLoop.condition, callback); }
+            else if (st is Statement_ForLoop forLoop)
+            {
+                if (GetAllStatement(forLoop.condition, callback)) return true;
+                if (GetAllStatement(forLoop.expression, callback)) return true;
+                if (GetAllStatement(forLoop.variableDeclaration, callback)) return true;
+            }
+            else if (st is Statement_If @if)
+            { return GetAllStatement(@if.parts.ToArray(), callback); }
+            else if (st is Statement_If_If ifIf)
+            { return GetAllStatement(ifIf.condition, callback); }
+            else if (st is Statement_If_ElseIf ifElseif)
+            { return GetAllStatement(ifElseif.condition, callback); }
+            else if (st is Statement_If_Else)
+            { }
+            else if (st is Statement_NewStruct newStruct)
+            { }
+            else if (st is Statement_Index indexStatement)
+            { }
+            else if (st is Statement_Field field)
+            { return GetAllStatement(field.PrevStatement, callback); }
+            else
+            { throw new NotImplementedException($"{st.GetType().FullName}"); }
+
+            return false;
+        }
+        static bool GetAllStatement(Statement[] statements, Func<Statement, bool> callback)
+        {
+            if (statements is null) throw new ArgumentNullException(nameof(statements));
+
+            if (callback == null) return false;
+
+            for (int i = 0; i < statements.Length; i++)
+            {
+                if (GetAllStatement(statements[i], callback))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        public static void GetAllStatement(ParserResult parserResult, Func<Statement, bool> callback)
+        {
+            if (callback == null) return;
+
+            for (int i = 0; i < parserResult.Functions.Count; i++)
+            {
+                if (parserResult.Functions[i].Statements == null) continue;
+                GetAllStatement(parserResult.Functions[i].Statements, callback);
+            }
+        }
+        static bool GetAllStatement(List<Statement> statements, Func<Statement, bool> callback)
+        {
+            if (statements is null) throw new ArgumentNullException(nameof(statements));
+            return GetAllStatement(statements.ToArray(), callback);
+        }
+    }
+
     public abstract class Statement
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
@@ -18,6 +110,38 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public virtual object TryGetValue()
         { return null; }
+
+        public abstract bool TryGetTotalPosition(out Position result);
+
+        internal abstract void SetPosition();
+    }
+    public class Statement_HashInfo : Statement, IDefinition
+    {
+        public Token HashToken;
+        public Token HashName;
+        public Statement_Literal[] Parameters;
+
+        public string FilePath { get; set; }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"# <hasn info>";
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            result = new(HashToken, HashName);
+            foreach (var item in Parameters)
+            {
+                result.Extend(item.ValueToken);
+            }
+            return true;
+        }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
 
     public abstract class StatementWithReturnValue : Statement
@@ -25,11 +149,17 @@ namespace IngameCoding.BBCode.Parser.Statements
         public bool SaveValue = true;
     }
 
-    abstract class StatementParent : Statement
+    public abstract class StatementParent : Statement
     {
         public List<Statement> statements;
         public StatementParent()
         { this.statements = new(); }
+
+        public Token BracketStart;
+        public Token BracketEnd;
+
+        public override bool TryGetTotalPosition(out Position result)
+        { throw new NotImplementedException(); }
 
         public abstract override string PrettyPrint(int ident = 0);
     }
@@ -44,13 +174,37 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             return $"{" ".Repeat(ident)}[{string.Join(", ", Values)}]";
         }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            if (Values.Count == 0) { result = position; return false; }
+            bool clean = Values[0].TryGetTotalPosition(out result);
+            for (int i = 1; i < Values.Count; i++)
+            {
+                clean = Values[i].TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
+
+        internal override void SetPosition()
+        {
+            Values[0].SetPosition();
+            Position position = Values[0].position;
+            foreach (var item in Values)
+            {
+                item.SetPosition();
+                position.Extend(item);
+            }
+            this.position = position;
+        }
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_NewVariable : Statement
+    public class Statement_NewVariable : Statement, IDefinition
     {
-        internal TypeToken type;
-        internal string variableName;
+        public TypeToken type;
+        public Token variableName;
         /// <summary>
         /// <b>The value is:</b>
         /// <seealso cref="Parser.ExpectExpression"/><br/>
@@ -85,6 +239,8 @@ namespace IngameCoding.BBCode.Parser.Statements
         internal Statement initialValue;
         internal bool IsRef;
 
+        public string FilePath { get; set; }
+
         public override string ToString()
         {
             return $"{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
@@ -94,17 +250,39 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             return $"{" ".Repeat(ident)}{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
         }
+
+        internal override void SetPosition()
+        {
+            position = type.GetPosition();
+            if (initialValue != null)
+            {
+                initialValue.SetPosition();
+                position.Extend(initialValue);
+            }
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = true;
+            result = new(type, variableName);
+            if (initialValue != null)
+            {
+                clean = initialValue.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_FunctionCall : StatementWithReturnValue
     {
         string[] namespacePath;
         readonly string[] targetNamespacePath;
-        internal Token functionNameT;
+        public Token functionNameT;
         internal string FunctionName => functionNameT.text;
-        internal List<Statement> parameters = new();
+        public List<Statement> parameters = new();
         internal bool IsMethodCall;
-        internal Statement PrevStatement;
+        public Statement PrevStatement;
 
         internal Statement[] MethodParameters
         {
@@ -194,11 +372,33 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
             return $"{" ".Repeat(ident)}{TargetNamespacePathPrefix}{FunctionName}({(string.Join(", ", parameters))})";
         }
+
+        internal override void SetPosition()
+        {
+            position = functionNameT.GetPosition();
+            foreach (var item in parameters)
+            {
+                item.SetPosition();
+                position.Extend(item);
+            }
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = true;
+            result = new(functionNameT);
+            foreach (var item in MethodParameters)
+            {
+                clean = item.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Operator : StatementWithReturnValue
+    public class Statement_Operator : StatementWithReturnValue
     {
-        internal readonly string Operator;
+        public readonly Token Operator;
         internal readonly Statement Left;
         internal Statement Right;
         internal bool InsideBracelet;
@@ -214,13 +414,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
-        public Statement_Operator(string op, Statement left)
+        public Statement_Operator(Token op, Statement left)
         {
             this.Operator = op;
             this.Left = left;
             this.Right = null;
         }
-        public Statement_Operator(string op, Statement left, Statement right)
+        public Statement_Operator(Token op, Statement left, Statement right)
         {
             this.Operator = op;
             this.Left = left;
@@ -285,7 +485,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override object TryGetValue()
         {
-            switch (this.Operator)
+            switch (this.Operator.text)
             {
                 case "+":
                     {
@@ -370,12 +570,32 @@ namespace IngameCoding.BBCode.Parser.Statements
                     return null;
             }
         }
+
+        internal override void SetPosition() { }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = true;
+            result = new(Operator);
+            if (Left != null)
+            {
+                clean = Left.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            if (Right != null)
+            {
+                clean = Right.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Literal : StatementWithReturnValue
+    public class Statement_Literal : StatementWithReturnValue
     {
-        internal TypeToken type;
+        public TypeToken type;
         internal string value;
+        public Token ValueToken;
 
         public override string ToString()
         {
@@ -407,32 +627,60 @@ namespace IngameCoding.BBCode.Parser.Statements
                 _ => null,
             };
         }
+
+        internal override void SetPosition()
+        {
+
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            result = new Position(ValueToken);
+            return true;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Variable : StatementWithReturnValue
+    public class Statement_Variable : StatementWithReturnValue
     {
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
         public Statement listIndex;
-        internal string variableName;
+        public Token variableName;
         internal bool reference;
 
         public override string ToString()
         {
-            return $"{(reference ? "ref " : "")}{variableName}{((listIndex != null) ? "[...]" : "")}";
+            return $"{(reference ? "ref " : "")}{variableName.text}{((listIndex != null) ? "[...]" : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{(reference ? "ref " : "")}{variableName}{((listIndex != null) ? $"[{listIndex.PrettyPrint()}]" : "")}";
+            return $"{" ".Repeat(ident)}{(reference ? "ref " : "")}{variableName.text}{((listIndex != null) ? $"[{listIndex.PrettyPrint()}]" : "")}";
         }
 
         public Statement_Variable()
         {
             this.listIndex = null;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = true;
+            result = new(variableName);
+            if (listIndex != null)
+            {
+                clean = listIndex.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_WhileLoop : StatementParent
+    public class Statement_WhileLoop : StatementParent
     {
         internal string name;
         internal Statement condition;
@@ -454,9 +702,14 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_ForLoop : StatementParent
+    public class Statement_ForLoop : StatementParent
     {
         internal string name;
         internal Statement_NewVariable variableDeclaration;
@@ -480,8 +733,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
-    class Statement_If : Statement
+    public class Statement_If : Statement
     {
         public List<Statement_If_Part> parts = new();
 
@@ -498,9 +756,17 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
             return x;
         }
+
+        public override bool TryGetTotalPosition(out Position result)
+        { throw new NotImplementedException(); }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    abstract class Statement_If_Part : StatementParent
+    public abstract class Statement_If_Part : StatementParent
     {
         public IfPart partType;
         internal string name;
@@ -517,9 +783,12 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{name} {((partType != IfPart.If_ElseStatement) ? "(...)" : "")} {{...}}";
         }
 
+        public override bool TryGetTotalPosition(out Position result)
+        { throw new NotImplementedException(); }
+
         public abstract override string PrettyPrint(int ident = 0);
     }
-    class Statement_If_If : Statement_If_Part
+    public class Statement_If_If : Statement_If_Part
     {
         internal Statement condition;
 
@@ -538,8 +807,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
-    class Statement_If_ElseIf : Statement_If_Part
+    public class Statement_If_ElseIf : Statement_If_Part
     {
         internal Statement condition;
 
@@ -558,8 +832,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
-    class Statement_If_Else : Statement_If_Part
+    public class Statement_If_Else : Statement_If_Part
     {
         public Statement_If_Else()
         { partType = IfPart.If_ElseStatement; }
@@ -576,13 +855,18 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
+
+        internal override void SetPosition()
+        {
+
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_NewStruct : StatementWithReturnValue
+    public class Statement_NewStruct : StatementWithReturnValue
     {
         readonly string[] namespacePath;
         readonly string[] targetNamespacePath;
-        internal string structName;
+        public Token structName;
 
         /// <returns> "[library].[...].[library]." </returns>
         public string NamespacePathPrefix
@@ -648,9 +932,20 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{structName}()";
         }
+
+        internal override void SetPosition()
+        {
+
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            result = new Position(structName);
+            return true;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Index : StatementWithReturnValue
+    public class Statement_Index : StatementWithReturnValue
     {
         internal readonly Statement indexStatement;
         internal Statement PrevStatement;
@@ -669,11 +964,28 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             return $"[{indexStatement.PrettyPrint()}]";
         }
+
+        internal override void SetPosition()
+        {
+            indexStatement.SetPosition();
+            this.position = indexStatement.position;
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = indexStatement.TryGetTotalPosition(out result);
+            if (PrevStatement != null)
+            {
+                clean = PrevStatement.TryGetTotalPosition(out var p) && clean;
+                result.Extend(p);
+            }
+            return clean;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    class Statement_Field : StatementWithReturnValue
+    public class Statement_Field : StatementWithReturnValue
     {
-        internal string FieldName;
+        public Token FieldName;
         internal Statement PrevStatement;
 
         public override string ToString()
@@ -684,6 +996,18 @@ namespace IngameCoding.BBCode.Parser.Statements
         public override string PrettyPrint(int ident = 0)
         {
             return $"{PrevStatement.PrettyPrint()}.{FieldName}";
+        }
+
+        internal override void SetPosition()
+        {
+
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            bool clean = PrevStatement.TryGetTotalPosition(out result);
+            result.Extend(new Position(FieldName));
+            return clean;
         }
     }
 

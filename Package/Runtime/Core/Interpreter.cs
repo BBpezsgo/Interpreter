@@ -7,13 +7,9 @@ using System.Linq;
 namespace IngameCoding.Core
 {
     using BBCode;
-
     using Bytecode;
-
     using Errors;
-
     using IngameCoding.BBCode.Compiler;
-
     using Terminal;
 
     /// <summary>
@@ -154,6 +150,7 @@ namespace IngameCoding.Core
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
+            builtinFunctions.SetInterpeter(bytecodeInterpeter);
 
             state = State.Initialized;
 
@@ -167,8 +164,8 @@ namespace IngameCoding.Core
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <param name="directory">
-        /// The directory where the source code file is located
+        /// <param name="file">
+        /// The source code file
         /// </param>
         /// <param name="warnings">
         /// A list that the compiler can fill with warnings
@@ -178,23 +175,30 @@ namespace IngameCoding.Core
         /// </returns>
         public Instruction[] CompileCode(
             string sourceCode,
-            DirectoryInfo directory,
+            FileInfo file,
             List<Warning> warnings,
             Compiler.CompilerSettings compilerSettings,
             BBCode.Parser.ParserSettings parserSettings)
         {
             OnOutput?.Invoke(this, $"Parse code: The main source code ...", TerminalInterpreter.LogType.Debug);
 
+            List<Error> errors = new();
+
             var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings, (msg, lv) => OnOutput?.Invoke(this, $"  {msg}", lv));
+            parserResult.SetFile(file.FullName);
             var compilerResult = Compiler.CompileCode(
                 parserResult,
                 builtinFunctions,
                 builtinStructs,
-                directory,
+                file,
                 warnings,
+                errors,
                 compilerSettings,
                 parserSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b));
+
+            if (errors.Count > 0)
+            { throw new System.Exception("Failed to compile", new Exception(errors[0].Message, errors[0].position)); }
 
             details.CompilerResult = compilerResult;
 
@@ -209,7 +213,7 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning);
             }
 
-            OnOutput?.Invoke(this, "Initializing bytecode interpreter...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", TerminalInterpreter.LogType.Debug);
 
             OnlyHaveCode = false;
 
@@ -220,46 +224,46 @@ namespace IngameCoding.Core
 
             foreach (var compiledFunction in compilerResult.compiledFunctions)
             {
-                if (compiledFunction.Value.attributes.TryGetValue("CodeEntry", out var attriute))
+                if (compiledFunction.Value.CompiledAttributes.TryGetValue("CodeEntry", out var attriute))
                 {
                     if (attriute.parameters.Count != 0)
-                    { throw new ParserException("Attribute 'CodeEntry' requies 0 parameter"); }
-                    if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                    { throw new ParserException("Attribute 'CodeEntry' requies 0 parameter", attriute.NameToken); }
+                    if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
                     {
                         instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
                     }
                     else
-                    { throw new InternalException($"Function '{compiledFunction.Value.functionDefinition.FullName}' offset not found"); }
+                    { throw new InternalException($"Function '{compiledFunction.Value.FullName}' offset not found"); }
                 }
-                else if (compiledFunction.Value.attributes.TryGetValue("Catch", out attriute))
+                else if (compiledFunction.Value.CompiledAttributes.TryGetValue("Catch", out attriute))
                 {
                     if (attriute.parameters.Count != 1)
-                    { throw new ParserException("Attribute 'Catch' requies 1 string parameter"); }
+                    { throw new ParserException("Attribute 'Catch' requies 1 string parameter", attriute.NameToken); }
                     if (attriute.TryGetValue(0, out string value))
                     {
                         if (value == "update")
                         {
-                            if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                             }
                             else
-                            { throw new ParserException($"Function '{compiledFunction.Value.functionDefinition.FullName}' offset not found"); }
+                            { throw new ParserException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
                         }
                         else if (value == "end")
                         {
-                            if (compilerResult.GetFunctionOffset(compiledFunction.Value.functionDefinition, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                             }
                             else
-                            { throw new ParserException($"Function '{compiledFunction.Value.functionDefinition.FullName}' offset not found"); }
+                            { throw new ParserException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
                         }
                         else
-                        { throw new ParserException("Unknown 'Catch' event name '" + value + "'"); }
+                        { throw new ParserException("Unknown event '" + value + "'", attriute.NameToken); }
                     }
                     else
-                    { throw new ParserException("Attribute 'Catch' requies 1 string parameter"); }
+                    { throw new ParserException("Attribute requies 1 string parameter", attriute.NameToken); }
                 }
             }
 
@@ -287,7 +291,7 @@ namespace IngameCoding.Core
 
             AddBuiltins();
             AddBuiltinFunction("conin", new BBCode.TypeToken[] {
-                new TypeToken("any", BuiltinType.ANY)
+                new TypeToken("any", BuiltinType.ANY, null)
             }, (DataItem[] parameters) =>
             {
                 pauseCode = true;
@@ -315,8 +319,8 @@ namespace IngameCoding.Core
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <param name="directory">
-        /// The directory where the source code file is located
+        /// <param name="file">
+        /// The source code file
         /// </param>
         /// <param name="HandleErrors">
         /// Throw or print exceptions?
@@ -326,7 +330,7 @@ namespace IngameCoding.Core
         /// </returns>
         public Instruction[] CompileCode(
             string sourceCode,
-            DirectoryInfo directory,
+            FileInfo file,
             Compiler.CompilerSettings compilerSettings,
             BBCode.Parser.ParserSettings parserSettings,
             bool HandleErrors = true)
@@ -337,7 +341,7 @@ namespace IngameCoding.Core
                 List<Warning> warnings = new();
                 try
                 {
-                    return CompileCode(sourceCode, directory, warnings, compilerSettings, parserSettings);
+                    return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings);
                 }
                 catch (Exception error)
                 {
@@ -386,7 +390,7 @@ namespace IngameCoding.Core
             else
             {
                 List<Warning> warnings = new();
-                return CompileCode(sourceCode, directory, warnings, compilerSettings, parserSettings);
+                return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings);
             }
         }
 
@@ -419,18 +423,18 @@ namespace IngameCoding.Core
 
             try
             {
-                this.printCallback?.Invoke("Parsing Code...", TerminalInterpreter.LogType.Debug);
+                this.printCallback?.Invoke("Parsing Code ...", TerminalInterpreter.LogType.Debug);
 
                 var tokenizer = new IngameCoding.AssemblerLike.Tokenizer();
                 var parser = new IngameCoding.AssemblerLike.Parser();
 
                 parser.Parse(tokenizer.Parse(code));
 
-                this.printCallback?.Invoke("Generate bytecodes...", TerminalInterpreter.LogType.Debug);
+                this.printCallback?.Invoke("Generate bytecodes ...", TerminalInterpreter.LogType.Debug);
 
                 var instructions = parser.GenerateCode();
 
-                this.printCallback?.Invoke("Initializing bytecode interpreter...", TerminalInterpreter.LogType.Debug);
+                this.printCallback?.Invoke("Initializing bytecode interpreter ...", TerminalInterpreter.LogType.Debug);
 
                 instructionOffsets = new() { Offsets = new() };
                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
@@ -578,8 +582,8 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            AddBuiltinFunction("conlog", new BBCode.TypeToken[] {
-                new BBCode.TypeToken("any", BuiltinType.ANY)
+            builtinFunctions.AddBuiltinFunction("conlog", new TypeToken[] {
+                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
                 if (parameters[0].type == DataItem.Type.LIST)
@@ -592,20 +596,20 @@ namespace IngameCoding.Core
                     OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Normal);
                 }
             });
-            AddBuiltinFunction("conerr", new BBCode.TypeToken[] {
-                new BBCode.TypeToken("any", BuiltinType.ANY)
+            builtinFunctions.AddBuiltinFunction("conerr", new TypeToken[] {
+                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
                 OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Error);
             });
-            AddBuiltinFunction("conwarn", new BBCode.TypeToken[] {
-                new BBCode.TypeToken("any", BuiltinType.ANY)
+            builtinFunctions.AddBuiltinFunction("conwarn", new TypeToken[] {
+                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
                 OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Warning);
             });
-            AddBuiltinFunction("sleep", new BBCode.TypeToken[] {
-                new BBCode.TypeToken("any", BuiltinType.ANY)
+            builtinFunctions.AddBuiltinFunction("sleep", new TypeToken[] {
+                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
                 pauseCodeFor = parameters[0].ValueInt;
@@ -615,7 +619,7 @@ namespace IngameCoding.Core
 
             #region Enviroment
 
-            AddBuiltinFunction("tmnw", () =>
+            builtinFunctions.AddBuiltinFunction("tmnw", () =>
             {
                 return new DataItem(DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
             });
@@ -624,9 +628,9 @@ namespace IngameCoding.Core
 
             #region Other
 
-            AddBuiltinFunction("splitstring", new BBCode.TypeToken[] {
-                new BBCode.TypeToken("string", BuiltinType.STRING),
-                new BBCode.TypeToken("string", BuiltinType.STRING)
+            this.builtinFunctions.AddBuiltinFunction("splitstring", new TypeToken[] {
+                TypeToken.CreateAnonymous("string", BuiltinType.STRING),
+                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
             }, (DataItem[] parameters) =>
             {
                 var splitCharacter = parameters[0].ValueString;
@@ -646,7 +650,7 @@ namespace IngameCoding.Core
 
             #region Net.Http
 
-            AddBuiltinFunction<string>("http-get", (url) =>
+            this.builtinFunctions.AddBuiltinFunction<string>("http-get", (url) =>
             {
                 System.Net.Http.HttpClient httpClient = new();
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
@@ -843,42 +847,6 @@ namespace IngameCoding.Core
 
         #region AddBuiltinFunction()
 
-        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Func<DataItem[], DataItem> callback)
-        {
-            BuiltinFunction function = new(new Action<DataItem[]>((p) =>
-            {
-                var x = callback(p);
-                this.bytecodeInterpeter.AddValueToStack(x);
-            }), parameterTypes, true);
-
-            if (!builtinFunctions.ContainsKey(name))
-            {
-                builtinFunctions.Add(name, function);
-            }
-            else
-            {
-                builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
-            }
-        }
-        void AddBuiltinFunction(string name, Func<DataItem> callback)
-        {
-            BuiltinFunction function = new(new Action<DataItem[]>((_) =>
-            {
-                var x = callback();
-                this.bytecodeInterpeter.AddValueToStack(x);
-            }), Array.Empty<BBCode.TypeToken>(), true);
-
-            if (!builtinFunctions.ContainsKey(name))
-            {
-                builtinFunctions.Add(name, function);
-            }
-            else
-            {
-                builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
-            }
-        }
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
         {
             BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
@@ -892,158 +860,6 @@ namespace IngameCoding.Core
                 builtinFunctions[name] = function;
                 Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
             }
-        }
-
-        public void AddBuiltinFunction(string name, Action callback)
-        {
-            var types = Array.Empty<TypeToken>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                callback?.Invoke();
-            });
-        }
-        public void AddBuiltinFunction<T0>(string name, Action<T0> callback)
-        {
-            var types = GetTypes<T0>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value());
-            });
-        }
-        public void AddBuiltinFunction<T0, T1>(string name, Action<T0, T1> callback)
-        {
-            var types = GetTypes<T0, T1>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value());
-            });
-        }
-        public void AddBuiltinFunction<T0, T1, T2>(string name, Action<T0, T1, T2> callback)
-        {
-            var types = GetTypes<T0, T1, T2>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value());
-            });
-        }
-
-        public void AddBuiltinFunction(string name, Func<object> callback)
-        {
-            var types = Array.Empty<TypeToken>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke(), $"{name}() result");
-            });
-        }
-        public void AddBuiltinFunction<T0>(string name, Func<T0, object> callback)
-        {
-            var types = GetTypes<T0>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value()), $"{name}() result");
-            });
-        }
-        public void AddBuiltinFunction<T0, T1>(string name, Func<T0, T1, object> callback)
-        {
-            var types = GetTypes<T0, T1>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value()), $"{name}() result");
-            });
-        }
-        public void AddBuiltinFunction<T0, T1, T2>(string name, Func<T0, T1, T2, object> callback)
-        {
-            var types = GetTypes<T0, T1, T2>();
-
-            AddBuiltinFunction(name, types, (args) =>
-            {
-                CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value()), $"{name}() result");
-            });
-        }
-
-        #endregion
-
-        static void CheckParameters(string functionName, TypeToken[] requied, DataItem[] passed)
-        {
-            if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
-
-            for (int i = 0; i < requied.Length; i++)
-            {
-                if (!passed[i].EqualType(requied[i].typeName)) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].typeName.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
-            }
-        }
-
-        #region GetTypes<>()
-
-        static TypeToken[] GetTypes<T0>() => new TypeToken[1]
-        {
-            GetType<T0>(),
-        };
-        static TypeToken[] GetTypes<T0, T1>() => new TypeToken[2]
-        {
-            GetType<T0>(),
-            GetType<T1>(),
-        };
-        static TypeToken[] GetTypes<T0, T1, T2>() => new TypeToken[3]
-        {
-            GetType<T0>(),
-            GetType<T1>(),
-            GetType<T2>(),
-        };
-        static TypeToken[] GetTypes<T0, T1, T2, T3>() => new TypeToken[4]
-        {
-            GetType<T0>(),
-            GetType<T1>(),
-            GetType<T2>(),
-            GetType<T3>(),
-        };
-        static TypeToken[] GetTypes<T0, T1, T2, T3, T4>() => new TypeToken[5]
-        {
-            GetType<T0>(),
-            GetType<T1>(),
-            GetType<T2>(),
-            GetType<T3>(),
-            GetType<T4>(),
-        };
-        static TypeToken[] GetTypes<T0, T1, T2, T3, T4, T5>() => new TypeToken[6]
-        {
-            GetType<T0>(),
-            GetType<T1>(),
-            GetType<T2>(),
-            GetType<T3>(),
-            GetType<T4>(),
-            GetType<T5>(),
-        };
-
-        static TypeToken GetType<T>()
-        {
-            var type_ = typeof(T);
-
-            if (type_ == typeof(int))
-            { return new TypeToken("int", BuiltinType.INT); }
-            if (type_ == typeof(float))
-            { return new TypeToken("float", BuiltinType.FLOAT); }
-            if (type_ == typeof(bool))
-            { return new TypeToken("bool", BuiltinType.BOOLEAN); }
-            if (type_ == typeof(string))
-            { return new TypeToken("string", BuiltinType.STRING); }
-
-            return null;
         }
 
         #endregion
@@ -1087,7 +903,7 @@ namespace IngameCoding.Core
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File.FullName, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -1099,7 +915,7 @@ namespace IngameCoding.Core
         /// Throw or print exceptions?
         /// </param>
         public static void Run(
-            string path,
+            FileInfo file,
             BBCode.Parser.ParserSettings parserSettings,
             Compiler.CompilerSettings compilerSettings,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
@@ -1108,13 +924,6 @@ namespace IngameCoding.Core
             bool HandleErrors = true
             )
         {
-            if (!File.Exists(path))
-            {
-                Output.Terminal.Output.LogError("File does not exists!");
-                return;
-            }
-
-            var file = new FileInfo(path);
             if (LogDebug) Output.Terminal.Output.LogDebug($"Run file '{file.FullName}'");
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
@@ -1163,7 +972,7 @@ namespace IngameCoding.Core
                 }
                 else
                 {
-                    compiledCode = codeInterpreter.CompileCode(code, file.Directory, compilerSettings, parserSettings, HandleErrors);
+                    compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
                 }
 
                 if (compiledCode != null)

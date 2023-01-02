@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace IngameCoding.Core
+﻿namespace IngameCoding.Core
 {
     public static class Extensions
     {
@@ -13,78 +11,68 @@ namespace IngameCoding.Core
             }
             return output;
         }
-    }
-
-    public struct Interval
-    {
-        public int Start;
-        public int End;
-
-        public Interval(int start, int end)
+        public static bool Contains(this Range<int> self, int v) => v >= self.Start && v <= self.End;
+        public static bool Contains(this Range<SinglePosition> self, SinglePosition v)
         {
-            Start = start;
-            End = end;
+            if (self.Start > v) return false;
+            if (self.End < v) return false;
+
+            return true;
         }
-        internal void Extend(Interval interval) => Extend(interval.Start, interval.End);
-
-        internal void Extend(int start, int end)
+        public static bool Contains(this Range<SinglePosition> self, int Line, int Column)
         {
-            Start = Math.Min(Start, start);
-            End = Math.Max(End, end);
+            if (self.Start.Line > Line) return false;
+            if (self.Start.Character > Column) return false;
+
+            if (self.End.Line < Line) return false;
+            if (self.End.Character < Column) return false;
+
+            return true;
         }
-    }
-
-    public struct Position
-    {
-        public static Position UnknownPosition => new(-1);
-
-        readonly bool unknown;
-        int line;
-        readonly int col;
-
-        public bool Unknown => unknown;
-        public int Line
+        public static Range<int> Extend(this Range<int> self, Range<int> range) => self.Extend(range.Start, range.End);
+        public static Range<int> Extend(this Range<int> self, int start, int end) => new()
         {
-            get { return line; }
-            set { line = value; }
-        }
-        public int Col => col;
-
-        public Interval AbsolutePosition;
-
-        public Position(int line)
+            Start = System.Math.Min(self.Start, start),
+            End = System.Math.Max(self.End, end),
+        };
+        public static Range<SinglePosition> Extend(this Range<SinglePosition> self, Range<SinglePosition> other)
         {
-            if (line > -1)
+            Range<SinglePosition> result = new()
             {
-                unknown = false;
-                this.line = line;
-            }
-            else
+                Start = new SinglePosition(self.Start.Line, self.Start.Character),
+                End = new SinglePosition(self.End.Line, self.End.Character),
+            };
+
+            if (result.Start.Line > other.Start.Line)
             {
-                unknown = true;
-                this.line = -1;
+                result.Start.Line = other.Start.Line;
+                result.Start.Character = other.Start.Character;
             }
-            col = -1;
-            AbsolutePosition = new Interval(-1, -1);
-        }
+            else if (result.Start.Character > other.Start.Character && result.Start.Line == other.Start.Line)
+            {
+                result.Start.Character = other.Start.Character;
+            }
 
-        public Position(int line, int column)
+            if (result.End.Line < other.End.Line)
+            {
+                result.End.Line = other.End.Line;
+                result.End.Character = other.End.Character;
+            }
+            else if (result.End.Character < other.End.Character && result.End.Line == other.End.Line)
+            {
+                result.End.Character = other.End.Character;
+            }
+
+            return result;
+        }
+        public static string ToMinString(this Range<SinglePosition> self)
         {
-            unknown = false;
-            this.line = line;
-            col = column;
-            AbsolutePosition = new Interval(-1, -1);
+            if (self.Start == self.End) return self.Start.ToMinString();
+            if (self.Start.Line == self.End.Line) return $"{self.Start.Line}:({self.Start.Character}-{self.End.Character})";
+            return $"{self.Start.ToMinString()}-{self.End.ToMinString()}";
         }
-
-        public Position(int line, int column, Interval absolutePosition)
-        {
-            unknown = false;
-            this.line = line;
-            col = column;
-            AbsolutePosition = absolutePosition;
-        }
-
-        internal void Extend(Interval absolutePosition) => AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
-        internal void Extend(int start, int end) => AbsolutePosition.Extend(start, end);
+        public static bool IsUnset(this Range<int> self) => self.Start == 0 && self.End == 0;
+        public static bool IsUnset(this Range<SinglePosition> self) => self.Start.IsUnset() && self.End.IsUnset();
+        public static bool IsUnset(this SinglePosition self) => self.Line == 0 && self.Character == 0;
     }
 }

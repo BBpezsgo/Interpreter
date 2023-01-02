@@ -27,14 +27,14 @@ namespace IngameCoding.Bytecode
         internal readonly ControlUnit CU;
         internal readonly MemoryUnit MU;
 
-        internal Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions;
+        internal Dictionary<string, BuiltinFunction> builtinFunctions;
 
         public int CodePointer
         {
             get { return MU.CodePointer; }
         }
 
-        public CentralProcessingUnit(Instruction[] code, int basePointer, Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions)
+        public CentralProcessingUnit(Instruction[] code, int basePointer, Dictionary<string, BuiltinFunction> builtinFunctions)
         {
             for (int i = 0; i < code.Length; i++)
             {
@@ -357,7 +357,7 @@ namespace IngameCoding.Bytecode
                 { throw new RuntimeException("Index was out of range!"); }
                 MU.Stack.Add(listValue.ValueList.items[indexValue.ValueInt]);
             }
-            if (listValue.type == DataItem.Type.STRING)
+            else if (listValue.type == DataItem.Type.STRING)
             {
                 if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
@@ -370,28 +370,27 @@ namespace IngameCoding.Bytecode
             return 4;
         }
 
+        void OnBuiltinFunctionReturnValue(DataItem returnValue)
+        {
+            Output.Debug.Debug.Log(returnValue.ToString());
+            MU.Stack.Add(returnValue, "return v");
+        }
+
         int CALL_BUILTIN()
         {
             if (MU.CurrentInstruction.additionParameter.Length == 0)
             { throw new InternalException("No function name given"); }
 
-            if (CPU.builtinFunctions.TryGetValue(MU.CurrentInstruction.additionParameter, out IngameCoding.BBCode.Compiler.BuiltinFunction builtinFunction))
+            if (CPU.builtinFunctions.TryGetValue(MU.CurrentInstruction.additionParameter, out BuiltinFunction builtinFunction))
             {
                 List<DataItem> parameters = new();
                 for (int i = 0; i < (int)MU.CurrentInstruction.parameter; i++)
                 { parameters.Add(MU.Stack.Pop()); }
-                if (builtinFunction.returnSomething)
+                if (builtinFunction.ReturnSomething)
                 {
-                    Action<DataItem> returnValue = new((returnVal) =>
-                    {
-                        Output.Debug.Debug.Log(returnVal.ToString());
-                        MU.Stack.Add(returnVal, "return v");
-                    });
+                    builtinFunction.OnReturn += OnBuiltinFunctionReturnValue;
                     builtinFunction.Callback(parameters.ToArray());
-                    builtinFunction.ReturnEvent += (result) =>
-                    {
-                        returnValue(result);
-                    };
+                    builtinFunction.OnReturn -= OnBuiltinFunctionReturnValue;
                 }
                 else
                 { builtinFunction.Callback(parameters.ToArray()); }
@@ -2383,7 +2382,7 @@ namespace IngameCoding.Bytecode
         readonly InterpeterDetails details;
         internal InterpeterDetails Details => details;
 
-        public BytecodeInterpeter(Instruction[] code, Dictionary<string, BBCode.Compiler.BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
+        public BytecodeInterpeter(Instruction[] code, Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
         {
             this.settings = settings;
 

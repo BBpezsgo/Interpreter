@@ -46,9 +46,12 @@ namespace IngameCoding.BCCode
             List<Token> tokens = new();
             Token currentToken = new()
             {
-                lineNumber = 1,
-                startOffset = 1,
-                endOffset = 1
+                Position = new Range<SinglePosition>()
+                {
+                    Start = new SinglePosition(-1, -1),
+                    End = new SinglePosition(-1, -1),
+                },
+                AbsolutePosition = new Range<int>(-1, -1)
             };
 
             string[] operators = new string[] { "-", ";", ",", ":" };
@@ -162,7 +165,7 @@ namespace IngameCoding.BCCode
                     currentToken.type = TokenType.LINEBREAK;
                     currentToken.text = currChar.ToString();
                     EndToken(currentToken, tokens, cursorPosition, cursorPositionTotal);
-                    if (currChar == '\n') currentToken.lineNumber++;
+                    if (currChar == '\n') currentToken.Position.Start.Line++;
                 }
                 else if (currChar == '"')
                 {
@@ -214,10 +217,11 @@ namespace IngameCoding.BCCode
 
         static void EndToken(Token token, List<Token> tokens, int cursorPosition, int cursorPositionTotal)
         {
-            token.endOffset = cursorPosition - 1;
-            token.startOffset = cursorPosition - token.text.Length;
-            token.endOffsetTotal = cursorPositionTotal - 1;
-            token.startOffsetTotal = cursorPositionTotal - token.text.Length;
+            token.Position.End.Character = cursorPosition - 1;
+            token.Position.Start.Character = cursorPosition - token.text.Length;
+            
+            token.AbsolutePosition.End = cursorPositionTotal - 1;
+            token.AbsolutePosition.Start = cursorPositionTotal - token.text.Length;
 
 
             if (token.type != TokenType.WHITESPACE)

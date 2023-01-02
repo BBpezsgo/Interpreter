@@ -142,7 +142,7 @@ namespace IngameCoding.BCCode
                 int paramCount = statement.intParameters.Count + statement.strParameters.Count + statement.identifyParameters.Count;
                 if (paramCount != GetParameterCount(instruction.opcode))
                 {
-                    throw new ParserException("Opcode '" + statement.name + "' needs " + GetParameterCount(instruction.opcode).ToString() + " parameters");
+                    throw new ParserException("Opcode '" + statement.name + "' needs " + GetParameterCount(instruction.opcode).ToString() + " parameters", new Position(statement.line, statement.startOffset));
                 }
 
                 if (instruction.opcode == Bytecode.Opcode.JUMP_BY_IF_FALSE || instruction.opcode == Bytecode.Opcode.JUMP_BY || instruction.opcode == Bytecode.Opcode.CALL)
@@ -306,13 +306,13 @@ namespace IngameCoding.BCCode
             {
                 name = possibleFunctionName.text,
 
-                line = possibleFunctionName.lineNumber,
+                line = possibleFunctionName.Position.Start.Line,
 
-                startOffset = possibleFunctionName.startOffset,
-                endOffset = possibleFunctionName.endOffset,
+                startOffset = possibleFunctionName.Position.Start.Character,
+                endOffset = possibleFunctionName.Position.End.Character,
 
-                startOffsetTotal = possibleFunctionName.startOffsetTotal,
-                endOffsetTotal = possibleFunctionName.endOffsetTotal
+                startOffsetTotal = possibleFunctionName.AbsolutePosition.Start,
+                endOffsetTotal = possibleFunctionName.AbsolutePosition.End
             };
 
             possibleFunctionName.subtype = TokenSubtype.CommandName;
@@ -331,7 +331,7 @@ namespace IngameCoding.BCCode
                             Token parameterIdentify = ExpectIdentifier();
                             if (parameterIdentify == null)
                             {
-                                throw new SyntaxException("Expected a parameter", new Position(command.line, command.endOffset, new Interval(command.endOffsetTotal, command.endOffsetTotal)));
+                                throw new SyntaxException("Expected a parameter", possibleFunctionName);
                             }
                             else
                             {
@@ -339,16 +339,16 @@ namespace IngameCoding.BCCode
 
                                 command.identifyParameters.Add(parameterIdentify.text);
 
-                                command.endOffset = parameterIdentify.endOffset;
-                                command.endOffsetTotal = parameterIdentify.endOffsetTotal;
+                                command.endOffset = parameterIdentify.Position.End.Character;
+                                command.endOffsetTotal = parameterIdentify.AbsolutePosition.End;
                             }
                         }
                         else
                         {
                             command.strParameters.Add(parameterStr.text);
 
-                            command.endOffset = parameterStr.endOffset;
-                            command.endOffsetTotal = parameterStr.endOffsetTotal;
+                            command.endOffset = parameterStr.Position.End.Character;
+                            command.endOffsetTotal = parameterStr.AbsolutePosition.End;
                         }
                     }
                     else
@@ -362,8 +362,8 @@ namespace IngameCoding.BCCode
                             command.intParameters.Add(int.Parse(parameterInt.text));
                         }
 
-                        command.endOffset = parameterInt.endOffset;
-                        command.endOffsetTotal = parameterInt.endOffsetTotal;
+                        command.endOffset = parameterInt.Position.End.Character;
+                        command.endOffsetTotal = parameterInt.AbsolutePosition.End;
                     }
 
                     if (ExpectLinebreak() != null)
@@ -373,11 +373,11 @@ namespace IngameCoding.BCCode
 
                     if (ExpectOperator(",", out Token operatorVesszo) == null)
                     {
-                        throw new SyntaxException("Expected ',' to separate parameters", new Position(parameterInt.lineNumber, parameterInt.endOffset, new Interval(parameterInt.endOffsetTotal, parameterInt.endOffsetTotal)));
+                        throw new SyntaxException("Expected ',' to separate parameters", parameterInt);
                     }
 
-                    command.endOffset = operatorVesszo.endOffset;
-                    command.endOffsetTotal = operatorVesszo.endOffsetTotal;
+                    command.endOffset = operatorVesszo.Position.End.Character;
+                    command.endOffsetTotal = operatorVesszo.AbsolutePosition.End;
 
                     endlessSafe++;
                     if (endlessSafe > 64) { throw new EndlessLoopException(); }

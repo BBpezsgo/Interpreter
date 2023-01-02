@@ -21,6 +21,9 @@ namespace IngameCoding.BBCode
         Statement,
         Library,
         Struct,
+        BuiltinType,
+        Hash,
+        HashParameter,
     }
 
     public enum BuiltinType
@@ -42,30 +45,49 @@ namespace IngameCoding.BBCode
         public BuiltinType typeName;
         public bool isList;
 
-        public override string ToString()
+        public TypeToken(string name, BuiltinType type, Token @base) : base()
         {
-            return this.text + (isList ? "[]" : "");
-        }
-
-        public TypeToken(string name, BuiltinType type)
-        {
-            this.text = name;
             this.typeName = type;
+            base.text = name;
+            if (@base == null)
+            {
+                base.type = TokenType.IDENTIFIER;
+            }
+            else
+            {
+                base.AbsolutePosition = @base.AbsolutePosition;
+                base.Position = @base.Position;
+                base.Analysis = @base.Analysis;
+                base.type = @base.type;
+            }
         }
 
         public new TypeToken Clone()
         {
-            return new TypeToken(this.text, this.typeName)
+            return new TypeToken(this.text, this.typeName, this)
             {
-                endOffset = this.endOffset,
-                startOffset = this.startOffset,
-                endOffsetTotal = this.endOffsetTotal,
-                startOffsetTotal = this.startOffsetTotal,
+                type = this.type,
+
+                AbsolutePosition = new Range<int>(this.AbsolutePosition.Start, this.AbsolutePosition.End),
+                Position = new Range<IngameCoding.Core.SinglePosition>()
+                {
+                    Start = new SinglePosition(Position.Start.Line, Position.Start.Character),
+                    End = new SinglePosition(Position.End.Line, Position.End.Character),
+                },
+
                 isList = this.isList,
-                lineNumber = this.lineNumber,
-                subtype = this.subtype,
+                Analysis = new TokenAnalysis()
+                {
+                    Subtype = Analysis.Subtype,
+                },
             };
         }
+
+        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
+        public static TypeToken CreateAnonymous(string name, BuiltinType type, bool isList) => new(name, type, null) { isList = isList };
+
+        public override string ToString() => this.text + (isList ? "[]" : "");
+        public new string ToFullString() => $"TypeToken {{ {this.typeName}{(isList ? "[]" : "")} {base.ToFullString()} }}";
     }
 
     namespace Parser
@@ -82,14 +104,19 @@ namespace IngameCoding.BBCode
             };
         }
 
+        public interface IDefinition
+        {
+            public string FilePath { get; set; }
+        }
+
         [Serializable]
         public class ParameterDefinition
         {
-            public string name;
+            public Token name;
             public TypeToken type;
 
-            internal bool withRefKeyword;
-            internal bool withThisKeyword;
+            public bool withRefKeyword;
+            public bool withThisKeyword;
 
             public override string ToString()
             {
@@ -102,41 +129,44 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public class FunctionDefinition
+        public class FunctionDefinition : IDefinition
         {
             public class Attribute
             {
-                public string Name;
+                public Token Name;
                 public object[] Parameters;
             }
 
-            public Attribute[] attributes;
-            public readonly string Name;
-            public string FullName
-            {
-                get
-                {
-                    return NamespacePathPrefix + Name;
-                }
-            }
-            public List<ParameterDefinition> parameters;
-            public List<Statement> statements;
-            public TypeToken type;
-            public readonly string[] namespacePath;
-            string NamespacePathPrefix
+            public Token BracketStart;
+            public Token BracketEnd;
+
+            public Attribute[] Attributes;
+            public readonly Token Name;
+            /// <summary>
+            /// <c>[Namespace].[...].Name</c>
+            /// </summary>
+            public string FullName => NamespacePathString + Name.text;
+            public List<ParameterDefinition> Parameters;
+            public List<Statement> Statements;
+            public TypeToken Type;
+            public readonly string[] NamespacePath;
+            /// <summary>
+            /// <c>[Namespace].[...].</c>
+            /// </summary>
+            string NamespacePathString
             {
                 get
                 {
                     string val = "";
-                    for (int i = 0; i < namespacePath.Length; i++)
+                    for (int i = 0; i < NamespacePath.Length; i++)
                     {
                         if (val.Length > 0)
                         {
-                            val += "." + namespacePath[i].ToString();
+                            val += "." + NamespacePath[i].ToString();
                         }
                         else
                         {
-                            val = namespacePath[i].ToString();
+                            val = NamespacePath[i].ToString();
                         }
                     }
                     if (val.Length > 0)
@@ -147,140 +177,107 @@ namespace IngameCoding.BBCode
                 }
             }
 
-            public FunctionDefinition(string[] namespacePath, string name)
+            public string FilePath { get; set; }
+
+            public FunctionDefinition(string[] namespacePath, Token name)
             {
-                parameters = new List<ParameterDefinition>();
-                statements = new List<Statement>();
-                attributes = Array.Empty<Attribute>();
-                this.namespacePath = namespacePath;
+                Parameters = new List<ParameterDefinition>();
+                Statements = new List<Statement>();
+                Attributes = Array.Empty<Attribute>();
+                this.NamespacePath = namespacePath;
                 this.Name = name;
             }
 
-            public FunctionDefinition(List<string> namespacePath, string name)
+            public FunctionDefinition(List<string> namespacePath, Token name)
             {
-                parameters = new List<ParameterDefinition>();
-                statements = new List<Statement>();
-                attributes = Array.Empty<Attribute>();
-                this.namespacePath = namespacePath.ToArray();
+                Parameters = new List<ParameterDefinition>();
+                Statements = new List<Statement>();
+                Attributes = Array.Empty<Attribute>();
+                this.NamespacePath = namespacePath.ToArray();
                 this.Name = name;
             }
 
             public override string ToString()
             {
-                return $"{this.type.text} {this.FullName}" + (this.parameters.Count > 0 ? "(...)" : "()") + " " + (this.statements.Count > 0 ? "{...}" : "{}");
+                return $"{this.Type.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
             }
 
             public string PrettyPrint(int ident = 0)
             {
                 List<string> parameters = new();
-                foreach (var parameter in this.parameters)
+                foreach (var parameter in this.Parameters)
                 {
                     parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
                 }
 
                 List<string> statements = new();
-                foreach (var statement in this.statements)
+                foreach (var statement in this.Statements)
                 {
                     statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}{this.type.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+                return $"{" ".Repeat(ident)}{this.Type.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
             }
         }
 
-        public class StructDefinition
+        public class StructDefinition : IDefinition
         {
-            public FunctionDefinition.Attribute[] attributes;
-            readonly string name;
-            public string FullName
+            public readonly FunctionDefinition.Attribute[] Attributes;
+            public readonly Token Name;
+            /// <summary><c>[Namespace].[...].Name</c></summary>
+            public string FullName => NamespacePathString + Name.text;
+            public Token BracketStart;
+            public Token BracketEnd;
+            public List<Statement> Statements;
+            public string FilePath { get; set; }
+            public readonly string[] NamespacePath;
+            /// <summary><c>[Namespace].[...].</c></summary>
+            string NamespacePathString
             {
                 get
                 {
-                    return NamespacePathPrefix + name;
-                }
-            }
-            public List<ParameterDefinition> parameters;
-            public List<Statement> statements;
-            public TypeToken type;
-            public readonly string[] namespacePath;
-            string NamespacePathPrefix
-            {
-                get
-                {
-                    string val = "";
-                    for (int i = 0; i < namespacePath.Length; i++)
+                    string result = "";
+                    for (int i = 0; i < NamespacePath.Length; i++)
                     {
-                        if (val.Length > 0)
+                        if (result.Length > 0)
                         {
-                            val += "." + namespacePath[i].ToString();
+                            result += "." + NamespacePath[i].ToString();
                         }
                         else
                         {
-                            val = namespacePath[i].ToString();
+                            result = NamespacePath[i].ToString();
                         }
                     }
-                    if (val.Length > 0)
+                    if (result.Length > 0)
                     {
-                        val += ".";
+                        result += ".";
                     }
-                    return val;
+                    return result;
                 }
             }
+            public readonly ParameterDefinition[] Fields;
+            public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
+            readonly Dictionary<string, FunctionDefinition> methods;
 
-            public List<ParameterDefinition> fields;
-            public Dictionary<string, FunctionDefinition> methods;
-            public string NamespacePath
+            public StructDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<ParameterDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
             {
-                get
-                {
-                    string val = "";
-                    for (int i = 0; i < namespacePath.Length; i++)
-                    {
-                        if (val.Length > 0)
-                        {
-                            val += "." + namespacePath[i].ToString();
-                        }
-                        else
-                        {
-                            val = namespacePath[i].ToString();
-                        }
-                    }
-                    return val;
-                }
-            }
-
-            public StructDefinition(string[] namespacePath, string name)
-            {
-                this.name = name;
-                this.fields = new List<ParameterDefinition>();
-                this.methods = new Dictionary<string, FunctionDefinition>();
-                this.attributes = Array.Empty<FunctionDefinition.Attribute>();
-                this.namespacePath = namespacePath;
-                this.parameters = new List<ParameterDefinition>();
-                this.statements = new List<Statement>();
-                this.type = null;
-            }
-            public StructDefinition(List<string> namespacePath, string name)
-            {
-                this.name = name;
-                this.fields = new List<ParameterDefinition>();
-                this.methods = new Dictionary<string, FunctionDefinition>();
-                this.attributes = Array.Empty<FunctionDefinition.Attribute>();
-                this.namespacePath = namespacePath.ToArray();
-                this.parameters = new List<ParameterDefinition>();
-                this.statements = new List<Statement>();
-                this.type = null;
+                this.Name = name;
+                this.Fields = fields.ToArray();
+                this.methods = new Dictionary<string, FunctionDefinition>(methods);
+                this.Attributes = attributes.ToArray();
+                this.NamespacePath = namespacePath.ToArray();
+                this.Statements = new List<Statement>();
             }
 
             public override string ToString()
             {
-                return $"struct {this.name} " + "{...}";
+                return $"struct {this.Name.text} " + "{...}";
             }
 
             public string PrettyPrint(int ident = 0)
             {
                 List<string> fields = new();
-                foreach (var field in this.fields)
+                foreach (var field in this.Fields)
                 {
                     fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
@@ -291,8 +288,29 @@ namespace IngameCoding.BBCode
                     methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}struct {this.name} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
+                return $"{" ".Repeat(ident)}struct {this.Name.text} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
             }
+        }
+
+        public class NamespaceDefinition : IDefinition
+        {
+            public Token Name;
+            public Token Keyword;
+            public Token BracketStart;
+            public Token BracketEnd;
+            public string FilePath { get; set; }
+
+            public override string ToString()
+            {
+                return $"namespace {this.Name.text} " + "{ ... }";
+            }
+        }
+
+        public struct UsingAnalysis
+        {
+            public string Path;
+            public bool Found;
+            public double ParseTime;
         }
 
         public struct ParserResult
@@ -300,26 +318,33 @@ namespace IngameCoding.BBCode
             public readonly List<FunctionDefinition> Functions;
             public readonly Dictionary<string, StructDefinition> Structs;
             public readonly List<Statement_NewVariable> GlobalVariables;
-            public readonly List<string> Usings;
+            public readonly List<UsingDefinition> Usings;
+            public readonly Statement_HashInfo[] Hashes;
+            public readonly List<UsingAnalysis> UsingsAnalytics;
+            /// <summary>
+            /// Only used for diagnostics!
+            /// </summary>
+            public readonly List<NamespaceDefinition> Namespaces;
 
-            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<string> usings)
+            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes)
             {
                 Functions = functions;
                 GlobalVariables = globalVariables;
                 Structs = structs;
                 Usings = usings;
+                UsingsAnalytics = new();
+                Namespaces = namespaces;
+                Hashes = hashes.ToArray();
             }
 
-            /// <summary>
-            /// Converts the parsed AST into text
-            /// </summary>
+            /// <summary>Converts the parsed AST into text</summary>
             public string PrettyPrint()
             {
                 var x = "";
 
                 foreach (var @using in Usings)
                 {
-                    x += "using " + @using + ";\n";
+                    x += "using " + @using.PathString + ";\n";
                 }
 
                 foreach (var globalVariable in GlobalVariables)
@@ -435,7 +460,7 @@ namespace IngameCoding.BBCode
 
                 foreach (var item in this.Structs)
                 {
-                    foreach (var attr in item.Value.attributes)
+                    foreach (var attr in item.Value.Attributes)
                     { Attribute(attr); }
 
                     Console.ForegroundColor = ConsoleColor.Blue;
@@ -444,7 +469,7 @@ namespace IngameCoding.BBCode
                     Console.Write($"{item.Key} ");
                     Console.Write("\n\r");
 
-                    foreach (var field in item.Value.fields)
+                    foreach (var field in item.Value.Fields)
                     {
                         Console.ForegroundColor = ConsoleColor.Blue;
                         Console.Write($"  {field.type} ");
@@ -463,21 +488,21 @@ namespace IngameCoding.BBCode
 
                 foreach (var item in this.Functions)
                 {
-                    foreach (var attr in item.attributes)
+                    foreach (var attr in item.Attributes)
                     { Attribute(attr); }
 
                     Console.ForegroundColor = ConsoleColor.Blue;
-                    if (item.type.typeName == BuiltinType.STRUCT)
+                    if (item.Type.typeName == BuiltinType.STRUCT)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
-                    Console.Write($"{item.type} ");
+                    Console.Write($"{item.Type} ");
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Write($"{item.FullName}");
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write("(");
-                    for (int i = 0; i < item.parameters.Count; i++)
+                    for (int i = 0; i < item.Parameters.Count; i++)
                     {
                         if (i > 0)
                         {
@@ -485,7 +510,7 @@ namespace IngameCoding.BBCode
                             Console.Write($", ");
                         }
 
-                        ParameterDefinition param = item.parameters[i];
+                        ParameterDefinition param = item.Parameters[i];
                         Console.ForegroundColor = ConsoleColor.Blue;
                         if (param.withThisKeyword)
                         { Console.Write("this "); }
@@ -500,7 +525,7 @@ namespace IngameCoding.BBCode
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write(")");
 
-                    if (item.statements.Count > 0)
+                    if (item.Statements.Count > 0)
                     {
                         int statementCount = 0;
                         void AddStatement(Statement st)
@@ -554,7 +579,7 @@ namespace IngameCoding.BBCode
                                 }
                             }
                         }
-                        foreach (var st in item.statements)
+                        foreach (var st in item.Statements)
                         {
                             AddStatement(st);
                         }
@@ -572,6 +597,111 @@ namespace IngameCoding.BBCode
 
                 Console.WriteLine("\n\r === ===\n\r");
             }
+
+            public void SetFile(string path)
+            {
+                if (string.IsNullOrEmpty(path))
+                { throw new ArgumentException($"'{nameof(path)}' cannot be null or empty.", nameof(path)); }
+
+                for (int i = 0; i < this.Functions.Count; i++)
+                { this.Functions[i].FilePath = path; }
+                for (int j = 0; j < this.Namespaces.Count; j++)
+                { this.Namespaces[j].FilePath = path; }
+                for (int i = 0; i < this.GlobalVariables.Count; i++)
+                { this.GlobalVariables[i].FilePath = path; }
+                for (int i = 0; i < this.Structs.Count; i++)
+                { this.Structs.ElementAt(i).Value.FilePath = path; }
+                for (int i = 0; i < this.Hashes.Length; i++)
+                { this.Hashes[i].FilePath = path; }
+                StatementFinder.GetAllStatement(this, statement =>
+                {
+                    if (statement is not IDefinition def) return false;
+                    def.FilePath = path;
+                    return false;
+                });
+            }
+
+            public void CheckFilePaths(System.Action<string> NotSetCallback)
+            {
+                for (int i = 0; i < this.Functions.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(this.Functions[i].FilePath))
+                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} : {this.Functions[i].FilePath}"); }
+                }
+                for (int i = 0; i < this.Namespaces.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(this.Namespaces[i].FilePath))
+                    { NotSetCallback?.Invoke($"Namespace.FilePath {this.Namespaces[i]} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"Namespace.FilePath {this.Namespaces[i]} : {this.Namespaces[i].FilePath}"); }
+                }
+                for (int i = 0; i < this.GlobalVariables.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(this.GlobalVariables[i].FilePath))
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {this.GlobalVariables[i]} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {this.GlobalVariables[i]} : {this.GlobalVariables[i].FilePath}"); }
+                }
+                for (int i = 0; i < this.Structs.Count; i++)
+                {
+                    if (string.IsNullOrEmpty(this.Structs.ElementAt(i).Value.FilePath))
+                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} : {this.Structs.ElementAt(i).Value.FilePath}"); }
+                }
+                for (int i = 0; i < this.Hashes.Length; i++)
+                {
+                    if (string.IsNullOrEmpty(this.Hashes[i].FilePath))
+                    { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
+                }
+                StatementFinder.GetAllStatement(this, statement =>
+                {
+                    if (statement is not IDefinition def) return false;
+                    if (string.IsNullOrEmpty(def.FilePath))
+                    { NotSetCallback?.Invoke($"IDefinition.FilePath {def} is null"); }
+                    else
+                    { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
+                    return false;
+                });
+            }
+        }
+
+        public struct ParserResultHeader
+        {
+            public readonly List<UsingDefinition> Usings;
+            public readonly Statement_HashInfo[] Hashes;
+            public readonly List<UsingAnalysis> UsingsAnalytics;
+
+            public ParserResultHeader(List<UsingDefinition> usings, List<Statement_HashInfo> hashes)
+            {
+                Usings = usings;
+                UsingsAnalytics = new();
+                Hashes = hashes.ToArray();
+            }
+        }
+
+        public class UsingDefinition
+        {
+            public Token[] Path;
+            public Token Keyword;
+
+            public string PathString
+            {
+                get
+                {
+                    string result = "";
+                    for (int i = 0; i < Path.Length; i++)
+                    {
+                        if (i > 0) result += ".";
+                        result += Path[i].text;
+                    }
+                    return result;
+                }
+            }
         }
 
         /// <summary>
@@ -581,8 +711,23 @@ namespace IngameCoding.BBCode
         {
             int currentTokenIndex;
             readonly List<Token> tokens = new();
+            public Token[] Tokens => tokens.ToArray();
 
-            Token CurrentToken => (currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
+            Token CurrentToken
+            {
+                get
+                {
+                    if (currentTokenIndex < tokens.Count)
+                    {
+                        tokens[currentTokenIndex].Analysis.ParserReached = true;
+                        return tokens[currentTokenIndex];
+                    }
+                    else
+                    {
+                        return null;
+                    }
+                }
+            }
 
             readonly Dictionary<string, TypeToken> types = new();
             readonly Dictionary<string, int> operators = new();
@@ -596,28 +741,31 @@ namespace IngameCoding.BBCode
                     List<string> returnValue = new();
                     foreach (var variable in GlobalVariables)
                     {
-                        returnValue.Add(variable.variableName);
+                        returnValue.Add(variable.variableName.text);
                     }
                     return returnValue;
                 }
             }
 
             List<Warning> Warnings;
+            public readonly List<Error> Errors = new();
 
             // === Result ===
             readonly List<FunctionDefinition> Functions = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly List<Statement_NewVariable> GlobalVariables = new();
-            readonly List<string> Usings = new();
+            readonly List<UsingDefinition> Usings = new();
+            readonly List<NamespaceDefinition> Namespaces = new();
+            readonly List<Statement_HashInfo> Hashes = new();
             // === ===
 
             public Parser()
             {
-                types.Add("int", new TypeToken("int", BuiltinType.INT));
-                types.Add("string", new TypeToken("string", BuiltinType.STRING));
-                types.Add("void", new TypeToken("void", BuiltinType.VOID));
-                types.Add("float", new TypeToken("float", BuiltinType.FLOAT));
-                types.Add("bool", new TypeToken("bool", BuiltinType.BOOLEAN));
+                types.Add("int", TypeToken.CreateAnonymous("int", BuiltinType.INT));
+                types.Add("string", TypeToken.CreateAnonymous("string", BuiltinType.STRING));
+                types.Add("void", TypeToken.CreateAnonymous("void", BuiltinType.VOID));
+                types.Add("float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT));
+                types.Add("bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN));
 
                 operators.Add("|", 4);
                 operators.Add("&", 4);
@@ -687,7 +835,20 @@ namespace IngameCoding.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings);
+                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes);
+            }
+
+            public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
+            {
+                Warnings = warnings;
+                tokens.Clear();
+                tokens.AddRange(_tokens);
+
+                currentTokenIndex = 0;
+
+                ParseCodeHeader();
+
+                return new ParserResultHeader(this.Usings, this.Hashes);
             }
 
             /// <summary>
@@ -714,14 +875,20 @@ namespace IngameCoding.BBCode
             /// </returns>
             public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Terminal.TerminalInterpreter.LogType> printCallback = null)
             {
-                var (tokens, _) = Tokenizer.Parse(code, TokenizerSettings.Default, printCallback);
+                var tokenizer = new Tokenizer(TokenizerSettings.Default);
+                var (tokens, _) = tokenizer.Parse(code);
 
                 DateTime parseStarted = DateTime.Now;
                 if (printCallback != null)
-                { printCallback?.Invoke("Parsing...", Terminal.TerminalInterpreter.LogType.Debug); }
+                { printCallback?.Invoke("Parsing ...", Terminal.TerminalInterpreter.LogType.Debug); }
 
                 Parser parser = new();
                 var result = parser.Parse(tokens, warnings);
+
+                if (parser.Errors.Count > 0)
+                {
+                    throw new Exception("Failed to parse", new Exception(parser.Errors[0].Message, parser.Errors[0].position));
+                }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Terminal.TerminalInterpreter.LogType.Debug); }
@@ -731,51 +898,92 @@ namespace IngameCoding.BBCode
 
             #region Parse top level
 
-            bool ExpectUsing(out string @namespace)
+            bool ExpectHash(out Statement_HashInfo hashStatement)
             {
-                @namespace = string.Empty;
+                hashStatement = null;
 
-                Token usingT = ExpectIdentifier("using");
-                if (usingT == null)
+                if (ExpectOperator("#", out var hashT) == null)
                 { return false; }
-                usingT.subtype = TokenSubtype.Keyword;
 
-                List<Token> tokens = new();
+                hashT.Analysis.Subtype = TokenSubtype.Hash;
+
+                if (ExpectIdentifier(out var hashName) == null)
+                { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", hashT); }
+
+                hashName.Analysis.Subtype = TokenSubtype.Hash;
+
+                List<Statement_Literal> parameters = new();
                 int endlessSafe = 50;
-                while (ExpectIdentifier(out Token pathPartT) != null)
+                while (ExpectOperator(";") == null)
                 {
-                    pathPartT.subtype = TokenSubtype.Library;
-                    tokens.Add(pathPartT);
-                    @namespace += pathPartT.text;
-                    if (ExpectOperator(";") != null)
-                    {
-                        break;
-                    }
-                    else if (ExpectOperator(".") == null)
-                    {
-                        throw new SyntaxException($"Unexpected token '{CurrentToken.text}'", pathPartT);
-                    }
+                    if (!ExpectLiteral(out var parameter))
+                    { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", CurrentToken); }
 
-                    @namespace += ".";
+                    parameter.ValueToken.Analysis.Subtype = TokenSubtype.HashParameter;
+                    parameters.Add(parameter);
+
+                    if (ExpectOperator(";") != null)
+                    { break; }
 
                     endlessSafe--;
                     if (endlessSafe <= 0)
                     { throw new EndlessLoopException(); }
                 }
 
-                if (@namespace == string.Empty)
+                hashStatement = new Statement_HashInfo
+                {
+                    HashToken = hashT,
+                    HashName = hashName,
+                    Parameters = parameters.ToArray()
+                };
+
+                return true;
+            }
+
+            bool ExpectUsing(out UsingDefinition usingDefinition)
+            {
+                usingDefinition = null;
+
+                Token usingT = ExpectIdentifier("using");
+                if (usingT == null)
+                { return false; }
+                usingT.Analysis.Subtype = TokenSubtype.Keyword;
+
+                List<Token> tokens = new();
+                int endlessSafe = 50;
+                while (ExpectIdentifier(out Token pathPartT) != null)
+                {
+                    pathPartT.Analysis.Subtype = TokenSubtype.Library;
+                    tokens.Add(pathPartT);
+
+                    if (ExpectOperator(";") != null)
+                    { break; }
+                    else if (ExpectOperator(".") == null)
+                    { throw new SyntaxException($"Unexpected token '{CurrentToken.text}'", pathPartT); }
+
+                    endlessSafe--;
+                    if (endlessSafe <= 0)
+                    { throw new EndlessLoopException(); }
+                }
+
+                if (tokens.Count == 0)
                 { throw new SyntaxException("Expected library name after 'using'", usingT); }
 
+                usingDefinition = new UsingDefinition
+                {
+                    Path = tokens.ToArray(),
+                    Keyword = usingT,
+                };
 
                 return true;
             }
 
             void ParseCodeHeader()
             {
+                while (ExpectHash(out var hash))
+                { Hashes.Add(hash); }
                 while (ExpectUsing(out var usingNamespace))
-                {
-                    Usings.Add(usingNamespace);
-                }
+                { Usings.Add(usingNamespace); }
             }
 
             void ParseCodeBlock()
@@ -785,7 +993,7 @@ namespace IngameCoding.BBCode
                 else if (ExpectFunctionDefinition()) { }
                 else if (ExpectGlobalVariable()) { }
                 else
-                { throw new SyntaxException("Expected global variable or namespace/struct/function definition", CurrentToken); }
+                { throw new SyntaxException($"Expected global variable or namespace/struct/function definition. Got a token {CurrentToken}", CurrentToken); }
             }
 
             bool ExpectGlobalVariable()
@@ -796,7 +1004,7 @@ namespace IngameCoding.BBCode
                     GlobalVariables.Add(possibleVariable);
 
                     if (ExpectOperator(";") == null)
-                    { throw new SyntaxException("Expected ';' at end of statement", new Position(CurrentToken.lineNumber)); }
+                    { Errors.Add(new Error("Expected ';' at end of statement (after global variable definition)", CurrentToken)); }
 
                     return true;
                 }
@@ -825,7 +1033,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { throw new ParserException("Attribute '" + attr + "' already applied to the function"); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Name)); }
                 }
 
                 TypeToken possibleType = ExceptTypeToken(false);
@@ -839,13 +1047,13 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("(") == null)
                 { currentTokenIndex = parseStart; return false; }
 
-                FunctionDefinition function = new(CurrentNamespace, possibleNameT.text)
+                FunctionDefinition function = new(CurrentNamespace, possibleNameT)
                 {
-                    type = possibleType,
-                    attributes = attributes.ToArray()
+                    Type = possibleType,
+                    Attributes = attributes.ToArray(),
                 };
 
-                possibleNameT.subtype = TokenSubtype.MethodName;
+                possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
 
                 var expectParameter = false;
                 while (ExpectOperator(")") == null || expectParameter)
@@ -853,13 +1061,13 @@ namespace IngameCoding.BBCode
                     Token thisKeywordT = ExpectIdentifier("this");
                     if (thisKeywordT != null)
                     {
-                        thisKeywordT.subtype = TokenSubtype.Keyword;
-                        if (function.parameters.Count > 0)
-                        { throw new ParserException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
+                        thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
+                        if (function.Parameters.Count > 0)
+                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
                     }
 
                     Token referenceKeywordT = ExpectIdentifier("ref");
-                    if (referenceKeywordT != null) referenceKeywordT.subtype = TokenSubtype.Keyword;
+                    if (referenceKeywordT != null) referenceKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
 
                     TypeToken possibleParameterType = ExceptTypeToken(false, true);
                     if (possibleParameterType == null)
@@ -869,16 +1077,16 @@ namespace IngameCoding.BBCode
                     if (possibleParameterNameT == null)
                     { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                    possibleParameterNameT.subtype = TokenSubtype.VariableName;
+                    possibleParameterNameT.Analysis.Subtype = TokenSubtype.VariableName;
 
                     ParameterDefinition parameterDefinition = new()
                     {
                         type = possibleParameterType,
-                        name = possibleParameterNameT.text,
+                        name = possibleParameterNameT,
                         withRefKeyword = referenceKeywordT != null,
                         withThisKeyword = thisKeywordT != null,
                     };
-                    function.parameters.Add(parameterDefinition);
+                    function.Parameters.Add(parameterDefinition);
 
                     if (ExpectOperator(")") != null)
                     { break; }
@@ -893,10 +1101,12 @@ namespace IngameCoding.BBCode
 
                 if (ExpectOperator(";") == null)
                 {
-                    statements = ParseFunctionBody();
+                    statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                    function.BracketStart = braceletStart;
+                    function.BracketEnd = braceletEnd;
                 }
 
-                function.statements = statements;
+                function.Statements = statements;
 
                 Functions.Add(function);
 
@@ -908,18 +1118,18 @@ namespace IngameCoding.BBCode
                 if (ExpectIdentifier("namespace", out var possibleNamespaceIdentifier) == null)
                 { return false; }
 
-                possibleNamespaceIdentifier.subtype = TokenSubtype.Keyword;
+                possibleNamespaceIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
 
                 Token possibleName = ExpectIdentifier();
                 if (possibleName != null)
                 {
-                    Token possibleOperator = ExpectOperator("{");
-                    if (possibleOperator != null)
+                    if (ExpectOperator("{", out var braceletStart) != null)
                     {
-                        possibleName.subtype = TokenSubtype.Library;
+                        possibleName.Analysis.Subtype = TokenSubtype.Library;
                         CurrentNamespace.Add(possibleName.text);
                         int endlessSafe = 0;
-                        while (ExpectOperator("}") == null)
+                        Token braceletEnd;
+                        while (ExpectOperator("}", out braceletEnd) == null)
                         {
                             ParseCodeBlock();
                             endlessSafe++;
@@ -929,7 +1139,13 @@ namespace IngameCoding.BBCode
                             }
                         }
                         CurrentNamespace.RemoveAt(CurrentNamespace.Count - 1);
-
+                        Namespaces.Add(new NamespaceDefinition()
+                        {
+                            Name = possibleName,
+                            Keyword = possibleNamespaceIdentifier,
+                            BracketStart = braceletStart,
+                            BracketEnd = braceletEnd,
+                        });
                         return true;
                     }
                     { throw new SyntaxException("Expected { after namespace name", possibleName); }
@@ -959,7 +1175,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { throw new ParserException("Attribute '" + attr + "' already applied to the struct"); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Name)); }
                 }
 
                 Token possibleType = ExpectIdentifier("struct");
@@ -968,26 +1184,27 @@ namespace IngameCoding.BBCode
 
                 Token possibleStructName = ExpectIdentifier();
                 if (possibleStructName == null)
-                { throw new ParserException("Expected struct identifier after keyword 'struct'"); }
+                { throw new ParserException("Expected struct identifier after keyword 'struct'", possibleType); }
 
-                if (ExpectOperator("{") == null)
-                { throw new ParserException("Expected '{' after struct identifier"); }
+                if (ExpectOperator("{", out var braceletStart) == null)
+                { throw new ParserException("Expected '{' after struct identifier", possibleStructName); }
 
-                possibleStructName.subtype = TokenSubtype.Struct;
-                possibleType.subtype = TokenSubtype.Keyword;
+                possibleStructName.Analysis.Subtype = TokenSubtype.Struct;
+                possibleType.Analysis.Subtype = TokenSubtype.Keyword;
 
-                StructDefinition structDefinition = new(CurrentNamespace, possibleStructName.text)
-                {
-                    attributes = attributes.ToArray()
-                };
+                List<ParameterDefinition> fields = new();
+                Dictionary<string, FunctionDefinition> methods = new();
 
                 int endlessSafe = 0;
-                while (ExpectOperator("}") == null)
+                Token braceletEnd;
+                while (ExpectOperator("}", out braceletEnd) == null)
                 {
                     ParameterDefinition field = ExpectField();
                     if (field != null)
                     {
-                        structDefinition.fields.Add(field);
+                        fields.Add(field);
+                        if (ExpectOperator(";") == null)
+                        { Errors.Add(new Error("Expected ';' at end of statement" + ((field != null) ? " (after field definition)" : ""), new Position(CurrentToken.Position.Start.Line))); }
                     }
                     else
                     {
@@ -996,11 +1213,11 @@ namespace IngameCoding.BBCode
                         enableThisKeyword = false;
                         if (method != null)
                         {
-                            structDefinition.methods.Add(method.FullName, method);
+                            methods.Add(method.FullName, method);
                         }
+                        if (ExpectOperator(";") == null)
+                        { Errors.Add(new Error("Expected ';' at end of statement" + ((field != null) ? " (after method definition)" : ""), new Position(CurrentToken.Position.Start.Line))); }
                     }
-                    if (ExpectOperator(";") == null)
-                        throw new SyntaxException("Expected ';' at end of statement", new Position(CurrentToken.lineNumber));
 
                     endlessSafe++;
                     if (endlessSafe > 50)
@@ -1008,6 +1225,12 @@ namespace IngameCoding.BBCode
                         throw new EndlessLoopException();
                     }
                 }
+
+                StructDefinition structDefinition = new(CurrentNamespace, possibleStructName, attributes, fields, methods)
+                {
+                    BracketStart = braceletStart,
+                    BracketEnd = braceletEnd
+                };
 
                 Structs.Add(structDefinition.FullName, structDefinition);
 
@@ -1019,7 +1242,7 @@ namespace IngameCoding.BBCode
                 if (ExpectIdentifier("ref", out var refKeyword) == null)
                 { return null; }
 
-                refKeyword.subtype = TokenSubtype.Keyword;
+                refKeyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 if (ExpectIdentifier(out Token variableName) == null)
                 { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
@@ -1038,14 +1261,12 @@ namespace IngameCoding.BBCode
 
                 Statement_Variable variableNameStatement = new()
                 {
-                    variableName = variableName.text,
+                    variableName = variableName,
                     reference = true,
+                    position = variableName.GetPosition(),
                 };
 
-                variableNameStatement.position.Line = variableName.lineNumber;
-                variableNameStatement.position.Extend(variableName.Position.AbsolutePosition);
-
-                variableName.subtype = TokenSubtype.VariableName;
+                variableName.Analysis.Subtype = TokenSubtype.VariableName;
 
                 return variableNameStatement;
             }
@@ -1063,7 +1284,8 @@ namespace IngameCoding.BBCode
 
                 listValue = new Statement_ListValue()
                 {
-                    Values = new List<Statement>()
+                    Values = new List<Statement>(),
+                    position = o0.GetPosition(),
                 };
 
                 int endlessSafe = 0;
@@ -1100,11 +1322,10 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new TypeToken("float", BuiltinType.FLOAT)
+                        type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
+                        position = CurrentToken.GetPosition(),
+                        ValueToken = CurrentToken,
                     };
-
-                    literal.position.Line = CurrentToken.lineNumber;
-                    literal.position.Extend(CurrentToken.Position.AbsolutePosition);
 
                     currentTokenIndex++;
 
@@ -1116,11 +1337,10 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new TypeToken("int", BuiltinType.INT)
+                        type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        position = CurrentToken.GetPosition(),
+                        ValueToken = CurrentToken,
                     };
-
-                    literal.position.Line = CurrentToken.lineNumber;
-                    literal.position.Extend(CurrentToken.Position.AbsolutePosition);
 
                     currentTokenIndex++;
 
@@ -1132,11 +1352,12 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = CurrentToken.text,
-                        type = new TypeToken("string", BuiltinType.STRING)
+                        type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
+                        position = CurrentToken.GetPosition(),
+                        ValueToken = CurrentToken,
                     };
 
-                    literal.position.Line = CurrentToken.lineNumber;
-                    literal.position.Extend(CurrentToken.startOffsetTotal - 1, CurrentToken.endOffsetTotal + 1);
+                    literal.position.Extend(CurrentToken.AbsolutePosition.Start - 1, CurrentToken.AbsolutePosition.End + 1);
 
                     currentTokenIndex++;
 
@@ -1148,13 +1369,12 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = "true",
-                        type = new TypeToken("bool", BuiltinType.BOOLEAN)
+                        type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
+                        position = tTrue.GetPosition(),
+                        ValueToken = CurrentToken,
                     };
 
-                    tTrue.subtype = TokenSubtype.Keyword;
-
-                    literal.position.Line = tTrue.lineNumber;
-                    literal.position.Extend(tTrue.Position.AbsolutePosition);
+                    tTrue.Analysis.Subtype = TokenSubtype.Keyword;
 
                     statement = literal;
                     return true;
@@ -1164,13 +1384,12 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         value = "false",
-                        type = new TypeToken("bool", BuiltinType.BOOLEAN)
+                        type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
+                        position = tFalse.GetPosition(),
+                        ValueToken = CurrentToken,
                     };
 
-                    tFalse.subtype = TokenSubtype.Keyword;
-
-                    literal.position.Line = tFalse.lineNumber;
-                    literal.position.Extend(tFalse.Position.AbsolutePosition);
+                    tFalse.Analysis.Subtype = TokenSubtype.Keyword;
 
                     statement = literal;
                     return true;
@@ -1189,7 +1408,10 @@ namespace IngameCoding.BBCode
                     var st = ExpectOneValue();
                     if (ExpectOperator("]") != null)
                     {
-                        statement = new Statement_Index(st);
+                        statement = new Statement_Index(st)
+                        {
+                            position = token0.GetPosition()
+                        };
                         return true;
                     }
                     else
@@ -1253,13 +1475,13 @@ namespace IngameCoding.BBCode
                 }
                 else if (ExpectIdentifier("new", out Token newIdentifier) != null)
                 {
-                    newIdentifier.subtype = TokenSubtype.Keyword;
+                    newIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
 
                     Token structName = ExpectIdentifier();
                     if (structName == null)
                     { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
 
-                    structName.subtype = TokenSubtype.Struct;
+                    structName.Analysis.Subtype = TokenSubtype.Struct;
 
                     List<string> targetLibraryPath = new();
                     List<Token> targetLibraryPathTokens = new();
@@ -1280,27 +1502,27 @@ namespace IngameCoding.BBCode
                     }
 
                     foreach (var token in targetLibraryPathTokens)
-                    { token.subtype = TokenSubtype.Library; }
+                    { token.Analysis.Subtype = TokenSubtype.Library; }
 
                     if (structName == null)
                     { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
 
-                    structName.subtype = TokenSubtype.Struct;
+                    structName.Analysis.Subtype = TokenSubtype.Struct;
 
                     Statement_NewStruct newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                     {
-                        structName = structName.text
+                        structName = structName,
+                        position = structName.GetPosition(),
                     };
 
-                    newStructStatement.position.Line = structName.lineNumber;
-                    newStructStatement.position.Extend(structName.Position.AbsolutePosition);
+                    newStructStatement.position.Extend(newIdentifier);
 
                     returnStatement = newStructStatement;
                 }
                 else if (ExpectIdentifier(out Token variableName) != null)
                 {
                     if (variableName.text == "this" && !enableThisKeyword)
-                    { throw new ParserException("The keyword 'this' does not avaiable in the current context", variableName); }
+                    { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
 
                     if (ExpectOperator("(") != null)
                     {
@@ -1311,16 +1533,14 @@ namespace IngameCoding.BBCode
                     {
                         Statement_Variable variableNameStatement = new()
                         {
-                            variableName = variableName.text
+                            variableName = variableName,
+                            position = variableName.GetPosition()
                         };
 
-                        variableNameStatement.position.Line = variableName.lineNumber;
-                        variableNameStatement.position.Extend(variableName.Position.AbsolutePosition);
-
                         if (variableName.text == "this")
-                        { variableName.subtype = TokenSubtype.Keyword; }
+                        { variableName.Analysis.Subtype = TokenSubtype.Keyword; }
                         else
-                        { variableName.subtype = TokenSubtype.VariableName; }
+                        { variableName.Analysis.Subtype = TokenSubtype.VariableName; }
 
                         returnStatement = variableNameStatement;
                     }
@@ -1343,12 +1563,8 @@ namespace IngameCoding.BBCode
 
                             var fieldStatement = new Statement_Field()
                             {
-                                FieldName = fieldName.text,
-                                position = new Position()
-                                {
-                                    AbsolutePosition = fieldName.Position.AbsolutePosition,
-                                    Line = fieldName.Position.Line
-                                },
+                                FieldName = fieldName,
+                                position = fieldName.GetPosition(),
                                 PrevStatement = returnStatement
                             };
                             returnStatement = fieldStatement;
@@ -1371,16 +1587,18 @@ namespace IngameCoding.BBCode
                 return returnStatement;
             }
 
-            List<Statement> ParseFunctionBody()
+            List<Statement> ParseFunctionBody(out Token braceletStart, out Token braceletEnd)
             {
-                if (ExpectOperator("{") == null)
+                braceletEnd = null;
+
+                if (ExpectOperator("{", out braceletStart) == null)
                 { return null; }
 
                 List<Statement> statements = new();
 
                 int endlessSafe = 0;
                 VariableNames.Clear();
-                while (ExpectOperator("}") == null)
+                while (ExpectOperator("}", out braceletEnd) == null)
                 {
                     Statement statement = ExpectStatement();
                     if (statement == null)
@@ -1391,7 +1609,7 @@ namespace IngameCoding.BBCode
                         }
                         else
                         {
-                            throw new SyntaxException("Unknown statement");
+                            throw new SyntaxException("Unknown statement", Position.UnknownPosition);
                         }
                     }
                     else if (statement is Statement_Literal)
@@ -1419,7 +1637,7 @@ namespace IngameCoding.BBCode
                         }
 
                         if (ExpectOperator(";") == null)
-                        { throw new SyntaxException("Expected ';' at end of statement", statement.position); }
+                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
                     }
 
                     endlessSafe++;
@@ -1438,7 +1656,7 @@ namespace IngameCoding.BBCode
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 bool IsRef = false;
-                if (ExpectIdentifier("ref") != null)
+                if (ExpectIdentifier("ref", out var tRef) != null)
                 {
                     if (enableRefKeyword)
                     {
@@ -1446,28 +1664,28 @@ namespace IngameCoding.BBCode
                         // IsRef = true;
                     }
                     else
-                    { throw new SyntaxException("Keyword 'ref' is not valid in the current context"); }
+                    { Errors.Add(new Error("Keyword 'ref' is not valid in the current context", tRef)); }
                 }
 
                 Token possibleVariableName = ExpectIdentifier();
                 if (possibleVariableName == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleVariableName.subtype = TokenSubtype.VariableName;
+                possibleVariableName.Analysis.Subtype = TokenSubtype.VariableName;
 
                 Statement_NewVariable statement = new()
                 {
-                    variableName = possibleVariableName.text,
+                    variableName = possibleVariableName,
                     type = possibleType,
-                    IsRef = IsRef
+                    IsRef = IsRef,
+                    position = possibleVariableName.GetPosition(),
                 };
                 VariableNames.Add(possibleVariableName.text);
 
                 if (structNotFoundWarning != null)
                 { Warnings.Add(structNotFoundWarning); }
 
-                statement.position.Line = possibleType.lineNumber;
-                statement.position.Extend(possibleType.startOffsetTotal, possibleVariableName.endOffsetTotal);
+                statement.position.Extend(possibleType.AbsolutePosition.Start, possibleVariableName.AbsolutePosition.End);
 
                 if (ExpectOperator("=", out var eqT) != null)
                 {
@@ -1476,9 +1694,9 @@ namespace IngameCoding.BBCode
                 else
                 {
                     if (IsRef)
-                    { throw new SyntaxException("Initial value for reference variable declaration is requied"); }
+                    { throw new SyntaxException("Initial value for reference variable declaration is requied", tRef); }
                     if (possibleType.typeName == BuiltinType.AUTO)
-                    { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Position); }
+                    { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType); }
                 }
 
                 return statement;
@@ -1489,7 +1707,7 @@ namespace IngameCoding.BBCode
                 if (ExpectIdentifier("for", out Token tokenFor) == null)
                 { return null; }
 
-                tokenFor.subtype = TokenSubtype.Statement;
+                tokenFor.Analysis.Subtype = TokenSubtype.Statement;
 
                 if (ExpectOperator("(", out Token tokenZarojel) == null)
                 { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor); }
@@ -1503,19 +1721,19 @@ namespace IngameCoding.BBCode
 
                 Statement condition = ExpectExpression();
                 if (condition == null)
-                { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel.Position); }
+                { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
                 if (ExpectOperator(";") == null)
                 { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.position); }
 
                 Statement expression = ExpectExpression();
                 if (expression == null)
-                { throw new SyntaxException("Expected expression after \"for\" condition", tokenZarojel.Position); }
+                { throw new SyntaxException("Expected expression after \"for\" condition", tokenZarojel); }
 
                 if (ExpectOperator(")", out Token tokenZarojel2) == null)
                 { throw new SyntaxException("Expected ')' after \"for\" condition", condition.position); }
 
-                if (ExpectOperator("{") == null)
+                if (ExpectOperator("{", out var braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"for\" condition", tokenZarojel2); }
 
                 Statement_ForLoop forStatement = new()
@@ -1524,19 +1742,17 @@ namespace IngameCoding.BBCode
                     variableDeclaration = variableDeclaration,
                     condition = condition,
                     expression = expression,
+                    position = tokenFor.GetPosition(),
+                    BracketStart = braceletStart,
                 };
 
-                forStatement.position.Line = tokenFor.lineNumber;
-                forStatement.position.Extend(tokenFor.Position.AbsolutePosition);
-                forStatement.position.Extend(tokenZarojel2.Position.AbsolutePosition);
-
                 int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}") == null)
+                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}", out forStatement.BracketEnd) == null)
                 {
                     var statement = ExpectStatement();
                     if (statement == null) break;
                     if (ExpectOperator(";") == null)
-                    { throw new SyntaxException("Expected ';' at end of statement", statement.position); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
 
                     forStatement.statements.Add(statement);
 
@@ -1555,37 +1771,35 @@ namespace IngameCoding.BBCode
                 if (ExpectIdentifier("while", out Token tokenWhile) == null)
                 { return null; }
 
-                tokenWhile.subtype = TokenSubtype.Statement;
+                tokenWhile.Analysis.Subtype = TokenSubtype.Statement;
 
                 if (ExpectOperator("(", out Token tokenZarojel) == null)
                 { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
 
                 Statement condition = ExpectExpression();
                 if (condition == null)
-                { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel.Position); }
+                { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
 
                 if (ExpectOperator(")", out Token tokenZarojel2) == null)
                 { throw new SyntaxException("Expected ')' after \"while\" condition", condition.position); }
 
-                if (ExpectOperator("{", out Token tokenZarojel3) == null)
+                if (ExpectOperator("{", out Token braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"while\" condition", tokenZarojel2); }
 
                 Statement_WhileLoop whileStatement = new()
                 {
                     name = tokenWhile.text,
                     condition = condition,
+                    position = tokenWhile.GetPosition(),
+                    BracketStart = braceletStart,
                 };
 
-                whileStatement.position.Line = tokenWhile.lineNumber;
-                whileStatement.position.Extend(tokenWhile.Position.AbsolutePosition);
-                whileStatement.position.Extend(tokenZarojel3.Position.AbsolutePosition);
-
                 int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}") == null)
+                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}", out whileStatement.BracketEnd) == null)
                 {
                     var statement = ExpectStatement();
                     if (ExpectOperator(";") == null)
-                    { throw new SyntaxException("Expected ';' at end of statement", statement.position); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.position)); }
                     if (statement == null) break;
 
                     whileStatement.statements.Add(statement);
@@ -1606,7 +1820,7 @@ namespace IngameCoding.BBCode
                 Statement_If statement = new();
                 statement.parts.Add(ifStatement);
 
-                statement.position.Line = ifStatement.position.Line;
+                statement.position.Start.Line = ifStatement.position.Start.Line;
                 statement.position.Extend(ifStatement.position.AbsolutePosition);
 
                 int endlessSafe = 0;
@@ -1637,7 +1851,7 @@ namespace IngameCoding.BBCode
                 if (ExpectIdentifier(ifSegmentName, out Token tokenIf) == null)
                 { return null; }
 
-                tokenIf.subtype = TokenSubtype.Statement;
+                tokenIf.Analysis.Subtype = TokenSubtype.Statement;
 
                 Statement condition = null;
                 if (needParameters)
@@ -1646,12 +1860,12 @@ namespace IngameCoding.BBCode
                     { throw new SyntaxException("Expected '(' after \"" + ifSegmentName + "\" statement", tokenIf); }
                     condition = ExpectExpression();
                     if (condition == null)
-                    { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel.Position); }
+                    { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel); }
 
                     if (ExpectOperator(")", out _) == null)
                     { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.position); }
                 }
-                if (ExpectOperator("{", out Token tokenZarojel3) == null)
+                if (ExpectOperator("{", out Token braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"" + ifSegmentName + "\" condition", tokenIf); }
 
                 Statement_If_Part ifStatement = null;
@@ -1663,6 +1877,8 @@ namespace IngameCoding.BBCode
                         {
                             name = tokenIf.text,
                             condition = condition,
+                            position = tokenIf.GetPosition(),
+                            BracketStart = braceletStart,
                         };
                         break;
                     case Statement_If_Part.IfPart.If_ElseIfStatement:
@@ -1670,12 +1886,16 @@ namespace IngameCoding.BBCode
                         {
                             name = tokenIf.text,
                             condition = condition,
+                            position = tokenIf.GetPosition(),
+                            BracketStart = braceletStart,
                         };
                         break;
                     case Statement_If_Part.IfPart.If_ElseStatement:
                         ifStatement = new Statement_If_Else()
                         {
-                            name = tokenIf.text
+                            name = tokenIf.text,
+                            position = tokenIf.GetPosition(),
+                            BracketStart = braceletStart,
                         };
                         break;
                 }
@@ -1683,12 +1903,8 @@ namespace IngameCoding.BBCode
                 if (ifStatement == null)
                 { throw new InternalException(); }
 
-                ifStatement.position.Line = tokenIf.lineNumber;
-                ifStatement.position.Extend(tokenIf.Position.AbsolutePosition);
-                ifStatement.position.Extend(tokenZarojel3.Position.AbsolutePosition);
-
                 int endlessSafe = 0;
-                while (CurrentToken != null && ExpectOperator("}") == null)
+                while (CurrentToken != null && ExpectOperator("}", out ifStatement.BracketEnd) == null)
                 {
                     var statement = ExpectStatement();
                     if (ExpectOperator(";") == null)
@@ -1696,7 +1912,7 @@ namespace IngameCoding.BBCode
                         if (statement == null)
                         { throw new SyntaxException("Expected a statement", CurrentToken); }
                         else
-                        { throw new SyntaxException("Expected ';' at end of statement", statement.position); }
+                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
                     }
 
                     ifStatement.statements.Add(statement);
@@ -1761,15 +1977,13 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("(") == null)
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                possibleFunctionName.subtype = TokenSubtype.MethodName;
+                possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
 
                 methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>(), true)
                 {
                     functionNameT = possibleFunctionName,
+                    position = possibleFunctionName.GetPosition(),
                 };
-
-                methodCall.position.Line = possibleFunctionName.lineNumber;
-                methodCall.position.Extend(possibleFunctionName.Position.AbsolutePosition);
 
                 bool expectParameter = false;
 
@@ -1786,7 +2000,7 @@ namespace IngameCoding.BBCode
 
                     if (ExpectOperator(")", out Token outToken0) != null)
                     {
-                        methodCall.position.Extend(outToken0.Position.AbsolutePosition);
+                        methodCall.position.Extend(outToken0.AbsolutePosition);
                         break;
                     }
 
@@ -1795,7 +2009,7 @@ namespace IngameCoding.BBCode
                     else
                     { expectParameter = true; }
 
-                    methodCall.position.Extend(operatorVesszo.Position.AbsolutePosition);
+                    methodCall.position.Extend(operatorVesszo.AbsolutePosition);
 
                     endlessSafe++;
                     if (endlessSafe > 100)
@@ -1804,7 +2018,7 @@ namespace IngameCoding.BBCode
 
                 if (possibleFunctionName.text == "type")
                 {
-                    possibleFunctionName.subtype = TokenSubtype.Keyword;
+                    possibleFunctionName.Analysis.Subtype = TokenSubtype.Keyword;
                 }
 
                 return true;
@@ -1844,17 +2058,19 @@ namespace IngameCoding.BBCode
                     if (statement == null)
                     { throw new SyntaxException("Expected value or expression after '!' operator", tNotOperator); }
 
-                    return new Statement_Operator("!", statement);
+                    return new Statement_Operator(tNotOperator, statement);
                 }
 
+                /*
                 if (ExpectOperator("-", out var tMinusOperator) != null)
                 {
                     Statement statement = ExpectOneValue();
                     if (statement == null)
                     { throw new SyntaxException("Expected value or expression after '-' operator", tMinusOperator); }
 
-                    return new Statement_Operator("!", statement);
+                    return new Statement_Operator(tMinusOperator, statement);
                 }
+                */
 
                 // Possible a variable
                 Statement leftStatement = ExpectOneValue();
@@ -1869,37 +2085,99 @@ namespace IngameCoding.BBCode
                     if (valueToAssign == null)
                     { throw new SyntaxException("Expected expression", o0); }
 
-                    Statement_Operator statementToAssign = new(o0.text.Replace("=", ""), leftStatement, valueToAssign);
+                    Statement_Operator statementToAssign = new(new Token()
+                    {
+                        AbsolutePosition = o0.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = o0.text.Replace("=", ""),
+                        Position = o0.Position,
+                        type = o0.type,
+                    }, leftStatement, valueToAssign)
+                    {
+                        position = o0.GetPosition(),
+                    };
 
-                    Statement_Operator operatorCall = new("=", leftStatement, statementToAssign);
+                    Statement_Operator operatorCall = new(new Token()
+                    {
+                        AbsolutePosition = o0.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = "=",
+                        Position = o0.Position,
+                        type = o0.type,
+                    }, leftStatement, statementToAssign)
+                    {
+                        position = o0.GetPosition(),
+                    };
 
                     return operatorCall;
                 }
-                else if (ExpectOperator("++") != null)
+                else if (ExpectOperator("++", out var t0) != null)
                 {
                     Statement_Literal literalOne = new()
                     {
                         value = "1",
                         type = types["int"],
+                        position = t0.GetPosition(),
                     };
 
-                    Statement_Operator statementToAssign = new("+", leftStatement, literalOne);
+                    Statement_Operator statementToAssign = new(new Token()
+                    {
+                        AbsolutePosition = t0.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = "+",
+                        Position = t0.Position,
+                        type = t0.type,
+                    }, leftStatement, literalOne)
+                    {
+                        position = t0.GetPosition(),
+                    };
 
-                    Statement_Operator operatorCall = new("=", leftStatement, statementToAssign);
+                    Statement_Operator operatorCall = new(new Token()
+                    {
+                        AbsolutePosition = t0.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = "=",
+                        Position = t0.Position,
+                        type = t0.type,
+                    }, leftStatement, statementToAssign)
+                    {
+                        position = t0.GetPosition(),
+                    };
 
                     return operatorCall;
                 }
-                else if (ExpectOperator("--") != null)
+                else if (ExpectOperator("--", out var t1) != null)
                 {
                     Statement_Literal literalOne = new()
                     {
                         value = "1",
                         type = types["int"],
+                        position = t1.GetPosition(),
                     };
 
-                    Statement_Operator statementToAssign = new("-", leftStatement, literalOne);
+                    Statement_Operator statementToAssign = new(new Token()
+                    {
+                        AbsolutePosition = t1.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = "-",
+                        Position = t1.Position,
+                        type = t1.type,
+                    }, leftStatement, literalOne)
+                    {
+                        position = t1.GetPosition(),
+                    };
 
-                    Statement_Operator operatorCall = new("=", leftStatement, statementToAssign);
+                    Statement_Operator operatorCall = new(new Token()
+                    {
+                        AbsolutePosition = t1.AbsolutePosition,
+                        Analysis = new TokenAnalysis(),
+                        text = "=",
+                        Position = t1.Position,
+                        type = t1.type,
+                    }, leftStatement, statementToAssign)
+                    {
+                        position = t1.GetPosition(),
+                    };
 
                     return operatorCall;
                 }
@@ -1933,33 +2211,30 @@ namespace IngameCoding.BBCode
                     {
                         if (rightmostStatement is Statement_Operator rightmostOperator)
                         {
-                            Statement_Operator operatorCall = new(op.text, rightmostOperator.Right, rightStatement);
-
-                            operatorCall.position = op.Position;
-                            operatorCall.position.Extend(rightmostOperator.Right.position.AbsolutePosition);
-                            operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+                            Statement_Operator operatorCall = new(op, rightmostOperator.Right, rightStatement)
+                            {
+                                position = op.GetPosition()
+                            };
 
 
                             rightmostOperator.Right = operatorCall;
                         }
                         else
                         {
-                            Statement_Operator operatorCall = new(op.text, leftStatement, rightStatement);
-
-                            operatorCall.position = op.Position;
-                            operatorCall.position.Extend(leftStatement.position.AbsolutePosition);
-                            operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+                            Statement_Operator operatorCall = new(op, leftStatement, rightStatement)
+                            {
+                                position = op.GetPosition()
+                            };
 
                             leftStatement = operatorCall;
                         }
                     }
                     else
                     {
-                        Statement_Operator operatorCall = new(op.text, leftStatement, rightStatement);
-
-                        operatorCall.position = op.Position;
-                        operatorCall.position.Extend(leftStatement.position.AbsolutePosition);
-                        operatorCall.position.Extend(rightStatement.position.AbsolutePosition);
+                        Statement_Operator operatorCall = new(op, leftStatement, rightStatement)
+                        {
+                            position = op.GetPosition()
+                        };
 
                         leftStatement = operatorCall;
                     }
@@ -1971,7 +2246,7 @@ namespace IngameCoding.BBCode
             Statement_Operator FindRightmostStatement(Statement statement, int rhsPrecedence)
             {
                 if (statement is not Statement_Operator lhs) return null;
-                if (OperatorPrecedence(lhs.Operator) >= rhsPrecedence) return null;
+                if (OperatorPrecedence(lhs.Operator.text) >= rhsPrecedence) return null;
                 if (lhs.InsideBracelet) return null;
 
                 var rhs = FindRightmostStatement(lhs.Right, rhsPrecedence);
@@ -2021,17 +2296,15 @@ namespace IngameCoding.BBCode
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 foreach (var token in targetLibraryPathTokens)
-                { token.subtype = TokenSubtype.Library; }
+                { token.Analysis.Subtype = TokenSubtype.Library; }
 
-                possibleFunctionName.subtype = TokenSubtype.MethodName;
+                possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
 
                 Statement_FunctionCall functionCall = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                 {
                     functionNameT = possibleFunctionName,
+                    position = possibleFunctionName.GetPosition(),
                 };
-
-                functionCall.position.Line = possibleFunctionName.lineNumber;
-                functionCall.position.Extend(possibleFunctionName.Position.AbsolutePosition);
 
                 bool expectParameter = false;
 
@@ -2042,13 +2315,11 @@ namespace IngameCoding.BBCode
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", functionCall.position); }
 
-                    functionCall.position.Extend(parameter.position.AbsolutePosition);
-
                     functionCall.parameters.Add(parameter);
 
                     if (ExpectOperator(")", out Token outToken0) != null)
                     {
-                        functionCall.position.Extend(outToken0.Position.AbsolutePosition);
+                        functionCall.position.Extend(outToken0.AbsolutePosition);
                         break;
                     }
 
@@ -2057,8 +2328,6 @@ namespace IngameCoding.BBCode
                     else
                     { expectParameter = true; }
 
-                    functionCall.position.Extend(operatorVesszo.Position.AbsolutePosition);
-
                     endlessSafe++;
                     if (endlessSafe > 100)
                     { throw new EndlessLoopException(); }
@@ -2066,7 +2335,7 @@ namespace IngameCoding.BBCode
 
                 if (possibleFunctionName.text == "type" && targetLibraryPath.Count == 0)
                 {
-                    possibleFunctionName.subtype = TokenSubtype.Keyword;
+                    possibleFunctionName.Analysis.Subtype = TokenSubtype.Keyword;
                 }
 
                 return functionCall;
@@ -2083,18 +2352,16 @@ namespace IngameCoding.BBCode
                 if (possibleMethodName == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleMethodName.subtype = TokenSubtype.MethodName;
+                possibleMethodName.Analysis.Subtype = TokenSubtype.MethodName;
 
                 if (ExpectOperator("(") == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 Statement_MethodCall methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>())
                 {
-                    functionNameT = possibleMethodName
+                    functionNameT = possibleMethodName,
+                    position = possibleMethodName.GetPosition(),
                 };
-
-                methodCall.position.Line = possibleMethodName.lineNumber;
-                methodCall.position.Extend(possibleMethodName.Position.AbsolutePosition);
 
                 bool expectParameter = false;
 
@@ -2114,7 +2381,7 @@ namespace IngameCoding.BBCode
 
                     if (ExpectOperator(")", out Token outToken0) != null)
                     {
-                        methodCall.position.Extend(outToken0.Position.AbsolutePosition);
+                        methodCall.position.Extend(outToken0.AbsolutePosition);
                         break;
                     }
 
@@ -2125,7 +2392,7 @@ namespace IngameCoding.BBCode
                     else
                     { expectParameter = true; }
 
-                    methodCall.position.Extend(operatorVesszo.Position.AbsolutePosition);
+                    methodCall.position.Extend(operatorVesszo.AbsolutePosition);
 
                     endlessSafe++;
                     if (endlessSafe > 100) { throw new EndlessLoopException(); }
@@ -2146,15 +2413,13 @@ namespace IngameCoding.BBCode
                 if (possibleFunctionName.text != name)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleFunctionName.subtype = TokenSubtype.Statement;
+                possibleFunctionName.Analysis.Subtype = TokenSubtype.Statement;
 
                 Statement_FunctionCall functionCall = new(Array.Empty<string>(), Array.Empty<string>())
                 {
-                    functionNameT = possibleFunctionName
+                    functionNameT = possibleFunctionName,
+                    position = possibleFunctionName.GetPosition(),
                 };
-
-                functionCall.position.Line = possibleFunctionName.lineNumber;
-                functionCall.position.Extend(possibleFunctionName.Position.AbsolutePosition);
 
                 if (canHaveParameters)
                 {
@@ -2164,7 +2429,6 @@ namespace IngameCoding.BBCode
 
                     if (parameter != null)
                     {
-                        functionCall.position.Extend(parameter.position.AbsolutePosition);
                         functionCall.parameters.Add(parameter);
                     }
                 }
@@ -2178,14 +2442,14 @@ namespace IngameCoding.BBCode
                 int parseStart = currentTokenIndex;
                 attribute = new();
 
-                if (ExpectOperator("[") == null)
+                if (ExpectOperator("[", out var t0) == null)
                 { currentTokenIndex = parseStart; return false; }
 
                 Token attributeT = ExpectIdentifier();
                 if (attributeT == null)
                 { currentTokenIndex = parseStart; return false; }
 
-                attributeT.subtype = TokenSubtype.Type;
+                attributeT.Analysis.Subtype = TokenSubtype.Type;
 
                 if (ExpectOperator("(", out var t3) != null)
                 {
@@ -2208,9 +2472,9 @@ namespace IngameCoding.BBCode
                 }
 
                 if (ExpectOperator("]") == null)
-                { throw new SyntaxException("Expected ] after attribute parameter list"); }
+                { throw new SyntaxException("Unbalanced ]", t0); }
 
-                attribute.Name = attributeT.text;
+                attribute.Name = attributeT;
                 return true;
             }
 
@@ -2235,7 +2499,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { throw new ParserException("Attribute '" + attr + "' already applied to the method"); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the method", attr.Name)); }
                 }
 
                 TypeToken possibleType = ExceptTypeToken(false);
@@ -2250,15 +2514,13 @@ namespace IngameCoding.BBCode
                 if (possibleOperator == null)
                 { currentTokenIndex = parseStart; return null; }
 
-                throw new Errors.Exception("Methods are not supported", possibleType.Position);
-
-                FunctionDefinition methodDefinition = new(Array.Empty<string>(), possibleName.text)
+                FunctionDefinition methodDefinition = new(Array.Empty<string>(), possibleName)
                 {
-                    type = possibleType,
-                    attributes = attributes.ToArray()
+                    Type = possibleType,
+                    Attributes = attributes.ToArray()
                 };
 
-                possibleName.subtype = TokenSubtype.MethodName;
+                possibleName.Analysis.Subtype = TokenSubtype.MethodName;
 
                 var expectParameter = false;
                 while (ExpectOperator(")") == null || expectParameter)
@@ -2266,8 +2528,8 @@ namespace IngameCoding.BBCode
                     Token thisKeywordT = ExpectIdentifier("this");
                     if (thisKeywordT != null)
                     {
-                        thisKeywordT.subtype = TokenSubtype.Keyword;
-                        if (methodDefinition.parameters.Count > 0)
+                        thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
+                        if (methodDefinition.Parameters.Count > 0)
                         { throw new ParserException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
                     }
 
@@ -2277,17 +2539,17 @@ namespace IngameCoding.BBCode
 
                     Token possibleParameterName = ExpectIdentifier();
                     if (possibleParameterName == null)
-                        throw new SyntaxException("Expected a parameter name", possibleParameterType.Position);
+                        throw new SyntaxException("Expected a parameter name", possibleParameterType);
 
-                    possibleParameterName.subtype = TokenSubtype.VariableName;
+                    possibleParameterName.Analysis.Subtype = TokenSubtype.VariableName;
 
                     ParameterDefinition parameterDefinition = new()
                     {
                         type = possibleParameterType,
-                        name = possibleParameterName.text,
+                        name = possibleParameterName,
                         withThisKeyword = thisKeywordT != null
                     };
-                    methodDefinition.parameters.Add(parameterDefinition);
+                    methodDefinition.Parameters.Add(parameterDefinition);
 
                     if (ExpectOperator(")") != null)
                     { break; }
@@ -2301,19 +2563,21 @@ namespace IngameCoding.BBCode
                 List<Statement> statements = new();
                 if (ExpectOperator(";") == null)
                 {
-                    statements = ParseFunctionBody();
+                    statements = ParseFunctionBody(out _, out _);
                 }
                 else
                 {
                     currentTokenIndex--;
                 }
 
+                Errors.Add(new Error("Methods are not supported", possibleType));
+
                 if (statements == null)
                 {
                     currentTokenIndex = parseStart;
                     return null;
                 }
-                methodDefinition.statements = statements;
+                methodDefinition.Statements = statements;
 
                 return methodDefinition;
             }
@@ -2332,11 +2596,11 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("(") != null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleVariableName.subtype = TokenSubtype.None;
+                possibleVariableName.Analysis.Subtype = TokenSubtype.None;
 
                 ParameterDefinition field = new()
                 {
-                    name = possibleVariableName.text,
+                    name = possibleVariableName,
                     type = possibleType,
                 };
 
@@ -2380,7 +2644,7 @@ namespace IngameCoding.BBCode
 
                 return returnToken;
             }
-            Token ExpectIdentifier() { return ExpectIdentifier(""); }
+            Token ExpectIdentifier() => ExpectIdentifier("");
             Token ExpectIdentifier(out Token result)
             {
                 result = null;
@@ -2462,31 +2726,33 @@ namespace IngameCoding.BBCode
                 Token possibleType = ExpectIdentifier();
                 if (possibleType == null) return null;
 
-                possibleType.subtype = TokenSubtype.Keyword;
-
-                bool typeFound = types.TryGetValue(possibleType.text, out TypeToken foundtype);
+                possibleType.Analysis.Subtype = TokenSubtype.Keyword;
 
                 TypeToken newType = null;
 
-                if (typeFound == false)
+                if (!types.TryGetValue(possibleType.text, out TypeToken builtinType))
                 {
                     if (newType == null && possibleType.text == "any")
                     {
                         if (allowAnyKeyword)
-                        { newType = new TypeToken("any", BuiltinType.ANY); }
+                        {
+                            newType = new TypeToken("any", BuiltinType.ANY, possibleType);
+                        }
                         else
                         {
-                            throw new ParserException($"TypeToken '{possibleType.text}' is not valid in the current context");
+                            Errors.Add(new Error($"Type '{possibleType.text}' is not valid in the current context", possibleType));
                         }
                     }
 
                     if (newType == null && possibleType.text == "var")
                     {
                         if (allowVarKeyword)
-                        { newType = new TypeToken("var", BuiltinType.AUTO); }
+                        {
+                            newType = new TypeToken("var", BuiltinType.AUTO, possibleType);
+                        }
                         else
                         {
-                            throw new ParserException($"TypeToken '{possibleType.text}' is not valid in the current context");
+                            Errors.Add(new Error($"Type '{possibleType.text}' is not valid in the current context", possibleType));
                         }
                     }
 
@@ -2494,37 +2760,40 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.text, out var s))
                         {
-                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT);
-                            possibleType.subtype = TokenSubtype.Struct;
+                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT, possibleType); ;
                         }
                         else
                         {
-                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT);
-                            possibleType.subtype = TokenSubtype.None;
-                            warning = new Warning()
-                            {
-                                Message = $"Struct '{possibleType.text}' not found",
-                                Position = possibleType.Position
-                            };
+                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT, possibleType);
+                            warning = new Warning($"Struct '{possibleType.text}' not found", possibleType);
                         }
+                        newType.Analysis.Subtype = TokenSubtype.Struct;
                     }
 
                     if (newType == null)
                     { return null; }
                 }
                 else
-                { newType = foundtype.Clone(); }
+                {
+                    newType = new TypeToken(builtinType.text, builtinType.typeName, possibleType)
+                    {
+                        isList = builtinType.isList,
+                    };
+                    newType.Analysis.Subtype = TokenSubtype.BuiltinType;
+                }
 
-                if (ExpectOperator("[") != null)
+                if (ExpectOperator("[", out var t0) != null)
                 {
                     if (ExpectOperator("]") != null)
                     { newType.isList = true; }
                     else
-                    { throw new SyntaxException("Unbalanced '['"); }
+                    { throw new SyntaxException("Unbalanced '['", t0); }
                 }
+
+                tokens[currentTokenIndex - 1] = newType;
+
                 return newType;
             }
-
             TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExceptTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
 
             bool TryGetStruct(string structName, out StructDefinition @struct)

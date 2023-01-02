@@ -35,14 +35,14 @@ namespace IngameCoding.BBCode.Compiler
         };
     }
 
-    internal static class FunctionID
+    public static class FunctionID
     {
         public static string ID(this FunctionDefinition function)
         {
             string result = function.FullName;
-            for (int i = 0; i < function.parameters.Count; i++)
+            for (int i = 0; i < function.Parameters.Count; i++)
             {
-                var param = function.parameters[i];
+                var param = function.Parameters[i];
                 var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
                 result += "," + paramType + (param.type.isList ? "[]" : "");
             }
@@ -56,8 +56,9 @@ namespace IngameCoding.BBCode.Compiler
         public Statement_FunctionCall functionCallStatement;
         public Dictionary<string, Parameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
+        internal string CurrentFile;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, KeyValuePair<string, Parameter>[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables)
+        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, KeyValuePair<string, Parameter>[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.callInstructionIndex = callInstructionIndex;
             this.functionCallStatement = functionCallStatement;
@@ -69,12 +70,14 @@ namespace IngameCoding.BBCode.Compiler
             { this.currentParameters.Add(item.Key, item.Value); }
             foreach (var item in currentVariables)
             { this.currentVariables.Add(item.Key, item.Value); }
+            this.CurrentFile = file;
         }
     }
 
     public struct AttributeValues
     {
         public List<Literal> parameters;
+        public Token NameToken;
 
         public bool TryGetValue(int index, out string value)
         {
@@ -208,37 +211,28 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    [Serializable]
-    public class CompiledFunction
+    public class CompiledFunction : FunctionDefinition
     {
-        public TypeToken[] parameters;
-
-        public FunctionDefinition functionDefinition;
+        public TypeToken[] ParameterTypes;
 
         public int TimesUsed;
 
-        public int ParameterCount => parameters.Length;
-        public bool returnSomething;
+        public int ParameterCount => ParameterTypes.Length;
+        public bool ReturnSomething => this.Type.typeName != BuiltinType.VOID;
 
         /// <summary>
         /// the first parameter is labeled as 'this'
         /// </summary>
         public bool IsMethod;
 
-        public Dictionary<string, AttributeValues> attributes;
+        public Dictionary<string, AttributeValues> CompiledAttributes;
 
-        public bool IsBuiltin
-        {
-            get
-            {
-                return attributes.ContainsKey("Builtin");
-            }
-        }
+        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
         public string BuiltinName
         {
             get
             {
-                if (attributes.TryGetValue("Builtin", out var attributeValues))
+                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
                 {
                     if (attributeValues.TryGetValue(0, out string builtinName))
                     {
@@ -249,22 +243,31 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        public TypeToken type;
-
-        public CompiledFunction()
+        public CompiledFunction(FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
         {
-
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
         }
-        public CompiledFunction(TypeToken[] parameters, bool returnSomething, bool isMethod, TypeToken type)
+        public CompiledFunction(TypeToken[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
         {
-            this.parameters = parameters;
-            this.returnSomething = returnSomething;
+            this.ParameterTypes = parameters;
             this.IsMethod = isMethod;
-            this.type = type;
-            this.attributes = new();
-            this.functionDefinition = null;
+            this.CompiledAttributes = new();
+
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
         }
-        public CompiledFunction(ParameterDefinition[] parameters, bool returnSomething, bool isMethod, TypeToken type)
+        public CompiledFunction(ParameterDefinition[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
         {
             List<TypeToken> @params = new();
 
@@ -273,86 +276,44 @@ namespace IngameCoding.BBCode.Compiler
                 @params.Add(param.type);
             }
 
-            this.parameters = @params.ToArray();
-            this.returnSomething = returnSomething;
+            this.ParameterTypes = @params.ToArray();
             this.IsMethod = isMethod;
-            this.type = type;
-            this.attributes = new();
-            this.functionDefinition = null;
+            this.CompiledAttributes = new();
+
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
         }
     }
 
-    public class BuiltinFunction
-    {
-        public TypeToken[] parameters;
-
-        readonly Action<DataItem[]> callback;
-
-        public delegate void ReturnEventHandler(DataItem returnValue);
-        public event ReturnEventHandler ReturnEvent;
-
-        public int ParameterCount { get { return parameters.Length; } }
-        public bool returnSomething;
-
-        // Wrap the event in a protected virtual method
-        // to enable derived classes to raise the event.
-        public void RaiseReturnEvent(DataItem returnValue)
-        {
-            // Raise the event in a thread-safe manner using the ?. operator.
-            ReturnEvent?.Invoke(returnValue);
-        }
-
-        /// <summary>
-        /// Function without return value
-        /// </summary>
-        /// <param name="callback">Callback when the machine process this function</param>
-        public BuiltinFunction(Action<IngameCoding.Bytecode.DataItem[]> callback, TypeToken[] parameters, bool returnSomething = false)
-        {
-            this.parameters = parameters;
-            this.callback = callback;
-            this.returnSomething = returnSomething;
-        }
-
-        public void Callback(DataItem[] parameters)
-        {
-            if (returnSomething)
-            {
-                if (callback != null)
-                {
-                    callback(parameters);
-                }
-                else
-                {
-                    throw new InternalException("No OnDone");
-                }
-            }
-            else
-            {
-                callback(parameters);
-            }
-        }
-    }
     internal struct CompiledVariable
     {
         public int offset;
         public BuiltinType type;
         public string structName;
         public bool isList;
+        public Statement_NewVariable Declaration;
 
-        public CompiledVariable(int offset, BuiltinType type, bool isList)
+        public CompiledVariable(int offset, BuiltinType type, bool isList, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = type;
             this.structName = string.Empty;
             this.isList = isList;
+            this.Declaration = declaration;
         }
 
-        public CompiledVariable(int offset, string structName, bool isList)
+        public CompiledVariable(int offset, string structName, bool isList, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = BuiltinType.STRUCT;
             this.structName = structName;
             this.isList = isList;
+            this.Declaration = declaration;
         }
 
         public string Type
@@ -367,25 +328,26 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
     }
-    [Serializable]
-    public class CompiledStruct
-    {
-        public Func<IStruct> CreateBuiltinStruct;
-        public bool IsBuiltin => CreateBuiltinStruct != null;
-        public string name;
-        public ParameterDefinition[] fields;
-        public Dictionary<string, CompiledFunction> methods;
-        internal Dictionary<string, AttributeValues> attributes;
-        public readonly Dictionary<string, int> methodOffsets;
 
-        public CompiledStruct(string name, List<ParameterDefinition> fields, Dictionary<string, CompiledFunction> methods)
+    public class CompiledStruct : StructDefinition
+    {
+        public Func<IStruct> CreateBuiltinStructCallback;
+        public bool IsBuiltin => CreateBuiltinStructCallback != null;
+        public Dictionary<string, CompiledFunction> CompiledMethods;
+        public readonly Dictionary<string, int> MethodOffsets;
+        internal Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
-            this.name = name;
-            this.fields = fields.ToArray();
-            this.methods = methods;
-            this.methodOffsets = new();
-            this.attributes = new();
-            this.CreateBuiltinStruct = null;
+            this.CompiledMethods = new Dictionary<string, CompiledFunction>();
+            this.MethodOffsets = new();
+            this.CompiledAttributes = compiledAttributes;
+            this.CreateBuiltinStructCallback = null;
+
+            base.FilePath = definition.FilePath;
+            base.BracketEnd = definition.BracketEnd;
+            base.BracketStart = definition.BracketStart;
+            base.Statements = definition.Statements;
         }
     }
 

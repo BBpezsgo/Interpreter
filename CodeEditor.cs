@@ -29,12 +29,13 @@ namespace TheProgram
                             (Token[] tokens, Token[] tokensWithComments) = (null, null);
                             try
                             {
-                                (tokens, tokensWithComments) = Tokenizer.Parse(code, new TokenizerSettings()
+                                var tokenizer = new Tokenizer(new TokenizerSettings()
                                 {
                                     DistinguishBetweenSpacesAndNewlines = true,
                                     JoinLinebreaks = false,
                                     TokenizeWhitespaces = true,
                                 });
+                                (tokens, tokensWithComments) = tokenizer.Parse(code);
                             }
                             catch (IngameCoding.Errors.Exception err)
                             {
@@ -92,7 +93,7 @@ namespace TheProgram
                             ipc.Send("result", new Data_Result()
                             {
                                 Tokens = tokensWithComments.ToData(v => new Data_Token(v)),
-                                Error = null,
+                                Error = parser.Errors.Count == 0 ? null : new Data_Error(new IngameCoding.Errors.Exception(parser.Errors[0].Message, parser.Errors[0].position)),
                             });
                         }
                         break;
@@ -122,12 +123,12 @@ namespace TheProgram
         public Data_Token(Token v) : base(v)
         {
             this.Type = v.type.ToString();
-            this.Col = v.startOffset;
-            this.Line = v.lineNumber;
-            this.Start = v.startOffsetTotal;
-            this.End = v.endOffsetTotal;
+            this.Col = v.Position.Start.Character;
+            this.Line = v.Position.Start.Line;
+            this.Start = v.AbsolutePosition.Start;
+            this.End = v.AbsolutePosition.End;
             this.Text = v.text;
-            this.Subtype = v.subtype.ToString();
+            this.Subtype = v.Analysis.Subtype.ToString();
         }
     }
 
@@ -142,8 +143,8 @@ namespace TheProgram
             this.Message = v.Message;
             if (v.Token != null)
             {
-                this.Start = v.Token.startOffsetTotal;
-                this.End = v.Token.endOffsetTotal;
+                this.Start = v.Token.AbsolutePosition.Start;
+                this.End = v.Token.AbsolutePosition.End;
             }
             else
             {

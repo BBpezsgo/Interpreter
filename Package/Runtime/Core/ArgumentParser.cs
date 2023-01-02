@@ -3,15 +3,94 @@ using System.Linq;
 
 namespace TheProgram
 {
-    using IngameCoding.BBCode;
+    using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser;
     using IngameCoding.Bytecode;
-    using IngameCoding;
     using IngameCoding.Output.Terminal;
-    using IngameCoding.BBCode.Compiler;
+
+    using System.Collections.Generic;
 
     internal static class ArgumentParser
     {
+        internal class ArgumentNormalizer
+        {
+            internal readonly List<string> Result;
+
+            NormalizerState State;
+            string CurrentArg;
+
+            enum NormalizerState
+            {
+                None,
+                String,
+            }
+
+            public ArgumentNormalizer()
+            {
+                Result = new();
+                State = NormalizerState.None;
+                CurrentArg = "";
+            }
+
+            void FinishArgument()
+            {
+                var currentArg = CurrentArg.Trim();
+
+                State = NormalizerState.None;
+                CurrentArg = "";
+
+                if (string.IsNullOrEmpty(currentArg)) return;
+                if (currentArg == "") return;
+                if (currentArg.Length == 0) return;
+
+                Result.Add(currentArg);
+            }
+
+            public void NormalizeArgs(params string[] args) => NormalizeArgs(string.Join(' ', args));
+            public void NormalizeArgs(string args)
+            {
+                Result.Clear();
+                State = NormalizerState.None;
+                CurrentArg = "";
+
+                for (int i = 0; i < args.Length; i++)
+                {
+                    char c = args[i];
+
+                    switch (c)
+                    {
+                        case '"':
+                            if (State == NormalizerState.String)
+                            {
+                                FinishArgument();
+                                break;
+                            }
+                            State = NormalizerState.String;
+                            break;
+                        case '\t':
+                        case ' ':
+                            if (State == NormalizerState.String)
+                            {
+                                CurrentArg += c;
+                                break;
+                            }
+                            FinishArgument();
+                            break;
+                        default:
+                            CurrentArg += c;
+                            break;
+                    }
+                }
+
+                FinishArgument();
+            }
+        }
+
+        /// <summary>
+        /// Parses the passed arguments
+        /// </summary>
+        /// <param name="args">The passed arguments</param>
+        /// <exception cref="ArgumentException"></exception>
         static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
@@ -124,6 +203,9 @@ namespace TheProgram
             }
         }
 
+        /// <summary>
+        /// Argument parser result
+        /// </summary>
         public struct Settings
         {
             public System.IO.FileInfo File;
@@ -139,11 +221,16 @@ namespace TheProgram
             public bool CodeEditor;
         }
 
+        /// <summary>
+        /// Normalizes, parses and compiles the passed arguments
+        /// </summary>
+        /// <param name="args">The passed arguments</param>
+        /// <returns><seealso cref="Settings"/>, or <c>null</c> on error</returns>
         public static Settings? Parse(params string[] args)
         {
             if (args.Length == 0)
             {
-                Output.LogError("Wrong number of arguments was passed!");
+                Output.LogError("No arguments passed!");
                 return null;
             }
 
@@ -154,13 +241,24 @@ namespace TheProgram
             bool LogDebugs;
             bool LogSystem;
 
+            ArgumentNormalizer normalizer = new();
+            normalizer.NormalizeArgs(args);
+            string[] normalizedArgs = normalizer.Result.ToArray();
+
             try
             {
-                ParseArgs(args, out ThrowErrors, out LogDebugs, out LogSystem, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
                 Output.LogError(error.Message);
+                PrintArgs(normalizedArgs);
+                return null;
+            }
+
+            if (!System.IO.File.Exists(normalizedArgs.Last()))
+            {
+                Output.LogError($"File '{normalizedArgs.Last()}' not found!");
                 return null;
             }
 
@@ -172,10 +270,21 @@ namespace TheProgram
                 ThrowErrors = ThrowErrors,
                 LogDebugs = LogDebugs,
                 LogSystem = LogSystem,
-                File = new System.IO.FileInfo(args.Last()),
-                Debug = args.Contains("-debug"),
-                CodeEditor = args.Contains("-code-editor")
+                File = new System.IO.FileInfo(normalizedArgs.Last()),
+                Debug = normalizedArgs.Contains("-debug"),
+                CodeEditor = normalizedArgs.Contains("-code-editor")
             };
+        }
+
+        public static void PrintArgs(params string[] args)
+        {
+            Console.Write("[ ");
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (i > 0) Console.Write(", ");
+                Console.Write($"'{args[i]}'");
+            }
+            Console.WriteLine(" ]");
         }
     }
 }

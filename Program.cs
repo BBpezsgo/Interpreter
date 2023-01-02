@@ -1,4 +1,8 @@
-﻿using System;
+﻿#define ENABLE_DEBUG
+
+using IngameCoding.Core;
+
+using System;
 
 namespace TheProgram
 {
@@ -6,15 +10,35 @@ namespace TheProgram
     {
         static void Main(string[] args)
         {
-#if DEBUG
+#if DEBUG && ENABLE_DEBUG
 
-#if true
+            /*
+            Range<SinglePosition> range = new(new SinglePosition(3, 9), new SinglePosition(4, 1));
+            SinglePosition p0 = new(3, 10);
+
+            Console.WriteLine($"{range.Contains(p0)}");
+
+            return;
+
+            for (int line = 0; line < 20; line++)
+            {
+                for (int chr = 0; chr < 20; chr++)
+                {
+                    SinglePosition point = new(line, chr);
+                    Console.WriteLine($"{point} {range.Contains(point)}");
+                }
+            }
+
+            return;
+            */
+
+#if false
             var file = "test-net.bbc";
             IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse(
                 // "-throw-errors",
                 // "-c-print-instructions",
                 // "true",
-                ProjectFolder() + "\\TestFiles\\" + file
+                "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc" //$"\"{TestConstants.TestFilesPath}{file}\""
             ).Value);
 #else
             var settings = ArgumentParser.Parse(args).Value;
@@ -46,12 +70,6 @@ namespace TheProgram
             Console.WriteLine("\n\r\n\rPress any key to exit");
             Console.ReadKey();
 #endif
-        }
-
-        static string ProjectFolder()
-        {
-            var file = new System.IO.FileInfo(System.Reflection.Assembly.GetEntryAssembly().Location);
-            return file.Directory.Parent.Parent.Parent.FullName;
         }
     }
 }

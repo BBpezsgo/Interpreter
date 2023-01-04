@@ -1,6 +1,4 @@
-﻿#define ENABLE_DEBUG
-
-using IngameCoding.Core;
+﻿#define ENABLE_DEBUG_
 
 using System;
 

@@ -19,6 +19,13 @@ namespace ConsoleGUI
             VersionDownloadDone = false;
             VersionDownloadState = "Loading";
 
+            ClearBuffer();
+        }
+
+        internal override void OnStart()
+        {
+            base.OnStart();
+
             TheProgram.Version.DownloadVersion(
                 (state) =>
                 {
@@ -30,8 +37,6 @@ namespace ConsoleGUI
                     VersionDownloadDone = true;
                 }
             );
-
-            ClearBuffer();
         }
 
         internal override void BeforeDraw()

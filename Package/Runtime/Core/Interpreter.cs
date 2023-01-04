@@ -381,7 +381,7 @@ namespace IngameCoding.Core
                     { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", TerminalInterpreter.LogType.Error);
-                    Output.Terminal.Output.LogError(error);
+                    Output.Output.Error(error);
 
                     OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
                     return null;
@@ -759,7 +759,7 @@ namespace IngameCoding.Core
                         bytecodeInterpeter = null;
                         currentlyRunningCode = false;
 
-                        Output.Terminal.Output.LogError(error);
+                        Output.Output.Error(error);
                     }
                     catch (System.Exception error)
                     {
@@ -771,7 +771,7 @@ namespace IngameCoding.Core
                         bytecodeInterpeter = null;
                         currentlyRunningCode = false;
 
-                        Output.Terminal.Output.LogError(error);
+                        Output.Output.Error(error);
                     }
                 }
                 else
@@ -858,7 +858,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
+                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
 
@@ -924,7 +924,7 @@ namespace IngameCoding.Core
             bool HandleErrors = true
             )
         {
-            if (LogDebug) Output.Terminal.Output.LogDebug($"Run file '{file.FullName}'");
+            if (LogDebug) Output.Output.Debug($"Run file '{file.FullName}'");
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
 
@@ -933,19 +933,19 @@ namespace IngameCoding.Core
                 switch (logType)
                 {
                     case TerminalInterpreter.LogType.System:
-                        if (LogSystem) Output.Terminal.Output.Log(message);
+                        if (LogSystem) Output.Output.Log(message);
                         break;
                     case TerminalInterpreter.LogType.Normal:
-                        Output.Terminal.Output.Log(message);
+                        Output.Output.Log(message);
                         break;
                     case TerminalInterpreter.LogType.Warning:
-                        Output.Terminal.Output.LogWarning(message);
+                        Output.Output.Warning(message);
                         break;
                     case TerminalInterpreter.LogType.Error:
-                        Output.Terminal.Output.LogError(message);
+                        Output.Output.Error(message);
                         break;
                     case TerminalInterpreter.LogType.Debug:
-                        if (LogDebug) Output.Terminal.Output.LogDebug(message);
+                        if (LogDebug) Output.Output.Debug(message);
                         break;
                 }
             };
@@ -989,19 +989,19 @@ namespace IngameCoding.Core
                     }
                     catch (ParserException error)
                     {
-                        Output.Terminal.Output.LogError($"ParserException: {error.MessageAll}");
+                        Output.Output.Error($"ParserException: {error.MessageAll}");
                     }
                     catch (RuntimeException error)
                     {
-                        Output.Terminal.Output.LogError($"RuntimeException: {error.MessageAll}");
+                        Output.Output.Error($"RuntimeException: {error.MessageAll}");
                     }
                     catch (EndlessLoopException)
                     {
-                        Output.Terminal.Output.LogError($"Endless loop!!!");
+                        Output.Output.Error($"Endless loop!!!");
                     }
                     catch (InternalException error)
                     {
-                        Output.Terminal.Output.LogError($"InternalException: {error.Message}");
+                        Output.Output.Error($"InternalException: {error.Message}");
                     }
                 }
                 else

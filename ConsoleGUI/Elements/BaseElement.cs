@@ -44,5 +44,7 @@ namespace ConsoleGUI
         internal virtual void OnKeyEvent(NativeMethods.KEY_EVENT_RECORD e) { }
 
         internal virtual void RefreshSize() { this.ClearBuffer(); }
+
+        internal virtual void OnStart() { }
     }
 }

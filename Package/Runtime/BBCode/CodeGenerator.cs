@@ -2669,14 +2669,14 @@ namespace IngameCoding.BBCode.Compiler
                             {
                                 builtinFunctions.AddBuiltinFunction(bfName, pTypes, new Action<DataItem[]>((p) =>
                                 {
-                                    Output.Terminal.Output.LogDebug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
                                 }), false);
                             }
                             else
                             {
                                 builtinFunctions.Add(bfName, new BuiltinFunction(new Action<DataItem[], BuiltinFunction>((p, self) =>
                                 {
-                                    Output.Terminal.Output.LogDebug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
 
                                     switch (returnType.typeName)
                                     {

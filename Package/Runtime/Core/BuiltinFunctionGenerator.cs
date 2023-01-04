@@ -83,7 +83,7 @@ namespace IngameCoding.Core
                 DataItem x = callback(p);
                 if (self.BytecodeInterpeter == null)
                 {
-                    Output.Terminal.Output.LogError($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
+                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
                     return;
                 }
                 self.BytecodeInterpeter.AddValueToStack(x);
@@ -96,7 +96,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
+                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<DataItem> callback)
@@ -106,7 +106,7 @@ namespace IngameCoding.Core
                 var x = callback();
                 if (self.BytecodeInterpeter == null)
                 {
-                    Output.Terminal.Output.LogError($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
+                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
                     return;
                 }
                 self.BytecodeInterpeter.AddValueToStack(x);
@@ -119,7 +119,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
+                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
@@ -133,7 +133,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Terminal.Output.LogWarning($"The built-in function '{name}' is already defined, so I'll override it");
+                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
 

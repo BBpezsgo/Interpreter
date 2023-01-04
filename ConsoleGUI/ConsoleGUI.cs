@@ -15,7 +15,7 @@ namespace ConsoleGUI
         internal static Character NullCharacter => new()
         {
             Char = ' ',
-            Color = CharColors.BgGray
+            Color = CharColors.BgBlack
         };
 
         internal List<BaseWindowElement> Elements = new();
@@ -36,7 +36,7 @@ namespace ConsoleGUI
         void Log(string message)
         {
             if (!DebugLogs) return;
-            Console.WriteLine(message);
+            // Console.WriteLine(message);
             System.Diagnostics.Debug.WriteLine(message);
         }
 
@@ -52,8 +52,21 @@ namespace ConsoleGUI
 
             System.Timers.Timer bTimer = new();
             bTimer.Elapsed += BTimer_Elapsed;
-            bTimer.Interval = 5000;
+            bTimer.Interval = 1000;
             bTimer.Enabled = true;
+
+            System.Timers.Timer cTimer = new();
+            cTimer.Elapsed += (_, _) =>
+            {
+                cTimer.Stop();
+                cTimer.Dispose();
+
+                foreach (var element in Elements)
+                { element.OnStart(); }
+                FilledElement?.OnStart();
+            };
+            cTimer.Interval = 2000;
+            cTimer.Enabled = true;
 
             Log("Setup console");
             SetupConsole();
@@ -73,6 +86,7 @@ namespace ConsoleGUI
             width = (short)Console.WindowWidth;
             height = (short)Console.WindowHeight;
 
+            Log("Start");
             Start();
         }
 
@@ -99,15 +113,10 @@ namespace ConsoleGUI
             ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
         }
 
-        private void BTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            ResizeElements = true;
-        }
+        private void BTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e) => BTimer_Elapsed();
+        private void BTimer_Elapsed() => ResizeElements = true;
 
-        private void WindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r)
-        {
-            ResizeElements = true;
-        }
+        private void WindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r) => ResizeElements = true;
 
         void RefreshElementsSize(bool Force = false)
         {

@@ -6,7 +6,7 @@ namespace TheProgram
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser;
     using IngameCoding.Bytecode;
-    using IngameCoding.Output.Terminal;
+    using IngameCoding.Output;
 
     using System.Collections.Generic;
 
@@ -230,7 +230,7 @@ namespace TheProgram
         {
             if (args.Length == 0)
             {
-                Output.LogError("No arguments passed!");
+                Output.Error("No arguments passed!");
                 return null;
             }
 
@@ -251,14 +251,14 @@ namespace TheProgram
             }
             catch (ArgumentException error)
             {
-                Output.LogError(error.Message);
+                Output.Error(error.Message);
                 PrintArgs(normalizedArgs);
                 return null;
             }
 
             if (!System.IO.File.Exists(normalizedArgs.Last()))
             {
-                Output.LogError($"File '{normalizedArgs.Last()}' not found!");
+                Output.Error($"File '{normalizedArgs.Last()}' not found!");
                 return null;
             }
 

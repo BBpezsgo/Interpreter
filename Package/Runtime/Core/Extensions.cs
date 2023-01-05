@@ -74,5 +74,18 @@
         public static bool IsUnset(this Range<int> self) => self.Start == 0 && self.End == 0;
         public static bool IsUnset(this Range<SinglePosition> self) => self.Start.IsUnset() && self.End.IsUnset();
         public static bool IsUnset(this SinglePosition self) => self.Line == 0 && self.Character == 0;
+
+        public static T[] Add<T>(this T[] self, params T[] values)
+        {
+            System.Collections.Generic.List<T> selfList = new(self);
+            selfList.AddRange(values);
+            return selfList.ToArray();
+        }
+        public static T[] Add<T>(this T[] self, T value)
+        {
+            System.Collections.Generic.List<T> selfList = new(self);
+            selfList.Add(value);
+            return selfList.ToArray();
+        }
     }
 }

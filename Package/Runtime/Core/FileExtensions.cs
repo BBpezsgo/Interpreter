@@ -1,6 +1,6 @@
 ﻿namespace IngameCoding.Core
 {
-    struct FileExtensions
+    public struct FileExtensions
     {
         public const string Code = "bbc";
         public const string Bytecode = "byc";

@@ -943,23 +943,19 @@ namespace IngameCoding.BBCode
             bool ExpectUsing(out UsingDefinition usingDefinition)
             {
                 usingDefinition = null;
-
-                Token usingT = ExpectIdentifier("using");
-                if (usingT == null)
+                if (ExpectIdentifier("using", out var keyword) == null)
                 { return false; }
-                usingT.Analysis.Subtype = TokenSubtype.Keyword;
+
+                keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 List<Token> tokens = new();
                 int endlessSafe = 50;
-                while (ExpectIdentifier(out Token pathPartT) != null)
+                while (ExpectIdentifier(out Token pathIdentifier) != null)
                 {
-                    pathPartT.Analysis.Subtype = TokenSubtype.Library;
-                    tokens.Add(pathPartT);
+                    pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
+                    tokens.Add(pathIdentifier);
 
-                    if (ExpectOperator(";") != null)
-                    { break; }
-                    else if (ExpectOperator(".") == null)
-                    { throw new SyntaxException($"Unexpected token '{CurrentToken.text}'", pathPartT); }
+                    ExpectOperator(".");
 
                     endlessSafe--;
                     if (endlessSafe <= 0)
@@ -967,12 +963,25 @@ namespace IngameCoding.BBCode
                 }
 
                 if (tokens.Count == 0)
-                { throw new SyntaxException("Expected library name after 'using'", usingT); }
+                {
+                    if (ExpectOperator(";") == null)
+                    {
+                        throw new SyntaxException("Expected library name after 'using'", keyword);
+                    }
+                    else
+                    {
+                        Errors.Add(new Error("Expected library name after 'using'", keyword));
+                        return true;
+                    }
+                }
+
+                if (ExpectOperator(";") == null)
+                { throw new SyntaxException("Expected ';' at end of statement (after 'using')", keyword); }
 
                 usingDefinition = new UsingDefinition
                 {
                     Path = tokens.ToArray(),
-                    Keyword = usingT,
+                    Keyword = keyword,
                 };
 
                 return true;

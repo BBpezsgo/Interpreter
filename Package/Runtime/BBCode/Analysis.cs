@@ -32,6 +32,68 @@ namespace IngameCoding.BBCode
         public Token[] Tokens;
         public string[] FileReferences;
 
+        public AnalysisResult SetTokenizerResult(Exception fatalError, Error[] errors)
+        {
+            this.Tokens = null;
+            this.TokenizerFatalError = fatalError;
+            if (errors != null) this.TokenizerErrors = errors;
+
+            return this;
+        }
+
+        public AnalysisResult SetParserResult(Exception fatalError, Error[] errors, Warning[] warnings)
+        {
+            this.parserResult = null;
+            this.ParserFatalError = fatalError;
+            if (errors != null) this.ParserErrors = errors;
+            if (warnings != null) this.Warnings = warnings;
+
+            return this;
+        }
+
+        public AnalysisResult SetCompilerResult(Exception fatalError, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
+        {
+            this.compilerResult = null;
+            this.CompilerFatalError = fatalError;
+            if (errors != null) this.CompilerErrors = errors;
+            if (warnings != null) this.Warnings = warnings;
+            if (informations != null) this.Informations = informations;
+            if (hints != null) this.Hints = hints;
+
+            return this;
+        }
+
+        public AnalysisResult SetTokenizerResult(Token[] tokens, Error[] errors)
+        {
+            this.Tokens = tokens;
+            this.TokenizerFatalError = null;
+            if (errors != null) this.TokenizerErrors = errors;
+
+            return this;
+        }
+
+        public AnalysisResult SetParserResult(ParserResult parserResult, Error[] errors, Warning[] warnings)
+        {
+            this.parserResult = parserResult;
+            this.ParserFatalError = null;
+            if (errors != null) this.ParserErrors = errors;
+            if (warnings != null) this.Warnings = warnings;
+
+            return this;
+        }
+
+        public AnalysisResult SetCompilerResult(Compiler.Compiler.CompilerResult compilerResult, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
+        {
+            this.compilerResult = compilerResult;
+            this.CompilerFatalError = null;
+            if (errors != null) this.CompilerErrors = errors;
+            if (warnings != null) this.Warnings = warnings;
+            if (informations != null) this.Informations = informations;
+            if (hints != null) this.Hints = hints;
+
+            return this;
+        }
+
         public static AnalysisResult Empty() => new()
         {
             CompilerErrors = System.Array.Empty<Error>(),
@@ -69,7 +131,7 @@ namespace IngameCoding.BBCode
         static Dictionary<string, BuiltinFunction> BuiltinFunctions => new();
         static Dictionary<string, System.Func<IStruct>> BuiltinStructs => new();
 
-        static Compiler.Compiler.CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, List<Error> errors, System.IO.DirectoryInfo directory, List<Hint> hints, List<Information> informations)
+        static Compiler.Compiler.CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, List<Error> errors, System.IO.DirectoryInfo directory, string path, List<Hint> hints, List<Information> informations)
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -80,7 +142,7 @@ namespace IngameCoding.BBCode
             for (int i = 0; i < parserResult.Usings.Count; i++)
             {
                 var usingItem = parserResult.Usings[i];
-                var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + Core.FileExtensions.Code;
+                var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
                 UsingAnalysis usingAnalysis = new()
                 {
                     Path = usingFile
@@ -136,6 +198,38 @@ namespace IngameCoding.BBCode
                 else
                 {
                     usingAnalysis.Found = false;
+
+                    System.IO.FileInfo[] files = directory.GetFiles("*.bbc", System.IO.SearchOption.TopDirectoryOnly);
+                    int largestSimilarityI = -1;
+                    int largestSimilarity = int.MaxValue;
+                    for (int fileI = 0; fileI < files.Length; fileI++)
+                    {
+                        string file = files[fileI].Name;
+                        if (!file.EndsWith("." + FileExtensions.Code)) continue;
+                        file = file[..^("." + FileExtensions.Code).Length];
+                        int similarity = file.LevenshteinDis(usingItem.PathString);
+                        if (largestSimilarityI == -1)
+                        {
+                            largestSimilarityI = fileI;
+                            largestSimilarity = similarity;
+                            continue;
+                        }
+                        if (largestSimilarity > similarity)
+                        {
+                            largestSimilarityI = fileI;
+                            largestSimilarity = similarity;
+                        }
+                    }
+
+                    if (largestSimilarityI != -1)
+                    {
+                        string hintedFile = files[largestSimilarityI].Name[..^("." + FileExtensions.Code).Length];
+                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + FileExtensions.Code}\" is not found in the current directory. Did you mean \"{hintedFile}\"?", new Position(usingItem.Path), path));
+                    }
+                    else
+                    {
+                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + FileExtensions.Code}\" is not found in the current directory.", new Position(usingItem.Path), path));
+                    }
                 }
 
                 parserResult.UsingsAnalytics.Add(usingAnalysis);
@@ -175,28 +269,25 @@ namespace IngameCoding.BBCode
             { throw new System.ArgumentNullException(nameof(path)); }
 
             Parser.Parser parser = new();
-            ParserResult result;
             fatalError = null;
 
             try
             {
-                result = parser.Parse(tokens, warnings);
+                ParserResult result = parser.Parse(tokens, warnings);
+                result.SetFile(path);
+                errors.AddRange(parser.Errors);
+                modifyedTokens = tokens;
+
+                return result;
             }
             catch (Exception error)
             {
                 fatalError = error;
-
-                if (parser.Errors.Count > 0)
-                { errors.AddRange(parser.Errors); }
-
+                errors.AddRange(parser.Errors);
                 modifyedTokens = tokens;
+
                 return null;
             }
-
-            result.SetFile(path);
-
-            modifyedTokens = parser.Tokens;
-            return result;
         }
 
         public static AnalysisResult Analyze(string code, System.IO.FileInfo file, string path)
@@ -204,31 +295,21 @@ namespace IngameCoding.BBCode
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
 
-            AnalysisResult result = new()
-            {
-                FileReferences = System.Array.Empty<string>(),
-                TokenizerErrors = System.Array.Empty<Error>(),
-                ParserErrors = System.Array.Empty<Error>(),
-                CompilerErrors = System.Array.Empty<Error>(),
-                Hints = System.Array.Empty<Hint>(),
-                Informations = System.Array.Empty<Information>(),
-            };
+            AnalysisResult result = AnalysisResult.Empty();
 
             try
             {
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
-                return Analyze(tokenizer.Parse(code).Item1, file, path, out Token[] modifyedTokens);
+                return Analyze(tokenizer.Parse(code).Item1, file, path);
             }
             catch (Exception error)
             {
                 result.TokenizerFatalError = error;
-                result.Warnings = System.Array.Empty<Warning>();
-                result.Tokens = System.Array.Empty<Token>();
                 return result;
             }
         }
 
-        public static AnalysisResult Analyze(Token[] tokens, System.IO.FileInfo file, string path, out Token[] modifyedTokens)
+        public static AnalysisResult Analyze(Token[] tokens, System.IO.FileInfo file, string path)
         {
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
@@ -236,38 +317,18 @@ namespace IngameCoding.BBCode
             List<Error> errors = new();
             List<Warning> warnings = new();
 
-            ParserResult? parserResult = Parse(tokens, warnings, errors, path, out Exception parserError, out modifyedTokens);
+            ParserResult? parserResult = Parse(tokens, warnings, errors, path, out Exception parserError, out var modifyedTokens);
 
-            if (errors.Count > 0 || parserError != null) return new AnalysisResult()
-            {
-                FileReferences = System.Array.Empty<string>(),
-
-                CompilerErrors = System.Array.Empty<Error>(),
-                Hints = System.Array.Empty<Hint>(),
-                Informations = System.Array.Empty<Information>(),
-
-                Tokens = modifyedTokens,
-                TokenizerFatalError = null,
-                TokenizerErrors = System.Array.Empty<Error>(),
-
-                ParserErrors = errors.ToArray(),
-                ParserFatalError = parserError,
-            };
-            if (!parserResult.HasValue) return new AnalysisResult()
-            {
-                FileReferences = System.Array.Empty<string>(),
-
-                CompilerErrors = System.Array.Empty<Error>(),
-                Hints = System.Array.Empty<Hint>(),
-                Informations = System.Array.Empty<Information>(),
-
-                Tokens = modifyedTokens,
-                TokenizerFatalError = null,
-                TokenizerErrors = System.Array.Empty<Error>(),
-
-                ParserErrors = System.Array.Empty<Error>(),
-                ParserFatalError = new Exception("Parse failed", new System.Exception("Parser result is null")),
-            };
+            if (errors.Count > 0 || parserError != null)
+                return AnalysisResult
+                    .Empty()
+                    .SetTokenizerResult(modifyedTokens, null)
+                    .SetParserResult(parserError, errors.ToArray(), warnings.ToArray());
+            if (!parserResult.HasValue)
+                return AnalysisResult
+                    .Empty()
+                    .SetTokenizerResult(modifyedTokens, null)
+                    .SetParserResult(new Exception("Parse failed", new System.Exception("Parser result is null")), errors.ToArray(), warnings.ToArray());
 
             parserResult.Value.SetFile(path);
 
@@ -295,7 +356,7 @@ namespace IngameCoding.BBCode
                     for (int i = 0; i < codeHeader.Usings.Count; i++)
                     {
                         var @using = codeHeader.Usings[i];
-                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + Core.FileExtensions.Code;
+                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + FileExtensions.Code;
                         if (!System.IO.File.Exists(usingFile)) continue;
                         if (usingFile.Replace('\\', '/') != path) continue;
                         fileReferences.Add(file_.FullName);
@@ -314,23 +375,6 @@ namespace IngameCoding.BBCode
             var parserResult_ = parserResult;
             parserResult_.SetFile(path);
 
-            AnalysisResult result = new()
-            {
-                FileReferences = System.Array.Empty<string>(),
-
-                CompilerErrors = System.Array.Empty<Error>(),
-                Hints = System.Array.Empty<Hint>(),
-                Informations = System.Array.Empty<Information>(),
-
-                Tokens = tokens,
-                TokenizerErrors = System.Array.Empty<Error>(),
-                TokenizerFatalError = null,
-
-                ParserErrors = System.Array.Empty<Error>(),
-                ParserFatalError = null,
-                parserResult = parserResult_,
-            };
-
             List<Error> compilerErrors = new();
             List<Warning> warnings = new(warnings_);
             List<Information> compilerInformations = new();
@@ -338,23 +382,21 @@ namespace IngameCoding.BBCode
 
             try
             {
-                result.compilerResult = Compile(parserResult_, warnings, compilerErrors, file?.Directory, compilerHints, compilerInformations);
+                var compilerResult = Compile(parserResult_, warnings, compilerErrors, file?.Directory, path, compilerHints, compilerInformations);
+                return AnalysisResult
+                    .Empty()
+                    .SetTokenizerResult(tokens, null)
+                    .SetParserResult(parserResult, null, null)
+                    .SetCompilerResult(compilerResult, compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
             catch (Exception error)
             {
-                result.CompilerFatalError = error;
-                result.CompilerErrors = compilerErrors.ToArray();
-                result.Warnings = warnings.ToArray();
-                result.Informations = compilerInformations.ToArray();
-                result.Hints = compilerHints.ToArray();
-                return result;
+                return AnalysisResult
+                   .Empty()
+                   .SetTokenizerResult(tokens, null)
+                   .SetParserResult(parserResult, null, null)
+                   .SetCompilerResult(error, compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
-
-            result.CompilerErrors = compilerErrors.ToArray();
-            result.Warnings = warnings.ToArray();
-            result.Informations = compilerInformations.ToArray();
-            result.Hints = compilerHints.ToArray();
-            return result;
         }
 
         public static CodeGenerator.Context GetContext(ParserResult parserResult, int position)

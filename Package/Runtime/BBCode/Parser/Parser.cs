@@ -218,6 +218,19 @@ namespace IngameCoding.BBCode
 
                 return $"{" ".Repeat(ident)}{this.Type.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
             }
+
+            public string ReadableID()
+            {
+                string result = this.FullName;
+                result += "(";
+                for (int j = 0; j < this.Parameters.Count; j++)
+                {
+                    if (j > 0) { result += ", "; }
+                    result += this.Parameters[j].type.ToString();
+                }
+                result += ")";
+                return result;
+            }
         }
 
         public class StructDefinition : IDefinition

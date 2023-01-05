@@ -44,7 +44,7 @@ namespace IngameCoding.Bytecode
             this.builtinFunctions = builtinFunctions;
 
             MU = new(
-                new Stack() { cpu = this },
+                new DataStack() { cpu = this },
                 new HEAP(),
                 code
             )
@@ -201,12 +201,32 @@ namespace IngameCoding.Bytecode
                     return HEAP_SET();
                 case Opcode.DEBUG_SET_TAG:
                     return DEBUG_SET_TAG();
+                case Opcode.CS_PUSH:
+                    return CS_PUSH();
+                case Opcode.CS_POP:
+                    return CS_POP();
                 default:
                     throw new InternalException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
             }
         }
 
         #region Commands
+
+        int CS_PUSH()
+        {
+            MU.CallStack.Push(MU.CurrentInstruction.parameter.ToString());
+            MU.Step();
+
+            return 1;
+        }
+
+        int CS_POP()
+        {
+            MU.CallStack.Pop();
+            MU.Step();
+
+            return 1;
+        }
 
         int DEBUG_SET_TAG()
         {
@@ -221,7 +241,7 @@ namespace IngameCoding.Bytecode
         int HEAP_GET()
         {
             var v = MU.Heap[(int)MU.CurrentInstruction.parameter];
-            MU.Stack.Add(v);
+            MU.Stack.Push(v);
             MU.Step();
 
             return 2;
@@ -239,7 +259,7 @@ namespace IngameCoding.Bytecode
         int LOGIC_NOT()
         {
             var v = MU.Stack.Pop();
-            MU.Stack.Add(!v);
+            MU.Stack.Push(!v);
             MU.Step();
 
             return 3;
@@ -257,7 +277,7 @@ namespace IngameCoding.Bytecode
         {
             var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter);
             item.ValueRef = (int)MU.CurrentInstruction.parameter;
-            MU.Stack.Add(item, null);
+            MU.Stack.Push(item, null);
             MU.Step();
 
             return 4;
@@ -282,7 +302,7 @@ namespace IngameCoding.Bytecode
         {
             var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer);
             item.ValueRef = (int)MU.CurrentInstruction.parameter + MU.BasePointer;
-            MU.Stack.Add(item, null);
+            MU.Stack.Push(item, null);
             MU.Step();
 
             return 4;
@@ -291,7 +311,7 @@ namespace IngameCoding.Bytecode
         int TYPE_GET()
         {
             var v = MU.Stack.Pop();
-            MU.Stack.Add(CentralProcessingUnit.GetTypeText(v), "type() result");
+            MU.Stack.Push(CentralProcessingUnit.GetTypeText(v), "type() result");
             MU.Step();
 
             return 3;
@@ -355,13 +375,13 @@ namespace IngameCoding.Bytecode
             {
                 if (listValue.ValueList.items.Count <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
-                MU.Stack.Add(listValue.ValueList.items[indexValue.ValueInt]);
+                MU.Stack.Push(listValue.ValueList.items[indexValue.ValueInt]);
             }
             else if (listValue.type == DataItem.Type.STRING)
             {
                 if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
-                MU.Stack.Add(listValue.ValueString[indexValue.ValueInt].ToString());
+                MU.Stack.Push(listValue.ValueString[indexValue.ValueInt].ToString());
             }
             else
             { throw new RuntimeException("The variable type is not list or string!"); }
@@ -373,7 +393,7 @@ namespace IngameCoding.Bytecode
         void OnBuiltinFunctionReturnValue(DataItem returnValue)
         {
             Output.Debug.Debug.Log(returnValue.ToString());
-            MU.Stack.Add(returnValue, "return v");
+            MU.Stack.Push(returnValue, "return v");
         }
 
         int CALL_BUILTIN()
@@ -408,7 +428,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide > rightSide);
+            MU.Stack.Push(leftSide > rightSide);
 
             MU.Step();
 
@@ -419,7 +439,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide == rightSide);
+            MU.Stack.Push(leftSide == rightSide);
 
             MU.Step();
 
@@ -430,7 +450,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide != rightSide);
+            MU.Stack.Push(leftSide != rightSide);
 
             MU.Step();
 
@@ -441,7 +461,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide | rightSide);
+            MU.Stack.Push(leftSide | rightSide);
 
             MU.Step();
 
@@ -452,7 +472,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide ^ rightSide);
+            MU.Stack.Push(leftSide ^ rightSide);
 
             MU.Step();
 
@@ -463,7 +483,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide <= rightSide);
+            MU.Stack.Push(leftSide <= rightSide);
 
             MU.Step();
 
@@ -474,7 +494,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide >= rightSide);
+            MU.Stack.Push(leftSide >= rightSide);
 
             MU.Step();
 
@@ -485,7 +505,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide & rightSide);
+            MU.Stack.Push(leftSide & rightSide);
 
             MU.Step();
 
@@ -511,7 +531,7 @@ namespace IngameCoding.Bytecode
         }
         int CALL()
         {
-            MU.Stack.Add(MU.BasePointer, "saved base pointer");
+            MU.Stack.Push(MU.BasePointer, "saved base pointer");
             MU.ReturnAddressStack.Add(MU.CodePointer + 1);
             MU.BasePointer = MU.Stack.Count;
             MU.Step((int)MU.CurrentInstruction.parameter);
@@ -532,7 +552,7 @@ namespace IngameCoding.Bytecode
         }
         int LOAD_VALUE_BR()
         {
-            MU.Stack.Add(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer), MU.CurrentInstruction.tag);
+            MU.Stack.Push(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer), MU.CurrentInstruction.tag);
 
             MU.Step();
 
@@ -552,7 +572,7 @@ namespace IngameCoding.Bytecode
         }
         int LOAD_VALUE_R()
         {
-            MU.Stack.Add(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count), MU.CurrentInstruction.tag);
+            MU.Stack.Push(MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count), MU.CurrentInstruction.tag);
 
             MU.Step();
 
@@ -593,7 +613,7 @@ namespace IngameCoding.Bytecode
 
                 if (field == "Length")
                 {
-                    MU.Stack.Add(value.Length, MU.CurrentInstruction.tag);
+                    MU.Stack.Push(value.Length, MU.CurrentInstruction.tag);
                 }
                 else
                 { throw new RuntimeException("Type string does not have field " + field); }
@@ -605,7 +625,7 @@ namespace IngameCoding.Bytecode
                 if (!value.HaveField(field))
                 { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
 
-                MU.Stack.Add(value.GetField(field), MU.CurrentInstruction.tag);
+                MU.Stack.Push(value.GetField(field), MU.CurrentInstruction.tag);
             }
             else
             { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
@@ -655,7 +675,7 @@ namespace IngameCoding.Bytecode
         }
         int LOAD_VALUE()
         {
-            MU.Stack.Add(MU.Stack.Get((int)MU.CurrentInstruction.parameter), MU.CurrentInstruction.tag);
+            MU.Stack.Push(MU.Stack.Get((int)MU.CurrentInstruction.parameter), MU.CurrentInstruction.tag);
 
             MU.Step();
 
@@ -675,7 +695,7 @@ namespace IngameCoding.Bytecode
 
             var fieldValue = structItem.GetField(MU.CurrentInstruction.additionParameter);
 
-            MU.Stack.Add(fieldValue, "field." + MU.CurrentInstruction.additionParameter);
+            MU.Stack.Push(fieldValue, "field." + MU.CurrentInstruction.additionParameter);
 
             MU.Step();
 
@@ -712,7 +732,7 @@ namespace IngameCoding.Bytecode
             if (!structItem.HaveField(MU.CurrentInstruction.additionParameter))
             { throw new RuntimeException("Field " + MU.CurrentInstruction.additionParameter + " doesn't exists in this struct."); }
 
-            MU.Stack.Add(structItem.GetField(MU.CurrentInstruction.additionParameter), "field." + MU.CurrentInstruction.additionParameter);
+            MU.Stack.Push(structItem.GetField(MU.CurrentInstruction.additionParameter), "field." + MU.CurrentInstruction.additionParameter);
 
             MU.Step();
 
@@ -724,7 +744,7 @@ namespace IngameCoding.Bytecode
             var rightSide = MU.Stack.Pop();
             var leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide < rightSide);
+            MU.Stack.Push(leftSide < rightSide);
 
             MU.Step();
 
@@ -733,7 +753,7 @@ namespace IngameCoding.Bytecode
 
         int PUSH_VALUE()
         {
-            MU.Stack.Add(MU.CurrentInstruction.parameter, MU.CurrentInstruction.tag);
+            MU.Stack.Push(new DataItem(MU.CurrentInstruction.parameter, MU.CurrentInstruction.tag), MU.CurrentInstruction.tag);
 
             MU.Step();
 
@@ -745,7 +765,7 @@ namespace IngameCoding.Bytecode
             DataItem rightSide = MU.Stack.Pop();
             DataItem leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide + rightSide);
+            MU.Stack.Push(leftSide + rightSide);
 
             MU.Step();
 
@@ -764,7 +784,7 @@ namespace IngameCoding.Bytecode
             DataItem rightSide = MU.Stack.Pop();
             DataItem leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide / rightSide);
+            MU.Stack.Push(leftSide / rightSide);
 
             MU.Step();
 
@@ -776,7 +796,7 @@ namespace IngameCoding.Bytecode
             DataItem rightSide = MU.Stack.Pop();
             DataItem leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide - rightSide);
+            MU.Stack.Push(leftSide - rightSide);
 
             MU.Step();
 
@@ -788,7 +808,7 @@ namespace IngameCoding.Bytecode
             DataItem rightSide = MU.Stack.Pop();
             DataItem leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide * rightSide);
+            MU.Stack.Push(leftSide * rightSide);
 
             MU.Step();
 
@@ -800,7 +820,7 @@ namespace IngameCoding.Bytecode
             DataItem rightSide = MU.Stack.Pop();
             DataItem leftSide = MU.Stack.Pop();
 
-            MU.Stack.Add(leftSide % rightSide);
+            MU.Stack.Push(leftSide % rightSide);
 
             MU.Step();
 
@@ -893,21 +913,23 @@ namespace IngameCoding.Bytecode
 
     internal class MemoryUnit
     {
-        internal Stack Stack;
+        internal DataStack Stack;
         internal HEAP Heap;
         internal List<int> ReturnAddressStack;
         internal Instruction[] Code;
+        internal Stack<string> CallStack;
 
         internal int CodePointer;
         internal int BasePointer;
 
         internal Instruction CurrentInstruction => Code[CodePointer];
 
-        public MemoryUnit(Stack stack, HEAP heap, Instruction[] code)
+        public MemoryUnit(DataStack stack, HEAP heap, Instruction[] code)
         {
             Stack = stack;
             Code = code;
             Heap = heap;
+            CallStack = new Stack<string>();
         }
 
         public int End() => Code.Length;
@@ -916,7 +938,46 @@ namespace IngameCoding.Bytecode
         public void Step(int num) => CodePointer += num;
     }
 
-    public class Stack
+    public class Stack<T>
+    {
+        protected readonly List<T> stack;
+
+        public Stack() => stack = new List<T>();
+
+        /// <summary>
+        /// Gives the last item, and then remove
+        /// </summary>
+        /// <returns>The last item</returns>
+        public virtual T Pop()
+        {
+            T val = this.stack[^1];
+            this.stack.RemoveAt(this.stack.Count - 1);
+            return val;
+        }
+        /// <returns>Adds a new item to the end</returns>
+        public virtual void Push(T value) => this.stack.Add(value);
+        /// <summary>Removes a specific item</summary>
+        public virtual void RemoveAt(int index) => this.stack.RemoveAt(index);
+        /// <returns>The number of items</returns>
+        public virtual int Count => this.stack.Count;
+        /// <summary>Adds a list to the end</summary>
+        public virtual void PushRange(List<T> list) => PushRange(list.ToArray());
+        /// <summary>Adds an array to the end</summary>
+        public virtual void PushRange(T[] list)
+        { foreach (T item in list) Push(item); }
+        /// <returns>The last item</returns>
+        public virtual T Last() => this.stack.Last();
+
+        public virtual T[] ToArray() => this.stack.ToArray();
+
+        public virtual T this[int i]
+        {
+            get => this.stack[i];
+            set => this.stack[i] = value;
+        }
+    }
+
+    public class DataStack : Stack<DataItem>
     {
         internal int UsedVirtualMemory
         {
@@ -966,10 +1027,6 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        public Stack()
-        { stack = new List<DataItem>(); }
-
-        readonly List<DataItem> stack;
         internal CentralProcessingUnit cpu;
 
         public void Destroy() => stack.Clear();
@@ -978,21 +1035,21 @@ namespace IngameCoding.Bytecode
         /// Gives the last item, and then remove
         /// </summary>
         /// <returns>The last item</returns>
-        public DataItem Pop()
+        public override DataItem Pop()
         {
             DataItem val = this.stack[^1];
             this.stack.RemoveAt(this.stack.Count - 1);
             return val;
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(DataItem value)
+        public override void Push(DataItem value)
         {
             var item = value;
             item.stack = this;
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(DataItem value, string tag)
+        public void Push(DataItem value, string tag)
         {
             var item = value;
             item.stack = this;
@@ -1000,91 +1057,40 @@ namespace IngameCoding.Bytecode
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
-        public void Add(int value, string tag = null) => Add(new DataItem(value, tag));
+        public void Push(int value, string tag = null) => Push(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(float value, string tag = null) => Add(new DataItem(value, tag));
+        public void Push(float value, string tag = null) => Push(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(string value, string tag = null) => Add(new DataItem(value, tag));
+        public void Push(string value, string tag = null) => Push(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(bool value, string tag = null) => Add(new DataItem(value, tag));
+        public void Push(bool value, string tag = null) => Push(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Add(IStruct value, string tag = null) => Add(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
-        public void Add(object value, string tag = null)
-        {
-            if (value is int @int)
-            {
-                Add(new DataItem(@int, tag));
-                return;
-            }
-            else if (value is float @float)
-            {
-                Add(new DataItem(@float, tag));
-                return;
-            }
-            else if (value is string @string)
-            {
-                Add(new DataItem(@string, tag));
-                return;
-            }
-            else if (value is bool boolean)
-            {
-                Add(new DataItem(boolean, tag));
-                return;
-            }
-            else if (value is IStruct @struct)
-            {
-                Add(new DataItem(@struct, tag));
-                return;
-            }
-            else if (value is DataItem.List list)
-            {
-                Add(new DataItem(list, tag));
-                return;
-            }
-            else if (value is DataItem item)
-            {
-                Add(item);
-                return;
-            }
-            throw new RuntimeException("Unknown type " + value.GetType().Name);
-        }
-        /// <summary>Removes a specific item</summary>
-        public void RemoveAt(int index) => this.stack.RemoveAt(index);
-        /// <returns>The number of items</returns>
-        public int Count => this.stack.Count;
+        public void Push(IStruct value, string tag = null) => Push(new DataItem(value, tag));
         /// <summary>Adds a list to the end</summary>
-        public void AddRange(List<DataItem> list) => AddRange(list.ToArray());
+        public override void PushRange(List<DataItem> list) => PushRange(list.ToArray());
         /// <summary>Adds a list to the end</summary>
-        public void AddRange(List<int> list)
+        public void PushRange(List<int> list)
         {
             var newList = new List<DataItem>();
             for (int i = 0; i < list.Count; i++)
             {
                 newList.Add(new DataItem(list[i], null));
             }
-            AddRange(newList);
+            PushRange(newList);
         }
         /// <summary>Adds an array to the end</summary>
-        public void AddRange(DataItem[] list)
-        {
-            foreach (DataItem item in list)
-            {
-                Add(item);
-            }
-        }
+        public override void PushRange(DataItem[] list)
+        { foreach (DataItem item in list) Push(item); }
         /// <summary>Adds a list to the end</summary>
-        public void AddRange(int[] list, string tag = "")
+        public void PushRange(int[] list, string tag = "")
         {
             var newList = new List<DataItem>();
             for (int i = 0; i < list.Length; i++)
             {
                 newList.Add(new DataItem(list[i], (tag.Length > 0) ? tag : null));
             }
-            AddRange(newList);
+            PushRange(newList);
         }
-        /// <returns>The last item</returns>
-        public DataItem Last() => this.stack.Last();
         /// <summary>Sets a specific item's value</summary>
         public void Set(int index, DataItem val, bool overrideTag = false)
         {
@@ -1098,14 +1104,6 @@ namespace IngameCoding.Bytecode
         }
         /// <returns>A specific item</returns>
         public DataItem Get(int index) => this.stack[index];
-
-        internal DataItem[] ToArray() => this.stack.ToArray();
-
-        public DataItem this[int i]
-        {
-            get => this.stack[i];
-            set => this.stack[i] = value;
-        }
     }
     internal class HEAP
     {
@@ -1240,7 +1238,7 @@ namespace IngameCoding.Bytecode
 
         bool IsReference;
 
-        public Stack stack;
+        public DataStack stack;
 
         #region Value Properties
 
@@ -1707,7 +1705,7 @@ namespace IngameCoding.Bytecode
             }
             else
             {
-                throw new Errors.Exception($"Unknown type {value.GetType().FullName}", Position.UnknownPosition);
+                throw new Errors.RuntimeException($"Unknown type {value.GetType().FullName}");
             }
         }
 
@@ -2426,10 +2424,10 @@ namespace IngameCoding.Bytecode
             IsCall = true;
 
             CPU.MU.CodePointer = instructionOffset;
-            CPU.MU.Stack.Add(0, "return value");
-            CPU.MU.Stack.AddRange(this.arguments, "arg");
+            CPU.MU.Stack.Push(0, "return value");
+            CPU.MU.Stack.PushRange(this.arguments, "arg");
 
-            CPU.MU.Stack.Add(0, "saved base pointer");
+            CPU.MU.Stack.Push(0, "saved base pointer");
             CPU.MU.ReturnAddressStack.Add(CPU.MU.End());
             CPU.MU.BasePointer = CPU.MU.Stack.Count;
         }
@@ -2441,12 +2439,12 @@ namespace IngameCoding.Bytecode
             if (endlessSafe > settings.InstructionLimit)
             {
                 CPU.MU.CodePointer = CPU.MU.Code.Length;
-                throw new RuntimeException("Instruction limit reached!");
+                throw new RuntimeException("Instruction limit reached!", GetContext());
             }
 
             if (CPU.MU.Stack.Count > settings.StackMaxSize)
             {
-                throw new RuntimeException("Stack overflow!");
+                throw new RuntimeException("Stack overflow!", GetContext());
             }
 
             if (CPU.CodePointer < CPU.MU.End())
@@ -2460,7 +2458,15 @@ namespace IngameCoding.Bytecode
 
                 endlessSafe++;
 
-                remainingClockCycles -= Math.Max(1, CPU.Clock());
+                try
+                {
+                    remainingClockCycles -= Math.Max(1, CPU.Clock());
+                }
+                catch (RuntimeException error)
+                {
+                    error.Context = GetContext();
+                    throw;
+                }
 
                 if (lastInstrPointer == CPU.CodePointer)
                 {
@@ -2521,7 +2527,24 @@ namespace IngameCoding.Bytecode
         public void AddValueToStack(DataItem value)
         {
             if (destroyed) return;
-            CPU.MU.Stack.Add(value);
+            CPU.MU.Stack.Push(value);
+        }
+
+        public void CallStackPush(string data) => this.CPU.MU.CallStack.Push(data);
+        public void CallStackPop() => this.CPU.MU.CallStack.Pop();
+
+        internal Context GetContext() => new()
+        {
+            CallStack = this.CPU.MU.CallStack.ToArray(),
+            ExecutedInstructionCount = this.endlessSafe,
+            CodePointer = this.CPU.CodePointer,
+        };
+
+        public struct Context
+        {
+            public string[] CallStack;
+            public int CodePointer;
+            public int ExecutedInstructionCount;
         }
     }
 }

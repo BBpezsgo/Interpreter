@@ -1,0 +1,19 @@
+﻿using System;
+
+struct Foo
+{
+  int v;
+}
+
+[CodeEntry]
+void Start()
+{
+  Foo v;
+}
+
+[Catch("end")]
+void End()
+{
+  Foo v;
+  Console.Log(v.v);
+}

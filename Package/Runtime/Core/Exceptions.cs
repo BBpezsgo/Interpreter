@@ -15,7 +15,7 @@ namespace IngameCoding.Errors
     {
         public Position Position => position;
         public readonly string File;
-        public string MessageAll
+        public virtual string MessageAll
         {
             get
             {
@@ -107,10 +107,30 @@ namespace IngameCoding.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
+        public IngameCoding.Bytecode.BytecodeInterpeter.Context? Context;
+
         public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        public RuntimeException(string message, Position pos) : base(message, pos) { }
-        public RuntimeException(string message, System.Exception inner) : base(message, inner) { }
+        public RuntimeException(string message, IngameCoding.Bytecode.BytecodeInterpeter.Context context) : base(message, Position.UnknownPosition)
+        { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+        public override string MessageAll
+        {
+            get
+            {
+                if (!Context.HasValue) return Message + " (no context)";
+                var cont = Context.Value;
+
+                var result = Message;
+                result += $"\n Executed Instructions: {cont.ExecutedInstructionCount}";
+                result += $"\n Code Pointer: {cont.CodePointer}";
+                result += $"\n Call Stack:";
+                if (cont.CallStack.Length == 0) { result += " (callstack is empty)"; }
+                else { result += "\n  " + string.Join("\n  ", cont.CallStack); }
+
+                return result;
+            }
+        }
     }
 
     #endregion

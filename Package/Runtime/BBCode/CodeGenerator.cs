@@ -2126,6 +2126,8 @@ namespace IngameCoding.BBCode.Compiler
 
             CurrentFile = function.Value.FilePath;
 
+            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()}");
+
             // Search for variables
             AddInstruction(Opcode.COMMENT, "Variables");
             GenerateCodeForVariable(function.Value.Statements, out int variableCount);
@@ -2141,6 +2143,8 @@ namespace IngameCoding.BBCode.Compiler
                     GenerateCodeForStatement(statement);
                 }
             }
+
+            AddInstruction(Opcode.CS_POP);
 
             CurrentFile = null;
 
@@ -2533,14 +2537,7 @@ namespace IngameCoding.BBCode.Compiler
                     if (attr.Key == "Catch") goto JumpOut;
                 }
 
-                string readableID = element.Value.FullName;
-                readableID += "(";
-                for (int j = 0; j < element.Value.Parameters.Count; j++)
-                {
-                    if (j > 0) { readableID += ", "; }
-                    readableID += element.Value.Parameters[j].type.ToString();
-                }
-                readableID += ")";
+                string readableID = element.Value.ReadableID();
 
                 printCallback?.Invoke($"      Remove function '{readableID}' ...", TerminalInterpreter.LogType.Debug);
                 informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Value.Name, element.Value.FilePath));

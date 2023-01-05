@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG_
+﻿#define ENABLE_DEBUG
 
 using System;
 
@@ -31,12 +31,12 @@ namespace TheProgram
             */
 
 #if false
-            var file = "test-net.bbc";
+            var file = "test-errors.bbc";
             IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse(
                 // "-throw-errors",
-                // "-c-print-instructions",
-                // "true",
-                "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc" //$"\"{TestConstants.TestFilesPath}{file}\""
+                // "-c-print-instructions", "true",
+                // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc"
+                $"\"{TestConstants.TestFilesPath}{file}\""
             ).Value);
 #else
             var settings = ArgumentParser.Parse(args).Value;

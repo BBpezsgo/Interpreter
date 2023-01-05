@@ -1,7 +1,4 @@
-﻿#if DEBUG
-using System.Diagnostics;
-#endif
-using System;
+﻿using System;
 
 namespace IngameCoding.Bytecode
 {
@@ -126,14 +123,21 @@ namespace IngameCoding.Bytecode
         /// </summary>
         DEBUG_SET_TAG,
 
+        /// <summary>
+        /// Call Stack Push
+        /// </summary>
+        CS_PUSH,
+        /// <summary>
+        /// Call Stack Pop
+        /// </summary>
+        CS_POP,
+
         COMMENT,
         UNKNOWN,
     }
 
     [Serializable]
-#if DEBUG
-    [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
-#endif
+    [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
     public class Instruction
     {
         public Opcode opcode;
@@ -145,7 +149,7 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="bool"/></item>
         /// <item><see cref="float"/></item>
         /// <item><see cref="string"/></item>
-        /// <item><see cref="Stack.IStruct"/></item>
+        /// <item><see cref="DataStack.IStruct"/></item>
         /// <item><see cref="DataItem.Struct"/></item>
         /// <item><see cref="DataItem.List"/></item>
         /// </list>
@@ -253,9 +257,6 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        private string GetDebuggerDisplay()
-        {
-            return ToString();
-        }
+        private string GetDebuggerDisplay() => ToString();
     }
 }

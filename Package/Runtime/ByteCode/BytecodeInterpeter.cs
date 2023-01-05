@@ -194,7 +194,7 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOGIC_NOT:
                     return LOGIC_NOT();
                 case Opcode.UNKNOWN:
-                    throw new SystemException("Unknown command");
+                    throw new InternalException("Unknown command");
                 case Opcode.HEAP_GET:
                     return HEAP_GET();
                 case Opcode.HEAP_SET:
@@ -202,7 +202,7 @@ namespace IngameCoding.Bytecode
                 case Opcode.DEBUG_SET_TAG:
                     return DEBUG_SET_TAG();
                 default:
-                    throw new SystemException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
+                    throw new InternalException("Unimplemented operation " + MU.CurrentInstruction.opcode.ToString());
             }
         }
 

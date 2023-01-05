@@ -344,9 +344,9 @@ namespace IngameCoding.BBCode.Compiler
                 return type.typeName switch
                 {
                     BuiltinType.INT => 0,
-                    BuiltinType.AUTO => throw new ParserException("Undefined type", type, CurrentFile),
+                    BuiltinType.AUTO => throw new CompilerException("Undefined type", type, CurrentFile),
                     BuiltinType.FLOAT => 0f,
-                    BuiltinType.VOID => throw new ParserException("Invalid type", type, CurrentFile),
+                    BuiltinType.VOID => throw new CompilerException("Invalid type", type, CurrentFile),
                     BuiltinType.STRING => "",
                     BuiltinType.BOOLEAN => false,
                     BuiltinType.STRUCT => new DataItem.UnassignedStruct(),
@@ -378,7 +378,7 @@ namespace IngameCoding.BBCode.Compiler
         string FindStatementType(Statement_FunctionCall functionCall)
         {
             if (!GetCompiledFunction(functionCall, out var calledFunc))
-            { throw new ParserException("Function '" + functionCall.FunctionName + "' not found!", functionCall.functionNameT, CurrentFile); }
+            { throw new CompilerException("Function '" + functionCall.FunctionName + "' not found!", functionCall.functionNameT, CurrentFile); }
             return FindStatementType(calledFunc.Type);
         }
         string FindStatementType(Statement_Operator @operator)
@@ -387,77 +387,77 @@ namespace IngameCoding.BBCode.Compiler
 
             if (@operator.Operator.text == "!")
             {
-                if (@operator.ParameterCount != 1) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 1) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NOT;
             }
             else if (@operator.Operator.text == "+")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_ADD;
             }
             else if (@operator.Operator.text == "<")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LT;
             }
             else if (@operator.Operator.text == ">")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MT;
             }
             else if (@operator.Operator.text == "-")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_SUB;
             }
             else if (@operator.Operator.text == "*")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MULT;
             }
             else if (@operator.Operator.text == "/")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_DIV;
             }
             else if (@operator.Operator.text == "%")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MOD;
             }
             else if (@operator.Operator.text == "==")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_EQ;
             }
             else if (@operator.Operator.text == "!=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NEQ;
             }
             else if (@operator.Operator.text == "&")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_AND;
             }
             else if (@operator.Operator.text == "|")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_OR;
             }
             else if (@operator.Operator.text == "^")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_XOR;
             }
             else if (@operator.Operator.text == "<=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LTEQ;
             }
             else if (@operator.Operator.text == ">=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MTEQ;
             }
 
@@ -492,7 +492,7 @@ namespace IngameCoding.BBCode.Compiler
                 throw new NotImplementedException();
             }
             else
-            { throw new ParserException($"Unknown operator '{@operator.Operator.text}'", @operator.position, CurrentFile); }
+            { throw new CompilerException($"Unknown operator '{@operator.Operator.text}'", @operator.position, CurrentFile); }
         }
         static string FindStatementType(Statement_Literal literal)
         {
@@ -534,7 +534,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new ParserException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
             }
         }
         string FindStatementType(Statement_NewStruct newStruct)
@@ -545,7 +545,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new ParserException("Unknown struct '" + newStruct.structName.text + "'", newStruct.structName, CurrentFile);
+                throw new CompilerException("Unknown struct '" + newStruct.structName.text + "'", newStruct.structName, CurrentFile);
             }
         }
         static string FindStatementType(TypeToken type)
@@ -703,7 +703,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -720,7 +720,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -737,7 +737,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -754,7 +754,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -771,7 +771,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -788,7 +788,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
                             else
                             {
-                                throw new ParserException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
+                                throw new CompilerException("Unknown variable '" + newVariable.variableName.text + "'", newVariable.variableName, CurrentFile);
                             }
                         }
                     }
@@ -814,7 +814,7 @@ namespace IngameCoding.BBCode.Compiler
             if (functionCall.FunctionName == "return")
             {
                 if (functionCall.parameters.Count > 1)
-                { throw new ParserException("Wrong number of parameters passed to 'return'", functionCall.position, CurrentFile); }
+                { throw new CompilerException("Wrong number of parameters passed to 'return'", functionCall.position, CurrentFile); }
                 else if (functionCall.parameters.Count == 1)
                 {
                     GenerateCodeForStatement(functionCall.parameters[0]);
@@ -830,7 +830,7 @@ namespace IngameCoding.BBCode.Compiler
             if (functionCall.FunctionName == "break")
             {
                 if (breakInstructions.Count <= 0)
-                { throw new ParserException("The keyword 'break' does not avaiable in the current context", functionCall.position, CurrentFile); }
+                { throw new CompilerException("The keyword 'break' does not avaiable in the current context", functionCall.position, CurrentFile); }
 
                 breakInstructions.Last().Add(compiledCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
@@ -841,7 +841,7 @@ namespace IngameCoding.BBCode.Compiler
             if (functionCall.FunctionName == "type")
             {
                 if (functionCall.parameters.Count != 1)
-                { throw new ParserException("Wrong number of parameters passed to 'type'", functionCall.position, CurrentFile); }
+                { throw new CompilerException("Wrong number of parameters passed to 'type'", functionCall.position, CurrentFile); }
 
                 GenerateCodeForStatement(functionCall.parameters[0]);
                 AddInstruction(Opcode.TYPE_GET);
@@ -862,7 +862,7 @@ namespace IngameCoding.BBCode.Compiler
                             if (functionCall.FunctionName == "Push")
                             {
                                 if (functionCall.parameters.Count != 1)
-                                { throw new ParserException("Wrong number of parameters passed to '<list>.Push'", functionCall.functionNameT, CurrentFile); }
+                                { throw new CompilerException("Wrong number of parameters passed to '<list>.Push'", functionCall.functionNameT, CurrentFile); }
                                 GenerateCodeForStatement(functionCall.parameters[0]);
 
                                 AddInstruction(Opcode.LIST_PUSH_ITEM);
@@ -872,7 +872,7 @@ namespace IngameCoding.BBCode.Compiler
                             else if (functionCall.FunctionName == "Pull")
                             {
                                 if (functionCall.parameters.Count != 0)
-                                { throw new ParserException("Wrong number of parameters passed to '<list>.Pull'", functionCall.functionNameT, CurrentFile); }
+                                { throw new CompilerException("Wrong number of parameters passed to '<list>.Pull'", functionCall.functionNameT, CurrentFile); }
 
                                 AddInstruction(Opcode.LIST_PULL_ITEM);
 
@@ -881,7 +881,7 @@ namespace IngameCoding.BBCode.Compiler
                             else if (functionCall.FunctionName == "Add")
                             {
                                 if (functionCall.parameters.Count != 2)
-                                { throw new ParserException("Wrong number of parameters passed to '<list>.Add'", functionCall.functionNameT, CurrentFile); }
+                                { throw new CompilerException("Wrong number of parameters passed to '<list>.Add'", functionCall.functionNameT, CurrentFile); }
                                 GenerateCodeForStatement(functionCall.parameters[0]);
                                 GenerateCodeForStatement(functionCall.parameters[1]);
 
@@ -892,7 +892,7 @@ namespace IngameCoding.BBCode.Compiler
                             else if (functionCall.FunctionName == "Remove")
                             {
                                 if (functionCall.parameters.Count != 1)
-                                { throw new ParserException("Wrong number of parameters passed to '<list>.Remove'", functionCall.functionNameT, CurrentFile); }
+                                { throw new CompilerException("Wrong number of parameters passed to '<list>.Remove'", functionCall.functionNameT, CurrentFile); }
                                 GenerateCodeForStatement(functionCall.parameters[0]);
 
                                 AddInstruction(Opcode.LIST_REMOVE_ITEM);
@@ -924,16 +924,16 @@ namespace IngameCoding.BBCode.Compiler
 
             if (!GetCompiledFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                throw new ParserException("Unknown function " + searchedID + "", functionCall.functionNameT, CurrentFile);
+                throw new CompilerException("Unknown function " + searchedID + "", functionCall.functionNameT, CurrentFile);
             }
 
             functionCall.functionNameT.Analysis.Reference = new TokenAnalysis.RefFunction(compiledFunction);
 
             if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-            { throw new ParserException("Wrong number of parameters passed to '" + searchedID + $"': requied {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall.position, CurrentFile); }
+            { throw new CompilerException("Wrong number of parameters passed to '" + searchedID + $"': requied {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall.position, CurrentFile); }
 
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
-            { throw new ParserException($"You called the {((compiledFunction.IsMethod) ? "method" : "function")} '{functionCall.FunctionName}' as {((functionCall.IsMethodCall) ? "method" : "function")}", functionCall.position, CurrentFile); }
+            { throw new CompilerException($"You called the {((compiledFunction.IsMethod) ? "method" : "function")} '{functionCall.FunctionName}' as {((functionCall.IsMethodCall) ? "method" : "function")}", functionCall.position, CurrentFile); }
 
             if (compiledFunction.IsBuiltin)
             {
@@ -1015,7 +1015,7 @@ namespace IngameCoding.BBCode.Compiler
                     if (structMethodCall.FunctionName == "Push")
                     {
                         if (structMethodCall.parameters.Count != 1)
-                        { throw new ParserException("Wrong number of parameters passed to '<list>.Push'", structMethodCall.functionNameT, CurrentFile); }
+                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Push'", structMethodCall.functionNameT, CurrentFile); }
                         GenerateCodeForStatement(structMethodCall.parameters[0]);
 
                         AddInstruction(Opcode.LIST_PUSH_ITEM);
@@ -1023,14 +1023,14 @@ namespace IngameCoding.BBCode.Compiler
                     else if (structMethodCall.FunctionName == "Pull")
                     {
                         if (structMethodCall.parameters.Count != 0)
-                        { throw new ParserException("Wrong number of parameters passed to '<list>.Pull'", structMethodCall.functionNameT, CurrentFile); }
+                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Pull'", structMethodCall.functionNameT, CurrentFile); }
 
                         AddInstruction(Opcode.LIST_PULL_ITEM);
                     }
                     else if (structMethodCall.FunctionName == "Add")
                     {
                         if (structMethodCall.parameters.Count != 2)
-                        { throw new ParserException("Wrong number of parameters passed to '<list>.Add'", structMethodCall.functionNameT, CurrentFile); }
+                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Add'", structMethodCall.functionNameT, CurrentFile); }
                         GenerateCodeForStatement(structMethodCall.parameters[0]);
                         GenerateCodeForStatement(structMethodCall.parameters[1]);
 
@@ -1039,14 +1039,14 @@ namespace IngameCoding.BBCode.Compiler
                     else if (structMethodCall.FunctionName == "Remove")
                     {
                         if (structMethodCall.parameters.Count != 1)
-                        { throw new ParserException("Wrong number of parameters passed to '<list>.Remove'", structMethodCall.functionNameT, CurrentFile); }
+                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Remove'", structMethodCall.functionNameT, CurrentFile); }
                         GenerateCodeForStatement(structMethodCall.parameters[0]);
 
                         AddInstruction(Opcode.LIST_REMOVE_ITEM);
                     }
                     else
                     {
-                        throw new ParserException("Unknown list method " + structMethodCall.FunctionName, structMethodCall.functionNameT, CurrentFile);
+                        throw new CompilerException("Unknown list method " + structMethodCall.FunctionName, structMethodCall.functionNameT, CurrentFile);
                     }
                 }
                 else
@@ -1061,7 +1061,7 @@ namespace IngameCoding.BBCode.Compiler
                         else
                         {
                             if (structMethodCall.parameters.Count != compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount)
-                            { throw new ParserException("Wrong number of parameters passed to '" + structMethodCall.VariableName + "'", structMethodCall.position, CurrentFile); }
+                            { throw new CompilerException("Wrong number of parameters passed to '" + structMethodCall.VariableName + "'", structMethodCall.position, CurrentFile); }
 
                             if (compiledStruct.CompiledMethods[structMethodCall.FunctionName].ReturnSomething)
                             {
@@ -1069,7 +1069,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
 
                             if (structMethodCall.parameters.Count != compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount)
-                            { throw new ParserException("Method '" + structMethodCall.VariableName + "' requies " + compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount + " parameters", structMethodCall.position, CurrentFile); }
+                            { throw new CompilerException("Method '" + structMethodCall.VariableName + "' requies " + compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount + " parameters", structMethodCall.position, CurrentFile); }
 
                             AddInstruction(new Instruction(isGlob3 ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, compiledVariable.offset) { tag = "struct.this" });
                             compiledVariables.Add("this", new CompiledVariable(compiledVariable.offset, compiledVariable.structName, compiledVariable.isList, compiledVariable.Declaration));
@@ -1110,7 +1110,7 @@ namespace IngameCoding.BBCode.Compiler
                         if (GetCompiledFunction(structMethodCall, out var compiledFunction))
                         {
                             if (!compiledFunction.IsMethod)
-                            { throw new ParserException($"You called the function '{structMethodCall.FunctionName}' as method", structMethodCall.position, CurrentFile); }
+                            { throw new CompilerException($"You called the function '{structMethodCall.FunctionName}' as method", structMethodCall.position, CurrentFile); }
 
                             if (compiledFunction.ReturnSomething)
                             {
@@ -1118,7 +1118,7 @@ namespace IngameCoding.BBCode.Compiler
                             }
 
                             if (structMethodCall.parameters.Count + 1 != compiledFunction.ParameterCount)
-                            { throw new ParserException("Method '" + structMethodCall.FunctionName + "' requies " + compiledFunction.ParameterCount + " parameters", structMethodCall.position, CurrentFile); }
+                            { throw new CompilerException("Method '" + structMethodCall.FunctionName + "' requies " + compiledFunction.ParameterCount + " parameters", structMethodCall.position, CurrentFile); }
 
                             AddInstruction(new Instruction(isGlob3 ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, compiledVariable.offset) { tag = "param.this" });
                             foreach (Statement param in structMethodCall.parameters)
@@ -1138,12 +1138,12 @@ namespace IngameCoding.BBCode.Compiler
                             }
                         }
                         else
-                        { throw new ParserException($"Method '{structMethodCall.FunctionName}' is doesn't exists", structMethodCall.position, CurrentFile); }
+                        { throw new CompilerException($"Method '{structMethodCall.FunctionName}' is doesn't exists", structMethodCall.position, CurrentFile); }
                     }
                 }
             }
             else
-            { throw new ParserException("Unknown variable '" + structMethodCall.VariableName + "'", structMethodCall.position, CurrentFile); }
+            { throw new CompilerException("Unknown variable '" + structMethodCall.VariableName + "'", structMethodCall.position, CurrentFile); }
 
         }
         void GenerateCodeForStatement(Statement_Operator @operator)
@@ -1203,77 +1203,77 @@ namespace IngameCoding.BBCode.Compiler
 
             if (@operator.Operator.text == "!")
             {
-                if (@operator.ParameterCount != 1) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 1) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NOT;
             }
             else if (@operator.Operator.text == "+")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_ADD;
             }
             else if (@operator.Operator.text == "<")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LT;
             }
             else if (@operator.Operator.text == ">")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MT;
             }
             else if (@operator.Operator.text == "-")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_SUB;
             }
             else if (@operator.Operator.text == "*")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MULT;
             }
             else if (@operator.Operator.text == "/")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_DIV;
             }
             else if (@operator.Operator.text == "%")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MOD;
             }
             else if (@operator.Operator.text == "==")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_EQ;
             }
             else if (@operator.Operator.text == "!=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NEQ;
             }
             else if (@operator.Operator.text == "&")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_AND;
             }
             else if (@operator.Operator.text == "|")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_OR;
             }
             else if (@operator.Operator.text == "^")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_XOR;
             }
             else if (@operator.Operator.text == "<=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LTEQ;
             }
             else if (@operator.Operator.text == ">=")
             {
-                if (@operator.ParameterCount != 2) throw new ParserException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MTEQ;
             }
 
@@ -1286,7 +1286,7 @@ namespace IngameCoding.BBCode.Compiler
             else if (@operator.Operator.text == "=")
             {
                 if (@operator.ParameterCount != 2)
-                { throw new ParserException("Wrong number of parameters passed to assigment operator '" + @operator.Operator.text + "'", @operator.Operator, CurrentFile); }
+                { throw new CompilerException("Wrong number of parameters passed to assigment operator '" + @operator.Operator.text + "'", @operator.Operator, CurrentFile); }
 
                 if (@operator.Left is Statement_Variable variable)
                 {
@@ -1305,7 +1305,7 @@ namespace IngameCoding.BBCode.Compiler
                     }
                     else
                     {
-                        throw new ParserException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
+                        throw new CompilerException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
                     }
                 }
                 else if (@operator.Left is Statement_Field field)
@@ -1330,7 +1330,7 @@ namespace IngameCoding.BBCode.Compiler
                         }
                         else
                         {
-                            throw new ParserException("Unknown variable '" + variable1.variableName.text + "'", variable1.variableName, CurrentFile);
+                            throw new CompilerException("Unknown variable '" + variable1.variableName.text + "'", variable1.variableName, CurrentFile);
                         }
                     }
                     else
@@ -1340,11 +1340,11 @@ namespace IngameCoding.BBCode.Compiler
                 }
                 else
                 {
-                    throw new ParserException("Unexpected statement", @operator.Left.position, CurrentFile);
+                    throw new CompilerException("Unexpected statement", @operator.Left.position, CurrentFile);
                 }
             }
             else
-            { throw new ParserException($"Unknown operator '{@operator.Operator.text}'", @operator.Operator, CurrentFile); }
+            { throw new CompilerException($"Unknown operator '{@operator.Operator.text}'", @operator.Operator, CurrentFile); }
         }
         void GenerateCodeForStatement(Statement_Literal literal)
         {
@@ -1391,19 +1391,19 @@ namespace IngameCoding.BBCode.Compiler
                 variable.variableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
 
                 if (variable.reference)
-                { throw new ParserException("Reference can only be applied to a variable", variable.variableName, CurrentFile); }
+                { throw new CompilerException("Reference can only be applied to a variable", variable.variableName, CurrentFile); }
 
                 AddInstruction((param.isReference) ? Opcode.LOAD_VALUE_BR_AS_REF : Opcode.LOAD_VALUE_BR, param.RealIndex);
             }
             else
             {
-                throw new ParserException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + variable.variableName.text + "'", variable.variableName, CurrentFile);
             }
 
             if (variable.listIndex != null)
             {
                 if (variable.reference)
-                { throw new ParserException("Reference cannot be applied to the list", variable.variableName, CurrentFile); }
+                { throw new CompilerException("Reference cannot be applied to the list", variable.variableName, CurrentFile); }
                 GenerateCodeForStatement(variable.listIndex);
                 AddInstruction(new Instruction(Opcode.LIST_INDEX));
             }
@@ -1600,7 +1600,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new ParserException("Unknown struct '" + newStruct.structName.text + "'", newStruct.structName, CurrentFile);
+                throw new CompilerException("Unknown struct '" + newStruct.structName.text + "'", newStruct.structName, CurrentFile);
             }
         }
         void GenerateCodeForStatement(Statement_Field field)
@@ -1649,7 +1649,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
                 else
                 {
-                    throw new ParserException($"Unknown variable '{prevVariable.variableName.text}'", prevVariable.position, CurrentFile);
+                    throw new CompilerException($"Unknown variable '{prevVariable.variableName.text}'", prevVariable.position, CurrentFile);
                 }
                 return;
             }
@@ -1661,7 +1661,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             GenerateCodeForStatement(indexStatement.PrevStatement);
             if (indexStatement.indexStatement == null)
-            { throw new ParserException($"Index statement for indexer is requied", indexStatement.position, CurrentFile); }
+            { throw new CompilerException($"Index statement for indexer is requied", indexStatement.position, CurrentFile); }
             GenerateCodeForStatement(indexStatement.indexStatement);
             AddInstruction(new Instruction(Opcode.LIST_INDEX));
         }
@@ -1671,15 +1671,15 @@ namespace IngameCoding.BBCode.Compiler
             for (int i = 0; i < listValue.Size; i++)
             {
                 if (listValue.Values[i] is not Statement_Literal literal)
-                { throw new ParserException("Only literals are supported in list value", listValue.Values[i].position, CurrentFile); }
+                { throw new CompilerException("Only literals are supported in list value", listValue.Values[i].position, CurrentFile); }
                 if (i == 0)
                 {
                     listType = literal.type.typeName.Convert();
                     if (listType == DataItem.Type.RUNTIME)
-                    { throw new ParserException($"Unknown literal type {listType}", literal.type, CurrentFile); }
+                    { throw new CompilerException($"Unknown literal type {listType}", literal.type, CurrentFile); }
                 }
                 if (literal.type.typeName.Convert() != listType)
-                { throw new ParserException($"Wrong literal type {literal.type.typeName}. Expected {listType}", literal.type, CurrentFile); }
+                { throw new CompilerException($"Wrong literal type {literal.type.typeName}. Expected {listType}", literal.type, CurrentFile); }
             }
             DataItem newList = new(new DataItem.List(listType), null);
             AddInstruction(Opcode.COMMENT, "Generate List {");
@@ -1775,7 +1775,7 @@ namespace IngameCoding.BBCode.Compiler
                 newVariable.type.Analysis.CompilerReached = true;
 
                 if (Keywords.Contains(newVariable.variableName.text))
-                { throw new ParserException($"Illegal variable name '{newVariable.variableName.text}'", st.position, newVariable.FilePath); }
+                { throw new CompilerException($"Illegal variable name '{newVariable.variableName.text}'", st.position, newVariable.FilePath); }
 
                 switch (newVariable.type.typeName)
                 {
@@ -1873,7 +1873,7 @@ namespace IngameCoding.BBCode.Compiler
                                 if (newStruct.structName.text == newVariable.type.text)
                                 { GenerateCodeForStatement(newStruct); }
                                 else
-                                { throw new ParserException("Can't cast " + newStruct.structName.text + " to " + newVariable.type.text, newStruct.position, newVariable.FilePath); }
+                                { throw new CompilerException("Can't cast " + newStruct.structName.text + " to " + newVariable.type.text, newStruct.position, newVariable.FilePath); }
                             }
                         }
                         newVariable.variableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true);
@@ -1917,7 +1917,7 @@ namespace IngameCoding.BBCode.Compiler
                 newVariable.type.Analysis.CompilerReached = true;
 
                 if (Keywords.Contains(newVariable.variableName.text))
-                { throw new ParserException($"Illegal variable name '{newVariable.variableName.text}'", st.position, CurrentFile); }
+                { throw new CompilerException($"Illegal variable name '{newVariable.variableName.text}'", st.position, CurrentFile); }
 
                 switch (newVariable.type.typeName)
                 {
@@ -2028,7 +2028,7 @@ namespace IngameCoding.BBCode.Compiler
                                 }
                                 else
                                 {
-                                    throw new ParserException("Can't cast " + literal.structName.text + " to " + newVariable.type.text, literal.position, CurrentFile);
+                                    throw new CompilerException("Can't cast " + literal.structName.text + " to " + newVariable.type.text, literal.position, CurrentFile);
                                 }
                             }
                         }
@@ -2055,10 +2055,10 @@ namespace IngameCoding.BBCode.Compiler
                                 newVariable.type.text = newStruct.structName.text;
                             }
                             else
-                            { throw new ParserException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
+                            { throw new CompilerException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
                         }
                         else
-                        { throw new ParserException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
+                        { throw new CompilerException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
                         newVariable.variableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false);
                         GenerateCodeForVariable(newVariable, out _);
                         variableCount++;
@@ -2070,12 +2070,12 @@ namespace IngameCoding.BBCode.Compiler
                                 throw new NotImplementedException();
                             }
                             else
-                            { throw new ParserException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
+                            { throw new CompilerException("Expected literal or new struct as initial value for variable", newVariable.variableName, CurrentFile); }
                         }
                     case BuiltinType.VOID:
                     case BuiltinType.ANY:
                     default:
-                        throw new ParserException($"Unknown variable type '{newVariable.type.typeName}'", newVariable.type, CurrentFile);
+                        throw new CompilerException($"Unknown variable type '{newVariable.type.typeName}'", newVariable.type, CurrentFile);
                 }
             }
 
@@ -2098,7 +2098,7 @@ namespace IngameCoding.BBCode.Compiler
             function.Value.Type.Analysis.CompilerReached = true;
 
             if (Keywords.Contains(function.Value.Name.text))
-            { throw new ParserException($"Illegal function name '{function.Value.Name.text}'", function.Value.Name, function.Value.FilePath); }
+            { throw new CompilerException($"Illegal function name '{function.Value.Name.text}'", function.Value.Name, function.Value.FilePath); }
 
             function.Value.Name.Analysis.SubSubtype = TokenSubSubtype.FunctionName;
 
@@ -2177,12 +2177,12 @@ namespace IngameCoding.BBCode.Compiler
             @struct.Value.Name.Analysis.CompilerReached = true;
 
             if (Keywords.Contains(@struct.Key))
-            { throw new ParserException($"Illegal struct name '{@struct.Value.FullName}'", @struct.Value.Name, CurrentFile); }
+            { throw new CompilerException($"Illegal struct name '{@struct.Value.FullName}'", @struct.Value.Name, CurrentFile); }
 
             @struct.Value.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
 
             if (compiledStructs.ContainsKey(@struct.Value.FullName))
-            { throw new ParserException($"Struct with name '{@struct.Value.FullName}' already exist", @struct.Value.Name, CurrentFile); }
+            { throw new CompilerException($"Struct with name '{@struct.Value.FullName}' already exist", @struct.Value.Name, CurrentFile); }
 
             Dictionary<string, AttributeValues> attributes = new();
 
@@ -2208,7 +2208,7 @@ namespace IngameCoding.BBCode.Compiler
             if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
             {
                 if (attributeBuiltin.parameters.Count != 1)
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, CurrentFile); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, CurrentFile); }
                 if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
                 {
                     foreach (var builtinStruct in builtinStructs)
@@ -2222,7 +2222,7 @@ namespace IngameCoding.BBCode.Compiler
                             foreach (var method in @struct.Value.Methods)
                             {
                                 if (compiledFunctions.ContainsKey(method.Key))
-                                { throw new ParserException($"Function with name '{method.Key}' already defined", method.Value.Name, CurrentFile); }
+                                { throw new CompilerException($"Function with name '{method.Key}' already defined", method.Value.Name, CurrentFile); }
 
                                 var methodInfo = GetFunctionInfo(method, true);
 
@@ -2238,10 +2238,10 @@ namespace IngameCoding.BBCode.Compiler
                             return;
                         }
                     }
-                    throw new ParserException("Builtin struct '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.NameToken, CurrentFile);
+                    throw new CompilerException("Builtin struct '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.NameToken, CurrentFile);
                 }
                 else
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, CurrentFile); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, CurrentFile); }
             }
 
             foreach (var field in @struct.Value.Fields)
@@ -2256,7 +2256,7 @@ namespace IngameCoding.BBCode.Compiler
             foreach (var method in @struct.Value.Methods)
             {
                 if (compiledFunctions.ContainsKey(method.Key))
-                { throw new ParserException($"Function with name '{method.Key}' already defined", method.Value.Name, CurrentFile); }
+                { throw new CompilerException($"Function with name '{method.Key}' already defined", method.Value.Name, CurrentFile); }
 
                 var methodInfo = GetFunctionInfo(method, true);
                 methodInfo.IsMethod = true;
@@ -2318,7 +2318,7 @@ namespace IngameCoding.BBCode.Compiler
             if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
             {
                 if (attributeBuiltin.parameters.Count != 1)
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
                 if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
                 {
                     foreach (var builtinFunction in builtinFunctions)
@@ -2326,16 +2326,16 @@ namespace IngameCoding.BBCode.Compiler
                         if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
                         {
                             if (builtinFunction.Value.ParameterCount != function.Value.Parameters.Count + (isStructMethod ? 1 : 0))
-                            { throw new ParserException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Value.Name, function.Value.FilePath); }
+                            { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Value.Name, function.Value.FilePath); }
                             if (builtinFunction.Value.ReturnSomething != (function.Value.Type.typeName != BuiltinType.VOID))
-                            { throw new ParserException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Value.Type, function.Value.FilePath); }
+                            { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Value.Type, function.Value.FilePath); }
 
                             for (int i = 0; i < builtinFunction.Value.ParameterTypes.Length; i++)
                             {
                                 if (builtinFunction.Value.ParameterTypes[i].typeName == BuiltinType.ANY) continue;
 
                                 if (builtinFunction.Value.ParameterTypes[i].typeName != function.Value.Parameters[i].type.typeName)
-                                { throw new ParserException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].typeName.ToString().ToLower()} Passed: {function.Value.Parameters[i].type.typeName.ToString().ToLower()}", function.Value.Parameters[i].type, function.Value.FilePath); }
+                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].typeName.ToString().ToLower()} Passed: {function.Value.Parameters[i].type.typeName.ToString().ToLower()}", function.Value.Parameters[i].type, function.Value.FilePath); }
                             }
 
                             return new CompiledFunction(function.Value)
@@ -2355,7 +2355,7 @@ namespace IngameCoding.BBCode.Compiler
                     { CompiledAttributes = attributes };
                 }
                 else
-                { throw new ParserException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
             }
 
             return new CompiledFunction(
@@ -2377,7 +2377,7 @@ namespace IngameCoding.BBCode.Compiler
                 var id = function.Value.ID();
 
                 if (this.compiledFunctions.ContainsKey(id))
-                { throw new ParserException($"Function with name '{id}' already defined", function.Value.Name, function.Value.FilePath); }
+                { throw new CompilerException($"Function with name '{id}' already defined", function.Value.Name, function.Value.FilePath); }
 
                 this.compiledFunctions.Add(id, GetFunctionInfo(function));
             }

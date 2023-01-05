@@ -164,7 +164,7 @@ namespace IngameCoding.BBCode
                     ParserResult? parserResult2_ = Parse(tokens, parserWarnings, parserErrors, usingFile.Replace('\\', '/'), out Exception parserFatalError, out _);
 
                     if (parserErrors.Count > 0)
-                    { throw new Exception("Failed to parse", new Exception(parserErrors[0].Message, parserErrors[0].position)); }
+                    { throw new Exception("Failed to parse", parserErrors[0].ToException()); }
 
                     if (parserFatalError != null)
                     { throw new Exception("Failed to parse", parserFatalError); }
@@ -239,7 +239,7 @@ namespace IngameCoding.BBCode
             {
                 var id = func.ID();
                 if (Functions.ContainsKey(id))
-                { throw new ParserException($"Function '{id}' already exists", func.Name); }
+                { throw new CompilerException($"Function '{id}' already exists", func.Name); }
 
                 Functions.Add(id, func);
             }
@@ -409,7 +409,7 @@ namespace IngameCoding.BBCode
                 var id = func.ID();
 
                 if (Functions.ContainsKey(id))
-                { throw new ParserException($"Function '{id}' already exists", func.Name); }
+                { throw new CompilerException($"Function '{id}' already exists", func.Name); }
 
                 Functions.Add(id, func);
             }

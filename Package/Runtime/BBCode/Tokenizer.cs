@@ -242,7 +242,7 @@ namespace IngameCoding.BBCode
         /// Two token arrays: the first without, the second with the comments
         /// (tokens, tokens with comments)
         /// </returns>
-        /// <exception cref="Errors.SyntaxException"/>
+        /// <exception cref="Errors.TokenizerException"/>
         public (Token[], Token[]) Parse(string sourceCode)
         {
             DateTime tokenizingStarted = DateTime.Now;
@@ -280,7 +280,7 @@ namespace IngameCoding.BBCode
                         't' => "\t",
                         '\\' => "\\",
                         '"' => "\"",
-                        _ => throw new Errors.SyntaxException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", CurrentToken),
+                        _ => throw new Errors.TokenizerException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", CurrentToken),
                     };
                     CurrentToken.type = TokenType.LITERAL_STRING;
                     continue;

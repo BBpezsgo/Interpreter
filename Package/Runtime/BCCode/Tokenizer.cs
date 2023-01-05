@@ -79,7 +79,7 @@ namespace IngameCoding.BCCode
                         'r' => "\r",
                         't' => "\t",
                         '\\' => "\\",
-                        _ => throw new Errors.SyntaxException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", currentToken),
+                        _ => throw new Errors.TokenizerException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", currentToken),
                     };
                     currentToken.type = TokenType.LITERAL_STRING;
                     continue;

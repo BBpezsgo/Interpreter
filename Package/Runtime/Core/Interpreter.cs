@@ -198,7 +198,7 @@ namespace IngameCoding.Core
                 (a, b) => OnOutput?.Invoke(this, a, b));
 
             if (errors.Count > 0)
-            { throw new System.Exception("Failed to compile", new Exception(errors[0].Message, errors[0].position)); }
+            { throw new System.Exception("Failed to compile", errors[0].ToException()); }
 
             details.CompilerResult = compilerResult;
 
@@ -227,7 +227,7 @@ namespace IngameCoding.Core
                 if (compiledFunction.Value.CompiledAttributes.TryGetValue("CodeEntry", out var attriute))
                 {
                     if (attriute.parameters.Count != 0)
-                    { throw new ParserException("Attribute 'CodeEntry' requies 0 parameter", attriute.NameToken); }
+                    { throw new CompilerException("Attribute 'CodeEntry' requies 0 parameter", attriute.NameToken); }
                     if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
                     {
                         instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
@@ -238,7 +238,7 @@ namespace IngameCoding.Core
                 else if (compiledFunction.Value.CompiledAttributes.TryGetValue("Catch", out attriute))
                 {
                     if (attriute.parameters.Count != 1)
-                    { throw new ParserException("Attribute 'Catch' requies 1 string parameter", attriute.NameToken); }
+                    { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", attriute.NameToken); }
                     if (attriute.TryGetValue(0, out string value))
                     {
                         if (value == "update")
@@ -248,7 +248,7 @@ namespace IngameCoding.Core
                                 instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                             }
                             else
-                            { throw new ParserException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
+                            { throw new CompilerException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
                         }
                         else if (value == "end")
                         {
@@ -257,13 +257,13 @@ namespace IngameCoding.Core
                                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                             }
                             else
-                            { throw new ParserException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
+                            { throw new CompilerException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Name); }
                         }
                         else
-                        { throw new ParserException("Unknown event '" + value + "'", attriute.NameToken); }
+                        { throw new CompilerException("Unknown event '" + value + "'", attriute.NameToken); }
                     }
                     else
-                    { throw new ParserException("Attribute requies 1 string parameter", attriute.NameToken); }
+                    { throw new CompilerException("Attribute requies 1 string parameter", attriute.NameToken); }
                 }
             }
 
@@ -987,9 +987,9 @@ namespace IngameCoding.Core
                     {
                         codeInterpreter.Update();
                     }
-                    catch (ParserException error)
+                    catch (CompilerException error)
                     {
-                        Output.Output.Error($"ParserException: {error.MessageAll}");
+                        Output.Output.Error($"CompilerException: {error.MessageAll}");
                     }
                     catch (RuntimeException error)
                     {

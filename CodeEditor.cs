@@ -93,7 +93,7 @@ namespace TheProgram
                             ipc.Send("result", new Data_Result()
                             {
                                 Tokens = tokensWithComments.ToData(v => new Data_Token(v)),
-                                Error = parser.Errors.Count == 0 ? null : new Data_Error(new IngameCoding.Errors.Exception(parser.Errors[0].Message, parser.Errors[0].position)),
+                                Error = parser.Errors.Count == 0 ? null : new Data_Error(parser.Errors[0].ToException()),
                             });
                         }
                         break;
@@ -141,16 +141,8 @@ namespace TheProgram
         public Data_Error(IngameCoding.Errors.Exception v) : base(v)
         {
             this.Message = v.Message;
-            if (v.Token != null)
-            {
-                this.Start = v.Token.AbsolutePosition.Start;
-                this.End = v.Token.AbsolutePosition.End;
-            }
-            else
-            {
-                this.Start = v.Position.AbsolutePosition.Start;
-                this.End = v.Position.AbsolutePosition.End;
-            }
+            this.Start = v.Position.AbsolutePosition.Start;
+            this.End = v.Position.AbsolutePosition.End;
         }
     }
 }

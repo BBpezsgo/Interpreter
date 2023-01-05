@@ -293,7 +293,7 @@ namespace IngameCoding.BBCode.Compiler
         /// </param>
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="ParserException"/>
+        /// <exception cref="CompilerException"/>
         /// <exception cref="Exception"/>
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
@@ -350,7 +350,7 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
                 else
-                { errors.Add(new Error($"Namespace file '{usingItem}' not found (\"{file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")")); }
+                { errors.Add(new Error($"Namespace file '{usingItem}' not found (\"{file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")", new Position(parserResult.Usings[i].Path))); }
             }
 
             if (parserSettings.PrintInfo)

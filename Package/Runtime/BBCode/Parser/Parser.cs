@@ -811,7 +811,6 @@ namespace IngameCoding.BBCode
             /// </param>
             /// <exception cref="EndlessLoopException"/>
             /// <exception cref="SyntaxException"/>
-            /// <exception cref="ParserException"/>
             /// <exception cref="Exception"/>
             /// <returns>
             /// The generated AST
@@ -865,7 +864,6 @@ namespace IngameCoding.BBCode
             /// </param>
             /// <exception cref="EndlessLoopException"/>
             /// <exception cref="SyntaxException"/>
-            /// <exception cref="ParserException"/>
             /// <exception cref="Exception"/>
             /// <exception cref="InternalException"/>
             /// <exception cref="NotImplementedException"/>
@@ -887,7 +885,7 @@ namespace IngameCoding.BBCode
 
                 if (parser.Errors.Count > 0)
                 {
-                    throw new Exception("Failed to parse", new Exception(parser.Errors[0].Message, parser.Errors[0].position));
+                    throw new Exception("Failed to parse", parser.Errors[0].ToException());
                 }
 
                 if (printCallback != null)
@@ -1193,10 +1191,10 @@ namespace IngameCoding.BBCode
 
                 Token possibleStructName = ExpectIdentifier();
                 if (possibleStructName == null)
-                { throw new ParserException("Expected struct identifier after keyword 'struct'", possibleType); }
+                { throw new SyntaxException("Expected struct identifier after keyword 'struct'", possibleType); }
 
                 if (ExpectOperator("{", out var braceletStart) == null)
-                { throw new ParserException("Expected '{' after struct identifier", possibleStructName); }
+                { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
                 possibleStructName.Analysis.Subtype = TokenSubtype.Struct;
                 possibleType.Analysis.Subtype = TokenSubtype.Keyword;
@@ -2539,7 +2537,7 @@ namespace IngameCoding.BBCode
                     {
                         thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
                         if (methodDefinition.Parameters.Count > 0)
-                        { throw new ParserException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
+                        { throw new SyntaxException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
                     }
 
                     TypeToken possibleParameterType = ExceptTypeToken(false, true);

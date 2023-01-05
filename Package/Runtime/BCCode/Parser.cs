@@ -115,7 +115,7 @@ namespace IngameCoding.BCCode
                 { return color; }
             }
 
-            throw new ParserException("There is no opcode with name '" + text + "'", token);
+            throw new CompilerException("There is no opcode with name '" + text + "'", token);
         }
         public static Bytecode.Opcode GetOpcode(string text, int line)
         {
@@ -128,7 +128,7 @@ namespace IngameCoding.BCCode
                 { return color; }
             }
 
-            throw new ParserException("There is no opcode with name '" + text + "'", new Position(line));
+            throw new CompilerException("There is no opcode with name '" + text + "'", new Position(line));
         }
 
         public static Bytecode.Instruction[] GenerateCode(List<Statement> statements, Dictionary<string, TagDefinition> tags)
@@ -142,7 +142,7 @@ namespace IngameCoding.BCCode
                 int paramCount = statement.intParameters.Count + statement.strParameters.Count + statement.identifyParameters.Count;
                 if (paramCount != GetParameterCount(instruction.opcode))
                 {
-                    throw new ParserException("Opcode '" + statement.name + "' needs " + GetParameterCount(instruction.opcode).ToString() + " parameters", new Position(statement.line, statement.startOffset));
+                    throw new CompilerException("Opcode '" + statement.name + "' needs " + GetParameterCount(instruction.opcode).ToString() + " parameters", new Position(statement.line, statement.startOffset));
                 }
 
                 if (instruction.opcode == Bytecode.Opcode.JUMP_BY_IF_FALSE || instruction.opcode == Bytecode.Opcode.JUMP_BY || instruction.opcode == Bytecode.Opcode.CALL)

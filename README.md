@@ -25,12 +25,15 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-debug` <b>(Experimental feature)</b> This will start another thing that you might be able to use for debugging. You must manually jump to the next instruction with the TAB key.
 - `-dont-optimize` Disables basic code optimization
 
-## [Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
+## Download:
+[Download .EXE](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8)
 
-## [Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/TestFiles/System.bbc)
-Some predefined structs and functions.
+[Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/TestFiles/System.bbc)
+> Some predefined structs and functions.
 
 ## [Debugger](https://github.com/BBpezsgo/InterpreterDebugger)
+
+## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## Hello World program:
 https://github.com/BBpezsgo/Interpreter/blob/32a5cb93a041a326dbf46774ca7dceb3945ad24d/TestFiles/helloworld.bbc#L1-L14

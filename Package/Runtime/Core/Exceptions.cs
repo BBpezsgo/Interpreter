@@ -6,6 +6,7 @@ using System.Runtime.Serialization;
 namespace IngameCoding.Errors
 {
     using Core;
+
     using Tokenizer;
 
     #region Exception
@@ -103,14 +104,14 @@ namespace IngameCoding.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="IngameCoding.Bytecode.BytecodeInterpeter"/> </summary>
+    /// <summary> Thrown by the <see cref="IngameCoding.Bytecode.BytecodeInterpreter"/> </summary>
     [Serializable]
     public class RuntimeException : Exception
     {
-        public IngameCoding.Bytecode.BytecodeInterpeter.Context? Context;
+        public IngameCoding.Bytecode.BytecodeInterpreter.Context? Context;
 
         public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        public RuntimeException(string message, IngameCoding.Bytecode.BytecodeInterpeter.Context context) : base(message, Position.UnknownPosition)
+        public RuntimeException(string message, IngameCoding.Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
@@ -127,6 +128,10 @@ namespace IngameCoding.Errors
                 result += $"\n Call Stack:";
                 if (cont.CallStack.Length == 0) { result += " (callstack is empty)"; }
                 else { result += "\n  " + string.Join("\n  ", cont.CallStack); }
+                result += $"\n System Stack Trace:";
+                if (StackTrace == null) { result += " (stacktrace is null)"; }
+                else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }
+                else { result += "\n  " + string.Join("\n  ", StackTrace); }
 
                 return result;
             }

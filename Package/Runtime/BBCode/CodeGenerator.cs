@@ -377,6 +377,8 @@ namespace IngameCoding.BBCode.Compiler
         #region FindStatementType()
         string FindStatementType(Statement_FunctionCall functionCall)
         {
+            if (functionCall.FunctionName == "type") return "string"; 
+
             if (!GetCompiledFunction(functionCall, out var calledFunc))
             { throw new CompilerException("Function '" + functionCall.FunctionName + "' not found!", functionCall.functionNameT, CurrentFile); }
             return FindStatementType(calledFunc.Type);
@@ -1614,7 +1616,21 @@ namespace IngameCoding.BBCode.Compiler
 
                 if (GetCompiledVariable(prevVariable.variableName.text, out CompiledVariable variable, out var isGlob))
                 {
-                    if (variable.type == BuiltinType.STRUCT && !variable.isList)
+                    if (variable.isList)
+                    {
+                        if (field.FieldName.text == "Length")
+                        { }
+                        else
+                        { throw new CompilerException($"Type list does not have field '{field.FieldName.text}'", field.FieldName, CurrentFile); }
+                    }
+                    else if (variable.type == BuiltinType.STRING)
+                    {
+                        if (field.FieldName.text == "Length")
+                        { }
+                        else
+                        { throw new CompilerException($"Type list does not have field '{field.FieldName.text}'", field.FieldName, CurrentFile); }
+                    }
+                    else if (variable.type == BuiltinType.STRUCT)
                     {
                         if (GetCompiledStruct(variable.structName, out var @struct))
                         {

@@ -18,22 +18,29 @@ Foo Xy()
 [CodeEntry]
 void Start()
 {
-  None("");
-  None(8);
-  None(3.7);
-  None(false);
+  Faa("");
+  Faa(8);
+  Faa(3.7);
+  Faa(false);
 
   var v0 = "";
-  None(v0);
-  None(5 + 2);
+  Faa(v0);
+  Faa(5 + 2);
   var v1 = true;
-  None(!v1);
-  None(new Foo);
+  Faa(!v1);
+  Faa(new Foo);
   Foo v2;
   v2 = new Foo;
-  None(v2.f);
-  None(Xy().f);
-  None([false, true, true, false][5]);
+  Faa(v2.f);
+  Faa(Xy().f);
+  Faa([false, true, true, false][3]);
 }
 
-void None(any p) { }
+void Faa(int p) { Console.Log(type (p)); }
+void Faa(bool p) { Console.Log(type (p)); }
+void Faa(string p) { Console.Log(type (p)); }
+void Faa(float p) { Console.Log(type (p)); }
+void Faa(bool[] p) { Console.Log(type (p)); }
+void Faa(Xy p) { Console.Log(type (p)); }
+void Faa(Foo2 p) { Console.Log(type (p)); }
+void Faa(Foo p) { Console.Log(type (p)); }

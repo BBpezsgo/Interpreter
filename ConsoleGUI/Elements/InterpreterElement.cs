@@ -8,7 +8,7 @@ namespace ConsoleGUI
 {
     using ConsoleLib;
 
-    internal class InterpeterElement : BaseWindowElement
+    internal class InterpreterElement : BaseWindowElement
     {
         public string File;
         int Scroll;
@@ -16,19 +16,19 @@ namespace ConsoleGUI
 
         string ConsoleText = "";
 
-        public InterpeterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
+        public InterpreterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
         {
             ClearBuffer();
             this.File = file;
-            SetupInterpeter(compilerSettings, parserSettings, interpreterSettings, handleErrors);
+            SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors);
             InitElements();
         }
 
-        public InterpeterElement(string file) : base()
+        public InterpreterElement(string file) : base()
         {
             ClearBuffer();
             this.File = file;
-            SetupInterpeter();
+            SetupInterpreter();
             InitElements();
         }
 
@@ -124,8 +124,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpeter() => SetupInterpeter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
-        void SetupInterpeter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
+        void SetupInterpreter() => SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
+        void SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
             var fileInfo = new FileInfo(File);
             var code = System.IO.File.ReadAllText(fileInfo.FullName);
@@ -215,7 +215,7 @@ namespace ConsoleGUI
         {
             sender.ClearBuffer();
 
-            if (this.Interpreter.Details.Interpeter == null) return;
+            if (this.Interpreter.Details.Interpreter == null) return;
 
             CharColors ForegroundColor;
             CharColors BackgroundColor;
@@ -259,13 +259,13 @@ namespace ConsoleGUI
             }
 
             AddText("  ");
-            AddText($"IsRunning: {this.Interpreter.Details.Interpeter.IsRunning}");
+            AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsRunning}");
             BackgroundColor = CharColors.BgBlack;
             FinishLine();
             ForegroundColor = CharColors.FgDefault;
 
             AddText("  ");
-            if (this.Interpreter.Details.Interpeter.Details.CodePointer == this.Interpreter.Details.CompilerResult.compiledCode.Length)
+            if (this.Interpreter.Details.Interpreter.Details.CodePointer == this.Interpreter.Details.CompilerResult.compiledCode.Length)
             {
                 AddText($"State: {this.Interpreter.Details.State}");
             }
@@ -282,7 +282,7 @@ namespace ConsoleGUI
         {
             sender.ClearBuffer();
 
-            if (this.Interpreter.Details.Interpeter == null) return;
+            if (this.Interpreter.Details.Interpreter == null) return;
 
             CharColors ForegroundColor;
             CharColors BackgroundColor;
@@ -333,13 +333,13 @@ namespace ConsoleGUI
                 AddChar(' ');
             }
 
-            for (int i = 0; i < this.Interpreter.Details.Interpeter.Details.Stack.Length; i++)
+            for (int i = 0; i < this.Interpreter.Details.Interpreter.Details.Stack.Length; i++)
             {
-                var item = this.Interpreter.Details.Interpeter.Details.Stack[i];
+                var item = this.Interpreter.Details.Interpreter.Details.Stack[i];
 
                 LinePrefix(i.ToString());
 
-                if (this.Interpreter.Details.Interpeter.Details.BasePointer == i)
+                if (this.Interpreter.Details.Interpreter.Details.BasePointer == i)
                 {
                     BackgroundColor = CharColors.BgGray;
                 }
@@ -386,7 +386,7 @@ namespace ConsoleGUI
                     AddText(item.Tag);
                 }
 
-                if (this.Interpreter.Details.Interpeter.Details.BasePointer == i && ForegroundColor == CharColors.FgGray)
+                if (this.Interpreter.Details.Interpreter.Details.BasePointer == i && ForegroundColor == CharColors.FgGray)
                 {
                     ForegroundColor = CharColors.FgBlack;
                 }
@@ -468,7 +468,7 @@ namespace ConsoleGUI
                     FinishLine();
                 }
 
-                if (Interpreter.Details.Interpeter != null) if (Interpreter.Details.Interpeter.Details.CodePointer == i) IsNextInstruction = true;
+                if (Interpreter.Details.Interpreter != null) if (Interpreter.Details.Interpreter.Details.CodePointer == i) IsNextInstruction = true;
 
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)

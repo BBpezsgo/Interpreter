@@ -1,7 +1,39 @@
-﻿namespace IngameCoding.Core
+﻿using IngameCoding.BBCode;
+using IngameCoding.Bytecode;
+
+namespace IngameCoding.Core
 {
     public static class Extensions
     {
+        public static object Value(this DataItem item) => item.type switch
+        {
+            DataItem.Type.INT => item.ValueInt,
+            DataItem.Type.FLOAT => item.ValueFloat,
+            DataItem.Type.STRING => item.ValueString,
+            DataItem.Type.BOOLEAN => item.ValueBoolean,
+            _ => null,
+        };
+
+        public static bool EqualType(this DataItem item, BuiltinType type)
+        {
+            switch (item.type)
+            {
+                case DataItem.Type.INT:
+                    if (type == BuiltinType.INT) return true;
+                    break;
+                case DataItem.Type.FLOAT:
+                    if (type == BuiltinType.FLOAT) return true;
+                    break;
+                case DataItem.Type.STRING:
+                    if (type == BuiltinType.STRING) return true;
+                    break;
+                case DataItem.Type.BOOLEAN:
+                    if (type == BuiltinType.BOOLEAN) return true;
+                    break;
+            }
+            return false;
+        }
+
         public static string Repeat(this string v, int count)
         {
             string output = "";

@@ -34,7 +34,7 @@ namespace IngameCoding.Core
         {
             internal Compiler.CompilerResult CompilerResult;
             internal InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
-            internal BytecodeInterpeter Interpeter => interpreter.bytecodeInterpeter;
+            internal BytecodeInterpreter Interpreter => interpreter.bytecodeInterpreter;
             internal State State => interpreter.state;
 
             readonly Interpreter interpreter;
@@ -60,6 +60,9 @@ namespace IngameCoding.Core
         /// Call <see cref="OnInput(string)"/> after this invoked
         /// </summary>
         public event OnInputEventHandler OnNeedInput;
+
+        public delegate void OnExecutedEventHandler(Interpreter sender, OnExecutedEventArgs e);
+        public event OnExecutedEventHandler OnExecuted;
 
         bool OnlyHaveCode = true;
         /// <summary>
@@ -109,6 +112,21 @@ namespace IngameCoding.Core
             }
         }
 
+        public struct OnExecutedEventArgs
+        {
+            public double ElapsedMilliseconds;
+            public int ExitCode;
+
+            public OnExecutedEventArgs(double elapsedMilliseconds, int exitCode)
+            {
+                ElapsedMilliseconds = elapsedMilliseconds;
+                ExitCode = exitCode;
+            }
+
+            public override string ToString() => $"Code executed in {ElapsedTime} with exit code {ExitCode}";
+            public string ElapsedTime => GetEllapsedTime(ElapsedMilliseconds);
+        }
+
         readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
         readonly Dictionary<string, Func<IStruct>> builtinStructs = new();
 
@@ -119,7 +137,7 @@ namespace IngameCoding.Core
 
         bool currentlyRunningCode;
 
-        BytecodeInterpeter bytecodeInterpeter;
+        BytecodeInterpreter bytecodeInterpreter;
         TimeSpan codeStartedTimespan;
 
         int result;
@@ -149,8 +167,8 @@ namespace IngameCoding.Core
         public void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
-            bytecodeInterpeter = new BytecodeInterpeter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
-            builtinFunctions.SetInterpeter(bytecodeInterpeter);
+            bytecodeInterpreter = new BytecodeInterpreter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
+            builtinFunctions.SetInterpreter(bytecodeInterpreter);
 
             state = State.Initialized;
 
@@ -346,7 +364,7 @@ namespace IngameCoding.Core
                 catch (Exception error)
                 {
                     OnDone?.Invoke(this, false);
-                    bytecodeInterpeter = null;
+                    bytecodeInterpreter = null;
                     currentlyRunningCode = false;
 
                     foreach (var warning in warnings)
@@ -374,7 +392,7 @@ namespace IngameCoding.Core
                 catch (System.Exception error)
                 {
                     OnDone?.Invoke(this, false);
-                    bytecodeInterpeter = null;
+                    bytecodeInterpreter = null;
                     currentlyRunningCode = false;
 
                     foreach (var warning in warnings)
@@ -444,7 +462,7 @@ namespace IngameCoding.Core
             catch (Exception error)
             {
                 this.onDone(false);
-                bytecodeInterpeter = null;
+                bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
@@ -458,10 +476,10 @@ namespace IngameCoding.Core
         {
             currentlyRunningCode = false;
 
-            if (bytecodeInterpeter != null)
+            if (bytecodeInterpreter != null)
             {
-                bytecodeInterpeter.Destroy();
-                bytecodeInterpeter = null;
+                bytecodeInterpreter.Destroy();
+                bytecodeInterpreter = null;
             }
 
             state = State.Destroyed;
@@ -501,7 +519,7 @@ namespace IngameCoding.Core
             catch (Exception error)
             {
                 this.onDone(false);
-                bytecodeInterpeter = null;
+                bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
@@ -510,7 +528,7 @@ namespace IngameCoding.Core
             catch (System.Exception error)
             {
                 this.onDone(false);
-                bytecodeInterpeter = null;
+                bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
                 this.printCallback(error.GetType().Name + ": " + error.Message, TerminalInterpreter.LogType.Error);
@@ -535,7 +553,7 @@ namespace IngameCoding.Core
             catch (IngameCoding.Exception error)
             {
                 onDone(false);
-                bytecodeInterpeter = null;
+                bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
                 printCallback(error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
@@ -544,7 +562,7 @@ namespace IngameCoding.Core
             catch (System.Exception error)
             {
                 onDone(false);
-                bytecodeInterpeter = null;
+                bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
                 printCallback(error.GetType().Name + ": " + error.Message, TerminalInterpreter.LogType.Error);
@@ -563,7 +581,7 @@ namespace IngameCoding.Core
         /// </param>
         public void OnInput(string inputValue)
         {
-            bytecodeInterpeter.AddValueToStack(new DataItem(inputValue, "Console Input"));
+            bytecodeInterpreter.AddValueToStack(new DataItem(inputValue, "Console Input"));
             pauseCode = false;
         }
 
@@ -697,8 +715,8 @@ namespace IngameCoding.Core
         {
             OnDone?.Invoke(this, true);
             var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-            OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of " + result.ToString(), TerminalInterpreter.LogType.System);
-            bytecodeInterpeter = null;
+            OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, result));
+            bytecodeInterpreter = null;
             currentlyRunningCode = false;
 
             state = State.CodeExecuted;
@@ -741,45 +759,41 @@ namespace IngameCoding.Core
                 return;
             }
 
-            if (bytecodeInterpeter != null && !pauseCode)
+            if (bytecodeInterpreter != null && !pauseCode)
             {
                 if (HandleErrors)
                 {
                     try
                     {
-                        bytecodeInterpeter.Tick();
+                        bytecodeInterpreter.Tick();
                     }
                     catch (RuntimeException error)
                     {
-                        OnOutput?.Invoke(this, "Runtime Error: " + error.MessageAll, TerminalInterpreter.LogType.Error);
+                        OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, TerminalInterpreter.LogType.Error);
 
                         OnDone?.Invoke(this, false);
                         var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                        OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
-                        bytecodeInterpeter = null;
+                        OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                        bytecodeInterpreter = null;
                         currentlyRunningCode = false;
-
-                        Output.Output.Error(error);
                     }
                     catch (System.Exception error)
                     {
-                        OnOutput?.Invoke(this, "Internal Error: " + error.Message, TerminalInterpreter.LogType.Error);
+                        OnOutput?.Invoke(this, "Internal Exception: " + error.Message, TerminalInterpreter.LogType.Error);
 
                         OnDone?.Invoke(this, false);
                         var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                        OnOutput?.Invoke(this, "Code executed in " + GetEllapsedTime(elapsedMilliseconds) + " with result of -1", TerminalInterpreter.LogType.System);
-                        bytecodeInterpeter = null;
+                        OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                        bytecodeInterpreter = null;
                         currentlyRunningCode = false;
-
-                        Output.Output.Error(error);
                     }
                 }
                 else
                 {
-                    bytecodeInterpeter.Tick();
+                    bytecodeInterpreter.Tick();
                 }
 
-                if (bytecodeInterpeter != null && !bytecodeInterpeter.IsRunning)
+                if (bytecodeInterpreter != null && !bytecodeInterpreter.IsRunning)
                 {
                     if (OnlyHaveCode)
                     {
@@ -789,17 +803,17 @@ namespace IngameCoding.Core
                     {
                         if (!globalVariablesCreated)
                         {
-                            bytecodeInterpeter.CallStackPush("state: SetGlobalVariables");
+                            bytecodeInterpreter.CallStackPush("state: SetGlobalVariables");
                             state = State.SetGlobalVariables;
                             OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
 
                             globalVariablesCreated = true;
-                            bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
+                            bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
                         }
                         else if (!startCalled)
                         {
-                            bytecodeInterpeter.CallStackPop();
-                            bytecodeInterpeter.CallStackPush("state: Call CodeEntry");
+                            bytecodeInterpreter.CallStackPop();
+                            bytecodeInterpreter.CallStackPush("state: Call CodeEntry");
                             state = State.CallCodeEntry;
                             OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
 
@@ -807,47 +821,47 @@ namespace IngameCoding.Core
                             if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
                             { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
 
-                            bytecodeInterpeter.Call(offset);
+                            bytecodeInterpreter.Call(offset);
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
                         {
-                            bytecodeInterpeter.CallStackPop();
-                            bytecodeInterpeter.CallStackPush("event: Update");
+                            bytecodeInterpreter.CallStackPop();
+                            bytecodeInterpreter.CallStackPush("event: Update");
                             state = State.CallUpdate;
                             WaitForUpdates(10, () =>
                             {
-                                if (bytecodeInterpeter != null)
+                                if (bytecodeInterpreter != null)
                                 {
-                                    bytecodeInterpeter.Call(offset);
+                                    bytecodeInterpreter.Call(offset);
                                 }
                             });
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
                         {
-                            bytecodeInterpeter.CallStackPop();
-                            bytecodeInterpeter.CallStackPush("event: CodeEnd");
+                            bytecodeInterpreter.CallStackPop();
+                            bytecodeInterpreter.CallStackPush("event: CodeEnd");
                             state = State.CallCodeEnd;
                             OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
 
                             exitCalled = true;
-                            if (bytecodeInterpeter != null)
+                            if (bytecodeInterpreter != null)
                             {
-                                bytecodeInterpeter.Call(offset);
+                                bytecodeInterpreter.Call(offset);
                             }
                         }
                         else if (!globalVariablesDisposed)
                         {
-                            bytecodeInterpeter.CallStackPop();
-                            bytecodeInterpeter.CallStackPush("state: DisposeGlobalVariables");
+                            bytecodeInterpreter.CallStackPop();
+                            bytecodeInterpreter.CallStackPush("state: DisposeGlobalVariables");
                             state = State.DisposeGlobalVariables;
                             OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
 
                             globalVariablesDisposed = true;
-                            bytecodeInterpeter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
+                            bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
                         }
                         else
                         {
-                            bytecodeInterpeter.CallStackPop();
+                            bytecodeInterpreter.CallStackPop();
                             OnCodeExecuted(result);
                         }
                     }
@@ -873,152 +887,5 @@ namespace IngameCoding.Core
         }
 
         #endregion
-    }
-
-    static class StackItemExtension
-    {
-        public static object Value(this DataItem item) => item.type switch
-        {
-            DataItem.Type.INT => item.ValueInt,
-            DataItem.Type.FLOAT => item.ValueFloat,
-            DataItem.Type.STRING => item.ValueString,
-            DataItem.Type.BOOLEAN => item.ValueBoolean,
-            _ => null,
-        };
-
-        public static bool EqualType(this DataItem item, BuiltinType type)
-        {
-            switch (item.type)
-            {
-                case DataItem.Type.INT:
-                    if (type == BuiltinType.INT) return true;
-                    break;
-                case DataItem.Type.FLOAT:
-                    if (type == BuiltinType.FLOAT) return true;
-                    break;
-                case DataItem.Type.STRING:
-                    if (type == BuiltinType.STRING) return true;
-                    break;
-                case DataItem.Type.BOOLEAN:
-                    if (type == BuiltinType.BOOLEAN) return true;
-                    break;
-            }
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// A simpler form of <see cref="Interpreter"/><br/>
-    /// Just call <see cref="Run(string, bool)"/> and that's it
-    /// </summary>
-    class EasyInterpreter
-    {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
-
-        /// <summary>
-        /// Compiles and interprets source code
-        /// </summary>
-        /// <param name="path">
-        /// The path to the source code file
-        /// </param>
-        /// <param name="HandleErrors">
-        /// Throw or print exceptions?
-        /// </param>
-        public static void Run(
-            FileInfo file,
-            BBCode.Parser.ParserSettings parserSettings,
-            Compiler.CompilerSettings compilerSettings,
-            BytecodeInterpreterSettings bytecodeInterpreterSettings,
-            bool LogDebug = true,
-            bool LogSystem = true,
-            bool HandleErrors = true
-            )
-        {
-            if (LogDebug) Output.Output.Debug($"Run file '{file.FullName}'");
-            var code = File.ReadAllText(file.FullName);
-            var codeInterpreter = new Interpreter();
-
-            codeInterpreter.OnOutput += (sender, message, logType) =>
-            {
-                switch (logType)
-                {
-                    case TerminalInterpreter.LogType.System:
-                        if (LogSystem) Output.Output.Log(message);
-                        break;
-                    case TerminalInterpreter.LogType.Normal:
-                        Output.Output.Log(message);
-                        break;
-                    case TerminalInterpreter.LogType.Warning:
-                        Output.Output.Warning(message);
-                        break;
-                    case TerminalInterpreter.LogType.Error:
-                        Output.Output.Error(message);
-                        break;
-                    case TerminalInterpreter.LogType.Debug:
-                        if (LogDebug) Output.Output.Debug(message);
-                        break;
-                }
-            };
-
-            codeInterpreter.OnNeedInput += (sender, message) =>
-            {
-                Console.Write(message);
-                var input = Console.ReadLine();
-                sender.OnInput(input);
-            };
-
-            if (codeInterpreter.Initialize())
-            {
-                Instruction[] compiledCode;
-
-                if (file.Extension.ToLower() == ".bcc")
-                {
-                    var tokens = BCCode.Tokenizer.Parse(code);
-
-                    var parser = new BCCode.Parser();
-                    var (statements, labels) = parser.Parse(tokens);
-
-                    compiledCode = BCCode.Parser.GenerateCode(statements, labels);
-                }
-                else
-                {
-                    compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
-                }
-
-                if (compiledCode != null)
-                { codeInterpreter.RunCode(compiledCode, bytecodeInterpreterSettings); }
-            }
-
-            while (codeInterpreter.IsExecutingCode)
-            {
-                if (HandleErrors)
-                {
-                    try
-                    {
-                        codeInterpreter.Update();
-                    }
-                    catch (CompilerException error)
-                    {
-                        Output.Output.Error($"CompilerException: {error.MessageAll}");
-                    }
-                    catch (RuntimeException error)
-                    {
-                        Output.Output.Error($"RuntimeException: {error.MessageAll}");
-                    }
-                    catch (EndlessLoopException)
-                    {
-                        Output.Output.Error($"Endless loop!!!");
-                    }
-                    catch (InternalException error)
-                    {
-                        Output.Output.Error($"InternalException: {error.Message}");
-                    }
-                }
-                else
-                {
-                    codeInterpreter.Update();
-                }
-            }
-        }
     }
 }

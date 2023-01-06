@@ -19,7 +19,7 @@ namespace IngameCoding.Core
         public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething;
 
-        internal BytecodeInterpeter BytecodeInterpeter;
+        internal BytecodeInterpreter BytecodeInterpreter;
 
         public void RaiseReturnEvent(DataItem returnValue)
         {
@@ -32,7 +32,7 @@ namespace IngameCoding.Core
         /// <summary>
         /// Function without return value
         /// </summary>
-        /// <param name="callback">Callback when the interpeter process this function</param>
+        /// <param name="callback">Callback when the interpreter process this function</param>
         public BuiltinFunction(Action<DataItem[], BuiltinFunction> callback, TypeToken[] parameters, bool returnSomething = false)
         {
             this.ParameterTypes = parameters;
@@ -43,7 +43,7 @@ namespace IngameCoding.Core
         /// <summary>
         /// Function without return value
         /// </summary>
-        /// <param name="callback">Callback when the interpeter process this function</param>
+        /// <param name="callback">Callback when the interpreter process this function</param>
         public BuiltinFunction(Action<DataItem[]> callback, TypeToken[] parameters, bool returnSomething = false)
         {
             this.ParameterTypes = parameters;
@@ -81,12 +81,12 @@ namespace IngameCoding.Core
             BuiltinFunction function = new(new Action<DataItem[], BuiltinFunction>((p, self) =>
             {
                 DataItem x = callback(p);
-                if (self.BytecodeInterpeter == null)
+                if (self.BytecodeInterpreter == null)
                 {
-                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
+                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpreter is null");
                     return;
                 }
-                self.BytecodeInterpeter.AddValueToStack(x);
+                self.BytecodeInterpreter.AddValueToStack(x);
             }), parameterTypes, true);
 
             if (!builtinFunctions.ContainsKey(name))
@@ -104,12 +104,12 @@ namespace IngameCoding.Core
             BuiltinFunction function = new(new Action<DataItem[], BuiltinFunction>((_, self) =>
             {
                 var x = callback();
-                if (self.BytecodeInterpeter == null)
+                if (self.BytecodeInterpreter == null)
                 {
-                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpeter is null");
+                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpreter is null");
                     return;
                 }
-                self.BytecodeInterpeter.AddValueToStack(x);
+                self.BytecodeInterpreter.AddValueToStack(x);
             }), Array.Empty<TypeToken>(), true);
 
             if (!builtinFunctions.ContainsKey(name))
@@ -219,10 +219,10 @@ namespace IngameCoding.Core
             });
         }
 
-        public static void SetInterpeter(this Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpeter interpeter)
+        public static void SetInterpreter(this Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreter interpreter)
         {
             foreach (KeyValuePair<string, BuiltinFunction> item in builtinFunctions)
-            { item.Value.BytecodeInterpeter = interpeter; }
+            { item.Value.BytecodeInterpreter = interpreter; }
         }
 
         #endregion

@@ -30,6 +30,18 @@ namespace TheProgram
             return;
             */
 
+            var file = "tester.test.bbc";
+            IngameCoding.Tester.Tester.RunTestFile(ArgumentParser.Parse(
+                // "-throw-errors",
+                // "-c-print-instructions", "true",
+                // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
+                "-hide-debug",
+                "-test",
+                $"\"{TestConstants.TestFilesPath}{file}\""
+            ).Value);
+
+            return;
+
 #if false
             var file = "test-errors.bbc";
             IngameCoding.Core.EasyInterpreter.Run(ArgumentParser.Parse(
@@ -43,6 +55,10 @@ namespace TheProgram
             if (settings.Debug)
             {
                 DebugTest.Run(settings);
+            }
+            else if (settings.IsTesting)
+            {
+                IngameCoding.Tester.Tester.RunTestFile(settings);
             }
             else if (settings.CodeEditor)
             {
@@ -58,6 +74,10 @@ namespace TheProgram
             {
                 DebugTest.Run(settings.Value);
                 return;
+            }
+            else if (settings.Value.IsTesting)
+            {
+                IngameCoding.Tester.Tester.RunTestFile(settings.Value);
             }
             else
             {

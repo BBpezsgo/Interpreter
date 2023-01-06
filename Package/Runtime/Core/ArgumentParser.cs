@@ -91,11 +91,12 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out bool IsTesting, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
             LogSystem = true;
+            IsTesting = false;
             compilerSettings = Compiler.CompilerSettings.Default;
             parserSettings = ParserSettings.Default;
             bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
@@ -195,6 +196,13 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-test")
+                    {
+                        i++;
+                        IsTesting = true;
+                        goto ArgParseDone;
+                    }
+
                     throw new ArgumentException($"Unknown argument '{args[i]}'");
 
                 ArgParseDone:
@@ -219,6 +227,7 @@ namespace TheProgram
             public bool LogSystem;
             public bool Debug;
             public bool CodeEditor;
+            public bool IsTesting;
         }
 
         /// <summary>
@@ -240,6 +249,7 @@ namespace TheProgram
             bool ThrowErrors;
             bool LogDebugs;
             bool LogSystem;
+            bool IsTesting;
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
@@ -247,7 +257,7 @@ namespace TheProgram
 
             try
             {
-                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out IsTesting, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
@@ -270,6 +280,7 @@ namespace TheProgram
                 ThrowErrors = ThrowErrors,
                 LogDebugs = LogDebugs,
                 LogSystem = LogSystem,
+                IsTesting = IsTesting,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
                 Debug = normalizedArgs.Contains("-debug"),
                 CodeEditor = normalizedArgs.Contains("-code-editor")

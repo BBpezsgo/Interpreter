@@ -73,7 +73,7 @@ namespace IngameCoding.Bytecode
                 _ => "",
             };
         }
-        internal static string GetTypeText(DataItem val) => GetTypeText(val.ValueList.itemTypes) + (val.type == DataItem.Type.LIST ? "[]" : "");
+        internal static string GetTypeText(DataItem val) => val.type == DataItem.Type.LIST ? $"{GetTypeText(val.ValueList.itemTypes)}[]" : GetTypeText(val.type);
 
         public void Destroy()
         {
@@ -618,6 +618,17 @@ namespace IngameCoding.Bytecode
                 else
                 { throw new RuntimeException("Type string does not have field " + field); }
             }
+            else if (item.type == DataItem.Type.LIST)
+            {
+                var value = item.ValueList;
+
+                if (field == "Length")
+                {
+                    MU.Stack.Push(value.items.Count, MU.CurrentInstruction.tag);
+                }
+                else
+                { throw new RuntimeException("Type list does not have field " + field); }
+            }
             else if (item.type == DataItem.Type.STRUCT)
             {
                 var value = item.ValueStruct;
@@ -753,7 +764,14 @@ namespace IngameCoding.Bytecode
 
         int PUSH_VALUE()
         {
-            MU.Stack.Push(new DataItem(MU.CurrentInstruction.parameter, MU.CurrentInstruction.tag), MU.CurrentInstruction.tag);
+            if (MU.CurrentInstruction.parameter is DataItem dataItem)
+            {
+                MU.Stack.Push(dataItem, MU.CurrentInstruction.tag);
+            }
+            else
+            {
+                MU.Stack.Push(new DataItem(MU.CurrentInstruction.parameter, MU.CurrentInstruction.tag), MU.CurrentInstruction.tag);
+            }
 
             MU.Step();
 
@@ -2343,20 +2361,20 @@ namespace IngameCoding.Bytecode
         };
     }
 
-    public class BytecodeInterpeter
+    public class BytecodeInterpreter
     {
-        internal class InterpeterDetails
+        internal class InterpreterDetails
         {
-            readonly BytecodeInterpeter bytecodeInterpeter;
-            public int CodePointer => bytecodeInterpeter.CPU.CodePointer;
-            public int BasePointer => bytecodeInterpeter.CPU.MU.BasePointer;
-            public int[] ReturnAddressStack => bytecodeInterpeter.CPU.MU.ReturnAddressStack.ToArray();
-            public DataItem[] Stack => bytecodeInterpeter.CPU.MU.Stack.ToArray();
-            public int StackMemorySize => bytecodeInterpeter.CPU.MU.Stack.UsedVirtualMemory;
+            readonly BytecodeInterpreter bytecodeInterpreter;
+            public int CodePointer => bytecodeInterpreter.CPU.CodePointer;
+            public int BasePointer => bytecodeInterpreter.CPU.MU.BasePointer;
+            public int[] ReturnAddressStack => bytecodeInterpreter.CPU.MU.ReturnAddressStack.ToArray();
+            public DataItem[] Stack => bytecodeInterpreter.CPU.MU.Stack.ToArray();
+            public int StackMemorySize => bytecodeInterpreter.CPU.MU.Stack.UsedVirtualMemory;
 
-            public InterpeterDetails(BytecodeInterpeter bytecodeInterpeter)
+            public InterpreterDetails(BytecodeInterpreter bytecodeInterpreter)
             {
-                this.bytecodeInterpeter = bytecodeInterpeter;
+                this.bytecodeInterpreter = bytecodeInterpreter;
             }
         }
 
@@ -2377,10 +2395,10 @@ namespace IngameCoding.Bytecode
         int lastInstrPointer = -1;
         int endlessSafe;
 
-        readonly InterpeterDetails details;
-        internal InterpeterDetails Details => details;
+        readonly InterpreterDetails details;
+        internal InterpreterDetails Details => details;
 
-        public BytecodeInterpeter(Instruction[] code, Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
+        public BytecodeInterpreter(Instruction[] code, Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
         {
             this.settings = settings;
 
@@ -2397,7 +2415,7 @@ namespace IngameCoding.Bytecode
             endlessSafe = 0;
             lastInstrPointer = -1;
 
-            details = new InterpeterDetails(this);
+            details = new InterpreterDetails(this);
         }
 
         public void Jump(int instructionOffset)

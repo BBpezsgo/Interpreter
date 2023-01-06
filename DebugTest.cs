@@ -40,13 +40,13 @@ namespace TheProgram
                         break;
                     case "get-intp-data":
                         {
-                            if (interpreter.Details.Interpeter == null) return;
-                            manager.Send("intp-data", new Data_BytecodeInterpeterDetails(interpreter.Details.Interpeter.Details));
+                            if (interpreter.Details.Interpreter == null) return;
+                            manager.Send("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter.Details));
                         }
                         break;
                     case "get-intp2-data":
                         {
-                            manager.Send("intp2-data", new Data_CodeInterpeterDetails(interpreter.Details));
+                            manager.Send("intp2-data", new Data_CodeInterpreterDetails(interpreter.Details));
                         }
                         break;
                 }
@@ -98,26 +98,26 @@ namespace TheProgram
         internal Data_Serializable(TOriginal v) { }
     }
 
-    internal class Data_CodeInterpeterDetails : Data_Serializable<Interpreter.InterpreterDetails>
+    internal class Data_CodeInterpreterDetails : Data_Serializable<Interpreter.InterpreterDetails>
     {
-        internal Data_CodeInterpeterDetails(Interpreter.InterpreterDetails v) : base(v)
+        internal Data_CodeInterpreterDetails(Interpreter.InterpreterDetails v) : base(v)
         {
             this.State = v.State.ToString();
         }
 
         public string State { get; private set; }
 
-        public static Data_BytecodeInterpeterDetails Make(BytecodeInterpeter.InterpeterDetails v) => new(v);
+        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter.InterpreterDetails v) => new(v);
     }
 
-    internal class Data_BytecodeInterpeterDetails : Data_Serializable<BytecodeInterpeter.InterpeterDetails>
+    internal class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter.InterpreterDetails>
     {
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
         public int StackMemorySize { get; set; }
         public Data_StackItem[] Stack { get; set; }
 
-        internal Data_BytecodeInterpeterDetails(BytecodeInterpeter.InterpeterDetails v) : base(v)
+        internal Data_BytecodeInterpreterDetails(BytecodeInterpreter.InterpreterDetails v) : base(v)
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
@@ -125,7 +125,7 @@ namespace TheProgram
             Stack = v.Stack.ToData(v => new Data_StackItem(v));
         }
 
-        public static Data_BytecodeInterpeterDetails Make(BytecodeInterpeter.InterpeterDetails v) => new(v);
+        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter.InterpreterDetails v) => new(v);
     }
 
     public class Data_StackItem : Data_Serializable<DataItem>

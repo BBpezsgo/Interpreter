@@ -26,7 +26,8 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-dont-optimize` Disables basic code optimization
 
 ## Download:
-Download .EXE from [OneDrive](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8) or [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y)
+Download .EXE from [OneDrive](https://onedrive.live.com/download?cid=6AEB0DA011C539BF&resid=6AEB0DA011C539BF%2153979&authkey=AB-_RBd-SC-FnC8) or [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y)<br>
+![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)
 
 [Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/TestFiles/System.bbc)
 > Some predefined structs and functions.

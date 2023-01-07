@@ -12,6 +12,13 @@ namespace TheProgram
 
     internal static class ArgumentParser
     {
+        public enum RunType
+        {
+            Normal,
+            Debugger,
+            Tester,
+        }
+
         internal class ArgumentNormalizer
         {
             internal readonly List<string> Result;
@@ -91,12 +98,12 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out bool IsTesting, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
             LogSystem = true;
-            IsTesting = false;
+            RunType = RunType.Normal;
             compilerSettings = Compiler.CompilerSettings.Default;
             parserSettings = ParserSettings.Default;
             bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
@@ -108,6 +115,9 @@ namespace TheProgram
                 {
                     if (args[i] == "-debug")
                     {
+                        if (RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Debugger}");
+                        RunType = RunType.Debugger;
                         goto ArgParseDone;
                     }
 
@@ -198,8 +208,9 @@ namespace TheProgram
 
                     if (args[i] == "-test")
                     {
-                        i++;
-                        IsTesting = true;
+                        if (RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Tester}");
+                        RunType = RunType.Tester;
                         goto ArgParseDone;
                     }
 
@@ -225,9 +236,8 @@ namespace TheProgram
             public bool HandleErrors => !ThrowErrors;
             public bool LogDebugs;
             public bool LogSystem;
-            public bool Debug;
             public bool CodeEditor;
-            public bool IsTesting;
+            public RunType RunType;
         }
 
         /// <summary>
@@ -250,6 +260,7 @@ namespace TheProgram
             bool LogDebugs;
             bool LogSystem;
             bool IsTesting;
+            RunType RunType;
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
@@ -257,7 +268,7 @@ namespace TheProgram
 
             try
             {
-                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out IsTesting, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
@@ -280,9 +291,8 @@ namespace TheProgram
                 ThrowErrors = ThrowErrors,
                 LogDebugs = LogDebugs,
                 LogSystem = LogSystem,
-                IsTesting = IsTesting,
+                RunType = RunType,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
-                Debug = normalizedArgs.Contains("-debug"),
                 CodeEditor = normalizedArgs.Contains("-code-editor")
             };
         }

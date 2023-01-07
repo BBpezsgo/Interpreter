@@ -236,7 +236,6 @@ namespace TheProgram
             public bool HandleErrors => !ThrowErrors;
             public bool LogDebugs;
             public bool LogSystem;
-            public bool CodeEditor;
             public RunType RunType;
         }
 
@@ -259,7 +258,6 @@ namespace TheProgram
             bool ThrowErrors;
             bool LogDebugs;
             bool LogSystem;
-            bool IsTesting;
             RunType RunType;
 
             ArgumentNormalizer normalizer = new();
@@ -293,7 +291,6 @@ namespace TheProgram
                 LogSystem = LogSystem,
                 RunType = RunType,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
-                CodeEditor = normalizedArgs.Contains("-code-editor")
             };
         }
 

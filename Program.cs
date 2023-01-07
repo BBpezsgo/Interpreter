@@ -1,4 +1,5 @@
-﻿#define ENABLE_DEBUG
+﻿#define ENABLE_DEBUG_
+#define RELEASE_TEST_
 
 using System;
 
@@ -10,7 +11,7 @@ namespace TheProgram
         {
 #if DEBUG && ENABLE_DEBUG
             var file = "tester.test.bbc";
-            args = new string[]
+            if (args.Length == 0) args = new string[]
             {
                 // "-throw-errors",
                 // "-c-print-instructions", "true",
@@ -18,6 +19,12 @@ namespace TheProgram
                 "-hide-debug",
                 "-test",
                 $"\"{TestConstants.TestFilesPath}{file}\""
+            };
+#endif
+#if RELEASE_TEST
+            if (args.Length == 0) args = new string[]
+            {
+                "\"D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\helloworld.bbc\""
             };
 #endif
 
@@ -32,20 +39,13 @@ namespace TheProgram
                 case ArgumentParser.RunType.Tester:
                     IngameCoding.Tester.Tester.RunTestFile(settings.Value);
                     break;
-                default:
-                    if (settings.Value.CodeEditor)
-                    {
-                        CodeEditor.Run(settings.Value);
-                    }
-                    else
-                    {
-                        IngameCoding.Core.EasyInterpreter.Run(settings.Value);
-                    }
+                case ArgumentParser.RunType.Normal:
+                    IngameCoding.Core.EasyInterpreter.Run(settings.Value);
                     break;
             }
 
         ExitProgram:
-#if DEBUG
+#if DEBUG && ENABLE_DEBUG
             ;
 #else
             Console.WriteLine("\n\r\n\rPress any key to exit");

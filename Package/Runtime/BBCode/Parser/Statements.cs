@@ -708,7 +708,6 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override bool TryGetTotalPosition(out Position result)
         {
-            // TODO: ezt tesztelni !!!
             result = new Position(Keyword, BracketStart, BracketEnd);
             return true;
         }

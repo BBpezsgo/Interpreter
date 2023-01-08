@@ -1500,16 +1500,9 @@ namespace IngameCoding.BBCode.Compiler
                     if (conditionValue.type == DataItem.Type.BOOLEAN)
                     {
                         if (conditionValue.ValueBoolean)
-                        {
-                            if (whileLoop.TryGetTotalPosition(out var p))
-                            {
-                                warnings.Add(new Warning($"Infinity loop", p, CurrentFile));
-                            }
-                            else
-                            {
-                                warnings.Add(new Warning($"Infinity loop", whileLoop.position, CurrentFile));
-                            }
-                        }
+                        { warnings.Add(new Warning($"Infinity loop", whileLoop.Keyword, CurrentFile)); }
+                        else
+                        { warnings.Add(new Warning($"Why? this will never run", whileLoop.Keyword, CurrentFile)); }
                     }
                 }
             }

@@ -159,7 +159,10 @@ namespace IngameCoding.BBCode.Parser.Statements
         public Token BracketEnd;
 
         public override bool TryGetTotalPosition(out Position result)
-        { throw new NotImplementedException(); }
+        {
+            result = new Position(BracketStart, BracketEnd);
+            return true;
+        }
 
         public abstract override string PrettyPrint(int ident = 0);
     }
@@ -682,8 +685,8 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_WhileLoop : StatementParent
     {
-        internal string name;
         internal Statement condition;
+        internal Token Keyword;
 
         public override string ToString()
         {
@@ -701,6 +704,13 @@ namespace IngameCoding.BBCode.Parser.Statements
 
             x += $"{" ".Repeat(ident)}}}";
             return x;
+        }
+
+        public override bool TryGetTotalPosition(out Position result)
+        {
+            // TODO: ezt tesztelni !!!
+            result = new Position(Keyword, BracketStart, BracketEnd);
+            return true;
         }
 
         internal override void SetPosition()

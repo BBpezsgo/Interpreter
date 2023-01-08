@@ -3,12 +3,9 @@
 [CodeEntry]
 void Start()
 {
-  int[] list = [6,5,4,3,2,1,0,-1];
-  int i = 0;
-  while (i < 11)
-  {
-    list.Push(i);
-    i++;
-  };
-  Console.Log(list);
+  string[] list2 = ["a"];
+  if (list2.Contains("b")) { Console.Log("list2 contains 'b'"); }
+  else { Console.Log("list2 not contains 'b'"); };
+  if (list2.Contains("a")) { Console.Log("list2 contains 'a'"); }
+  else { Console.Log("list2 not contains 'a'"); };
 }

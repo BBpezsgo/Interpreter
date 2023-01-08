@@ -10,14 +10,14 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG && ENABLE_DEBUG
-            var file = "tester.test.bbc";
+            var file = "test-list.bbc";
             if (args.Length == 0) args = new string[]
             {
                 // "-throw-errors",
                 // "-c-print-instructions", "true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
-                "-hide-debug",
-                "-test",
+                // "-hide-debug",
+                // "-test",
                 $"\"{TestConstants.TestFilesPath}{file}\""
             };
 #endif

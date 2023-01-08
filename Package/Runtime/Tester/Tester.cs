@@ -136,11 +136,10 @@ namespace IngameCoding.Tester
                 }
             };
 
-            codeInterpreter.OnNeedInput += (sender, message) =>
+            codeInterpreter.OnNeedInput += (sender) =>
             {
-                Console.Write(message);
-                var input = Console.ReadLine();
-                sender.OnInput(input);
+                var input = Console.ReadKey();
+                sender.OnInput(input.KeyChar);
             };
 
             if (codeInterpreter.Initialize())

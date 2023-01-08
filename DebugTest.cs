@@ -22,6 +22,8 @@ namespace TheProgram
             var code = File.ReadAllText(settings.File.FullName);
             var interpreter = new Interpreter();
 
+            bool needStdin = false;
+
             ipc.OnRecived += (manager, message) =>
             {
                 if (interpreter == null) return;
@@ -49,6 +51,12 @@ namespace TheProgram
                             manager.Send("intp2-data", new Data_CodeInterpreterDetails(interpreter.Details));
                         }
                         break;
+                    case "stdin":
+                        if (!needStdin) break;
+                        needStdin = false;
+
+                        interpreter.OnInput(message.data.ToString()[0]);
+                        break;
                 }
             };
 
@@ -57,11 +65,19 @@ namespace TheProgram
                 ipc.Send("con-out", new Data_Log((logType.ToString(), message)));
             };
 
-            interpreter.OnNeedInput += (sender, message) =>
+            interpreter.OnStdOut += (sender, message) =>
             {
-                Console.Write(message);
-                var input = Console.ReadLine();
-                sender.OnInput(input);
+                ipc.Send("stdout", message);
+            };
+
+            interpreter.OnStdError += (sender, message) =>
+            {
+                ipc.Send("stderr", message);
+            };
+
+            interpreter.OnNeedInput += (sender) =>
+            {
+                needStdin = true;
             };
 
             if (interpreter.Initialize())

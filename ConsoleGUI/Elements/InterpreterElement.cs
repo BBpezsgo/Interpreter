@@ -133,11 +133,10 @@ namespace ConsoleGUI
 
             Interpreter.OnOutput += (sender, message, logType) => { ConsoleText += message + "\n"; };
 
-            Interpreter.OnNeedInput += (sender, message) =>
+            Interpreter.OnNeedInput += (sender) =>
             {
-                Console.Write(message);
-                var input = Console.ReadLine();
-                sender.OnInput(input);
+                var input = Console.ReadKey();
+                sender.OnInput(input.KeyChar);
             };
 
             if (Interpreter.Initialize())

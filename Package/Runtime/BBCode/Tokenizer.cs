@@ -232,6 +232,8 @@ namespace IngameCoding.BBCode
             this.printCallback = printCallback;
         }
 
+        Position GetCurrentPosition(int OffsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(OffsetTotal, OffsetTotal + 1));
+
         /// <summary>
         /// Convert source code into tokens
         /// </summary>
@@ -280,7 +282,7 @@ namespace IngameCoding.BBCode
                         't' => "\t",
                         '\\' => "\\",
                         '"' => "\"",
-                        _ => throw new Errors.TokenizerException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", CurrentToken),
+                        _ => throw new Errors.TokenizerException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", GetCurrentPosition(OffsetTotal)),
                     };
                     CurrentToken.type = TokenType.LITERAL_STRING;
                     continue;
@@ -302,6 +304,11 @@ namespace IngameCoding.BBCode
                 }
                 else if (CurrentToken.type == TokenType.LITERAL_STRING && currChar != '"')
                 {
+                    if (currChar == '\\')
+                    {
+                        CurrentToken.type = TokenType.STRING_ESCAPE_SEQUENCE;
+                        continue;
+                    }
                     CurrentToken.text += currChar;
                     continue;
                 }
@@ -549,17 +556,10 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == '\\')
                 {
-                    if (CurrentToken.type == TokenType.LITERAL_STRING)
-                    {
-                        CurrentToken.type = TokenType.STRING_ESCAPE_SEQUENCE;
-                    }
-                    else
-                    {
                         EndToken(OffsetTotal);
                         CurrentToken.type = TokenType.OPERATOR;
                         CurrentToken.text += currChar;
                         EndToken(OffsetTotal);
-                    }
                 }
                 else
                 {

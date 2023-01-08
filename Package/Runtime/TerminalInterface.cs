@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace IngameCoding.Output
 {
@@ -96,6 +97,16 @@ namespace IngameCoding.Output
             Console.ForegroundColor = color;
             Console.WriteLine(message);
             Console.ResetColor();
+        }
+
+        internal static async Task Write(string data)
+        {
+            await Console.Out.WriteAsync(data);
+        }
+
+        internal static async Task WriteError(string data)
+        {
+            await Console.Error.WriteAsync(data);
         }
     }
 

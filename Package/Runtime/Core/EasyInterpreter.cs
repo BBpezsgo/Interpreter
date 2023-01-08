@@ -39,6 +39,16 @@ namespace IngameCoding.Core
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
 
+            codeInterpreter.OnStdOut += (sender, data) =>
+            {
+                Output.Output.Write(data).Wait();
+            };
+
+            codeInterpreter.OnStdError += (sender, data) =>
+            {
+                Output.Output.WriteError(data).Wait();
+            };
+
             codeInterpreter.OnExecuted += (sender, e) =>
             {
                 if (LogSystem) Output.Output.Log(e.ToString());
@@ -66,11 +76,10 @@ namespace IngameCoding.Core
                 }
             };
 
-            codeInterpreter.OnNeedInput += (sender, message) =>
+            codeInterpreter.OnNeedInput += (sender) =>
             {
-                Console.Write(message);
-                var input = Console.ReadLine();
-                sender.OnInput(input);
+                var input = Console.ReadKey();
+                sender.OnInput(input.KeyChar);
             };
 
             if (codeInterpreter.Initialize())

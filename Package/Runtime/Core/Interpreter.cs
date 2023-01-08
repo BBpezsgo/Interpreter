@@ -50,14 +50,26 @@ namespace IngameCoding.Core
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, TerminalInterpreter.LogType logType);
         /// <summary>
-        /// Will be invoked when the code has output
+        /// Will be invoked when the interpeter has output
         /// </summary>
         public event OnOutputEventHandler OnOutput;
 
-        public delegate void OnInputEventHandler(Interpreter sender, string message);
+        public delegate void OnStdOutEventHandler(Interpreter sender, string data);
+        /// <summary>
+        /// Will be invoked when the code has standard output data
+        /// </summary>
+        public event OnStdOutEventHandler OnStdOut;
+
+        public delegate void OnStdErrorEventHandler(Interpreter sender, string data);
+        /// <summary>
+        /// Will be invoked when the code has standard error data
+        /// </summary>
+        public event OnStdErrorEventHandler OnStdError;
+
+        public delegate void OnInputEventHandler(Interpreter sender);
         /// <summary>
         /// Will be invoked when the code needs input<br/>
-        /// Call <see cref="OnInput(string)"/> after this invoked
+        /// Call <see cref="OnInput(char)"/> after this invoked
         /// </summary>
         public event OnInputEventHandler OnNeedInput;
 
@@ -308,19 +320,17 @@ namespace IngameCoding.Core
             this.currentlyRunningCode = true;
 
             AddBuiltins();
-            AddBuiltinFunction("conin", new BBCode.TypeToken[] {
-                new TypeToken("any", BuiltinType.ANY, null)
-            }, (DataItem[] parameters) =>
+            AddBuiltinFunction("stdin", Array.Empty<TypeToken>(), (DataItem[] parameters) =>
             {
                 pauseCode = true;
                 if (OnNeedInput == null)
                 {
                     OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", TerminalInterpreter.LogType.Warning);
-                    OnInput("");
+                    OnInput('\0');
                 }
                 else
                 {
-                    OnNeedInput?.Invoke(this, parameters[0].ToStringValue());
+                    OnNeedInput?.Invoke(this);
                 }
             }, true);
 
@@ -576,12 +586,12 @@ namespace IngameCoding.Core
         /// Provides input to the interpreter<br/>
         /// <lv>WARNING:</lv> Call it only after <see cref="OnNeedInput"/> invoked!
         /// </summary>
-        /// <param name="inputValue">
+        /// <param name="key">
         /// The input value
         /// </param>
-        public void OnInput(string inputValue)
+        public void OnInput(char key)
         {
-            bytecodeInterpreter.AddValueToStack(new DataItem(inputValue, "Console Input"));
+            bytecodeInterpreter.AddValueToStack(new DataItem(key.ToString(), "Console Input"));
             pauseCode = false;
         }
 
@@ -600,31 +610,17 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            builtinFunctions.AddBuiltinFunction("conlog", new TypeToken[] {
+            builtinFunctions.AddBuiltinFunction("stdout", new TypeToken[] {
                 TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
-                if (parameters[0].type == DataItem.Type.LIST)
-                {
-                    var list = parameters[0].ValueList;
-                    OnOutput?.Invoke(this, $"[ {string.Join(", ", list.items)} ]", TerminalInterpreter.LogType.Normal);
-                }
-                else
-                {
-                    OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Normal);
-                }
+                OnStdOut?.Invoke(this, parameters[0].ToStringValue());
             });
-            builtinFunctions.AddBuiltinFunction("conerr", new TypeToken[] {
+            builtinFunctions.AddBuiltinFunction("stderr", new TypeToken[] {
                 TypeToken.CreateAnonymous("any", BuiltinType.ANY)
             }, (DataItem[] parameters) =>
             {
-                OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Error);
-            });
-            builtinFunctions.AddBuiltinFunction("conwarn", new TypeToken[] {
-                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
-            }, (DataItem[] parameters) =>
-            {
-                OnOutput?.Invoke(this, parameters[0].ToStringValue(), TerminalInterpreter.LogType.Warning);
+                OnStdError?.Invoke(this, parameters[0].ToStringValue());
             });
             builtinFunctions.AddBuiltinFunction("sleep", new TypeToken[] {
                 TypeToken.CreateAnonymous("any", BuiltinType.ANY)

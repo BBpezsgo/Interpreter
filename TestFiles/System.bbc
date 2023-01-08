@@ -1,36 +1,55 @@
+#bf "stdout" "void" "string";
+#bf "stderr" "void" "string";
+#bf "sleep" "void" "int";
+#bf "stdin" "string";
+#bf "tmnw" "string";
+#bf "splitstring" "string" "string" "string";
+
 namespace Console
 {
-  [Builtin("conlog")]
-  void Log(string message);
+  [Builtin("stdout")]
+  void Write(string data);
 
-  void Log(int value)
+  void Log(string message)
   {
-    Log(value.ToString());
+    Write(message + "\r\n");
   }
 
-  void Log(int[] value)
-  {
-    string result = "";
-    result += "[ ";
+  void Log(int message)
+  { Log(message.ToString()); }
 
-    for (int i = 0; i < value.Length; i++)
+  void Log(int[] message)
+  {
+    Write("[ ");
+    for (int i = 0; i < message.Length; i++)
     {
-      if (i > 0) { result += ", "; };
-      result += value[i].ToString();
+      if (i > 0) { Write(", "); };
+      Write(message[i].ToString());
     };
-
-    result += " ]";
-    Log(result);
+    Log(" ]");
   }
-  
-  [Builtin("conerr")]
-  void LogError(string message);
-  
-  [Builtin("conwarn")]
-  void LogWarning(string message);
-  
-  [Builtin("conin")]
-  string Input(string promt);
+
+  [Builtin("stderr")]
+  void WriteError(string data);
+    
+  void LogError(string message)
+  {
+    WriteError(message + "\r\n");
+  }
+
+  [Builtin("stdin")]
+  string ReadKey();
+
+  string ReadLine() {
+    string result = "";
+    while (true)
+    {
+      string inpChar = ReadKey();
+      if (inpChar == "\n") { break; };
+      result += inpChar;
+    };
+    return result;
+  }
 }
 
 struct TimeSpan
@@ -39,7 +58,7 @@ struct TimeSpan
   int mins;
   int secs;
 }
-  
+
 string ToTimeSpanString(this TimeSpan self)
 {
     return self.hours + ":" + self.mins + ":" + self.secs;
@@ -75,6 +94,15 @@ string[] splitstring(string a, string b);
 string[] Split(this string v, string separator)
 { return splitstring(v, separator); }
 
+bool Contains(this string[] v, string search)
+{
+  for (int i = 0; i < v.Length; i++)
+  {
+    if (v[i] == search) { return true; };
+  };
+  return false;
+}
+
 namespace Math
 {
   int Pow(int a, int b)
@@ -93,7 +121,7 @@ namespace Math
     if (v < 0) { return v * -1; };
     return v;
   }
-
+  
   int Min(int a, int b)
   {
     if (a < b) { return a; };
@@ -106,7 +134,6 @@ namespace Math
     return b;
   }
 }
-
 
 string Substring(this string v, int start)
 {

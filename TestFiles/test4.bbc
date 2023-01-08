@@ -2,5 +2,6 @@
 
 [CodeEntry]
 void Start() {
-    Console.Log(Console.Input("Input > "));
+    Console.Write("Enter your name > ");
+    Console.Log("Hello " + Console.ReadLine() + "!");
 }

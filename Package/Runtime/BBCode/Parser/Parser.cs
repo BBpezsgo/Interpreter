@@ -1808,7 +1808,7 @@ namespace IngameCoding.BBCode
 
                 Statement_WhileLoop whileStatement = new()
                 {
-                    name = tokenWhile.text,
+                    Keyword = tokenWhile,
                     condition = condition,
                     position = tokenWhile.GetPosition(),
                     BracketStart = braceletStart,

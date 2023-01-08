@@ -1450,11 +1450,6 @@ namespace IngameCoding.BBCode.Compiler
         }
         void GenerateCodeForStatement(Statement_WhileLoop whileLoop)
         {
-            AddInstruction(Opcode.COMMENT, "while (...) {");
-            AddInstruction(Opcode.COMMENT, "Condition");
-            int conditionOffset = compiledCode.Count;
-            GenerateCodeForStatement(whileLoop.condition);
-
             var conditionValue_ = PredictStatementValue(whileLoop.condition);
             if (conditionValue_.HasValue)
             {
@@ -1469,7 +1464,21 @@ namespace IngameCoding.BBCode.Compiler
                         warnings.Add(new Warning($"Condition must be boolean", whileLoop.condition.position, CurrentFile));
                     }
                 }
+                else if (TrimUnreachableCode)
+                {
+                    if (!conditionValue_.Value.ValueBoolean)
+                    {
+                        AddInstruction(Opcode.COMMENT, "Unreachable code not compiled");
+                        informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.BracketStart, whileLoop.BracketEnd), CurrentFile));
+                        return;
+                    }
+                }
             }
+
+            AddInstruction(Opcode.COMMENT, "while (...) {");
+            AddInstruction(Opcode.COMMENT, "Condition");
+            int conditionOffset = compiledCode.Count;
+            GenerateCodeForStatement(whileLoop.condition);
 
             AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
             int conditionJumpOffset = compiledCode.Count - 1;
@@ -1573,6 +1582,20 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (ifSegment is Statement_If_If partIf)
                 {
+                    var conditionValue_ = PredictStatementValue(partIf.condition);
+                    if (conditionValue_.HasValue)
+                    {
+                        var conditionValue = conditionValue_.Value;
+
+                        if (conditionValue.type != DataItem.Type.BOOLEAN)
+                        {
+                            if (partIf.condition.TryGetTotalPosition(out var p))
+                            {
+                                warnings.Add(new Warning($"Condition must be boolean", p, CurrentFile));
+                            }
+                        }
+                    }
+
                     AddInstruction(Opcode.COMMENT, "if (...) {");
 
                     AddInstruction(Opcode.COMMENT, "IF Condition");

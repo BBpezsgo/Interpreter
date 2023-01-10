@@ -35,6 +35,16 @@ namespace IngameCoding.Serialization
             }
             return result;
         }
+        internal T[] DeserializeObjectArray<T>() where T : ISerializable<T>
+        {
+            int length = DeserializeInt32();
+            T[] result = new T[length];
+            for (int i = 0; i < length; i++)
+            {
+                result[i] = (T)DeserializeObject<T>();
+            }
+            return result;
+        }
         internal object Deserialize<T>()
         {
             if (typeof(T) == typeof(System.Int32))
@@ -45,6 +55,10 @@ namespace IngameCoding.Serialization
             { return DeserializeChar(); }
             if (typeof(T) == typeof(System.String))
             { return DeserializeString(); }
+            if (typeof(T) == typeof(System.Boolean))
+            { return DeserializeBoolean(); }
+            if (typeof(T) == typeof(System.Single))
+            { return DeserializeFloat(); }
 
             throw new NotImplementedException();
         }
@@ -68,6 +82,20 @@ namespace IngameCoding.Serialization
             currentIndex += 2;
             if (BitConverter.IsLittleEndian) Array.Reverse(data);
             return BitConverter.ToInt16(data, 0);
+        }
+        internal System.Single DeserializeFloat()
+        {
+            var data = this.data.Get(currentIndex, 4);
+            currentIndex += 4;
+            if (BitConverter.IsLittleEndian) Array.Reverse(data);
+            return BitConverter.ToSingle(data, 0);
+        }
+        internal System.Boolean DeserializeBoolean()
+        {
+            var data = this.data.Get(currentIndex, 1);
+            currentIndex ++;
+            if (BitConverter.IsLittleEndian) Array.Reverse(data);
+            return BitConverter.ToBoolean(data, 0);
         }
         internal System.String DeserializeString()
         {
@@ -98,6 +126,16 @@ namespace IngameCoding.Serialization
             var result = BitConverter.GetBytes(v);
             if (BitConverter.IsLittleEndian) Array.Reverse(result);
             this.result.AddRange(result);
+        }
+        internal void Serialize(System.Single v)
+        {
+            var result = BitConverter.GetBytes(v);
+            if (BitConverter.IsLittleEndian) Array.Reverse(result);
+            this.result.AddRange(result);
+        }
+        internal void Serialize(System.Boolean v)
+        {
+            this.result.Add(BitConverter.GetBytes(v)[0]);
         }
         internal void Serialize(System.Int16 v)
         {
@@ -136,6 +174,12 @@ namespace IngameCoding.Serialization
             { Serialize(v[i]); }
         }
         internal void Serialize(System.Char[] v)
+        {
+            Serialize(v.Length);
+            for (int i = 0; i < v.Length; i++)
+            { Serialize(v[i]); }
+        }
+        internal void Serialize<T>(ISerializable<T>[] v)
         {
             Serialize(v.Length);
             for (int i = 0; i < v.Length; i++)

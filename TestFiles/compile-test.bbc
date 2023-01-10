@@ -1,0 +1,7 @@
+using System;
+
+[CodeEntry]
+void Start()
+{
+    Console.Log("Hello world!");
+}

@@ -111,7 +111,7 @@ namespace IngameCoding.BBCode
 
         public bool Tokenized => Tokens != null;
         public bool Parsed => parserResult.HasValue;
-        public bool Compiled => compilerResult.HasValue;
+        public bool Compiled => compilerResult != null;
 
         public bool TokenizingSuccess => TokenizerFatalError == null && TokenizerErrors.Length == 0;
         public bool ParsingSuccess => ParserFatalError == null && ParserErrors.Length == 0 && TokenizingSuccess;

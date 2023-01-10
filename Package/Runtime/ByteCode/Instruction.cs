@@ -1,4 +1,5 @@
 ﻿using System;
+using IngameCoding.Serialization;
 
 namespace IngameCoding.Bytecode
 {
@@ -138,7 +139,7 @@ namespace IngameCoding.Bytecode
 
     [Serializable]
     [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
-    public class Instruction
+    public class Instruction : IngameCoding.Serialization.ISerializable<Instruction>
     {
         public Opcode opcode;
         /// <summary>
@@ -197,6 +198,11 @@ namespace IngameCoding.Bytecode
             }
         }
 
+        [Obsolete("Only for deserialization", true)]
+        public Instruction()
+        {
+            this.parameter = null;
+        }
         public Instruction(Opcode opcode)
         {
             this.opcode = opcode;
@@ -258,5 +264,35 @@ namespace IngameCoding.Bytecode
         }
 
         private string GetDebuggerDisplay() => ToString();
+
+        void ISerializable<Instruction>.Serialize(Serializer serializer)
+        {
+            serializer.Serialize((int)this.opcode);
+            serializer.Serialize(this.tag);
+            serializer.Serialize(this.additionParameter);
+            serializer.Serialize(this.additionParameter2);
+            if (this.parameter is int) {
+                serializer.Serialize(1);
+                serializer.Serialize((int)this.parameter);
+            } else if (this.parameter is string) {
+                serializer.Serialize(2);
+                serializer.Serialize((string)this.parameter);
+            } else if (this.parameter is bool) {
+                serializer.Serialize(3);
+                serializer.Serialize((bool)this.parameter);
+            } else if (this.parameter is float) {
+                serializer.Serialize(4);
+                serializer.Serialize((float)this.parameter);
+            } else if (this.parameter is null) {
+                serializer.Serialize(0);
+            } else {
+                throw new NotImplementedException();
+            }
+        }
+
+        void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
+        {
+            
+        }
     }
 }

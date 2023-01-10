@@ -17,6 +17,8 @@ namespace TheProgram
             Normal,
             Debugger,
             Tester,
+            Compile,
+            Decompile,
         }
 
         internal class ArgumentNormalizer
@@ -98,7 +100,7 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out string? CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
@@ -107,6 +109,7 @@ namespace TheProgram
             compilerSettings = Compiler.CompilerSettings.Default;
             parserSettings = ParserSettings.Default;
             bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
+            CompileOutput = null;
 
             if (args.Length > 1)
             {
@@ -118,6 +121,29 @@ namespace TheProgram
                         if (RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Debugger}");
                         RunType = RunType.Debugger;
+                        goto ArgParseDone;
+                    }
+                    
+                    if (args[i] == "-decompile")
+                    {
+                        if (RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Decompile}");
+                        RunType = RunType.Decompile;
+                        goto ArgParseDone;
+                    }
+                    
+                    if (args[i] == "-compile")
+                    {
+                        if (RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Compile}");
+                        RunType = RunType.Compile;
+                        
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-compile'"); }
+
+                        CompileOutput = args[i];
+
                         goto ArgParseDone;
                     }
 
@@ -237,6 +263,7 @@ namespace TheProgram
             public bool LogDebugs;
             public bool LogSystem;
             public RunType RunType;
+            public string? CompileOutput;
         }
 
         /// <summary>
@@ -259,6 +286,7 @@ namespace TheProgram
             bool LogDebugs;
             bool LogSystem;
             RunType RunType;
+            string CompileOutput;
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
@@ -266,7 +294,7 @@ namespace TheProgram
 
             try
             {
-                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
@@ -290,6 +318,7 @@ namespace TheProgram
                 LogDebugs = LogDebugs,
                 LogSystem = LogSystem,
                 RunType = RunType,
+                CompileOutput = CompileOutput,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
             };
         }

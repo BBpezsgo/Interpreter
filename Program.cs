@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG_
+﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
 using System;
@@ -10,7 +10,7 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-list.bbc";
+            var file = "compile-test.bbc";
             if (args.Length == 0) args = new string[]
             {
                 // "-throw-errors",
@@ -18,6 +18,7 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 // "-test",
+                "-decompile",
                 $"\"{TestConstants.TestFilesPath}{file}\""
             };
 #endif
@@ -41,6 +42,12 @@ namespace TheProgram
                     break;
                 case ArgumentParser.RunType.Normal:
                     IngameCoding.Core.EasyInterpreter.Run(settings.Value);
+                    break;
+                case ArgumentParser.RunType.Compile:
+                    IngameCoding.CompileIntoFile.Compile(settings.Value);
+                    break;
+                case ArgumentParser.RunType.Decompile:
+                    IngameCoding.CompileIntoFile.Decompile(settings.Value);
                     break;
             }
 

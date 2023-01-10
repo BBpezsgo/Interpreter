@@ -9,7 +9,7 @@ namespace IngameCoding.BBCode.Compiler
     using Core;
 
     using Errors;
-
+    using IngameCoding.Serialization;
     using Parser;
     using Parser.Statements;
 
@@ -17,7 +17,7 @@ namespace IngameCoding.BBCode.Compiler
 
     public class Compiler
     {
-        public struct CompilerResult
+        public class CompilerResult : Serialization.ISerializable<CompilerResult>
         {
             public Instruction[] compiledCode;
 
@@ -253,6 +253,20 @@ namespace IngameCoding.BBCode.Compiler
                     { NotSetCallback?.Invoke($"StructDefinition.FilePath {@struct} : {@struct.FilePath}"); }
                 }
             }
+
+            void ISerializable<CompilerResult>.Serialize(Serializer serializer)
+            {
+                serializer.Serialize(setGlobalVariablesInstruction);
+                serializer.Serialize(clearGlobalVariablesInstruction);
+                serializer.Serialize(compiledCode);
+            }
+
+            void ISerializable<CompilerResult>.Deserialize(Deserializer deserializer)
+            {
+                this.setGlobalVariablesInstruction = deserializer.DeserializeInt32();
+                this.clearGlobalVariablesInstruction = deserializer.DeserializeInt32();
+                this.compiledCode = deserializer.DeserializeObjectArray<Instruction>();
+            }
         }
 
         public struct CompilerSettings
@@ -311,6 +325,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
+            List<Statement_HashInfo> Hashes = new();
 
             if (parserResult.Usings.Count > 0)
             { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
@@ -348,6 +363,11 @@ namespace IngameCoding.BBCode.Compiler
                             Structs.Add(@struct.Key, @struct.Value);
                         }
                     }
+
+                    foreach (var hash in parserResult2.Hashes)
+                    {
+                        Hashes.Add(hash);
+                    }
                 }
                 else
                 { errors.Add(new Error($"Namespace file '{usingItem}' not found (\"{file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")", new Position(parserResult.Usings[i].Path))); }
@@ -375,7 +395,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, parserResult.Hashes, parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug);
 

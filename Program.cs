@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG
+﻿#define ENABLE_DEBUG_
 #define RELEASE_TEST_
 
 using System;
@@ -19,6 +19,8 @@ namespace TheProgram
                 // "-hide-debug",
                 // "-test",
                 "-decompile",
+                // "-compile",
+                // "\".\\output.bin\"",
                 $"\"{TestConstants.TestFilesPath}{file}\""
             };
 #endif
@@ -47,7 +49,7 @@ namespace TheProgram
                     IngameCoding.CompileIntoFile.Compile(settings.Value);
                     break;
                 case ArgumentParser.RunType.Decompile:
-                    IngameCoding.CompileIntoFile.Decompile(settings.Value);
+                    IngameCoding.Core.EasyInterpreter.RunBinary(settings.Value);
                     break;
             }
 

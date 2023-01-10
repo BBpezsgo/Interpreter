@@ -1,5 +1,6 @@
-﻿using System;
-using IngameCoding.Serialization;
+﻿using IngameCoding.Serialization;
+
+using System;
 
 namespace IngameCoding.Bytecode
 {
@@ -201,6 +202,7 @@ namespace IngameCoding.Bytecode
         [Obsolete("Only for deserialization", true)]
         public Instruction()
         {
+            this.opcode = Opcode.UNKNOWN;
             this.parameter = null;
         }
         public Instruction(Opcode opcode)
@@ -271,28 +273,63 @@ namespace IngameCoding.Bytecode
             serializer.Serialize(this.tag);
             serializer.Serialize(this.additionParameter);
             serializer.Serialize(this.additionParameter2);
-            if (this.parameter is int) {
-                serializer.Serialize(1);
+            if (this.parameter is int)
+            {
+                serializer.Serialize((byte)1);
                 serializer.Serialize((int)this.parameter);
-            } else if (this.parameter is string) {
-                serializer.Serialize(2);
+            }
+            else if (this.parameter is string)
+            {
+                serializer.Serialize((byte)2);
                 serializer.Serialize((string)this.parameter);
-            } else if (this.parameter is bool) {
-                serializer.Serialize(3);
+            }
+            else if (this.parameter is bool)
+            {
+                serializer.Serialize((byte)3);
                 serializer.Serialize((bool)this.parameter);
-            } else if (this.parameter is float) {
-                serializer.Serialize(4);
+            }
+            else if (this.parameter is float)
+            {
+                serializer.Serialize((byte)4);
                 serializer.Serialize((float)this.parameter);
-            } else if (this.parameter is null) {
-                serializer.Serialize(0);
-            } else {
+            }
+            else if (this.parameter is null)
+            {
+                serializer.Serialize((byte)0);
+            }
+            else
+            {
                 throw new NotImplementedException();
             }
         }
 
         void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
         {
-            
+            this.opcode = (Opcode)deserializer.DeserializeInt32();
+            this.tag = deserializer.DeserializeString();
+            this.additionParameter = deserializer.DeserializeString();
+            this.additionParameter2 = deserializer.DeserializeInt32();
+            var parameterType = deserializer.DeserializeByte();
+            if (parameterType == 0)
+            {
+                this.parameter = null;
+            }
+            else if (parameterType == 1)
+            {
+                this.parameter = deserializer.DeserializeInt32();
+            }
+            else if (parameterType == 2)
+            {
+                this.parameter = deserializer.DeserializeString();
+            }
+            else if (parameterType == 3)
+            {
+                this.parameter = deserializer.DeserializeBoolean();
+            }
+            else if (parameterType == 4)
+            {
+                this.parameter = deserializer.DeserializeFloat();
+            }
         }
     }
 }

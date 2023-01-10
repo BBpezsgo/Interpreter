@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.Versioning;
 
 namespace IngameCoding.Serialization
 {
@@ -45,6 +47,16 @@ namespace IngameCoding.Serialization
             }
             return result;
         }
+        internal T[] DeserializeObjectArray<T>(Func<Deserializer, T> callback)
+        {
+            int length = DeserializeInt32();
+            T[] result = new T[length];
+            for (int i = 0; i < length; i++)
+            {
+                result[i] = callback.Invoke(this);
+            }
+            return result;
+        }
         internal object Deserialize<T>()
         {
             if (typeof(T) == typeof(System.Int32))
@@ -59,6 +71,8 @@ namespace IngameCoding.Serialization
             { return DeserializeBoolean(); }
             if (typeof(T) == typeof(System.Single))
             { return DeserializeFloat(); }
+            if (typeof(T) == typeof(System.Byte))
+            { return DeserializeByte(); }
 
             throw new NotImplementedException();
         }
@@ -68,6 +82,12 @@ namespace IngameCoding.Serialization
             currentIndex += 4;
             if (BitConverter.IsLittleEndian) Array.Reverse(data);
             return BitConverter.ToInt32(data, 0);
+        }
+        internal System.Byte DeserializeByte()
+        {
+            var data = this.data.Get(currentIndex, 1);
+            currentIndex += 1;
+            return data[0];
         }
         internal System.Char DeserializeChar()
         {
@@ -93,13 +113,15 @@ namespace IngameCoding.Serialization
         internal System.Boolean DeserializeBoolean()
         {
             var data = this.data.Get(currentIndex, 1);
-            currentIndex ++;
+            currentIndex++;
             if (BitConverter.IsLittleEndian) Array.Reverse(data);
             return BitConverter.ToBoolean(data, 0);
         }
         internal System.String DeserializeString()
         {
             int length = DeserializeInt32();
+            if (length == -1) return null;
+            if (length == 0) return System.String.Empty;
             char[] result = new char[length];
             for (int i = 0; i < length; i++)
             {
@@ -112,6 +134,31 @@ namespace IngameCoding.Serialization
             var instance = (ISerializable<T>)Activator.CreateInstance(typeof(T));
             instance.Deserialize(this);
             return instance;
+        }
+        ISerializable<T> DeserializeObjectUnsafe<T>()
+        {
+            var instance = (ISerializable<T>)Activator.CreateInstance(typeof(T));
+            instance.Deserialize(this);
+            return instance;
+        }
+        internal T DeserializeObject<T>(Func<Deserializer, T> callback)
+        {
+            return callback.Invoke(this);
+        }
+        internal Dictionary<TKey, TValue> DeserializeDictionary<TKey, TValue>(bool keyIsObj, bool valIsObj)
+        {
+            int length = DeserializeInt32();
+            if (length == -1) return null;
+            Dictionary<TKey, TValue> result = new();
+
+            for (int i = 0; i < length; i++)
+            {
+                var key = keyIsObj ? (TKey)DeserializeObjectUnsafe<TKey>() : (TKey)Deserialize<TKey>();
+                var value = valIsObj ? (TValue)DeserializeObjectUnsafe<TValue>() : (TValue)Deserialize<TValue>();
+                result.Add(key, value);
+            }
+
+            return result;
         }
     }
 
@@ -137,6 +184,10 @@ namespace IngameCoding.Serialization
         {
             this.result.Add(BitConverter.GetBytes(v)[0]);
         }
+        internal void Serialize(System.Byte v)
+        {
+            this.result.Add(v);
+        }
         internal void Serialize(System.Int16 v)
         {
             var result = BitConverter.GetBytes(v);
@@ -151,6 +202,11 @@ namespace IngameCoding.Serialization
         }
         internal void Serialize(System.String v)
         {
+            if (v == null)
+            {
+                Serialize(-1);
+                return;
+            }
             Serialize(v.Length);
             for (int i = 0; i < v.Length; i++)
             { Serialize(v[i]); }
@@ -179,15 +235,109 @@ namespace IngameCoding.Serialization
             for (int i = 0; i < v.Length; i++)
             { Serialize(v[i]); }
         }
-        internal void Serialize<T>(ISerializable<T>[] v)
+        internal void SerializeObjectArray<T>(ISerializable<T>[] v)
         {
             Serialize(v.Length);
             for (int i = 0; i < v.Length; i++)
-            { Serialize(v[i]); }
+            { SerializeObject(v[i]); }
         }
-        internal void Serialize<T>(ISerializable<T> v)
+        internal void SerializeObjectArray<T>(T[] v, Action<Serializer, T> callback)
+        {
+            Serialize(v.Length);
+            for (int i = 0; i < v.Length; i++)
+            { callback.Invoke(this, v[i]); }
+        }
+        internal void SerializeObject<T>(ISerializable<T> v)
         {
             v.Serialize(this);
+        }
+        internal void SerializeObject<T>(T v, Action<Serializer, T> callback)
+        {
+            callback.Invoke(this, v);
+        }
+        void Serialize(object v)
+        {
+            if (v is System.Int16 int16)
+            { Serialize(int16); }
+            else if (v is System.Int32 int32)
+            { Serialize(int32); }
+            else if (v is System.Char @char)
+            { Serialize(@char); }
+            else if (v is System.String @string)
+            { Serialize(@string); }
+            else if (v is System.Single single)
+            { Serialize(single); }
+            else if (v is System.Boolean boolean)
+            { Serialize(boolean); }
+            else if (v is System.Byte @byte)
+            { Serialize(@byte); }
+            else
+            { throw new NotImplementedException(); }
+        }
+        internal void Serialize<TKey, TValue>(Dictionary<TKey, TValue> v, bool keyIsObj, bool valIsObj)
+            where TKey : struct, IConvertible
+            where TValue : struct, IConvertible
+        {
+            if (v.Count == 0) { Serialize(-1); return; }
+            Serialize(v.Count);
+
+            foreach (var pair in v)
+            {
+                if (keyIsObj)
+                {
+                    SerializeObject((ISerializable<TKey>)pair.Key);
+                }
+                else
+                {
+                    Serialize(pair.Key);
+                }
+                if (valIsObj)
+                {
+                    SerializeObject((ISerializable<TValue>)pair.Value);
+                }
+                else
+                {
+                    Serialize(pair.Value);
+                }
+            }
+        }
+        internal void Serialize<TKey>(Dictionary<TKey, string> v, bool keyIsObj)
+            where TKey : struct, IConvertible
+        {
+            if (v.Count == 0) { Serialize(-1); return; }
+            Serialize(v.Count);
+
+            foreach (var pair in v)
+            {
+                if (keyIsObj)
+                {
+                    SerializeObject((ISerializable<TKey>)pair.Key);
+                }
+                else
+                {
+                    Serialize(pair.Key);
+                }
+                Serialize(pair.Value);
+            }
+        }
+        internal void Serialize<TValue>(Dictionary<string, TValue> v, bool valIsObj)
+            where TValue : struct, IConvertible
+        {
+            if (v.Count == 0) { Serialize(-1); return; }
+            Serialize(v.Count);
+
+            foreach (var pair in v)
+            {
+                Serialize(pair.Key);
+                if (valIsObj)
+                {
+                    SerializeObject((ISerializable<TValue>)pair.Value);
+                }
+                else
+                {
+                    Serialize(pair.Value);
+                }
+            }
         }
     }
 

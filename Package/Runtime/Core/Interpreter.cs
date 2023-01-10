@@ -7,9 +7,13 @@ using System.Linq;
 namespace IngameCoding.Core
 {
     using BBCode;
+
     using Bytecode;
+
     using Errors;
+
     using IngameCoding.BBCode.Compiler;
+
     using Terminal;
 
     /// <summary>
@@ -185,6 +189,71 @@ namespace IngameCoding.Core
             state = State.Initialized;
 
             OnOutput?.Invoke(this, "Start code ...", TerminalInterpreter.LogType.Debug);
+        }
+
+        public Instruction[] ReadBinary(byte[] code, bool handleErrors)
+        {
+            List<Error> errors = new();
+
+            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
+
+            details = new InterpreterDetails(this);
+
+            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", TerminalInterpreter.LogType.Debug);
+
+            OnlyHaveCode = false;
+
+            instructionOffsets = new() { Offsets = new() };
+
+            instructionOffsets.Set(InstructionOffsets.Kind.SetGlobalVariables, deserializedCode.OffsetSetGlobalVariables);
+            instructionOffsets.Set(InstructionOffsets.Kind.ClearGlobalVariables, deserializedCode.OffsetClearGlobalVariables);
+
+            foreach (var compiledFunction in deserializedCode.CompiledFunctions)
+            {
+                if (compiledFunction.TryGetAttribute("CodeEntry", out var attriute))
+                {
+                    if (attriute.parameters.Length != 0)
+                    { throw new CompilerException("Attribute 'CodeEntry' requies 0 parameter", Position.UnknownPosition); }
+                    if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
+                    {
+                        instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
+                    }
+                    else
+                    { throw new InternalException($"Function '{compiledFunction.FullName}' offset not found"); }
+                }
+                else if (compiledFunction.TryGetAttribute("Catch", out attriute))
+                {
+                    if (attriute.parameters.Length != 1)
+                    { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", Position.UnknownPosition); }
+                    if (attriute.TryGetValue(0, out string value))
+                    {
+                        if (value == "update")
+                        {
+                            if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
+                            {
+                                instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
+                            }
+                            else
+                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", Position.UnknownPosition); }
+                        }
+                        else if (value == "end")
+                        {
+                            if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
+                            {
+                                instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
+                            }
+                            else
+                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", Position.UnknownPosition); }
+                        }
+                        else
+                        { throw new CompilerException("Unknown event '" + value + "'", Position.UnknownPosition); }
+                    }
+                    else
+                    { throw new CompilerException("Attribute requies 1 string parameter", Position.UnknownPosition); }
+                }
+            }
+
+            return deserializedCode.Instructions;
         }
 
         /// <summary>

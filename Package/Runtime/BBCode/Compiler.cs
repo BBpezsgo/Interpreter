@@ -9,7 +9,9 @@ namespace IngameCoding.BBCode.Compiler
     using Core;
 
     using Errors;
+
     using IngameCoding.Serialization;
+
     using Parser;
     using Parser.Statements;
 
@@ -286,6 +288,73 @@ namespace IngameCoding.BBCode.Compiler
             };
         }
 
+        static void CompileFile(
+            List<string> alreadyCompiledCodes,
+            Token[] usingPath,
+            FileInfo file,
+            string usingItem,
+            ParserSettings parserSettings,
+            Dictionary<string, FunctionDefinition> Functions,
+            Dictionary<string, StructDefinition> Structs,
+            List<Statement_HashInfo> Hashes,
+            List<Error> errors,
+            List<Warning> warnings,
+            Action<string, TerminalInterpreter.LogType> printCallback)
+        {
+            var filePath = file.Directory.FullName + "\\" + usingItem + "." + FileExtensions.Code;
+            if (File.Exists(filePath))
+            {
+                if (alreadyCompiledCodes.Contains(filePath))
+                {
+                    printCallback?.Invoke($" Skip file \"{filePath}\" ...", TerminalInterpreter.LogType.Debug);
+                    return;
+                }
+
+                alreadyCompiledCodes.Add(filePath);
+
+                printCallback?.Invoke($" Parse file \"{filePath}\" ...", TerminalInterpreter.LogType.Debug);
+                ParserResult parserResult2 = Parser.Parse(File.ReadAllText(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
+                    (msg, lv) => { printCallback?.Invoke($"  {msg}", lv); });
+
+                parserResult2.SetFile(filePath);
+
+                if (parserSettings.PrintInfo)
+                { parserResult2.WriteToConsole($"PARSER INFO FOR '{usingItem}'"); }
+
+                foreach (var func in parserResult2.Functions)
+                {
+                    var id = func.ID();
+
+                    if (Functions.ContainsKey(id))
+                    { errors.Add(new Error($" Function '{id}' already exists", func.Name)); continue; }
+
+                    Functions.Add(id, func);
+                }
+
+                foreach (var @struct in parserResult2.Structs)
+                {
+                    if (Structs.ContainsKey(@struct.Key))
+                    {
+                        errors.Add(new Error($" Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                    }
+                    else
+                    {
+                        Structs.Add(@struct.Key, @struct.Value);
+                    }
+                }
+
+                foreach (var hash in parserResult2.Hashes)
+                {
+                    Hashes.Add(hash);
+                }
+
+                foreach (UsingDefinition usingItem_ in parserResult2.Usings)
+                { CompileFile(alreadyCompiledCodes, usingItem_.Path, file, usingItem_.PathString, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
+            }
+            else
+            { errors.Add(new Error($" File \"{filePath}\" not found", new Position(usingPath))); }
+        }
+
         /// <summary>
         /// Compiles the source code into a list of instructions
         /// </summary>
@@ -328,52 +397,13 @@ namespace IngameCoding.BBCode.Compiler
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
             List<Statement_HashInfo> Hashes = new();
+            List<string> AlreadyCompiledCodes = new() { file.FullName };
 
             if (parserResult.Usings.Count > 0)
             { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
 
-            for (int i = 0; i < parserResult.Usings.Count; i++)
-            {
-                string usingItem = parserResult.Usings[i].PathString;
-                if (File.Exists(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code))
-                {
-                    printCallback?.Invoke($"Parse code: {usingItem} ...", TerminalInterpreter.LogType.Debug);
-                    var parserResult2 = Parser.Parse(File.ReadAllText(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
-                        (msg, lv) => { printCallback?.Invoke($"  {msg}", lv); });
-                    parserResult2.SetFile(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code);
-                    if (parserSettings.PrintInfo)
-                    { parserResult2.WriteToConsole($"PARSER INFO FOR '{usingItem}'"); }
-
-                    foreach (var func in parserResult2.Functions)
-                    {
-                        var id = func.ID();
-
-                        if (Functions.ContainsKey(id))
-                        { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
-
-                        Functions.Add(id, func);
-                    }
-
-                    foreach (var @struct in parserResult2.Structs)
-                    {
-                        if (Structs.ContainsKey(@struct.Key))
-                        {
-                            errors.Add(new Error($"Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
-                        }
-                        else
-                        {
-                            Structs.Add(@struct.Key, @struct.Value);
-                        }
-                    }
-
-                    foreach (var hash in parserResult2.Hashes)
-                    {
-                        Hashes.Add(hash);
-                    }
-                }
-                else
-                { errors.Add(new Error($"Namespace file '{usingItem}' not found (\"{file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code}\")", new Position(parserResult.Usings[i].Path))); }
-            }
+            foreach (UsingDefinition usingItem in parserResult.Usings)
+            { CompileFile(AlreadyCompiledCodes, usingItem.Path, file, usingItem.PathString, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
 
             if (parserSettings.PrintInfo)
             { parserResult.WriteToConsole(); }

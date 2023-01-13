@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG_
+﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
 using System;
@@ -10,7 +10,7 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG && ENABLE_DEBUG
-            var file = "compile-test.bbc";
+            var file = "test8.bbc";
             if (args.Length == 0) args = new string[]
             {
                 // "-throw-errors",
@@ -18,7 +18,7 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 // "-test",
-                "-decompile",
+                // "-decompile",
                 // "-compile",
                 // "\".\\output.bin\"",
                 $"\"{TestConstants.TestFilesPath}{file}\""

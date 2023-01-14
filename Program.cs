@@ -10,10 +10,10 @@ namespace TheProgram
         static void Main(string[] args)
         {
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-heap.bbc";
+            var file = "helloworld.bbc";
             if (args.Length == 0) args = new string[]
             {
-                "-throw-errors",
+                // "-throw-errors",
                 // "-c-print-instructions", "true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",

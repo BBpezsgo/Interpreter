@@ -277,11 +277,12 @@ namespace IngameCoding.Core
             FileInfo file,
             List<Warning> warnings,
             Compiler.CompilerSettings compilerSettings,
-            BBCode.Parser.ParserSettings parserSettings)
+            BBCode.Parser.ParserSettings parserSettings,
+            out List<Error> errors)
         {
             OnOutput?.Invoke(this, $"Parse code: The main source code ...", TerminalInterpreter.LogType.Debug);
 
-            List<Error> errors = new();
+            errors = new();
 
             var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings, (msg, lv) => OnOutput?.Invoke(this, $"  {msg}", lv));
             parserResult.SetFile(file.FullName);
@@ -297,7 +298,11 @@ namespace IngameCoding.Core
                 (a, b) => OnOutput?.Invoke(this, a, b));
 
             if (errors.Count > 0)
-            { throw new System.Exception("Failed to compile", errors[0].ToException()); }
+            {
+                var firstError = errors[0].ToException();
+                errors.Clear();
+                throw new System.Exception("Failed to compile", firstError);
+            }
 
             details.CompilerResult = compilerResult;
 
@@ -436,18 +441,16 @@ namespace IngameCoding.Core
             if (this.HandleErrors)
             {
                 List<Warning> warnings = new();
+                List<Error> errors = new();
                 try
                 {
-                    return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings);
+                    return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings, out errors);
                 }
                 catch (Exception error)
                 {
                     OnDone?.Invoke(this, false);
                     bytecodeInterpreter = null;
                     currentlyRunningCode = false;
-
-                    foreach (var warning in warnings)
-                    { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
 
                     OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
                     Output.Debug.Debug.LogError(error);
@@ -461,12 +464,10 @@ namespace IngameCoding.Core
                         var method = frame.GetMethod();
                         if (method != null)
                         {
-                            StackTraceString += "  " + method.Name + "()\n";
+                            StackTraceString += "  " + method.Name + "()\r\n";
                         }
                     }
-                    OnOutput?.Invoke(this, "Stack Trace:\n" + StackTraceString, TerminalInterpreter.LogType.Error);
-                    OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
-                    return null;
+                    OnOutput?.Invoke(this, " Stack Trace:\r\n" + StackTraceString, TerminalInterpreter.LogType.Error);
                 }
                 catch (System.Exception error)
                 {
@@ -474,20 +475,24 @@ namespace IngameCoding.Core
                     bytecodeInterpreter = null;
                     currentlyRunningCode = false;
 
-                    foreach (var warning in warnings)
-                    { OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning); }
-
                     OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", TerminalInterpreter.LogType.Error);
                     Output.Output.Error(error);
-
-                    OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
-                    return null;
                 }
+
+                foreach (var warning in warnings)
+                { OnOutput?.Invoke(this, warning.MessageAll + "\r\n", TerminalInterpreter.LogType.Warning); }
+
+                foreach (var error in errors)
+                { OnOutput?.Invoke(this, error.MessageAll + "\r\n", TerminalInterpreter.LogType.Error); }
+
+                OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
+
+                return null;
             }
             else
             {
                 List<Warning> warnings = new();
-                return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings);
+                return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings, out _);
             }
         }
 

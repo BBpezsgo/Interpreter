@@ -93,6 +93,8 @@ namespace IngameCoding.BBCode
     {
         using Statements;
 
+        using System.Runtime.InteropServices;
+
         public struct ParserSettings
         {
             public bool PrintInfo;
@@ -724,6 +726,7 @@ namespace IngameCoding.BBCode
                     return result;
                 }
             }
+            public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].text, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
         }
 
         /// <summary>
@@ -956,17 +959,25 @@ namespace IngameCoding.BBCode
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 List<Token> tokens = new();
-                int endlessSafe = 50;
-                while (ExpectIdentifier(out Token pathIdentifier) != null)
+                if (CurrentToken.type == TokenType.LITERAL_STRING)
                 {
-                    pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
-                    tokens.Add(pathIdentifier);
+                    tokens.Add(CurrentToken);
+                    currentTokenIndex++;
+                }
+                else
+                {
+                    int endlessSafe = 50;
+                    while (ExpectIdentifier(out Token pathIdentifier) != null)
+                    {
+                        pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
+                        tokens.Add(pathIdentifier);
 
-                    ExpectOperator(".");
+                        ExpectOperator(".");
 
-                    endlessSafe--;
-                    if (endlessSafe <= 0)
-                    { throw new EndlessLoopException(); }
+                        endlessSafe--;
+                        if (endlessSafe <= 0)
+                        { throw new EndlessLoopException(); }
+                    }
                 }
 
                 if (tokens.Count == 0)

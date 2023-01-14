@@ -293,9 +293,8 @@ namespace IngameCoding.BBCode.Compiler
 
         static void CompileFile(
             List<string> alreadyCompiledCodes,
-            Token[] usingPath,
+            UsingDefinition @using,
             FileInfo file,
-            string usingItem,
             ParserSettings parserSettings,
             Dictionary<string, FunctionDefinition> Functions,
             Dictionary<string, StructDefinition> Structs,
@@ -304,58 +303,100 @@ namespace IngameCoding.BBCode.Compiler
             List<Warning> warnings,
             Action<string, TerminalInterpreter.LogType> printCallback)
         {
-            var filePath = file.Directory.FullName + "\\" + usingItem + "." + FileExtensions.Code;
-            if (File.Exists(filePath))
+            string content = null;
+            string path = null;
+
+            if (@using.IsUrl)
             {
-                if (alreadyCompiledCodes.Contains(filePath))
+                if (!Uri.TryCreate(@using.Path[0].text, UriKind.Absolute, out var uri))
+                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].text}\"", @using.Path[0], file.FullName); }
+
+                path = uri.ToString();
+
+                if (alreadyCompiledCodes.Contains(path))
                 {
-                    printCallback?.Invoke($" Skip file \"{filePath}\" ...", TerminalInterpreter.LogType.Debug);
+                    printCallback?.Invoke($" Skip file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
                     return;
                 }
+                alreadyCompiledCodes.Add(path);
 
-                alreadyCompiledCodes.Add(filePath);
-
-                printCallback?.Invoke($" Parse file \"{filePath}\" ...", TerminalInterpreter.LogType.Debug);
-                ParserResult parserResult2 = Parser.Parse(File.ReadAllText(file.Directory.FullName + "\\" + usingItem + "." + Core.FileExtensions.Code), warnings,
-                    (msg, lv) => { printCallback?.Invoke($"  {msg}", lv); });
-
-                parserResult2.SetFile(filePath);
-
-                if (parserSettings.PrintInfo)
-                { parserResult2.WriteToConsole($"PARSER INFO FOR '{usingItem}'"); }
-
-                foreach (var func in parserResult2.Functions)
+                printCallback?.Invoke($" Download file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+                System.Net.Http.HttpClient httpClient = new();
+                System.Threading.Tasks.Task<string> req;
+                try
                 {
-                    var id = func.ID();
-
-                    if (Functions.ContainsKey(id))
-                    { errors.Add(new Error($" Function '{id}' already exists", func.Name)); continue; }
-
-                    Functions.Add(id, func);
+                    req = httpClient.GetStringAsync(uri);
                 }
-
-                foreach (var @struct in parserResult2.Structs)
+                catch (System.Net.Http.HttpRequestException ex)
                 {
-                    if (Structs.ContainsKey(@struct.Key))
-                    {
-                        errors.Add(new Error($" Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
-                    }
-                    else
-                    {
-                        Structs.Add(@struct.Key, @struct.Value);
-                    }
+                    throw new Exception($"HTTP GET Error", ex);
                 }
+                req.Wait();
 
-                foreach (var hash in parserResult2.Hashes)
-                {
-                    Hashes.Add(hash);
-                }
+                printCallback?.Invoke($" File \"{path}\" downloaded", TerminalInterpreter.LogType.Debug);
 
-                foreach (UsingDefinition usingItem_ in parserResult2.Usings)
-                { CompileFile(alreadyCompiledCodes, usingItem_.Path, file, usingItem_.PathString, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
+                content = req.Result;
             }
             else
-            { errors.Add(new Error($" File \"{filePath}\" not found", new Position(usingPath))); }
+            {
+                string filename = @using.PathString.Replace("/", "\\");
+                if (!filename.EndsWith("." + FileExtensions.Code)) filename += "." + FileExtensions.Code;
+                path = Path.GetFullPath(filename, file.Directory.FullName);
+                if (File.Exists(path))
+                {
+                    if (alreadyCompiledCodes.Contains(path))
+                    {
+                        printCallback?.Invoke($" Skip file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+                        return;
+                    }
+                    alreadyCompiledCodes.Add(path);
+
+                    content = File.ReadAllText(path);
+                }
+                else
+                {
+                    errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path)));
+                    return;
+                }
+            }
+
+            printCallback?.Invoke($" Parse file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+            ParserResult parserResult2 = Parser.Parse(content, warnings, (msg, lv) => printCallback?.Invoke($"  {msg}", lv));
+
+            parserResult2.SetFile(path);
+
+            if (parserSettings.PrintInfo)
+            { parserResult2.WriteToConsole($"PARSER INFO FOR '{@using.PathString}'"); }
+
+            foreach (var func in parserResult2.Functions)
+            {
+                var id = func.ID();
+
+                if (Functions.ContainsKey(id))
+                { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
+
+                Functions.Add(id, func);
+            }
+
+            foreach (var @struct in parserResult2.Structs)
+            {
+                if (Structs.ContainsKey(@struct.Key))
+                {
+                    errors.Add(new Error($"Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                }
+                else
+                {
+                    Structs.Add(@struct.Key, @struct.Value);
+                }
+            }
+
+            foreach (var hash in parserResult2.Hashes)
+            {
+                Hashes.Add(hash);
+            }
+
+            foreach (UsingDefinition using_ in parserResult2.Usings)
+            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
         }
 
         /// <summary>
@@ -406,7 +447,7 @@ namespace IngameCoding.BBCode.Compiler
             { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
 
             foreach (UsingDefinition usingItem in parserResult.Usings)
-            { CompileFile(AlreadyCompiledCodes, usingItem.Path, file, usingItem.PathString, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
+            { CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
 
             if (parserSettings.PrintInfo)
             { parserResult.WriteToConsole(); }

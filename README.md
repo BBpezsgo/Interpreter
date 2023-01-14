@@ -120,6 +120,15 @@ void Update() { }
 > **NOTE:**
 > If you listen to the `update` event, the program will run until you manually close it.
 
+## `export` Keyword
+You can use the `export` keyword to specify that the following function definition can be used in other files.
+```
+export void Foo()
+{ }
+```
+> **NOTE:**
+> The `export` keyword is not supported on structs: all structs can be used in other files!
+
 ## Builtin Functions
 
 ### System.bbc

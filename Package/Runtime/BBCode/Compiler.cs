@@ -279,12 +279,15 @@ namespace IngameCoding.BBCode.Compiler
             public byte RemoveUnusedFunctionsMaxIterations;
             public bool PrintInstructions;
             public bool DontOptimize;
+            public bool GenerateDebugInstructions;
 
             public static CompilerSettings Default => new()
             {
                 GenerateComments = true,
                 RemoveUnusedFunctionsMaxIterations = 4,
                 PrintInstructions = false,
+                DontOptimize = false,
+                GenerateDebugInstructions = true,
             };
         }
 

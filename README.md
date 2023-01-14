@@ -12,18 +12,34 @@ This program parses the given source code, creates a list of instructions and ex
 ## How to run a file?
 When you've created a source file, just run it with the executable. Or run the exe file with an argument where you specify the path to the source code.<br>
 ### Arguments:
-- `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
+
+**Logging:**
 - `-hide-debug` Hides the debug logs
 - `-hide-system` Hides the system logs
+
+**Parser:**
 - `-p-print-info [bool]` Prints the parser info
+
+**Code Generator:**
 - `-c-generate-comments [bool]` Generates comment instructions
 - `-c-remove-unused-functions [byte]` Remove unused instructions iterations
 - `-c-print-instructions [bool]` Prints the generated instructions
+- `-dont-optimize` Disables basic code optimization
+
+**Interpreter:**
 - `-bc-clock [int]` Sets the interpreter *clock cycles/update*
 - `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
 - `-bc-stack-size [int]` Sets the interpreter *stack size*
-- `-debug` <b>(Experimental feature)</b> This will start another thing that you might be able to use for debugging. You must manually jump to the next instruction with the TAB key.
-- `-dont-optimize` Disables basic code optimization
+
+**Modes:**
+> Use only one of these!
+- `-test` Executes a test file.
+- `-decompile` Executes a binary file.
+- `-compile [string]` Compiles and writes the code to the given path
+
+**Other:**
+- `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!
+- `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
 
 ## [Download](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y)
 ![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)

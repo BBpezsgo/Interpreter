@@ -1,6 +1,8 @@
 ﻿using IngameCoding.Serialization;
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
@@ -12,14 +14,14 @@ namespace IngameCoding.Bytecode
         /// <summary>
         /// Can be:
         /// <list type="bullet">
-        /// <item><see cref="null"/></item>
-        /// <item><see cref="int"/></item>
-        /// <item><see cref="bool"/></item>
-        /// <item><see cref="float"/></item>
-        /// <item><see cref="string"/></item>
-        /// <item><see cref="IStruct"/></item>
-        /// <item><see cref="DataItem.Struct"/></item>
-        /// <item><see cref="DataItem.List"/></item>
+        /// <dataItem><see cref="null"/></dataItem>
+        /// <dataItem><see cref="int"/></dataItem>
+        /// <dataItem><see cref="bool"/></dataItem>
+        /// <dataItem><see cref="float"/></dataItem>
+        /// <dataItem><see cref="string"/></dataItem>
+        /// <dataItem><see cref="IStruct"/></dataItem>
+        /// <dataItem><see cref="DataItem.Struct"/></dataItem>
+        /// <dataItem><see cref="DataItem.List"/></dataItem>
         /// </list>
         /// </summary>
         public object parameter;
@@ -33,10 +35,10 @@ namespace IngameCoding.Bytecode
         /// Sets the <see cref="DataItem.Tag"/> to this.<br/>
         /// Can use on:
         /// <list type="bullet">
-        /// <item><see cref="Opcode.LOAD_VALUE_BR"/></item>
-        /// <item><see cref="Opcode.LOAD_FIELD_BR"/></item>
-        /// <item><see cref="Opcode.LOAD_VALUE"/></item>
-        /// <item><see cref="Opcode.PUSH_VALUE"/></item>
+        /// <dataItem><see cref="Opcode.LOAD_VALUE_BR"/></dataItem>
+        /// <dataItem><see cref="Opcode.LOAD_FIELD_BR"/></dataItem>
+        /// <dataItem><see cref="Opcode.LOAD_VALUE"/></dataItem>
+        /// <dataItem><see cref="Opcode.PUSH_VALUE"/></dataItem>
         /// </list>
         /// </summary>
         public string tag = string.Empty;
@@ -130,7 +132,11 @@ namespace IngameCoding.Bytecode
             serializer.Serialize(this.tag);
             serializer.Serialize(this.additionParameter);
             serializer.Serialize(this.additionParameter2);
-            if (this.parameter is int)
+            if (this.parameter is null)
+            {
+                serializer.Serialize((byte)0);
+            }
+            else if (this.parameter is int)
             {
                 serializer.Serialize((byte)1);
                 serializer.Serialize((int)this.parameter);
@@ -150,13 +156,110 @@ namespace IngameCoding.Bytecode
                 serializer.Serialize((byte)4);
                 serializer.Serialize((float)this.parameter);
             }
-            else if (this.parameter is null)
+            else if (this.parameter is DataItem.List)
             {
-                serializer.Serialize((byte)0);
+                serializer.Serialize((byte)5);
+                serializer.Serialize((int)((DataItem.List)this.parameter).itemTypes);
+                serializer.SerializeObjectArray(((DataItem.List)this.parameter).items.ToArray(), SerializeDataItem);
+            }
+            else if (this.parameter is DataItem.Struct strct)
+            {
+                serializer.Serialize((byte)6);
+                string[] fieldNames = new string[strct.fields.Count];
+                DataItem[] fieldValues = new DataItem[strct.fields.Count];
+                for (int i = 0; i < strct.fields.Count; i++)
+                {
+                    var pair = strct.fields.ElementAt(i);
+                    fieldNames[i] = pair.Key;
+                    fieldValues[i] = pair.Value;
+                }
+                serializer.Serialize(fieldNames);
+                serializer.SerializeObjectArray(fieldValues, SerializeDataItem);
+            }
+            else if (this.parameter is DataItem.UnassignedStruct)
+            {
+                serializer.Serialize((byte)7);
             }
             else
             {
                 throw new NotImplementedException();
+            }
+        }
+        void SerializeDataItem(Serializer serializer, DataItem dataItem)
+        {
+            serializer.Serialize((int)dataItem.type);
+            serializer.Serialize(dataItem.Tag);
+            switch (dataItem.type)
+            {
+                case DataItem.Type.INT:
+                    serializer.Serialize(dataItem.ValueInt);
+                    break;
+                case DataItem.Type.FLOAT:
+                    serializer.Serialize(dataItem.ValueFloat);
+                    break;
+                case DataItem.Type.STRING:
+                    serializer.Serialize(dataItem.ValueString);
+                    break;
+                case DataItem.Type.BOOLEAN:
+                    serializer.Serialize(dataItem.ValueBoolean);
+                    break;
+                case DataItem.Type.STRUCT:
+                    if (dataItem.ValueStruct is DataItem.Struct strct)
+                    {
+                        string[] fieldNames = new string[strct.fields.Count];
+                        DataItem[] fieldValues = new DataItem[strct.fields.Count];
+                        for (int i = 0; i < strct.fields.Count; i++)
+                        {
+                            var pair = strct.fields.ElementAt(i);
+                            fieldNames[i] = pair.Key;
+                            fieldValues[i] = pair.Value;
+                        }
+                        serializer.Serialize(fieldNames);
+                        serializer.SerializeObjectArray(fieldValues, SerializeDataItem);
+                        break;
+                    }
+                    throw new NotImplementedException();
+                case DataItem.Type.LIST:
+                    serializer.Serialize((int)dataItem.ValueList.itemTypes);
+                    serializer.SerializeObjectArray(dataItem.ValueList.items.ToArray(), SerializeDataItem);
+                    break;
+                case DataItem.Type.RUNTIME:
+                default:
+                    throw new Errors.InternalException($"Unknown type {dataItem.type}");
+            }
+        }
+        DataItem DeserializeDataItem(Deserializer deserializer)
+        {
+            DataItem.Type type = (DataItem.Type)deserializer.DeserializeInt32();
+            string tag = deserializer.DeserializeString();
+
+            switch (type)
+            {
+                case DataItem.Type.INT:
+                    return new DataItem(deserializer.DeserializeInt32(), tag);
+                case DataItem.Type.FLOAT:
+                    return new DataItem(deserializer.DeserializeFloat(), tag);
+                case DataItem.Type.STRING:
+                    return new DataItem(deserializer.DeserializeString(), tag);
+                case DataItem.Type.BOOLEAN:
+                    return new DataItem(deserializer.DeserializeBoolean(), tag);
+                case DataItem.Type.STRUCT:
+                    string[] fieldNames = deserializer.DeserializeArray<string>();
+                    DataItem[] fieldValues = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
+                    Dictionary<string, DataItem> fields = new Dictionary<string, DataItem>();
+                    for (int i = 0; i < fieldNames.Length; i++)
+                    { fields.Add(fieldNames[i], fieldValues[i]); }
+                    return new DataItem(new DataItem.Struct(fields), tag);
+                case DataItem.Type.LIST:
+                    var itemTypes = (DataItem.Type)deserializer.DeserializeInt32();
+                    var items = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
+                    var newList = new DataItem.List(itemTypes);
+                    for (int i = 0; i < items.Length; i++)
+                    { newList.Add(items[i]); }
+                    return new DataItem(newList, tag);
+                case DataItem.Type.RUNTIME:
+                default:
+                    throw new Errors.InternalException($"Unknown type {type}");
             }
         }
         void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
@@ -186,6 +289,29 @@ namespace IngameCoding.Bytecode
             {
                 this.parameter = deserializer.DeserializeFloat();
             }
+            else if (parameterType == 5)
+            {
+                var types = (DataItem.Type)deserializer.DeserializeInt32();
+                var newList = new DataItem.List(types);
+                var items = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                foreach (var item in items)
+                { newList.Add(item); }
+            }
+            else if (parameterType == 6)
+            {
+                string[] fieldNames = deserializer.DeserializeArray<string>();
+                DataItem[] fieldValues = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
+                Dictionary<string, DataItem> fields = new Dictionary<string, DataItem>();
+                for (int i = 0; i < fieldNames.Length; i++)
+                { fields.Add(fieldNames[i], fieldValues[i]); }
+                this.parameter = new DataItem.Struct(fields);
+            }
+            else if (parameterType == 7)
+            {
+                this.parameter = new DataItem.UnassignedStruct();
+            }
+            else
+            { throw new NotImplementedException(); }
         }
     }
 }

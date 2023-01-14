@@ -9,6 +9,7 @@ namespace TheProgram
     using IngameCoding.Output;
 
     using System.Collections.Generic;
+    using System.IO.Compression;
 
     internal static class ArgumentParser
     {
@@ -100,7 +101,7 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out string? CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string? CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
@@ -110,6 +111,7 @@ namespace TheProgram
             parserSettings = ParserSettings.Default;
             bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
             CompileOutput = null;
+            CompressionLevel = CompressionLevel.Optimal;
 
             if (args.Length > 1)
             {
@@ -123,7 +125,7 @@ namespace TheProgram
                         RunType = RunType.Debugger;
                         goto ArgParseDone;
                     }
-                    
+
                     if (args[i] == "-decompile")
                     {
                         if (RunType != RunType.Normal) throw new ArgumentException(
@@ -131,18 +133,41 @@ namespace TheProgram
                         RunType = RunType.Decompile;
                         goto ArgParseDone;
                     }
-                    
+
                     if (args[i] == "-compile")
                     {
                         if (RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Compile}");
                         RunType = RunType.Compile;
-                        
+
                         i++;
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-compile'"); }
 
                         CompileOutput = args[i];
+
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-compression")
+                    {
+                        if (RunType != RunType.Normal && RunType != RunType.Compile)
+                        { Output.Warning($"\"-compression\" argument is valid only in Compile mode"); }
+
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-compression'"); }
+
+                        CompressionLevel = args[i].ToLower() switch
+                        {
+                            "no" => CompressionLevel.NoCompression,
+                            "none" => CompressionLevel.NoCompression,
+                            "fast" => CompressionLevel.Fastest,
+                            "fastest" => CompressionLevel.Fastest,
+                            "optimal" => CompressionLevel.Optimal,
+                            "smallest" => CompressionLevel.SmallestSize,
+                            _ => throw new ArgumentException($"Unknown compression level '{args[i]}'"),
+                        };
 
                         goto ArgParseDone;
                     }
@@ -264,6 +289,7 @@ namespace TheProgram
             public bool LogSystem;
             public RunType RunType;
             public string? CompileOutput;
+            public CompressionLevel compressionLevel;
         }
 
         /// <summary>
@@ -287,6 +313,7 @@ namespace TheProgram
             bool LogSystem;
             RunType RunType;
             string CompileOutput;
+            CompressionLevel CompressionLevel;
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
@@ -294,7 +321,7 @@ namespace TheProgram
 
             try
             {
-                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompressionLevel, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
@@ -320,6 +347,7 @@ namespace TheProgram
                 RunType = RunType,
                 CompileOutput = CompileOutput,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
+                compressionLevel = CompressionLevel,
             };
         }
 

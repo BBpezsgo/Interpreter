@@ -7,23 +7,101 @@ using IngameCoding.Serialization;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 
 namespace IngameCoding
 {
     internal class CompileIntoFile
     {
+        static byte[] Compress(byte[] data, CompressionLevel compressionLevel)
+        {
+            MemoryStream output = new();
+            using (DeflateStream dstream = new(output, compressionLevel))
+            { dstream.Write(data, 0, data.Length); }
+            return output.ToArray();
+        }
+
+        static byte[] Decompress(byte[] data)
+        {
+            MemoryStream input = new(data);
+            MemoryStream output = new();
+            using (DeflateStream dstream = new(input, CompressionMode.Decompress))
+            { dstream.CopyTo(output); }
+            return output.ToArray();
+        }
+
+        static void WriteFile(string output, byte[] data, CompressionLevel compressionLevel = CompressionLevel.Optimal, bool LogDebugs = false)
+        {
+            List<byte> dataToWrite = new();
+            switch (compressionLevel)
+            {
+                case CompressionLevel.NoCompression:
+                    dataToWrite.Add(0);
+                    dataToWrite.AddRange(data);
+                    break;
+                case CompressionLevel.Fastest:
+                    dataToWrite.Add(1);
+                    dataToWrite.AddRange(Compress(data, compressionLevel));
+                    break;
+                case CompressionLevel.Optimal:
+                    dataToWrite.Add(2);
+                    dataToWrite.AddRange(Compress(data, compressionLevel));
+                    break;
+                case CompressionLevel.SmallestSize:
+                    dataToWrite.Add(3);
+                    dataToWrite.AddRange(Compress(data, compressionLevel));
+                    break;
+            }
+            byte[] dataToWriteArray = dataToWrite.ToArray();
+            File.WriteAllBytes(output, dataToWriteArray);
+
+            var compressionRatio = data.LongLength / (float)dataToWriteArray.LongLength;
+          
+            if (LogDebugs) Output.Output.Debug($"Done");
+            if (LogDebugs) Output.Output.Debug($" Compression Ratio: -{Math.Round((1f - compressionRatio) * 100f)}%");
+            if (LogDebugs) Output.Output.Debug($" Size: {dataToWriteArray.LongLength} bytes");
+        }
+        internal static byte[] ReadFile(string input)
+        {
+            List<byte> data = File.ReadAllBytes(input).ToList();
+            byte compressionLevelI = data[0];
+            data.RemoveAt(0);
+            var compressedData = data.ToArray();
+            return compressionLevelI switch
+            {
+                0 => compressedData,
+                1 => Decompress(compressedData),
+                2 => Decompress(compressedData),
+                3 => Decompress(compressedData),
+                _ => throw new InternalException($"Unknown compression level {compressionLevelI}"),
+            };
+        }
+
         internal static void Compile(TheProgram.ArgumentParser.Settings settings)
         {
             var output = settings.CompileOutput;
             var file = settings.File;
+            var compilerSettings = settings.compilerSettings;
+            CompressionLevel compressionLevel = settings.compressionLevel;
+
+            compilerSettings.GenerateComments = false;
+            compilerSettings.RemoveUnusedFunctionsMaxIterations = 0;
+            compilerSettings.GenerateDebugInstructions = false;
+
+            if (settings.LogDebugs) Output.Output.Debug($"Compile file \"{file.FullName}\" ...");
 
             var code = File.ReadAllText(file.FullName);
-            var compilerResult = CompileCode(code, file, new List<Warning>(), settings.compilerSettings, settings.parserSettings);
+            var compilerResult = CompileCode(code, file, new List<Warning>(), compilerSettings, settings.parserSettings);
+
+            if (settings.LogDebugs) Output.Output.Debug($"Serialize code ...");
 
             Serializer serializer = new();
             serializer.SerializeObject(new SerializableCode(compilerResult));
-            File.WriteAllBytes(output, serializer.Result);
+
+            if (settings.LogDebugs) Output.Output.Debug($"Write binary to \"{output}\" ...");
+            if (settings.LogDebugs) Output.Output.Debug($" Compression Level: {compressionLevel}");
+            WriteFile(output, serializer.Result, compressionLevel, settings.LogDebugs);
         }
 
         internal static SerializableCode Decompile(byte[] data)

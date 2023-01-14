@@ -125,7 +125,7 @@ namespace IngameCoding.Core
             )
         {
             if (LogDebug) Output.Output.Debug($"Run binary file '{file.FullName}'");
-            var code = File.ReadAllBytes(file.FullName);
+            var code = CompileIntoFile.ReadFile(file.FullName);
             var codeInterpreter = new Interpreter();
 
             codeInterpreter.OnStdOut += (sender, data) => Output.Output.Write(data).Wait();

@@ -120,6 +120,7 @@ namespace IngameCoding.BBCode.Compiler
         bool OptimizeCode;
         bool AddCommentsToCode = true;
         bool TrimUnreachableCode = true;
+        bool GenerateDebugInstructions = true;
 
         int ContextPosition;
         private bool FindContext;
@@ -384,8 +385,11 @@ namespace IngameCoding.BBCode.Compiler
 
         void AddInstruction(Instruction instruction)
         {
-            if ((AddCommentsToCode || instruction.opcode != Opcode.COMMENT) && !BlockCodeGeneration)
-            { compiledCode.Add(instruction); }
+            if (BlockCodeGeneration) return;
+            if (instruction.opcode == Opcode.COMMENT && !AddCommentsToCode) return;
+            if (instruction.opcode == Opcode.DEBUG_SET_TAG && !GenerateDebugInstructions) return;
+
+            compiledCode.Add(instruction);
         }
         void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
         void AddInstruction(Opcode opcode, object param0) => AddInstruction(new Instruction(opcode, param0));
@@ -2502,20 +2506,6 @@ namespace IngameCoding.BBCode.Compiler
         {
             printCallback?.Invoke($"  Remove unused functions ...", TerminalInterpreter.LogType.Debug);
 
-            this.compiledFunctions = new();
-
-            foreach (var function in functions)
-            {
-                var id = function.Value.ID();
-
-                if (this.compiledFunctions.ContainsKey(id))
-                { throw new CompilerException($"Function with name '{id}' already defined", function.Value.Name, function.Value.FilePath); }
-
-                this.compiledFunctions.Add(id, GetFunctionInfo(function));
-            }
-
-            printCallback?.Invoke($"    Searching ...", TerminalInterpreter.LogType.Debug);
-
             // Remove unused functions
             {
                 void AnalyzeStatements(List<Statement> statements)
@@ -2649,7 +2639,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            printCallback?.Invoke($"    Processing ...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke($"   Processing ...", TerminalInterpreter.LogType.Debug);
 
             int functionsRemoved = 0;
 
@@ -2719,6 +2709,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             BlockCodeGeneration = true;
 
+            this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
             this.compiledStructs = new();
             this.compiledGlobalVariables = new();
@@ -2726,6 +2717,7 @@ namespace IngameCoding.BBCode.Compiler
             this.compiledCode = new();
             this.builtinFunctions = builtinFunctions;
             this.OptimizeCode = !settings.DontOptimize;
+            this.compiledFunctions = new();
 
             #region Compile test built-in functions
 
@@ -2867,6 +2859,17 @@ namespace IngameCoding.BBCode.Compiler
             BlockCodeGeneration = true;
 
             #endregion
+
+
+            foreach (var function in functions)
+            {
+                var id = function.Value.ID();
+
+                if (this.compiledFunctions.ContainsKey(id))
+                { throw new CompilerException($"Function with name '{id}' already defined", function.Value.Name, function.Value.FilePath); }
+
+                this.compiledFunctions.Add(id, GetFunctionInfo(function));
+            }
 
             int iterations = settings.RemoveUnusedFunctionsMaxIterations;
 

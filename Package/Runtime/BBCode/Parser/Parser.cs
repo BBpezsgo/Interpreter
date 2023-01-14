@@ -132,8 +132,6 @@ namespace IngameCoding.BBCode
         {
             public Token ExportKeyword;
             public bool IsExport => ExportKeyword != null;
-
-            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
         }
 
         public class FunctionDefinition : Exportable, IDefinition
@@ -238,6 +236,8 @@ namespace IngameCoding.BBCode
                 result += ")";
                 return result;
             }
+
+            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
         }
 
         public class StructDefinition : Exportable, IDefinition
@@ -310,6 +310,8 @@ namespace IngameCoding.BBCode
 
                 return $"{" ".Repeat(ident)}struct {this.Name.text} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
             }
+
+            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
         }
 
         public class NamespaceDefinition : IDefinition

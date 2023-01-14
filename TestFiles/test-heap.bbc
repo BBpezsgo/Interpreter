@@ -10,7 +10,10 @@ void Start()
 {
   Foo foo = new Foo;
   foo.Func();
+  Foo foo2 = foo;
+  foo2.v = 3;
   Console.Log(foo.v);
+  Console.Log(foo2.v);
 }
 
 void Func(this Foo p)

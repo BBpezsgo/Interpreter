@@ -724,6 +724,7 @@ namespace IngameCoding.BBCode.Compiler
                             if (GetCompiledVariable(newVariable.variableName.text, out CompiledVariable val_, out var isGlob))
                             {
                                 GenerateCodeForStatement(newVariable.initialValue);
+                                AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
                                 AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, val_.offset);
                             }
                             else
@@ -809,6 +810,7 @@ namespace IngameCoding.BBCode.Compiler
                             if (GetCompiledVariable(newVariable.variableName.text, out CompiledVariable val_, out var isGlob))
                             {
                                 GenerateCodeForStatement(newVariable.initialValue);
+                                AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
                                 AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, val_.offset);
                             }
                             else
@@ -2149,6 +2151,11 @@ namespace IngameCoding.BBCode.Compiler
                                 {
                                     throw new CompilerException("Can't cast " + literal.structName.text + " to " + newVariable.type.text, literal.position, CurrentFile);
                                 }
+                            }
+                            else
+                            {
+                                compiledVariables.Add(newVariable.variableName.text, new CompiledVariable(compiledVariables.Count, newVariable.type.text, newVariable.type.isList, newVariable));
+                                AddInstruction(new Instruction(Opcode.PUSH_VALUE, new DataItem.UnassignedStruct()) { tag = "var." + newVariable.variableName.text });
                             }
                         }
                         else

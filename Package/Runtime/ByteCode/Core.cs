@@ -140,6 +140,8 @@ namespace IngameCoding.Bytecode
                 case Opcode.DEBUG_SET_TAG: return DEBUG_SET_TAG();
                 case Opcode.CS_PUSH: return CS_PUSH();
                 case Opcode.CS_POP: return CS_POP();
+                case Opcode.COPY_VALUE: return COPY_VALUE();
+                case Opcode.COPY_VALUE_RECURSIVE: return COPY_VALUE_RECURSIVE();
                 #endregion
 
                 default: throw new InternalException("Unimplemented instruction " + MU.CurrentInstruction.opcode.ToString());
@@ -147,6 +149,24 @@ namespace IngameCoding.Bytecode
         }
 
         #region Instruction Methods
+
+        int COPY_VALUE()
+        {
+            DataItem itemToCopy = MU.Stack.Pop();
+            MU.Stack.Push(itemToCopy.Copy());
+            MU.Step();
+
+            return 2;
+        }
+
+        int COPY_VALUE_RECURSIVE()
+        {
+            DataItem itemToCopy = MU.Stack.Pop();
+            MU.Stack.Push(itemToCopy.CopyRecursive());
+            MU.Step();
+
+            return 3;
+        }
 
         int CS_PUSH()
         {
@@ -1051,6 +1071,8 @@ namespace IngameCoding.Bytecode
             public bool HaveField(string field) => throw new RuntimeException("Struct is null");
             public void SetField(string field, DataItem value) => throw new RuntimeException("Struct is null");
             public DataItem GetField(string field) => throw new RuntimeException("Struct is null");
+            public IStruct Copy() => new UnassignedStruct();
+            public IStruct CopyRecursive() => new UnassignedStruct();
 
             public override string ToString() => "struct {...}";
         }
@@ -1060,13 +1082,29 @@ namespace IngameCoding.Bytecode
             internal readonly Dictionary<string, DataItem> fields = new();
 
             public Struct(Dictionary<string, DataItem> fields)
-            {
-                this.fields = fields;
-            }
+            { this.fields = fields; }
 
             public bool HaveField(string field) => fields.ContainsKey(field);
             public void SetField(string field, DataItem value) => fields[field] = value;
             public DataItem GetField(string field) => fields[field];
+            public IStruct Copy()
+            {
+                Dictionary<string, DataItem> fieldsClone = new();
+
+                foreach (var field in this.fields)
+                { fieldsClone.Add(field.Key, field.Value); }
+
+                return new Struct(fieldsClone);
+            }
+            public IStruct CopyRecursive()
+            {
+                Dictionary<string, DataItem> fieldsClone = new();
+
+                foreach (var field in this.fields)
+                { fieldsClone.Add(field.Key, field.Value.Copy()); }
+
+                return new Struct(fieldsClone);
+            }
 
             public override string ToString() => "struct {...}";
         }
@@ -1127,6 +1165,21 @@ namespace IngameCoding.Bytecode
             {
                 var num = raw[1..^1];
                 this.itemTypes = (Type)int.Parse(num);
+            }
+
+            internal List Copy()
+            {
+                List listCopy = new(itemTypes);
+                foreach (var item in items)
+                { listCopy.Add(item); }
+                return listCopy;
+            }
+            internal List CopyRecursive()
+            {
+                List listCopy = new(itemTypes);
+                foreach (var item in items)
+                { listCopy.Add(item.CopyRecursive()); }
+                return listCopy;
             }
         }
 
@@ -2240,11 +2293,36 @@ namespace IngameCoding.Bytecode
                    valueRef == item.valueRef &&
                    IsReference == item.IsReference;
         }
+
+        public DataItem Copy() => type switch
+        {
+            Type.INT => new DataItem(valueInt, Tag),
+            Type.FLOAT => new DataItem(valueFloat, Tag),
+            Type.STRING => new DataItem(valueString, Tag),
+            Type.BOOLEAN => new DataItem(valueBoolean, Tag),
+            Type.STRUCT => new DataItem(valueStruct.Copy(), Tag),
+            Type.LIST => new DataItem(valueList.Copy(), Tag),
+            Type.RUNTIME => throw new InternalException($"Unknown type {type}"),
+            _ => throw new InternalException($"Unknown type {type}"),
+        };
+        public DataItem CopyRecursive() => type switch
+        {
+            Type.INT => new DataItem(valueInt, Tag),
+            Type.FLOAT => new DataItem(valueFloat, Tag),
+            Type.STRING => new DataItem(valueString, Tag),
+            Type.BOOLEAN => new DataItem(valueBoolean, Tag),
+            Type.STRUCT => new DataItem(valueStruct.CopyRecursive(), Tag),
+            Type.LIST => new DataItem(valueList.CopyRecursive(), Tag),
+            Type.RUNTIME => throw new InternalException($"Unknown type {type}"),
+            _ => throw new InternalException($"Unknown type {type}"),
+        };
     }
     public interface IStruct
     {
         public bool HaveField(string field);
         public void SetField(string field, DataItem value);
         public DataItem GetField(string field);
+        public IStruct Copy();
+        public IStruct CopyRecursive();
     }
 }

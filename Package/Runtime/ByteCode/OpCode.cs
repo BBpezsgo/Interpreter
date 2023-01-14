@@ -132,5 +132,14 @@
         /// Call Stack Pop
         /// </summary>
         CS_POP,
+
+        /// <summary>
+        /// Replaces the last element with its own copy
+        /// </summary>
+        COPY_VALUE,
+        /// <summary>
+        /// Replaces the last element with its own recursive copy
+        /// </summary>
+        COPY_VALUE_RECURSIVE,
     }
 }

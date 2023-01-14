@@ -998,7 +998,8 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var param in functionCall.parameters)
                 { GenerateCodeForStatement(param); }
 
-                AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount, compiledFunction.BuiltinName);
+                AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName);
+                AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
 
                 if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
                 { AddInstruction(Opcode.POP_VALUE); }

@@ -4,143 +4,9 @@ using System;
 
 namespace IngameCoding.Bytecode
 {
-    public enum Opcode
-    {
-        EXIT,
-        PUSH_VALUE,
-        POP_VALUE,
-
-        JUMP_BY_IF_FALSE,
-        JUMP_BY_IF_TRUE,
-        JUMP_BY,
-
-        LOAD_VALUE,
-        STORE_VALUE,
-
-        /// <summary>
-        /// LOAD_VALUE_BASEPOINTER_RELATIVE
-        /// </summary>
-        LOAD_VALUE_BR,
-        /// <summary>
-        /// LOAD_VALUE_RELATIVE
-        /// </summary>
-        LOAD_VALUE_R,
-        /// <summary>
-        /// STORE_VALUE_BASEPOINTER_RELATIVE
-        /// </summary>
-        STORE_VALUE_BR,
-        /// <summary>
-        /// STORE_VALUE_RELATIVE
-        /// </summary>
-        STORE_VALUE_R,
-
-        LOAD_VALUE_AS_REF,
-        STORE_VALUE_AS_REF,
-
-        /// <summary>
-        /// LOAD_VALUE_BASEPOINTER_RELATIVE_AS_REF
-        /// </summary>
-        LOAD_VALUE_BR_AS_REF,
-        /// <summary>
-        /// STORE_VALUE_BASEPOINTER_RELATIVE_AS_REF
-        /// </summary>
-        STORE_VALUE_BR_AS_REF,
-
-        CALL,
-        RETURN,
-
-        CALL_BUILTIN,
-
-        // === ALU ===
-        /// <summary> LESS_THAN </summary>
-        LOGIC_LT,
-        /// <summary> MORE_THAN </summary>
-        LOGIC_MT,
-        /// <summary> LESS_THAN or EQUAL </summary>
-        LOGIC_LTEQ,
-        /// <summary> MORE_THAN or EQUAL </summary>
-        LOGIC_MTEQ,
-        LOGIC_AND,
-        LOGIC_OR,
-        LOGIC_XOR,
-        /// <summary> EQUAL </summary>
-        LOGIC_EQ,
-        /// <summary> NOT_EQUAL </summary>
-        LOGIC_NEQ,
-        /// <summary> NOT </summary>
-        LOGIC_NOT,
-
-        MATH_ADD,
-        MATH_SUB,
-        MATH_MULT,
-        MATH_DIV,
-        MATH_MOD,
-        // === ===
-
-        // === Structs ===
-        LOAD_FIELD,
-        STORE_FIELD,
-
-        LOAD_FIELD_R,
-
-        /// <summary>
-        /// LOAD_FIELD_BASEPOINTER_RELATIVE
-        /// </summary>
-        LOAD_FIELD_BR,
-        /// <summary>
-        /// STORE_FIELD_BASEPOINTER_RELATIVE
-        /// </summary>
-        STORE_FIELD_BR,
-        // === ===
-
-        // === Lists ===
-        LIST_INDEX,
-        /// <summary>
-        /// Adds new item to the end of list
-        /// </summary>
-        LIST_PUSH_ITEM,
-        /// <summary>
-        /// Adds new item to the list at the given index
-        /// </summary>
-        LIST_ADD_ITEM,
-        /// <summary>
-        /// Removes new item to the end of list
-        /// </summary>
-        LIST_PULL_ITEM,
-        /// <summary>
-        /// Removes new item to the list at the given index
-        /// </summary>
-        LIST_REMOVE_ITEM,
-        // === ===
-
-        // === HEAP ===
-        HEAP_GET,
-        HEAP_SET,
-        // === ===
-
-        TYPE_GET,
-
-        /// <summary>
-        /// Sets the last stack item's tag
-        /// </summary>
-        DEBUG_SET_TAG,
-
-        /// <summary>
-        /// Call Stack Push
-        /// </summary>
-        CS_PUSH,
-        /// <summary>
-        /// Call Stack Pop
-        /// </summary>
-        CS_POP,
-
-        COMMENT,
-        UNKNOWN,
-    }
-
     [Serializable]
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
-    public class Instruction : IngameCoding.Serialization.ISerializable<Instruction>
+    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Instruction : ISerializable<Instruction>
     {
         public Opcode opcode;
         /// <summary>
@@ -151,26 +17,20 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="bool"/></item>
         /// <item><see cref="float"/></item>
         /// <item><see cref="string"/></item>
-        /// <item><see cref="DataStack.IStruct"/></item>
+        /// <item><see cref="IStruct"/></item>
         /// <item><see cref="DataItem.Struct"/></item>
         /// <item><see cref="DataItem.List"/></item>
         /// </list>
         /// </summary>
         public object parameter;
-        /// <summary>
-        /// Used for:
-        /// <list type="bullet">
-        /// <item>Builtin function calls</item>
-        /// <item>Struct field names</item>
-        /// </list>
-        /// </summary>
+        /// <summary>Used for: <b>Only struct field names!</b></summary>
         public string additionParameter = string.Empty;
-        /// <summary>Used for: Only lists! This is the value []</summary>
+        /// <summary>Used for: <b>Only lists!</b> This is the value <c>.[i]</c></summary>
         public int additionParameter2 = -1;
 
         /// <summary>
-        /// Only for debugging:<br/>
-        /// sets the Stack item <b>Tag</b> value to this.<br/>
+        /// <b>Only for debugging!</b><br/>
+        /// Sets the <see cref="DataItem.Tag"/> to this.<br/>
         /// Can use on:
         /// <list type="bullet">
         /// <item><see cref="Opcode.LOAD_VALUE_BR"/></item>
@@ -181,9 +41,11 @@ namespace IngameCoding.Bytecode
         /// </summary>
         public string tag = string.Empty;
 
+        /// <summary><b>Only works at runtime!</b></summary>
         internal int? index;
+        /// <summary><b>Only works at runtime!</b></summary>
         internal CentralProcessingUnit cpu;
-
+        /// <summary><b>Only works at runtime!</b></summary>
         string IsRunning
         {
             get
@@ -216,15 +78,12 @@ namespace IngameCoding.Bytecode
             this.parameter = parameter;
         }
 
-        /// <param name="additionParameter">For builtin function calls</param>
         public Instruction(Opcode opcode, object parameter, string additionParameter)
         {
             this.opcode = opcode;
             this.parameter = parameter;
             this.additionParameter = additionParameter;
         }
-
-        /// <param name="additionParameter">Only for lists! This is the value []</param>
         public Instruction(Opcode opcode, object parameter, int additionParameter)
         {
             this.opcode = opcode;
@@ -265,8 +124,6 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        private string GetDebuggerDisplay() => ToString();
-
         void ISerializable<Instruction>.Serialize(Serializer serializer)
         {
             serializer.Serialize((int)this.opcode);
@@ -302,7 +159,6 @@ namespace IngameCoding.Bytecode
                 throw new NotImplementedException();
             }
         }
-
         void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
         {
             this.opcode = (Opcode)deserializer.DeserializeInt32();

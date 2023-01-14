@@ -155,3 +155,6 @@ export void Foo()
 ### System.Net.bbc
 
 `Http.Get(url)` Sends a HTTP GET request to `url`
+
+## api-ms-win-crt-string-l1-1-0.dll Missing Error
+This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).

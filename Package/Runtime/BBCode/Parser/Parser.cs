@@ -4,9 +4,8 @@ using System.Linq;
 
 namespace IngameCoding.BBCode
 {
-    using Core;
-
-    using Errors;
+    using IngameCoding.Core;
+    using IngameCoding.Errors;
 
     public enum TokenSubtype
     {
@@ -129,7 +128,15 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public class FunctionDefinition : IDefinition
+        public class Exportable
+        {
+            public Token ExportKeyword;
+            public bool IsExport => ExportKeyword != null;
+
+            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+        }
+
+        public class FunctionDefinition : Exportable, IDefinition
         {
             public class Attribute
             {
@@ -199,7 +206,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"{this.Type.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
+                return $"{(IsExport ? "export " : "")}{this.Type.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
             }
 
             public string PrettyPrint(int ident = 0)
@@ -233,7 +240,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public class StructDefinition : IDefinition
+        public class StructDefinition : Exportable, IDefinition
         {
             public readonly FunctionDefinition.Attribute[] Attributes;
             public readonly Token Name;
@@ -746,19 +753,6 @@ namespace IngameCoding.BBCode
             readonly Dictionary<string, int> operators = new();
             bool enableThisKeyword;
             readonly List<string> CurrentNamespace = new();
-            readonly List<string> VariableNames = new();
-            List<string> GlobalVariableNames
-            {
-                get
-                {
-                    List<string> returnValue = new();
-                    foreach (var variable in GlobalVariables)
-                    {
-                        returnValue.Add(variable.variableName.text);
-                    }
-                    return returnValue;
-                }
-            }
 
             List<Warning> Warnings;
             public readonly List<Error> Errors = new();
@@ -1056,6 +1050,8 @@ namespace IngameCoding.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Name)); }
                 }
 
+                Token ExportKeyword = ExpectIdentifier("export");
+
                 TypeToken possibleType = ExceptTypeToken(false);
                 if (possibleType == null)
                 { currentTokenIndex = parseStart; return false; }
@@ -1071,6 +1067,7 @@ namespace IngameCoding.BBCode
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
+                    ExportKeyword = ExportKeyword,
                 };
 
                 possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
@@ -1198,19 +1195,21 @@ namespace IngameCoding.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Name)); }
                 }
 
-                Token possibleType = ExpectIdentifier("struct");
-                if (possibleType == null)
+                Token ExportKeyword = ExpectIdentifier("export");
+
+                Token keyword = ExpectIdentifier("struct");
+                if (keyword == null)
                 { currentTokenIndex = startTokenIndex; return false; }
 
                 Token possibleStructName = ExpectIdentifier();
                 if (possibleStructName == null)
-                { throw new SyntaxException("Expected struct identifier after keyword 'struct'", possibleType); }
+                { throw new SyntaxException("Expected struct identifier after keyword 'struct'", keyword); }
 
                 if (ExpectOperator("{", out var braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
                 possibleStructName.Analysis.Subtype = TokenSubtype.Struct;
-                possibleType.Analysis.Subtype = TokenSubtype.Keyword;
+                keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 List<ParameterDefinition> fields = new();
                 Dictionary<string, FunctionDefinition> methods = new();
@@ -1249,7 +1248,8 @@ namespace IngameCoding.BBCode
                 StructDefinition structDefinition = new(CurrentNamespace, possibleStructName, attributes, fields, methods)
                 {
                     BracketStart = braceletStart,
-                    BracketEnd = braceletEnd
+                    BracketEnd = braceletEnd,
+                    ExportKeyword = ExportKeyword,
                 };
 
                 Structs.Add(structDefinition.FullName, structDefinition);
@@ -1617,7 +1617,6 @@ namespace IngameCoding.BBCode
                 List<Statement> statements = new();
 
                 int endlessSafe = 0;
-                VariableNames.Clear();
                 while (ExpectOperator("}", out braceletEnd) == null)
                 {
                     Statement statement = ExpectStatement();
@@ -1663,7 +1662,6 @@ namespace IngameCoding.BBCode
                     endlessSafe++;
                     if (endlessSafe > 500) throw new EndlessLoopException();
                 }
-                VariableNames.Clear();
 
                 return statements;
             }
@@ -1700,7 +1698,6 @@ namespace IngameCoding.BBCode
                     IsRef = IsRef,
                     position = possibleVariableName.GetPosition(),
                 };
-                VariableNames.Add(possibleVariableName.text);
 
                 if (structNotFoundWarning != null)
                 { Warnings.Add(structNotFoundWarning); }

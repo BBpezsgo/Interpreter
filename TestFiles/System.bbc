@@ -8,17 +8,17 @@
 namespace Console
 {
   [Builtin("stdout")]
-  void Write(string data);
+  export void Write(string data);
 
-  void Log(string message)
+  export void Log(string message)
   {
     Write(message + "\r\n");
   }
 
-  void Log(int message)
+  export void Log(int message)
   { Log(message.ToString()); }
 
-  void Log(int[] message)
+  export void Log(int[] message)
   {
     Write("[ ");
     for (int i = 0; i < message.Length; i++)
@@ -30,17 +30,17 @@ namespace Console
   }
 
   [Builtin("stderr")]
-  void WriteError(string data);
+  export void WriteError(string data);
     
-  void LogError(string message)
+  export void LogError(string message)
   {
     WriteError(message + "\r\n");
   }
 
   [Builtin("stdin")]
-  string ReadKey();
+  export string ReadKey();
 
-  string ReadLine() {
+  export string ReadLine() {
     string result = "";
     while (true)
     {
@@ -52,14 +52,14 @@ namespace Console
   }
 }
 
-struct TimeSpan
+export struct TimeSpan
 {
   int hours;
   int mins;
   int secs;
 }
 
-string ToTimeSpanString(this TimeSpan self)
+export string ToTimeSpanString(this TimeSpan self)
 {
     return self.hours + ":" + self.mins + ":" + self.secs;
 }
@@ -69,7 +69,7 @@ namespace Time
   [Builtin("tmnw")]
   string tmnw();
 
-  TimeSpan Now()
+  export TimeSpan Now()
   {
     string[] nowSplitted;
     string now = tmnw();
@@ -82,19 +82,19 @@ namespace Time
   }
 }
 
-string ToString(this int v)
+export string ToString(this int v)
 { return v; }
 
 [Builtin("sleep")]
-void Sleep(int ms);
+export void Sleep(int ms);
 
 [Builtin("splitstring")]
 string[] splitstring(string a, string b);
 
-string[] Split(this string v, string separator)
+export string[] Split(this string v, string separator)
 { return splitstring(v, separator); }
 
-bool Contains(this string[] v, string search)
+export bool Contains(this string[] v, string search)
 {
   for (int i = 0; i < v.Length; i++)
   {
@@ -105,7 +105,7 @@ bool Contains(this string[] v, string search)
 
 namespace Math
 {
-  int Pow(int a, int b)
+  export int Pow(int a, int b)
   {
     if (b == 0) { return 1; };
     if (b < 0)
@@ -116,26 +116,26 @@ namespace Math
     return answer;
   }
 
-  int Abs(int v)
+  export int Abs(int v)
   {
     if (v < 0) { return v * -1; };
     return v;
   }
   
-  int Min(int a, int b)
+  export int Min(int a, int b)
   {
     if (a < b) { return a; };
     return b;
   }
 
-  int Max(int a, int b)
+  export int Max(int a, int b)
   {
     if (a > b) { return a; };
     return b;
   }
 }
 
-string Substring(this string v, int start)
+export string Substring(this string v, int start)
 {
   string newV = "";
   for (int i = start; i < v.Length; i++)
@@ -145,7 +145,7 @@ string Substring(this string v, int start)
   return newV;
 }
 
-string Reverse(this string v)
+export string Reverse(this string v)
 {
   string newV = "";
   for (int i = 0; i < v.Length; i++)
@@ -155,7 +155,7 @@ string Reverse(this string v)
   return newV;
 }
 
-string Substring(this string v, int start, int length)
+export string Substring(this string v, int start, int length)
 {
   string newV = "";
   for (int i = start; i < Math.Min(v.Length, start + length); i++)
@@ -165,7 +165,7 @@ string Substring(this string v, int start, int length)
   return newV;
 }
 
-int ParseInt(string v)
+export int ParseInt(string v)
 {
   bool IsNegative = (v[0] == "-");
   string parsing = v;

@@ -4,16 +4,12 @@ using System.Linq;
 
 namespace IngameCoding.BBCode.Compiler
 {
-    using Bytecode;
-
-    using Core;
-
-    using Errors;
-
-    using Parser;
-    using Parser.Statements;
-
-    using Terminal;
+    using IngameCoding.BBCode.Parser;
+    using IngameCoding.BBCode.Parser.Statements;
+    using IngameCoding.Bytecode;
+    using IngameCoding.Core;
+    using IngameCoding.Errors;
+    using IngameCoding.Terminal;
 
     public struct Reference<T>
     {
@@ -973,6 +969,12 @@ namespace IngameCoding.BBCode.Compiler
                 throw new CompilerException("Unknown function " + searchedID + "", functionCall.functionNameT, CurrentFile);
             }
 
+            if (!compiledFunction.CanUse(CurrentFile))
+            {
+                errors.Add(new Error($"The {searchedID} function cannot be called due to its protection level", functionCall.functionNameT, CurrentFile));
+                return;
+            }
+
             functionCall.functionNameT.Analysis.Reference = new TokenAnalysis.RefFunction(compiledFunction);
 
             if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
@@ -1693,6 +1695,14 @@ namespace IngameCoding.BBCode.Compiler
 
             if (GetCompiledStruct(newStruct, out var structDefinition))
             {
+                /*
+                if (!structDefinition.CanUse(CurrentFile))
+                {
+                    errors.Add(new Error($"The {structDefinition.Name.text} struct cannot be used due to its protection level", newStruct.structName, CurrentFile));
+                    return;
+                }
+                */
+
                 newStruct.structName.Analysis.Reference = new TokenAnalysis.RefStruct(structDefinition);
 
                 if (structDefinition.IsBuiltin)
@@ -2627,14 +2637,13 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var f in functions)
                 {
                     parameters.Clear();
-
                     foreach (ParameterDefinition parameter in f.Value.Parameters)
-                    {
-                        parameters.Add(parameter.name.text, new Parameter(-1, parameter.name.text, parameter.withRefKeyword, -1, parameter.type.ToString()));
-                    }
+                    { parameters.Add(parameter.name.text, new Parameter(-1, parameter.name.text, parameter.withRefKeyword, -1, parameter.type.ToString())); }
+                    CurrentFile = f.Value.FilePath;
 
                     AnalyzeStatements(f.Value.Statements);
 
+                    CurrentFile = null;
                     parameters.Clear();
                 }
             }

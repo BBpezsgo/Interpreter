@@ -13,15 +13,15 @@ namespace TheProgram
             var file = "test-heap.bbc";
             if (args.Length == 0) args = new string[]
             {
-                // "-throw-errors",
+                "-throw-errors",
                 // "-c-print-instructions", "true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 // "-test",
                 // "-decompile",
-                "-compile",
-                "\".\\output.bin\"",
-                "-compression", "no",
+                // "-compile",
+                // "\".\\output.bin\"",
+                // "-compression", "no",
                 $"\"{TestConstants.TestFilesPath}{file}\""
             };
 #endif

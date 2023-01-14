@@ -252,6 +252,7 @@ namespace IngameCoding.BBCode.Compiler
             base.Statements = functionDefinition.Statements;
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
+            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
         public CompiledFunction(TypeToken[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
         {
@@ -266,6 +267,7 @@ namespace IngameCoding.BBCode.Compiler
             base.Statements = functionDefinition.Statements;
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
+            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
         public CompiledFunction(ParameterDefinition[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
         {
@@ -287,6 +289,7 @@ namespace IngameCoding.BBCode.Compiler
             base.Statements = functionDefinition.Statements;
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
+            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
     }
 
@@ -348,6 +351,7 @@ namespace IngameCoding.BBCode.Compiler
             base.BracketEnd = definition.BracketEnd;
             base.BracketStart = definition.BracketStart;
             base.Statements = definition.Statements;
+            base.ExportKeyword = definition.ExportKeyword;
         }
     }
 

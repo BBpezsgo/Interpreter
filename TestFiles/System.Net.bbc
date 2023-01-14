@@ -1,5 +1,5 @@
 ﻿namespace Http
 {
   [Builtin("http-get")]
-  string Get(string url);
+  export string Get(string url);
 }

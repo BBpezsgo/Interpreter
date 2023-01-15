@@ -1,7 +1,5 @@
 ﻿using IngameCoding.BBCode;
 
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 using System;
 
 namespace IngameCoding.Core

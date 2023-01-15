@@ -1,45 +1,40 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net6.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-    <StartupObject>TheProgram.Program</StartupObject>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
-    <ProduceReferenceAssembly>False</ProduceReferenceAssembly>
-    <ErrorReport>send</ErrorReport>
-    <IsPublishable>False</IsPublishable>
-    <PackageId>bb.bbcode-interpreter</PackageId>
-    <Title>BBCode Interpreter</Title>
-    <Authors>BB</Authors>
-    <Product>BBCode Interpreter</Product>
-    <AnalysisLevel>latest-Recommended</AnalysisLevel>
-    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net6.0</TargetFramework>
+		<ImplicitUsings>disable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<StartupObject>TheProgram.Program</StartupObject>
+		<ApplicationIcon>icon.ico</ApplicationIcon>
+		<ProduceReferenceAssembly>False</ProduceReferenceAssembly>
+		<ErrorReport>send</ErrorReport>
+		<IsPublishable>False</IsPublishable>
+		<PackageId>bb.bbcode-interpreter</PackageId>
+		<Title>BBCode Interpreter</Title>
+		<Authors>BB</Authors>
+		<Product>BBCode Interpreter</Product>
+		<AnalysisLevel>latest-Recommended</AnalysisLevel>
+		<EnableCompressionInSingleFile>True</EnableCompressionInSingleFile>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-	  <DebugType>none</DebugType>
-	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<DebugType>none</DebugType>
+		<CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+		<NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-	  <CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
-	  <NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<CheckForOverflowUnderflow>True</CheckForOverflowUnderflow>
+		<NoWarn>1701;1702;CA1707;CA1720;CA1051;CA1310;CA1305;CA1304;CA1852;CA1311;CA1711;CA1708</NoWarn>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="Package\**\*.meta" />
-  </ItemGroup>
+	<ItemGroup>
+		<Compile Remove="SomeTests.cs" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <Content Include="icon.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" />
-    <PackageReference Include="System.CodeDom" Version="7.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="icon.ico" />
+	</ItemGroup>
 
 </Project>

@@ -42,8 +42,4 @@
     <PackageReference Include="System.CodeDom" Version="7.0.0" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="call post-build.bat&#xD;&#xA;call upload.bat" />
-  </Target>
-
 </Project>

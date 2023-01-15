@@ -77,6 +77,10 @@ namespace IngameCoding.Core
 
             if (codeInterpreter.Initialize())
             {
+                var dlls = file.Directory.GetFiles("*.dll");
+                foreach (var dll in dlls)
+                { codeInterpreter.LoadDLL(dll.FullName); }
+
                 Instruction[] compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
                 if (compiledCode != null)
                 { codeInterpreter.RunCode(compiledCode, bytecodeInterpreterSettings); }

@@ -1,0 +1,7 @@
+﻿#bf "http_get" "string" "string";
+
+namespace Http
+{
+  [Builtin("http_get")]
+  export string Get(string url);
+}

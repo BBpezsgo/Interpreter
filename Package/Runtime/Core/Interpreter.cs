@@ -671,13 +671,23 @@ namespace IngameCoding.Core
 
         public void LoadDLL(string path)
         {
+            OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", TerminalInterpreter.LogType.Debug);
             var dll = System.Reflection.Assembly.LoadFile(path);
             var exportedTypes = dll.GetExportedTypes();
+            int functionsAdded = 0;
 
             foreach (Type type in exportedTypes)
             {
-                Debug.WriteLine(type.FullName);
+                var methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                foreach (var method in methods)
+                {
+                    var newFunction = builtinFunctions.AddBuiltinFunction(method);
+                    OnOutput?.Invoke(this, $" Added function {newFunction.ReadableID()}", TerminalInterpreter.LogType.Debug);
+                    functionsAdded++;
+                }
             }
+
+            OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", TerminalInterpreter.LogType.Debug);
         }
 
         void AddBuiltins()
@@ -738,7 +748,7 @@ namespace IngameCoding.Core
 
             #region Net.Http
 
-            this.builtinFunctions.AddBuiltinFunction<string>("http-get", (url) =>
+            this.builtinFunctions.AddBuiltinFunction<string>("http_get", (url) =>
             {
                 System.Net.Http.HttpClient httpClient = new();
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
@@ -943,7 +953,7 @@ namespace IngameCoding.Core
 
         void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
         {
-            BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
+            BuiltinFunction function = new(callback, name, parameterTypes, ReturnSomething);
 
             if (!builtinFunctions.ContainsKey(name))
             {

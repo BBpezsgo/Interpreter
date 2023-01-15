@@ -1,5 +1,5 @@
 // This imports the local System.bbc file along with its functions and structures.
-using System;
+using "../CodeFiles/System";
 
 // Namespaces can only be used to organize code
 namespace Program

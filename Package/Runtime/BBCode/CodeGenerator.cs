@@ -2843,7 +2843,7 @@ namespace IngameCoding.BBCode.Compiler
                                         default:
                                             throw new RuntimeException($"Invalid return type \"{returnType.text}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\"");
                                     }
-                                }), pTypes, true));
+                                }), bfName, pTypes, true));
                             }
                         }
                         break;

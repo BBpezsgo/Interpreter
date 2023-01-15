@@ -1,4 +1,5 @@
 ﻿using IngameCoding.BBCode;
+using IngameCoding.BBCode.Compiler;
 using IngameCoding.Bytecode;
 using IngameCoding.Errors;
 
@@ -10,6 +11,7 @@ namespace IngameCoding.Core
     public class BuiltinFunction
     {
         public readonly TypeToken[] ParameterTypes;
+        public readonly string Name;
 
         readonly Action<DataItem[], BuiltinFunction> callback;
 
@@ -33,8 +35,9 @@ namespace IngameCoding.Core
         /// Function without return value
         /// </summary>
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[], BuiltinFunction> callback, TypeToken[] parameters, bool returnSomething = false)
+        public BuiltinFunction(Action<DataItem[], BuiltinFunction> callback, string name, TypeToken[] parameters, bool returnSomething = false)
         {
+            this.Name = name;
             this.ParameterTypes = parameters;
             this.callback = callback;
             this.ReturnSomething = returnSomething;
@@ -44,8 +47,9 @@ namespace IngameCoding.Core
         /// Function without return value
         /// </summary>
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[]> callback, TypeToken[] parameters, bool returnSomething = false)
+        public BuiltinFunction(Action<DataItem[]> callback, string name, TypeToken[] parameters, bool returnSomething = false)
         {
+            this.Name = name;
             this.ParameterTypes = parameters;
             this.callback = new Action<DataItem[], BuiltinFunction>((a, b) =>
             { callback?.Invoke(a); });
@@ -70,11 +74,89 @@ namespace IngameCoding.Core
                 callback(parameters, this);
             }
         }
+
+        internal object ReadableID()
+        {
+            string result = Name;
+            result += "(";
+            for (int j = 0; j < ParameterTypes.Length; j++)
+            {
+                if (j > 0) { result += ", "; }
+                result += ParameterTypes[j].typeName.ToString().ToLower();
+            }
+            result += ")";
+            return result;
+        }
     }
 
     public static class BuiltinFunctionGenerator
     {
         #region AddBuiltinFunction()
+
+        public static BuiltinFunction AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, System.Reflection.MethodInfo method)
+        {
+            System.Reflection.ParameterInfo[] parameters = method.GetParameters();
+            TypeToken[] parameterTypes = new TypeToken[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                System.Reflection.ParameterInfo parameter = parameters[i];
+                Type paramType = parameter.ParameterType;
+                if (paramType == typeof(string))
+                {
+                    parameterTypes[i] = TypeToken.CreateAnonymous("string", BuiltinType.STRING);
+                }
+                else if (paramType == typeof(int))
+                {
+                    parameterTypes[i] = TypeToken.CreateAnonymous("int", BuiltinType.INT);
+                }
+                else if (paramType == typeof(float))
+                {
+                    parameterTypes[i] = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT);
+                }
+                else if (paramType == typeof(bool))
+                {
+                    parameterTypes[i] = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN);
+                }
+                else
+                {
+                    throw new InternalException($"Unknown type {paramType.FullName}");
+                }
+            }
+
+            BuiltinFunction function = new((ps) =>
+            {
+                if (ps.Length != parameters.Length)
+                { throw new RuntimeException($"Wrong number of parameters passed to built-in function {method.Name} ({ps.Length}): expected {parameters.Length}"); }
+
+                var objs = new object[ps.Length];
+                for (int i = 0; i < ps.Length; i++)
+                {
+                    var p = ps[i];
+                    if (p.type != DataItem.Type.INT &&
+                        p.type != DataItem.Type.FLOAT &&
+                        p.type != DataItem.Type.STRING &&
+                        p.type != DataItem.Type.BOOLEAN)
+                    { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
+                    if (p.type != parameterTypes[i].typeName.Convert())
+                    { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].typeName.ToString().ToLower()}"); }
+                    objs[i] = p.Value();
+                }
+
+                method.Invoke(null, objs);
+            }, method.Name, parameterTypes, method.ReturnType != typeof(void));
+
+            if (!builtinFunctions.ContainsKey(method.Name))
+            {
+                builtinFunctions.Add(method.Name, function);
+            }
+            else
+            {
+                builtinFunctions[method.Name] = function;
+                Output.Output.Warning($"The built-in function '{method.Name}' is already defined, so I'll override it");
+            }
+
+            return function;
+        }
 
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, TypeToken[] parameterTypes, Func<DataItem[], DataItem> callback)
         {
@@ -87,7 +169,7 @@ namespace IngameCoding.Core
                     return;
                 }
                 self.BytecodeInterpreter.AddValueToStack(x);
-            }), parameterTypes, true);
+            }), name, parameterTypes, true);
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -110,7 +192,7 @@ namespace IngameCoding.Core
                     return;
                 }
                 self.BytecodeInterpreter.AddValueToStack(x);
-            }), Array.Empty<TypeToken>(), true);
+            }), name, Array.Empty<TypeToken>(), true);
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -124,7 +206,7 @@ namespace IngameCoding.Core
         }
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
         {
-            BuiltinFunction function = new(callback, parameterTypes, ReturnSomething);
+            BuiltinFunction function = new(callback, name, parameterTypes, ReturnSomething);
 
             if (!builtinFunctions.ContainsKey(name))
             {

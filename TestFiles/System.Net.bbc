@@ -1,5 +1,0 @@
-﻿namespace Http
-{
-  [Builtin("http-get")]
-  export string Get(string url);
-}

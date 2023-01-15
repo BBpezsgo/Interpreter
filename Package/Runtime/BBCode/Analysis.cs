@@ -398,30 +398,5 @@ namespace IngameCoding.BBCode
                    .SetCompilerResult(error, compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
         }
-
-        public static CodeGenerator.Context GetContext(ParserResult parserResult, int position)
-        {
-            Dictionary<string, FunctionDefinition> Functions = new();
-            Dictionary<string, StructDefinition> Structs = new();
-
-            foreach (var func in parserResult.Functions)
-            {
-                var id = func.ID();
-
-                if (Functions.ContainsKey(id))
-                { throw new CompilerException($"Function '{id}' already exists", func.Name); }
-
-                Functions.Add(id, func);
-            }
-            foreach (var @struct in parserResult.Structs)
-            {
-                Structs.Add(@struct.Key, @struct.Value);
-            }
-
-            CodeGenerator codeGenerator = new()
-            { warnings = new List<Warning>() };
-
-            return codeGenerator.GenerateCode(Functions, Structs, parserResult.Hashes, parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default, position);
-        }
     }
 }

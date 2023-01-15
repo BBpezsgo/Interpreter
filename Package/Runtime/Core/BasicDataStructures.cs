@@ -102,7 +102,11 @@ namespace IngameCoding.Core
         }
     }
 
+#pragma warning disable CS0660
+#pragma warning disable CS0661
     public struct SinglePosition
+#pragma warning restore CS0660
+#pragma warning restore CS0661
     {
         public int Line;
         public int Character;
@@ -149,9 +153,11 @@ namespace IngameCoding.Core
         {
             if (tokens.Length == 0) throw new ArgumentException($"Array 'tokens' length is 0");
 
-            Range<SinglePosition> result = new();
-            result.Start = tokens[0].Position.Start;
-            result.End = tokens[0].Position.End;
+            Range<SinglePosition> result = new()
+            {
+                Start = tokens[0].Position.Start,
+                End = tokens[0].Position.End
+            };
 
             for (int i = 1; i < tokens.Length; i++)
             {

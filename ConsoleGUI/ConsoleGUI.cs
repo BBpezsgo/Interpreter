@@ -29,7 +29,7 @@ namespace ConsoleGUI
         SmallRect ConsoleRect;
 
         MouseInfo Mouse;
-        internal BaseWindowElement FilledElement;
+        internal BaseWindowElement FilledElement = null;
 
         bool ResizeElements;
 

@@ -1,13 +1,10 @@
 ﻿using IngameCoding.BBCode.Compiler;
-using IngameCoding.BBCode.Parser;
 using IngameCoding.Bytecode;
 using IngameCoding.Errors;
 using IngameCoding.Terminal;
 
 using System;
 using System.IO;
-
-using TheProgram;
 
 namespace IngameCoding.Core
 {
@@ -18,7 +15,7 @@ namespace IngameCoding.Core
     class EasyInterpreter
     {
         public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
-        public static void RunBinary(TheProgram.ArgumentParser.Settings settings) => RunBinary(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
+        public static void RunBinary(TheProgram.ArgumentParser.Settings settings) => RunBinary(settings.File, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -120,8 +117,6 @@ namespace IngameCoding.Core
 
         public static void RunBinary(
             FileInfo file,
-            BBCode.Parser.ParserSettings parserSettings,
-            Compiler.CompilerSettings compilerSettings,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
             bool LogDebug = true,
             bool LogSystem = true,

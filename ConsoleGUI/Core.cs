@@ -340,6 +340,7 @@ namespace ConsoleGUI
                  */
             }
 
+#pragma warning disable CS0649
             internal struct MOUSE_EVENT_RECORD
             {
                 public COORD dwMousePosition;
@@ -368,6 +369,7 @@ namespace ConsoleGUI
                     MOUSE_WHEELED = 0x0004;
                 public uint dwEventFlags;
             }
+#pragma warning restore CS0649
 
             [StructLayout(LayoutKind.Explicit, CharSet = CharSet.Unicode)]
             internal struct KEY_EVENT_RECORD

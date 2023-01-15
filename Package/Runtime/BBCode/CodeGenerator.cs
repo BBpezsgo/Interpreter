@@ -118,10 +118,6 @@ namespace IngameCoding.BBCode.Compiler
         bool TrimUnreachableCode = true;
         bool GenerateDebugInstructions = true;
 
-        int ContextPosition;
-        private bool FindContext;
-        Context ContextResult;
-
         string CurrentFile;
 
         #endregion
@@ -2676,34 +2672,6 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             return functionsRemoved;
-        }
-
-        public struct Context
-        {
-
-        }
-
-        public Context GenerateCode(
-            Dictionary<string, FunctionDefinition> functions,
-            Dictionary<string, StructDefinition> structs,
-            Statement_HashInfo[] hashes,
-            List<Statement_NewVariable> globalVariables,
-            Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, Func<IStruct>> builtinStructs,
-            Compiler.CompilerSettings settings,
-            int contextPosition,
-            Action<string, TerminalInterpreter.LogType> printCallback = null)
-        {
-            this.ContextPosition = contextPosition;
-            this.FindContext = true;
-            this.ContextResult = new Context();
-            GenerateCode(functions, structs, hashes, globalVariables, builtinFunctions, builtinStructs, settings, printCallback);
-            return this.ContextResult;
-        }
-
-        bool AtContext(Statement st)
-        {
-            return st.position.AbsolutePosition.Contains(ContextPosition);
         }
 
         internal CodeGeneratorResult GenerateCode(

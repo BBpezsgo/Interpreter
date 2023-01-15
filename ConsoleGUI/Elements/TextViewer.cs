@@ -5,7 +5,7 @@ namespace ConsoleGUI
 {
     internal class TextViewer : BaseWindowElement
     {
-        public string Text;
+        public string Text = "";
         int Scroll;
         Character[] buf;
 
@@ -14,7 +14,7 @@ namespace ConsoleGUI
             ClearBuffer();
         }
 
-        void ClearBuffer() => buf = new Character[Rect.Width * Rect.Height];
+        new void ClearBuffer() => buf = new Character[Rect.Width * Rect.Height];
 
         internal override void BeforeDraw()
         {

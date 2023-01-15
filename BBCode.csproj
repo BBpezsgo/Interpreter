@@ -15,7 +15,6 @@
 		<Authors>BB</Authors>
 		<Product>BBCode Interpreter</Product>
 		<AnalysisLevel>latest-Recommended</AnalysisLevel>
-		<EnableCompressionInSingleFile>True</EnableCompressionInSingleFile>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

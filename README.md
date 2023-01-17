@@ -41,7 +41,7 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!
 - `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
 
-## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y) or [Mega](https://mega.nz/file/CJ4EXCLb#80hrb8ofv5RNCy7uIMmxxeA43dAl5I5jbfs7t_OBanU)
+## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y) or [Mega](https://mega.nz/file/CNpUFR5S#80hrb8ofv5RNCy7uIMmxxeA43dAl5I5jbfs7t_OBanU)
 ![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)
 
 [Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.bbc)

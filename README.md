@@ -158,3 +158,7 @@ export void Foo()
 
 ## api-ms-win-crt-string-l1-1-0.dll Missing Error
 This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
+
+## Known issules
+
+The file `/TestFiles/test-matrix.bbc` doesn't work for some reason :(

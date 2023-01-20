@@ -130,6 +130,10 @@ namespace IngameCoding.Bytecode
                     error.Context = GetContext();
                     throw;
                 }
+                catch (System.Exception error)
+                {
+                    throw new RuntimeException(error.Message, error, GetContext());
+                }
 
                 if (lastInstrPointer == CPU.CodePointer)
                 {
@@ -219,7 +223,7 @@ namespace IngameCoding.Bytecode
         public static BytecodeInterpreterSettings Default => new()
         {
             ClockCyclesPerUpdate = 2,
-            InstructionLimit = 1024,
+            InstructionLimit = 8192,
             StackMaxSize = 128,
         };
     }

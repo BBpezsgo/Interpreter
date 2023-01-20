@@ -29,6 +29,17 @@ namespace Console
     Log(" ]");
   }
 
+  export void Log(string[] message)
+  {
+    Write("[ ");
+    for (int i = 0; i < message.Length; i++)
+    {
+      if (i > 0) { Write(", "); };
+      Write("\"" + message[i] + "\"");
+    };
+    Log(" ]");
+  }
+
   [Builtin("stderr")]
   export void WriteError(string data);
     

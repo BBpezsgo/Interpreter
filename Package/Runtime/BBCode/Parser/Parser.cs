@@ -34,6 +34,8 @@ namespace IngameCoding.BBCode
         STRING,
         BOOLEAN,
         STRUCT,
+        LISTOF,
+
         RUNTIME,
         ANY,
     }
@@ -42,12 +44,15 @@ namespace IngameCoding.BBCode
     public class TypeToken : Token
     {
         public BuiltinType typeName;
-        public bool isList;
+        public TypeToken ListOf;
+        public bool IsList => ListOf != null;
 
         public TypeToken(string name, BuiltinType type, Token @base) : base()
         {
             this.typeName = type;
+
             base.text = name;
+
             if (@base == null)
             {
                 base.type = TokenType.IDENTIFIER;
@@ -61,39 +66,61 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public new TypeToken Clone()
+        public TypeToken(string name, TypeToken listOf, Token @base) : base()
         {
-            return new TypeToken(this.text, this.typeName, this)
+            this.typeName = BuiltinType.LISTOF;
+            this.ListOf = listOf;
+
+            base.text = name;
+
+            if (@base == null)
             {
-                type = this.type,
-
-                AbsolutePosition = new Range<int>(this.AbsolutePosition.Start, this.AbsolutePosition.End),
-                Position = new Range<IngameCoding.Core.SinglePosition>()
-                {
-                    Start = new SinglePosition(Position.Start.Line, Position.Start.Character),
-                    End = new SinglePosition(Position.End.Line, Position.End.Character),
-                },
-
-                isList = this.isList,
-                Analysis = new TokenAnalysis()
-                {
-                    Subtype = Analysis.Subtype,
-                },
-            };
+                base.type = TokenType.IDENTIFIER;
+            }
+            else
+            {
+                base.AbsolutePosition = @base.AbsolutePosition;
+                base.Position = @base.Position;
+                base.Analysis = @base.Analysis;
+                base.type = @base.type;
+            }
         }
 
-        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
-        public static TypeToken CreateAnonymous(string name, BuiltinType type, bool isList) => new(name, type, null) { isList = isList };
+        public new TypeToken Clone() => new(this.text, this.typeName, this)
+        {
+            type = this.type,
 
-        public override string ToString() => this.text + (isList ? "[]" : "");
-        public new string ToFullString() => $"TypeToken {{ {this.typeName}{(isList ? "[]" : "")} {base.ToFullString()} }}";
+            AbsolutePosition = new Range<int>(this.AbsolutePosition.Start, this.AbsolutePosition.End),
+            Position = new Range<SinglePosition>()
+            {
+                Start = new SinglePosition(Position.Start.Line, Position.Start.Character),
+                End = new SinglePosition(Position.End.Line, Position.End.Character),
+            },
+
+            ListOf = this.ListOf,
+            Analysis = new TokenAnalysis()
+            {
+                Subtype = Analysis.Subtype,
+            },
+        };
+
+        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
+        public static TypeToken CreateAnonymous(string name, TypeToken listOf) => new(name, listOf, null);
+
+        public override string ToString()
+        {
+            if (IsList) return ListOf.ToString() + "[]";
+            return text;
+        }
+        public new string ToFullString()
+        {
+            return $"TypeToken {{ {this.ToString()} {base.ToFullString()} }}";
+        }
     }
 
     namespace Parser
     {
         using Statements;
-
-        using System.Runtime.InteropServices;
 
         public struct ParserSettings
         {
@@ -754,7 +781,14 @@ namespace IngameCoding.BBCode
                 }
             }
 
-            readonly Dictionary<string, TypeToken> types = new();
+            static readonly Dictionary<string, TypeToken> types = new()
+            {
+                { "int", TypeToken.CreateAnonymous("int", BuiltinType.INT) },
+                { "string", TypeToken.CreateAnonymous("string", BuiltinType.STRING) },
+                { "void", TypeToken.CreateAnonymous("void", BuiltinType.VOID) },
+                { "float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT) },
+                { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) }
+            };
             readonly Dictionary<string, int> operators = new();
             bool enableThisKeyword;
             readonly List<string> CurrentNamespace = new();
@@ -773,12 +807,6 @@ namespace IngameCoding.BBCode
 
             public Parser()
             {
-                types.Add("int", TypeToken.CreateAnonymous("int", BuiltinType.INT));
-                types.Add("string", TypeToken.CreateAnonymous("string", BuiltinType.STRING));
-                types.Add("void", TypeToken.CreateAnonymous("void", BuiltinType.VOID));
-                types.Add("float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT));
-                types.Add("bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN));
-
                 operators.Add("|", 4);
                 operators.Add("&", 4);
                 operators.Add("^", 4);
@@ -1319,23 +1347,30 @@ namespace IngameCoding.BBCode
                 {
                     Values = new List<Statement>(),
                     position = o0.GetPosition(),
+                    BracketLeft = o0,
                 };
 
                 int endlessSafe = 0;
                 while (true)
                 {
                     var v = ExpectExpression();
-                    if (v == null)
-                    { throw new SyntaxException("Expected expression", CurrentToken); }
-
-                    listValue.Values.Add(v);
-
-                    if (ExpectOperator(",") == null)
+                    if (v != null)
                     {
-                        if (ExpectOperator("]") == null)
+                        listValue.Values.Add(v);
+
+                        if (ExpectOperator(",") == null)
                         {
-                            throw new SyntaxException("Unbalanced '['", o0);
+                            if (ExpectOperator("]", out var o1) == null)
+                            { throw new SyntaxException("Unbalanced '['", o0); }
+                            listValue.BracketRight = o1;
+                            break;
                         }
+                    }
+                    else
+                    {
+                        if (ExpectOperator("]", out var o1) == null)
+                        { throw new SyntaxException("Unbalanced '['", o0); }
+                        listValue.BracketRight = o1;
                         break;
                     }
 
@@ -1856,7 +1891,7 @@ namespace IngameCoding.BBCode
                 int endlessSafe = 0;
                 while (true)
                 {
-                    Statement_If_Part elseifStatement = ExpectIfSegmentStatement("elseif", Statement_If_Part.IfPart.If_ElseIfStatement);
+                    Statement_If_Part elseifStatement = ExpectIfSegmentStatement("elseif", Statement_If_Part.IfPart.ElseIf);
                     if (elseifStatement == null) break;
                     statement.parts.Add(elseifStatement);
                     statement.position.Extend(elseifStatement.position.AbsolutePosition);
@@ -1866,7 +1901,7 @@ namespace IngameCoding.BBCode
                     { throw new EndlessLoopException(); }
                 }
 
-                Statement_If_Part elseStatement = ExpectIfSegmentStatement("else", Statement_If_Part.IfPart.If_ElseStatement, false);
+                Statement_If_Part elseStatement = ExpectIfSegmentStatement("else", Statement_If_Part.IfPart.Else, false);
                 if (elseStatement != null)
                 {
                     statement.parts.Add(elseStatement);
@@ -1876,7 +1911,7 @@ namespace IngameCoding.BBCode
                 return statement;
             }
 
-            Statement_If_Part ExpectIfSegmentStatement(string ifSegmentName = "if", Statement_If_Part.IfPart ifSegmentType = Statement_If_Part.IfPart.If_IfStatement, bool needParameters = true)
+            Statement_If_Part ExpectIfSegmentStatement(string ifSegmentName = "if", Statement_If_Part.IfPart ifSegmentType = Statement_If_Part.IfPart.If, bool needParameters = true)
             {
                 if (ExpectIdentifier(ifSegmentName, out Token tokenIf) == null)
                 { return null; }
@@ -1902,28 +1937,28 @@ namespace IngameCoding.BBCode
 
                 switch (ifSegmentType)
                 {
-                    case Statement_If_Part.IfPart.If_IfStatement:
+                    case Statement_If_Part.IfPart.If:
                         ifStatement = new Statement_If_If()
                         {
-                            name = tokenIf.text,
+                            Keyword = tokenIf,
                             condition = condition,
                             position = tokenIf.GetPosition(),
                             BracketStart = braceletStart,
                         };
                         break;
-                    case Statement_If_Part.IfPart.If_ElseIfStatement:
+                    case Statement_If_Part.IfPart.ElseIf:
                         ifStatement = new Statement_If_ElseIf()
                         {
-                            name = tokenIf.text,
+                            Keyword = tokenIf,
                             condition = condition,
                             position = tokenIf.GetPosition(),
                             BracketStart = braceletStart,
                         };
                         break;
-                    case Statement_If_Part.IfPart.If_ElseStatement:
+                    case Statement_If_Part.IfPart.Else:
                         ifStatement = new Statement_If_Else()
                         {
-                            name = tokenIf.text,
+                            Keyword = tokenIf,
                             position = tokenIf.GetPosition(),
                             BracketStart = braceletStart,
                         };
@@ -2752,6 +2787,8 @@ namespace IngameCoding.BBCode
 
             TypeToken ExceptTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
             {
+                int parseStart = currentTokenIndex;
+
                 warning = null;
                 Token possibleType = ExpectIdentifier();
                 if (possibleType == null) return null;
@@ -2806,18 +2843,18 @@ namespace IngameCoding.BBCode
                 else
                 {
                     newType = new TypeToken(builtinType.text, builtinType.typeName, possibleType)
-                    {
-                        isList = builtinType.isList,
-                    };
+                    { ListOf = builtinType.ListOf };
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }
 
-                if (ExpectOperator("[", out var t0) != null)
+                while (ExpectOperator("[", out var t0) != null)
                 {
                     if (ExpectOperator("]") != null)
-                    { newType.isList = true; }
+                    {
+                        newType = new TypeToken(newType.text, newType, newType);
+                    }
                     else
-                    { throw new SyntaxException("Unbalanced '['", t0); }
+                    { currentTokenIndex = parseStart; return null; }
                 }
 
                 tokens[currentTokenIndex - 1] = newType;
@@ -2836,6 +2873,43 @@ namespace IngameCoding.BBCode
             }
 
             #endregion
+
+            public static TypeToken ParseType(string type)
+            {
+                if (string.IsNullOrEmpty(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or empty.", nameof(type));
+                if (string.IsNullOrWhiteSpace(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or whitespace.", nameof(type));
+
+                Tokenizer tokenizer = new(TokenizerSettings.Default);
+                Token[] tokens = tokenizer.Parse(type).Item1;
+
+                TypeToken result = null;
+
+                int i = -1;
+                while (i < tokens.Length)
+                {
+                    i++;
+                    if (tokens.Length <= i) break;
+
+                    Token token = tokens[i];
+                    if (i == 0)
+                    {
+                        if (token.type != TokenType.IDENTIFIER) throw new FormatException();
+                        if (types.TryGetValue(token.text, out result)) continue;
+                        result = TypeToken.CreateAnonymous(token.text, BuiltinType.STRUCT);
+                        continue;
+                    }
+                    if (token.type != TokenType.OPERATOR) throw new FormatException();
+                    if (token.text != "[") throw new FormatException();
+                    i++;
+                    if (tokens.Length <= i) throw new FormatException();
+                    token = tokens[i];
+                    if (token.type != TokenType.OPERATOR) throw new FormatException();
+                    if (token.text != "]") throw new FormatException();
+                    result = TypeToken.CreateAnonymous(result.text, result);
+                }
+
+                return result;
+            }
         }
     }
 }

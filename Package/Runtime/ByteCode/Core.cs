@@ -59,7 +59,7 @@ namespace IngameCoding.Bytecode
                 _ => "",
             };
         }
-        internal static string GetTypeText(DataItem val) => val.type == DataItem.Type.LIST ? $"{GetTypeText(val.ValueList.itemTypes)}[]" : GetTypeText(val.type);
+        internal static string GetTypeText(DataItem val) => val.type == DataItem.Type.LIST ? $"{(val.ValueList.itemTypes == DataItem.Type.LIST ? "?[]" : GetTypeText(val.ValueList.itemTypes))}[]" : GetTypeText(val.type);
 
         public void Destroy()
         {
@@ -126,6 +126,7 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOGIC_XOR: return LOGIC_XOR();
                 case Opcode.LIST_INDEX: return LIST_INDEX();
                 case Opcode.LIST_PUSH_ITEM: return LIST_PUSH_ITEM();
+                case Opcode.LIST_SET_ITEM: return LIST_SET_ITEM();
                 case Opcode.LIST_ADD_ITEM: return LIST_ADD_ITEM();
                 case Opcode.LIST_PULL_ITEM: return LIST_PULL_ITEM();
                 case Opcode.LIST_REMOVE_ITEM: return LIST_REMOVE_ITEM();
@@ -297,6 +298,20 @@ namespace IngameCoding.Bytecode
             MU.Step();
 
             return 5;
+        }
+        int LIST_SET_ITEM()
+        {
+            var indexValue = MU.Stack.Pop().ValueInt;
+            var newItem = MU.Stack.Pop();
+            var listValue = MU.Stack.Pop();
+            if (listValue.type == DataItem.Type.LIST)
+            { listValue.ValueList.items[indexValue] = newItem; }
+            else
+            { throw new RuntimeException("The variable type is not list!"); }
+            MU.Stack.Push(listValue);
+            MU.Step();
+
+            return 3;
         }
         int LIST_PULL_ITEM()
         {
@@ -565,6 +580,14 @@ namespace IngameCoding.Bytecode
             var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer);
             var field = MU.CurrentInstruction.additionParameter;
 
+            ProcessField(item, field);
+
+            MU.Step();
+
+            return 4;
+        }
+        void ProcessField(DataItem item, string field)
+        {
             if (item.type == DataItem.Type.STRING)
             {
                 var value = item.ValueString;
@@ -599,9 +622,6 @@ namespace IngameCoding.Bytecode
             else
             { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
 
-            MU.Step();
-
-            return 4;
         }
 
         int JUMP_BY()
@@ -656,15 +676,11 @@ namespace IngameCoding.Bytecode
             if (MU.CurrentInstruction.additionParameter.Length == 0)
             { throw new InternalException("No field name given"); }
 
-            var structItem = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count).ValueStruct;
+            var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count);
             MU.Stack.Pop();
+            var field = MU.CurrentInstruction.additionParameter;
 
-            if (!structItem.HaveField(MU.CurrentInstruction.additionParameter))
-            { throw new RuntimeException("Field " + MU.CurrentInstruction.additionParameter + " doesn't exists in this struct."); }
-
-            var fieldValue = structItem.GetField(MU.CurrentInstruction.additionParameter);
-
-            MU.Stack.Push(fieldValue, "field." + MU.CurrentInstruction.additionParameter);
+            ProcessField(item, field);
 
             MU.Step();
 
@@ -1127,7 +1143,7 @@ namespace IngameCoding.Bytecode
                 }
                 else
                 {
-                    throw new RuntimeException($"Wrong type ({newItem.type}) of item pushed to the list with type {itemTypes}");
+                    throw new RuntimeException($"Wrong type ({newItem.type.ToString().ToLower()}) of item pushed to the list {(itemTypes == Type.LIST ? "?[]" : itemTypes.ToString().ToLower()) + "[]"}");
                 }
             }
 
@@ -1159,12 +1175,6 @@ namespace IngameCoding.Bytecode
             public override string ToString()
             {
                 return $"[{(int)itemTypes}]";
-            }
-
-            public List(string raw)
-            {
-                var num = raw[1..^1];
-                this.itemTypes = (Type)int.Parse(num);
             }
 
             internal List Copy()
@@ -1629,6 +1639,11 @@ namespace IngameCoding.Bytecode
         }
         public DataItem(object value, string tag)
         {
+            if (value == null)
+            {
+                throw new RuntimeException($"Unknown type null");
+            }
+
             this.type = Type.INT;
 
             this.IsReference = false;
@@ -1677,7 +1692,7 @@ namespace IngameCoding.Bytecode
             }
             else
             {
-                throw new Errors.RuntimeException($"Unknown type {value.GetType().FullName}");
+                throw new RuntimeException($"Unknown type {value.GetType().FullName}");
             }
         }
 

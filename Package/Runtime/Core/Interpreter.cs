@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 
 namespace IngameCoding.Core
 {
@@ -844,11 +843,11 @@ namespace IngameCoding.Core
                 if (HandleErrors)
                 {
                     try
-                    {
-                        bytecodeInterpreter.Tick();
-                    }
+                    { bytecodeInterpreter.Tick(); }
                     catch (RuntimeException error)
                     {
+                        error.FeedDebugInfo(details.CompilerResult.debugInfo);
+
                         OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, TerminalInterpreter.LogType.Error);
 
                         OnDone?.Invoke(this, false);
@@ -870,7 +869,13 @@ namespace IngameCoding.Core
                 }
                 else
                 {
-                    bytecodeInterpreter.Tick();
+                    try
+                    { bytecodeInterpreter.Tick(); }
+                    catch (RuntimeException error)
+                    {
+                        error.FeedDebugInfo(details.CompilerResult.debugInfo);
+                        throw;
+                    }
                 }
 
                 if (bytecodeInterpreter != null && !bytecodeInterpreter.IsRunning)
@@ -883,7 +888,6 @@ namespace IngameCoding.Core
                     {
                         if (!globalVariablesCreated)
                         {
-                            bytecodeInterpreter.CallStackPush("state: SetGlobalVariables");
                             state = State.SetGlobalVariables;
                             OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
 
@@ -892,8 +896,6 @@ namespace IngameCoding.Core
                         }
                         else if (!startCalled)
                         {
-                            bytecodeInterpreter.CallStackPop();
-                            bytecodeInterpreter.CallStackPush("state: Call CodeEntry");
                             state = State.CallCodeEntry;
                             OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
 
@@ -905,8 +907,6 @@ namespace IngameCoding.Core
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
                         {
-                            bytecodeInterpreter.CallStackPop();
-                            bytecodeInterpreter.CallStackPush("event: Update");
                             state = State.CallUpdate;
                             WaitForUpdates(10, () =>
                             {
@@ -918,8 +918,6 @@ namespace IngameCoding.Core
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
                         {
-                            bytecodeInterpreter.CallStackPop();
-                            bytecodeInterpreter.CallStackPush("event: CodeEnd");
                             state = State.CallCodeEnd;
                             OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
 
@@ -931,8 +929,6 @@ namespace IngameCoding.Core
                         }
                         else if (!globalVariablesDisposed)
                         {
-                            bytecodeInterpreter.CallStackPop();
-                            bytecodeInterpreter.CallStackPush("state: DisposeGlobalVariables");
                             state = State.DisposeGlobalVariables;
                             OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
 
@@ -941,7 +937,6 @@ namespace IngameCoding.Core
                         }
                         else
                         {
-                            bytecodeInterpreter.CallStackPop();
                             OnCodeExecuted(result);
                         }
                     }

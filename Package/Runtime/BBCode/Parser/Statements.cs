@@ -170,6 +170,8 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_ListValue : StatementWithReturnValue
     {
+        public Token BracketLeft;
+        public Token BracketRight;
         public List<Statement> Values;
         public int Size => Values.Count;
 
@@ -180,6 +182,9 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override bool TryGetTotalPosition(out Position result)
         {
+            result = new Position(BracketLeft, BracketRight);
+            return true;
+
             if (Values.Count == 0) { result = position; return false; }
             bool clean = Values[0].TryGetTotalPosition(out result);
             for (int i = 1; i < Values.Count; i++)
@@ -246,12 +251,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
+            return $"{type.text}{(type.IsList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{type.text}{(type.isList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{type.text}{(type.IsList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
         }
 
         internal override void SetPosition()
@@ -619,7 +624,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override object TryGetValue()
         {
-            if (type.isList) return null;
+            if (type.IsList) return null;
 
             return type.typeName switch
             {
@@ -638,6 +643,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override bool TryGetTotalPosition(out Position result)
         {
+            if (ValueToken == null) { result = new Position(); return false; }
             result = new Position(ValueToken);
             return true;
         }
@@ -767,7 +773,10 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
 
         public override bool TryGetTotalPosition(out Position result)
-        { throw new NotImplementedException(); }
+        {
+            result = new Position(parts[0].BracketStart, parts[^1].BracketEnd);
+            return true;
+        }
 
         internal override void SetPosition()
         {
@@ -777,19 +786,19 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public abstract class Statement_If_Part : StatementParent
     {
-        public IfPart partType;
-        internal string name;
+        public IfPart Type;
+        internal Token Keyword;
 
         public enum IfPart
         {
-            If_IfStatement,
-            If_ElseStatement,
-            If_ElseIfStatement
+            If,
+            Else,
+            ElseIf,
         }
 
         public override string ToString()
         {
-            return $"{name} {((partType != IfPart.If_ElseStatement) ? "(...)" : "")} {{...}}";
+            return $"{Keyword} {((Type != IfPart.Else) ? "(...)" : "")} {{...}}";
         }
 
         public override bool TryGetTotalPosition(out Position result)
@@ -802,7 +811,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         internal Statement condition;
 
         public Statement_If_If()
-        { partType = IfPart.If_IfStatement; }
+        { Type = IfPart.If; }
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -827,7 +836,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         internal Statement condition;
 
         public Statement_If_ElseIf()
-        { partType = IfPart.If_ElseIfStatement; }
+        { Type = IfPart.ElseIf; }
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -850,7 +859,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     public class Statement_If_Else : Statement_If_Part
     {
         public Statement_If_Else()
-        { partType = IfPart.If_ElseStatement; }
+        { Type = IfPart.Else; }
 
         public override string PrettyPrint(int ident = 0)
         {

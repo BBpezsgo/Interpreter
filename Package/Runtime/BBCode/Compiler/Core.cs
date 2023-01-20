@@ -1,12 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace IngameCoding.BBCode.Compiler
 {
     using Bytecode;
-
-    using Errors;
 
     using Parser;
     using Parser.Statements;
@@ -20,6 +17,8 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType.STRING => DataItem.Type.STRING,
             BuiltinType.BOOLEAN => DataItem.Type.BOOLEAN,
             BuiltinType.STRUCT => DataItem.Type.STRUCT,
+            BuiltinType.LISTOF => DataItem.Type.LIST,
+
             _ => DataItem.Type.RUNTIME,
         };
         public static BuiltinType Convert(this DataItem.Type v) => v switch
@@ -29,10 +28,48 @@ namespace IngameCoding.BBCode.Compiler
             DataItem.Type.STRING => BuiltinType.STRUCT,
             DataItem.Type.BOOLEAN => BuiltinType.BOOLEAN,
             DataItem.Type.STRUCT => BuiltinType.STRUCT,
-            DataItem.Type.LIST => BuiltinType.RUNTIME,
+            DataItem.Type.LIST => BuiltinType.LISTOF,
+
             DataItem.Type.RUNTIME => BuiltinType.RUNTIME,
             _ => BuiltinType.ANY,
         };
+
+        public static int RemoveInstruction(this List<Instruction> self, int index, List<int> watchTheseIndexesToo)
+        {
+            if (index < -1 || index >= self.Count) throw new IndexOutOfRangeException();
+
+            int changedInstructions = 0;
+            for (int instructionIndex = 0; instructionIndex < self.Count; instructionIndex++)
+            {
+                Instruction instruction = self[instructionIndex];
+                if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_TRUE || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
+                {
+                    if (instruction.parameter is int jumpBy)
+                    {
+                        if (jumpBy + instructionIndex < index && instructionIndex < index) continue;
+                        if (jumpBy + instructionIndex > index && instructionIndex > index) continue;
+                        if (jumpBy + instructionIndex == index) throw new Exception($"Can't remove instruction at {index} becouse instruction {instruction} is referencing to this position");
+
+                        if (instructionIndex < index)
+                        { instruction.parameter = jumpBy - 1; changedInstructions++; }
+                        else if (instructionIndex > index)
+                        { instruction.parameter = jumpBy + 1; changedInstructions++; }
+                    }
+                }
+            }
+
+            for (int i = 0; i < watchTheseIndexesToo.Count; i++)
+            {
+                int instructionIndex = watchTheseIndexesToo[i];
+
+                if (instructionIndex > index)
+                { watchTheseIndexesToo[i] = instructionIndex - 1; }
+            }
+
+            self.RemoveAt(index);
+
+            return changedInstructions;
+        }
     }
 
     public static class FunctionID
@@ -43,8 +80,8 @@ namespace IngameCoding.BBCode.Compiler
             for (int i = 0; i < function.Parameters.Count; i++)
             {
                 var param = function.Parameters[i];
-                var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
-                result += "," + paramType + (param.type.isList ? "[]" : "");
+                // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
+                result += "," + param.type.ToString();
             }
             return result;
         }
@@ -216,6 +253,7 @@ namespace IngameCoding.BBCode.Compiler
         public TypeToken[] ParameterTypes;
 
         public int TimesUsed;
+        public int TimesUsedTotal;
 
         public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething => this.Type.typeName != BuiltinType.VOID;
@@ -298,24 +336,25 @@ namespace IngameCoding.BBCode.Compiler
         public int offset;
         public BuiltinType type;
         public string structName;
-        public bool isList;
+        public TypeToken ListOf;
+        public bool IsList => ListOf != null;
         public Statement_NewVariable Declaration;
 
-        public CompiledVariable(int offset, BuiltinType type, bool isList, Statement_NewVariable declaration)
+        public CompiledVariable(int offset, BuiltinType type, TypeToken listOf, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = type;
             this.structName = string.Empty;
-            this.isList = isList;
+            this.ListOf = listOf;
             this.Declaration = declaration;
         }
 
-        public CompiledVariable(int offset, string structName, bool isList, Statement_NewVariable declaration)
+        public CompiledVariable(int offset, string structName, TypeToken listOf, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = BuiltinType.STRUCT;
             this.structName = structName;
-            this.isList = isList;
+            this.ListOf = listOf;
             this.Declaration = declaration;
         }
 
@@ -323,11 +362,17 @@ namespace IngameCoding.BBCode.Compiler
         {
             get
             {
+                if (IsList)
+                {
+                    var listOfText = ListOf.ToString();
+                    return listOfText + "[]";
+                }
+
                 if (type == BuiltinType.STRUCT)
                 {
-                    return structName + (isList ? "[]" : "");
+                    return structName;
                 }
-                return type.ToString().ToLower() + (isList ? "[]" : "");
+                return type.ToString().ToLower();
             }
         }
     }

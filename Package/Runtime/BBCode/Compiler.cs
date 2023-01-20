@@ -31,6 +31,7 @@ namespace IngameCoding.BBCode.Compiler
             public Dictionary<string, int> functionOffsets;
             public int clearGlobalVariablesInstruction;
             public int setGlobalVariablesInstruction;
+            internal DebugInfo[] debugInfo;
 
             bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable, out bool isGlobal)
             {
@@ -179,10 +180,10 @@ namespace IngameCoding.BBCode.Compiler
                         Console.Write($"{instruction.parameter}");
                         Console.Write($" ");
                     }
-                    else if (instruction.parameter is string)
+                    else if (instruction.parameter is string parameterString)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write($"\"{instruction.parameter}\"");
+                        Console.Write($"\"{parameterString.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}\"");
                         Console.Write($" ");
                     }
                     else
@@ -447,7 +448,12 @@ namespace IngameCoding.BBCode.Compiler
             { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
 
             foreach (UsingDefinition usingItem in parserResult.Usings)
-            { CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
+            {
+                List<Error> compileErrors = new();
+                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Hashes, compileErrors, warnings, printCallback);
+                if (compileErrors.Count > 0)
+                { throw new System.Exception($"Failed to compile file {usingItem.PathString}", compileErrors[0].ToException()); }
+            }
 
             if (parserSettings.PrintInfo)
             { parserResult.WriteToConsole(); }
@@ -478,6 +484,7 @@ namespace IngameCoding.BBCode.Compiler
             return new CompilerResult()
             {
                 compiledCode = codeGeneratorResult.compiledCode,
+                debugInfo = codeGeneratorResult.DebugInfo,
 
                 compiledStructs = codeGeneratorResult.compiledStructs,
                 compiledFunctions = codeGeneratorResult.compiledFunctions,

@@ -209,6 +209,12 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-no-debug-info")
+                    {
+                        compilerSettings.GenerateDebugInstructions = false;
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-c-remove-unused-functions")
                     {
                         i++;

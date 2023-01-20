@@ -1,0 +1,18 @@
+﻿using "../CodeFiles/System";
+
+[CodeEntry]
+void Start()
+{
+	int[][] matrix;
+
+	for (int y; y < 5; y++)
+	{
+		matrix.Push([1]);
+		for (int x; x < 10; x++)
+		{
+			int[] row = matrix[y];
+			row.Push(x);
+			matrix[y] = row;
+		};
+	};
+}

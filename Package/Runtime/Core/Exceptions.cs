@@ -7,6 +7,11 @@ namespace IngameCoding.Errors
 {
     using Core;
 
+    using IngameCoding.BBCode.Parser.Statements;
+
+    using System.Collections.Generic;
+    using System.Reflection.PortableExecutable;
+
     using Tokenizer;
 
     #region Exception
@@ -56,6 +61,13 @@ namespace IngameCoding.Errors
         [Obsolete("Don't use this", false)]
         public Exception(string message, BaseToken token, string file) : this(message, token.GetPosition(), file) { }
 
+        public Exception(string message, Statement statement, string file) : base(message)
+        {
+            this.File = file;
+            if (!statement.TryGetTotalPosition(out var pos)) throw new System.Exception($"Failed to get {statement.GetType().Name} position");
+            this.position = pos;
+        }
+
         public Exception(string message, System.Exception inner) : base(message, inner) { }
         protected Exception(
           SerializationInfo info,
@@ -70,6 +82,7 @@ namespace IngameCoding.Errors
         public CompilerException(string message, BaseToken token) : base(message, token) { }
         public CompilerException(string message, Position pos, string file) : base(message, pos, file) { }
         public CompilerException(string message, BaseToken token, string file) : base(message, token, file) { }
+        public CompilerException(string message, Statement statement, string file) : base(message, statement, file) { }
 
         protected CompilerException(
           SerializationInfo info,
@@ -108,12 +121,30 @@ namespace IngameCoding.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        public IngameCoding.Bytecode.BytecodeInterpreter.Context? Context;
+        public Bytecode.BytecodeInterpreter.Context? Context;
+        BBCode.Compiler.DebugInfo[] ContextDebugInfo = null;
+
+        internal void FeedDebugInfo(BBCode.Compiler.DebugInfo[] DebugInfo)
+        {
+            if (!Context.HasValue) return;
+            List<BBCode.Compiler.DebugInfo> contextDebugInfo = new();
+            var context = Context.Value;
+            for (int i = 0; i < DebugInfo.Length; i++)
+            {
+                BBCode.Compiler.DebugInfo item = DebugInfo[i];
+                if (item.InstructionStart > context.CodePointer || item.InstructionEnd < context.CodePointer) continue;
+                contextDebugInfo.Add(item);
+            }
+            ContextDebugInfo = contextDebugInfo.ToArray();
+        }
 
         public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        public RuntimeException(string message, IngameCoding.Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
+        public RuntimeException(string message, Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+
+        public RuntimeException(string message, System.Exception inner, Bytecode.BytecodeInterpreter.Context context) : base(message, inner)
+        { this.Context = context; }
 
         public override string MessageAll
         {
@@ -128,6 +159,10 @@ namespace IngameCoding.Errors
                 result += $"\n Call Stack:";
                 if (cont.CallStack.Length == 0) { result += " (callstack is empty)"; }
                 else { result += "\n  " + string.Join("\n  ", cont.CallStack); }
+                if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
+                {
+                    result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";
+                }
                 result += $"\n System Stack Trace:";
                 if (StackTrace == null) { result += " (stacktrace is null)"; }
                 else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }

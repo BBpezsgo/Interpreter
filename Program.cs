@@ -9,14 +9,20 @@ namespace TheProgram
     {
         static void Main(string[] args)
         {
+            // TODO: valami hiba van amit nem volt kedvem debuggolni, szoval hajrá :D
+            // fájl: test-matrix.bbc
+
 #if DEBUG && ENABLE_DEBUG
-            var file = "helloworld.bbc";
+            var file = "test-code-optimization.bbc";
             if (args.Length == 0) args = new string[]
             {
                 // "-throw-errors",
-                // "-c-print-instructions", "true",
+                "-c-print-instructions true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
+                "-c-generate-comments false",
+                "-no-debug-info",
+                // "-dont-optimize",
                 // "-test",
                 // "-decompile",
                 // "-compile",

@@ -110,6 +110,10 @@
         /// Removes new item to the list at the given index
         /// </summary>
         LIST_REMOVE_ITEM,
+        /// <summary>
+        /// Sets a value at the given index
+        /// </summary>
+        LIST_SET_ITEM,
         // === ===
 
         // === HEAP ===

@@ -16,4 +16,8 @@
     <Content Include="icon.ico" />
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="call post-build.bat" />
+  </Target>
+
 </Project>

@@ -148,14 +148,7 @@ namespace IngameCoding.BBCode.Compiler
             return false;
         }
 
-        bool GetParameter(string parameterName, out Parameter parameters)
-        {
-            if (this.parameters.TryGetValue(parameterName, out parameters))
-            {
-                return true;
-            }
-            return false;
-        }
+        bool GetParameter(string parameterName, out Parameter parameters) => this.parameters.TryGetValue(parameterName, out parameters);
 
         bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
@@ -219,11 +212,11 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (statement is Statement_Variable s1)
                 {
-                    if (GetCompiledVariable(s1.variableName.text, out _, out _))
+                    if (GetParameter(s1.variableName.text, out _))
                     {
                         return null;
                     }
-                    else if (GetParameter(s1.variableName.text, out _))
+                    else if (GetCompiledVariable(s1.variableName.text, out _, out _))
                     {
                         return null;
                     }
@@ -289,47 +282,6 @@ namespace IngameCoding.BBCode.Compiler
             {
                 return true;
             }
-            functionOffset = -1;
-            return false;
-        }
-        bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
-        {
-            if (GetCompiledVariable(methodCallStatement.VariableName, out CompiledVariable compiledVariable, out _))
-            {
-                bool IsStructMethodCall = true;
-                if (!GetCompiledStruct(compiledVariable.structName, out _))
-                { IsStructMethodCall = false; }
-                else
-                {
-                    if (!compiledStructs[compiledVariable.structName].CompiledMethods.ContainsKey(methodCallStatement.FunctionName))
-                    { IsStructMethodCall = false; }
-                }
-
-                if (!IsStructMethodCall)
-                {
-                    string callID = "";
-                    for (int i = 0; i < methodCallStatement.parameters.Count; i++)
-                    { callID += "," + FindStatementType(methodCallStatement.parameters[i]); }
-
-                    if (functionOffsets.TryGetValue(methodCallStatement.FunctionName + callID, out functionOffset))
-                    {
-                        return true;
-                    }
-                    else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.FunctionName + callID, out functionOffset))
-                    {
-                        return true;
-                    }
-                    else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName + callID, out functionOffset))
-                    {
-                        return true;
-                    }
-                    else if (functionOffsets.TryGetValue(methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName + callID, out functionOffset))
-                    {
-                        return true;
-                    }
-                }
-            }
-
             functionOffset = -1;
             return false;
         }
@@ -537,7 +489,13 @@ namespace IngameCoding.BBCode.Compiler
         }
         string FindStatementType(Statement_Variable variable)
         {
-            if (GetCompiledVariable(variable.variableName.text, out CompiledVariable val, out _))
+            if (GetParameter(variable.variableName.text, out Parameter param))
+            {
+                if (variable.listIndex != null)
+                { throw new NotImplementedException(); }
+                return param.type;
+            }
+            else if (GetCompiledVariable(variable.variableName.text, out CompiledVariable val, out _))
             {
                 if (variable.listIndex != null)
                 {
@@ -551,12 +509,6 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
                 return val.Type;
-            }
-            else if (parameters.TryGetValue(variable.variableName.text, out Parameter param))
-            {
-                if (variable.listIndex != null)
-                { throw new NotImplementedException(); }
-                return param.type;
             }
             else if (variable.variableName.text == "this")
             {
@@ -1000,6 +952,7 @@ namespace IngameCoding.BBCode.Compiler
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
             { AddInstruction(Opcode.POP_VALUE); }
         }
+#if false
         void GenerateCodeForStatement(Statement_MethodCall structMethodCall)
         {
             if (GetCompiledVariable(structMethodCall.VariableName, out CompiledVariable compiledVariable, out var isGlob3))
@@ -1147,6 +1100,7 @@ namespace IngameCoding.BBCode.Compiler
             { throw new CompilerException("Unknown variable '" + structMethodCall.VariableName + "'", structMethodCall.position, CurrentFile); }
 
         }
+#endif
         void GenerateCodeForStatement(Statement_Operator @operator)
         {
             @operator.Operator.Analysis.CompilerReached = true;
@@ -1294,15 +1248,15 @@ namespace IngameCoding.BBCode.Compiler
                     variable.variableName.Analysis.CompilerReached = true;
                     variable.variableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
 
-                    if (GetCompiledVariable(variable.variableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
-                    {
-                        GenerateCodeForStatement(@operator.Right);
-                        AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, valueMemoryIndex.offset);
-                    }
-                    else if (GetParameter(variable.variableName.text, out Parameter parameter))
+                    if (GetParameter(variable.variableName.text, out Parameter parameter))
                     {
                         GenerateCodeForStatement(@operator.Right);
                         AddInstruction(parameter.isReference ? Opcode.STORE_VALUE_BR_AS_REF : Opcode.STORE_VALUE_BR, parameter.RealIndex);
+                    }
+                    else if (GetCompiledVariable(variable.variableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
+                    {
+                        GenerateCodeForStatement(@operator.Right);
+                        AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, valueMemoryIndex.offset);
                     }
                     else
                     {
@@ -1319,15 +1273,15 @@ namespace IngameCoding.BBCode.Compiler
                         variable1.variableName.Analysis.CompilerReached = true;
                         variable1.variableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
 
-                        if (GetCompiledVariable(variable1.variableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
+                        if (GetParameter(variable1.variableName.text, out Parameter parameter))
+                        {
+                            GenerateCodeForStatement(@operator.Right);
+                            AddInstruction(Opcode.STORE_FIELD_BR, parameter.RealIndex, field.FieldName.text);
+                        }
+                        else if (GetCompiledVariable(variable1.variableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                         {
                             GenerateCodeForStatement(@operator.Right);
                             AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, valueMemoryIndex.offset, field.FieldName.text);
-                        }
-                        else if (GetParameter(variable1.variableName.text, out Parameter parameter))
-                        {
-                            GenerateCodeForStatement(@operator.Right);
-                            AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, parameter.RealIndex, field.FieldName.text);
                         }
                         else
                         {
@@ -1398,7 +1352,17 @@ namespace IngameCoding.BBCode.Compiler
         {
             variable.variableName.Analysis.CompilerReached = true;
 
-            if (GetCompiledVariable(variable.variableName.text, out CompiledVariable val, out var isGlob_))
+            if (GetParameter(variable.variableName.text, out Parameter param))
+            {
+                variable.variableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
+                variable.variableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
+
+                if (variable.reference)
+                { throw new CompilerException("Reference can only be applied to a variable", variable.variableName, CurrentFile); }
+
+                AddInstruction((param.isReference) ? Opcode.LOAD_VALUE_BR_AS_REF : Opcode.LOAD_VALUE_BR, param.RealIndex);
+            }
+            else if (GetCompiledVariable(variable.variableName.text, out CompiledVariable val, out var isGlob_))
             {
                 variable.variableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
                 variable.variableName.Analysis.Reference = new TokenAnalysis.RefVariable(val.Declaration, isGlob_);
@@ -1411,16 +1375,6 @@ namespace IngameCoding.BBCode.Compiler
                 {
                     AddInstruction(isGlob_ ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, val.offset);
                 }
-            }
-            else if (parameters.TryGetValue(variable.variableName.text, out Parameter param))
-            {
-                variable.variableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
-                variable.variableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
-
-                if (variable.reference)
-                { throw new CompilerException("Reference can only be applied to a variable", variable.variableName, CurrentFile); }
-
-                AddInstruction((param.isReference) ? Opcode.LOAD_VALUE_BR_AS_REF : Opcode.LOAD_VALUE_BR, param.RealIndex);
             }
             else
             {
@@ -1700,7 +1654,23 @@ namespace IngameCoding.BBCode.Compiler
             {
                 prevVariable.variableName.Analysis.CompilerReached = true;
 
-                if (GetCompiledVariable(prevVariable.variableName.text, out CompiledVariable variable, out var isGlob))
+                if (GetParameter(prevVariable.variableName.text, out Parameter param))
+                {
+                    if (GetCompiledStruct(param.type, out var @struct))
+                    {
+                        foreach (var field_ in @struct.Fields)
+                        {
+                            if (field_.name.text == field.FieldName.text)
+                            {
+                                field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(field_.type.ToString(), field_.name, @struct.Name.text, @struct.FilePath);
+                                break;
+                            }
+                        }
+                    }
+                    prevVariable.variableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
+                    AddInstruction(Opcode.LOAD_FIELD_BR, param.RealIndex, field.FieldName.text);
+                }
+                else if (GetCompiledVariable(prevVariable.variableName.text, out CompiledVariable variable, out var isGlob))
                 {
                     if (variable.IsList)
                     {
@@ -1732,22 +1702,6 @@ namespace IngameCoding.BBCode.Compiler
                     }
                     prevVariable.variableName.Analysis.Reference = new TokenAnalysis.RefVariable(variable.Declaration, isGlob);
                     AddInstruction(isGlob ? Opcode.LOAD_FIELD : Opcode.LOAD_FIELD_BR, variable.offset, field.FieldName.text);
-                }
-                else if (parameters.TryGetValue(prevVariable.variableName.text, out Parameter param))
-                {
-                    if (GetCompiledStruct(param.type, out var @struct))
-                    {
-                        foreach (var field_ in @struct.Fields)
-                        {
-                            if (field_.name.text == field.FieldName.text)
-                            {
-                                field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(field_.type.ToString(), field_.name, @struct.Name.text, @struct.FilePath);
-                                break;
-                            }
-                        }
-                    }
-                    prevVariable.variableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
-                    AddInstruction(Opcode.LOAD_FIELD_BR, param.RealIndex, field.FieldName.text);
                 }
                 else
                 {
@@ -1812,12 +1766,7 @@ namespace IngameCoding.BBCode.Compiler
             else if (st is Statement_NewVariable newVariable)
             { GenerateCodeForStatement(newVariable); }
             else if (st is Statement_FunctionCall functionCall)
-            {
-                if (st is Statement_MethodCall structMethodCall)
-                { GenerateCodeForStatement(structMethodCall); }
-                else
-                { GenerateCodeForStatement(functionCall); }
-            }
+            { GenerateCodeForStatement(functionCall); }
             else if (st is Statement_Operator @operator)
             { GenerateCodeForStatement(@operator); }
             else if (st is Statement_Literal literal)
@@ -1876,9 +1825,9 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        #endregion
+#endregion
 
-        #region GenerateCodeFor...
+#region GenerateCodeFor...
 
         void GenerateCodeForGlobalVariable(Statement st, out int globalVariablesAdded)
         {
@@ -2318,7 +2267,7 @@ namespace IngameCoding.BBCode.Compiler
             CurrentFile = null;
         }
 
-        #endregion
+#endregion
 
         CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int offset)
         {
@@ -2335,7 +2284,7 @@ namespace IngameCoding.BBCode.Compiler
             return new CompiledVariable(offset, newVariable.type.typeName, newVariable.type.ListOf, newVariable);
         }
 
-        #region Result Structs
+#region Result Structs
 
         public struct CodeGeneratorResult
         {
@@ -2349,7 +2298,7 @@ namespace IngameCoding.BBCode.Compiler
             public int setGlobalVariablesInstruction;
         }
 
-        #endregion
+#endregion
 
         CompiledFunction GetFunctionInfo(KeyValuePair<string, FunctionDefinition> function, bool isStructMethod = false)
         {
@@ -2634,7 +2583,7 @@ namespace IngameCoding.BBCode.Compiler
             this.compiledFunctions = new();
             this.GeneratedDebugInfo.Clear();
 
-            #region Compile test built-in functions
+#region Compile test built-in functions
 
             foreach (var hash in hashes)
             {
@@ -2762,9 +2711,9 @@ namespace IngameCoding.BBCode.Compiler
                 continue;
             }
 
-            #endregion
+#endregion
 
-            #region Compile Structs
+#region Compile Structs
 
             BlockCodeGeneration = false;
 
@@ -2773,7 +2722,7 @@ namespace IngameCoding.BBCode.Compiler
 
             BlockCodeGeneration = true;
 
-            #endregion
+#endregion
 
             foreach (var function in functions)
             {
@@ -2799,7 +2748,7 @@ namespace IngameCoding.BBCode.Compiler
                 printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", TerminalInterpreter.LogType.Debug);
             }
 
-            #region Code Generation
+#region Code Generation
 
             BlockCodeGeneration = false;
 
@@ -2832,7 +2781,7 @@ namespace IngameCoding.BBCode.Compiler
 
             BlockCodeGeneration = true;
 
-            #endregion
+#endregion
 
             foreach (var item in undefinedFunctionOffsets)
             {

@@ -1029,7 +1029,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
 
-
+#if false
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_MethodCall : Statement_FunctionCall
     {
@@ -1056,4 +1056,5 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}{VariableName}.{FunctionName}({string.Join(", ", parameters)})";
         }
     }
+#endif
 }

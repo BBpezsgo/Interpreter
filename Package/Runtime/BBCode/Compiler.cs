@@ -72,43 +72,6 @@ namespace IngameCoding.BBCode.Compiler
                 functionOffset = -1;
                 return false;
             }
-            public bool GetFunctionOffset(Statement_MethodCall methodCallStatement, out int functionOffset)
-            {
-                if (GetCompiledVariable(methodCallStatement.VariableName, out CompiledVariable compiledVariable, out _))
-                {
-                    bool IsStructMethodCall = true;
-                    if (!GetCompiledStruct(compiledVariable.structName, out _))
-                    { IsStructMethodCall = false; }
-                    else
-                    {
-                        if (!compiledStructs[compiledVariable.structName].CompiledMethods.ContainsKey(methodCallStatement.FunctionName))
-                        { IsStructMethodCall = false; }
-                    }
-
-                    if (!IsStructMethodCall)
-                    {
-                        if (functionOffsets.TryGetValue(methodCallStatement.FunctionName, out functionOffset))
-                        {
-                            return true;
-                        }
-                        else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
-                        {
-                            return true;
-                        }
-                        else if (functionOffsets.TryGetValue(methodCallStatement.NamespacePathPrefix + methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
-                        {
-                            return true;
-                        }
-                        else if (functionOffsets.TryGetValue(methodCallStatement.TargetNamespacePathPrefix + methodCallStatement.FunctionName, out functionOffset))
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                functionOffset = -1;
-                return false;
-            }
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
             {

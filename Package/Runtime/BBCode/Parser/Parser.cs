@@ -1260,6 +1260,14 @@ namespace IngameCoding.BBCode
                 while (ExpectOperator("}", out braceletEnd) == null)
                 {
                     ParameterDefinition field = ExpectField();
+                    if (field == null)
+                    { throw new SyntaxException($"Expected field definition", CurrentToken); }
+
+                    fields.Add(field);
+                    if (ExpectOperator(";") == null)
+                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+
+#if false
                     if (field != null)
                     {
                         fields.Add(field);
@@ -1278,6 +1286,7 @@ namespace IngameCoding.BBCode
                         if (ExpectOperator(";") == null)
                         { Errors.Add(new Error("Expected ';' at end of statement" + ((field != null) ? " (after method definition)" : ""), new Position(CurrentToken.Position.Start.Line))); }
                     }
+#endif
 
                     endlessSafe++;
                     if (endlessSafe > 50)
@@ -2406,6 +2415,7 @@ namespace IngameCoding.BBCode
                 return functionCall;
             }
 
+#if false
             Statement_MethodCall ExpectMethodCall()
             {
                 int startTokenIndex = currentTokenIndex;
@@ -2465,6 +2475,7 @@ namespace IngameCoding.BBCode
 
                 return methodCall;
             }
+#endif
 
             /// <summary> return, break, continue, etc. </summary>
             Statement_FunctionCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)

@@ -367,4 +367,5 @@ FodyWeavers.xsd
 
 
 # Custom
-Package/package.json
+/Source/package.json
+/Source/bb.bbcode-interpreter.asmdef

@@ -6,8 +6,6 @@ namespace IngameCoding.BBCode.Parser.Statements
 {
     using Core;
 
-    using System.Security.Cryptography;
-
     public static class StatementFinder
     {
         static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
@@ -18,17 +16,17 @@ namespace IngameCoding.BBCode.Parser.Statements
             if (callback?.Invoke(st) == true) return true;
 
             if (st is StatementParent statementParent)
-            { if (GetAllStatement(statementParent.statements, callback)) return true; }
+            { if (GetAllStatement(statementParent.Statements, callback)) return true; }
 
             if (st is Statement_ListValue listValue)
             { return GetAllStatement(listValue.Values, callback); }
             else if (st is Statement_NewVariable newVariable)
-            { if (newVariable.initialValue != null) return GetAllStatement(newVariable.initialValue, callback); }
+            { if (newVariable.InitialValue != null) return GetAllStatement(newVariable.InitialValue, callback); }
             else if (st is Statement_FunctionCall functionCall)
             {
                 if (GetAllStatement(functionCall.PrevStatement, callback)) return true;
 
-                return GetAllStatement(functionCall.parameters, callback);
+                return GetAllStatement(functionCall.Parameters, callback);
             }
             else if (st is Statement_Operator @operator)
             {
@@ -38,21 +36,21 @@ namespace IngameCoding.BBCode.Parser.Statements
             else if (st is Statement_Literal literal)
             { }
             else if (st is Statement_Variable variable)
-            { if (variable.listIndex != null) return GetAllStatement(variable.listIndex, callback); }
+            { if (variable.ListIndex != null) return GetAllStatement(variable.ListIndex, callback); }
             else if (st is Statement_WhileLoop whileLoop)
-            { return GetAllStatement(whileLoop.condition, callback); }
+            { return GetAllStatement(whileLoop.Condition, callback); }
             else if (st is Statement_ForLoop forLoop)
             {
-                if (GetAllStatement(forLoop.condition, callback)) return true;
-                if (GetAllStatement(forLoop.expression, callback)) return true;
-                if (GetAllStatement(forLoop.variableDeclaration, callback)) return true;
+                if (GetAllStatement(forLoop.Condition, callback)) return true;
+                if (GetAllStatement(forLoop.Expression, callback)) return true;
+                if (GetAllStatement(forLoop.VariableDeclaration, callback)) return true;
             }
             else if (st is Statement_If @if)
-            { return GetAllStatement(@if.parts.ToArray(), callback); }
+            { return GetAllStatement(@if.Parts.ToArray(), callback); }
             else if (st is Statement_If_If ifIf)
-            { return GetAllStatement(ifIf.condition, callback); }
+            { return GetAllStatement(ifIf.Condition, callback); }
             else if (st is Statement_If_ElseIf ifElseif)
-            { return GetAllStatement(ifElseif.condition, callback); }
+            { return GetAllStatement(ifElseif.Condition, callback); }
             else if (st is Statement_If_Else)
             { }
             else if (st is Statement_NewStruct newStruct)
@@ -100,20 +98,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
     public abstract class Statement
     {
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        public Position position;
-
         public override string ToString()
         { return this.GetType().Name; }
 
         public abstract string PrettyPrint(int ident = 0);
-
-        public virtual object TryGetValue()
-        { return null; }
-
-        public abstract bool TryGetTotalPosition(out Position result);
-
-        internal abstract void SetPosition();
+        public virtual object TryGetValue() => null;
+        public abstract Position TotalPosition();
     }
     public class Statement_HashInfo : Statement, IDefinition
     {
@@ -128,19 +118,14 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"# <hasn info>";
         }
 
-        public override bool TryGetTotalPosition(out Position result)
+        public override Position TotalPosition()
         {
-            result = new(HashToken, HashName);
+            Position result = new(HashToken, HashName);
             foreach (var item in Parameters)
             {
                 result.Extend(item.ValueToken);
             }
-            return true;
-        }
-
-        internal override void SetPosition()
-        {
-
+            return result;
         }
     }
 
@@ -151,18 +136,14 @@ namespace IngameCoding.BBCode.Parser.Statements
 
     public abstract class StatementParent : Statement
     {
-        public List<Statement> statements;
+        public List<Statement> Statements;
         public StatementParent()
-        { this.statements = new(); }
+        { this.Statements = new(); }
 
         public Token BracketStart;
         public Token BracketEnd;
 
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            result = new Position(BracketStart, BracketEnd);
-            return true;
-        }
+        public override Position TotalPosition() => new(BracketStart, BracketEnd);
 
         public abstract override string PrettyPrint(int ident = 0);
     }
@@ -180,39 +161,14 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}[{string.Join(", ", Values)}]";
         }
 
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            result = new Position(BracketLeft, BracketRight);
-            return true;
-
-            if (Values.Count == 0) { result = position; return false; }
-            bool clean = Values[0].TryGetTotalPosition(out result);
-            for (int i = 1; i < Values.Count; i++)
-            {
-                clean = Values[i].TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
-            return clean;
-        }
-
-        internal override void SetPosition()
-        {
-            Values[0].SetPosition();
-            Position position = Values[0].position;
-            foreach (var item in Values)
-            {
-                item.SetPosition();
-                position.Extend(item);
-            }
-            this.position = position;
-        }
+        public override Position TotalPosition() => new(BracketLeft, BracketRight);
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_NewVariable : Statement, IDefinition
     {
-        public TypeToken type;
-        public Token variableName;
+        public TypeToken Type;
+        public Token VariableName;
         /// <summary>
         /// <b>The value is:</b>
         /// <seealso cref="Parser.ExpectExpression"/><br/>
@@ -244,41 +200,28 @@ namespace IngameCoding.BBCode.Parser.Statements
         /// </item>
         /// </list>
         /// </summary>
-        internal Statement initialValue;
-        internal bool IsRef;
+        internal Statement InitialValue;
+        internal Token ReferenceKeyword;
+        internal bool IsReference => ReferenceKeyword != null;
 
         public string FilePath { get; set; }
 
         public override string ToString()
         {
-            return $"{type.text}{(type.IsList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? " = ..." : "")}";
+            return $"{Type.text}{(Type.IsList ? "[]" : "")}{(IsReference ? " ref" : "")} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{type.text}{(type.IsList ? "[]" : "")}{(IsRef ? " ref" : "")} {variableName}{((initialValue != null) ? $" = {initialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{Type.text}{(Type.IsList ? "[]" : "")}{(IsReference ? " ref" : "")} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
         }
 
-        internal override void SetPosition()
+        public override Position TotalPosition()
         {
-            position = type.GetPosition();
-            if (initialValue != null)
-            {
-                initialValue.SetPosition();
-                position.Extend(initialValue);
-            }
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            bool clean = true;
-            result = new(type, variableName);
-            if (initialValue != null)
-            {
-                clean = initialValue.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
-            return clean;
+            Position result = new(Type, VariableName);
+            if (InitialValue != null)
+            { result.Extend(InitialValue.TotalPosition()); }
+            return result;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -286,10 +229,10 @@ namespace IngameCoding.BBCode.Parser.Statements
     {
         string[] namespacePath;
         readonly string[] targetNamespacePath;
-        public Token functionNameT;
-        internal string FunctionName => functionNameT.text;
-        public List<Statement> parameters = new();
-        internal bool IsMethodCall;
+        public Token Identifier;
+        internal string FunctionName => Identifier.text;
+        public List<Statement> Parameters = new();
+        internal bool IsMethodCall => PrevStatement != null;
         public Statement PrevStatement;
 
         internal Statement[] MethodParameters
@@ -297,8 +240,8 @@ namespace IngameCoding.BBCode.Parser.Statements
             get
             {
                 if (PrevStatement == null)
-                { return parameters.ToArray(); }
-                var newList = new List<Statement>(parameters.ToArray());
+                { return Parameters.ToArray(); }
+                var newList = new List<Statement>(Parameters.ToArray());
                 newList.Insert(0, PrevStatement);
                 return newList.ToArray();
             }
@@ -311,20 +254,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 string val = "";
                 for (int i = 0; i < namespacePath.Length; i++)
-                {
-                    if (val.Length > 0)
-                    {
-                        val += "." + namespacePath[i].ToString();
-                    }
-                    else
-                    {
-                        val = namespacePath[i].ToString();
-                    }
-                }
-                if (val.Length > 0)
-                {
-                    val += ".";
-                }
+                { val += namespacePath[i].ToString() + "."; }
                 return val;
             }
             set
@@ -341,29 +271,15 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 string val = "";
                 for (int i = 0; i < targetNamespacePath.Length; i++)
-                {
-                    if (val.Length > 0)
-                    {
-                        val += "." + targetNamespacePath[i].ToString();
-                    }
-                    else
-                    {
-                        val = targetNamespacePath[i].ToString();
-                    }
-                }
-                if (val.Length > 0)
-                {
-                    val += ".";
-                }
+                { val += targetNamespacePath[i].ToString() + "."; }
                 return val;
             }
         }
 
-        public Statement_FunctionCall(string[] namespacePath, string[] targetNamespacePath, bool isMethodCall = false)
+        public Statement_FunctionCall(string[] namespacePath, string[] targetNamespacePath)
         {
             this.namespacePath = namespacePath;
             this.targetNamespacePath = targetNamespacePath;
-            this.IsMethodCall = isMethodCall;
         }
 
         public override string ToString()
@@ -374,33 +290,21 @@ namespace IngameCoding.BBCode.Parser.Statements
         public override string PrettyPrint(int ident = 0)
         {
             List<string> parameters = new();
-            foreach (var arg in this.parameters)
+            foreach (var arg in this.Parameters)
             {
                 parameters.Add(arg.PrettyPrint());
             }
             return $"{" ".Repeat(ident)}{TargetNamespacePathPrefix}{FunctionName}({(string.Join(", ", parameters))})";
         }
 
-        internal override void SetPosition()
+        public override Position TotalPosition()
         {
-            position = functionNameT.GetPosition();
-            foreach (var item in parameters)
-            {
-                item.SetPosition();
-                position.Extend(item);
-            }
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            bool clean = true;
-            result = new(functionNameT);
+            Position result = new(Identifier);
             foreach (var item in MethodParameters)
             {
-                clean = item.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
+                result.Extend(item.TotalPosition());
             }
-            return clean;
+            return result;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -579,120 +483,97 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
-        internal override void SetPosition() { }
-
-        public override bool TryGetTotalPosition(out Position result)
+        public override Position TotalPosition()
         {
-            bool clean = true;
-            result = new(Operator);
+            Position result = new(Operator);
             if (Left != null)
-            {
-                clean = Left.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
+            { result.Extend(Left.TotalPosition()); }
             if (Right != null)
-            {
-                clean = Right.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
-            return clean;
+            { result.Extend(Right.TotalPosition()); }
+            return result;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Literal : StatementWithReturnValue
     {
-        public TypeToken type;
-        internal string value;
+        public TypeToken Type;
+        internal string Value;
+        /// <summary>
+        /// If there is no <c>ValueToken</c>:<br/>
+        /// i.e in <c>i++</c> statement
+        /// </summary>
+        internal Position ImagineryPosition;
         public Token ValueToken;
 
         public override string ToString()
         {
-            return $"{value}";
+            return $"{Value}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            if (type.typeName == BuiltinType.STRING)
+            if (Type.typeName == BuiltinType.STRING)
             {
-                return $"{" ".Repeat(ident)}\"{value}\"";
+                return $"{" ".Repeat(ident)}\"{Value}\"";
             }
             else
             {
-                return $"{" ".Repeat(ident)}{value}";
+                return $"{" ".Repeat(ident)}{Value}";
             }
         }
 
         public override object TryGetValue()
         {
-            if (type.IsList) return null;
+            if (Type.IsList) return null;
 
-            return type.typeName switch
+            return Type.typeName switch
             {
-                BuiltinType.INT => int.Parse(value),
-                BuiltinType.FLOAT => float.Parse(value),
-                BuiltinType.STRING => value,
-                BuiltinType.BOOLEAN => bool.Parse(value),
+                BuiltinType.INT => int.Parse(Value),
+                BuiltinType.FLOAT => float.Parse(Value),
+                BuiltinType.STRING => Value,
+                BuiltinType.BOOLEAN => bool.Parse(Value),
                 _ => null,
             };
         }
 
-        internal override void SetPosition()
-        {
-
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            if (ValueToken == null) { result = new Position(); return false; }
-            result = new Position(ValueToken);
-            return true;
-        }
+        public override Position TotalPosition() => ValueToken == null ? ImagineryPosition : new Position(ValueToken);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Variable : StatementWithReturnValue
     {
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
-        public Statement listIndex;
-        public Token variableName;
-        internal bool reference;
+        public Statement ListIndex;
+        public Token VariableName;
+        internal bool IsReference;
 
         public override string ToString()
         {
-            return $"{(reference ? "ref " : "")}{variableName.text}{((listIndex != null) ? "[...]" : "")}";
+            return $"{(IsReference ? "ref " : "")}{VariableName.text}{((ListIndex != null) ? "[...]" : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{(reference ? "ref " : "")}{variableName.text}{((listIndex != null) ? $"[{listIndex.PrettyPrint()}]" : "")}";
+            return $"{" ".Repeat(ident)}{(IsReference ? "ref " : "")}{VariableName.text}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
         }
 
         public Statement_Variable()
         {
-            this.listIndex = null;
+            this.ListIndex = null;
         }
 
-        internal override void SetPosition()
+        public override Position TotalPosition()
         {
-
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            bool clean = true;
-            result = new(variableName);
-            if (listIndex != null)
-            {
-                clean = listIndex.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
-            return clean;
+            Position result = new(VariableName);
+            if (ListIndex != null)
+            { result.Extend(ListIndex.TotalPosition()); }
+            return result;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_WhileLoop : StatementParent
     {
-        internal Statement condition;
         internal Token Keyword;
+        internal Statement Condition;
 
         public override string ToString()
         {
@@ -701,9 +582,9 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}while ({condition.PrettyPrint()}) {{\n";
+            var x = $"{" ".Repeat(ident)}while ({Condition.PrettyPrint()}) {{\n";
 
-            foreach (var statement in statements)
+            foreach (var statement in Statements)
             {
                 x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
             }
@@ -712,24 +593,15 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
 
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            result = new Position(Keyword, BracketStart, BracketEnd);
-            return true;
-        }
-
-        internal override void SetPosition()
-        {
-
-        }
+        public override Position TotalPosition() => new(Keyword, BracketStart, BracketEnd);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_ForLoop : StatementParent
     {
-        internal string name;
-        internal Statement_NewVariable variableDeclaration;
-        internal Statement condition;
-        internal Statement expression;
+        internal Token Keyword;
+        internal Statement_NewVariable VariableDeclaration;
+        internal Statement Condition;
+        internal Statement Expression;
 
         public override string ToString()
         {
@@ -738,9 +610,9 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}for ({variableDeclaration.PrettyPrint()}; {condition.PrettyPrint()}; {expression.PrettyPrint()}) {{\n";
+            var x = $"{" ".Repeat(ident)}for ({VariableDeclaration.PrettyPrint()}; {Condition.PrettyPrint()}; {Expression.PrettyPrint()}) {{\n";
 
-            foreach (var statement in statements)
+            foreach (var statement in Statements)
             {
                 x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
             }
@@ -749,19 +621,16 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
 
-        internal override void SetPosition()
-        {
-
-        }
+        public override Position TotalPosition() => new(Keyword, BracketStart, BracketEnd);
     }
     public class Statement_If : Statement
     {
-        public List<Statement_If_Part> parts = new();
+        public List<Statement_If_Part> Parts = new();
 
         public override string PrettyPrint(int ident = 0)
         {
             var x = "";
-            foreach (var part in parts)
+            foreach (var part in Parts)
             {
                 x += $"{part.PrettyPrint(ident)}\n";
             }
@@ -772,22 +641,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             return x;
         }
 
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            result = new Position(parts[0].BracketStart, parts[^1].BracketEnd);
-            return true;
-        }
-
-        internal override void SetPosition()
-        {
-
-        }
+        public override Position TotalPosition() => new(Parts[0].BracketStart, Parts[^1].BracketEnd);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public abstract class Statement_If_Part : StatementParent
     {
-        public IfPart Type;
         internal Token Keyword;
+        public IfPart Type;
 
         public enum IfPart
         {
@@ -801,23 +661,22 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{Keyword} {((Type != IfPart.Else) ? "(...)" : "")} {{...}}";
         }
 
-        public override bool TryGetTotalPosition(out Position result)
-        { throw new NotImplementedException(); }
+        public override Position TotalPosition() => new(Keyword, BracketStart, BracketEnd);
 
         public abstract override string PrettyPrint(int ident = 0);
     }
     public class Statement_If_If : Statement_If_Part
     {
-        internal Statement condition;
+        internal Statement Condition;
 
         public Statement_If_If()
         { Type = IfPart.If; }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}if ({condition.PrettyPrint()}) {{\n";
+            var x = $"{" ".Repeat(ident)}if ({Condition.PrettyPrint()}) {{\n";
 
-            foreach (var statement in statements)
+            foreach (var statement in Statements)
             {
                 x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
             }
@@ -825,35 +684,25 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
-
-        internal override void SetPosition()
-        {
-
-        }
     }
     public class Statement_If_ElseIf : Statement_If_Part
     {
-        internal Statement condition;
+        internal Statement Condition;
 
         public Statement_If_ElseIf()
         { Type = IfPart.ElseIf; }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}elseif ({condition.PrettyPrint()}) {{\n";
+            var x = $"{" ".Repeat(ident)}elseif ({Condition.PrettyPrint()}) {{\n";
 
-            foreach (var statement in statements)
+            foreach (var statement in Statements)
             {
                 x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
             }
 
             x += $"{" ".Repeat(ident)}}}";
             return x;
-        }
-
-        internal override void SetPosition()
-        {
-
         }
     }
     public class Statement_If_Else : Statement_If_Part
@@ -865,7 +714,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             var x = $"{" ".Repeat(ident)}else {{\n";
 
-            foreach (var statement in statements)
+            foreach (var statement in Statements)
             {
                 x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
             }
@@ -873,18 +722,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             x += $"{" ".Repeat(ident)}}}";
             return x;
         }
-
-        internal override void SetPosition()
-        {
-
-        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_NewStruct : StatementWithReturnValue
     {
         readonly string[] namespacePath;
         readonly string[] targetNamespacePath;
-        public Token structName;
+        public Token StructName;
 
         /// <returns> "[library].[...].[library]." </returns>
         public string NamespacePathPrefix
@@ -943,61 +787,43 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"new {TargetNamespacePathPrefix}{structName}()";
+            return $"new {TargetNamespacePathPrefix}{StructName}()";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{structName}()";
+            return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{StructName}()";
         }
 
-        internal override void SetPosition()
-        {
-
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            result = new Position(structName);
-            return true;
-        }
+        public override Position TotalPosition() => new(StructName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Index : StatementWithReturnValue
     {
-        internal readonly Statement indexStatement;
+        internal readonly Statement Expression;
         internal Statement PrevStatement;
 
         public Statement_Index(Statement indexStatement)
         {
-            this.indexStatement = indexStatement;
+            this.Expression = indexStatement;
         }
 
         public override string ToString()
         {
-            return $"[{indexStatement}]";
+            return $"[{Expression}]";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"[{indexStatement.PrettyPrint()}]";
+            return $"[{Expression.PrettyPrint()}]";
         }
 
-        internal override void SetPosition()
+        public override Position TotalPosition()
         {
-            indexStatement.SetPosition();
-            this.position = indexStatement.position;
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            bool clean = indexStatement.TryGetTotalPosition(out result);
+            Position result = Expression.TotalPosition();
             if (PrevStatement != null)
-            {
-                clean = PrevStatement.TryGetTotalPosition(out var p) && clean;
-                result.Extend(p);
-            }
-            return clean;
+            { result.Extend(PrevStatement.TotalPosition()); }
+            return result;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -1016,16 +842,11 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{PrevStatement.PrettyPrint()}.{FieldName}";
         }
 
-        internal override void SetPosition()
+        public override Position TotalPosition()
         {
-
-        }
-
-        public override bool TryGetTotalPosition(out Position result)
-        {
-            bool clean = PrevStatement.TryGetTotalPosition(out result);
+            Position result = PrevStatement.TotalPosition();
             result.Extend(new Position(FieldName));
-            return clean;
+            return result;
         }
     }
 

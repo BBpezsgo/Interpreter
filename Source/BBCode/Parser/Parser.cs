@@ -497,10 +497,10 @@ namespace IngameCoding.BBCode
                 foreach (var item in this.GlobalVariables)
                 {
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"{item.type} ");
+                    Console.Write($"{item.Type} ");
 
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"{item.variableName}");
+                    Console.Write($"{item.VariableName}");
 
                     Console.Write("\n\r");
 
@@ -584,37 +584,37 @@ namespace IngameCoding.BBCode
                             statementCount++;
                             if (st is Statement_ForLoop st0)
                             {
-                                AddStatement(st0.condition);
-                                AddStatement(st0.variableDeclaration);
-                                AddStatement(st0.expression);
+                                AddStatement(st0.Condition);
+                                AddStatement(st0.VariableDeclaration);
+                                AddStatement(st0.Expression);
                             }
                             else if (st is Statement_WhileLoop st1)
                             {
-                                AddStatement(st1.condition);
+                                AddStatement(st1.Condition);
                             }
                             else if (st is Statement_FunctionCall st2)
                             {
-                                foreach (var st3 in st2.parameters)
+                                foreach (var st3 in st2.Parameters)
                                 {
                                     AddStatement(st3);
                                 }
                             }
                             else if (st is Statement_If_If st3)
                             {
-                                AddStatement(st3.condition);
+                                AddStatement(st3.Condition);
                             }
                             else if (st is Statement_If_ElseIf st4)
                             {
-                                AddStatement(st4.condition);
+                                AddStatement(st4.Condition);
                             }
                             else if (st is Statement_Index st5)
                             {
-                                AddStatement(st5.indexStatement);
+                                AddStatement(st5.Expression);
                                 statementCount++;
                             }
                             else if (st is Statement_NewVariable st6)
                             {
-                                if (st6.initialValue != null) AddStatement(st6.initialValue);
+                                if (st6.InitialValue != null) AddStatement(st6.InitialValue);
                             }
                             else if (st is Statement_Operator st7)
                             {
@@ -624,7 +624,7 @@ namespace IngameCoding.BBCode
 
                             if (st is StatementParent st8)
                             {
-                                foreach (var item in st8.statements)
+                                foreach (var item in st8.Statements)
                                 {
                                     AddStatement(st);
                                 }
@@ -790,7 +790,6 @@ namespace IngameCoding.BBCode
                 { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) }
             };
             readonly Dictionary<string, int> operators = new();
-            bool enableThisKeyword;
             readonly List<string> CurrentNamespace = new();
 
             List<Warning> Warnings;
@@ -1331,9 +1330,8 @@ namespace IngameCoding.BBCode
 
                 Statement_Variable variableNameStatement = new()
                 {
-                    variableName = variableName,
-                    reference = true,
-                    position = variableName.GetPosition(),
+                    VariableName = variableName,
+                    IsReference = true,
                 };
 
                 variableName.Analysis.Subtype = TokenSubtype.VariableName;
@@ -1355,7 +1353,6 @@ namespace IngameCoding.BBCode
                 listValue = new Statement_ListValue()
                 {
                     Values = new List<Statement>(),
-                    position = o0.GetPosition(),
                     BracketLeft = o0,
                 };
 
@@ -1398,9 +1395,8 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        value = CurrentToken.text,
-                        type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
-                        position = CurrentToken.GetPosition(),
+                        Value = CurrentToken.text,
+                        Type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
                         ValueToken = CurrentToken,
                     };
 
@@ -1413,9 +1409,8 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        value = CurrentToken.text,
-                        type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
-                        position = CurrentToken.GetPosition(),
+                        Value = CurrentToken.text,
+                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
                         ValueToken = CurrentToken,
                     };
 
@@ -1428,13 +1423,10 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        value = CurrentToken.text,
-                        type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
-                        position = CurrentToken.GetPosition(),
+                        Value = CurrentToken.text,
+                        Type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
                         ValueToken = CurrentToken,
                     };
-
-                    literal.position.Extend(CurrentToken.AbsolutePosition.Start - 1, CurrentToken.AbsolutePosition.End + 1);
 
                     currentTokenIndex++;
 
@@ -1445,9 +1437,8 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        value = "true",
-                        type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
-                        position = tTrue.GetPosition(),
+                        Value = "true",
+                        Type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
                         ValueToken = CurrentToken,
                     };
 
@@ -1460,9 +1451,8 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        value = "false",
-                        type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
-                        position = tFalse.GetPosition(),
+                        Value = "false",
+                        Type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
                         ValueToken = CurrentToken,
                     };
 
@@ -1485,10 +1475,7 @@ namespace IngameCoding.BBCode
                     var st = ExpectOneValue();
                     if (ExpectOperator("]") != null)
                     {
-                        statement = new Statement_Index(st)
-                        {
-                            position = token0.GetPosition()
-                        };
+                        statement = new Statement_Index(st);
                         return true;
                     }
                     else
@@ -1588,17 +1575,14 @@ namespace IngameCoding.BBCode
 
                     Statement_NewStruct newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                     {
-                        structName = structName,
-                        position = structName.GetPosition(),
+                        StructName = structName,
                     };
-
-                    newStructStatement.position.Extend(newIdentifier);
 
                     returnStatement = newStructStatement;
                 }
                 else if (ExpectIdentifier(out Token variableName) != null)
                 {
-                    if (variableName.text == "this" && !enableThisKeyword)
+                    if (variableName.text == "this")
                     { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
 
                     if (ExpectOperator("(") != null)
@@ -1610,8 +1594,7 @@ namespace IngameCoding.BBCode
                     {
                         Statement_Variable variableNameStatement = new()
                         {
-                            variableName = variableName,
-                            position = variableName.GetPosition()
+                            VariableName = variableName,
                         };
 
                         if (variableName.text == "this")
@@ -1641,7 +1624,6 @@ namespace IngameCoding.BBCode
                             var fieldStatement = new Statement_Field()
                             {
                                 FieldName = fieldName,
-                                position = fieldName.GetPosition(),
                                 PrevStatement = returnStatement
                             };
                             returnStatement = fieldStatement;
@@ -1690,15 +1672,15 @@ namespace IngameCoding.BBCode
                     }
                     else if (statement is Statement_Literal)
                     {
-                        throw new SyntaxException("Unexpected kind of statement", statement.position);
+                        throw new SyntaxException("Unexpected kind of statement", statement.TotalPosition());
                     }
                     else if (statement is Statement_Variable)
                     {
-                        throw new SyntaxException("Unexpected kind of statement", statement.position);
+                        throw new SyntaxException("Unexpected kind of statement", statement.TotalPosition());
                     }
                     else if (statement is Statement_NewStruct)
                     {
-                        throw new SyntaxException("Unexpected kind of statement", statement.position);
+                        throw new SyntaxException("Unexpected kind of statement", statement.TotalPosition());
                     }
                     else
                     {
@@ -1713,7 +1695,7 @@ namespace IngameCoding.BBCode
                         }
 
                         if (ExpectOperator(";") == null)
-                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
+                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
                     }
 
                     endlessSafe++;
@@ -1730,16 +1712,9 @@ namespace IngameCoding.BBCode
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                bool IsRef = false;
                 if (ExpectIdentifier("ref", out var tRef) != null)
                 {
-                    if (enableRefKeyword)
-                    {
-                        throw new NotImplementedException();
-                        // IsRef = true;
-                    }
-                    else
-                    { Errors.Add(new Error("Keyword 'ref' is not valid in the current context", tRef)); }
+                    Errors.Add(new Error("Keyword 'ref' is not valid in the current context", tRef));
                 }
 
                 Token possibleVariableName = ExpectIdentifier();
@@ -1750,24 +1725,21 @@ namespace IngameCoding.BBCode
 
                 Statement_NewVariable statement = new()
                 {
-                    variableName = possibleVariableName,
-                    type = possibleType,
-                    IsRef = IsRef,
-                    position = possibleVariableName.GetPosition(),
+                    VariableName = possibleVariableName,
+                    Type = possibleType,
+                    ReferenceKeyword = tRef,
                 };
 
                 if (structNotFoundWarning != null)
                 { Warnings.Add(structNotFoundWarning); }
 
-                statement.position.Extend(possibleType.AbsolutePosition.Start, possibleVariableName.AbsolutePosition.End);
-
                 if (ExpectOperator("=", out var eqT) != null)
                 {
-                    statement.initialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
+                    statement.InitialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
                 }
                 else
                 {
-                    if (IsRef)
+                    if (tRef != null)
                     { throw new SyntaxException("Initial value for reference variable declaration is requied", tRef); }
                     if (possibleType.typeName == BuiltinType.AUTO)
                     { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType); }
@@ -1791,32 +1763,31 @@ namespace IngameCoding.BBCode
                 { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
                 if (ExpectOperator(";") == null)
-                { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.position); }
+                { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition()); }
 
                 Statement condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
                 if (ExpectOperator(";") == null)
-                { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.position); }
+                { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.TotalPosition()); }
 
                 Statement expression = ExpectExpression();
                 if (expression == null)
                 { throw new SyntaxException("Expected expression after \"for\" condition", tokenZarojel); }
 
                 if (ExpectOperator(")", out Token tokenZarojel2) == null)
-                { throw new SyntaxException("Expected ')' after \"for\" condition", condition.position); }
+                { throw new SyntaxException("Expected ')' after \"for\" condition", condition.TotalPosition()); }
 
                 if (ExpectOperator("{", out var braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"for\" condition", tokenZarojel2); }
 
                 Statement_ForLoop forStatement = new()
                 {
-                    name = tokenFor.text,
-                    variableDeclaration = variableDeclaration,
-                    condition = condition,
-                    expression = expression,
-                    position = tokenFor.GetPosition(),
+                    Keyword = tokenFor,
+                    VariableDeclaration = variableDeclaration,
+                    Condition = condition,
+                    Expression = expression,
                     BracketStart = braceletStart,
                 };
 
@@ -1826,9 +1797,9 @@ namespace IngameCoding.BBCode
                     var statement = ExpectStatement();
                     if (statement == null) break;
                     if (ExpectOperator(";") == null)
-                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
 
-                    forStatement.statements.Add(statement);
+                    forStatement.Statements.Add(statement);
 
                     endlessSafe++;
                     if (endlessSafe > 500)
@@ -1855,7 +1826,7 @@ namespace IngameCoding.BBCode
                 { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
 
                 if (ExpectOperator(")", out Token tokenZarojel2) == null)
-                { throw new SyntaxException("Expected ')' after \"while\" condition", condition.position); }
+                { throw new SyntaxException("Expected ')' after \"while\" condition", condition.TotalPosition()); }
 
                 if (ExpectOperator("{", out Token braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"while\" condition", tokenZarojel2); }
@@ -1863,8 +1834,7 @@ namespace IngameCoding.BBCode
                 Statement_WhileLoop whileStatement = new()
                 {
                     Keyword = tokenWhile,
-                    condition = condition,
-                    position = tokenWhile.GetPosition(),
+                    Condition = condition,
                     BracketStart = braceletStart,
                 };
 
@@ -1873,10 +1843,10 @@ namespace IngameCoding.BBCode
                 {
                     var statement = ExpectStatement();
                     if (ExpectOperator(";") == null)
-                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.position)); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.TotalPosition())); }
                     if (statement == null) break;
 
-                    whileStatement.statements.Add(statement);
+                    whileStatement.Statements.Add(statement);
 
                     endlessSafe++;
                     if (endlessSafe > 500)
@@ -1892,18 +1862,14 @@ namespace IngameCoding.BBCode
                 if (ifStatement == null) return null;
 
                 Statement_If statement = new();
-                statement.parts.Add(ifStatement);
-
-                statement.position.Start.Line = ifStatement.position.Start.Line;
-                statement.position.Extend(ifStatement.position.AbsolutePosition);
+                statement.Parts.Add(ifStatement);
 
                 int endlessSafe = 0;
                 while (true)
                 {
                     Statement_If_Part elseifStatement = ExpectIfSegmentStatement("elseif", Statement_If_Part.IfPart.ElseIf);
                     if (elseifStatement == null) break;
-                    statement.parts.Add(elseifStatement);
-                    statement.position.Extend(elseifStatement.position.AbsolutePosition);
+                    statement.Parts.Add(elseifStatement);
 
                     endlessSafe++;
                     if (endlessSafe > 100)
@@ -1913,8 +1879,7 @@ namespace IngameCoding.BBCode
                 Statement_If_Part elseStatement = ExpectIfSegmentStatement("else", Statement_If_Part.IfPart.Else, false);
                 if (elseStatement != null)
                 {
-                    statement.parts.Add(elseStatement);
-                    statement.position.Extend(elseStatement.position.AbsolutePosition);
+                    statement.Parts.Add(elseStatement);
                 }
 
                 return statement;
@@ -1937,7 +1902,7 @@ namespace IngameCoding.BBCode
                     { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel); }
 
                     if (ExpectOperator(")", out _) == null)
-                    { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.position); }
+                    { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.TotalPosition()); }
                 }
                 if (ExpectOperator("{", out Token braceletStart) == null)
                 { throw new SyntaxException("Expected '{' after \"" + ifSegmentName + "\" condition", tokenIf); }
@@ -1950,8 +1915,7 @@ namespace IngameCoding.BBCode
                         ifStatement = new Statement_If_If()
                         {
                             Keyword = tokenIf,
-                            condition = condition,
-                            position = tokenIf.GetPosition(),
+                            Condition = condition,
                             BracketStart = braceletStart,
                         };
                         break;
@@ -1959,8 +1923,7 @@ namespace IngameCoding.BBCode
                         ifStatement = new Statement_If_ElseIf()
                         {
                             Keyword = tokenIf,
-                            condition = condition,
-                            position = tokenIf.GetPosition(),
+                            Condition = condition,
                             BracketStart = braceletStart,
                         };
                         break;
@@ -1968,7 +1931,6 @@ namespace IngameCoding.BBCode
                         ifStatement = new Statement_If_Else()
                         {
                             Keyword = tokenIf,
-                            position = tokenIf.GetPosition(),
                             BracketStart = braceletStart,
                         };
                         break;
@@ -1986,10 +1948,10 @@ namespace IngameCoding.BBCode
                         if (statement == null)
                         { throw new SyntaxException("Expected a statement", CurrentToken); }
                         else
-                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.position)); }
+                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
                     }
 
-                    ifStatement.statements.Add(statement);
+                    ifStatement.Statements.Add(statement);
 
                     endlessSafe++;
                     if (endlessSafe > 500)
@@ -2053,10 +2015,9 @@ namespace IngameCoding.BBCode
 
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
 
-                methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>(), true)
+                methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>())
                 {
-                    functionNameT = possibleFunctionName,
-                    position = possibleFunctionName.GetPosition(),
+                    Identifier = possibleFunctionName,
                 };
 
                 bool expectParameter = false;
@@ -2066,24 +2027,17 @@ namespace IngameCoding.BBCode
                 {
                     Statement parameter = ExpectReference() ?? ExpectExpression();
                     if (parameter == null)
-                    { throw new SyntaxException("Expected expression as parameter", methodCall.position); }
+                    { throw new SyntaxException("Expected expression as parameter", methodCall.TotalPosition()); }
 
-                    methodCall.position.Extend(parameter.position.AbsolutePosition);
-
-                    methodCall.parameters.Add(parameter);
+                    methodCall.Parameters.Add(parameter);
 
                     if (ExpectOperator(")", out Token outToken0) != null)
-                    {
-                        methodCall.position.Extend(outToken0.AbsolutePosition);
-                        break;
-                    }
+                    { break; }
 
                     if (ExpectOperator(",", out Token operatorVesszo) == null)
-                    { throw new SyntaxException("Expected ',' to separate parameters", parameter.position); }
+                    { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
                     else
                     { expectParameter = true; }
-
-                    methodCall.position.Extend(operatorVesszo.AbsolutePosition);
 
                     endlessSafe++;
                     if (endlessSafe > 100)
@@ -2166,10 +2120,7 @@ namespace IngameCoding.BBCode
                         text = o0.text.Replace("=", ""),
                         Position = o0.Position,
                         type = o0.type,
-                    }, leftStatement, valueToAssign)
-                    {
-                        position = o0.GetPosition(),
-                    };
+                    }, leftStatement, valueToAssign);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
@@ -2178,10 +2129,7 @@ namespace IngameCoding.BBCode
                         text = "=",
                         Position = o0.Position,
                         type = o0.type,
-                    }, leftStatement, statementToAssign)
-                    {
-                        position = o0.GetPosition(),
-                    };
+                    }, leftStatement, statementToAssign);
 
                     return operatorCall;
                 }
@@ -2189,9 +2137,9 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literalOne = new()
                     {
-                        value = "1",
-                        type = types["int"],
-                        position = t0.GetPosition(),
+                        Value = "1",
+                        Type = types["int"],
+                        ImagineryPosition = t0.GetPosition(),
                     };
 
                     Statement_Operator statementToAssign = new(new Token()
@@ -2201,10 +2149,7 @@ namespace IngameCoding.BBCode
                         text = "+",
                         Position = t0.Position,
                         type = t0.type,
-                    }, leftStatement, literalOne)
-                    {
-                        position = t0.GetPosition(),
-                    };
+                    }, leftStatement, literalOne);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
@@ -2213,10 +2158,7 @@ namespace IngameCoding.BBCode
                         text = "=",
                         Position = t0.Position,
                         type = t0.type,
-                    }, leftStatement, statementToAssign)
-                    {
-                        position = t0.GetPosition(),
-                    };
+                    }, leftStatement, statementToAssign);
 
                     return operatorCall;
                 }
@@ -2224,9 +2166,9 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literalOne = new()
                     {
-                        value = "1",
-                        type = types["int"],
-                        position = t1.GetPosition(),
+                        Value = "1",
+                        Type = types["int"],
+                        ImagineryPosition = t0.GetPosition(),
                     };
 
                     Statement_Operator statementToAssign = new(new Token()
@@ -2236,10 +2178,7 @@ namespace IngameCoding.BBCode
                         text = "-",
                         Position = t1.Position,
                         type = t1.type,
-                    }, leftStatement, literalOne)
-                    {
-                        position = t1.GetPosition(),
-                    };
+                    }, leftStatement, literalOne);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
@@ -2248,10 +2187,7 @@ namespace IngameCoding.BBCode
                         text = "=",
                         Position = t1.Position,
                         type = t1.type,
-                    }, leftStatement, statementToAssign)
-                    {
-                        position = t1.GetPosition(),
-                    };
+                    }, leftStatement, statementToAssign);
 
                     return operatorCall;
                 }
@@ -2285,30 +2221,21 @@ namespace IngameCoding.BBCode
                     {
                         if (rightmostStatement is Statement_Operator rightmostOperator)
                         {
-                            Statement_Operator operatorCall = new(op, rightmostOperator.Right, rightStatement)
-                            {
-                                position = op.GetPosition()
-                            };
+                            Statement_Operator operatorCall = new(op, rightmostOperator.Right, rightStatement);
 
 
                             rightmostOperator.Right = operatorCall;
                         }
                         else
                         {
-                            Statement_Operator operatorCall = new(op, leftStatement, rightStatement)
-                            {
-                                position = op.GetPosition()
-                            };
+                            Statement_Operator operatorCall = new(op, leftStatement, rightStatement);
 
                             leftStatement = operatorCall;
                         }
                     }
                     else
                     {
-                        Statement_Operator operatorCall = new(op, leftStatement, rightStatement)
-                        {
-                            position = op.GetPosition()
-                        };
+                        Statement_Operator operatorCall = new(op, leftStatement, rightStatement);
 
                         leftStatement = operatorCall;
                     }
@@ -2376,8 +2303,7 @@ namespace IngameCoding.BBCode
 
                 Statement_FunctionCall functionCall = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                 {
-                    functionNameT = possibleFunctionName,
-                    position = possibleFunctionName.GetPosition(),
+                    Identifier = possibleFunctionName,
                 };
 
                 bool expectParameter = false;
@@ -2387,18 +2313,15 @@ namespace IngameCoding.BBCode
                 {
                     Statement parameter = ExpectReference() ?? ExpectExpression();
                     if (parameter == null)
-                    { throw new SyntaxException("Expected expression as parameter", functionCall.position); }
+                    { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
-                    functionCall.parameters.Add(parameter);
+                    functionCall.Parameters.Add(parameter);
 
                     if (ExpectOperator(")", out Token outToken0) != null)
-                    {
-                        functionCall.position.Extend(outToken0.AbsolutePosition);
-                        break;
-                    }
+                    { break; }
 
                     if (ExpectOperator(",", out Token operatorVesszo) == null)
-                    { throw new SyntaxException("Expected ',' to separate parameters", parameter.position); }
+                    { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
                     else
                     { expectParameter = true; }
 
@@ -2446,28 +2369,28 @@ namespace IngameCoding.BBCode
                     Statement parameter = ExpectExpression();
                     if (parameter == null)
                     {
-                        throw new SyntaxException("Expected expression as parameter", methodCall.position);
+                        throw new SyntaxException("Expected expression as parameter", methodCall.Position);
                     }
 
 
-                    methodCall.position.Extend(parameter.position.AbsolutePosition);
+                    methodCall.Position.Extend(parameter.Position.AbsolutePosition);
 
                     methodCall.parameters.Add(parameter);
 
                     if (ExpectOperator(")", out Token outToken0) != null)
                     {
-                        methodCall.position.Extend(outToken0.AbsolutePosition);
+                        methodCall.Position.Extend(outToken0.AbsolutePosition);
                         break;
                     }
 
                     if (ExpectOperator(",", out Token operatorVesszo) == null)
                     {
-                        throw new SyntaxException("Expected ',' to separate parameters", parameter.position);
+                        throw new SyntaxException("Expected ',' to separate parameters", parameter.Position);
                     }
                     else
                     { expectParameter = true; }
 
-                    methodCall.position.Extend(operatorVesszo.AbsolutePosition);
+                    methodCall.Position.Extend(operatorVesszo.AbsolutePosition);
 
                     endlessSafe++;
                     if (endlessSafe > 100) { throw new EndlessLoopException(); }
@@ -2493,19 +2416,18 @@ namespace IngameCoding.BBCode
 
                 Statement_FunctionCall functionCall = new(Array.Empty<string>(), Array.Empty<string>())
                 {
-                    functionNameT = possibleFunctionName,
-                    position = possibleFunctionName.GetPosition(),
+                    Identifier = possibleFunctionName,
                 };
 
                 if (canHaveParameters)
                 {
                     Statement parameter = ExpectExpression();
                     if (parameter == null && needParameters)
-                    { throw new SyntaxException("Expected expression as parameter", functionCall.position); }
+                    { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
                     if (parameter != null)
                     {
-                        functionCall.parameters.Add(parameter);
+                        functionCall.Parameters.Add(parameter);
                     }
                 }
                 return functionCall;

@@ -101,7 +101,7 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string? CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
@@ -294,7 +294,7 @@ namespace TheProgram
             public bool LogDebugs;
             public bool LogSystem;
             public RunType RunType;
-            public string? CompileOutput;
+            public string CompileOutput;
             public CompressionLevel compressionLevel;
         }
 

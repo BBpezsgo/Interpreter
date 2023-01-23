@@ -111,7 +111,9 @@ namespace TheProgram
 
     public abstract class Data_Serializable<TOriginal>
     {
+#pragma warning disable IDE0060 // Remove unused parameter
         internal Data_Serializable(TOriginal v) { }
+#pragma warning restore IDE0060 // Remove unused parameter
     }
 
     internal class Data_CodeInterpreterDetails : Data_Serializable<Interpreter.InterpreterDetails>

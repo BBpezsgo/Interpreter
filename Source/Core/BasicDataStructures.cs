@@ -1,6 +1,7 @@
 ﻿using IngameCoding.BBCode;
 
 using System;
+using System.Diagnostics;
 
 namespace IngameCoding.Core
 {
@@ -92,7 +93,7 @@ namespace IngameCoding.Core
         internal void Extend(Range<int> absolutePosition) => AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
         internal void Extend(int start, int end) => AbsolutePosition.Extend(start, end);
         internal void Extend(Tokenizer.BaseToken token) => AbsolutePosition.Extend(token.AbsolutePosition);
-        internal void Extend(BBCode.Parser.Statements.Statement statement) => AbsolutePosition.Extend(statement.position.AbsolutePosition);
+        internal void Extend(BBCode.Parser.Statements.Statement statement) => AbsolutePosition.Extend(statement.TotalPosition().AbsolutePosition);
     
         public string ToMinString()
         {
@@ -102,11 +103,8 @@ namespace IngameCoding.Core
         }
     }
 
-#pragma warning disable CS0660
-#pragma warning disable CS0661
-    public struct SinglePosition
-#pragma warning restore CS0660
-#pragma warning restore CS0661
+    [DebuggerDisplay($"{{{nameof(ToMinString)}(),nq}}")]
+    public struct SinglePosition : IEquatable<SinglePosition>
     {
         public int Line;
         public int Character;
@@ -136,6 +134,9 @@ namespace IngameCoding.Core
 
         public override string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
         public string ToMinString() => $"{Line}:{Character}";
+        public override bool Equals(object obj) => obj is SinglePosition position && Equals(position);
+        public bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
+        public override int GetHashCode() => HashCode.Combine(Line, Character);
     }
 
     public struct Range<T>

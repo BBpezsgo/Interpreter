@@ -25,7 +25,7 @@ namespace IngameCoding.BBCode
         public ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
         public ParserResult? parserResult;
         public Compiler.Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
-        public Compiler.Compiler.CompilerResult? compilerResult;
+        public Compiler.Compiler.CompilerResult compilerResult;
         public Warning[] Warnings;
         public Hint[] Hints;
         public Information[] Informations;

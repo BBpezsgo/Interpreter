@@ -64,8 +64,7 @@ namespace IngameCoding.Errors
         public Exception(string message, Statement statement, string file) : base(message)
         {
             this.File = file;
-            if (!statement.TryGetTotalPosition(out var pos)) throw new System.Exception($"Failed to get {statement.GetType().Name} position");
-            this.position = pos;
+            this.position = statement.TotalPosition();
         }
 
         public Exception(string message, System.Exception inner) : base(message, inner) { }

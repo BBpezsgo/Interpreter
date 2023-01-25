@@ -23,6 +23,7 @@ namespace IngameCoding.BBCode
         BuiltinType,
         Hash,
         HashParameter,
+        Class,
     }
 
     public enum BuiltinType
@@ -143,17 +144,16 @@ namespace IngameCoding.BBCode
             public Token name;
             public TypeToken type;
 
-            public bool withRefKeyword;
             public bool withThisKeyword;
 
             public override string ToString()
             {
-                return $"{(this.withRefKeyword ? "ref " : "")}{type} {name}";
+                return $"{type} {name}";
             }
 
             internal string PrettyPrint(int ident = 0)
             {
-                return $"{" ".Repeat(ident)}{(this.withRefKeyword ? "ref " : "")}{type} {name}";
+                return $"{" ".Repeat(ident)}{type} {name}";
             }
         }
 
@@ -269,6 +269,80 @@ namespace IngameCoding.BBCode
             public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
         }
 
+        public class ClassDefinition : Exportable, IDefinition
+        {
+            public readonly FunctionDefinition.Attribute[] Attributes;
+            public readonly Token Name;
+            /// <summary><c>[Namespace].[...].Name</c></summary>
+            public string FullName => NamespacePathString + Name.text;
+            public Token BracketStart;
+            public Token BracketEnd;
+            public List<Statement> Statements;
+            public string FilePath { get; set; }
+            public readonly string[] NamespacePath;
+            /// <summary><c>[Namespace].[...].</c></summary>
+            string NamespacePathString
+            {
+                get
+                {
+                    string result = "";
+                    for (int i = 0; i < NamespacePath.Length; i++)
+                    {
+                        if (result.Length > 0)
+                        {
+                            result += "." + NamespacePath[i].ToString();
+                        }
+                        else
+                        {
+                            result = NamespacePath[i].ToString();
+                        }
+                    }
+                    if (result.Length > 0)
+                    {
+                        result += ".";
+                    }
+                    return result;
+                }
+            }
+            public readonly ParameterDefinition[] Fields;
+            public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
+            readonly Dictionary<string, FunctionDefinition> methods;
+
+            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<ParameterDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
+            {
+                this.Name = name;
+                this.Fields = fields.ToArray();
+                this.methods = new Dictionary<string, FunctionDefinition>(methods);
+                this.Attributes = attributes.ToArray();
+                this.NamespacePath = namespacePath.ToArray();
+                this.Statements = new List<Statement>();
+            }
+
+            public override string ToString()
+            {
+                return $"class {this.Name.text} " + "{...}";
+            }
+
+            public string PrettyPrint(int ident = 0)
+            {
+                List<string> fields = new();
+                foreach (var field in this.Fields)
+                {
+                    fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
+                }
+
+                List<string> methods = new();
+                foreach (var method in this.methods)
+                {
+                    methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
+                }
+
+                return $"{" ".Repeat(ident)}class {this.Name.text} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
+            }
+
+            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+        }
+
         public class StructDefinition : Exportable, IDefinition
         {
             public readonly FunctionDefinition.Attribute[] Attributes;
@@ -368,6 +442,7 @@ namespace IngameCoding.BBCode
         {
             public readonly List<FunctionDefinition> Functions;
             public readonly Dictionary<string, StructDefinition> Structs;
+            public readonly Dictionary<string, ClassDefinition> Classes;
             public readonly List<Statement_NewVariable> GlobalVariables;
             public readonly List<UsingDefinition> Usings;
             public readonly Statement_HashInfo[] Hashes;
@@ -377,7 +452,7 @@ namespace IngameCoding.BBCode
             /// </summary>
             public readonly List<NamespaceDefinition> Namespaces;
 
-            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes)
+            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes, Dictionary<string, ClassDefinition> classes)
             {
                 Functions = functions;
                 GlobalVariables = globalVariables;
@@ -386,6 +461,7 @@ namespace IngameCoding.BBCode
                 UsingsAnalytics = new();
                 Namespaces = namespaces;
                 Hashes = hashes.ToArray();
+                Classes = classes;
             }
 
             /// <summary>Converts the parsed AST into text</summary>
@@ -406,6 +482,11 @@ namespace IngameCoding.BBCode
                 foreach (var @struct in Structs)
                 {
                     x += @struct.Value.PrettyPrint() + "\n";
+                }
+
+                foreach (var @class in Classes)
+                {
+                    x += @class.Value.PrettyPrint() + "\n";
                 }
 
                 foreach (var function in Functions)
@@ -535,6 +616,32 @@ namespace IngameCoding.BBCode
                     Console.ResetColor();
                 }
 
+                foreach (var item in this.Classes)
+                {
+                    foreach (var attr in item.Value.Attributes)
+                    { Attribute(attr); }
+
+                    Console.ForegroundColor = ConsoleColor.Blue;
+                    Console.Write("class ");
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.Write($"{item.Key} ");
+                    Console.Write("\n\r");
+
+                    foreach (var field in item.Value.Fields)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.Write($"  {field.type} ");
+
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write($"{field.name}");
+
+                        Console.Write("\n\r");
+                    }
+
+                    Console.Write("\n\r");
+                    Console.ResetColor();
+                }
+
                 Console.WriteLine("");
 
                 foreach (var item in this.Functions)
@@ -565,8 +672,6 @@ namespace IngameCoding.BBCode
                         Console.ForegroundColor = ConsoleColor.Blue;
                         if (param.withThisKeyword)
                         { Console.Write("this "); }
-                        if (param.withRefKeyword)
-                        { Console.Write("ref "); }
                         if (param.type.typeName == BuiltinType.STRUCT)
                         { Console.ForegroundColor = ConsoleColor.Green; }
                         Console.Write($"{param.type} ");
@@ -798,6 +903,7 @@ namespace IngameCoding.BBCode
             // === Result ===
             readonly List<FunctionDefinition> Functions = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
+            readonly Dictionary<string, ClassDefinition> Classes = new();
             readonly List<Statement_NewVariable> GlobalVariables = new();
             readonly List<UsingDefinition> Usings = new();
             readonly List<NamespaceDefinition> Namespaces = new();
@@ -873,7 +979,7 @@ namespace IngameCoding.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes);
+                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes, this.Classes);
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -1044,15 +1150,16 @@ namespace IngameCoding.BBCode
             {
                 if (ExpectNamespaceDefinition()) { }
                 else if (ExpectStructDefinition()) { }
+                else if (ExpectClassDefinition()) { }
                 else if (ExpectFunctionDefinition()) { }
                 else if (ExpectGlobalVariable()) { }
                 else
-                { throw new SyntaxException($"Expected global variable or namespace/struct/function definition. Got a token {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected global variable or namespace/type/function definition. Got a token {CurrentToken}", CurrentToken); }
             }
 
             bool ExpectGlobalVariable()
             {
-                var possibleVariable = ExpectVariableDeclaration(false);
+                var possibleVariable = ExpectVariableDeclaration();
                 if (possibleVariable != null)
                 {
                     GlobalVariables.Add(possibleVariable);
@@ -1123,9 +1230,6 @@ namespace IngameCoding.BBCode
                         { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
                     }
 
-                    Token referenceKeywordT = ExpectIdentifier("ref");
-                    if (referenceKeywordT != null) referenceKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
-
                     TypeToken possibleParameterType = ExceptTypeToken(false, true);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
@@ -1140,7 +1244,6 @@ namespace IngameCoding.BBCode
                     {
                         type = possibleParameterType,
                         name = possibleParameterNameT,
-                        withRefKeyword = referenceKeywordT != null,
                         withThisKeyword = thisKeywordT != null,
                     };
                     function.Parameters.Add(parameterDefinition);
@@ -1209,6 +1312,82 @@ namespace IngameCoding.BBCode
                 }
                 else
                 { throw new SyntaxException("Expected namespace name", possibleNamespaceIdentifier); }
+            }
+
+            bool ExpectClassDefinition()
+            {
+                int startTokenIndex = currentTokenIndex;
+
+                List<FunctionDefinition.Attribute> attributes = new();
+                while (ExpectAttribute(out var attr))
+                {
+                    bool alreadyHave = false;
+                    foreach (var attribute in attributes)
+                    {
+                        if (attribute.Name == attr.Name)
+                        {
+                            alreadyHave = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyHave)
+                    {
+                        attributes.Add(attr);
+                    }
+                    else
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Name)); }
+                }
+
+                Token ExportKeyword = ExpectIdentifier("export");
+
+                Token keyword = ExpectIdentifier("class");
+                if (keyword == null)
+                { currentTokenIndex = startTokenIndex; return false; }
+
+                Token possibleClassName = ExpectIdentifier();
+                if (possibleClassName == null)
+                { throw new SyntaxException("Expected class identifier after keyword 'class'", keyword); }
+
+                if (ExpectOperator("{", out var braceletStart) == null)
+                { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
+
+                possibleClassName.Analysis.Subtype = TokenSubtype.Class;
+                keyword.Analysis.Subtype = TokenSubtype.Keyword;
+
+                List<ParameterDefinition> fields = new();
+                Dictionary<string, FunctionDefinition> methods = new();
+
+                int endlessSafe = 0;
+                Token braceletEnd;
+                while (ExpectOperator("}", out braceletEnd) == null)
+                {
+                    ParameterDefinition field = ExpectField();
+                    if (field == null)
+                    { throw new SyntaxException($"Expected field definition", CurrentToken); }
+
+                    fields.Add(field);
+                    if (ExpectOperator(";") == null)
+                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+
+                    endlessSafe++;
+                    if (endlessSafe > 50)
+                    {
+                        throw new EndlessLoopException();
+                    }
+                }
+
+                ClassDefinition classDefinition = new(CurrentNamespace, possibleClassName, attributes, fields, methods)
+                {
+                    BracketStart = braceletStart,
+                    BracketEnd = braceletEnd,
+                    ExportKeyword = ExportKeyword,
+                };
+
+                Classes.Add(classDefinition.FullName, classDefinition);
+
+                Warnings.Add(new Warning($"Class is experimental feature!", keyword));
+
+                return true;
             }
 
             bool ExpectStructDefinition()
@@ -1304,39 +1483,6 @@ namespace IngameCoding.BBCode
                 Structs.Add(structDefinition.FullName, structDefinition);
 
                 return true;
-            }
-
-            Statement_Variable ExpectReference()
-            {
-                if (ExpectIdentifier("ref", out var refKeyword) == null)
-                { return null; }
-
-                refKeyword.Analysis.Subtype = TokenSubtype.Keyword;
-
-                if (ExpectIdentifier(out Token variableName) == null)
-                { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
-
-                if (variableName.text == "this")
-                { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
-
-                if (ExpectOperator("(") != null)
-                { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
-
-                if (ExpectOperator(".") != null)
-                { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
-
-                if (ExpectOperator("[") != null)
-                { throw new SyntaxException("Expected variable name after 'ref' keyword", refKeyword); }
-
-                Statement_Variable variableNameStatement = new()
-                {
-                    VariableName = variableName,
-                    IsReference = true,
-                };
-
-                variableName.Analysis.Subtype = TokenSubtype.VariableName;
-
-                return variableNameStatement;
             }
 
             #endregion
@@ -1705,17 +1851,12 @@ namespace IngameCoding.BBCode
                 return statements;
             }
 
-            Statement_NewVariable ExpectVariableDeclaration(bool enableRefKeyword)
+            Statement_NewVariable ExpectVariableDeclaration()
             {
                 int startTokenIndex = currentTokenIndex;
                 TypeToken possibleType = ExceptTypeToken(out var structNotFoundWarning);
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
-
-                if (ExpectIdentifier("ref", out var tRef) != null)
-                {
-                    Errors.Add(new Error("Keyword 'ref' is not valid in the current context", tRef));
-                }
 
                 Token possibleVariableName = ExpectIdentifier();
                 if (possibleVariableName == null)
@@ -1727,7 +1868,6 @@ namespace IngameCoding.BBCode
                 {
                     VariableName = possibleVariableName,
                     Type = possibleType,
-                    ReferenceKeyword = tRef,
                 };
 
                 if (structNotFoundWarning != null)
@@ -1739,8 +1879,6 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    if (tRef != null)
-                    { throw new SyntaxException("Initial value for reference variable declaration is requied", tRef); }
                     if (possibleType.typeName == BuiltinType.AUTO)
                     { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType); }
                 }
@@ -1758,7 +1896,7 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("(", out Token tokenZarojel) == null)
                 { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor); }
 
-                var variableDeclaration = ExpectVariableDeclaration(false);
+                var variableDeclaration = ExpectVariableDeclaration();
                 if (variableDeclaration == null)
                 { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
@@ -1990,7 +2128,7 @@ namespace IngameCoding.BBCode
                 statement ??= ExpectKeywordCall("return", true);
                 statement ??= ExpectKeywordCall("break");
                 statement ??= ExpectIfStatement();
-                statement ??= ExpectVariableDeclaration(true);
+                statement ??= ExpectVariableDeclaration();
                 statement ??= ExpectExpression();
                 return statement;
             }
@@ -2025,7 +2163,7 @@ namespace IngameCoding.BBCode
                 int endlessSafe = 0;
                 while (ExpectOperator(")") == null || expectParameter)
                 {
-                    Statement parameter = ExpectReference() ?? ExpectExpression();
+                    Statement parameter = ExpectExpression();
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", methodCall.TotalPosition()); }
 
@@ -2311,7 +2449,7 @@ namespace IngameCoding.BBCode
                 int endlessSafe = 0;
                 while (ExpectOperator(")") == null || expectParameter)
                 {
-                    Statement parameter = ExpectReference() ?? ExpectExpression();
+                    Statement parameter = ExpectExpression();
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
@@ -2760,14 +2898,19 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.text, out var s))
                         {
-                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT, possibleType); ;
+                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT, possibleType);
+                            newType.Analysis.Subtype = TokenSubtype.Struct;
+                        }
+                        else if (TryGetClass(possibleType.text, out var c))
+                        {
+                            newType = new TypeToken(c.FullName, BuiltinType.STRUCT, possibleType);
+                            newType.Analysis.Subtype = TokenSubtype.Class;
                         }
                         else
                         {
                             newType = new TypeToken(possibleType.text, BuiltinType.STRUCT, possibleType);
-                            warning = new Warning($"Struct '{possibleType.text}' not found", possibleType);
+                            warning = new Warning($"Type '{possibleType.text}' not found", possibleType);
                         }
-                        newType.Analysis.Subtype = TokenSubtype.Struct;
                     }
 
                     if (newType == null)
@@ -2796,9 +2939,17 @@ namespace IngameCoding.BBCode
             }
             TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExceptTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
 
-            bool TryGetStruct(string structName, out StructDefinition @struct)
+            bool TryGetStruct(string name, out StructDefinition @struct)
             {
-                if (Structs.TryGetValue(structName, out @struct))
+                if (Structs.TryGetValue(name, out @struct))
+                {
+                    return true;
+                }
+                return false;
+            }
+            bool TryGetClass(string name, out ClassDefinition @class)
+            {
+                if (Classes.TryGetValue(name, out @class))
                 {
                     return true;
                 }

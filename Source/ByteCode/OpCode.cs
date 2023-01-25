@@ -33,18 +33,6 @@
         /// </summary>
         STORE_VALUE_R,
 
-        LOAD_VALUE_AS_REF,
-        STORE_VALUE_AS_REF,
-
-        /// <summary>
-        /// LOAD_VALUE_BASEPOINTER_RELATIVE_AS_REF
-        /// </summary>
-        LOAD_VALUE_BR_AS_REF,
-        /// <summary>
-        /// STORE_VALUE_BASEPOINTER_RELATIVE_AS_REF
-        /// </summary>
-        STORE_VALUE_BR_AS_REF,
-
         CALL,
         RETURN,
 
@@ -145,5 +133,6 @@
         /// Replaces the last element with its own recursive copy
         /// </summary>
         COPY_VALUE_RECURSIVE,
+        STORE_FIELD_R,
     }
 }

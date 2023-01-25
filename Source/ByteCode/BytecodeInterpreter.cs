@@ -15,6 +15,7 @@ namespace IngameCoding.Bytecode
             public int BasePointer => bytecodeInterpreter.CPU.MU.BasePointer;
             public int[] ReturnAddressStack => bytecodeInterpreter.CPU.MU.ReturnAddressStack.ToArray();
             public DataItem[] Stack => bytecodeInterpreter.CPU.MU.Stack.ToArray();
+            public DataItem[] Heap => bytecodeInterpreter.CPU.MU.Heap.ToArray();
             public int StackMemorySize => bytecodeInterpreter.CPU.MU.Stack.UsedVirtualMemory;
 
             public InterpreterDetails(BytecodeInterpreter bytecodeInterpreter)

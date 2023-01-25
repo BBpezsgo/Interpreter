@@ -337,6 +337,7 @@ namespace IngameCoding.BBCode.Compiler
         public BuiltinType type;
         public string structName;
         public TypeToken ListOf;
+        public bool IsStoredInHEAP;
         public bool IsList => ListOf != null;
         public Statement_NewVariable Declaration;
 
@@ -347,6 +348,7 @@ namespace IngameCoding.BBCode.Compiler
             this.structName = string.Empty;
             this.ListOf = listOf;
             this.Declaration = declaration;
+            this.IsStoredInHEAP = false;
         }
 
         public CompiledVariable(int offset, string structName, TypeToken listOf, Statement_NewVariable declaration)
@@ -356,6 +358,7 @@ namespace IngameCoding.BBCode.Compiler
             this.structName = structName;
             this.ListOf = listOf;
             this.Declaration = declaration;
+            this.IsStoredInHEAP = false;
         }
 
         public string Type
@@ -400,26 +403,40 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
+    public class CompiledClass : ClassDefinition
+    {
+        internal Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
+        {
+            this.CompiledAttributes = compiledAttributes;
+
+            base.FilePath = definition.FilePath;
+            base.BracketEnd = definition.BracketEnd;
+            base.BracketStart = definition.BracketStart;
+            base.Statements = definition.Statements;
+            base.ExportKeyword = definition.ExportKeyword;
+        }
+    }
+
     class Parameter
     {
         public int index;
         public string name;
-        public bool isReference;
         readonly int allParamCount;
         public readonly string type;
 
-        public Parameter(int index, string name, bool isReference, int allParamCount, string type)
+        public Parameter(int index, string name, int allParamCount, string type)
         {
             this.index = index;
             this.name = name;
-            this.isReference = isReference;
             this.allParamCount = allParamCount;
             this.type = type;
         }
 
         public override string ToString()
         {
-            return $"{((isReference) ? "ref " : "")} {index} {name}";
+            return $"{index} {name}";
         }
 
         public int RealIndex

@@ -1,6 +1,6 @@
-﻿using System;
+﻿using "../CodeFiles/System.bbc";
 
-struct Foo
+class Foo
 {
   int v;
 }

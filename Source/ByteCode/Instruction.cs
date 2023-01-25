@@ -245,14 +245,14 @@ namespace IngameCoding.Bytecode
                     return new DataItem(deserializer.DeserializeBoolean(), tag);
                 case DataItem.Type.STRUCT:
                     string[] fieldNames = deserializer.DeserializeArray<string>();
-                    DataItem[] fieldValues = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
-                    Dictionary<string, DataItem> fields = new Dictionary<string, DataItem>();
+                    DataItem[] fieldValues = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                    Dictionary<string, DataItem> fields = new();
                     for (int i = 0; i < fieldNames.Length; i++)
                     { fields.Add(fieldNames[i], fieldValues[i]); }
-                    return new DataItem(new DataItem.Struct(fields), tag);
+                    return new DataItem(new DataItem.Struct(fields, null), tag);
                 case DataItem.Type.LIST:
                     var itemTypes = (DataItem.Type)deserializer.DeserializeInt32();
-                    var items = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
+                    var items = deserializer.DeserializeObjectArray(DeserializeDataItem);
                     var newList = new DataItem.List(itemTypes);
                     for (int i = 0; i < items.Length; i++)
                     { newList.Add(items[i]); }
@@ -300,11 +300,11 @@ namespace IngameCoding.Bytecode
             else if (parameterType == 6)
             {
                 string[] fieldNames = deserializer.DeserializeArray<string>();
-                DataItem[] fieldValues = deserializer.DeserializeObjectArray<DataItem>(DeserializeDataItem);
-                Dictionary<string, DataItem> fields = new Dictionary<string, DataItem>();
+                DataItem[] fieldValues = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                Dictionary<string, DataItem> fields = new();
                 for (int i = 0; i < fieldNames.Length; i++)
                 { fields.Add(fieldNames[i], fieldValues[i]); }
-                this.parameter = new DataItem.Struct(fields);
+                this.parameter = new DataItem.Struct(fields, null);
             }
             else if (parameterType == 7)
             {

@@ -13,15 +13,15 @@ namespace TheProgram
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-code-optimization.bbc";
+            var file = "test-heap.bbc";
             if (args.Length == 0) args = new string[]
             {
-                // "-throw-errors",
-                "-c-print-instructions true",
+                 "-throw-errors",
+                 "-c-print-instructions true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
-                "-c-generate-comments false",
-                "-no-debug-info",
+                // "-c-generate-comments false",
+                // "-no-debug-info",
                 // "-dont-optimize",
                 // "-test",
                 // "-decompile",

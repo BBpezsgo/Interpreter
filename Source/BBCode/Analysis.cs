@@ -135,6 +135,7 @@ namespace IngameCoding.BBCode
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
+            Dictionary<string, ClassDefinition> Classes = new();
             List<Statement_HashInfo> Hashes = new(parserResult.Hashes);
 
             parserResult.UsingsAnalytics.Clear();
@@ -247,10 +248,14 @@ namespace IngameCoding.BBCode
             {
                 Structs.Add(@struct.Key, @struct.Value);
             }
+            foreach (var @class in parserResult.Classes)
+            {
+                Classes.Add(@class.Key, @class.Value);
+            }
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = hints, informations = informations };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default);
 
             var compilerResult = new Compiler.Compiler.CompilerResult()
             {

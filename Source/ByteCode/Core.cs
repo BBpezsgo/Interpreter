@@ -6,6 +6,8 @@ namespace IngameCoding.Bytecode
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
+    using System.Linq;
+
     #region CPU
 
     internal class CentralProcessingUnit
@@ -31,7 +33,7 @@ namespace IngameCoding.Bytecode
 
             MU = new(
                 new DataStack() { cpu = this },
-                new HEAP(),
+                new HEAP(10),
                 code
             )
             {
@@ -104,6 +106,7 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOAD_FIELD: return LOAD_FIELD();
                 case Opcode.STORE_FIELD: return STORE_FIELD();
                 case Opcode.LOAD_FIELD_R: return LOAD_FIELD_R();
+                case Opcode.STORE_FIELD_R: return STORE_FIELD_R();
                 case Opcode.LOAD_FIELD_BR: return LOAD_FIELD_BR();
                 case Opcode.STORE_FIELD_BR: return STORE_FIELD_BR();
                 case Opcode.CALL: return CALL();
@@ -131,10 +134,6 @@ namespace IngameCoding.Bytecode
                 case Opcode.LIST_PULL_ITEM: return LIST_PULL_ITEM();
                 case Opcode.LIST_REMOVE_ITEM: return LIST_REMOVE_ITEM();
                 case Opcode.TYPE_GET: return TYPE_GET();
-                case Opcode.LOAD_VALUE_AS_REF: return LOAD_VALUE_AS_REF();
-                case Opcode.STORE_VALUE_AS_REF: return STORE_VALUE_AS_REF();
-                case Opcode.LOAD_VALUE_BR_AS_REF: return LOAD_VALUE_BR_AS_REF();
-                case Opcode.STORE_VALUE_BR_AS_REF: return STORE_VALUE_BR_AS_REF();
                 case Opcode.LOGIC_NOT: return LOGIC_NOT();
                 case Opcode.HEAP_GET: return HEAP_GET();
                 case Opcode.HEAP_SET: return HEAP_SET();
@@ -220,49 +219,6 @@ namespace IngameCoding.Bytecode
             MU.Step();
 
             return 3;
-        }
-
-        int STORE_VALUE_AS_REF()
-        {
-            MU.Stack.Set(MU.Stack.Get((int)MU.CurrentInstruction.parameter).GetRefIndex(), MU.Stack.Last());
-            MU.Stack.RemoveAt(MU.Stack.Count - 1);
-            MU.Step();
-
-            return 3;
-        }
-        int LOAD_VALUE_AS_REF()
-        {
-            var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter);
-            item.ValueRef = (int)MU.CurrentInstruction.parameter;
-            MU.Stack.Push(item, null);
-            MU.Step();
-
-            return 4;
-        }
-
-        int STORE_VALUE_BR_AS_REF()
-        {
-            var index = (int)MU.CurrentInstruction.parameter + MU.BasePointer;
-            var item = MU.Stack.Get(index);
-            var refIndex = item.GetRefIndex();
-            if (refIndex == -1)
-            {
-                refIndex = index;
-            }
-            MU.Stack.Set(refIndex, MU.Stack.Last());
-            MU.Stack.Pop();
-            MU.Step();
-
-            return 5;
-        }
-        int LOAD_VALUE_BR_AS_REF()
-        {
-            var item = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.BasePointer);
-            item.ValueRef = (int)MU.CurrentInstruction.parameter + MU.BasePointer;
-            MU.Stack.Push(item, null);
-            MU.Step();
-
-            return 4;
         }
 
         int TYPE_GET()
@@ -687,6 +643,27 @@ namespace IngameCoding.Bytecode
             return 4;
         }
 
+        int STORE_FIELD_R()
+        {
+            if (MU.CurrentInstruction.additionParameter.Length == 0)
+            { throw new InternalException("No field name given"); }
+
+            DataItem valueToSet = MU.Stack.Pop();
+            string fieldToSet = MU.CurrentInstruction.additionParameter;
+            var structItem = MU.Stack.Get((int)MU.CurrentInstruction.parameter + MU.Stack.Count).ValueStruct;
+
+            if (!structItem.HaveField(fieldToSet))
+            { throw new RuntimeException("Field " + fieldToSet + " doesn't exists in this struct."); }
+
+            structItem.SetField(fieldToSet, structItem.GetField(fieldToSet).TrySet(valueToSet));
+
+            MU.Stack.Set((int)MU.CurrentInstruction.parameter + MU.Stack.Count, new DataItem(structItem, null));
+
+            MU.Step();
+
+            return 7;
+        }
+
         int STORE_FIELD()
         {
             if (MU.CurrentInstruction.additionParameter.Length == 0)
@@ -1001,6 +978,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
+            item.heap = this.cpu.MU.Heap;
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
@@ -1008,6 +986,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
+            item.heap = this.cpu.MU.Heap;
             item.Tag = tag;
             this.stack.Add(item);
         }
@@ -1051,6 +1030,7 @@ namespace IngameCoding.Bytecode
         {
             DataItem item = val;
             item.stack = this;
+            item.heap = this.cpu.MU.Heap;
             if (!overrideTag)
             {
                 item.Tag = stack[index].Tag;
@@ -1075,30 +1055,41 @@ namespace IngameCoding.Bytecode
             get => heap[i];
             set => heap[i] = value;
         }
+
+        internal void Set(int address, int v) => heap[address].ValueInt = v;
+        internal void Set(int address, float v) => heap[address].ValueFloat = v;
+        internal void Set(int address, bool v) => heap[address].ValueBoolean = v;
+        internal void Set(int address, string v) => heap[address].ValueString = v;
+        internal void Set(int address, IStruct v) => heap[address].ValueStruct = v;
+        internal void Set(int address, DataItem.List v) => heap[address].ValueList = v;
+
+        internal DataItem[] ToArray() => heap.ToList().ToArray();
     }
 
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public struct DataItem
     {
-        const int MaxReferenceDepth = 16;
-
         public class UnassignedStruct : IStruct
         {
+            public string Name => throw new RuntimeException("Struct is null");
             public bool HaveField(string field) => throw new RuntimeException("Struct is null");
             public void SetField(string field, DataItem value) => throw new RuntimeException("Struct is null");
             public DataItem GetField(string field) => throw new RuntimeException("Struct is null");
             public IStruct Copy() => new UnassignedStruct();
             public IStruct CopyRecursive() => new UnassignedStruct();
 
-            public override string ToString() => "struct {...}";
+            public override string ToString() => "struct {null}";
         }
 
         public class Struct : IStruct
         {
             internal readonly Dictionary<string, DataItem> fields = new();
 
-            public Struct(Dictionary<string, DataItem> fields)
-            { this.fields = fields; }
+            readonly string name;
+            public string Name => name;
+
+            public Struct(Dictionary<string, DataItem> fields, string name)
+            { this.fields = fields; this.name = name; }
 
             public bool HaveField(string field) => fields.ContainsKey(field);
             public void SetField(string field, DataItem value) => fields[field] = value;
@@ -1110,7 +1101,7 @@ namespace IngameCoding.Bytecode
                 foreach (var field in this.fields)
                 { fieldsClone.Add(field.Key, field.Value); }
 
-                return new Struct(fieldsClone);
+                return new Struct(fieldsClone, name);
             }
             public IStruct CopyRecursive()
             {
@@ -1119,7 +1110,7 @@ namespace IngameCoding.Bytecode
                 foreach (var field in this.fields)
                 { fieldsClone.Add(field.Key, field.Value.Copy()); }
 
-                return new Struct(fieldsClone);
+                return new Struct(fieldsClone, name);
             }
 
             public override string ToString() => "struct {...}";
@@ -1214,13 +1205,13 @@ namespace IngameCoding.Bytecode
         bool? valueBoolean;
         IStruct valueStruct;
         List valueList;
-        int? valueRef;
 
         #endregion
 
-        bool IsReference;
+        internal bool IsHeapAddress;
 
         internal DataStack stack;
+        internal HEAP heap;
 
         #region Value Properties
 
@@ -1229,13 +1220,14 @@ namespace IngameCoding.Bytecode
             get
             {
                 if (type == Type.INT)
-                { return GetRef().valueInt.Value; }
+                { return valueInt.Value; }
 
-                throw new RuntimeException("Can't cast " + type.ToString() + " to INT");
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to integer");
             }
             set
             {
-                SetRef(value);
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueInt = value;
             }
         }
         public float ValueFloat
@@ -1246,11 +1238,12 @@ namespace IngameCoding.Bytecode
                 {
                     return valueFloat.Value;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString() + " to FLOAT");
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to float");
             }
             set
             {
-                SetRef(value);
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueFloat = value;
             }
         }
         public string ValueString
@@ -1261,11 +1254,12 @@ namespace IngameCoding.Bytecode
                 {
                     return valueString;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString() + " to STRING");
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to string");
             }
             set
             {
-                SetRef(value);
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueString = value;
             }
         }
         public bool ValueBoolean
@@ -1276,11 +1270,12 @@ namespace IngameCoding.Bytecode
                 {
                     return valueBoolean.Value;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString() + " to BOOLEAN");
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to boolean");
             }
             set
             {
-                SetRef(value);
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueBoolean = value;
             }
         }
         public IStruct ValueStruct
@@ -1291,11 +1286,12 @@ namespace IngameCoding.Bytecode
                 {
                     return valueStruct;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString() + " to STRUCT");
+                throw new RuntimeException($"Can't cast {type.ToString().ToLower()} to {(valueStruct != null ? valueStruct is not UnassignedStruct ? valueStruct.Name ?? "struct" : "struct" : "struct")}");
             }
             set
             {
-                SetRef(value);
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueStruct = value;
             }
         }
         public List ValueList
@@ -1306,176 +1302,12 @@ namespace IngameCoding.Bytecode
                 {
                     return valueList;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString() + " to LIST");
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + $" to {(valueList != null ? $"{valueList.ToString().ToString().ToLower()}[]" : "list")}");
             }
             set
             {
-                SetRef(value);
-            }
-        }
-        public int ValueRef
-        {
-            get
-            {
-                if (IsReference) return valueRef.Value;
-                throw new RuntimeException("Can't cast " + type.ToString() + " to REF");
-            }
-            set
-            {
-                this.IsReference = true;
-
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = value;
-            }
-        }
-
-        #endregion
-
-        #region Get/Set Ref
-
-        DataItem GetRef(int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                return stack.Get(ValueRef).GetRef(currentDepth + 1);
-            }
-            else
-            {
-                return this;
-            }
-        }
-        void SetRef(int value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.INT;
-                this.valueInt = value;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-            }
-        }
-        void SetRef(float value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.FLOAT;
-                this.valueInt = null;
-                this.valueFloat = value;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-            }
-        }
-        void SetRef(string value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.STRING;
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = value;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-            }
-        }
-        void SetRef(bool value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.BOOLEAN;
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = value;
-                this.valueStruct = null;
-                this.valueList = null;
-                this.valueRef = null;
-            }
-        }
-        void SetRef(IStruct value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.STRUCT;
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = value;
-                this.valueList = null;
-                this.valueRef = null;
-            }
-        }
-        void SetRef(List value, int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                stack[ValueRef].SetRef(value, currentDepth + 1);
-            }
-            else
-            {
-                this.type = Type.LIST;
-                this.valueInt = null;
-                this.valueFloat = null;
-                this.valueString = null;
-                this.valueBoolean = null;
-                this.valueStruct = null;
-                this.valueList = value;
-                this.valueRef = null;
+                if (IsHeapAddress) heap.Set(valueInt.Value, value);
+                else valueList = value;
             }
         }
 
@@ -1486,11 +1318,11 @@ namespace IngameCoding.Bytecode
 
         #region Constructors
 
-        public DataItem(int value, string tag)
+        public DataItem(int value, string tag, bool isHeapAddress = false)
         {
             this.type = Type.INT;
 
-            this.IsReference = false;
+            this.IsHeapAddress = isHeapAddress;
 
             this.valueInt = value;
             this.valueFloat = null;
@@ -1498,9 +1330,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1508,7 +1340,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.FLOAT;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = value;
@@ -1516,9 +1348,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1526,7 +1358,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.STRING;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1534,9 +1366,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1544,7 +1376,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.BOOLEAN;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1552,9 +1384,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = value;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1562,7 +1394,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.STRUCT;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1570,9 +1402,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = value;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1580,7 +1412,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.LIST;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1588,9 +1420,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = value;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1598,7 +1430,7 @@ namespace IngameCoding.Bytecode
         {
             this.type = Type.INT;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1606,7 +1438,6 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             switch (type1.typeName)
             {
@@ -1634,6 +1465,7 @@ namespace IngameCoding.Bytecode
             }
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
         }
@@ -1646,7 +1478,7 @@ namespace IngameCoding.Bytecode
 
             this.type = Type.INT;
 
-            this.IsReference = false;
+            this.IsHeapAddress = false;
 
             this.valueInt = null;
             this.valueFloat = null;
@@ -1654,9 +1486,9 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueStruct = null;
             this.valueList = null;
-            this.valueRef = null;
 
             this.stack = null;
+            this.heap = null;
 
             this.Tag = tag;
 
@@ -2228,34 +2060,17 @@ namespace IngameCoding.Bytecode
 
         #endregion
 
-        public int GetRefIndex(int currentDepth = 0)
-        {
-            if (currentDepth >= MaxReferenceDepth)
-            { throw new RuntimeException("Reference depth exceeded"); }
-
-            if (IsReference)
-            {
-                var x = stack.Get(ValueRef).GetRefIndex(currentDepth + 1);
-                if (x == -1)
-                { return ValueRef; }
-                else
-                { throw new RuntimeException("Reference not found"); }
-            }
-            else
-            { return -1; }
-        }
-
         public string ToStringValue()
         {
             string retStr = type switch
             {
-                Type.INT => (IsReference ? "ref " : "") + ValueInt.ToString(),
-                Type.FLOAT => (IsReference ? "ref " : "") + ValueFloat.ToString().Replace(',', '.'),
-                Type.STRING => (IsReference ? "ref " : "") + ValueString,
-                Type.BOOLEAN => (IsReference ? "ref " : "") + ValueBoolean.ToString(),
-                Type.STRUCT => (IsReference ? "ref " : "") + "{ ... }",
-                Type.LIST => (IsReference ? "ref " : "") + "[ ... ]",
-                Type.RUNTIME => (IsReference ? "ref " : "") + "<RUNTIME>",
+                Type.INT => ValueInt.ToString(),
+                Type.FLOAT => ValueFloat.ToString().Replace(',', '.'),
+                Type.STRING => ValueString,
+                Type.BOOLEAN => ValueBoolean.ToString(),
+                Type.STRUCT => "{ ... }",
+                Type.LIST => "[ ... ]",
+                Type.RUNTIME => "<RUNTIME>",
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             return retStr;
@@ -2265,12 +2080,12 @@ namespace IngameCoding.Bytecode
         {
             string retStr = type switch
             {
-                Type.INT => IsReference ? $"ref <{ValueRef}>" : ValueInt.ToString(),
-                Type.FLOAT => IsReference ? $"ref <{ValueRef}>" : ValueFloat.ToString().Replace(',', '.') + "f",
-                Type.STRING => IsReference ? $"ref <{ValueRef}>" : $"\"{ValueString}\"",
-                Type.BOOLEAN => IsReference ? $"ref <{ValueRef}>" : ValueBoolean.ToString(),
-                Type.STRUCT => IsReference ? $"ref <{ValueRef}>" : $"{ValueStruct.GetType().Name} {{...}}",
-                Type.LIST => IsReference ? $"ref <{ValueRef}>" : "[...]",
+                Type.INT => ValueInt.ToString(),
+                Type.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
+                Type.STRING => $"\"{ValueString}\"",
+                Type.BOOLEAN => ValueBoolean.ToString(),
+                Type.STRUCT => $"{ValueStruct.GetType().Name} {{...}}",
+                Type.LIST => "[...]",
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             if (!string.IsNullOrEmpty(this.Tag))
@@ -2290,8 +2105,7 @@ namespace IngameCoding.Bytecode
             hash.Add(valueBoolean);
             hash.Add(valueStruct);
             hash.Add(valueList);
-            hash.Add(valueRef);
-            hash.Add(IsReference);
+            hash.Add(IsHeapAddress);
             return hash.ToHashCode();
         }
 
@@ -2305,8 +2119,7 @@ namespace IngameCoding.Bytecode
                    valueBoolean == item.valueBoolean &&
                    EqualityComparer<IStruct>.Default.Equals(valueStruct, item.valueStruct) &&
                    EqualityComparer<List>.Default.Equals(valueList, item.valueList) &&
-                   valueRef == item.valueRef &&
-                   IsReference == item.IsReference;
+                   IsHeapAddress == item.IsHeapAddress;
         }
 
         public DataItem Copy() => type switch
@@ -2334,6 +2147,7 @@ namespace IngameCoding.Bytecode
     }
     public interface IStruct
     {
+        public string Name { get; }
         public bool HaveField(string field);
         public void SetField(string field, DataItem value);
         public DataItem GetField(string field);

@@ -262,6 +262,7 @@ namespace IngameCoding.BBCode.Compiler
             ParserSettings parserSettings,
             Dictionary<string, FunctionDefinition> Functions,
             Dictionary<string, StructDefinition> Structs,
+            Dictionary<string, ClassDefinition> Classes,
             List<Statement_HashInfo> Hashes,
             List<Error> errors,
             List<Warning> warnings,
@@ -354,13 +355,25 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
+            foreach (var @class in parserResult2.Classes)
+            {
+                if (Classes.ContainsKey(@class.Key))
+                {
+                    errors.Add(new Error($"Class '{@class.Value.FullName}' already exists", @class.Value.Name));
+                }
+                else
+                {
+                    Classes.Add(@class.Key, @class.Value);
+                }
+            }
+
             foreach (var hash in parserResult2.Hashes)
             {
                 Hashes.Add(hash);
             }
 
             foreach (UsingDefinition using_ in parserResult2.Usings)
-            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Hashes, errors, warnings, printCallback); }
+            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Classes, Hashes, errors, warnings, printCallback); }
         }
 
         /// <summary>
@@ -404,6 +417,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
+            Dictionary<string, ClassDefinition> Classes = new();
             List<Statement_HashInfo> Hashes = new();
             List<string> AlreadyCompiledCodes = new() { file.FullName };
 
@@ -413,7 +427,7 @@ namespace IngameCoding.BBCode.Compiler
             foreach (UsingDefinition usingItem in parserResult.Usings)
             {
                 List<Error> compileErrors = new();
-                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Hashes, compileErrors, warnings, printCallback);
+                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Classes, Hashes, compileErrors, warnings, printCallback);
                 if (compileErrors.Count > 0)
                 { throw new System.Exception($"Failed to compile file {usingItem.PathString}", compileErrors[0].ToException()); }
             }
@@ -434,13 +448,17 @@ namespace IngameCoding.BBCode.Compiler
             {
                 Structs.Add(@struct.Key, @struct.Value);
             }
+            foreach (var @class in parserResult.Classes)
+            {
+                Classes.Add(@class.Key, @class.Value);
+            }
 
             DateTime codeGenerationStarted = DateTime.Now;
             printCallback?.Invoke("Generating code ...", TerminalInterpreter.LogType.Debug);
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug);
 

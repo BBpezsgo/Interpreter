@@ -96,6 +96,7 @@ namespace IngameCoding.BBCode.Compiler
         bool BlockCodeGeneration;
 
         internal Dictionary<string, CompiledStruct> compiledStructs;
+        internal Dictionary<string, CompiledClass> compiledClasses;
         internal Dictionary<string, CompiledFunction> compiledFunctions;
         internal readonly Dictionary<string, CompiledVariable> compiledVariables = new();
         internal Dictionary<string, CompiledVariable> compiledGlobalVariables;
@@ -308,6 +309,30 @@ namespace IngameCoding.BBCode.Compiler
         bool GetCompiledStruct(string structName, out CompiledStruct compiledStruct)
         { return compiledStructs.TryGetValue(structName, out compiledStruct); }
 
+        bool GetCompiledClass(Statement_NewStruct newClassStatement, out CompiledClass compiledClass)
+        {
+            if (compiledClasses.TryGetValue(newClassStatement.StructName.text, out compiledClass))
+            {
+                return true;
+            }
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            {
+                return true;
+            }
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            {
+                return true;
+            }
+            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            {
+                return true;
+            }
+            return false;
+        }
+
+        bool GetCompiledClass(string className, out CompiledClass compiledClass)
+        { return compiledClasses.TryGetValue(className, out compiledClass); }
+
         object GenerateInitialValue(TypeToken type)
         {
             if (type.IsList)
@@ -516,9 +541,13 @@ namespace IngameCoding.BBCode.Compiler
             {
                 return structDefinition.Name.text;
             }
+            else if (GetCompiledClass(newStruct, out var classDefinition))
+            {
+                return classDefinition.Name.text;
+            }
             else
             {
-                throw new CompilerException("Unknown struct '" + newStruct.StructName.text + "'", newStruct.StructName, CurrentFile);
+                throw new CompilerException("Unknown struct/class '" + newStruct.StructName.text + "'", newStruct.StructName, CurrentFile);
             }
         }
         static string FindStatementType(TypeToken type)
@@ -545,6 +574,20 @@ namespace IngameCoding.BBCode.Compiler
                 if (strct.Key != prevStatementType) continue;
 
                 foreach (var sField in strct.Value.Fields)
+                {
+                    if (sField.name.text != field.FieldName.text) continue;
+
+                    return FindStatementType(sField.type);
+                }
+
+                break;
+            }
+
+            foreach (var @class in compiledClasses)
+            {
+                if (@class.Key != prevStatementType) continue;
+
+                foreach (var sField in @class.Value.Fields)
                 {
                     if (sField.name.text != field.FieldName.text) continue;
 
@@ -686,7 +729,10 @@ namespace IngameCoding.BBCode.Compiler
                     AddInstruction(Opcode.PUSH_VALUE, initialValue);
                 }
 
-                AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, val_.offset);
+                if (val_.IsStoredInHEAP)
+                { AddInstruction(Opcode.HEAP_SET, val_.offset); }
+                else
+                { AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, val_.offset); }
                 return;
             }
             else
@@ -1108,82 +1154,52 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            Opcode opcode = Opcode.UNKNOWN;
+            Dictionary<string, Opcode> operatorOpCodes = new()
+            {
+                { "!", Opcode.LOGIC_NOT },
+                { "+", Opcode.MATH_ADD },
+                { "<", Opcode.LOGIC_LT },
+                { ">", Opcode.LOGIC_MT },
+                { "-", Opcode.MATH_SUB },
+                { "*", Opcode.MATH_MULT },
+                { "/", Opcode.MATH_DIV },
+                { "%", Opcode.MATH_MOD },
+                { "==", Opcode.LOGIC_EQ },
+                { "!=", Opcode.LOGIC_NEQ },
+                { "&", Opcode.LOGIC_AND },
+                { "|", Opcode.LOGIC_OR },
+                { "^", Opcode.LOGIC_XOR },
+                { "<=", Opcode.LOGIC_LTEQ },
+                { ">=", Opcode.LOGIC_MTEQ },
+            };
+            Dictionary<string, int> operatorParameterCounts = new()
+            {
+                { "!", 1 },
+                { "+", 2 },
+                { "<", 2 },
+                { ">", 2 },
+                { "-", 2 },
+                { "*", 2 },
+                { "/", 2 },
+                { "%", 2 },
+                { "==", 2 },
+                { "!=", 2 },
+                { "&", 2 },
+                { "|", 2 },
+                { "^", 2 },
+                { "<=", 2 },
+                { ">=", 2 },
+            };
 
-            if (@operator.Operator.text == "!")
+
+            if (operatorOpCodes.TryGetValue(@operator.Operator.text, out Opcode opcode))
             {
-                if (@operator.ParameterCount != 1) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_NOT;
+                if (operatorParameterCounts[@operator.Operator.text] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of passed ({@operator.ParameterCount}) to operator '{@operator.Operator.text}', requied: {operatorParameterCounts[@operator.Operator.text]}", @operator.Operator, CurrentFile); }
             }
-            else if (@operator.Operator.text == "+")
+            else
             {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_ADD;
-            }
-            else if (@operator.Operator.text == "<")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_LT;
-            }
-            else if (@operator.Operator.text == ">")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_MT;
-            }
-            else if (@operator.Operator.text == "-")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_SUB;
-            }
-            else if (@operator.Operator.text == "*")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_MULT;
-            }
-            else if (@operator.Operator.text == "/")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_DIV;
-            }
-            else if (@operator.Operator.text == "%")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_MOD;
-            }
-            else if (@operator.Operator.text == "==")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_EQ;
-            }
-            else if (@operator.Operator.text == "!=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_NEQ;
-            }
-            else if (@operator.Operator.text == "&")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_AND;
-            }
-            else if (@operator.Operator.text == "|")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_OR;
-            }
-            else if (@operator.Operator.text == "^")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_XOR;
-            }
-            else if (@operator.Operator.text == "<=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_LTEQ;
-            }
-            else if (@operator.Operator.text == ">=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_MTEQ;
+                opcode = Opcode.UNKNOWN;
             }
 
             if (opcode != Opcode.UNKNOWN)
@@ -1205,12 +1221,15 @@ namespace IngameCoding.BBCode.Compiler
                     if (GetParameter(variable.VariableName.text, out Parameter parameter))
                     {
                         GenerateCodeForStatement(@operator.Right);
-                        AddInstruction(parameter.isReference ? Opcode.STORE_VALUE_BR_AS_REF : Opcode.STORE_VALUE_BR, parameter.RealIndex);
+                        AddInstruction(Opcode.STORE_VALUE_BR, parameter.RealIndex);
                     }
                     else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                     {
                         GenerateCodeForStatement(@operator.Right);
-                        AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, valueMemoryIndex.offset);
+                        if (valueMemoryIndex.IsStoredInHEAP)
+                        { AddInstruction(Opcode.HEAP_SET, valueMemoryIndex.offset); }
+                        else
+                        { AddInstruction(isGlob ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, valueMemoryIndex.offset); }
                     }
                     else
                     {
@@ -1234,8 +1253,18 @@ namespace IngameCoding.BBCode.Compiler
                         }
                         else if (GetCompiledVariable(variable1.VariableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                         {
-                            GenerateCodeForStatement(@operator.Right);
-                            AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, valueMemoryIndex.offset, field.FieldName.text);
+                            if (valueMemoryIndex.IsStoredInHEAP)
+                            {
+                                AddInstruction(Opcode.HEAP_GET, valueMemoryIndex.offset);
+                                GenerateCodeForStatement(@operator.Right);
+                                AddInstruction(Opcode.STORE_FIELD_R, -1, field.FieldName.text);
+                                AddInstruction(Opcode.HEAP_SET, valueMemoryIndex.offset);
+                            }
+                            else
+                            {
+                                GenerateCodeForStatement(@operator.Right);
+                                AddInstruction(isGlob ? Opcode.STORE_FIELD : Opcode.STORE_FIELD_BR, valueMemoryIndex.offset, field.FieldName.text);
+                            }
                         }
                         else
                         {
@@ -1311,19 +1340,16 @@ namespace IngameCoding.BBCode.Compiler
                 variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
                 variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
 
-                if (variable.IsReference)
-                { throw new CompilerException("Reference can only be applied to a variable", variable.VariableName, CurrentFile); }
-
-                AddInstruction((param.isReference) ? Opcode.LOAD_VALUE_BR_AS_REF : Opcode.LOAD_VALUE_BR, param.RealIndex);
+                AddInstruction(Opcode.LOAD_VALUE_BR, param.RealIndex);
             }
             else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val, out var isGlob_))
             {
                 variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
                 variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val.Declaration, isGlob_);
 
-                if (variable.IsReference)
+                if (val.IsStoredInHEAP)
                 {
-                    AddInstruction(isGlob_ ? Opcode.LOAD_VALUE_AS_REF : Opcode.LOAD_VALUE_BR_AS_REF, val.offset);
+                    AddInstruction(Opcode.HEAP_GET, val.offset);
                 }
                 else
                 {
@@ -1337,8 +1363,6 @@ namespace IngameCoding.BBCode.Compiler
 
             if (variable.ListIndex != null)
             {
-                if (variable.IsReference)
-                { throw new CompilerException("Reference cannot be applied to the list", variable.VariableName, CurrentFile); }
                 GenerateCodeForStatement(variable.ListIndex);
                 AddInstruction(new Instruction(Opcode.LIST_INDEX));
             }
@@ -1553,21 +1577,13 @@ namespace IngameCoding.BBCode.Compiler
                 compiledCode[item].parameter = compiledCode.Count - item;
             }
         }
-        void GenerateCodeForStatement(Statement_NewStruct newStruct)
+        void GenerateCodeForStatement(Statement_NewStruct newObject)
         {
-            newStruct.StructName.Analysis.CompilerReached = true;
+            newObject.StructName.Analysis.CompilerReached = true;
 
-            if (GetCompiledStruct(newStruct, out var structDefinition))
+            if (GetCompiledStruct(newObject, out var structDefinition))
             {
-                /*
-                if (!structDefinition.CanUse(CurrentFile))
-                {
-                    errors.Add(new Error($"The {structDefinition.Name.text} struct cannot be used due to its protection level", newStruct.structName, CurrentFile));
-                    return;
-                }
-                */
-
-                newStruct.StructName.Analysis.Reference = new TokenAnalysis.RefStruct(structDefinition);
+                newObject.StructName.Analysis.Reference = new TokenAnalysis.RefStruct(structDefinition);
 
                 if (structDefinition.IsBuiltin)
                 {
@@ -1580,78 +1596,29 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         fields.Add(structDefFieldDefinition.name.text, new DataItem(structDefFieldDefinition.type, null));
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields, structDefinition.FullName));
                 }
+            }
+            else if (GetCompiledClass(newObject, out var classDefinition))
+            {
+                newObject.StructName.Analysis.Reference = new TokenAnalysis.RefClass(classDefinition);
+
+                Dictionary<string, DataItem> fields = new();
+                foreach (ParameterDefinition classDefFieldDefinition in classDefinition.Fields)
+                {
+                    fields.Add(classDefFieldDefinition.name.text, new DataItem(classDefFieldDefinition.type, null));
+                }
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields, classDefinition.FullName));
             }
             else
             {
-                throw new CompilerException("Unknown struct '" + newStruct.StructName.text + "'", newStruct.StructName, CurrentFile);
+                throw new CompilerException("Unknown struct/class '" + newObject.StructName.text + "'", newObject.StructName, CurrentFile);
             }
         }
         void GenerateCodeForStatement(Statement_Field field)
         {
             field.FieldName.Analysis.CompilerReached = true;
             field.FieldName.Analysis.SubSubtype = TokenSubSubtype.FieldName;
-
-            if (field.PrevStatement is Statement_Variable prevVariable)
-            {
-                prevVariable.VariableName.Analysis.CompilerReached = true;
-
-                if (GetParameter(prevVariable.VariableName.text, out Parameter param))
-                {
-                    if (GetCompiledStruct(param.type, out var @struct))
-                    {
-                        foreach (var field_ in @struct.Fields)
-                        {
-                            if (field_.name.text == field.FieldName.text)
-                            {
-                                field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(field_.type.ToString(), field_.name, @struct.Name.text, @struct.FilePath);
-                                break;
-                            }
-                        }
-                    }
-                    prevVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
-                    AddInstruction(Opcode.LOAD_FIELD_BR, param.RealIndex, field.FieldName.text);
-                }
-                else if (GetCompiledVariable(prevVariable.VariableName.text, out CompiledVariable variable, out var isGlob))
-                {
-                    if (variable.IsList)
-                    {
-                        if (field.FieldName.text == "Length")
-                        { }
-                        else
-                        { throw new CompilerException($"Type list does not have field '{field.FieldName.text}'", field.FieldName, CurrentFile); }
-                    }
-                    else if (variable.type == BuiltinType.STRING)
-                    {
-                        if (field.FieldName.text == "Length")
-                        { }
-                        else
-                        { throw new CompilerException($"Type list does not have field '{field.FieldName.text}'", field.FieldName, CurrentFile); }
-                    }
-                    else if (variable.type == BuiltinType.STRUCT)
-                    {
-                        if (GetCompiledStruct(variable.structName, out var @struct))
-                        {
-                            foreach (var field_ in @struct.Fields)
-                            {
-                                if (field_.name.text == field.FieldName.text)
-                                {
-                                    field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(field_.type.ToString(), field_.name, @struct.Name.text, @struct.FilePath);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    prevVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(variable.Declaration, isGlob);
-                    AddInstruction(isGlob ? Opcode.LOAD_FIELD : Opcode.LOAD_FIELD_BR, variable.offset, field.FieldName.text);
-                }
-                else
-                {
-                    throw new CompilerException($"Unknown variable '{prevVariable.VariableName.text}'", prevVariable.VariableName, CurrentFile);
-                }
-                return;
-            }
 
             GenerateCodeForStatement(field.PrevStatement);
             AddInstruction(Opcode.LOAD_FIELD_R, -1, field.FieldName.text);
@@ -1660,7 +1627,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             GenerateCodeForStatement(indexStatement.PrevStatement);
             if (indexStatement.Expression == null)
-            { throw new CompilerException($"Index statement for indexer is requied", indexStatement.TotalPosition(), CurrentFile); }
+            { throw new CompilerException($"Index expression for indexer is missing", indexStatement.TotalPosition(), CurrentFile); }
             GenerateCodeForStatement(indexStatement.Expression);
             AddInstruction(new Instruction(Opcode.LIST_INDEX));
         }
@@ -2050,7 +2017,7 @@ namespace IngameCoding.BBCode.Compiler
                 paramIndex++;
                 parameter.name.Analysis.CompilerReached = true;
                 parameter.type.Analysis.CompilerReached = true;
-                parameters.Add(parameter.name.text, new Parameter(paramIndex, parameter.name.text, parameter.withRefKeyword, function.Value.Parameters.Count, parameter.type.ToString()));
+                parameters.Add(parameter.name.text, new Parameter(paramIndex, parameter.name.text, function.Value.Parameters.Count, parameter.type.ToString()));
             }
 
             CurrentFile = function.Value.FilePath;
@@ -2207,6 +2174,51 @@ namespace IngameCoding.BBCode.Compiler
             CurrentFile = null;
         }
 
+        void GenerateCodeForClass(KeyValuePair<string, ClassDefinition> @class)
+        {
+            CurrentFile = @class.Value.FilePath;
+            @class.Value.Name.Analysis.CompilerReached = true;
+
+            if (Keywords.Contains(@class.Key))
+            { throw new CompilerException($"Illegal class name '{@class.Value.FullName}'", @class.Value.Name, CurrentFile); }
+
+            @class.Value.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
+
+            if (compiledClasses.ContainsKey(@class.Value.FullName))
+            { throw new CompilerException($"Class with name '{@class.Value.FullName}' already exist", @class.Value.Name, CurrentFile); }
+
+            Dictionary<string, AttributeValues> attributes = new();
+
+            foreach (var attribute in @class.Value.Attributes)
+            {
+                attribute.Name.Analysis.CompilerReached = true;
+                attribute.Name.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+
+                AttributeValues newAttribute = new()
+                { parameters = new() };
+
+                if (attribute.Parameters != null)
+                {
+                    foreach (object parameter in attribute.Parameters)
+                    {
+                        newAttribute.parameters.Add(new Literal(parameter));
+                    }
+                }
+
+                attributes.Add(attribute.Name.text, newAttribute);
+            }
+
+            foreach (var field in @class.Value.Fields)
+            {
+                field.name.Analysis.CompilerReached = true;
+                field.type.Analysis.CompilerReached = true;
+            }
+
+            this.compiledClasses.Add(@class.Key, new CompiledClass(attributes, @class.Value));
+
+            CurrentFile = null;
+        }
+
         #endregion
 
         CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int offset)
@@ -2217,11 +2229,15 @@ namespace IngameCoding.BBCode.Compiler
             if (Keywords.Contains(newVariable.VariableName.text))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.text}'", newVariable.VariableName, CurrentFile); }
 
+            bool storedInHeap = false;
+            if (GetCompiledClass(newVariable.Type.text, out _))
+            { storedInHeap = true; }
+
             if (newVariable.Type.typeName == BuiltinType.STRUCT)
             {
-                return new CompiledVariable(offset, newVariable.Type.text, newVariable.Type.ListOf, newVariable);
+                return new CompiledVariable(offset, newVariable.Type.text, newVariable.Type.ListOf, newVariable) { IsStoredInHEAP = storedInHeap };
             }
-            return new CompiledVariable(offset, newVariable.Type.typeName, newVariable.Type.ListOf, newVariable);
+            return new CompiledVariable(offset, newVariable.Type.typeName, newVariable.Type.ListOf, newVariable) { IsStoredInHEAP = storedInHeap };
         }
 
         #region Result Structs
@@ -2456,7 +2472,7 @@ namespace IngameCoding.BBCode.Compiler
                 {
                     parameters.Clear();
                     foreach (ParameterDefinition parameter in f.Value.Parameters)
-                    { parameters.Add(parameter.name.text, new Parameter(-1, parameter.name.text, parameter.withRefKeyword, -1, parameter.type.ToString())); }
+                    { parameters.Add(parameter.name.text, new Parameter(-1, parameter.name.text, -1, parameter.type.ToString())); }
                     CurrentFile = f.Value.FilePath;
 
                     currentFunction = f.Value;
@@ -2500,6 +2516,7 @@ namespace IngameCoding.BBCode.Compiler
         internal CodeGeneratorResult GenerateCode(
             Dictionary<string, FunctionDefinition> functions,
             Dictionary<string, StructDefinition> structs,
+            Dictionary<string, ClassDefinition> classes,
             Statement_HashInfo[] hashes,
             List<Statement_NewVariable> globalVariables,
             Dictionary<string, BuiltinFunction> builtinFunctions,
@@ -2512,6 +2529,7 @@ namespace IngameCoding.BBCode.Compiler
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
             this.compiledStructs = new();
+            this.compiledClasses = new();
             this.compiledGlobalVariables = new();
             this.functionOffsets = new();
             this.compiledCode = new();
@@ -2647,6 +2665,17 @@ namespace IngameCoding.BBCode.Compiler
             ExitBreak:
                 continue;
             }
+
+            #endregion
+
+            #region Compile Classes
+
+            BlockCodeGeneration = false;
+
+            foreach (var @class in classes)
+            { GenerateCodeForClass(@class); }
+
+            BlockCodeGeneration = true;
 
             #endregion
 

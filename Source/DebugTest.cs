@@ -134,6 +134,7 @@ namespace TheProgram
         public int CodePointer { get; set; }
         public int StackMemorySize { get; set; }
         public Data_StackItem[] Stack { get; set; }
+        public Data_StackItem[] Heap { get; set; }
 
         internal Data_BytecodeInterpreterDetails(BytecodeInterpreter.InterpreterDetails v) : base(v)
         {
@@ -141,6 +142,7 @@ namespace TheProgram
             CodePointer = v.CodePointer;
             StackMemorySize = v.StackMemorySize;
             Stack = v.Stack.ToData(v => new Data_StackItem(v));
+            Heap = v.Heap.ToData(v => new Data_StackItem(v));
         }
 
         public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter.InterpreterDetails v) => new(v);
@@ -151,6 +153,7 @@ namespace TheProgram
         public string Type { get; set; }
         public string Value { get; set; }
         public string Tag { get; set; }
+        public bool IsHeapAddress { get; set; }
 
         public Data_StackItem(DataItem v) : base(v)
         {
@@ -158,6 +161,7 @@ namespace TheProgram
             Type = v.type.ToString();
             Value = v_v == null ? "null" : v_v.ToString();
             Tag = v.Tag;
+            IsHeapAddress = v.IsHeapAddress;
         }
     }
 

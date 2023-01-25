@@ -108,6 +108,18 @@ namespace IngameCoding.BBCode
 
             public override string ToString() => $"Ref Struct";
         }
+
+        public class RefClass : Ref
+        {
+            public CompiledClass Definition;
+
+            public RefClass(CompiledClass definition) : base(definition.FilePath)
+            {
+                Definition = definition;
+            }
+
+            public override string ToString() => $"Ref Class";
+        }
     }
 
     public enum TokenType

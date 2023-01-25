@@ -201,19 +201,17 @@ namespace IngameCoding.BBCode.Parser.Statements
         /// </list>
         /// </summary>
         internal Statement InitialValue;
-        internal Token ReferenceKeyword;
-        internal bool IsReference => ReferenceKeyword != null;
 
         public string FilePath { get; set; }
 
         public override string ToString()
         {
-            return $"{Type.text}{(Type.IsList ? "[]" : "")}{(IsReference ? " ref" : "")} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
+            return $"{Type.text}{(Type.IsList ? "[]" : "")} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{Type.text}{(Type.IsList ? "[]" : "")}{(IsReference ? " ref" : "")} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{Type.text}{(Type.IsList ? "[]" : "")} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
         }
 
         public override Position TotalPosition()
@@ -544,16 +542,15 @@ namespace IngameCoding.BBCode.Parser.Statements
         /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
         public Statement ListIndex;
         public Token VariableName;
-        internal bool IsReference;
 
         public override string ToString()
         {
-            return $"{(IsReference ? "ref " : "")}{VariableName.text}{((ListIndex != null) ? "[...]" : "")}";
+            return $"{VariableName.text}{((ListIndex != null) ? "[...]" : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{(IsReference ? "ref " : "")}{VariableName.text}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
+            return $"{" ".Repeat(ident)}{VariableName.text}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
         }
 
         public Statement_Variable()

@@ -1,5 +1,8 @@
 # Interpreter
 
+![.Net v6.0](https://img.shields.io/badge/.NET-v6.0-5C2D91)
+![C# v10](https://img.shields.io/badge/C%23-v10.0-239120.svg)
+
 ## What is this??
 I was bored, so I googled how to make a programming language. I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great
 [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF)

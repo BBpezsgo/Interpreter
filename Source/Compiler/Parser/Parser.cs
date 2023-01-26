@@ -1015,14 +1015,14 @@ namespace IngameCoding.BBCode
             /// <returns>
             /// The AST
             /// </returns>
-            public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Terminal.TerminalInterpreter.LogType> printCallback = null)
+            public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Output.LogType> printCallback = null)
             {
                 var tokenizer = new Tokenizer(TokenizerSettings.Default);
                 var (tokens, _) = tokenizer.Parse(code);
 
                 DateTime parseStarted = DateTime.Now;
                 if (printCallback != null)
-                { printCallback?.Invoke("Parsing ...", Terminal.TerminalInterpreter.LogType.Debug); }
+                { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
 
                 Parser parser = new();
                 var result = parser.Parse(tokens, warnings);
@@ -1033,7 +1033,7 @@ namespace IngameCoding.BBCode
                 }
 
                 if (printCallback != null)
-                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Terminal.TerminalInterpreter.LogType.Debug); }
+                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
 
                 return result;
             }
@@ -1044,19 +1044,19 @@ namespace IngameCoding.BBCode
             {
                 hashStatement = null;
 
-                if (ExpectOperator("#", out var hashT) == null)
+                if (!ExpectOperator("#", out var hashT))
                 { return false; }
 
                 hashT.Analysis.Subtype = TokenSubtype.Hash;
 
-                if (ExpectIdentifier(out var hashName) == null)
+                if (!ExpectIdentifier(out var hashName))
                 { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", hashT); }
 
                 hashName.Analysis.Subtype = TokenSubtype.Hash;
 
                 List<Statement_Literal> parameters = new();
                 int endlessSafe = 50;
-                while (ExpectOperator(";") == null)
+                while (!ExpectOperator(";"))
                 {
                     if (!ExpectLiteral(out var parameter))
                     { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", CurrentToken); }
@@ -1064,7 +1064,7 @@ namespace IngameCoding.BBCode
                     parameter.ValueToken.Analysis.Subtype = TokenSubtype.HashParameter;
                     parameters.Add(parameter);
 
-                    if (ExpectOperator(";") != null)
+                    if (ExpectOperator(";"))
                     { break; }
 
                     endlessSafe--;
@@ -1085,7 +1085,7 @@ namespace IngameCoding.BBCode
             bool ExpectUsing(out UsingDefinition usingDefinition)
             {
                 usingDefinition = null;
-                if (ExpectIdentifier("using", out var keyword) == null)
+                if (!ExpectIdentifier("using", out var keyword))
                 { return false; }
 
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
@@ -1099,7 +1099,7 @@ namespace IngameCoding.BBCode
                 else
                 {
                     int endlessSafe = 50;
-                    while (ExpectIdentifier(out Token pathIdentifier) != null)
+                    while (!ExpectIdentifier(out Token pathIdentifier))
                     {
                         pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
                         tokens.Add(pathIdentifier);
@@ -1114,7 +1114,7 @@ namespace IngameCoding.BBCode
 
                 if (tokens.Count == 0)
                 {
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     {
                         throw new SyntaxException("Expected library name after 'using'", keyword);
                     }
@@ -1125,7 +1125,7 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                if (ExpectOperator(";") == null)
+                if (!ExpectOperator(";"))
                 { throw new SyntaxException("Expected ';' at end of statement (after 'using')", keyword); }
 
                 usingDefinition = new UsingDefinition
@@ -1163,7 +1163,7 @@ namespace IngameCoding.BBCode
                 {
                     GlobalVariables.Add(possibleVariable);
 
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     { Errors.Add(new Error("Expected ';' at end of statement (after global variable definition)", CurrentToken)); }
 
                     return true;
@@ -1196,17 +1196,16 @@ namespace IngameCoding.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Name)); }
                 }
 
-                Token ExportKeyword = ExpectIdentifier("export");
+                ExpectIdentifier("export", out Token ExportKeyword);
 
                 TypeToken possibleType = ExceptTypeToken(false);
                 if (possibleType == null)
                 { currentTokenIndex = parseStart; return false; }
 
-                Token possibleNameT = ExpectIdentifier();
-                if (possibleNameT == null)
+                if (!ExpectIdentifier(out Token possibleNameT))
                 { currentTokenIndex = parseStart; return false; }
 
-                if (ExpectOperator("(") == null)
+                if (!ExpectOperator("("))
                 { currentTokenIndex = parseStart; return false; }
 
                 FunctionDefinition function = new(CurrentNamespace, possibleNameT)
@@ -1219,10 +1218,9 @@ namespace IngameCoding.BBCode
                 possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
 
                 var expectParameter = false;
-                while (ExpectOperator(")") == null || expectParameter)
+                while (!ExpectOperator(")") || expectParameter)
                 {
-                    Token thisKeywordT = ExpectIdentifier("this");
-                    if (thisKeywordT != null)
+                    if (ExpectIdentifier("this", out Token thisKeywordT))
                     {
                         thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
                         if (function.Parameters.Count > 0)
@@ -1233,8 +1231,7 @@ namespace IngameCoding.BBCode
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
-                    Token possibleParameterNameT = ExpectIdentifier();
-                    if (possibleParameterNameT == null)
+                    if (!ExpectIdentifier(out Token possibleParameterNameT))
                     { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
                     possibleParameterNameT.Analysis.Subtype = TokenSubtype.VariableName;
@@ -1247,10 +1244,10 @@ namespace IngameCoding.BBCode
                     };
                     function.Parameters.Add(parameterDefinition);
 
-                    if (ExpectOperator(")") != null)
+                    if (ExpectOperator(")"))
                     { break; }
 
-                    if (ExpectOperator(",") == null)
+                    if (!ExpectOperator(","))
                     { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
                     else
                     { expectParameter = true; }
@@ -1258,7 +1255,7 @@ namespace IngameCoding.BBCode
 
                 List<Statement> statements = new();
 
-                if (ExpectOperator(";") == null)
+                if (!ExpectOperator(";"))
                 {
                     statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
                     function.BracketStart = braceletStart;
@@ -1274,21 +1271,20 @@ namespace IngameCoding.BBCode
 
             bool ExpectNamespaceDefinition()
             {
-                if (ExpectIdentifier("namespace", out var possibleNamespaceIdentifier) == null)
+                if (!ExpectIdentifier("namespace", out var possibleNamespaceIdentifier))
                 { return false; }
 
                 possibleNamespaceIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
 
-                Token possibleName = ExpectIdentifier();
-                if (possibleName != null)
+                if (ExpectIdentifier(out Token possibleName))
                 {
-                    if (ExpectOperator("{", out var braceletStart) != null)
+                    if (ExpectOperator("{", out var braceletStart))
                     {
                         possibleName.Analysis.Subtype = TokenSubtype.Library;
                         CurrentNamespace.Add(possibleName.text);
                         int endlessSafe = 0;
                         Token braceletEnd;
-                        while (ExpectOperator("}", out braceletEnd) == null)
+                        while (!ExpectOperator("}", out braceletEnd))
                         {
                             ParseCodeBlock();
                             endlessSafe++;
@@ -1337,17 +1333,15 @@ namespace IngameCoding.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Name)); }
                 }
 
-                Token ExportKeyword = ExpectIdentifier("export");
+                ExpectIdentifier("export", out Token ExportKeyword);
 
-                Token keyword = ExpectIdentifier("class");
-                if (keyword == null)
+                if (!ExpectIdentifier("class", out Token keyword))
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                Token possibleClassName = ExpectIdentifier();
-                if (possibleClassName == null)
+                if (!ExpectIdentifier(out Token possibleClassName))
                 { throw new SyntaxException("Expected class identifier after keyword 'class'", keyword); }
 
-                if (ExpectOperator("{", out var braceletStart) == null)
+                if (!ExpectOperator("{", out var braceletStart))
                 { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
 
                 possibleClassName.Analysis.Subtype = TokenSubtype.Class;
@@ -1358,14 +1352,14 @@ namespace IngameCoding.BBCode
 
                 int endlessSafe = 0;
                 Token braceletEnd;
-                while (ExpectOperator("}", out braceletEnd) == null)
+                while (!ExpectOperator("}", out braceletEnd))
                 {
                     ParameterDefinition field = ExpectField();
                     if (field == null)
                     { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
                     fields.Add(field);
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
 
                     endlessSafe++;
@@ -1413,17 +1407,15 @@ namespace IngameCoding.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Name)); }
                 }
 
-                Token ExportKeyword = ExpectIdentifier("export");
+                ExpectIdentifier("export", out Token ExportKeyword);
 
-                Token keyword = ExpectIdentifier("struct");
-                if (keyword == null)
+                if (!ExpectIdentifier("struct", out Token keyword))
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                Token possibleStructName = ExpectIdentifier();
-                if (possibleStructName == null)
+                if (!ExpectIdentifier(out Token possibleStructName))
                 { throw new SyntaxException("Expected struct identifier after keyword 'struct'", keyword); }
 
-                if (ExpectOperator("{", out var braceletStart) == null)
+                if (!ExpectOperator("{", out var braceletStart))
                 { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
                 possibleStructName.Analysis.Subtype = TokenSubtype.Struct;
@@ -1434,36 +1426,15 @@ namespace IngameCoding.BBCode
 
                 int endlessSafe = 0;
                 Token braceletEnd;
-                while (ExpectOperator("}", out braceletEnd) == null)
+                while (!ExpectOperator("}", out braceletEnd))
                 {
                     ParameterDefinition field = ExpectField();
                     if (field == null)
                     { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
                     fields.Add(field);
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
-
-#if false
-                    if (field != null)
-                    {
-                        fields.Add(field);
-                        if (ExpectOperator(";") == null)
-                        { Errors.Add(new Error("Expected ';' at end of statement" + ((field != null) ? " (after field definition)" : ""), new Position(CurrentToken.Position.Start.Line))); }
-                    }
-                    else
-                    {
-                        enableThisKeyword = true;
-                        FunctionDefinition method = ExpectMethodDefinition();
-                        enableThisKeyword = false;
-                        if (method != null)
-                        {
-                            methods.Add(method.FullName, method);
-                        }
-                        if (ExpectOperator(";") == null)
-                        { Errors.Add(new Error("Expected ';' at end of statement" + ((field != null) ? " (after method definition)" : ""), new Position(CurrentToken.Position.Start.Line))); }
-                    }
-#endif
 
                     endlessSafe++;
                     if (endlessSafe > 50)
@@ -1492,7 +1463,7 @@ namespace IngameCoding.BBCode
             {
                 listValue = null;
 
-                if (ExpectOperator("[", out var o0) == null)
+                if (!ExpectOperator("[", out var o0))
                 { return false; }
 
                 listValue = new Statement_ListValue()
@@ -1509,9 +1480,9 @@ namespace IngameCoding.BBCode
                     {
                         listValue.Values.Add(v);
 
-                        if (ExpectOperator(",") == null)
+                        if (!ExpectOperator(","))
                         {
-                            if (ExpectOperator("]", out var o1) == null)
+                            if (!ExpectOperator("]", out var o1))
                             { throw new SyntaxException("Unbalanced '['", o0); }
                             listValue.BracketRight = o1;
                             break;
@@ -1519,7 +1490,7 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        if (ExpectOperator("]", out var o1) == null)
+                        if (!ExpectOperator("]", out var o1))
                         { throw new SyntaxException("Unbalanced '['", o0); }
                         listValue.BracketRight = o1;
                         break;
@@ -1578,7 +1549,7 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (ExpectIdentifier("true", out var tTrue) != null)
+                else if (ExpectIdentifier("true", out var tTrue))
                 {
                     Statement_Literal literal = new()
                     {
@@ -1592,7 +1563,7 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (ExpectIdentifier("false", out var tFalse) != null)
+                else if (ExpectIdentifier("false", out var tFalse))
                 {
                     Statement_Literal literal = new()
                     {
@@ -1615,10 +1586,10 @@ namespace IngameCoding.BBCode
 
             bool ExpectIndex(out Statement_Index statement)
             {
-                if (ExpectOperator("[", out var token0) != null)
+                if (ExpectOperator("[", out var token0))
                 {
                     var st = ExpectOneValue();
-                    if (ExpectOperator("]") != null)
+                    if (ExpectOperator("]"))
                     {
                         statement = new Statement_Index(st);
                         return true;
@@ -1644,10 +1615,7 @@ namespace IngameCoding.BBCode
             ///  <seealso cref="Statement_NewStruct"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_MethodCall"></seealso>
-            /// </item>
-            /// <item>
-            ///  <seealso cref="Statement_StructField"></seealso>
+            ///  <seealso cref="Statement_Field"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="Statement_Variable"></seealso>
@@ -1668,7 +1636,7 @@ namespace IngameCoding.BBCode
                 {
                     returnStatement = literal;
                 }
-                else if (ExpectOperator("(", out var braceletT) != null)
+                else if (ExpectOperator("(", out var braceletT))
                 {
                     var expression = ExpectExpression();
                     if (expression == null)
@@ -1677,17 +1645,16 @@ namespace IngameCoding.BBCode
                     if (expression is Statement_Operator operation)
                     { operation.InsideBracelet = true; }
 
-                    if (ExpectOperator(")") == null)
+                    if (!ExpectOperator(")"))
                     { throw new SyntaxException("Unbalanced '('", braceletT); }
 
                     returnStatement = expression;
                 }
-                else if (ExpectIdentifier("new", out Token newIdentifier) != null)
+                else if (ExpectIdentifier("new", out Token newIdentifier))
                 {
                     newIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
 
-                    Token structName = ExpectIdentifier();
-                    if (structName == null)
+                    if (!ExpectIdentifier(out Token structName))
                     { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
 
                     structName.Analysis.Subtype = TokenSubtype.Struct;
@@ -1695,10 +1662,9 @@ namespace IngameCoding.BBCode
                     List<string> targetLibraryPath = new();
                     List<Token> targetLibraryPathTokens = new();
 
-                    while (ExpectOperator(".", out Token dotToken) != null)
+                    while (ExpectOperator(".", out Token dotToken))
                     {
-                        Token libraryToken = ExpectIdentifier();
-                        if (libraryToken == null)
+                        if (!ExpectIdentifier(out Token libraryToken))
                         {
                             throw new SyntaxException("Expected namespace or class identifier", dotToken);
                         }
@@ -1725,12 +1691,12 @@ namespace IngameCoding.BBCode
 
                     returnStatement = newStructStatement;
                 }
-                else if (ExpectIdentifier(out Token variableName) != null)
+                else if (ExpectIdentifier(out Token variableName))
                 {
                     if (variableName.text == "this")
                     { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
 
-                    if (ExpectOperator("(") != null)
+                    if (ExpectOperator("("))
                     {
                         currentTokenIndex = savedToken;
                         returnStatement = ExpectFunctionCall();
@@ -1753,7 +1719,7 @@ namespace IngameCoding.BBCode
 
                 while (true)
                 {
-                    if (ExpectOperator(".", out var tokenDot) != null)
+                    if (ExpectOperator(".", out var tokenDot))
                     {
                         if (ExpectMethodCall(false, out var methodCall))
                         {
@@ -1762,8 +1728,7 @@ namespace IngameCoding.BBCode
                         }
                         else
                         {
-                            var fieldName = ExpectIdentifier();
-                            if (fieldName == null)
+                            if (!ExpectIdentifier(out Token fieldName))
                             { throw new SyntaxException("Expected field or method", tokenDot); }
 
                             var fieldStatement = new Statement_Field()
@@ -1795,13 +1760,13 @@ namespace IngameCoding.BBCode
             {
                 braceletEnd = null;
 
-                if (ExpectOperator("{", out braceletStart) == null)
+                if (!ExpectOperator("{", out braceletStart))
                 { return null; }
 
                 List<Statement> statements = new();
 
                 int endlessSafe = 0;
-                while (ExpectOperator("}", out braceletEnd) == null)
+                while (!ExpectOperator("}", out braceletEnd))
                 {
                     Statement statement = ExpectStatement();
                     if (statement == null)
@@ -1839,7 +1804,7 @@ namespace IngameCoding.BBCode
                             statements.Add(statement);
                         }
 
-                        if (ExpectOperator(";") == null)
+                        if (!ExpectOperator(";"))
                         { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
                     }
 
@@ -1857,8 +1822,7 @@ namespace IngameCoding.BBCode
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                Token possibleVariableName = ExpectIdentifier();
-                if (possibleVariableName == null)
+                if (!ExpectIdentifier(out Token possibleVariableName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 possibleVariableName.Analysis.Subtype = TokenSubtype.VariableName;
@@ -1872,7 +1836,7 @@ namespace IngameCoding.BBCode
                 if (structNotFoundWarning != null)
                 { Warnings.Add(structNotFoundWarning); }
 
-                if (ExpectOperator("=", out var eqT) != null)
+                if (ExpectOperator("=", out var eqT))
                 {
                     statement.InitialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
                 }
@@ -1887,36 +1851,36 @@ namespace IngameCoding.BBCode
 
             Statement_ForLoop ExpectForStatement()
             {
-                if (ExpectIdentifier("for", out Token tokenFor) == null)
+                if (!ExpectIdentifier("for", out Token tokenFor))
                 { return null; }
 
                 tokenFor.Analysis.Subtype = TokenSubtype.Statement;
 
-                if (ExpectOperator("(", out Token tokenZarojel) == null)
+                if (!ExpectOperator("(", out Token tokenZarojel))
                 { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor); }
 
                 var variableDeclaration = ExpectVariableDeclaration();
                 if (variableDeclaration == null)
                 { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
-                if (ExpectOperator(";") == null)
+                if (!ExpectOperator(";"))
                 { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition()); }
 
                 Statement condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
-                if (ExpectOperator(";") == null)
+                if (!ExpectOperator(";"))
                 { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.TotalPosition()); }
 
                 Statement expression = ExpectExpression();
                 if (expression == null)
                 { throw new SyntaxException("Expected expression after \"for\" condition", tokenZarojel); }
 
-                if (ExpectOperator(")", out Token tokenZarojel2) == null)
+                if (!ExpectOperator(")", out Token tokenZarojel2))
                 { throw new SyntaxException("Expected ')' after \"for\" condition", condition.TotalPosition()); }
 
-                if (ExpectOperator("{", out var braceletStart) == null)
+                if (!ExpectOperator("{", out var braceletStart))
                 { throw new SyntaxException("Expected '{' after \"for\" condition", tokenZarojel2); }
 
                 Statement_ForLoop forStatement = new()
@@ -1929,11 +1893,11 @@ namespace IngameCoding.BBCode
                 };
 
                 int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}", out forStatement.BracketEnd) == null)
+                while (CurrentToken != null && CurrentToken != null && !ExpectOperator("}", out forStatement.BracketEnd))
                 {
                     var statement = ExpectStatement();
                     if (statement == null) break;
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
 
                     forStatement.Statements.Add(statement);
@@ -1950,22 +1914,22 @@ namespace IngameCoding.BBCode
 
             Statement_WhileLoop ExpectWhileStatement()
             {
-                if (ExpectIdentifier("while", out Token tokenWhile) == null)
+                if (!ExpectIdentifier("while", out Token tokenWhile))
                 { return null; }
 
                 tokenWhile.Analysis.Subtype = TokenSubtype.Statement;
 
-                if (ExpectOperator("(", out Token tokenZarojel) == null)
+                if (!ExpectOperator("(", out Token tokenZarojel))
                 { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
 
                 Statement condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
 
-                if (ExpectOperator(")", out Token tokenZarojel2) == null)
+                if (!ExpectOperator(")", out Token tokenZarojel2))
                 { throw new SyntaxException("Expected ')' after \"while\" condition", condition.TotalPosition()); }
 
-                if (ExpectOperator("{", out Token braceletStart) == null)
+                if (!ExpectOperator("{", out Token braceletStart))
                 { throw new SyntaxException("Expected '{' after \"while\" condition", tokenZarojel2); }
 
                 Statement_WhileLoop whileStatement = new()
@@ -1976,10 +1940,10 @@ namespace IngameCoding.BBCode
                 };
 
                 int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && ExpectOperator("}", out whileStatement.BracketEnd) == null)
+                while (CurrentToken != null && CurrentToken != null && !ExpectOperator("}", out whileStatement.BracketEnd))
                 {
                     var statement = ExpectStatement();
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.TotalPosition())); }
                     if (statement == null) break;
 
@@ -2024,7 +1988,7 @@ namespace IngameCoding.BBCode
 
             Statement_If_Part ExpectIfSegmentStatement(string ifSegmentName = "if", Statement_If_Part.IfPart ifSegmentType = Statement_If_Part.IfPart.If, bool needParameters = true)
             {
-                if (ExpectIdentifier(ifSegmentName, out Token tokenIf) == null)
+                if (!ExpectIdentifier(ifSegmentName, out Token tokenIf))
                 { return null; }
 
                 tokenIf.Analysis.Subtype = TokenSubtype.Statement;
@@ -2032,16 +1996,16 @@ namespace IngameCoding.BBCode
                 Statement condition = null;
                 if (needParameters)
                 {
-                    if (ExpectOperator("(", out Token tokenZarojel) == null)
+                    if (!ExpectOperator("(", out Token tokenZarojel))
                     { throw new SyntaxException("Expected '(' after \"" + ifSegmentName + "\" statement", tokenIf); }
                     condition = ExpectExpression();
                     if (condition == null)
                     { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel); }
 
-                    if (ExpectOperator(")", out _) == null)
+                    if (!ExpectOperator(")"))
                     { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.TotalPosition()); }
                 }
-                if (ExpectOperator("{", out Token braceletStart) == null)
+                if (!ExpectOperator("{", out Token braceletStart))
                 { throw new SyntaxException("Expected '{' after \"" + ifSegmentName + "\" condition", tokenIf); }
 
                 Statement_If_Part ifStatement = null;
@@ -2077,10 +2041,10 @@ namespace IngameCoding.BBCode
                 { throw new InternalException(); }
 
                 int endlessSafe = 0;
-                while (CurrentToken != null && ExpectOperator("}", out ifStatement.BracketEnd) == null)
+                while (CurrentToken != null && !ExpectOperator("}", out ifStatement.BracketEnd))
                 {
                     var statement = ExpectStatement();
-                    if (ExpectOperator(";") == null)
+                    if (!ExpectOperator(";"))
                     {
                         if (statement == null)
                         { throw new SyntaxException("Expected a statement", CurrentToken); }
@@ -2140,14 +2104,14 @@ namespace IngameCoding.BBCode
 
                 if (expectDot)
                 {
-                    if (ExpectOperator(".") == null)
+                    if (!ExpectOperator("."))
                     { currentTokenIndex = startTokenIndex; return false; }
                 }
 
-                if (ExpectIdentifier(out var possibleFunctionName) == null)
+                if (!ExpectIdentifier(out var possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                if (ExpectOperator("(") == null)
+                if (!ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return false; }
 
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
@@ -2160,7 +2124,7 @@ namespace IngameCoding.BBCode
                 bool expectParameter = false;
 
                 int endlessSafe = 0;
-                while (ExpectOperator(")") == null || expectParameter)
+                while (!ExpectOperator(")") || expectParameter)
                 {
                     Statement parameter = ExpectExpression();
                     if (parameter == null)
@@ -2168,10 +2132,10 @@ namespace IngameCoding.BBCode
 
                     methodCall.Parameters.Add(parameter);
 
-                    if (ExpectOperator(")", out Token outToken0) != null)
+                    if (ExpectOperator(")"))
                     { break; }
 
-                    if (ExpectOperator(",", out Token operatorVesszo) == null)
+                    if (!ExpectOperator(","))
                     { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
                     else
                     { expectParameter = true; }
@@ -2179,11 +2143,6 @@ namespace IngameCoding.BBCode
                     endlessSafe++;
                     if (endlessSafe > 100)
                     { throw new EndlessLoopException(); }
-                }
-
-                if (possibleFunctionName.text == "type")
-                {
-                    possibleFunctionName.Analysis.Subtype = TokenSubtype.Keyword;
                 }
 
                 return true;
@@ -2201,10 +2160,7 @@ namespace IngameCoding.BBCode
             ///  <seealso cref="Statement_NewStruct"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_MethodCall"></seealso>
-            /// </item>
-            /// <item>
-            ///  <seealso cref="Statement_StructField"></seealso>
+            ///  <seealso cref="Statement_Field"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="Statement_Variable"></seealso>
@@ -2217,7 +2173,7 @@ namespace IngameCoding.BBCode
             /// <exception cref="SyntaxException"></exception>
             Statement ExpectExpression()
             {
-                if (ExpectOperator("!", out var tNotOperator) != null)
+                if (ExpectOperator("!", out var tNotOperator))
                 {
                     Statement statement = ExpectOneValue();
                     if (statement == null)
@@ -2227,7 +2183,7 @@ namespace IngameCoding.BBCode
                 }
 
                 /*
-                if (ExpectOperator("-", out var tMinusOperator) != null)
+                if (ExpectOperator("-", out var tMinusOperator))
                 {
                     Statement statement = ExpectOneValue();
                     if (statement == null)
@@ -2244,7 +2200,7 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator(new string[] {
                     "+=", "-=", "*=", "/=", "%=",
                     "&=", "|=", "^=",
-                }, out var o0) != null)
+                }, out var o0))
                 {
                     var valueToAssign = ExpectOneValue();
                     if (valueToAssign == null)
@@ -2270,7 +2226,7 @@ namespace IngameCoding.BBCode
 
                     return operatorCall;
                 }
-                else if (ExpectOperator("++", out var t0) != null)
+                else if (ExpectOperator("++", out var t0))
                 {
                     Statement_Literal literalOne = new()
                     {
@@ -2299,7 +2255,7 @@ namespace IngameCoding.BBCode
 
                     return operatorCall;
                 }
-                else if (ExpectOperator("--", out var t1) != null)
+                else if (ExpectOperator("--", out var t1))
                 {
                     Statement_Literal literalOne = new()
                     {
@@ -2331,13 +2287,12 @@ namespace IngameCoding.BBCode
 
                 while (true)
                 {
-                    Token op = ExpectOperator(new string[]
-                    {
-                    "+", "-", "*", "/", "%",
-                    "=",
-                    "<", ">", ">=", "<=", "!=", "==", "&", "|", "^"
-                    });
-                    if (op == null) break;
+                    if (!ExpectOperator(new string[]
+                        {
+                        "+", "-", "*", "/", "%",
+                        "=",
+                        "<", ">", ">=", "<=", "!=", "==", "&", "|", "^"
+                        }, out Token op)) break;
 
                     int rhsPrecedence = OperatorPrecedence(op.text);
                     if (rhsPrecedence == 0)
@@ -2405,17 +2360,15 @@ namespace IngameCoding.BBCode
             {
                 int startTokenIndex = currentTokenIndex;
 
-                Token possibleFunctionName = ExpectIdentifier();
-                if (possibleFunctionName == null)
+                if (!ExpectIdentifier(out Token possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 List<string> targetLibraryPath = new();
                 List<Token> targetLibraryPathTokens = new();
 
-                while (ExpectOperator(".", out Token dotToken) != null)
+                while (ExpectOperator(".", out Token dotToken))
                 {
-                    Token libraryToken = ExpectIdentifier();
-                    if (libraryToken == null)
+                    if (!ExpectIdentifier(out Token libraryToken))
                     {
                         throw new SyntaxException("Expected namespace, class, method, or field identifier", dotToken);
                     }
@@ -2430,7 +2383,7 @@ namespace IngameCoding.BBCode
                 if (possibleFunctionName == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                if (ExpectOperator("(") == null)
+                if (!ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 foreach (var token in targetLibraryPathTokens)
@@ -2446,7 +2399,7 @@ namespace IngameCoding.BBCode
                 bool expectParameter = false;
 
                 int endlessSafe = 0;
-                while (ExpectOperator(")") == null || expectParameter)
+                while (!ExpectOperator(")") || expectParameter)
                 {
                     Statement parameter = ExpectExpression();
                     if (parameter == null)
@@ -2454,10 +2407,10 @@ namespace IngameCoding.BBCode
 
                     functionCall.Parameters.Add(parameter);
 
-                    if (ExpectOperator(")", out Token outToken0) != null)
+                    if (ExpectOperator(")"))
                     { break; }
 
-                    if (ExpectOperator(",", out Token operatorVesszo) == null)
+                    if (!ExpectOperator(","))
                     { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
                     else
                     { expectParameter = true; }
@@ -2467,83 +2420,15 @@ namespace IngameCoding.BBCode
                     { throw new EndlessLoopException(); }
                 }
 
-                if (possibleFunctionName.text == "type" && targetLibraryPath.Count == 0)
-                {
-                    possibleFunctionName.Analysis.Subtype = TokenSubtype.Keyword;
-                }
-
                 return functionCall;
             }
-
-#if false
-            Statement_MethodCall ExpectMethodCall()
-            {
-                int startTokenIndex = currentTokenIndex;
-
-                Token possibleMethodName = ExpectIdentifier();
-                if (possibleMethodName == null)
-                { currentTokenIndex = startTokenIndex; return null; }
-
-                if (possibleMethodName == null)
-                { currentTokenIndex = startTokenIndex; return null; }
-
-                possibleMethodName.Analysis.Subtype = TokenSubtype.MethodName;
-
-                if (ExpectOperator("(") == null)
-                { currentTokenIndex = startTokenIndex; return null; }
-
-                Statement_MethodCall methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>())
-                {
-                    functionNameT = possibleMethodName,
-                    position = possibleMethodName.GetPosition(),
-                };
-
-                bool expectParameter = false;
-
-                int endlessSafe = 0;
-                while (ExpectOperator(")") == null || expectParameter)
-                {
-                    Statement parameter = ExpectExpression();
-                    if (parameter == null)
-                    {
-                        throw new SyntaxException("Expected expression as parameter", methodCall.Position);
-                    }
-
-
-                    methodCall.Position.Extend(parameter.Position.AbsolutePosition);
-
-                    methodCall.parameters.Add(parameter);
-
-                    if (ExpectOperator(")", out Token outToken0) != null)
-                    {
-                        methodCall.Position.Extend(outToken0.AbsolutePosition);
-                        break;
-                    }
-
-                    if (ExpectOperator(",", out Token operatorVesszo) == null)
-                    {
-                        throw new SyntaxException("Expected ',' to separate parameters", parameter.Position);
-                    }
-                    else
-                    { expectParameter = true; }
-
-                    methodCall.Position.Extend(operatorVesszo.AbsolutePosition);
-
-                    endlessSafe++;
-                    if (endlessSafe > 100) { throw new EndlessLoopException(); }
-                }
-
-                return methodCall;
-            }
-#endif
 
             /// <summary> return, break, continue, etc. </summary>
             Statement_FunctionCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
             {
                 int startTokenIndex = currentTokenIndex;
 
-                Token possibleFunctionName = ExpectIdentifier();
-                if (possibleFunctionName == null)
+                if (!ExpectIdentifier(out Token possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 if (possibleFunctionName.text != name)
@@ -2577,20 +2462,19 @@ namespace IngameCoding.BBCode
                 int parseStart = currentTokenIndex;
                 attribute = new();
 
-                if (ExpectOperator("[", out var t0) == null)
+                if (!ExpectOperator("[", out var t0))
                 { currentTokenIndex = parseStart; return false; }
 
-                Token attributeT = ExpectIdentifier();
-                if (attributeT == null)
+                if (!ExpectIdentifier(out Token attributeT))
                 { currentTokenIndex = parseStart; return false; }
 
                 attributeT.Analysis.Subtype = TokenSubtype.Type;
 
-                if (ExpectOperator("(", out var t3) != null)
+                if (ExpectOperator("(", out var t3))
                 {
                     List<object> parameters = new();
                     int endlessSafe = 50;
-                    while (ExpectOperator(")") == null)
+                    while (!ExpectOperator(")"))
                     {
                         ExpectOneLiteral(out object param);
                         if (param == null)
@@ -2606,115 +2490,11 @@ namespace IngameCoding.BBCode
                     attribute.Parameters = parameters.ToArray();
                 }
 
-                if (ExpectOperator("]") == null)
+                if (!ExpectOperator("]"))
                 { throw new SyntaxException("Unbalanced ]", t0); }
 
                 attribute.Name = attributeT;
                 return true;
-            }
-
-            FunctionDefinition ExpectMethodDefinition()
-            {
-                int parseStart = currentTokenIndex;
-
-                List<FunctionDefinition.Attribute> attributes = new();
-                while (ExpectAttribute(out var attr))
-                {
-                    bool alreadyHave = false;
-                    foreach (var attribute in attributes)
-                    {
-                        if (attribute.Name == attr.Name)
-                        {
-                            alreadyHave = true;
-                            break;
-                        }
-                    }
-                    if (!alreadyHave)
-                    {
-                        attributes.Add(attr);
-                    }
-                    else
-                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the method", attr.Name)); }
-                }
-
-                TypeToken possibleType = ExceptTypeToken(false);
-                if (possibleType == null)
-                { currentTokenIndex = parseStart; return null; }
-
-                Token possibleName = ExpectIdentifier();
-                if (possibleName == null)
-                { currentTokenIndex = parseStart; return null; }
-
-                Token possibleOperator = ExpectOperator("(");
-                if (possibleOperator == null)
-                { currentTokenIndex = parseStart; return null; }
-
-                FunctionDefinition methodDefinition = new(Array.Empty<string>(), possibleName)
-                {
-                    Type = possibleType,
-                    Attributes = attributes.ToArray()
-                };
-
-                possibleName.Analysis.Subtype = TokenSubtype.MethodName;
-
-                var expectParameter = false;
-                while (ExpectOperator(")") == null || expectParameter)
-                {
-                    Token thisKeywordT = ExpectIdentifier("this");
-                    if (thisKeywordT != null)
-                    {
-                        thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
-                        if (methodDefinition.Parameters.Count > 0)
-                        { throw new SyntaxException("Keyword 'this' is only valid at the first parameter", thisKeywordT); }
-                    }
-
-                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
-                    if (possibleParameterType == null)
-                        throw new SyntaxException("Expected parameter type", possibleOperator);
-
-                    Token possibleParameterName = ExpectIdentifier();
-                    if (possibleParameterName == null)
-                        throw new SyntaxException("Expected a parameter name", possibleParameterType);
-
-                    possibleParameterName.Analysis.Subtype = TokenSubtype.VariableName;
-
-                    ParameterDefinition parameterDefinition = new()
-                    {
-                        type = possibleParameterType,
-                        name = possibleParameterName,
-                        withThisKeyword = thisKeywordT != null
-                    };
-                    methodDefinition.Parameters.Add(parameterDefinition);
-
-                    if (ExpectOperator(")") != null)
-                    { break; }
-
-                    if (ExpectOperator(",") == null)
-                    { throw new SyntaxException("Expected ',' or ')'", possibleParameterName); }
-                    else
-                    { expectParameter = true; }
-                }
-
-                List<Statement> statements = new();
-                if (ExpectOperator(";") == null)
-                {
-                    statements = ParseFunctionBody(out _, out _);
-                }
-                else
-                {
-                    currentTokenIndex--;
-                }
-
-                Errors.Add(new Error("Methods are not supported", possibleType));
-
-                if (statements == null)
-                {
-                    currentTokenIndex = parseStart;
-                    return null;
-                }
-                methodDefinition.Statements = statements;
-
-                return methodDefinition;
             }
 
             ParameterDefinition ExpectField()
@@ -2724,11 +2504,10 @@ namespace IngameCoding.BBCode
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                Token possibleVariableName = ExpectIdentifier();
-                if (possibleVariableName == null)
+                if (!ExpectIdentifier(out Token possibleVariableName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                if (ExpectOperator("(") != null)
+                if (ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 possibleVariableName.Analysis.Subtype = TokenSubtype.None;
@@ -2768,91 +2547,44 @@ namespace IngameCoding.BBCode
 
             #region Basic parsing
 
-            Token ExpectIdentifier(string name)
-            {
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.IDENTIFIER) return null;
-                if (name.Length > 0 && CurrentToken.text != name) return null;
-
-                Token returnToken = CurrentToken;
-                currentTokenIndex++;
-
-                return returnToken;
-            }
-            Token ExpectIdentifier() => ExpectIdentifier("");
-            Token ExpectIdentifier(out Token result)
+            bool ExpectIdentifier(out Token result) => ExpectIdentifier("", out result);
+            bool ExpectIdentifier(string name, out Token result)
             {
                 result = null;
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.IDENTIFIER) return null;
-                if ("".Length > 0 && CurrentToken.text != "") return null;
+                if (CurrentToken == null) return false;
+                if (CurrentToken.type != TokenType.IDENTIFIER) return false;
+                if (name.Length > 0 && CurrentToken.text != name) return false;
 
-                Token returnToken = CurrentToken;
-                result = returnToken;
+                result = CurrentToken;
                 currentTokenIndex++;
 
-                return returnToken;
+                return true;
             }
-            Token ExpectIdentifier(string name, out Token result)
+
+            bool ExpectOperator(string name) => ExpectOperator(name, out _);
+            bool ExpectOperator(string[] name, out Token result)
             {
                 result = null;
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.IDENTIFIER) return null;
-                if (name.Length > 0 && CurrentToken.text != name) return null;
+                if (CurrentToken == null) return false;
+                if (CurrentToken.type != TokenType.OPERATOR) return false;
+                if (name.Contains(CurrentToken.text) == false) return false;
 
-                Token returnToken = CurrentToken;
-                result = returnToken;
+                result = CurrentToken;
                 currentTokenIndex++;
 
-                return returnToken;
+                return true;
             }
-
-            Token ExpectOperator(string name)
+            bool ExpectOperator(string name, out Token result)
             {
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.OPERATOR) return null;
-                if (name.Length > 0 && CurrentToken.text != name) return null;
+                result = null;
+                if (CurrentToken == null) return false;
+                if (CurrentToken.type != TokenType.OPERATOR) return false;
+                if (name.Length > 0 && CurrentToken.text != name) return false;
 
-                Token returnToken = CurrentToken;
+                result = CurrentToken;
                 currentTokenIndex++;
 
-                return returnToken;
-            }
-            Token ExpectOperator(string[] name)
-            {
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.OPERATOR) return null;
-                if (name.Contains(CurrentToken.text) == false) return null;
-
-                Token returnToken = CurrentToken;
-                currentTokenIndex++;
-
-                return returnToken;
-            }
-            Token ExpectOperator(string[] name, out Token outToken)
-            {
-                outToken = null;
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.OPERATOR) return null;
-                if (name.Contains(CurrentToken.text) == false) return null;
-
-                Token returnToken = CurrentToken;
-                currentTokenIndex++;
-                outToken = returnToken;
-                return returnToken;
-            }
-            Token ExpectOperator(string name, out Token outToken)
-            {
-                outToken = null;
-                if (CurrentToken == null) return null;
-                if (CurrentToken.type != TokenType.OPERATOR) return null;
-                if (name.Length > 0 && CurrentToken.text != name) return null;
-
-                Token returnToken = CurrentToken;
-                outToken = returnToken;
-                currentTokenIndex++;
-
-                return returnToken;
+                return true;
             }
 
             TypeToken ExceptTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
@@ -2860,8 +2592,7 @@ namespace IngameCoding.BBCode
                 int parseStart = currentTokenIndex;
 
                 warning = null;
-                Token possibleType = ExpectIdentifier();
-                if (possibleType == null) return null;
+                if (!ExpectIdentifier(out Token possibleType)) return null;
 
                 possibleType.Analysis.Subtype = TokenSubtype.Keyword;
 
@@ -2922,9 +2653,9 @@ namespace IngameCoding.BBCode
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }
 
-                while (ExpectOperator("[", out var t0) != null)
+                while (ExpectOperator("["))
                 {
-                    if (ExpectOperator("]") != null)
+                    if (ExpectOperator("]"))
                     {
                         newType = new TypeToken(newType.text, newType, newType);
                     }

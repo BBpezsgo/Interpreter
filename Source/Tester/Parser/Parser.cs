@@ -203,14 +203,14 @@ namespace IngameCoding.Tester.Parser
             return new ParserResult(testDefinitions.ToArray(), disableDefinitions.ToArray());
         }
 
-        public static ParserResult Parse(string code, List<Warning> warnings, System.Action<string, Terminal.TerminalInterpreter.LogType> printCallback = null)
+        public static ParserResult Parse(string code, List<Warning> warnings, System.Action<string, Output.LogType> printCallback = null)
         {
             var tokenizer = new IngameCoding.BBCode.Tokenizer(TokenizerSettings.Default);
             var (tokens, _) = tokenizer.Parse(code);
 
             System.DateTime parseStarted = System.DateTime.Now;
             if (printCallback != null)
-            { printCallback?.Invoke("Parsing ...", Terminal.TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
 
             Parser parser = new();
             var result = parser.Parse(tokens, warnings);
@@ -221,7 +221,7 @@ namespace IngameCoding.Tester.Parser
             }
 
             if (printCallback != null)
-            { printCallback?.Invoke($"Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", Terminal.TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke($"Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
 
             return result;
         }
@@ -291,7 +291,7 @@ namespace IngameCoding.Tester.Parser
             if (!ExpectIdentifier("test", out var keyword))
             { currentTokenIndex = parseStart; return false; }
 
-            Token name = null;
+            Token name;
             if (!ExpectLiteral(out name))
             {
                 if (!ExpectIdentifier(out name))
@@ -339,7 +339,7 @@ namespace IngameCoding.Tester.Parser
             {
                 if (ExpectOperator(";") != null) break;
 
-                Token parameter = null;
+                Token parameter;
                 if (!ExpectLiteral(out parameter))
                 {
                     if (!ExpectIdentifier(out parameter))
@@ -386,18 +386,6 @@ namespace IngameCoding.Tester.Parser
 
         #region Basic parsing
 
-        Token ExpectIdentifier(string name)
-        {
-            if (CurrentToken == null) return null;
-            if (CurrentToken.type != TokenType.IDENTIFIER) return null;
-            if (name.Length > 0 && CurrentToken.text != name) return null;
-
-            Token returnToken = CurrentToken;
-            currentTokenIndex++;
-
-            return returnToken;
-        }
-        Token ExpectIdentifier() => ExpectIdentifier("");
         bool ExpectIdentifier(out Token result)
         {
             result = null;
@@ -435,29 +423,6 @@ namespace IngameCoding.Tester.Parser
             currentTokenIndex++;
 
             return returnToken;
-        }
-        Token ExpectOperator(string[] name)
-        {
-            if (CurrentToken == null) return null;
-            if (CurrentToken.type != TokenType.OPERATOR) return null;
-            if (name.Contains(CurrentToken.text) == false) return null;
-
-            Token returnToken = CurrentToken;
-            currentTokenIndex++;
-
-            return returnToken;
-        }
-        bool ExpectOperator(string[] name, out Token outToken)
-        {
-            outToken = null;
-            if (CurrentToken == null) return false;
-            if (CurrentToken.type != TokenType.OPERATOR) return false;
-            if (name.Contains(CurrentToken.text) == false) return false;
-
-            Token returnToken = CurrentToken;
-            currentTokenIndex++;
-            outToken = returnToken;
-            return true;
         }
         bool ExpectOperator(string name, out Token outToken)
         {

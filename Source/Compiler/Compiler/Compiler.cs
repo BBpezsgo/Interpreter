@@ -15,8 +15,6 @@ namespace IngameCoding.BBCode.Compiler
     using Parser;
     using Parser.Statements;
 
-    using Terminal;
-
     public class Compiler
     {
         public class CompilerResult : Serialization.ISerializable<CompilerResult>
@@ -266,7 +264,7 @@ namespace IngameCoding.BBCode.Compiler
             List<Statement_HashInfo> Hashes,
             List<Error> errors,
             List<Warning> warnings,
-            Action<string, TerminalInterpreter.LogType> printCallback)
+            Action<string, Output.LogType> printCallback)
         {
             string content = null;
             string path = null;
@@ -280,12 +278,12 @@ namespace IngameCoding.BBCode.Compiler
 
                 if (alreadyCompiledCodes.Contains(path))
                 {
-                    printCallback?.Invoke($" Skip file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+                    printCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
                     return;
                 }
                 alreadyCompiledCodes.Add(path);
 
-                printCallback?.Invoke($" Download file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+                printCallback?.Invoke($" Download file \"{path}\" ...", Output.LogType.Debug);
                 System.Net.Http.HttpClient httpClient = new();
                 System.Threading.Tasks.Task<string> req;
                 try
@@ -298,7 +296,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
                 req.Wait();
 
-                printCallback?.Invoke($" File \"{path}\" downloaded", TerminalInterpreter.LogType.Debug);
+                printCallback?.Invoke($" File \"{path}\" downloaded", Output.LogType.Debug);
 
                 content = req.Result;
             }
@@ -311,7 +309,7 @@ namespace IngameCoding.BBCode.Compiler
                 {
                     if (alreadyCompiledCodes.Contains(path))
                     {
-                        printCallback?.Invoke($" Skip file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+                        printCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
                         return;
                     }
                     alreadyCompiledCodes.Add(path);
@@ -325,7 +323,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            printCallback?.Invoke($" Parse file \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke($" Parse file \"{path}\" ...", Output.LogType.Debug);
             ParserResult parserResult2 = Parser.Parse(content, warnings, (msg, lv) => printCallback?.Invoke($"  {msg}", lv));
 
             parserResult2.SetFile(path);
@@ -413,7 +411,7 @@ namespace IngameCoding.BBCode.Compiler
             List<Error> errors,
             CompilerSettings settings,
             ParserSettings parserSettings,
-            Action<string, TerminalInterpreter.LogType> printCallback = null)
+            Action<string, Output.LogType> printCallback = null)
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -422,7 +420,7 @@ namespace IngameCoding.BBCode.Compiler
             List<string> AlreadyCompiledCodes = new() { file.FullName };
 
             if (parserResult.Usings.Count > 0)
-            { printCallback?.Invoke("Parse usings ...", TerminalInterpreter.LogType.Debug); }
+            { printCallback?.Invoke("Parse usings ...", Output.LogType.Debug); }
 
             foreach (UsingDefinition usingItem in parserResult.Usings)
             {
@@ -454,13 +452,13 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             DateTime codeGenerationStarted = DateTime.Now;
-            printCallback?.Invoke("Generating code ...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke("Generating code ...", Output.LogType.Debug);
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
             var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
 
-            printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
             return new CompilerResult()
             {

@@ -9,7 +9,6 @@ namespace IngameCoding.BBCode.Compiler
     using IngameCoding.Bytecode;
     using IngameCoding.Core;
     using IngameCoding.Errors;
-    using IngameCoding.Terminal;
 
     public struct Reference<T>
     {
@@ -2333,9 +2332,9 @@ namespace IngameCoding.BBCode.Compiler
             { CompiledAttributes = attributes };
         }
 
-        int AnalyzeFunctions(Dictionary<string, FunctionDefinition> functions, Action<string, TerminalInterpreter.LogType> printCallback = null)
+        int AnalyzeFunctions(Dictionary<string, FunctionDefinition> functions, Action<string, Output.LogType> printCallback = null)
         {
-            printCallback?.Invoke($"  Remove unused functions ...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
 
             // Remove unused functions
             {
@@ -2483,7 +2482,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            printCallback?.Invoke($"   Processing ...", TerminalInterpreter.LogType.Debug);
+            printCallback?.Invoke($"   Processing ...", Output.LogType.Debug);
 
             int functionsRemoved = 0;
 
@@ -2501,7 +2500,7 @@ namespace IngameCoding.BBCode.Compiler
 
                 string readableID = element.Value.ReadableID();
 
-                printCallback?.Invoke($"      Remove function '{readableID}' ...", TerminalInterpreter.LogType.Debug);
+                printCallback?.Invoke($"      Remove function '{readableID}' ...", Output.LogType.Debug);
                 informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Value.Name, element.Value.FilePath));
 
                 functions.Remove(element.Key);
@@ -2522,7 +2521,7 @@ namespace IngameCoding.BBCode.Compiler
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<IStruct>> builtinStructs,
             Compiler.CompilerSettings settings,
-            Action<string, TerminalInterpreter.LogType> printCallback = null)
+            Action<string, Output.LogType> printCallback = null)
         {
             BlockCodeGeneration = true;
 
@@ -2706,11 +2705,11 @@ namespace IngameCoding.BBCode.Compiler
                 int functionsRemoved = AnalyzeFunctions(functions, printCallback);
                 if (functionsRemoved == 0)
                 {
-                    printCallback?.Invoke($"  Deletion of unused functions is complete", TerminalInterpreter.LogType.Debug);
+                    printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
                     break;
                 }
 
-                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", TerminalInterpreter.LogType.Debug);
+                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", Output.LogType.Debug);
             }
 
             #region Code Generation
@@ -2797,7 +2796,7 @@ namespace IngameCoding.BBCode.Compiler
                         }
                     }
                 }
-                printCallback?.Invoke($"Optimalization: Removed {removedInstructions} & changed {changedInstructions} instructions", TerminalInterpreter.LogType.Debug);
+                printCallback?.Invoke($"Optimalization: Removed {removedInstructions} & changed {changedInstructions} instructions", Output.LogType.Debug);
             }
 
             return new CodeGeneratorResult()

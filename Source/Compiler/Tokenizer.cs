@@ -7,7 +7,6 @@ namespace IngameCoding.BBCode
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser.Statements;
     using IngameCoding.Core;
-    using IngameCoding.Terminal;
     using IngameCoding.Tokenizer;
 
     public class TokenAnalysis
@@ -209,9 +208,9 @@ namespace IngameCoding.BBCode
         readonly List<Token> tokensWithComments;
 
         readonly TokenizerSettings settings;
-        readonly Action<string, TerminalInterpreter.LogType> printCallback;
+        readonly Action<string, Output.LogType> printCallback;
 
-        void Print(string message, TerminalInterpreter.LogType type) => printCallback?.Invoke(message, type);
+        void Print(string message, Output.LogType type) => printCallback?.Invoke(message, type);
 
         static readonly char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] banned = new char[] { '\r', '\u200B' };
@@ -223,7 +222,7 @@ namespace IngameCoding.BBCode
         /// <param name="printCallback">
         /// Optional: Print callback
         /// </param>
-        public Tokenizer(TokenizerSettings settings, Action<string, TerminalInterpreter.LogType> printCallback = null)
+        public Tokenizer(TokenizerSettings settings, Action<string, Output.LogType> printCallback = null)
         {
             CurrentToken = new()
             {
@@ -260,7 +259,7 @@ namespace IngameCoding.BBCode
         public (Token[], Token[]) Parse(string sourceCode)
         {
             DateTime tokenizingStarted = DateTime.Now;
-            Print("Tokenizing ...", TerminalInterpreter.LogType.Debug);
+            Print("Tokenizing ...", Output.LogType.Debug);
 
             for (int OffsetTotal = 0; OffsetTotal < sourceCode.Length; OffsetTotal++)
             {
@@ -593,7 +592,7 @@ namespace IngameCoding.BBCode
 
             EndToken(sourceCode.Length);
 
-            Print($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", TerminalInterpreter.LogType.Debug);
+            Print($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
             return (NormalizeTokens(tokens, settings).ToArray(), NormalizeTokens(tokensWithComments, settings).ToArray());
         }

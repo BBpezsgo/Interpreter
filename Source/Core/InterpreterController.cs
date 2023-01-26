@@ -12,8 +12,7 @@ namespace IngameCoding.Core
     using Errors;
 
     using IngameCoding.BBCode.Compiler;
-
-    using Terminal;
+    using IngameCoding.Output;
 
     /// <summary>
     /// This compiles and runs the code
@@ -51,7 +50,7 @@ namespace IngameCoding.Core
         /// </summary>
         public event OnDoneEventHandler OnDone;
 
-        public delegate void OnOutputEventHandler(Interpreter sender, string message, TerminalInterpreter.LogType logType);
+        public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
         /// <summary>
         /// Will be invoked when the interpeter has output
         /// </summary>
@@ -187,10 +186,10 @@ namespace IngameCoding.Core
 
             state = State.Initialized;
 
-            OnOutput?.Invoke(this, "Start code ...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, "Start code ...", LogType.Debug);
         }
 
-        public Instruction[] ReadBinary(byte[] code, bool handleErrors)
+        public Instruction[] ReadBinary(byte[] code)
         {
             List<Error> errors = new();
 
@@ -198,7 +197,7 @@ namespace IngameCoding.Core
 
             details = new InterpreterDetails(this);
 
-            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
 
             OnlyHaveCode = false;
 
@@ -279,7 +278,7 @@ namespace IngameCoding.Core
             BBCode.Parser.ParserSettings parserSettings,
             out List<Error> errors)
         {
-            OnOutput?.Invoke(this, $"Parse code: The main source code ...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, $"Parse code: The main source code ...", LogType.Debug);
 
             errors = new();
 
@@ -313,10 +312,10 @@ namespace IngameCoding.Core
             {
                 if (printedWarnings.Contains(warning.MessageAll)) continue;
                 printedWarnings.Add(warning.MessageAll);
-                OnOutput?.Invoke(this, warning.MessageAll, TerminalInterpreter.LogType.Warning);
+                OnOutput?.Invoke(this, warning.MessageAll, LogType.Warning);
             }
 
-            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
 
             OnlyHaveCode = false;
 
@@ -387,7 +386,7 @@ namespace IngameCoding.Core
         {
             if (currentlyRunningCode)
             {
-                OnOutput?.Invoke(this, "Can't run the program: currently running another", TerminalInterpreter.LogType.Warning);
+                OnOutput?.Invoke(this, "Can't run the program: currently running another", LogType.Warning);
                 return false;
             }
             this.currentlyRunningCode = true;
@@ -398,7 +397,7 @@ namespace IngameCoding.Core
                 pauseCode = true;
                 if (OnNeedInput == null)
                 {
-                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", TerminalInterpreter.LogType.Warning);
+                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
                     OnInput('\0');
                 }
                 else
@@ -451,8 +450,8 @@ namespace IngameCoding.Core
                     bytecodeInterpreter = null;
                     currentlyRunningCode = false;
 
-                    OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, TerminalInterpreter.LogType.Error);
-                    Output.Debug.Debug.LogError(error);
+                    OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, LogType.Error);
+                    IngameCoding.Output.Debug.Debug.LogError(error);
 
                     StackTrace stackTrace = new(error);
                     var stackFrames = stackTrace.GetFrames();
@@ -466,7 +465,7 @@ namespace IngameCoding.Core
                             StackTraceString += "  " + method.Name + "()\r\n";
                         }
                     }
-                    OnOutput?.Invoke(this, " Stack Trace:\r\n" + StackTraceString, TerminalInterpreter.LogType.Error);
+                    OnOutput?.Invoke(this, " Stack Trace:\r\n" + StackTraceString, LogType.Error);
                 }
                 catch (System.Exception error)
                 {
@@ -474,17 +473,17 @@ namespace IngameCoding.Core
                     bytecodeInterpreter = null;
                     currentlyRunningCode = false;
 
-                    OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", TerminalInterpreter.LogType.Error);
-                    Output.Output.Error(error);
+                    OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", LogType.Error);
+                    IngameCoding.Output.Output.Error(error);
                 }
 
                 foreach (var warning in warnings)
-                { OnOutput?.Invoke(this, warning.MessageAll + "\r\n", TerminalInterpreter.LogType.Warning); }
+                { OnOutput?.Invoke(this, warning.MessageAll + "\r\n", LogType.Warning); }
 
                 foreach (var error in errors)
-                { OnOutput?.Invoke(this, error.MessageAll + "\r\n", TerminalInterpreter.LogType.Error); }
+                { OnOutput?.Invoke(this, error.MessageAll + "\r\n", LogType.Error); }
 
-                OnOutput?.Invoke(this, $"Code cannot be compiled", TerminalInterpreter.LogType.Error);
+                OnOutput?.Invoke(this, $"Code cannot be compiled", LogType.Error);
 
                 return null;
             }
@@ -670,7 +669,7 @@ namespace IngameCoding.Core
 
         public void LoadDLL(string path)
         {
-            OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", LogType.Debug);
             var dll = System.Reflection.Assembly.LoadFile(path);
             var exportedTypes = dll.GetExportedTypes();
             int functionsAdded = 0;
@@ -681,12 +680,12 @@ namespace IngameCoding.Core
                 foreach (var method in methods)
                 {
                     var newFunction = builtinFunctions.AddBuiltinFunction(method);
-                    OnOutput?.Invoke(this, $" Added function {newFunction.ReadableID()}", TerminalInterpreter.LogType.Debug);
+                    OnOutput?.Invoke(this, $" Added function {newFunction.ReadableID()}", LogType.Debug);
                     functionsAdded++;
                 }
             }
 
-            OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", TerminalInterpreter.LogType.Debug);
+            OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", LogType.Debug);
         }
 
         void AddBuiltins()
@@ -848,7 +847,7 @@ namespace IngameCoding.Core
                     {
                         error.FeedDebugInfo(details.CompilerResult.debugInfo);
 
-                        OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, TerminalInterpreter.LogType.Error);
+                        OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, LogType.Error);
 
                         OnDone?.Invoke(this, false);
                         var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
@@ -858,7 +857,7 @@ namespace IngameCoding.Core
                     }
                     catch (System.Exception error)
                     {
-                        OnOutput?.Invoke(this, "Internal Exception: " + error.Message, TerminalInterpreter.LogType.Error);
+                        OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
 
                         OnDone?.Invoke(this, false);
                         var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
@@ -889,7 +888,7 @@ namespace IngameCoding.Core
                         if (!globalVariablesCreated)
                         {
                             state = State.SetGlobalVariables;
-                            OnOutput?.Invoke(this, "Set Global Variables", TerminalInterpreter.LogType.Debug);
+                            OnOutput?.Invoke(this, "Set Global Variables", LogType.Debug);
 
                             globalVariablesCreated = true;
                             bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
@@ -897,7 +896,7 @@ namespace IngameCoding.Core
                         else if (!startCalled)
                         {
                             state = State.CallCodeEntry;
-                            OnOutput?.Invoke(this, "Call CodeEntry", TerminalInterpreter.LogType.Debug);
+                            OnOutput?.Invoke(this, "Call CodeEntry", LogType.Debug);
 
                             startCalled = true;
                             if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
@@ -908,29 +907,20 @@ namespace IngameCoding.Core
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
                         {
                             state = State.CallUpdate;
-                            WaitForUpdates(10, () =>
-                            {
-                                if (bytecodeInterpreter != null)
-                                {
-                                    bytecodeInterpreter.Call(offset);
-                                }
-                            });
+                            WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset));
                         }
                         else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
                         {
                             state = State.CallCodeEnd;
-                            OnOutput?.Invoke(this, "Call CodeEnd", TerminalInterpreter.LogType.Debug);
+                            OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
 
                             exitCalled = true;
-                            if (bytecodeInterpreter != null)
-                            {
-                                bytecodeInterpreter.Call(offset);
-                            }
+                            bytecodeInterpreter?.Call(offset);
                         }
                         else if (!globalVariablesDisposed)
                         {
                             state = State.DisposeGlobalVariables;
-                            OnOutput?.Invoke(this, "Dispose Global Variables", TerminalInterpreter.LogType.Debug);
+                            OnOutput?.Invoke(this, "Dispose Global Variables", LogType.Debug);
 
                             globalVariablesDisposed = true;
                             bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
@@ -957,7 +947,7 @@ namespace IngameCoding.Core
             else
             {
                 builtinFunctions[name] = function;
-                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+                Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
 

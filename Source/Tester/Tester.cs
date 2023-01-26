@@ -3,7 +3,6 @@ using IngameCoding.BBCode.Compiler;
 using IngameCoding.Bytecode;
 using IngameCoding.Core;
 using IngameCoding.Errors;
-using IngameCoding.Terminal;
 
 using System;
 using System.Collections.Generic;
@@ -118,19 +117,19 @@ namespace IngameCoding.Tester
             {
                 switch (logType)
                 {
-                    case TerminalInterpreter.LogType.System:
+                    case Output.LogType.System:
                         if (LogSystem) Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Normal:
+                    case Output.LogType.Normal:
                         Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Warning:
+                    case Output.LogType.Warning:
                         Output.Output.Warning(message);
                         break;
-                    case TerminalInterpreter.LogType.Error:
+                    case Output.LogType.Error:
                         Output.Output.Error(message);
                         break;
-                    case TerminalInterpreter.LogType.Debug:
+                    case Output.LogType.Debug:
                         if (LogDebug) Output.Output.Debug(message);
                         break;
                 }

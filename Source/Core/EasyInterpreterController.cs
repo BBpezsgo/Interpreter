@@ -1,7 +1,6 @@
 ﻿using IngameCoding.BBCode.Compiler;
 using IngameCoding.Bytecode;
 using IngameCoding.Errors;
-using IngameCoding.Terminal;
 
 using System;
 using System.IO;
@@ -48,19 +47,19 @@ namespace IngameCoding.Core
             {
                 switch (logType)
                 {
-                    case TerminalInterpreter.LogType.System:
+                    case Output.LogType.System:
                         if (LogSystem) Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Normal:
+                    case Output.LogType.Normal:
                         Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Warning:
+                    case Output.LogType.Warning:
                         Output.Output.Warning(message);
                         break;
-                    case TerminalInterpreter.LogType.Error:
+                    case Output.LogType.Error:
                         Output.Output.Error(message);
                         break;
-                    case TerminalInterpreter.LogType.Debug:
+                    case Output.LogType.Debug:
                         if (LogDebug) Output.Output.Debug(message);
                         break;
                 }
@@ -135,19 +134,19 @@ namespace IngameCoding.Core
             {
                 switch (logType)
                 {
-                    case TerminalInterpreter.LogType.System:
+                    case Output.LogType.System:
                         if (LogSystem) Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Normal:
+                    case Output.LogType.Normal:
                         Output.Output.Log(message);
                         break;
-                    case TerminalInterpreter.LogType.Warning:
+                    case Output.LogType.Warning:
                         Output.Output.Warning(message);
                         break;
-                    case TerminalInterpreter.LogType.Error:
+                    case Output.LogType.Error:
                         Output.Output.Error(message);
                         break;
-                    case TerminalInterpreter.LogType.Debug:
+                    case Output.LogType.Debug:
                         if (LogDebug) Output.Output.Debug(message);
                         break;
                 }
@@ -164,7 +163,7 @@ namespace IngameCoding.Core
                 Instruction[] compiledCode = null;
                 try
                 {
-                    compiledCode = codeInterpreter.ReadBinary(code, HandleErrors);
+                    compiledCode = codeInterpreter.ReadBinary(code);
                 }
                 catch (IndexOutOfRangeException)
                 {

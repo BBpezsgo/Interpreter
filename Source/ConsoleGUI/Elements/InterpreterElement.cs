@@ -368,10 +368,6 @@ namespace ConsoleGUI
                     case IngameCoding.Bytecode.DataItem.Type.LIST:
                         AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.RUNTIME:
-                        ForegroundColor = CharColors.FgGray;
-                        AddText("<runtime>");
-                        break;
                     default:
                         ForegroundColor = CharColors.FgGray;
                         AddText("<null>");

@@ -18,8 +18,7 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType.BOOLEAN => DataItem.Type.BOOLEAN,
             BuiltinType.STRUCT => DataItem.Type.STRUCT,
             BuiltinType.LISTOF => DataItem.Type.LIST,
-
-            _ => DataItem.Type.RUNTIME,
+            _ => throw new NotImplementedException(),
         };
         public static BuiltinType Convert(this DataItem.Type v) => v switch
         {
@@ -29,8 +28,6 @@ namespace IngameCoding.BBCode.Compiler
             DataItem.Type.BOOLEAN => BuiltinType.BOOLEAN,
             DataItem.Type.STRUCT => BuiltinType.STRUCT,
             DataItem.Type.LIST => BuiltinType.LISTOF,
-
-            DataItem.Type.RUNTIME => BuiltinType.RUNTIME,
             _ => BuiltinType.ANY,
         };
 

@@ -1192,7 +1192,6 @@ namespace IngameCoding.Bytecode
             BOOLEAN,
             STRUCT,
             LIST,
-            RUNTIME,
         }
 
         public Type type;
@@ -1590,8 +1589,6 @@ namespace IngameCoding.Bytecode
                             return new DataItem(value.ValueList, null);
                     }
                     break;
-                case Type.RUNTIME:
-                    return value;
             }
             throw new RuntimeException("Can't cast from " + value.type.ToString() + " to " + type.ToString());
         }
@@ -2070,7 +2067,6 @@ namespace IngameCoding.Bytecode
                 Type.BOOLEAN => ValueBoolean.ToString(),
                 Type.STRUCT => "{ ... }",
                 Type.LIST => "[ ... ]",
-                Type.RUNTIME => "<RUNTIME>",
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             return retStr;
@@ -2130,7 +2126,6 @@ namespace IngameCoding.Bytecode
             Type.BOOLEAN => new DataItem(valueBoolean, Tag),
             Type.STRUCT => new DataItem(valueStruct.Copy(), Tag),
             Type.LIST => new DataItem(valueList.Copy(), Tag),
-            Type.RUNTIME => throw new InternalException($"Unknown type {type}"),
             _ => throw new InternalException($"Unknown type {type}"),
         };
         public DataItem CopyRecursive() => type switch
@@ -2141,7 +2136,6 @@ namespace IngameCoding.Bytecode
             Type.BOOLEAN => new DataItem(valueBoolean, Tag),
             Type.STRUCT => new DataItem(valueStruct.CopyRecursive(), Tag),
             Type.LIST => new DataItem(valueList.CopyRecursive(), Tag),
-            Type.RUNTIME => throw new InternalException($"Unknown type {type}"),
             _ => throw new InternalException($"Unknown type {type}"),
         };
     }

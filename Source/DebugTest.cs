@@ -227,9 +227,6 @@ namespace TheProgram
                     case DataItem.Type.LIST:
                         Parameter = "[ ... ]";
                         break;
-                    case DataItem.Type.RUNTIME:
-                        Parameter = "RUNTIME";
-                        break;
                 }
                 ParameterIsComplicated = true;
             }

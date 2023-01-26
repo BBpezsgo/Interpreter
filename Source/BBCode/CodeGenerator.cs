@@ -1633,23 +1633,23 @@ namespace IngameCoding.BBCode.Compiler
         }
         void GenerateCodeForStatement(Statement_ListValue listValue)
         {
-            DataItem.Type listType = DataItem.Type.RUNTIME;
+            BuiltinType? listType = null;
             for (int i = 0; i < listValue.Size; i++)
             {
                 if (listValue.Values[i] is not Statement_Literal literal)
                 { throw new CompilerException("Only literals are supported in list value", listValue.Values[i].TotalPosition(), CurrentFile); }
                 if (i == 0)
                 {
-                    listType = literal.Type.typeName.Convert();
-                    if (listType == DataItem.Type.RUNTIME)
+                    listType = literal.Type.typeName;
+                    if (listType == null)
                     { throw new CompilerException($"Unknown literal type {listType}", literal.Type, CurrentFile); }
                 }
-                if (literal.Type.typeName.Convert() != listType)
+                if (literal.Type.typeName != listType)
                 { throw new CompilerException($"Wrong literal type {literal.Type.typeName}. Expected {listType}", literal.Type, CurrentFile); }
             }
-            if (listType == DataItem.Type.RUNTIME)
+            if (listType == null)
             { throw new CompilerException($"Failed to get the type of the list", listValue, CurrentFile); }
-            DataItem newList = new(new DataItem.List(listType), null);
+            DataItem newList = new(new DataItem.List(listType.Value.Convert()), null);
             AddInstruction(Opcode.COMMENT, "Generate List {");
             AddInstruction(Opcode.PUSH_VALUE, newList);
             for (int i = 0; i < listValue.Size; i++)
@@ -2646,7 +2646,6 @@ namespace IngameCoding.BBCode.Compiler
                                                 new DataItem.List(DataItem.Type.STRUCT) : new DataItem.UnassignedStruct()
                                             , "return value"));
                                             break;
-                                        case BuiltinType.RUNTIME:
                                         case BuiltinType.ANY:
                                         case BuiltinType.VOID:
                                         case BuiltinType.AUTO:

@@ -223,7 +223,6 @@ namespace IngameCoding.Bytecode
                     serializer.Serialize((int)dataItem.ValueList.itemTypes);
                     serializer.SerializeObjectArray(dataItem.ValueList.items.ToArray(), SerializeDataItem);
                     break;
-                case DataItem.Type.RUNTIME:
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
             }
@@ -257,7 +256,6 @@ namespace IngameCoding.Bytecode
                     for (int i = 0; i < items.Length; i++)
                     { newList.Add(items[i]); }
                     return new DataItem(newList, tag);
-                case DataItem.Type.RUNTIME:
                 default:
                     throw new Errors.InternalException($"Unknown type {type}");
             }

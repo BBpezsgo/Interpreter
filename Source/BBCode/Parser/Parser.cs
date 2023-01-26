@@ -37,7 +37,6 @@ namespace IngameCoding.BBCode
         STRUCT,
         LISTOF,
 
-        RUNTIME,
         ANY,
     }
 

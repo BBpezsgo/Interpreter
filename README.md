@@ -47,7 +47,8 @@ When you've created a source file, just run it with the executable. Or run the e
 ## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y) or [Mega](https://mega.nz/file/CNpUFR5S#80hrb8ofv5RNCy7uIMmxxeA43dAl5I5jbfs7t_OBanU)
 ![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)
 
-[Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.bbc)
+[Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.bbc)<br>
+[Download System.Net.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.Net.bbc)
 > Some predefined structs and functions.
 
 ## [Debugger](https://github.com/BBpezsgo/InterpreterDebugger)
@@ -132,7 +133,7 @@ export void Foo()
 > **NOTE:**
 > The `export` keyword is not supported on structs: all structs can be used in other files!
 
-## Builtin Functions
+## Predefined Functions
 
 ### System.bbc
 

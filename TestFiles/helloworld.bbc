@@ -4,7 +4,7 @@ using "../CodeFiles/System";
 // Namespaces can only be used to organize code
 namespace Program
 {
-    //The program needs a function with the [CodeEntry] attribute. This function will be executed when the file is run.
+    // The program needs a function with the [CodeEntry] attribute. This function will be executed when the program is started.
     [CodeEntry]
     void Main()
     {

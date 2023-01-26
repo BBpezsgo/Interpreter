@@ -55,8 +55,23 @@ When you've created a source file, just run it with the executable. Or run the e
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
-## Hello World program:
-https://github.com/BBpezsgo/Interpreter/blob/32a5cb93a041a326dbf46774ca7dceb3945ad24d/TestFiles/helloworld.bbc#L1-L14
+## Hello World:
+```
+// This imports the local System.bbc file along with its functions and structures.
+using "../CodeFiles/System";
+
+// Namespaces can only be used to organize code
+namespace Program
+{
+    // The program needs a function with the [CodeEntry] attribute. This function will be executed when the program is started.
+    [CodeEntry]
+    void Main()
+    {
+        // Print a message to the console
+        Console.Log("Hello world");
+    }
+}
+```
 
 ## Other features
 ### Structs

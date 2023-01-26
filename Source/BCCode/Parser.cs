@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace IngameCoding.BCCode
 {
@@ -17,7 +16,7 @@ namespace IngameCoding.BCCode
 
     public class Statement
     {
-        public string name;
+        public Token name;
         public List<int> intParameters = new();
         public List<string> strParameters = new();
         public List<string> identifyParameters = new();
@@ -33,74 +32,77 @@ namespace IngameCoding.BCCode
 
     public class TagDefinition
     {
-        public string name;
-        public int pointer = -1;
+        internal Token Name;
+        internal int Pointer = -1;
+    }
+
+    public struct ParserResult
+    {
+        internal Statement[] statements;
+        internal Dictionary<string, TagDefinition> tags;
     }
 
     public class Parser
     {
-        int currentTokenIndex;
-        List<Token> tokens;
+        int CurrentTokenIndex;
+        Token[] Tokens;
 
-        Token CurrentToken => (currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
+        Token CurrentToken => (CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
 
-        public Dictionary<string, TagDefinition> tags = new();
-        public List<Statement> statements = new();
+        readonly Dictionary<string, TagDefinition> Labels = new();
+        readonly List<Statement> Statements = new();
 
         static Bytecode.Opcode TryGetTagOverride(string name) => name switch
         {
             _ => Bytecode.Opcode.UNKNOWN,
         };
 
-        static int GetParameterCount(Bytecode.Opcode opcode)
+        static int GetParameterCount(Bytecode.Opcode opcode) => opcode switch
         {
-            return opcode switch
-            {
-                Bytecode.Opcode.EXIT => 0,
-                Bytecode.Opcode.PUSH_VALUE => 1,
-                Bytecode.Opcode.POP_VALUE => 0,
-                Bytecode.Opcode.JUMP_BY_IF_FALSE => 1,
-                Bytecode.Opcode.JUMP_BY_IF_TRUE => 1,
-                Bytecode.Opcode.JUMP_BY => 1,
-                Bytecode.Opcode.LOAD_VALUE => 1,
-                Bytecode.Opcode.STORE_VALUE => 1,
-                Bytecode.Opcode.LOAD_VALUE_BR => 1,
-                Bytecode.Opcode.STORE_VALUE_BR => 1,
-                Bytecode.Opcode.CALL => 1,
-                Bytecode.Opcode.RETURN => 0,
-                Bytecode.Opcode.CALL_BUILTIN => 0,
-                Bytecode.Opcode.LOGIC_LT => 0,
-                Bytecode.Opcode.LOGIC_MT => 0,
-                Bytecode.Opcode.LOGIC_LTEQ => 0,
-                Bytecode.Opcode.LOGIC_MTEQ => 0,
-                Bytecode.Opcode.LOGIC_AND => 0,
-                Bytecode.Opcode.LOGIC_OR => 0,
-                Bytecode.Opcode.LOGIC_XOR => 0,
-                Bytecode.Opcode.LOGIC_EQ => 0,
-                Bytecode.Opcode.LOGIC_NEQ => 0,
-                Bytecode.Opcode.LOGIC_NOT => 0,
-                Bytecode.Opcode.MATH_ADD => 0,
-                Bytecode.Opcode.MATH_SUB => 0,
-                Bytecode.Opcode.MATH_MULT => 0,
-                Bytecode.Opcode.MATH_DIV => 0,
-                Bytecode.Opcode.MATH_MOD => 0,
-                Bytecode.Opcode.LOAD_FIELD => 1,
-                Bytecode.Opcode.STORE_FIELD => 1,
-                Bytecode.Opcode.LOAD_FIELD_BR => 1,
-                Bytecode.Opcode.STORE_FIELD_BR => 1,
-                Bytecode.Opcode.LIST_INDEX => 1,
-                Bytecode.Opcode.LIST_PUSH_ITEM => 0,
-                Bytecode.Opcode.LIST_ADD_ITEM => 1,
-                Bytecode.Opcode.LIST_PULL_ITEM => 0,
-                Bytecode.Opcode.LIST_REMOVE_ITEM => 1,
-                Bytecode.Opcode.TYPE_GET => 0,
-                Bytecode.Opcode.COMMENT => -1,
-                Bytecode.Opcode.UNKNOWN => -1,
-                _ => -1,
-            };
-        }
+            Bytecode.Opcode.EXIT => 0,
+            Bytecode.Opcode.PUSH_VALUE => 1,
+            Bytecode.Opcode.POP_VALUE => 0,
+            Bytecode.Opcode.JUMP_BY_IF_FALSE => 1,
+            Bytecode.Opcode.JUMP_BY_IF_TRUE => 1,
+            Bytecode.Opcode.JUMP_BY => 1,
+            Bytecode.Opcode.LOAD_VALUE => 1,
+            Bytecode.Opcode.STORE_VALUE => 1,
+            Bytecode.Opcode.LOAD_VALUE_BR => 1,
+            Bytecode.Opcode.STORE_VALUE_BR => 1,
+            Bytecode.Opcode.CALL => 1,
+            Bytecode.Opcode.RETURN => 0,
+            Bytecode.Opcode.CALL_BUILTIN => 0,
+            Bytecode.Opcode.LOGIC_LT => 0,
+            Bytecode.Opcode.LOGIC_MT => 0,
+            Bytecode.Opcode.LOGIC_LTEQ => 0,
+            Bytecode.Opcode.LOGIC_MTEQ => 0,
+            Bytecode.Opcode.LOGIC_AND => 0,
+            Bytecode.Opcode.LOGIC_OR => 0,
+            Bytecode.Opcode.LOGIC_XOR => 0,
+            Bytecode.Opcode.LOGIC_EQ => 0,
+            Bytecode.Opcode.LOGIC_NEQ => 0,
+            Bytecode.Opcode.LOGIC_NOT => 0,
+            Bytecode.Opcode.MATH_ADD => 0,
+            Bytecode.Opcode.MATH_SUB => 0,
+            Bytecode.Opcode.MATH_MULT => 0,
+            Bytecode.Opcode.MATH_DIV => 0,
+            Bytecode.Opcode.MATH_MOD => 0,
+            Bytecode.Opcode.LOAD_FIELD => 1,
+            Bytecode.Opcode.STORE_FIELD => 1,
+            Bytecode.Opcode.LOAD_FIELD_BR => 1,
+            Bytecode.Opcode.STORE_FIELD_BR => 1,
+            Bytecode.Opcode.LIST_INDEX => 1,
+            Bytecode.Opcode.LIST_PUSH_ITEM => 0,
+            Bytecode.Opcode.LIST_ADD_ITEM => 1,
+            Bytecode.Opcode.LIST_PULL_ITEM => 0,
+            Bytecode.Opcode.LIST_REMOVE_ITEM => 1,
+            Bytecode.Opcode.TYPE_GET => 0,
+            Bytecode.Opcode.COMMENT => -1,
+            Bytecode.Opcode.UNKNOWN => -1,
+            _ => -1,
+        };
 
-        public static Bytecode.Opcode GetOpcode(string text, Token token)
+        static Bytecode.Opcode GetOpcode(string text, Token token)
         {
             if (TryGetTagOverride(text.ToLower()) != Bytecode.Opcode.UNKNOWN)
             { return TryGetTagOverride(text.ToLower()); }
@@ -113,7 +115,7 @@ namespace IngameCoding.BCCode
 
             throw new CompilerException("There is no opcode with name '" + text + "'", token);
         }
-        public static Bytecode.Opcode GetOpcode(string text, int line)
+        static Bytecode.Opcode GetOpcode(string text, int line)
         {
             if (TryGetTagOverride(text.ToLower()) != Bytecode.Opcode.UNKNOWN)
             { return TryGetTagOverride(text.ToLower()); }
@@ -127,13 +129,13 @@ namespace IngameCoding.BCCode
             throw new CompilerException("There is no opcode with name '" + text + "'", new Position(line));
         }
 
-        public static Bytecode.Instruction[] GenerateCode(List<Statement> statements, Dictionary<string, TagDefinition> tags)
+        public static Bytecode.Instruction[] GenerateCode(ParserResult parserResult)
         {
             List<Bytecode.Instruction> instructions = new();
-            for (int line = 0; line < statements.Count; line++)
+            for (int line = 0; line < parserResult.statements.Length; line++)
             {
-                Statement statement = statements[line];
-                Bytecode.Instruction instruction = new(GetOpcode(statement.name, statement.line), statement.line);
+                Statement statement = parserResult.statements[line];
+                Bytecode.Instruction instruction = new(GetOpcode(statement.name.text, statement.line), statement.line);
 
                 int paramCount = statement.intParameters.Count + statement.strParameters.Count + statement.identifyParameters.Count;
                 if (paramCount != GetParameterCount(instruction.opcode))
@@ -147,9 +149,9 @@ namespace IngameCoding.BCCode
                     {
                         if (statement.identifyParameters.Count == 1)
                         {
-                            if (tags.TryGetValue(statement.identifyParameters[0], out TagDefinition tag))
+                            if (parserResult.tags.TryGetValue(statement.identifyParameters[0], out TagDefinition tag))
                             {
-                                instruction.parameter = tag.pointer - line;
+                                instruction.parameter = tag.Pointer - line;
                             }
                             else
                             {
@@ -172,26 +174,11 @@ namespace IngameCoding.BCCode
             return instructions.ToArray();
         }
 
-        public static string GenerateTextCode(Bytecode.Instruction[] instructions)
+        public ParserResult Parse(List<Token> tokens) => Parse(tokens.ToArray());
+        public ParserResult Parse(Token[] tokens)
         {
-            string text = "";
-            foreach (var instruction in instructions)
-            {
-                text += instruction.opcode.ToString();
-                if (GetParameterCount(instruction.opcode) == 1)
-                {
-                    text += " " + instruction.parameter.ToString();
-                }
-                text += "\n";
-            }
-            return text;
-        }
-
-        public (List<Statement> statements, Dictionary<string, TagDefinition> tags) Parse(List<Token> _tokens)
-        {
-            tokens = _tokens;
-
-            currentTokenIndex = 0;
+            this.Tokens = tokens;
+            this.CurrentTokenIndex = 0;
 
             int endlessSafe = 0;
             while (CurrentToken != null)
@@ -205,42 +192,45 @@ namespace IngameCoding.BCCode
                 else
                 {
                     Statement statement = ExpectCommand();
-                    if (statement != null) statements.Add(statement);
+                    if (statement != null) Statements.Add(statement);
                 }
 
                 endlessSafe++;
                 if (endlessSafe > 500) { throw new EndlessLoopException(); }
             }
 
-            return (this.statements, this.tags);
+            return new ParserResult()
+            {
+                statements = this.Statements.ToArray(),
+                tags = this.Labels,
+            };
         }
 
         bool ExpectLabel()
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
 
             Token possibleName = ExpectIdentifier();
 
             if (possibleName == null)
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return false;
             }
 
             if (ExpectOperator(":", out Token endOperator) == null)
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return false;
             }
 
             possibleName.subtype = TokenSubtype.LabelName;
 
-            TagDefinition tagDefinition = new()
+            Labels.Add(possibleName.text, new TagDefinition()
             {
-                name = possibleName.text,
-                pointer = statements.Count
-            };
-            tags.Add(possibleName.text, tagDefinition);
+                Name = possibleName,
+                Pointer = Statements.Count,
+            });
 
             if (ExpectLinebreak() == null)
             { throw new SyntaxException("there must be a linebreak after a label", possibleName); }
@@ -257,7 +247,7 @@ namespace IngameCoding.BCCode
             if (CurrentToken.type == TokenType.LITERAL_INTEGER)
             {
                 Token integerToken = CurrentToken.Clone();
-                currentTokenIndex++;
+                CurrentTokenIndex++;
                 return integerToken;
             }
             else if (ExpectOperator("-", out Token minusToken) != null)
@@ -279,18 +269,18 @@ namespace IngameCoding.BCCode
             if (CurrentToken.type != TokenType.LITERAL_STRING) return null;
 
             Token integerToken = CurrentToken.Clone();
-            currentTokenIndex++;
+            CurrentTokenIndex++;
             return integerToken;
         }
 
         Statement ExpectCommand()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             Token possibleFunctionName = ExpectIdentifier();
             if (possibleFunctionName == null)
             {
-                currentTokenIndex = startTokenIndex;
+                CurrentTokenIndex = startTokenIndex;
                 return null;
             }
 
@@ -300,7 +290,7 @@ namespace IngameCoding.BCCode
 
             Statement command = new()
             {
-                name = possibleFunctionName.text,
+                name = possibleFunctionName,
 
                 line = possibleFunctionName.Position.Start.Line,
 
@@ -390,7 +380,7 @@ namespace IngameCoding.BCCode
             if (name.Length > 0 && CurrentToken.text != name) return null;
 
             Token returnToken = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
             return returnToken;
         }
         Token ExpectIdentifier() => ExpectIdentifier("");
@@ -404,7 +394,7 @@ namespace IngameCoding.BCCode
 
             Token returnToken = CurrentToken;
             outToken = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
             return returnToken;
         }
 
@@ -415,7 +405,7 @@ namespace IngameCoding.BCCode
             if (CurrentToken.type != TokenType.LINEBREAK) return null;
 
             Token returnToken = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
             return returnToken;
         }
 
@@ -426,7 +416,7 @@ namespace IngameCoding.BCCode
             {
                 if (CurrentToken == null) break;
                 if (CurrentToken.type != TokenType.COMMENT) break;
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 endlessSafe++;
                 if (endlessSafe > 16) throw new EndlessLoopException();
@@ -440,7 +430,7 @@ namespace IngameCoding.BCCode
                 if (CurrentToken == null) break;
                 ConsumeComments();
                 if (CurrentToken.type != TokenType.LINEBREAK) break;
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 endlessSafe++;
                 if (endlessSafe > 16) throw new EndlessLoopException();

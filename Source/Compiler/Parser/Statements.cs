@@ -6,6 +6,8 @@ namespace IngameCoding.BBCode.Parser.Statements
 {
     using Core;
 
+    using System.Linq;
+
     public static class StatementFinder
     {
         static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
@@ -225,13 +227,14 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_FunctionCall : StatementWithReturnValue
     {
-        string[] namespacePath;
-        readonly string[] targetNamespacePath;
+        readonly string[] namespacePath;
+        string[] targetNamespacePath;
         public Token Identifier;
         internal string FunctionName => Identifier.text;
         public List<Statement> Parameters = new();
         internal bool IsMethodCall => PrevStatement != null;
         public Statement PrevStatement;
+        internal bool TargetNamespacePathPrefixIsReversed;
 
         internal Statement[] MethodParameters
         {
@@ -245,6 +248,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
+        /// <summary> The path in which **the statement is located** </summary>
         /// <returns> "[library].[...].[library]." </returns>
         public string NamespacePathPrefix
         {
@@ -255,13 +259,8 @@ namespace IngameCoding.BBCode.Parser.Statements
                 { val += namespacePath[i].ToString() + "."; }
                 return val;
             }
-            set
-            {
-                if (value.Length == 0) { this.namespacePath = Array.Empty<string>(); }
-                if (!value.Contains('.')) { this.namespacePath = new string[1] { value }; }
-                this.namespacePath = value.Split(".");
-            }
         }
+        /// <summary> The path to which **the statement refers** </summary>
         /// <returns> "[library].[...].[library]." </returns>
         public string TargetNamespacePathPrefix
         {
@@ -271,6 +270,12 @@ namespace IngameCoding.BBCode.Parser.Statements
                 for (int i = 0; i < targetNamespacePath.Length; i++)
                 { val += targetNamespacePath[i].ToString() + "."; }
                 return val;
+            }
+            set
+            {
+                if (value.Length == 0) { this.targetNamespacePath = Array.Empty<string>(); }
+                if (!value.Contains('.')) { this.targetNamespacePath = new string[1] { value }; }
+                this.targetNamespacePath = value.Split(".");
             }
         }
 

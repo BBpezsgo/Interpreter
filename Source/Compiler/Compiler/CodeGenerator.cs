@@ -100,6 +100,7 @@ namespace IngameCoding.BBCode.Compiler
         internal readonly Dictionary<string, CompiledVariable> compiledVariables = new();
         internal Dictionary<string, CompiledVariable> compiledGlobalVariables;
         internal VariableStack variableCountStack = new();
+        internal string CurrentFunction_ForRecursionProtection;
 
         internal Dictionary<string, int> functionOffsets;
 
@@ -152,54 +153,38 @@ namespace IngameCoding.BBCode.Compiler
 
         bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
+            compiledFunction = null;
             string callID = "";
-            for (int i = 0; i < functionCallStatement.Parameters.Count; i++)
-            { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
-
-            if (compiledFunctions.TryGetValue(functionCallStatement.FunctionName + callID, out compiledFunction))
-            { return true; }
-
-            if (compiledFunctions.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
-            { return true; }
 
             string namespacePath = TryGetFunctionNamespacePath(functionCallStatement);
-
-            if (namespacePath == "")
+            if (namespacePath != "")
             {
-                callID = "";
-                for (int i = 0; i < functionCallStatement.MethodParameters.Length; i++)
-                { callID += "," + FindStatementType(functionCallStatement.MethodParameters[i]); }
-
-                if (compiledFunctions.TryGetValue(functionCallStatement.FunctionName + callID, out compiledFunction))
-                { return true; }
-
-                if (compiledFunctions.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
-                { return true; }
-            }
-
-            if (compiledFunctions.TryGetValue(namespacePath + functionCallStatement.FunctionName + callID, out compiledFunction))
-            {
-                if (namespacePath.EndsWith("."))
-                { namespacePath = namespacePath[..^1]; }
-                functionCallStatement.NamespacePathPrefix = namespacePath;
+                if (namespacePath.EndsWith(".")) namespacePath = namespacePath[..^1];
+                functionCallStatement.TargetNamespacePathPrefix = namespacePath;
                 functionCallStatement.PrevStatement = null;
-                return true;
-            }
 
-            if (compiledFunctions.TryGetValue(namespacePath + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
+                for (int i = 0; i < functionCallStatement.Parameters.Count; i++)
+                { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
+            }
+            else
             {
-                if (namespacePath.EndsWith("."))
-                { namespacePath = namespacePath[..^1]; }
-                functionCallStatement.NamespacePathPrefix = namespacePath;
-                functionCallStatement.PrevStatement = null;
-                return true;
+                if (functionCallStatement.PrevStatement != null)
+                { callID += "," + FindStatementType(functionCallStatement.PrevStatement); }
+                for (int i = 0; i < functionCallStatement.Parameters.Count; i++)
+                { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
             }
 
-            if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
-            { return true; }
+            List<string> searchForThese = new()
+            {
+                functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID,
+                functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID
+            };
 
-            if (compiledFunctions.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out compiledFunction))
-            { return true; }
+            foreach (var searchName in searchForThese)
+            {
+                if (compiledFunctions.TryGetValue(searchName, out compiledFunction))
+                { return true; }
+            }
 
             return false;
         }
@@ -239,8 +224,15 @@ namespace IngameCoding.BBCode.Compiler
 
             if (functionCallStatement.PrevStatement != null)
             {
-                var path = Get(functionCallStatement.PrevStatement);
+                string[] path = Get(functionCallStatement.PrevStatement);
                 if (path == null) return "";
+                if (!functionCallStatement.TargetNamespacePathPrefixIsReversed)
+                {
+                    functionCallStatement.TargetNamespacePathPrefixIsReversed = true;
+                    List<string> pathReversed = path.ToList();
+                    pathReversed.Reverse();
+                    path = pathReversed.ToArray();
+                }
                 return string.Join(".", path) + ".";
             }
             else
@@ -249,40 +241,7 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
-        {
-            string callID = "";
-
-            if (TryGetFunctionNamespacePath(functionCallStatement) == "")
-            {
-                for (int i = 0; i < functionCallStatement.MethodParameters.Length; i++)
-                { callID += "," + FindStatementType(functionCallStatement.MethodParameters[i]); }
-            }
-            else
-            {
-                for (int i = 0; i < functionCallStatement.Parameters.Count; i++)
-                { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
-            }
-
-            if (functionOffsets.TryGetValue(functionCallStatement.FunctionName + callID, out functionOffset))
-            {
-                return true;
-            }
-            else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName + callID, out functionOffset))
-            {
-                return true;
-            }
-            else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out functionOffset))
-            {
-                return true;
-            }
-            else if (functionOffsets.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID, out functionOffset))
-            {
-                return true;
-            }
-            functionOffset = -1;
-            return false;
-        }
+        bool GetFunctionOffset(CompiledFunction function, out int functionOffset) => functionOffsets.TryGetValue(function.ID(), out functionOffset);
 
         bool GetCompiledStruct(Statement_NewStruct newStructStatement, out CompiledStruct compiledStruct)
         {
@@ -305,9 +264,6 @@ namespace IngameCoding.BBCode.Compiler
             return false;
         }
 
-        bool GetCompiledStruct(string structName, out CompiledStruct compiledStruct)
-        { return compiledStructs.TryGetValue(structName, out compiledStruct); }
-
         bool GetCompiledClass(Statement_NewStruct newClassStatement, out CompiledClass compiledClass)
         {
             if (compiledClasses.TryGetValue(newClassStatement.StructName.text, out compiledClass))
@@ -329,8 +285,7 @@ namespace IngameCoding.BBCode.Compiler
             return false;
         }
 
-        bool GetCompiledClass(string className, out CompiledClass compiledClass)
-        { return compiledClasses.TryGetValue(className, out compiledClass); }
+        bool GetCompiledClass(string className, out CompiledClass compiledClass) => compiledClasses.TryGetValue(className, out compiledClass);
 
         object GenerateInitialValue(TypeToken type)
         {
@@ -596,7 +551,7 @@ namespace IngameCoding.BBCode.Compiler
                 break;
             }
 
-            throw new NotImplementedException();
+            throw new CompilerException("Unknown type '" + prevStatementType + "'", field.TotalPosition(), CurrentFile);
         }
 
         string FindStatementType(Statement st)
@@ -869,7 +824,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            string searchedID = functionCall.FunctionName;
+            string searchedID = functionCall.TargetNamespacePathPrefix + functionCall.FunctionName;
             searchedID += "(";
             for (int i = 0; i < functionCall.Parameters.Count; i++)
             {
@@ -888,6 +843,11 @@ namespace IngameCoding.BBCode.Compiler
             {
                 errors.Add(new Error($"The {searchedID} function cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
+            }
+
+            if (CurrentFunction_ForRecursionProtection != null && compiledFunction.ID() == CurrentFunction_ForRecursionProtection)
+            {
+                warnings.Add(new Warning($"Potential infinite recursive call", functionCall.TotalPosition(), CurrentFile));
             }
 
             functionCall.Identifier.Analysis.Reference = new TokenAnalysis.RefFunction(compiledFunction);
@@ -949,7 +909,7 @@ namespace IngameCoding.BBCode.Compiler
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.name);
             }
 
-            if (!GetFunctionOffset(functionCall, out var functionCallOffset))
+            if (!GetFunctionOffset(compiledFunction, out var functionCallOffset))
             { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
             AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
@@ -1958,6 +1918,7 @@ namespace IngameCoding.BBCode.Compiler
                                 newVariable.Type.text = initialType.text;
 
                                 GenerateCodeForVariable(newVariable, out variablesAdded);
+                                return;
                             }
                             catch (FormatException) { throw; }
                             catch (System.Exception) { throw new NotImplementedException(); }
@@ -1969,6 +1930,7 @@ namespace IngameCoding.BBCode.Compiler
                     if (newVariable.Type.typeName == BuiltinType.AUTO)
                     { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
 
+                    GenerateCodeForVariable(newVariable, out variablesAdded);
                     return;
                 }
 
@@ -1991,6 +1953,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             function.Value.Name.Analysis.CompilerReached = true;
             function.Value.Type.Analysis.CompilerReached = true;
+            CurrentFunction_ForRecursionProtection = function.Value.ID();
 
             if (Keywords.Contains(function.Value.Name.text))
             { throw new CompilerException($"Illegal function name '{function.Value.Name.text}'", function.Value.Name, function.Value.FilePath); }
@@ -2070,6 +2033,7 @@ namespace IngameCoding.BBCode.Compiler
             returnInstructions.Clear();
 
             this.isStructMethod = false;
+            CurrentFunction_ForRecursionProtection = null;
         }
 
         void GenerateCodeForStruct(KeyValuePair<string, StructDefinition> @struct, Dictionary<string, Func<IStruct>> builtinStructs)
@@ -2152,23 +2116,6 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             this.compiledStructs.Add(@struct.Key, new CompiledStruct(attributes, @struct.Value));
-
-            /*
-            foreach (var method in @struct.Value.Methods)
-            {
-                if (compiledFunctions.ContainsKey(method.Key))
-                { throw new CompilerException($"Function with name '{method.Key}' already defined", method.Value.Name, CurrentFile); }
-
-                var methodInfo = GetFunctionInfo(method, true);
-                methodInfo.IsMethod = true;
-                this.compiledFunctions.Add(method.Value.FullName, methodInfo);
-
-                AddInstruction(Opcode.COMMENT, @struct.Value.FullName + "." + method.Value.FullName + ((method.Value.Parameters.Count > 0) ? "(...)" : "()") + " {");
-                GenerateCodeForFunction(method, true);
-                AddInstruction(Opcode.COMMENT, "}");
-                this.compiledStructs.Last().Value.CompiledMethods.Add(method.Key, methodInfo);
-            }
-            */
 
             CurrentFile = null;
         }
@@ -2340,6 +2287,44 @@ namespace IngameCoding.BBCode.Compiler
             {
                 FunctionDefinition currentFunction = null;
 
+                void AnalyzeNewVariable(Statement_NewVariable newVariable)
+                {
+                    if (newVariable.Type.typeName == BuiltinType.AUTO)
+                    {
+                        if (newVariable.InitialValue != null)
+                        {
+                            if (newVariable.InitialValue is Statement_Literal literal)
+                            {
+                                newVariable.Type.typeName = literal.Type.typeName;
+                            }
+                            else if (newVariable.InitialValue is Statement_NewStruct newStruct)
+                            {
+                                newVariable.Type.typeName = BuiltinType.STRUCT;
+                                newVariable.Type.text = newStruct.StructName.text;
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    var initialTypeRaw = FindStatementType(newVariable.InitialValue);
+                                    var initialType = Parser.ParseType(initialTypeRaw);
+
+                                    newVariable.Type.typeName = initialType.typeName;
+                                    newVariable.Type.ListOf = initialType.ListOf;
+                                    newVariable.Type.text = initialType.text;
+                                }
+                                catch (FormatException) { throw; }
+                                catch (System.Exception) { throw new NotImplementedException(); }
+                            }
+                        }
+                        else
+                        { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
+
+                        if (newVariable.Type.typeName == BuiltinType.AUTO)
+                        { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
+                    }
+                    this.compiledVariables.Add(newVariable.VariableName.text, GetVariableInfo(newVariable, -1));
+                }
                 void AnalyzeStatements(List<Statement> statements)
                 {
                     int variablesAdded = 0;
@@ -2347,24 +2332,12 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         if (st is Statement_NewVariable newVar)
                         {
-                            this.compiledVariables.Add(newVar.VariableName.text, new CompiledVariable()
-                            {
-                                ListOf = newVar.Type.ListOf,
-                                offset = -1,
-                                type = newVar.Type.typeName,
-                                structName = (newVar.Type.typeName == BuiltinType.STRUCT) ? newVar.Type.text : null,
-                            });
+                            AnalyzeNewVariable(newVar);
                             variablesAdded++;
                         }
                         else if (st is Statement_ForLoop forLoop)
                         {
-                            this.compiledVariables.Add(forLoop.VariableDeclaration.VariableName.text, new CompiledVariable()
-                            {
-                                ListOf = forLoop.VariableDeclaration.Type.ListOf,
-                                offset = -1,
-                                type = forLoop.VariableDeclaration.Type.typeName,
-                                structName = (forLoop.VariableDeclaration.Type.typeName == BuiltinType.STRUCT) ? forLoop.VariableDeclaration.Type.text : null,
-                            });
+                            AnalyzeNewVariable(forLoop.VariableDeclaration);
                             variablesAdded++;
                         }
                     }
@@ -2754,7 +2727,21 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var pair in item.currentVariables)
                 { compiledVariables.Add(pair.Key, pair.Value); }
 
-                if (GetFunctionOffset(item.functionCallStatement, out var functionCallOffset))
+                if (!GetCompiledFunction(item.functionCallStatement, out var function))
+                {
+                    string searchedID = item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName;
+                    searchedID += "(";
+                    for (int i = 0; i < item.functionCallStatement.Parameters.Count; i++)
+                    {
+                        if (i > 0) { searchedID += ", "; }
+
+                        searchedID += FindStatementType(item.functionCallStatement.Parameters[i]);
+                    }
+                    searchedID += ")";
+                    throw new CompilerException("Unknown function " + searchedID + "", item.functionCallStatement.Identifier, CurrentFile);
+                }
+
+                if (GetFunctionOffset(function, out var functionCallOffset))
                 { compiledCode[item.callInstructionIndex].parameter = functionCallOffset - item.callInstructionIndex; }
                 else
                 { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName}' offset not found", item.CurrentFile); }

@@ -140,18 +140,30 @@ namespace IngameCoding.BBCode
 
             parserResult.UsingsAnalytics.Clear();
 
+            List<string> parsedUsings = new();
+
             for (int i = 0; i < parserResult.Usings.Count; i++)
             {
                 var usingItem = parserResult.Usings[i];
                 var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
                 UsingAnalysis usingAnalysis = new()
                 {
-                    Path = usingFile
+                    Path = usingFile,
+                    ParseTime = -1d,
                 };
 
                 if (System.IO.File.Exists(usingFile))
                 {
                     usingAnalysis.Found = true;
+
+                    if (parsedUsings.Contains(usingFile))
+                    {
+                        warnings.Add(new Warning($"File \"{usingFile}\" already imported", new Position(usingItem.Path), path));
+                        parserResult.UsingsAnalytics.Add(usingAnalysis);
+                        continue;
+                    }
+                    parsedUsings.Add(usingFile);
+
                     System.TimeSpan parseStarted = System.DateTime.Now.TimeOfDay;
 
                     string code = System.IO.File.ReadAllText(usingFile);
@@ -240,7 +252,7 @@ namespace IngameCoding.BBCode
             {
                 var id = func.ID();
                 if (Functions.ContainsKey(id))
-                { throw new CompilerException($"Function '{id}' already exists", func.Name); }
+                { throw new CompilerException($"Function '{id}' already exists", func.Name, path); }
 
                 Functions.Add(id, func);
             }

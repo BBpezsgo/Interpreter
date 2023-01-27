@@ -1099,7 +1099,7 @@ namespace IngameCoding.BBCode
                 else
                 {
                     int endlessSafe = 50;
-                    while (!ExpectIdentifier(out Token pathIdentifier))
+                    while (ExpectIdentifier(out Token pathIdentifier))
                     {
                         pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
                         tokens.Add(pathIdentifier);

@@ -1,0 +1,31 @@
+﻿using "../CodeFiles/System";
+using helloworld;
+
+namespace MyNamespace
+{
+    void Main()
+    {
+        Console.Log("a");
+        MyNamespace.Haha.Num();
+        Haha.Num();
+    }
+
+    struct Xd
+    {
+        int v;
+    }
+
+    namespace Haha
+    {
+        int Num() { return 1; }
+    }
+}
+
+[CodeEntry]
+void Main()
+{
+    MyNamespace.Main();
+    var xd = new MyNamespace.Xd;
+    xd.v = 5;
+    Console.Log(xd.v);
+}

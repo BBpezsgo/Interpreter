@@ -58,7 +58,7 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        internal CentralProcessingUnit cpu;
+        internal BytecodeProcessor cpu;
 
         public void Destroy() => stack.Clear();
 
@@ -77,7 +77,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
-            item.heap = this.cpu.MU.Heap;
+            item.heap = this.cpu.Memory.Heap;
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
@@ -85,7 +85,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
-            item.heap = this.cpu.MU.Heap;
+            item.heap = this.cpu.Memory.Heap;
             item.Tag = tag;
             this.stack.Add(item);
         }
@@ -129,7 +129,7 @@ namespace IngameCoding.Bytecode
         {
             DataItem item = val;
             item.stack = this;
-            item.heap = this.cpu.MU.Heap;
+            item.heap = this.cpu.Memory.Heap;
             if (!overrideTag)
             {
                 item.Tag = stack[index].Tag;

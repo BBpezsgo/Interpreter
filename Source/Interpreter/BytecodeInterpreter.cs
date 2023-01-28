@@ -11,12 +11,12 @@ namespace IngameCoding.Bytecode
         internal class InterpreterDetails
         {
             readonly BytecodeInterpreter bytecodeInterpreter;
-            public int CodePointer => bytecodeInterpreter.CPU.CodePointer;
-            public int BasePointer => bytecodeInterpreter.CPU.MU.BasePointer;
-            public int[] ReturnAddressStack => bytecodeInterpreter.CPU.MU.ReturnAddressStack.ToArray();
-            public DataItem[] Stack => bytecodeInterpreter.CPU.MU.Stack.ToArray();
-            public DataItem[] Heap => bytecodeInterpreter.CPU.MU.Heap.ToArray();
-            public int StackMemorySize => bytecodeInterpreter.CPU.MU.Stack.UsedVirtualMemory;
+            public int CodePointer => bytecodeInterpreter.BytecodeProcessor.CodePointer;
+            public int BasePointer => bytecodeInterpreter.BytecodeProcessor.Memory.BasePointer;
+            public int[] ReturnAddressStack => bytecodeInterpreter.BytecodeProcessor.Memory.ReturnAddressStack.ToArray();
+            public DataItem[] Stack => bytecodeInterpreter.BytecodeProcessor.Memory.Stack.ToArray();
+            public DataItem[] Heap => bytecodeInterpreter.BytecodeProcessor.Memory.Heap.ToArray();
+            public int StackMemorySize => bytecodeInterpreter.BytecodeProcessor.Memory.Stack.UsedVirtualMemory;
 
             public InterpreterDetails(BytecodeInterpreter bytecodeInterpreter)
             {
@@ -26,7 +26,7 @@ namespace IngameCoding.Bytecode
 
         BytecodeInterpreterSettings settings;
 
-        CentralProcessingUnit CPU;
+        BytecodeProcessor BytecodeProcessor;
         int[] arguments;
 
         // Running control
@@ -48,7 +48,7 @@ namespace IngameCoding.Bytecode
         {
             this.settings = settings;
 
-            CPU = new CentralProcessingUnit(code, 0, builtinFunctions);
+            BytecodeProcessor = new BytecodeProcessor(code, 0, builtinFunctions);
 
             arguments = Array.Empty<int>();
 
@@ -73,8 +73,8 @@ namespace IngameCoding.Bytecode
             enable = true;
             IsCall = false;
 
-            CPU.MU.CodePointer = instructionOffset;
-            CPU.MU.BasePointer = CPU.MU.Stack.Count;
+            BytecodeProcessor.Memory.CodePointer = instructionOffset;
+            BytecodeProcessor.Memory.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }
 
         public void Call(int instructionOffset, params int[] arguments)
@@ -87,13 +87,13 @@ namespace IngameCoding.Bytecode
             enable = true;
             IsCall = true;
 
-            CPU.MU.CodePointer = instructionOffset;
-            CPU.MU.Stack.Push(0, "return value");
-            CPU.MU.Stack.PushRange(this.arguments, "arg");
+            BytecodeProcessor.Memory.CodePointer = instructionOffset;
+            BytecodeProcessor.Memory.Stack.Push(0, "return value");
+            BytecodeProcessor.Memory.Stack.PushRange(this.arguments, "arg");
 
-            CPU.MU.Stack.Push(0, "saved base pointer");
-            CPU.MU.ReturnAddressStack.Add(CPU.MU.End());
-            CPU.MU.BasePointer = CPU.MU.Stack.Count;
+            BytecodeProcessor.Memory.Stack.Push(0, "saved base pointer");
+            BytecodeProcessor.Memory.ReturnAddressStack.Add(BytecodeProcessor.Memory.End());
+            BytecodeProcessor.Memory.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }
 
         void ExecuteNext()
@@ -102,20 +102,20 @@ namespace IngameCoding.Bytecode
 
             if (endlessSafe > settings.InstructionLimit)
             {
-                CPU.MU.CodePointer = CPU.MU.Code.Length;
+                BytecodeProcessor.Memory.CodePointer = BytecodeProcessor.Memory.Code.Length;
                 throw new RuntimeException("Instruction limit reached!", GetContext());
             }
 
-            if (CPU.MU.Stack.Count > settings.StackMaxSize)
+            if (BytecodeProcessor.Memory.Stack.Count > settings.StackMaxSize)
             {
                 throw new RuntimeException("Stack overflow!", GetContext());
             }
 
-            if (CPU.CodePointer < CPU.MU.End())
+            if (BytecodeProcessor.CodePointer < BytecodeProcessor.Memory.End())
             {
-                if (CPU.MU.CurrentInstruction.opcode == Opcode.COMMENT)
+                if (BytecodeProcessor.Memory.CurrentInstruction.opcode == Opcode.COMMENT)
                 {
-                    CPU.MU.Step();
+                    BytecodeProcessor.Memory.Step();
                     ExecuteNext();
                     return;
                 }
@@ -124,7 +124,7 @@ namespace IngameCoding.Bytecode
 
                 try
                 {
-                    remainingClockCycles -= Math.Max(1, CPU.Clock());
+                    remainingClockCycles -= Math.Max(1, BytecodeProcessor.Clock());
                 }
                 catch (RuntimeException error)
                 {
@@ -136,12 +136,12 @@ namespace IngameCoding.Bytecode
                     throw new RuntimeException(error.Message, error, GetContext());
                 }
 
-                if (lastInstrPointer == CPU.CodePointer)
+                if (lastInstrPointer == BytecodeProcessor.CodePointer)
                 {
-                    Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + CPU.MU.CurrentInstruction.ToString());
+                    Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + BytecodeProcessor.Memory.CurrentInstruction.ToString());
                 }
 
-                lastInstrPointer = CPU.CodePointer;
+                lastInstrPointer = BytecodeProcessor.CodePointer;
 
                 currentlyRunning = true;
 
@@ -159,8 +159,8 @@ namespace IngameCoding.Bytecode
         public void Destroy()
         {
             if (destroyed) return;
-            CPU.Destroy();
-            CPU = null;
+            BytecodeProcessor.Destroy();
+            BytecodeProcessor = null;
             destroyed = true;
         }
 
@@ -173,10 +173,10 @@ namespace IngameCoding.Bytecode
             {
                 for (int i = 0; i < arguments.Length; i++)
                 {
-                    if (CPU.MU.Stack.Count - 1 > i)
-                        CPU.MU.Stack.RemoveAt(CPU.MU.Stack.Count - 1);
+                    if (BytecodeProcessor.Memory.Stack.Count - 1 > i)
+                        BytecodeProcessor.Memory.Stack.RemoveAt(BytecodeProcessor.Memory.Stack.Count - 1);
                 }
-                result = CPU.MU.Stack.Pop().ValueInt;
+                result = BytecodeProcessor.Memory.Stack.Pop().ValueInt;
             }
 
             lastInstrPointer = -1;
@@ -195,17 +195,17 @@ namespace IngameCoding.Bytecode
         public void AddValueToStack(DataItem value)
         {
             if (destroyed) return;
-            CPU.MU.Stack.Push(value);
+            BytecodeProcessor.Memory.Stack.Push(value);
         }
 
-        public void CallStackPush(string data) => this.CPU.MU.CallStack.Push(data);
-        public void CallStackPop() => this.CPU.MU.CallStack.Pop();
+        public void CallStackPush(string data) => this.BytecodeProcessor.Memory.CallStack.Push(data);
+        public void CallStackPop() => this.BytecodeProcessor.Memory.CallStack.Pop();
 
         internal Context GetContext() => new()
         {
-            CallStack = this.CPU.MU.CallStack.ToArray(),
+            CallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
             ExecutedInstructionCount = this.endlessSafe,
-            CodePointer = this.CPU.CodePointer,
+            CodePointer = this.BytecodeProcessor.CodePointer,
         };
         public struct Context
         {

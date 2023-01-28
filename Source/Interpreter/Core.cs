@@ -5,19 +5,16 @@ namespace IngameCoding.Bytecode
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    internal class CentralProcessingUnit
+    internal class BytecodeProcessor
     {
-        internal readonly ControlUnit CU;
-        internal readonly MemoryUnit MU;
+        internal readonly BytecodeEvaluator BytecodeEvaluator;
+        internal readonly Memory Memory;
 
         internal Dictionary<string, BuiltinFunction> builtinFunctions;
 
-        public int CodePointer
-        {
-            get { return MU.CodePointer; }
-        }
+        public int CodePointer => Memory.CodePointer;
 
-        public CentralProcessingUnit(Instruction[] code, int basePointer, Dictionary<string, BuiltinFunction> builtinFunctions)
+        public BytecodeProcessor(Instruction[] code, int basePointer, Dictionary<string, BuiltinFunction> builtinFunctions)
         {
             for (int i = 0; i < code.Length; i++)
             {
@@ -26,7 +23,7 @@ namespace IngameCoding.Bytecode
             }
             this.builtinFunctions = builtinFunctions;
 
-            MU = new(
+            Memory = new(
                 new DataStack() { cpu = this },
                 new HEAP(10),
                 code
@@ -36,12 +33,12 @@ namespace IngameCoding.Bytecode
                 ReturnAddressStack = new List<int>(),
                 CodePointer = code.Length
             };
-            CU = new(MU, this);
+            BytecodeEvaluator = new(Memory, this);
         }
 
         public int Clock()
         {
-            return CU.Process();
+            return BytecodeEvaluator.Evaluate();
         }
 
         internal static string GetTypeText(DataItem.Type type)
@@ -60,31 +57,31 @@ namespace IngameCoding.Bytecode
 
         public void Destroy()
         {
-            MU.Stack.Destroy();
-            MU.ReturnAddressStack.Clear();
-            MU.Stack = null;
-            MU.ReturnAddressStack = null;
+            Memory.Stack.Destroy();
+            Memory.ReturnAddressStack.Clear();
+            Memory.Stack = null;
+            Memory.ReturnAddressStack = null;
             this.builtinFunctions = null;
         }
     }
 
-    internal class ControlUnit
+    internal class BytecodeEvaluator
     {
-        readonly MemoryUnit MU;
-        readonly CentralProcessingUnit CPU;
+        readonly Memory Memory;
+        readonly BytecodeProcessor Processor;
 
-        public ControlUnit(MemoryUnit mu, CentralProcessingUnit cpu)
+        public BytecodeEvaluator(Memory memory, BytecodeProcessor processor)
         {
-            MU = mu;
-            CPU = cpu;
+            Memory = memory;
+            Processor = processor;
         }
 
-        internal int Process()
+        internal int Evaluate()
         {
-            switch (MU.CurrentInstruction.opcode)
+            switch (Memory.CurrentInstruction.opcode)
             {
                 case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
-                case Opcode.COMMENT: MU.Step(); return 1;
+                case Opcode.COMMENT: Memory.Step(); return 1;
 
                 #region Instructions
                 case Opcode.EXIT: return EXIT();
@@ -142,20 +139,20 @@ namespace IngameCoding.Bytecode
                 case Opcode.CS_POP: return CS_POP();
                 #endregion
 
-                default: throw new InternalException("Unimplemented instruction " + MU.CurrentInstruction.opcode.ToString());
+                default: throw new InternalException("Unimplemented instruction " + Memory.CurrentInstruction.opcode.ToString());
             }
         }
 
         int Address()
         {
-            AddressingMode mode = MU.CurrentInstruction.AddressingMode;
-            int parameter = (int)MU.CurrentInstruction.parameter;
+            AddressingMode mode = Memory.CurrentInstruction.AddressingMode;
+            int parameter = (int)Memory.CurrentInstruction.parameter;
             return mode switch
             {
                 AddressingMode.ABSOLUTE => parameter,
-                AddressingMode.BASEPOINTER_RELATIVE => MU.BasePointer + parameter,
-                AddressingMode.RELATIVE => MU.Stack.Count + parameter,
-                AddressingMode.POP => MU.Stack.Count + parameter,
+                AddressingMode.BASEPOINTER_RELATIVE => Memory.BasePointer + parameter,
+                AddressingMode.RELATIVE => Memory.Stack.Count + parameter,
+                AddressingMode.POP => Memory.Stack.Count + parameter,
                 _ => parameter,
             };
         }
@@ -164,167 +161,167 @@ namespace IngameCoding.Bytecode
 
         int COPY_VALUE()
         {
-            DataItem itemToCopy = MU.Stack.Pop();
-            MU.Stack.Push(itemToCopy.Copy());
-            MU.Step();
+            DataItem itemToCopy = Memory.Stack.Pop();
+            Memory.Stack.Push(itemToCopy.Copy());
+            Memory.Step();
 
             return 2;
         }
 
         int COPY_VALUE_RECURSIVE()
         {
-            DataItem itemToCopy = MU.Stack.Pop();
-            MU.Stack.Push(itemToCopy.CopyRecursive());
-            MU.Step();
+            DataItem itemToCopy = Memory.Stack.Pop();
+            Memory.Stack.Push(itemToCopy.CopyRecursive());
+            Memory.Step();
 
             return 3;
         }
 
         int CS_PUSH()
         {
-            MU.CallStack.Push(MU.CurrentInstruction.parameter.ToString());
-            MU.Step();
+            Memory.CallStack.Push(Memory.CurrentInstruction.parameter.ToString());
+            Memory.Step();
 
             return 1;
         }
 
         int CS_POP()
         {
-            MU.CallStack.Pop();
-            MU.Step();
+            Memory.CallStack.Pop();
+            Memory.Step();
 
             return 1;
         }
 
         int DEBUG_SET_TAG()
         {
-            var last = MU.Stack.Last();
-            last.Tag = MU.CurrentInstruction.parameter.ToString();
-            MU.Stack.Set(MU.Stack.Count - 1, last, true);
-            MU.Step();
+            var last = Memory.Stack.Last();
+            last.Tag = Memory.CurrentInstruction.parameter.ToString();
+            Memory.Stack.Set(Memory.Stack.Count - 1, last, true);
+            Memory.Step();
 
             return 1;
         }
 
         int HEAP_GET()
         {
-            var v = MU.Heap[(int)MU.CurrentInstruction.parameter];
-            MU.Stack.Push(v);
-            MU.Step();
+            var v = Memory.Heap[(int)Memory.CurrentInstruction.parameter];
+            Memory.Stack.Push(v);
+            Memory.Step();
 
             return 2;
         }
 
         int HEAP_SET()
         {
-            var v = MU.Stack.Pop();
-            MU.Heap[(int)MU.CurrentInstruction.parameter] = v;
-            MU.Step();
+            var v = Memory.Stack.Pop();
+            Memory.Heap[(int)Memory.CurrentInstruction.parameter] = v;
+            Memory.Step();
 
             return 2;
         }
 
         int LOGIC_NOT()
         {
-            var v = MU.Stack.Pop();
-            MU.Stack.Push(!v);
-            MU.Step();
+            var v = Memory.Stack.Pop();
+            Memory.Stack.Push(!v);
+            Memory.Step();
 
             return 3;
         }
 
         int TYPE_GET()
         {
-            var v = MU.Stack.Pop();
-            MU.Stack.Push(CentralProcessingUnit.GetTypeText(v), "type() result");
-            MU.Step();
+            var v = Memory.Stack.Pop();
+            Memory.Stack.Push(BytecodeProcessor.GetTypeText(v), "type() result");
+            Memory.Step();
 
             return 3;
         }
 
         int LIST_PUSH_ITEM()
         {
-            var newItem = MU.Stack.Pop();
-            var listValue = MU.Stack.Pop();
+            var newItem = Memory.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
             if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Add(newItem); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LIST_ADD_ITEM()
         {
-            var indexValue = MU.Stack.Pop();
-            var newItem = MU.Stack.Pop();
-            var listValue = MU.Stack.Pop();
+            var indexValue = Memory.Stack.Pop();
+            var newItem = Memory.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
             if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Add(newItem, indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            MU.Step();
+            Memory.Step();
 
             return 5;
         }
         int LIST_SET_ITEM()
         {
-            var indexValue = MU.Stack.Pop().ValueInt;
-            var newItem = MU.Stack.Pop();
-            var listValue = MU.Stack.Pop();
+            var indexValue = Memory.Stack.Pop().ValueInt;
+            var newItem = Memory.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
             if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.items[indexValue] = newItem; }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            MU.Stack.Push(listValue);
-            MU.Step();
+            Memory.Stack.Push(listValue);
+            Memory.Step();
 
             return 3;
         }
         int LIST_PULL_ITEM()
         {
-            var listValue = MU.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
             if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Remove(); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            MU.Step();
+            Memory.Step();
 
             return 3;
         }
         int LIST_REMOVE_ITEM()
         {
-            var indexValue = MU.Stack.Pop();
-            var listValue = MU.Stack.Pop();
+            var indexValue = Memory.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
             if (listValue.type == DataItem.Type.LIST)
             { listValue.ValueList.Remove(indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int LIST_INDEX()
         {
-            var indexValue = MU.Stack.Pop();
-            var listValue = MU.Stack.Pop();
+            var indexValue = Memory.Stack.Pop();
+            var listValue = Memory.Stack.Pop();
 
             if (listValue.type == DataItem.Type.LIST)
             {
                 if (listValue.ValueList.items.Count <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
-                MU.Stack.Push(listValue.ValueList.items[indexValue.ValueInt]);
+                Memory.Stack.Push(listValue.ValueList.items[indexValue.ValueInt]);
             }
             else if (listValue.type == DataItem.Type.STRING)
             {
                 if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
-                MU.Stack.Push(listValue.ValueString[indexValue.ValueInt].ToString());
+                Memory.Stack.Push(listValue.ValueString[indexValue.ValueInt].ToString());
             }
             else
             { throw new RuntimeException("The variable type is not list or string!"); }
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
@@ -332,21 +329,21 @@ namespace IngameCoding.Bytecode
         void OnBuiltinFunctionReturnValue(DataItem returnValue)
         {
             Output.Debug.Debug.Log(returnValue.ToString());
-            MU.Stack.Push(returnValue, "return v");
+            Memory.Stack.Push(returnValue, "return v");
         }
 
         int CALL_BUILTIN()
         {
-            DataItem functionNameDataItem = MU.Stack.Pop();
+            DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.type != DataItem.Type.STRING)
             { throw new InternalException($"Instruction CALL_BUILTIN need a STRING DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToStringValue()}"); }
             string functionName = functionNameDataItem.ValueString;
 
-            if (CPU.builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            if (Processor.builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
             {
                 List<DataItem> parameters = new();
-                for (int i = 0; i < (int)MU.CurrentInstruction.parameter; i++)
-                { parameters.Add(MU.Stack.Pop()); }
+                for (int i = 0; i < (int)Memory.CurrentInstruction.parameter; i++)
+                { parameters.Add(Memory.Stack.Pop()); }
                 if (builtinFunction.ReturnSomething)
                 {
                     builtinFunction.OnReturn += OnBuiltinFunctionReturnValue;
@@ -359,152 +356,152 @@ namespace IngameCoding.Bytecode
             else
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }
 
-            MU.Step();
+            Memory.Step();
 
             return 15;
         }
 
         int LOGIC_MT()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide > rightSide);
+            Memory.Stack.Push(leftSide > rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_EQ()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide == rightSide);
+            Memory.Stack.Push(leftSide == rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_NEQ()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide != rightSide);
+            Memory.Stack.Push(leftSide != rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_OR()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide | rightSide);
+            Memory.Stack.Push(leftSide | rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_XOR()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide ^ rightSide);
+            Memory.Stack.Push(leftSide ^ rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_LTEQ()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide <= rightSide);
+            Memory.Stack.Push(leftSide <= rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_MTEQ()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide >= rightSide);
+            Memory.Stack.Push(leftSide >= rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
         int LOGIC_AND()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide & rightSide);
+            Memory.Stack.Push(leftSide & rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int POP_VALUE()
         {
-            if (MU.Stack.Count > 0) MU.Stack.RemoveAt(MU.Stack.Count - 1);
-            MU.Step();
+            if (Memory.Stack.Count > 0) Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
+            Memory.Step();
 
             return 2;
         }
 
         int RETURN()
         {
-            int returnAddress = MU.ReturnAddressStack[^1];
-            MU.ReturnAddressStack.RemoveAt(MU.ReturnAddressStack.Count - 1);
-            MU.BasePointer = MU.Stack.Pop().ValueInt;
-            MU.CodePointer = returnAddress;
+            int returnAddress = Memory.ReturnAddressStack[^1];
+            Memory.ReturnAddressStack.RemoveAt(Memory.ReturnAddressStack.Count - 1);
+            Memory.BasePointer = Memory.Stack.Pop().ValueInt;
+            Memory.CodePointer = returnAddress;
 
             return 3;
         }
         int CALL()
         {
-            MU.Stack.Push(MU.BasePointer, "saved base pointer");
-            MU.ReturnAddressStack.Add(MU.CodePointer + 1);
-            MU.BasePointer = MU.Stack.Count;
-            MU.Step((int)MU.CurrentInstruction.parameter);
+            Memory.Stack.Push(Memory.BasePointer, "saved base pointer");
+            Memory.ReturnAddressStack.Add(Memory.CodePointer + 1);
+            Memory.BasePointer = Memory.Stack.Count;
+            Memory.Step((int)Memory.CurrentInstruction.parameter);
 
             return 4;
         }
 
         int JUMP_BY()
         {
-            MU.CodePointer += (int)MU.CurrentInstruction.parameter;
+            Memory.CodePointer += (int)Memory.CurrentInstruction.parameter;
 
             return 1;
         }
         int JUMP_BY_IF_TRUE()
         {
-            var condition = MU.Stack.Pop();
+            var condition = Memory.Stack.Pop();
 
             if (condition == true)
-            { MU.CodePointer += (int)MU.CurrentInstruction.parameter; }
+            { Memory.CodePointer += (int)Memory.CurrentInstruction.parameter; }
             else
-            { MU.Step(); }
+            { Memory.Step(); }
 
             return 3;
         }
         int JUMP_BY_IF_FALSE()
         {
-            var condition = MU.Stack.Pop();
+            var condition = Memory.Stack.Pop();
 
             if (condition == false)
-            { MU.CodePointer += (int)MU.CurrentInstruction.parameter; }
+            { Memory.CodePointer += (int)Memory.CurrentInstruction.parameter; }
             else
-            { MU.Step(); }
+            { Memory.Step(); }
 
             return 3;
         }
@@ -513,10 +510,10 @@ namespace IngameCoding.Bytecode
         {
             int address = Address();
 
-            MU.Stack.Set(address, MU.Stack.Last());
+            Memory.Stack.Set(address, Memory.Stack.Last());
 
-            MU.Stack.RemoveAt(MU.Stack.Count - 1);
-            MU.Step();
+            Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
+            Memory.Step();
 
             return 3;
         }
@@ -524,9 +521,9 @@ namespace IngameCoding.Bytecode
         {
             int address = Address();
 
-            MU.Stack.Push(MU.Stack.Get(address), MU.CurrentInstruction.tag);
+            Memory.Stack.Push(Memory.Stack.Get(address), Memory.CurrentInstruction.tag);
 
-            MU.Step();
+            Memory.Step();
 
             return 3;
         }
@@ -535,20 +532,20 @@ namespace IngameCoding.Bytecode
         {
             int address = Address();
 
-            string field = MU.Stack.Pop().ValueString;
+            string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
-            DataItem newValue =  MU.Stack.Pop();
-            IStruct item = MU.Stack.Get(address).ValueStruct;
+            DataItem newValue =  Memory.Stack.Pop();
+            IStruct item = Memory.Stack.Get(address).ValueStruct;
 
             if (!item.HaveField(field))
             { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
 
             item.SetField(field, item.GetField(field).TrySet(newValue));
 
-            MU.Stack.Set(address, new DataItem(item, null));
+            Memory.Stack.Set(address, new DataItem(item, null));
 
-            MU.Step();
+            Memory.Step();
 
             return 7;
         }
@@ -556,10 +553,10 @@ namespace IngameCoding.Bytecode
         {
             int address = Address();
 
-            string field = MU.Stack.Pop().ValueString;
+            string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
-            DataItem item = MU.CurrentInstruction.AddressingMode == AddressingMode.POP ? MU.Stack.Pop() : MU.Stack.Get(address);
+            DataItem item = Memory.CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack.Get(address);
 
             if (item.type == DataItem.Type.STRING)
             {
@@ -567,7 +564,7 @@ namespace IngameCoding.Bytecode
 
                 if (field == "Length")
                 {
-                    MU.Stack.Push(value.Length, MU.CurrentInstruction.tag);
+                    Memory.Stack.Push(value.Length, Memory.CurrentInstruction.tag);
                 }
                 else
                 { throw new RuntimeException("Type string does not have field " + field); }
@@ -578,7 +575,7 @@ namespace IngameCoding.Bytecode
 
                 if (field == "Length")
                 {
-                    MU.Stack.Push(value.items.Count, MU.CurrentInstruction.tag);
+                    Memory.Stack.Push(value.items.Count, Memory.CurrentInstruction.tag);
                 }
                 else
                 { throw new RuntimeException("Type list does not have field " + field); }
@@ -590,107 +587,107 @@ namespace IngameCoding.Bytecode
                 if (!value.HaveField(field))
                 { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
 
-                MU.Stack.Push(value.GetField(field), "field." + field);
+                Memory.Stack.Push(value.GetField(field), "field." + field);
             }
             else
             { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int LOGIC_LT()
         {
-            var rightSide = MU.Stack.Pop();
-            var leftSide = MU.Stack.Pop();
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide < rightSide);
+            Memory.Stack.Push(leftSide < rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int PUSH_VALUE()
         {
-            if (MU.CurrentInstruction.parameter is DataItem dataItem)
+            if (Memory.CurrentInstruction.parameter is DataItem dataItem)
             {
-                MU.Stack.Push(dataItem, MU.CurrentInstruction.tag);
+                Memory.Stack.Push(dataItem, Memory.CurrentInstruction.tag);
             }
             else
             {
-                MU.Stack.Push(new DataItem(MU.CurrentInstruction.parameter, MU.CurrentInstruction.tag), MU.CurrentInstruction.tag);
+                Memory.Stack.Push(new DataItem(Memory.CurrentInstruction.parameter, Memory.CurrentInstruction.tag), Memory.CurrentInstruction.tag);
             }
 
-            MU.Step();
+            Memory.Step();
 
             return 2;
         }
 
         int MATH_ADD()
         {
-            DataItem rightSide = MU.Stack.Pop();
-            DataItem leftSide = MU.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide + rightSide);
+            Memory.Stack.Push(leftSide + rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int EXIT()
         {
-            MU.CodePointer = MU.Code.Length;
+            Memory.CodePointer = Memory.Code.Length;
 
             return 1;
         }
 
         int MATH_DIV()
         {
-            DataItem rightSide = MU.Stack.Pop();
-            DataItem leftSide = MU.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide / rightSide);
+            Memory.Stack.Push(leftSide / rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int MATH_SUB()
         {
-            DataItem rightSide = MU.Stack.Pop();
-            DataItem leftSide = MU.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide - rightSide);
+            Memory.Stack.Push(leftSide - rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int MATH_MULT()
         {
-            DataItem rightSide = MU.Stack.Pop();
-            DataItem leftSide = MU.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide * rightSide);
+            Memory.Stack.Push(leftSide * rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
 
         int MATH_MOD()
         {
-            DataItem rightSide = MU.Stack.Pop();
-            DataItem leftSide = MU.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
-            MU.Stack.Push(leftSide % rightSide);
+            Memory.Stack.Push(leftSide % rightSide);
 
-            MU.Step();
+            Memory.Step();
 
             return 4;
         }
@@ -698,7 +695,7 @@ namespace IngameCoding.Bytecode
         #endregion
     }
 
-    internal class MemoryUnit
+    internal class Memory
     {
         internal DataStack Stack;
         internal HEAP Heap;
@@ -711,7 +708,7 @@ namespace IngameCoding.Bytecode
 
         internal Instruction CurrentInstruction => Code[CodePointer];
 
-        public MemoryUnit(DataStack stack, HEAP heap, Instruction[] code)
+        public Memory(DataStack stack, HEAP heap, Instruction[] code)
         {
             Stack = stack;
             Code = code;

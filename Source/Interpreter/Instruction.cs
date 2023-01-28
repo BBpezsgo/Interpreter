@@ -51,7 +51,7 @@ namespace IngameCoding.Bytecode
         /// <summary><b>Only works at runtime!</b></summary>
         internal int? index;
         /// <summary><b>Only works at runtime!</b></summary>
-        internal CentralProcessingUnit cpu;
+        internal BytecodeProcessor cpu;
         /// <summary><b>Only works at runtime!</b></summary>
         string IsRunning
         {

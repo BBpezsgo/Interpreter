@@ -154,20 +154,6 @@ namespace IngameCoding.BBCode.Compiler
                         Console.Write($" ");
                     }
 
-                    if (!string.IsNullOrEmpty(instruction.additionParameter))
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write($"\"{instruction.additionParameter}\"");
-                        Console.Write($" ");
-                    }
-
-                    if (instruction.additionParameter2 != -1)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.additionParameter2}");
-                        Console.Write($" ");
-                    }
-
                     if (!string.IsNullOrEmpty(instruction.tag))
                     {
                         Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -264,7 +250,8 @@ namespace IngameCoding.BBCode.Compiler
             List<Statement_HashInfo> Hashes,
             List<Error> errors,
             List<Warning> warnings,
-            Action<string, Output.LogType> printCallback)
+            Action<string, Output.LogType> printCallback,
+            string basePath)
         {
             string content = null;
             string path = null;
@@ -304,23 +291,34 @@ namespace IngameCoding.BBCode.Compiler
             {
                 string filename = @using.PathString.Replace("/", "\\");
                 if (!filename.EndsWith("." + FileExtensions.Code)) filename += "." + FileExtensions.Code;
-                path = Path.GetFullPath(filename, file.Directory.FullName);
-                if (File.Exists(path))
-                {
-                    if (alreadyCompiledCodes.Contains(path))
-                    {
-                        printCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
-                        return;
-                    }
-                    alreadyCompiledCodes.Add(path);
 
-                    content = File.ReadAllText(path);
-                }
-                else
+                List<string> searchForThese = new()
                 {
-                    errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path)));
+                    Path.GetFullPath(basePath.Replace("/", "\\") + filename, file.Directory.FullName),
+                    Path.GetFullPath(filename, file.Directory.FullName),
+                };
+
+                bool found = false;
+                for (int i = 0; i < searchForThese.Count; i++)
+                {
+                    path = searchForThese[i];
+                    if (!File.Exists(path))
+                    { continue; }
+                    else
+                    { found = true; break; }
+                }
+
+                if (!found)
+                { errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path))); return; }
+
+                if (alreadyCompiledCodes.Contains(path))
+                {
+                    printCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
                     return;
                 }
+                alreadyCompiledCodes.Add(path);
+
+                content = File.ReadAllText(path);
             }
 
             printCallback?.Invoke($" Parse file \"{path}\" ...", Output.LogType.Debug);
@@ -371,7 +369,7 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             foreach (UsingDefinition using_ in parserResult2.Usings)
-            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Classes, Hashes, errors, warnings, printCallback); }
+            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Classes, Hashes, errors, warnings, printCallback, basePath); }
         }
 
         /// <summary>
@@ -411,7 +409,8 @@ namespace IngameCoding.BBCode.Compiler
             List<Error> errors,
             CompilerSettings settings,
             ParserSettings parserSettings,
-            Action<string, Output.LogType> printCallback = null)
+            Action<string, Output.LogType> printCallback = null,
+            string basePath = "")
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -425,7 +424,7 @@ namespace IngameCoding.BBCode.Compiler
             foreach (UsingDefinition usingItem in parserResult.Usings)
             {
                 List<Error> compileErrors = new();
-                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Classes, Hashes, compileErrors, warnings, printCallback);
+                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Classes, Hashes, compileErrors, warnings, printCallback, basePath);
                 if (compileErrors.Count > 0)
                 { throw new System.Exception($"Failed to compile file {usingItem.PathString}", compileErrors[0].ToException()); }
             }

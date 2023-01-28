@@ -402,7 +402,9 @@ namespace ConsoleGUI
 
             internal struct WINDOW_BUFFER_SIZE_RECORD
             {
+#pragma warning disable CS0649
                 public COORD dwSize;
+#pragma warning restore CS0649
             }
 
             internal const uint STD_INPUT_HANDLE = unchecked((uint)-10),

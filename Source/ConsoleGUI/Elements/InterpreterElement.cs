@@ -524,20 +524,6 @@ namespace ConsoleGUI
                     AddText($" ");
                 }
 
-                if (!string.IsNullOrEmpty(instruction.additionParameter))
-                {
-                    ForegroundColor = CharColors.FgYellow;
-                    AddText($"\"{instruction.additionParameter}\"");
-                    AddText($" ");
-                }
-
-                if (instruction.additionParameter2 != -1)
-                {
-                    ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgCyan;
-                    AddText($"{instruction.additionParameter2}");
-                    AddText($" ");
-                }
-
                 if (!string.IsNullOrEmpty(instruction.tag))
                 {
                     ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgGray;

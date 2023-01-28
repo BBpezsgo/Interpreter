@@ -16,23 +16,6 @@
         LOAD_VALUE,
         STORE_VALUE,
 
-        /// <summary>
-        /// LOAD_VALUE_BASEPOINTER_RELATIVE
-        /// </summary>
-        LOAD_VALUE_BR,
-        /// <summary>
-        /// LOAD_VALUE_RELATIVE
-        /// </summary>
-        LOAD_VALUE_R,
-        /// <summary>
-        /// STORE_VALUE_BASEPOINTER_RELATIVE
-        /// </summary>
-        STORE_VALUE_BR,
-        /// <summary>
-        /// STORE_VALUE_RELATIVE
-        /// </summary>
-        STORE_VALUE_R,
-
         CALL,
         RETURN,
 
@@ -67,17 +50,6 @@
         // === Structs ===
         LOAD_FIELD,
         STORE_FIELD,
-
-        LOAD_FIELD_R,
-
-        /// <summary>
-        /// LOAD_FIELD_BASEPOINTER_RELATIVE
-        /// </summary>
-        LOAD_FIELD_BR,
-        /// <summary>
-        /// STORE_FIELD_BASEPOINTER_RELATIVE
-        /// </summary>
-        STORE_FIELD_BR,
         // === ===
 
         // === Lists ===
@@ -111,11 +83,11 @@
 
         TYPE_GET,
 
+        // === Debug ===
         /// <summary>
         /// Sets the last stack item's tag
         /// </summary>
         DEBUG_SET_TAG,
-
         /// <summary>
         /// Call Stack Push
         /// </summary>
@@ -124,6 +96,7 @@
         /// Call Stack Pop
         /// </summary>
         CS_POP,
+        // === ===
 
         /// <summary>
         /// Replaces the last element with its own copy
@@ -133,6 +106,5 @@
         /// Replaces the last element with its own recursive copy
         /// </summary>
         COPY_VALUE_RECURSIVE,
-        STORE_FIELD_R,
     }
 }

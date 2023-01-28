@@ -13,7 +13,7 @@ namespace IngameCoding.Core
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors, settings.BasePath);
         public static void RunBinary(TheProgram.ArgumentParser.Settings settings) => RunBinary(settings.File, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
 
         /// <summary>
@@ -32,10 +32,11 @@ namespace IngameCoding.Core
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
             bool LogDebug = true,
             bool LogSystem = true,
-            bool HandleErrors = true
+            bool HandleErrors = true,
+            string BasePath = ""
             )
         {
-            if (LogDebug) Output.Output.Debug($"Run file '{file.FullName}'");
+            if (LogDebug) Output.Output.Debug($"Run file \"{file.FullName}\" ...");
             var code = File.ReadAllText(file.FullName);
             var codeInterpreter = new Interpreter();
 
@@ -73,9 +74,22 @@ namespace IngameCoding.Core
 
             if (codeInterpreter.Initialize())
             {
-                var dlls = file.Directory.GetFiles("*.dll");
-                foreach (var dll in dlls)
-                { codeInterpreter.LoadDLL(dll.FullName); }
+                codeInterpreter.BasePath = BasePath;
+
+                var dllsFolderPath = Path.Combine(file.Directory.FullName, BasePath.Replace('/', '\\'));
+
+                if (Directory.Exists(dllsFolderPath))
+                {
+                    var dllsFolder = new DirectoryInfo(dllsFolderPath);
+                    if (LogDebug) Output.Output.Debug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                    var dlls = dllsFolder.GetFiles("*.dll");
+                    foreach (var dll in dlls)
+                    { codeInterpreter.LoadDLL(dll.FullName); }
+                }
+                else
+                {
+                    Output.Output.Warning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+                }
 
                 Instruction[] compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
                 if (compiledCode != null)
@@ -84,32 +98,29 @@ namespace IngameCoding.Core
 
             while (codeInterpreter.IsExecutingCode)
             {
-                if (HandleErrors)
-                {
-                    try
-                    {
-                        codeInterpreter.Update();
-                    }
-                    catch (CompilerException error)
-                    {
-                        Output.Output.Error($"CompilerException: {error.MessageAll}");
-                    }
-                    catch (RuntimeException error)
-                    {
-                        Output.Output.Error($"RuntimeException: {error.MessageAll}");
-                    }
-                    catch (EndlessLoopException)
-                    {
-                        Output.Output.Error($"Endless loop!!!");
-                    }
-                    catch (InternalException error)
-                    {
-                        Output.Output.Error($"InternalException: {error.Message}");
-                    }
-                }
-                else
+                try
                 {
                     codeInterpreter.Update();
+                }
+                catch (CompilerException error)
+                {
+                    Output.Output.Error($"CompilerException: {error.MessageAll}");
+                    if (!HandleErrors) throw;
+                }
+                catch (RuntimeException error)
+                {
+                    Output.Output.Error($"RuntimeException: {error.MessageAll}");
+                    if (!HandleErrors) throw;
+                }
+                catch (EndlessLoopException)
+                {
+                    Output.Output.Error($"Endless loop!!!");
+                    if (!HandleErrors) throw;
+                }
+                catch (InternalException error)
+                {
+                    Output.Output.Error($"InternalException: {error.Message}");
+                    if (!HandleErrors) throw;
                 }
             }
         }
@@ -177,32 +188,29 @@ namespace IngameCoding.Core
 
             while (codeInterpreter.IsExecutingCode)
             {
-                if (HandleErrors)
-                {
-                    try
-                    {
-                        codeInterpreter.Update();
-                    }
-                    catch (CompilerException error)
-                    {
-                        Output.Output.Error($"CompilerException: {error.MessageAll}");
-                    }
-                    catch (RuntimeException error)
-                    {
-                        Output.Output.Error($"RuntimeException: {error.MessageAll}");
-                    }
-                    catch (EndlessLoopException)
-                    {
-                        Output.Output.Error($"Endless loop!!!");
-                    }
-                    catch (InternalException error)
-                    {
-                        Output.Output.Error($"InternalException: {error.Message}");
-                    }
-                }
-                else
+                try
                 {
                     codeInterpreter.Update();
+                }
+                catch (CompilerException error)
+                {
+                    Output.Output.Error($"CompilerException: {error.MessageAll}");
+                    if (!HandleErrors) throw;
+                }
+                catch (RuntimeException error)
+                {
+                    Output.Output.Error($"RuntimeException: {error.MessageAll}");
+                    if (!HandleErrors) throw;
+                }
+                catch (EndlessLoopException)
+                {
+                    Output.Output.Error($"Endless loop!!!");
+                    if (!HandleErrors) throw;
+                }
+                catch (InternalException error)
+                {
+                    Output.Output.Error($"InternalException: {error.Message}");
+                    if (!HandleErrors) throw;
                 }
             }
         }

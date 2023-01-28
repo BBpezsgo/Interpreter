@@ -6,10 +6,19 @@ using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
+    public enum AddressingMode : byte
+    {
+        ABSOLUTE,
+        BASEPOINTER_RELATIVE,
+        RELATIVE,
+        POP,
+    }
+
     [Serializable]
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Instruction : ISerializable<Instruction>
     {
+        public AddressingMode AddressingMode;
         public Opcode opcode;
         /// <summary>
         /// Can be:
@@ -25,10 +34,6 @@ namespace IngameCoding.Bytecode
         /// </list>
         /// </summary>
         public object parameter;
-        /// <summary>Used for: <b>Only struct field names!</b></summary>
-        public string additionParameter = string.Empty;
-        /// <summary>Used for: <b>Only lists!</b> This is the value <c>.[i]</c></summary>
-        public int additionParameter2 = -1;
 
         /// <summary>
         /// <b>Only for debugging!</b><br/>
@@ -67,30 +72,34 @@ namespace IngameCoding.Bytecode
         public Instruction()
         {
             this.opcode = Opcode.UNKNOWN;
+            this.AddressingMode = AddressingMode.ABSOLUTE;
             this.parameter = null;
         }
+
         public Instruction(Opcode opcode)
         {
             this.opcode = opcode;
+            this.AddressingMode = AddressingMode.ABSOLUTE;
             this.parameter = null;
         }
         public Instruction(Opcode opcode, object parameter)
         {
             this.opcode = opcode;
+            this.AddressingMode = AddressingMode.ABSOLUTE;
             this.parameter = parameter;
         }
 
-        public Instruction(Opcode opcode, object parameter, string additionParameter)
+        public Instruction(Opcode opcode, AddressingMode addressingMode)
         {
             this.opcode = opcode;
-            this.parameter = parameter;
-            this.additionParameter = additionParameter;
+            this.AddressingMode = addressingMode;
+            this.parameter = null;
         }
-        public Instruction(Opcode opcode, object parameter, int additionParameter)
+        public Instruction(Opcode opcode, AddressingMode addressingMode, object parameter)
         {
             this.opcode = opcode;
+            this.AddressingMode = addressingMode;
             this.parameter = parameter;
-            this.additionParameter2 = additionParameter;
         }
 
         public override string ToString()
@@ -117,10 +126,6 @@ namespace IngameCoding.Bytecode
                 {
                     str = opcode.ToString() + " { " + parameter.ToString();
                 }
-                if (additionParameter != string.Empty)
-                {
-                    str += ", " + additionParameter + "";
-                }
                 str += " }";
                 return IsRunning + str;
             }
@@ -129,9 +134,8 @@ namespace IngameCoding.Bytecode
         void ISerializable<Instruction>.Serialize(Serializer serializer)
         {
             serializer.Serialize((int)this.opcode);
+            serializer.Serialize((byte)this.AddressingMode);
             serializer.Serialize(this.tag);
-            serializer.Serialize(this.additionParameter);
-            serializer.Serialize(this.additionParameter2);
             if (this.parameter is null)
             {
                 serializer.Serialize((byte)0);
@@ -263,9 +267,8 @@ namespace IngameCoding.Bytecode
         void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
         {
             this.opcode = (Opcode)deserializer.DeserializeInt32();
+            this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
             this.tag = deserializer.DeserializeString();
-            this.additionParameter = deserializer.DeserializeString();
-            this.additionParameter2 = deserializer.DeserializeInt32();
             var parameterType = deserializer.DeserializeByte();
             if (parameterType == 0)
             {

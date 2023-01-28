@@ -13,10 +13,11 @@ namespace TheProgram
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-namespaces.bbc";
+            var file = "test-list.bbc";
             if (args.Length == 0) args = new string[]
             {
-                 "-throw-errors",
+                "-throw-errors",
+                "-basepath \"../CodeFiles/\"",
                 // "-c-print-instructions true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",

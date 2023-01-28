@@ -101,11 +101,12 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static void ParseArgs(string[] args, out string BasePath, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             ThrowErrors = false;
             LogDebugs = true;
             LogSystem = true;
+            BasePath = "";
             RunType = RunType.Normal;
             compilerSettings = Compiler.CompilerSettings.Default;
             parserSettings = ParserSettings.Default;
@@ -145,6 +146,17 @@ namespace TheProgram
                         { throw new ArgumentException("Expected string value after argument '-compile'"); }
 
                         CompileOutput = args[i];
+
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-basepath")
+                    {
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-basepath'"); }
+
+                        BasePath = args[i];
 
                         goto ArgParseDone;
                     }
@@ -296,6 +308,7 @@ namespace TheProgram
             public RunType RunType;
             public string CompileOutput;
             public CompressionLevel compressionLevel;
+            public string BasePath;
         }
 
         /// <summary>
@@ -319,6 +332,7 @@ namespace TheProgram
             bool LogSystem;
             RunType RunType;
             string CompileOutput;
+            string BasePath;
             CompressionLevel CompressionLevel;
 
             ArgumentNormalizer normalizer = new();
@@ -327,7 +341,7 @@ namespace TheProgram
 
             try
             {
-                ParseArgs(normalizedArgs, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompressionLevel, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                ParseArgs(normalizedArgs, out BasePath, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompressionLevel, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
             }
             catch (ArgumentException error)
             {
@@ -353,6 +367,7 @@ namespace TheProgram
                 RunType = RunType,
                 CompileOutput = CompileOutput,
                 File = new System.IO.FileInfo(normalizedArgs.Last()),
+                BasePath = BasePath,
                 compressionLevel = CompressionLevel,
             };
         }

@@ -181,8 +181,6 @@ namespace TheProgram
 
     public class Data_Instruction : Data_Serializable<Instruction>
     {
-        public int AdditionParameter2 { get; set; }
-        public string AdditionParameter { get; set; }
         public string Tag { get; set; }
         public object Parameter { get; set; }
         public bool ParameterIsComplicated { get; set; }
@@ -236,8 +234,6 @@ namespace TheProgram
                 ParameterIsComplicated = false;
             }
             Tag = v.tag;
-            AdditionParameter = v.additionParameter;
-            AdditionParameter2 = v.additionParameter2;
         }
     }
 

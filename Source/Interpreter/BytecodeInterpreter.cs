@@ -12,7 +12,7 @@ namespace IngameCoding.Bytecode
         {
             readonly BytecodeInterpreter bytecodeInterpreter;
             public int CodePointer => bytecodeInterpreter.BytecodeProcessor.CodePointer;
-            public int BasePointer => bytecodeInterpreter.BytecodeProcessor.Memory.BasePointer;
+            public int BasePointer => bytecodeInterpreter.BytecodeProcessor.BasePointer;
             public int[] ReturnAddressStack => bytecodeInterpreter.BytecodeProcessor.Memory.ReturnAddressStack.ToArray();
             public DataItem[] Stack => bytecodeInterpreter.BytecodeProcessor.Memory.Stack.ToArray();
             public DataItem[] Heap => bytecodeInterpreter.BytecodeProcessor.Memory.Heap.ToArray();
@@ -73,8 +73,8 @@ namespace IngameCoding.Bytecode
             enable = true;
             IsCall = false;
 
-            BytecodeProcessor.Memory.CodePointer = instructionOffset;
-            BytecodeProcessor.Memory.BasePointer = BytecodeProcessor.Memory.Stack.Count;
+            BytecodeProcessor.CodePointer = instructionOffset;
+            BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }
 
         public void Call(int instructionOffset, params int[] arguments)
@@ -87,13 +87,13 @@ namespace IngameCoding.Bytecode
             enable = true;
             IsCall = true;
 
-            BytecodeProcessor.Memory.CodePointer = instructionOffset;
+            BytecodeProcessor.CodePointer = instructionOffset;
             BytecodeProcessor.Memory.Stack.Push(0, "return value");
             BytecodeProcessor.Memory.Stack.PushRange(this.arguments, "arg");
 
             BytecodeProcessor.Memory.Stack.Push(0, "saved base pointer");
-            BytecodeProcessor.Memory.ReturnAddressStack.Add(BytecodeProcessor.Memory.End());
-            BytecodeProcessor.Memory.BasePointer = BytecodeProcessor.Memory.Stack.Count;
+            BytecodeProcessor.Memory.ReturnAddressStack.Add(BytecodeProcessor.End());
+            BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }
 
         void ExecuteNext()
@@ -102,7 +102,7 @@ namespace IngameCoding.Bytecode
 
             if (endlessSafe > settings.InstructionLimit)
             {
-                BytecodeProcessor.Memory.CodePointer = BytecodeProcessor.Memory.Code.Length;
+                BytecodeProcessor.CodePointer = BytecodeProcessor.Memory.Code.Length;
                 throw new RuntimeException("Instruction limit reached!", GetContext());
             }
 
@@ -111,11 +111,11 @@ namespace IngameCoding.Bytecode
                 throw new RuntimeException("Stack overflow!", GetContext());
             }
 
-            if (BytecodeProcessor.CodePointer < BytecodeProcessor.Memory.End())
+            if (BytecodeProcessor.CodePointer < BytecodeProcessor.End())
             {
-                if (BytecodeProcessor.Memory.CurrentInstruction.opcode == Opcode.COMMENT)
+                if (BytecodeProcessor.CurrentInstruction.opcode == Opcode.COMMENT)
                 {
-                    BytecodeProcessor.Memory.Step();
+                    BytecodeProcessor.Step();
                     ExecuteNext();
                     return;
                 }
@@ -138,7 +138,7 @@ namespace IngameCoding.Bytecode
 
                 if (lastInstrPointer == BytecodeProcessor.CodePointer)
                 {
-                    Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + BytecodeProcessor.Memory.CurrentInstruction.ToString());
+                    Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + BytecodeProcessor.CurrentInstruction.ToString());
                 }
 
                 lastInstrPointer = BytecodeProcessor.CodePointer;

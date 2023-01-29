@@ -10,6 +10,8 @@ namespace IngameCoding.Bytecode
 
     internal class DataStack : Stack<DataItem>
     {
+
+
         internal int UsedVirtualMemory
         {
             get
@@ -58,7 +60,9 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        internal BytecodeProcessor cpu;
+        internal BytecodeProcessor processor;
+
+        public DataStack(BytecodeProcessor processor) => this.processor = processor;
 
         public void Destroy() => stack.Clear();
 
@@ -77,7 +81,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
-            item.heap = this.cpu.Memory.Heap;
+            item.heap = this.processor.Memory.Heap;
             this.stack.Add(item);
         }
         /// <returns>Adds a new item to the end</returns>
@@ -85,7 +89,7 @@ namespace IngameCoding.Bytecode
         {
             var item = value;
             item.stack = this;
-            item.heap = this.cpu.Memory.Heap;
+            item.heap = this.processor.Memory.Heap;
             item.Tag = tag;
             this.stack.Add(item);
         }
@@ -129,7 +133,7 @@ namespace IngameCoding.Bytecode
         {
             DataItem item = val;
             item.stack = this;
-            item.heap = this.cpu.Memory.Heap;
+            item.heap = this.processor.Memory.Heap;
             if (!overrideTag)
             {
                 item.Tag = stack[index].Tag;

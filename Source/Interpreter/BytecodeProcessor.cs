@@ -7,12 +7,14 @@ namespace IngameCoding.Bytecode
 
     internal class BytecodeProcessor
     {
-        internal readonly BytecodeEvaluator BytecodeEvaluator;
         internal readonly Memory Memory;
 
         internal Dictionary<string, BuiltinFunction> builtinFunctions;
 
-        public int CodePointer => Memory.CodePointer;
+        internal int CodePointer;
+        internal int BasePointer;
+
+        internal Instruction CurrentInstruction => Memory.Code[CodePointer];
 
         public BytecodeProcessor(Instruction[] code, int basePointer, Dictionary<string, BuiltinFunction> builtinFunctions)
         {
@@ -23,22 +25,14 @@ namespace IngameCoding.Bytecode
             }
             this.builtinFunctions = builtinFunctions;
 
-            Memory = new(
-                new DataStack() { cpu = this },
-                new HEAP(10),
-                code
-            )
-            {
-                BasePointer = basePointer,
-                ReturnAddressStack = new List<int>(),
-                CodePointer = code.Length
-            };
-            BytecodeEvaluator = new(Memory, this);
-        }
+            BasePointer = basePointer;
+            CodePointer = code.Length;
 
-        public int Clock()
-        {
-            return BytecodeEvaluator.Evaluate();
+            Memory = new(
+                10,
+                code,
+                this
+            );
         }
 
         internal static string GetTypeText(DataItem.Type type)
@@ -55,6 +49,11 @@ namespace IngameCoding.Bytecode
         }
         internal static string GetTypeText(DataItem val) => val.type == DataItem.Type.LIST ? $"{(val.ValueList.itemTypes == DataItem.Type.LIST ? "?[]" : GetTypeText(val.ValueList.itemTypes))}[]" : GetTypeText(val.type);
 
+        public int End() => Memory.Code.Length;
+
+        public void Step() => Step(1);
+        public void Step(int num) => CodePointer += num;
+
         public void Destroy()
         {
             Memory.Stack.Destroy();
@@ -63,25 +62,13 @@ namespace IngameCoding.Bytecode
             Memory.ReturnAddressStack = null;
             this.builtinFunctions = null;
         }
-    }
 
-    internal class BytecodeEvaluator
-    {
-        readonly Memory Memory;
-        readonly BytecodeProcessor Processor;
-
-        public BytecodeEvaluator(Memory memory, BytecodeProcessor processor)
+        public int Clock()
         {
-            Memory = memory;
-            Processor = processor;
-        }
-
-        internal int Evaluate()
-        {
-            switch (Memory.CurrentInstruction.opcode)
+            switch (CurrentInstruction.opcode)
             {
                 case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
-                case Opcode.COMMENT: Memory.Step(); return 1;
+                case Opcode.COMMENT: Step(); return 1;
 
                 #region Instructions
                 case Opcode.EXIT: return EXIT();
@@ -139,23 +126,18 @@ namespace IngameCoding.Bytecode
                 case Opcode.CS_POP: return CS_POP();
                 #endregion
 
-                default: throw new InternalException("Unimplemented instruction " + Memory.CurrentInstruction.opcode.ToString());
+                default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
             }
         }
 
-        int Address()
+        int GetAddress() => CurrentInstruction.AddressingMode switch
         {
-            AddressingMode mode = Memory.CurrentInstruction.AddressingMode;
-            int parameter = (int)Memory.CurrentInstruction.parameter;
-            return mode switch
-            {
-                AddressingMode.ABSOLUTE => parameter,
-                AddressingMode.BASEPOINTER_RELATIVE => Memory.BasePointer + parameter,
-                AddressingMode.RELATIVE => Memory.Stack.Count + parameter,
-                AddressingMode.POP => Memory.Stack.Count + parameter,
-                _ => parameter,
-            };
-        }
+            AddressingMode.ABSOLUTE => (int)CurrentInstruction.parameter,
+            AddressingMode.BASEPOINTER_RELATIVE => BasePointer + (int)CurrentInstruction.parameter,
+            AddressingMode.RELATIVE => Memory.Stack.Count + (int)CurrentInstruction.parameter,
+            AddressingMode.POP => Memory.Stack.Count - 1,
+            _ => (int)CurrentInstruction.parameter,
+        };
 
         #region Instruction Methods
 
@@ -163,7 +145,7 @@ namespace IngameCoding.Bytecode
         {
             DataItem itemToCopy = Memory.Stack.Pop();
             Memory.Stack.Push(itemToCopy.Copy());
-            Memory.Step();
+            Step();
 
             return 2;
         }
@@ -172,15 +154,15 @@ namespace IngameCoding.Bytecode
         {
             DataItem itemToCopy = Memory.Stack.Pop();
             Memory.Stack.Push(itemToCopy.CopyRecursive());
-            Memory.Step();
+            Step();
 
             return 3;
         }
 
         int CS_PUSH()
         {
-            Memory.CallStack.Push(Memory.CurrentInstruction.parameter.ToString());
-            Memory.Step();
+            Memory.CallStack.Push(CurrentInstruction.parameter.ToString());
+            Step();
 
             return 1;
         }
@@ -188,7 +170,7 @@ namespace IngameCoding.Bytecode
         int CS_POP()
         {
             Memory.CallStack.Pop();
-            Memory.Step();
+            Step();
 
             return 1;
         }
@@ -196,18 +178,18 @@ namespace IngameCoding.Bytecode
         int DEBUG_SET_TAG()
         {
             var last = Memory.Stack.Last();
-            last.Tag = Memory.CurrentInstruction.parameter.ToString();
+            last.Tag = CurrentInstruction.parameter.ToString();
             Memory.Stack.Set(Memory.Stack.Count - 1, last, true);
-            Memory.Step();
+            Step();
 
             return 1;
         }
 
         int HEAP_GET()
         {
-            var v = Memory.Heap[(int)Memory.CurrentInstruction.parameter];
+            var v = Memory.Heap[(int)CurrentInstruction.parameter];
             Memory.Stack.Push(v);
-            Memory.Step();
+            Step();
 
             return 2;
         }
@@ -215,8 +197,8 @@ namespace IngameCoding.Bytecode
         int HEAP_SET()
         {
             var v = Memory.Stack.Pop();
-            Memory.Heap[(int)Memory.CurrentInstruction.parameter] = v;
-            Memory.Step();
+            Memory.Heap[(int)CurrentInstruction.parameter] = v;
+            Step();
 
             return 2;
         }
@@ -225,7 +207,7 @@ namespace IngameCoding.Bytecode
         {
             var v = Memory.Stack.Pop();
             Memory.Stack.Push(!v);
-            Memory.Step();
+            Step();
 
             return 3;
         }
@@ -234,7 +216,7 @@ namespace IngameCoding.Bytecode
         {
             var v = Memory.Stack.Pop();
             Memory.Stack.Push(BytecodeProcessor.GetTypeText(v), "type() result");
-            Memory.Step();
+            Step();
 
             return 3;
         }
@@ -247,7 +229,7 @@ namespace IngameCoding.Bytecode
             { listValue.ValueList.Add(newItem); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -260,7 +242,7 @@ namespace IngameCoding.Bytecode
             { listValue.ValueList.Add(newItem, indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            Memory.Step();
+            Step();
 
             return 5;
         }
@@ -274,7 +256,7 @@ namespace IngameCoding.Bytecode
             else
             { throw new RuntimeException("The variable type is not list!"); }
             Memory.Stack.Push(listValue);
-            Memory.Step();
+            Step();
 
             return 3;
         }
@@ -285,7 +267,7 @@ namespace IngameCoding.Bytecode
             { listValue.ValueList.Remove(); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            Memory.Step();
+            Step();
 
             return 3;
         }
@@ -297,7 +279,7 @@ namespace IngameCoding.Bytecode
             { listValue.ValueList.Remove(indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -321,7 +303,7 @@ namespace IngameCoding.Bytecode
             }
             else
             { throw new RuntimeException("The variable type is not list or string!"); }
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -339,10 +321,10 @@ namespace IngameCoding.Bytecode
             { throw new InternalException($"Instruction CALL_BUILTIN need a STRING DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToStringValue()}"); }
             string functionName = functionNameDataItem.ValueString;
 
-            if (Processor.builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            if (builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
             {
                 List<DataItem> parameters = new();
-                for (int i = 0; i < (int)Memory.CurrentInstruction.parameter; i++)
+                for (int i = 0; i < (int)CurrentInstruction.parameter; i++)
                 { parameters.Add(Memory.Stack.Pop()); }
                 if (builtinFunction.ReturnSomething)
                 {
@@ -356,7 +338,7 @@ namespace IngameCoding.Bytecode
             else
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }
 
-            Memory.Step();
+            Step();
 
             return 15;
         }
@@ -368,7 +350,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide > rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -379,7 +361,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide == rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -390,7 +372,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide != rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -401,7 +383,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide | rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -412,7 +394,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide ^ rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -423,7 +405,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide <= rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -434,7 +416,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide >= rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -445,7 +427,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide & rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -453,7 +435,7 @@ namespace IngameCoding.Bytecode
         int POP_VALUE()
         {
             if (Memory.Stack.Count > 0) Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
-            Memory.Step();
+            Step();
 
             return 2;
         }
@@ -462,24 +444,24 @@ namespace IngameCoding.Bytecode
         {
             int returnAddress = Memory.ReturnAddressStack[^1];
             Memory.ReturnAddressStack.RemoveAt(Memory.ReturnAddressStack.Count - 1);
-            Memory.BasePointer = Memory.Stack.Pop().ValueInt;
-            Memory.CodePointer = returnAddress;
+            BasePointer = Memory.Stack.Pop().ValueInt;
+            CodePointer = returnAddress;
 
             return 3;
         }
         int CALL()
         {
-            Memory.Stack.Push(Memory.BasePointer, "saved base pointer");
-            Memory.ReturnAddressStack.Add(Memory.CodePointer + 1);
-            Memory.BasePointer = Memory.Stack.Count;
-            Memory.Step((int)Memory.CurrentInstruction.parameter);
+            Memory.Stack.Push(BasePointer, "saved base pointer");
+            Memory.ReturnAddressStack.Add(CodePointer + 1);
+            BasePointer = Memory.Stack.Count;
+            Step((int)CurrentInstruction.parameter);
 
             return 4;
         }
 
         int JUMP_BY()
         {
-            Memory.CodePointer += (int)Memory.CurrentInstruction.parameter;
+            CodePointer += (int)CurrentInstruction.parameter;
 
             return 1;
         }
@@ -488,9 +470,9 @@ namespace IngameCoding.Bytecode
             var condition = Memory.Stack.Pop();
 
             if (condition == true)
-            { Memory.CodePointer += (int)Memory.CurrentInstruction.parameter; }
+            { CodePointer += (int)CurrentInstruction.parameter; }
             else
-            { Memory.Step(); }
+            { Step(); }
 
             return 3;
         }
@@ -499,43 +481,43 @@ namespace IngameCoding.Bytecode
             var condition = Memory.Stack.Pop();
 
             if (condition == false)
-            { Memory.CodePointer += (int)Memory.CurrentInstruction.parameter; }
+            { CodePointer += (int)CurrentInstruction.parameter; }
             else
-            { Memory.Step(); }
+            { Step(); }
 
             return 3;
         }
 
         int STORE_VALUE()
         {
-            int address = Address();
+            int address = GetAddress();
 
             Memory.Stack.Set(address, Memory.Stack.Last());
 
             Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
-            Memory.Step();
+            Step();
 
             return 3;
         }
         int LOAD_VALUE()
         {
-            int address = Address();
+            int address = GetAddress();
 
-            Memory.Stack.Push(Memory.Stack.Get(address), Memory.CurrentInstruction.tag);
+            Memory.Stack.Push(Memory.Stack.Get(address), CurrentInstruction.tag);
 
-            Memory.Step();
+            Step();
 
             return 3;
         }
 
         int STORE_FIELD()
         {
-            int address = Address();
+            int address = GetAddress();
 
             string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
-            DataItem newValue =  Memory.Stack.Pop();
+            DataItem newValue = Memory.Stack.Pop();
             IStruct item = Memory.Stack.Get(address).ValueStruct;
 
             if (!item.HaveField(field))
@@ -545,18 +527,18 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Set(address, new DataItem(item, null));
 
-            Memory.Step();
+            Step();
 
             return 7;
         }
         int LOAD_FIELD()
         {
-            int address = Address();
+            int address = GetAddress();
 
             string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
-            DataItem item = Memory.CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack.Get(address);
+            DataItem item = CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack.Get(address);
 
             if (item.type == DataItem.Type.STRING)
             {
@@ -564,7 +546,7 @@ namespace IngameCoding.Bytecode
 
                 if (field == "Length")
                 {
-                    Memory.Stack.Push(value.Length, Memory.CurrentInstruction.tag);
+                    Memory.Stack.Push(value.Length, CurrentInstruction.tag);
                 }
                 else
                 { throw new RuntimeException("Type string does not have field " + field); }
@@ -575,7 +557,7 @@ namespace IngameCoding.Bytecode
 
                 if (field == "Length")
                 {
-                    Memory.Stack.Push(value.items.Count, Memory.CurrentInstruction.tag);
+                    Memory.Stack.Push(value.items.Count, CurrentInstruction.tag);
                 }
                 else
                 { throw new RuntimeException("Type list does not have field " + field); }
@@ -592,7 +574,7 @@ namespace IngameCoding.Bytecode
             else
             { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -604,23 +586,23 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide < rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
 
         int PUSH_VALUE()
         {
-            if (Memory.CurrentInstruction.parameter is DataItem dataItem)
+            if (CurrentInstruction.parameter is DataItem dataItem)
             {
-                Memory.Stack.Push(dataItem, Memory.CurrentInstruction.tag);
+                Memory.Stack.Push(dataItem, CurrentInstruction.tag);
             }
             else
             {
-                Memory.Stack.Push(new DataItem(Memory.CurrentInstruction.parameter, Memory.CurrentInstruction.tag), Memory.CurrentInstruction.tag);
+                Memory.Stack.Push(new DataItem(CurrentInstruction.parameter, CurrentInstruction.tag), CurrentInstruction.tag);
             }
 
-            Memory.Step();
+            Step();
 
             return 2;
         }
@@ -632,14 +614,14 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide + rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
 
         int EXIT()
         {
-            Memory.CodePointer = Memory.Code.Length;
+            CodePointer = Memory.Code.Length;
 
             return 1;
         }
@@ -651,7 +633,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide / rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -663,7 +645,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide - rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -675,7 +657,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide * rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -687,7 +669,7 @@ namespace IngameCoding.Bytecode
 
             Memory.Stack.Push(leftSide % rightSide);
 
-            Memory.Step();
+            Step();
 
             return 4;
         }
@@ -703,22 +685,15 @@ namespace IngameCoding.Bytecode
         internal Instruction[] Code;
         internal Stack<string> CallStack;
 
-        internal int CodePointer;
-        internal int BasePointer;
-
-        internal Instruction CurrentInstruction => Code[CodePointer];
-
-        public Memory(DataStack stack, HEAP heap, Instruction[] code)
+        public Memory(int heapSize, Instruction[] code, BytecodeProcessor processor)
         {
-            Stack = stack;
             Code = code;
-            Heap = heap;
+
+            Stack = new DataStack(processor);
+            Heap = new HEAP(heapSize);
+
             CallStack = new Stack<string>();
+            ReturnAddressStack = new List<int>();
         }
-
-        public int End() => Code.Length;
-
-        public void Step() => Step(1);
-        public void Step(int num) => CodePointer += num;
     }
 }

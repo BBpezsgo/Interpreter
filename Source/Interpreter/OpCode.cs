@@ -40,6 +40,9 @@
         /// <summary> NOT </summary>
         LOGIC_NOT,
 
+        BITSHIFT_LEFT,
+        BITSHIFT_RIGHT,
+
         MATH_ADD,
         MATH_SUB,
         MATH_MULT,

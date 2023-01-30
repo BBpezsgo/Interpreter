@@ -916,6 +916,8 @@ namespace IngameCoding.BBCode
                 operators.Add("|", 4);
                 operators.Add("&", 4);
                 operators.Add("^", 4);
+                operators.Add("<<", 4);
+                operators.Add(">>", 4);
 
                 operators.Add("!=", 5);
                 operators.Add(">=", 5);
@@ -2291,6 +2293,7 @@ namespace IngameCoding.BBCode
                 {
                     if (!ExpectOperator(new string[]
                         {
+                        "<<", ">>",
                         "+", "-", "*", "/", "%",
                         "=",
                         "<", ">", ">=", "<=", "!=", "==", "&", "|", "^"

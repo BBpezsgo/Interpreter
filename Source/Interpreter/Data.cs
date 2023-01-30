@@ -709,6 +709,59 @@ namespace IngameCoding.Bytecode
             throw new RuntimeException("Can't do - operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
 
+        public static DataItem BitshiftLeft(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case DataType.BYTE:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueByte << rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueByte << rightSide.ValueInt, null);
+                    }
+                    break;
+                case DataType.INT:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueInt << rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueInt << rightSide.ValueInt, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do << operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+        public static DataItem BitshiftRight(DataItem leftSide, DataItem rightSide)
+        {
+            switch (leftSide.type)
+            {
+                case DataType.BYTE:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueByte >> rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueByte >> rightSide.ValueInt, null);
+                    }
+                    break;
+                case DataType.INT:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueInt >> rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueInt >> rightSide.ValueInt, null);
+                    }
+                    break;
+            }
+
+            throw new RuntimeException("Can't do >> operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+        }
+
         public static DataItem operator *(DataItem leftSide, DataItem rightSide)
         {
             switch (leftSide.type)

@@ -464,6 +464,16 @@ namespace IngameCoding.BBCode.Compiler
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MTEQ;
             }
+            else if (@operator.Operator.text == "<<")
+            {
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                opcode = Opcode.BITSHIFT_LEFT;
+            }
+            else if (@operator.Operator.text == ">>")
+            {
+                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
+                opcode = Opcode.BITSHIFT_RIGHT;
+            }
 
             if (opcode != Opcode.UNKNOWN)
             {
@@ -663,6 +673,9 @@ namespace IngameCoding.BBCode.Compiler
             "&" => left & right,
             "|" => left | right,
             "^" => left ^ right,
+
+            "<<" => DataItem.BitshiftLeft(left, right),
+            ">>" => DataItem.BitshiftRight(left, right),
 
             "<" => new DataItem(left < right, null),
             ">" => new DataItem(left > right, null),
@@ -1051,6 +1064,8 @@ namespace IngameCoding.BBCode.Compiler
                 { "^", Opcode.LOGIC_XOR },
                 { "<=", Opcode.LOGIC_LTEQ },
                 { ">=", Opcode.LOGIC_MTEQ },
+                { "<<", Opcode.BITSHIFT_LEFT },
+                { ">>", Opcode.BITSHIFT_RIGHT },
             };
             Dictionary<string, int> operatorParameterCounts = new()
             {
@@ -1069,6 +1084,8 @@ namespace IngameCoding.BBCode.Compiler
                 { "^", 2 },
                 { "<=", 2 },
                 { ">=", 2 },
+                { "<<", 2 },
+                { ">>", 2 },
             };
 
 

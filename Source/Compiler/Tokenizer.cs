@@ -448,6 +448,34 @@ namespace IngameCoding.BBCode
                         CurrentToken.text += currChar;
                     }
                 }
+                else if (currChar == '<')
+                {
+                    if (CurrentToken.text == "<")
+                    {
+                        CurrentToken.text += currChar;
+                        EndToken(OffsetTotal);
+                    }
+                    else
+                    {
+                        EndToken(OffsetTotal);
+                        CurrentToken.type = TokenType.OPERATOR;
+                        CurrentToken.text += currChar;
+                    }
+                }
+                else if (currChar == '>')
+                {
+                    if (CurrentToken.text == ">")
+                    {
+                        CurrentToken.text += currChar;
+                        EndToken(OffsetTotal);
+                    }
+                    else
+                    {
+                        EndToken(OffsetTotal);
+                        CurrentToken.type = TokenType.OPERATOR;
+                        CurrentToken.text += currChar;
+                    }
+                }
                 else if (currChar == '-')
                 {
                     if (CurrentToken.text == "-")

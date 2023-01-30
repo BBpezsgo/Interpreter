@@ -87,6 +87,9 @@ namespace IngameCoding.Bytecode
                 case Opcode.MATH_DIV: return MATH_DIV();
                 case Opcode.MATH_MOD: return MATH_MOD();
 
+                case Opcode.BITSHIFT_LEFT: return BITSHIFT_LEFT();
+                case Opcode.BITSHIFT_RIGHT: return BITSHIFT_RIGHT();
+
                 case Opcode.LOGIC_LT: return LOGIC_LT();
                 case Opcode.LOGIC_MT: return LOGIC_MT();
                 case Opcode.LOGIC_AND: return LOGIC_AND();
@@ -624,6 +627,29 @@ namespace IngameCoding.Bytecode
             Step();
 
             return 2;
+        }
+
+        int BITSHIFT_LEFT()
+        {
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(DataItem.BitshiftLeft(leftSide, rightSide));
+
+            Step();
+
+            return 4;
+        }
+        int BITSHIFT_RIGHT()
+        {
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(DataItem.BitshiftRight(leftSide, rightSide));
+
+            Step();
+
+            return 4;
         }
 
         int MATH_ADD()

@@ -3,8 +3,9 @@
 [CodeEntry]
 void Main()
 {
-	byte[] bytes = BitConverter.GetByteArray(666);
-	Console.Log(BitConverter.GetInt(bytes));
+	Console.Log(5<<2);
+	// byte[] bytes = BitConverter.GetByteArray(666);
+	// Console.Log(BitConverter.GetInt(bytes));
 }
 
 namespace BitConverter

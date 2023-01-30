@@ -214,6 +214,7 @@ namespace IngameCoding.BBCode
 
         static readonly char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] banned = new char[] { '\r', '\u200B' };
+        static readonly string[] operators = new string[] { "<<" };
 
         /// <param name="settings">
         /// Tokenizer settings<br/>
@@ -272,10 +273,7 @@ namespace IngameCoding.BBCode
                     CurrentLine++;
                 }
 
-                if (banned.Contains(currChar))
-                {
-                    continue;
-                }
+                if (banned.Contains(currChar)) continue;
 
                 if (currChar == '\n' && CurrentToken.type == TokenType.COMMENT_MULTILINE)
                 {
@@ -349,6 +347,39 @@ namespace IngameCoding.BBCode
                 if (CurrentToken.type == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
                 {
                     CurrentToken.type = TokenType.OPERATOR;
+                    EndToken(OffsetTotal);
+                }
+
+                if (CurrentToken.type != TokenType.OPERATOR)
+                {
+                    bool x = false;
+                    foreach (var o in operators)
+                    {
+                        if (o.StartsWith(currChar))
+                        {
+                            EndToken(OffsetTotal);
+                            CurrentToken.type = TokenType.OPERATOR;
+                            CurrentToken.text += currChar;
+                            x = true;
+                            break;
+                        }
+                    }
+                    if (x) continue;
+                }
+                else
+                {
+                    bool x = false;
+                    foreach (var o in operators)
+                    {
+                        if (o.StartsWith(CurrentToken.text + currChar))
+                        {
+                            CurrentToken.type = TokenType.OPERATOR;
+                            CurrentToken.text += currChar;
+                            x = true;
+                            break;
+                        }
+                    }
+                    if (x) continue;
                     EndToken(OffsetTotal);
                 }
 
@@ -595,10 +626,10 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == '\\')
                 {
-                        EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
-                        EndToken(OffsetTotal);
+                    EndToken(OffsetTotal);
+                    CurrentToken.type = TokenType.OPERATOR;
+                    CurrentToken.text += currChar;
+                    EndToken(OffsetTotal);
                 }
                 else
                 {

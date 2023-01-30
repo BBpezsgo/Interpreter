@@ -345,27 +345,27 @@ namespace ConsoleGUI
 
                 switch (item.type)
                 {
-                    case IngameCoding.Bytecode.DataItem.Type.INT:
+                    case IngameCoding.Bytecode.DataType.INT:
                         ForegroundColor = CharColors.FgCyan;
                         AddText($"{item.ValueInt}");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.FLOAT:
+                    case IngameCoding.Bytecode.DataType.FLOAT:
                         ForegroundColor = CharColors.FgCyan;
                         AddText($"{item.ValueFloat}");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.STRING:
+                    case IngameCoding.Bytecode.DataType.STRING:
                         ForegroundColor = CharColors.FgYellow;
                         AddText($"\"{item.ValueString}\"");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.BOOLEAN:
+                    case IngameCoding.Bytecode.DataType.BOOLEAN:
                         ForegroundColor = CharColors.FgDarkBlue;
                         AddText($"{item.ValueBoolean}");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.STRUCT:
+                    case IngameCoding.Bytecode.DataType.STRUCT:
                         ForegroundColor = CharColors.FgWhite;
                         AddText("{ ... }");
                         break;
-                    case IngameCoding.Bytecode.DataItem.Type.LIST:
+                    case IngameCoding.Bytecode.DataType.LIST:
                         AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
                         break;
                     default:

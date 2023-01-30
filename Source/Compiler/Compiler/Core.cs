@@ -10,24 +10,26 @@ namespace IngameCoding.BBCode.Compiler
 
     static class Extensions
     {
-        public static DataItem.Type Convert(this BuiltinType v) => v switch
+        public static DataType Convert(this BuiltinType v) => v switch
         {
-            BuiltinType.INT => DataItem.Type.INT,
-            BuiltinType.FLOAT => DataItem.Type.FLOAT,
-            BuiltinType.STRING => DataItem.Type.STRING,
-            BuiltinType.BOOLEAN => DataItem.Type.BOOLEAN,
-            BuiltinType.STRUCT => DataItem.Type.STRUCT,
-            BuiltinType.LISTOF => DataItem.Type.LIST,
+            BuiltinType.INT => DataType.INT,
+            BuiltinType.BYTE => DataType.BYTE,
+            BuiltinType.FLOAT => DataType.FLOAT,
+            BuiltinType.STRING => DataType.STRING,
+            BuiltinType.BOOLEAN => DataType.BOOLEAN,
+            BuiltinType.STRUCT => DataType.STRUCT,
+            BuiltinType.LISTOF => DataType.LIST,
             _ => throw new NotImplementedException(),
         };
-        public static BuiltinType Convert(this DataItem.Type v) => v switch
+        public static BuiltinType Convert(this DataType v) => v switch
         {
-            DataItem.Type.INT => BuiltinType.INT,
-            DataItem.Type.FLOAT => BuiltinType.FLOAT,
-            DataItem.Type.STRING => BuiltinType.STRUCT,
-            DataItem.Type.BOOLEAN => BuiltinType.BOOLEAN,
-            DataItem.Type.STRUCT => BuiltinType.STRUCT,
-            DataItem.Type.LIST => BuiltinType.LISTOF,
+            DataType.INT => BuiltinType.INT,
+            DataType.BYTE => BuiltinType.BYTE,
+            DataType.FLOAT => BuiltinType.FLOAT,
+            DataType.STRING => BuiltinType.STRING,
+            DataType.BOOLEAN => BuiltinType.BOOLEAN,
+            DataType.STRUCT => BuiltinType.STRUCT,
+            DataType.LIST => BuiltinType.LISTOF,
             _ => BuiltinType.ANY,
         };
 

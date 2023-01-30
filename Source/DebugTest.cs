@@ -198,7 +198,7 @@ namespace TheProgram
                 Parameter = "[ ... ]";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is DataItem.Struct)
+            else if (v.parameter is Struct)
             {
                 Parameter = "{ ... }";
                 ParameterIsComplicated = true;
@@ -207,22 +207,22 @@ namespace TheProgram
             {
                 switch (v2.type)
                 {
-                    case DataItem.Type.INT:
+                    case DataType.INT:
                         Parameter = "INT";
                         break;
-                    case DataItem.Type.FLOAT:
+                    case DataType.FLOAT:
                         Parameter = "FLOAT";
                         break;
-                    case DataItem.Type.STRING:
+                    case DataType.STRING:
                         Parameter = "STRING";
                         break;
-                    case DataItem.Type.BOOLEAN:
+                    case DataType.BOOLEAN:
                         Parameter = "BOOLEAN";
                         break;
-                    case DataItem.Type.STRUCT:
+                    case DataType.STRUCT:
                         Parameter = "{ ... }";
                         break;
-                    case DataItem.Type.LIST:
+                    case DataType.LIST:
                         Parameter = "[ ... ]";
                         break;
                 }

@@ -14,8 +14,14 @@ namespace Console
   {
     Write(message + "\r\n");
   }
-
+  
   export void Log(int message)
+  { Log(message.ToString()); }
+  
+  export void Log(byte message)
+  { Log(message.ToString()); }
+  
+  export void Log(float message)
   { Log(message.ToString()); }
 
   export void Log(int[] message)
@@ -94,6 +100,12 @@ namespace Time
 }
 
 export string ToString(this int v)
+{ return v; }
+
+export string ToString(this byte v)
+{ return v; }
+
+export string ToString(this float v)
 { return v; }
 
 [Builtin("sleep")]
@@ -177,6 +189,23 @@ export string Substring(this string v, int start, int length)
 }
 
 export int ParseInt(string v)
+{
+  bool IsNegative = (v[0] == "-");
+  string parsing = v;
+  if (IsNegative) { parsing = parsing.Substring(1); };
+  parsing = parsing.Reverse();
+  int result = 0;
+  for (int i = 0; i < parsing.Length; i++)
+  {
+    string digit = parsing[i];
+    result += (Math.Pow(10, i) * ParseDigit(digit));
+  };
+  if (IsNegative)
+  { result *= -1; };
+  return result;
+}
+
+export byte ParseByte(string v)
 {
   bool IsNegative = (v[0] == "-");
   string parsing = v;

@@ -1,0 +1,28 @@
+﻿using System;
+
+[CodeEntry]
+void Main()
+{
+	byte[] bytes = BitConverter.GetByteArray(666);
+	Console.Log(BitConverter.GetInt(bytes));
+}
+
+namespace BitConverter
+{
+	int GetInt(byte[] bytes)
+	{
+		return bytes[3] + bytes[2] * 256 + bytes[1] * 65536 + bytes[0] * 16777216;
+	}
+	
+	byte[] GetByteArray(int v)
+	{
+		byte b0 = ToByte(0); // (v & 4278190080) - 16777215;
+		byte b1 = ToByte((v & 16711680) - 65535);
+		byte b2 = ToByte((v & 65280) - 256);
+		byte b3 = ToByte((v & 255) - 0);
+
+		return [ b0, b1, b2, b3 ];
+	}
+}
+
+byte ToByte(int v) { return ParseByte(v.ToString()); }

@@ -87,7 +87,17 @@ namespace IngameCoding.BBCode.Compiler
             "bool",
             "string",
             "float",
+            "byte",
             "void"
+        };
+
+        static readonly Dictionary<string, DataType> TypeMap = new()
+        {
+            { "byte", DataType.BYTE },
+            { "int", DataType.INT },
+            { "float", DataType.FLOAT },
+            { "string", DataType.STRING },
+            { "bool", DataType.BOOLEAN },
         };
 
         #region Fields
@@ -133,6 +143,26 @@ namespace IngameCoding.BBCode.Compiler
         #endregion
 
         #region Helper Functions
+
+        string GetReadableID(Statement_FunctionCall functionCall)
+        {
+            string readableID = functionCall.TargetNamespacePathPrefix + functionCall.FunctionName;
+            readableID += "(";
+            bool addComma = false;
+            if (functionCall.IsMethodCall && functionCall.PrevStatement != null)
+            {
+                readableID += "this " + FindStatementType(functionCall.PrevStatement);
+                addComma = true;
+            }
+            for (int i = 0; i < functionCall.Parameters.Count; i++)
+            {
+                if (addComma) { readableID += ", "; }
+                readableID += FindStatementType(functionCall.Parameters[i]);
+                addComma = true;
+            }
+            readableID += ")";
+            return readableID;
+        }
 
         bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable, out bool isGlobal)
         {
@@ -298,12 +328,13 @@ namespace IngameCoding.BBCode.Compiler
                 return type.typeName switch
                 {
                     BuiltinType.INT => 0,
+                    BuiltinType.BYTE => 0,
                     BuiltinType.AUTO => throw new CompilerException("Undefined type", type, CurrentFile),
                     BuiltinType.FLOAT => 0f,
                     BuiltinType.VOID => throw new CompilerException("Invalid type", type, CurrentFile),
                     BuiltinType.STRING => "",
                     BuiltinType.BOOLEAN => false,
-                    BuiltinType.STRUCT => new DataItem.UnassignedStruct(),
+                    BuiltinType.STRUCT => new UnassignedStruct(),
                     _ => throw new InternalException($"initial value for type {type.typeName} is unimplemented", CurrentFile),
                 };
             }
@@ -330,6 +361,7 @@ namespace IngameCoding.BBCode.Compiler
         void AddInstruction(Opcode opcode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
 
         void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, object param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
@@ -340,6 +372,7 @@ namespace IngameCoding.BBCode.Compiler
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, (object)param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
 
         #endregion
 
@@ -349,7 +382,7 @@ namespace IngameCoding.BBCode.Compiler
             if (functionCall.FunctionName == "type") return "string";
 
             if (!GetCompiledFunction(functionCall, out var calledFunc))
-            { throw new CompilerException("Function '" + functionCall.FunctionName + "' not found!", functionCall.Identifier, CurrentFile); }
+            { throw new CompilerException("Function '" + GetReadableID(functionCall) + "' not found!", functionCall.Identifier, CurrentFile); }
             return FindStatementType(calledFunc.Type);
         }
         string FindStatementType(Statement_Operator @operator)
@@ -438,15 +471,28 @@ namespace IngameCoding.BBCode.Compiler
                 if (@operator.Right != null)
                 {
                     var rightType = FindStatementType(@operator.Right);
-                    if (leftType == rightType)
+
+                    if (TypeMap.TryGetValue(leftType, out var leftTypeName) && TypeMap.TryGetValue(rightType, out var rightTypeName))
                     {
-                        return leftType;
+                        var leftValue = GenerateInitialValue(TypeToken.CreateAnonymous(leftType, leftTypeName.Convert()));
+                        var rightValue = GenerateInitialValue(TypeToken.CreateAnonymous(rightType, rightTypeName.Convert()));
+
+                        var predictedValue = PredictStatementValue(@operator.Operator.text, new DataItem(leftValue, null), new DataItem(rightValue, null)); ;
+                        if (predictedValue.HasValue)
+                        {
+                            switch (predictedValue.Value.type)
+                            {
+                                case DataType.BYTE: return "byte";
+                                case DataType.INT: return "int";
+                                case DataType.FLOAT: return "float";
+                                case DataType.STRING: return "string";
+                                case DataType.BOOLEAN: return "bool";
+                            }
+                        }
                     }
-                    else
-                    {
-                        warnings.Add(new Warning("Thats not good :(", @operator.TotalPosition(), CurrentFile));
-                        return "any";
-                    }
+
+                    warnings.Add(new Warning("Thats not good :(", @operator.TotalPosition(), CurrentFile));
+                    return "any";
                 }
                 else
                 { return leftType; }
@@ -463,6 +509,7 @@ namespace IngameCoding.BBCode.Compiler
             return literal.Type.typeName switch
             {
                 BuiltinType.INT => BuiltinType.INT.ToString().ToLower(),
+                BuiltinType.BYTE => BuiltinType.BYTE.ToString().ToLower(),
                 BuiltinType.FLOAT => BuiltinType.FLOAT.ToString().ToLower(),
                 BuiltinType.STRING => BuiltinType.STRING.ToString().ToLower(),
                 BuiltinType.BOOLEAN => BuiltinType.BOOLEAN.ToString().ToLower(),
@@ -603,6 +650,28 @@ namespace IngameCoding.BBCode.Compiler
         #endregion
 
         #region PredictStatementValue()
+        static DataItem? PredictStatementValue(string @operator, DataItem left, DataItem right) => @operator switch
+        {
+            "!" => !left,
+
+            "+" => left + right,
+            "-" => left - right,
+            "*" => left * right,
+            "/" => left / right,
+            "%" => left % right,
+
+            "&" => left & right,
+            "|" => left | right,
+            "^" => left ^ right,
+
+            "<" => new DataItem(left < right, null),
+            ">" => new DataItem(left > right, null),
+            "==" => new DataItem(left == right, null),
+            "!=" => new DataItem(left != right, null),
+            "<=" => new DataItem(left <= right, null),
+            ">=" => new DataItem(left >= right, null),
+            _ => null,
+        };
         static DataItem? PredictStatementValue(Statement_Operator @operator)
         {
             var leftValue = PredictStatementValue(@operator.Left);
@@ -610,7 +679,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (@operator.Operator.text == "!")
             {
-                return new DataItem(!leftValue, null);
+                return !leftValue;
             }
 
             if (@operator.Right != null)
@@ -618,25 +687,7 @@ namespace IngameCoding.BBCode.Compiler
                 var rightValue = PredictStatementValue(@operator.Right);
                 if (!rightValue.HasValue) return null;
 
-                return @operator.Operator.text switch
-                {
-                    "+" => leftValue + rightValue,
-                    "-" => leftValue - rightValue,
-                    "*" => leftValue * rightValue,
-                    "/" => leftValue / rightValue,
-                    "%" => leftValue % rightValue,
-
-                    "<" => new DataItem(leftValue < rightValue, null),
-                    ">" => new DataItem(leftValue > rightValue, null),
-                    "==" => new DataItem(leftValue == rightValue, null),
-                    "!=" => new DataItem(leftValue != rightValue, null),
-                    "&" => new DataItem(leftValue & rightValue, null),
-                    "|" => new DataItem(leftValue | rightValue, null),
-                    "^" => new DataItem(leftValue ^ rightValue, null),
-                    "<=" => new DataItem(leftValue <= rightValue, null),
-                    ">=" => new DataItem(leftValue >= rightValue, null),
-                    _ => null,
-                };
+                return PredictStatementValue(@operator.Operator.text, leftValue.Value, rightValue.Value);
             }
             else
             { return leftValue; }
@@ -647,9 +698,10 @@ namespace IngameCoding.BBCode.Compiler
             {
                 BuiltinType.INT => new DataItem(int.Parse(literal.Value), null),
                 BuiltinType.FLOAT => new DataItem(float.Parse(literal.Value), null),
+                BuiltinType.BYTE => new DataItem(byte.Parse(literal.Value), null),
                 BuiltinType.STRING => new DataItem(literal.Value, null),
                 BuiltinType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
-                BuiltinType.STRUCT => new DataItem(new DataItem.UnassignedStruct(), null),
+                BuiltinType.STRUCT => new DataItem(new UnassignedStruct(), null),
                 _ => null,
             };
         }
@@ -935,155 +987,6 @@ namespace IngameCoding.BBCode.Compiler
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
             { AddInstruction(Opcode.POP_VALUE); }
         }
-#if false
-        void GenerateCodeForStatement(Statement_MethodCall structMethodCall)
-        {
-            if (GetCompiledVariable(structMethodCall.VariableName, out CompiledVariable compiledVariable, out var isGlob3))
-            {
-                if (compiledVariable.type == BuiltinType.RUNTIME)
-                {
-                    warnings.Add(new Warning($"The type of the variable '{structMethodCall.VariableName}' will be set at runtime. Potential errors may occur.", structMethodCall.variableNameToken, CurrentFile));
-                }
-
-                if (compiledVariable.IsList)
-                {
-                    AddInstruction(isGlob3 ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, compiledVariable.offset);
-
-                    if (structMethodCall.FunctionName == "Push")
-                    {
-                        if (structMethodCall.parameters.Count != 1)
-                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Push'", structMethodCall.functionNameT, CurrentFile); }
-                        GenerateCodeForStatement(structMethodCall.parameters[0]);
-
-                        AddInstruction(Opcode.LIST_PUSH_ITEM);
-                    }
-                    else if (structMethodCall.FunctionName == "Pull")
-                    {
-                        if (structMethodCall.parameters.Count != 0)
-                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Pull'", structMethodCall.functionNameT, CurrentFile); }
-
-                        AddInstruction(Opcode.LIST_PULL_ITEM);
-                    }
-                    else if (structMethodCall.FunctionName == "Add")
-                    {
-                        if (structMethodCall.parameters.Count != 2)
-                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Add'", structMethodCall.functionNameT, CurrentFile); }
-                        GenerateCodeForStatement(structMethodCall.parameters[0]);
-                        GenerateCodeForStatement(structMethodCall.parameters[1]);
-
-                        AddInstruction(Opcode.LIST_ADD_ITEM);
-                    }
-                    else if (structMethodCall.FunctionName == "Remove")
-                    {
-                        if (structMethodCall.parameters.Count != 1)
-                        { throw new CompilerException("Wrong number of parameters passed to '<list>.Remove'", structMethodCall.functionNameT, CurrentFile); }
-                        GenerateCodeForStatement(structMethodCall.parameters[0]);
-
-                        AddInstruction(Opcode.LIST_REMOVE_ITEM);
-                    }
-                    else
-                    {
-                        throw new CompilerException("Unknown list method " + structMethodCall.FunctionName, structMethodCall.functionNameT, CurrentFile);
-                    }
-                }
-                else
-                {
-                    bool IsStructMethodCall = true;
-                    if (!GetCompiledStruct(compiledVariable.structName, out var compiledStruct))
-                    { IsStructMethodCall = false; }
-                    else
-                    {
-                        if (!compiledStruct.CompiledMethods.ContainsKey(structMethodCall.FunctionName))
-                        { IsStructMethodCall = false; }
-                        else
-                        {
-                            if (structMethodCall.parameters.Count != compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount)
-                            { throw new CompilerException("Wrong number of parameters passed to '" + structMethodCall.VariableName + "'", structMethodCall.Position, CurrentFile); }
-
-                            if (compiledStruct.CompiledMethods[structMethodCall.FunctionName].ReturnSomething)
-                            {
-                                AddInstruction(new Instruction(Opcode.PUSH_VALUE, GenerateInitialValue(compiledStruct.CompiledMethods[structMethodCall.FunctionName].Type)) { tag = "return value" });
-                            }
-
-                            if (structMethodCall.parameters.Count != compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount)
-                            { throw new CompilerException("Method '" + structMethodCall.VariableName + "' requies " + compiledStruct.CompiledMethods[structMethodCall.FunctionName].ParameterCount + " parameters", structMethodCall.Position, CurrentFile); }
-
-                            AddInstruction(new Instruction(isGlob3 ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, compiledVariable.offset) { tag = "struct.this" });
-                            compiledVariables.Add("this", new CompiledVariable(compiledVariable.offset, compiledVariable.structName, compiledVariable.ListOf, compiledVariable.Declaration));
-
-                            foreach (Statement param in structMethodCall.parameters)
-                            { GenerateCodeForStatement(param); }
-
-                            if (compiledStruct.MethodOffsets.TryGetValue(structMethodCall.FunctionName, out var methodCallOffset))
-                            { AddInstruction(Opcode.CALL, methodCallOffset - compiledCode.Count); }
-                            else
-                            { throw new InternalException($"Method '{compiledVariable.structName}.{structMethodCall.FunctionName}' offset not found", CurrentFile); }
-
-                            for (int i = 0; i < structMethodCall.parameters.Count; i++)
-                            { AddInstruction(Opcode.POP_VALUE); }
-
-                            if (compiledVariables.Last().Key == "this")
-                            {
-                                compiledVariables.Remove("this");
-                            }
-                            else
-                            {
-                                throw new InternalException("Can't clear the variable 'this': not found", CurrentFile);
-                            }
-
-                            if (compiledStruct.CompiledMethods[structMethodCall.FunctionName].ReturnSomething)
-                            {
-                                AddInstruction(isGlob3 ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, compiledVariable.offset);
-                            }
-                            else
-                            {
-                                AddInstruction(isGlob3 ? Opcode.STORE_VALUE : Opcode.STORE_VALUE_BR, compiledVariable.offset);
-                            }
-                        }
-                    }
-
-                    if (!IsStructMethodCall)
-                    {
-                        if (GetCompiledFunction(structMethodCall, out var compiledFunction))
-                        {
-                            if (!compiledFunction.IsMethod)
-                            { throw new CompilerException($"You called the function '{structMethodCall.FunctionName}' as method", structMethodCall.Position, CurrentFile); }
-
-                            if (compiledFunction.ReturnSomething)
-                            {
-                                AddInstruction(new Instruction(Opcode.PUSH_VALUE, GenerateInitialValue(compiledFunction.Type)) { tag = "return value" });
-                            }
-
-                            if (structMethodCall.parameters.Count + 1 != compiledFunction.ParameterCount)
-                            { throw new CompilerException("Method '" + structMethodCall.FunctionName + "' requies " + compiledFunction.ParameterCount + " parameters", structMethodCall.Position, CurrentFile); }
-
-                            AddInstruction(new Instruction(isGlob3 ? Opcode.LOAD_VALUE : Opcode.LOAD_VALUE_BR, compiledVariable.offset) { tag = "param.this" });
-                            foreach (Statement param in structMethodCall.parameters)
-                            {
-                                GenerateCodeForStatement(param);
-                                compiledCode.Last().tag = "param";
-                            }
-                            if (!GetFunctionOffset(structMethodCall, out var functionCallOffset))
-                            {
-                                undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, structMethodCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile));
-                            }
-                            AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
-                            AddInstruction(Opcode.POP_VALUE);
-                            for (int i = 0; i < structMethodCall.parameters.Count; i++)
-                            {
-                                AddInstruction(Opcode.POP_VALUE);
-                            }
-                        }
-                        else
-                        { throw new CompilerException($"Method '{structMethodCall.FunctionName}' is doesn't exists", structMethodCall.Position, CurrentFile); }
-                    }
-                }
-            }
-            else
-            { throw new CompilerException("Unknown variable '" + structMethodCall.VariableName + "'", structMethodCall.Position, CurrentFile); }
-
-        }
-#endif
         void GenerateCodeForStatement(Statement_Operator @operator)
         {
             @operator.Operator.Analysis.CompilerReached = true;
@@ -1097,25 +1000,31 @@ namespace IngameCoding.BBCode.Compiler
 
                     switch (predictedValue.type)
                     {
-                        case DataItem.Type.INT:
+                        case DataType.BYTE:
+                            {
+                                AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueByte);
+                                informations.Add(new Information($"Predicted value: {predictedValue.ValueByte}", @operator.TotalPosition(), CurrentFile));
+                                return;
+                            }
+                        case DataType.INT:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueInt);
                                 informations.Add(new Information($"Predicted value: {predictedValue.ValueInt}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
-                        case DataItem.Type.BOOLEAN:
+                        case DataType.BOOLEAN:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueBoolean);
                                 informations.Add(new Information($"Predicted value: {predictedValue.ValueBoolean}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
-                        case DataItem.Type.FLOAT:
+                        case DataType.FLOAT:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueFloat);
                                 informations.Add(new Information($"Predicted value: {predictedValue.ValueFloat}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
-                        case DataItem.Type.STRING:
+                        case DataType.STRING:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueString);
                                 informations.Add(new Information($"Predicted value: {predictedValue.ValueString}", @operator.TotalPosition(), CurrentFile));
@@ -1303,6 +1212,9 @@ namespace IngameCoding.BBCode.Compiler
                 case BuiltinType.BOOLEAN:
                     AddInstruction(Opcode.PUSH_VALUE, bool.Parse(literal.Value));
                     break;
+                case BuiltinType.BYTE:
+                    AddInstruction(Opcode.PUSH_VALUE, byte.Parse(literal.Value));
+                    break;
             }
         }
         void GenerateCodeForStatement(Statement_Variable variable)
@@ -1346,7 +1258,7 @@ namespace IngameCoding.BBCode.Compiler
             var conditionValue_ = PredictStatementValue(whileLoop.Condition);
             if (conditionValue_.HasValue)
             {
-                if (conditionValue_.Value.type != DataItem.Type.BOOLEAN)
+                if (conditionValue_.Value.type != DataType.BOOLEAN)
                 {
                     warnings.Add(new Warning($"Condition must be boolean", whileLoop.Condition.TotalPosition(), CurrentFile));
                 }
@@ -1392,7 +1304,7 @@ namespace IngameCoding.BBCode.Compiler
                 if (conditionValue_.HasValue)
                 {
                     var conditionValue = conditionValue_.Value;
-                    if (conditionValue.type == DataItem.Type.BOOLEAN)
+                    if (conditionValue.type == DataType.BOOLEAN)
                     {
                         if (conditionValue.ValueBoolean)
                         { warnings.Add(new Warning($"Infinity loop", whileLoop.Keyword, CurrentFile)); }
@@ -1467,7 +1379,7 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         var conditionValue = conditionValue_.Value;
 
-                        if (conditionValue.type != DataItem.Type.BOOLEAN)
+                        if (conditionValue.type != DataType.BOOLEAN)
                         {
                             warnings.Add(new Warning($"Condition must be boolean", partIf.Condition.TotalPosition(), CurrentFile));
                         }
@@ -1570,7 +1482,7 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         fields.Add(structDefFieldDefinition.name.text, new DataItem(structDefFieldDefinition.type, null));
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields, structDefinition.FullName));
+                    AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, structDefinition.FullName));
                 }
             }
             else if (GetCompiledClass(newObject, out var classDefinition))
@@ -1582,7 +1494,7 @@ namespace IngameCoding.BBCode.Compiler
                 {
                     fields.Add(classDefFieldDefinition.name.text, new DataItem(classDefFieldDefinition.type, null));
                 }
-                AddInstruction(Opcode.PUSH_VALUE, new DataItem.Struct(fields, classDefinition.FullName));
+                AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, classDefinition.FullName));
             }
             else
             {
@@ -1611,16 +1523,20 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType? listType = null;
             for (int i = 0; i < listValue.Size; i++)
             {
-                if (listValue.Values[i] is not Statement_Literal literal)
-                { throw new CompilerException("Only literals are supported in list value", listValue.Values[i].TotalPosition(), CurrentFile); }
+                string itemType = FindStatementType(listValue.Values[i]);
+                BuiltinType itemTypeName;
+                if (itemType.EndsWith("[]"))
+                { itemTypeName = BuiltinType.LISTOF; }
+                else if (TypeMap.TryGetValue(itemType, out var itemTypeName2))
+                { itemTypeName = itemTypeName2.Convert(); }
+                else
+                { throw new CompilerException($"Unknown type {listType}", listValue.Values[i].TotalPosition(), CurrentFile); }
+
                 if (i == 0)
-                {
-                    listType = literal.Type.typeName;
-                    if (listType == null)
-                    { throw new CompilerException($"Unknown literal type {listType}", literal.Type, CurrentFile); }
-                }
-                if (literal.Type.typeName != listType)
-                { throw new CompilerException($"Wrong literal type {literal.Type.typeName}. Expected {listType}", literal.Type, CurrentFile); }
+                { listType = itemTypeName; }
+
+                if (itemTypeName != listType)
+                { throw new CompilerException($"Wrong type {itemType}. Expected {listType}", listValue.Values[i].TotalPosition(), CurrentFile); }
             }
             if (listType == null)
             { throw new CompilerException($"Failed to get the type of the list", listValue, CurrentFile); }
@@ -1744,6 +1660,27 @@ namespace IngameCoding.BBCode.Compiler
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true);
                         compiledGlobalVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, newVariable.Type.typeName, newVariable.Type.ListOf, newVariable));
                         AddInstruction(Opcode.PUSH_VALUE, initialValue1, "var." + newVariable.VariableName.text);
+                        variableCount++;
+                        break;
+                    case BuiltinType.BYTE:
+                        newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
+
+                        object initialValue5 = 0;
+                        if (newVariable.Type.IsList)
+                        {
+                            initialValue5 = GenerateInitialValue(newVariable.Type);
+                        }
+                        else if (newVariable.InitialValue != null)
+                        {
+                            if (newVariable.InitialValue is Statement_Literal literal)
+                            {
+                                if (literal.Type.typeName == newVariable.Type.typeName)
+                                { initialValue5 = byte.Parse(literal.Value); }
+                            }
+                        }
+                        newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true);
+                        compiledGlobalVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, newVariable.Type.typeName, newVariable.Type.ListOf, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue5, "var." + newVariable.VariableName.text);
                         variableCount++;
                         break;
                     case BuiltinType.FLOAT:
@@ -2566,6 +2503,9 @@ namespace IngameCoding.BBCode.Compiler
                                     case "bool":
                                         parameterTypes[i] = TypeToken.CreateAnonymous(bfParams[i], BuiltinType.BOOLEAN);
                                         break;
+                                    case "byte":
+                                        parameterTypes[i] = TypeToken.CreateAnonymous(bfParams[i], BuiltinType.BYTE);
+                                        break;
                                     case "int[]":
                                         parameterTypes[i] = TypeToken.CreateAnonymous(bfParams[i], TypeToken.CreateAnonymous("int", BuiltinType.INT));
                                         break;
@@ -2577,6 +2517,9 @@ namespace IngameCoding.BBCode.Compiler
                                         break;
                                     case "bool[]":
                                         parameterTypes[i] = TypeToken.CreateAnonymous(bfParams[i], TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN));
+                                        break;
+                                    case "byte[]":
+                                        parameterTypes[i] = TypeToken.CreateAnonymous(bfParams[i], TypeToken.CreateAnonymous("byte", BuiltinType.BYTE));
                                         break;
                                     default:
                                         errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
@@ -2607,31 +2550,37 @@ namespace IngameCoding.BBCode.Compiler
                                         case BuiltinType.INT:
                                             self.RaiseReturnEvent(new DataItem(
                                                 returnType.IsList ?
-                                                new DataItem.List(DataItem.Type.INT) : 0
+                                                new DataItem.List(DataType.INT) : 0
+                                            , "return value"));
+                                            break;
+                                        case BuiltinType.BYTE:
+                                            self.RaiseReturnEvent(new DataItem(
+                                                returnType.IsList ?
+                                                new DataItem.List(DataType.BYTE) : (byte)0
                                             , "return value"));
                                             break;
                                         case BuiltinType.FLOAT:
                                             self.RaiseReturnEvent(new DataItem(
                                                 returnType.IsList ?
-                                                new DataItem.List(DataItem.Type.FLOAT) : 0f
+                                                new DataItem.List(DataType.FLOAT) : 0f
                                             , "return value"));
                                             break;
                                         case BuiltinType.STRING:
                                             self.RaiseReturnEvent(new DataItem(
                                                 returnType.IsList ?
-                                                new DataItem.List(DataItem.Type.STRING) : ""
+                                                new DataItem.List(DataType.STRING) : ""
                                             , "return value"));
                                             break;
                                         case BuiltinType.BOOLEAN:
                                             self.RaiseReturnEvent(new DataItem(
                                                 returnType.IsList ?
-                                                new DataItem.List(DataItem.Type.BOOLEAN) : false
+                                                new DataItem.List(DataType.BOOLEAN) : false
                                             , "return value"));
                                             break;
                                         case BuiltinType.STRUCT:
                                             self.RaiseReturnEvent(new DataItem(
                                                 returnType.IsList ?
-                                                new DataItem.List(DataItem.Type.STRUCT) : new DataItem.UnassignedStruct()
+                                                new DataItem.List(DataType.STRUCT) : new UnassignedStruct()
                                             , "return value"));
                                             break;
                                         case BuiltinType.ANY:

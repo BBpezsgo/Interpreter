@@ -14,6 +14,8 @@ namespace IngameCoding.Core
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Output;
 
+    using System.Linq;
+
     /// <summary>
     /// This compiles and runs the code
     /// </summary>
@@ -413,6 +415,17 @@ namespace IngameCoding.Core
                     OnNeedInput?.Invoke(this);
                 }
             }, true);
+            builtinFunctions.AddBuiltinFunction("test", () =>
+            {
+                var d = bytecodeInterpreter.Details.Stack.ToByteArray((v) => v.ToByteArray());
+                var de = new StepList<byte>(d);
+                List<DataItem> r = new();
+                de.Next();
+                foreach (var item in bytecodeInterpreter.Details.Stack)
+                {
+                    r.Add(de.GetDataItem(item.Tag));
+                }
+            });
 
             details = new InterpreterDetails(this);
 
@@ -607,7 +620,7 @@ namespace IngameCoding.Core
 
                 var splitResult = stringToSplit.Split(splitCharacter, StringSplitOptions.None);
 
-                var newList = new DataItem.List(DataItem.Type.STRING);
+                var newList = new DataItem.List(DataType.STRING);
                 foreach (var item in splitResult)
                 {
                     newList.Add(new DataItem(item, ""));

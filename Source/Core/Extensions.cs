@@ -7,32 +7,21 @@ namespace IngameCoding.Core
     {
         public static object Value(this DataItem item) => item.type switch
         {
-            DataItem.Type.INT => item.ValueInt,
-            DataItem.Type.FLOAT => item.ValueFloat,
-            DataItem.Type.STRING => item.ValueString,
-            DataItem.Type.BOOLEAN => item.ValueBoolean,
+            DataType.INT => item.ValueInt,
+            DataType.FLOAT => item.ValueFloat,
+            DataType.STRING => item.ValueString,
+            DataType.BOOLEAN => item.ValueBoolean,
             _ => null,
         };
 
-        public static bool EqualType(this DataItem item, BuiltinType type)
+        public static bool EqualType(this DataItem item, BuiltinType type) => item.type switch
         {
-            switch (item.type)
-            {
-                case DataItem.Type.INT:
-                    if (type == BuiltinType.INT) return true;
-                    break;
-                case DataItem.Type.FLOAT:
-                    if (type == BuiltinType.FLOAT) return true;
-                    break;
-                case DataItem.Type.STRING:
-                    if (type == BuiltinType.STRING) return true;
-                    break;
-                case DataItem.Type.BOOLEAN:
-                    if (type == BuiltinType.BOOLEAN) return true;
-                    break;
-            }
-            return false;
-        }
+            DataType.INT => type == BuiltinType.INT,
+            DataType.FLOAT => type == BuiltinType.FLOAT,
+            DataType.STRING => type == BuiltinType.STRING,
+            DataType.BOOLEAN => type == BuiltinType.BOOLEAN,
+            _ => false,
+        };
 
         public static string Repeat(this string v, int count)
         {

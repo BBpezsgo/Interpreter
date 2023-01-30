@@ -29,6 +29,7 @@ namespace IngameCoding.BBCode
     public enum BuiltinType
     {
         AUTO,
+        BYTE,
         INT,
         FLOAT,
         VOID,
@@ -891,7 +892,8 @@ namespace IngameCoding.BBCode
                 { "string", TypeToken.CreateAnonymous("string", BuiltinType.STRING) },
                 { "void", TypeToken.CreateAnonymous("void", BuiltinType.VOID) },
                 { "float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT) },
-                { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) }
+                { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) },
+                { "byte", TypeToken.CreateAnonymous("byte", BuiltinType.BYTE) }
             };
             readonly Dictionary<string, int> operators = new();
             readonly List<string> CurrentNamespace = new();

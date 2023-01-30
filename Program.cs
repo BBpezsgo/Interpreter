@@ -13,7 +13,7 @@ namespace TheProgram
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-list.bbc";
+            var file = "test-types.bbc";
             if (args.Length == 0) args = new string[]
             {
                 "-throw-errors",

@@ -35,20 +35,6 @@ namespace IngameCoding.Bytecode
             );
         }
 
-        internal static string GetTypeText(DataItem.Type type)
-        {
-            return type switch
-            {
-                DataItem.Type.INT => "int",
-                DataItem.Type.FLOAT => "float",
-                DataItem.Type.STRING => "string",
-                DataItem.Type.BOOLEAN => "bool",
-                DataItem.Type.STRUCT => "complex",
-                _ => "",
-            };
-        }
-        internal static string GetTypeText(DataItem val) => val.type == DataItem.Type.LIST ? $"{(val.ValueList.itemTypes == DataItem.Type.LIST ? "?[]" : GetTypeText(val.ValueList.itemTypes))}[]" : GetTypeText(val.type);
-
         public int End() => Memory.Code.Length;
 
         public void Step() => Step(1);
@@ -93,6 +79,7 @@ namespace IngameCoding.Bytecode
 
                 case Opcode.CALL_BUILTIN: return CALL_BUILTIN();
                 case Opcode.TYPE_GET: return TYPE_GET();
+                case Opcode.TYPE_CAST: return TYPE_CAST();
 
                 case Opcode.MATH_ADD: return MATH_ADD();
                 case Opcode.MATH_SUB: return MATH_SUB();
@@ -215,17 +202,49 @@ namespace IngameCoding.Bytecode
         int TYPE_GET()
         {
             var v = Memory.Stack.Pop();
-            Memory.Stack.Push(BytecodeProcessor.GetTypeText(v), "type() result");
+            Memory.Stack.Push(v.GetTypeText(), "type() result");
             Step();
 
             return 3;
+        }
+
+        int TYPE_CAST()
+        {
+            var v = Memory.Stack.Pop();
+
+            bool successful = false;
+
+            switch ((string)CurrentInstruction.parameter)
+            {
+                case "int":
+                    {
+                        if (v.type == DataType.BYTE)
+                        {
+                            v = new DataItem((int)v.Value(), v.Tag);
+                            successful = true;
+                        }
+                        break;
+                    }
+                case "byte":
+                    {
+                        v = new DataItem((byte)v.Value(), v.Tag);
+                        break;
+                    }
+                default:
+                    break;
+            }
+
+            Memory.Stack.Push(v, v.Tag);
+            Step();
+
+            return 5;
         }
 
         int LIST_PUSH_ITEM()
         {
             var newItem = Memory.Stack.Pop();
             var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             { listValue.ValueList.Add(newItem); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -238,7 +257,7 @@ namespace IngameCoding.Bytecode
             var indexValue = Memory.Stack.Pop();
             var newItem = Memory.Stack.Pop();
             var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             { listValue.ValueList.Add(newItem, indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -251,7 +270,7 @@ namespace IngameCoding.Bytecode
             var indexValue = Memory.Stack.Pop().ValueInt;
             var newItem = Memory.Stack.Pop();
             var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             { listValue.ValueList.items[indexValue] = newItem; }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -263,7 +282,7 @@ namespace IngameCoding.Bytecode
         int LIST_PULL_ITEM()
         {
             var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             { listValue.ValueList.Remove(); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -275,7 +294,7 @@ namespace IngameCoding.Bytecode
         {
             var indexValue = Memory.Stack.Pop();
             var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             { listValue.ValueList.Remove(indexValue.ValueInt); }
             else
             { throw new RuntimeException("The variable type is not list!"); }
@@ -289,13 +308,13 @@ namespace IngameCoding.Bytecode
             var indexValue = Memory.Stack.Pop();
             var listValue = Memory.Stack.Pop();
 
-            if (listValue.type == DataItem.Type.LIST)
+            if (listValue.type == DataType.LIST)
             {
                 if (listValue.ValueList.items.Count <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
                 Memory.Stack.Push(listValue.ValueList.items[indexValue.ValueInt]);
             }
-            else if (listValue.type == DataItem.Type.STRING)
+            else if (listValue.type == DataType.STRING)
             {
                 if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
                 { throw new RuntimeException("Index was out of range!"); }
@@ -317,7 +336,7 @@ namespace IngameCoding.Bytecode
         int CALL_BUILTIN()
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
-            if (functionNameDataItem.type != DataItem.Type.STRING)
+            if (functionNameDataItem.type != DataType.STRING)
             { throw new InternalException($"Instruction CALL_BUILTIN need a STRING DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToStringValue()}"); }
             string functionName = functionNameDataItem.ValueString;
 
@@ -503,7 +522,7 @@ namespace IngameCoding.Bytecode
         {
             int address = GetAddress();
 
-            Memory.Stack.Push(Memory.Stack.Get(address), CurrentInstruction.tag);
+            Memory.Stack.Push(Memory.Stack[address], CurrentInstruction.tag);
 
             Step();
 
@@ -518,7 +537,7 @@ namespace IngameCoding.Bytecode
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
             DataItem newValue = Memory.Stack.Pop();
-            IStruct item = Memory.Stack.Get(address).ValueStruct;
+            IStruct item = Memory.Stack[address].ValueStruct;
 
             if (!item.HaveField(field))
             { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
@@ -538,9 +557,9 @@ namespace IngameCoding.Bytecode
             string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
-            DataItem item = CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack.Get(address);
+            DataItem item = CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack[address];
 
-            if (item.type == DataItem.Type.STRING)
+            if (item.type == DataType.STRING)
             {
                 string value = item.ValueString;
 
@@ -551,7 +570,7 @@ namespace IngameCoding.Bytecode
                 else
                 { throw new RuntimeException("Type string does not have field " + field); }
             }
-            else if (item.type == DataItem.Type.LIST)
+            else if (item.type == DataType.LIST)
             {
                 DataItem.List value = item.ValueList;
 
@@ -562,7 +581,7 @@ namespace IngameCoding.Bytecode
                 else
                 { throw new RuntimeException("Type list does not have field " + field); }
             }
-            else if (item.type == DataItem.Type.STRUCT)
+            else if (item.type == DataType.STRUCT)
             {
                 IStruct value = item.ValueStruct;
 

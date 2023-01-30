@@ -94,7 +94,7 @@ namespace IngameCoding.Core
         internal void Extend(int start, int end) => AbsolutePosition.Extend(start, end);
         internal void Extend(Tokenizer.BaseToken token) => AbsolutePosition.Extend(token.AbsolutePosition);
         internal void Extend(BBCode.Parser.Statements.Statement statement) => AbsolutePosition.Extend(statement.TotalPosition().AbsolutePosition);
-    
+
         public string ToMinString()
         {
             if (Start == End) return Start.ToMinString();
@@ -170,5 +170,35 @@ namespace IngameCoding.Core
         }
 
         public override string ToString() => $"Range{{start: {Start}, end: {End}}}";
+    }
+
+    public struct Couples<T1, T2>
+    {
+        public T1 V1;
+        public T2 V2;
+
+        public Couples(T1 v1, T2 v2)
+        { V1 = v1; V2 = v2; }
+    }
+
+    public struct Couples<T1, T2, T3>
+    {
+        public T1 V1;
+        public T2 V2;
+        public T3 V3;
+
+        public Couples(T1 v1, T2 v2, T3 v3)
+        { V1 = v1; V2 = v2; V3 = v3; }
+    }
+
+    public struct Couples<T1, T2, T3, T4>
+    {
+        public T1 V1;
+        public T2 V2;
+        public T3 V3;
+        public T4 V4;
+
+        public Couples(T1 v1, T2 v2, T3 v3, T4 v4)
+        { V1 = v1; V2 = v2; V3 = v3; V4 = v4; }
     }
 }

@@ -132,10 +132,10 @@ namespace IngameCoding.Core
                 for (int i = 0; i < ps.Length; i++)
                 {
                     var p = ps[i];
-                    if (p.type != DataItem.Type.INT &&
-                        p.type != DataItem.Type.FLOAT &&
-                        p.type != DataItem.Type.STRING &&
-                        p.type != DataItem.Type.BOOLEAN)
+                    if (p.type != DataType.INT &&
+                        p.type != DataType.FLOAT &&
+                        p.type != DataType.STRING &&
+                        p.type != DataType.BOOLEAN)
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
                     if (p.type != parameterTypes[i].typeName.Convert())
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].typeName.ToString().ToLower()}"); }

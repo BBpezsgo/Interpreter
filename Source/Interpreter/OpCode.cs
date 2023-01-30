@@ -82,6 +82,7 @@
         // === ===
 
         TYPE_GET,
+        TYPE_CAST,
 
         // === Debug ===
         /// <summary>

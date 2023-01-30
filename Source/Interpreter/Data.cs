@@ -1,17 +1,40 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    using System.Linq;
+    internal class StepList<T>
+    {
+        int Position = 0;
+        readonly T[] Values = null;
+
+        internal StepList(T[] values, int startIndex)
+        {
+            this.Values = values;
+            this.Position = startIndex;
+        }
+        internal StepList(List<T> values, int startIndex) : this(values.ToArray(), startIndex) { }
+
+        internal StepList(T[] values) : this(values, 0) { }
+        internal StepList(List<T> values) : this(values.ToArray(), 0) { }
+
+        internal T Next() => Values[Position++];
+        internal T[] Next(int n)
+        {
+            T[] result = new T[n];
+            for (int i = 0; i < n; i++) result[i] = Next();
+            return result;
+        }
+        internal bool End() => Position >= Values.Length;
+        internal void Reset() => Position = 0;
+    }
 
     internal class DataStack : Stack<DataItem>
     {
-
-
         internal int UsedVirtualMemory
         {
             get
@@ -20,16 +43,16 @@ namespace IngameCoding.Bytecode
                 {
                     switch (item.type)
                     {
-                        case DataItem.Type.INT:
+                        case DataType.INT:
                             return 4;
-                        case DataItem.Type.FLOAT:
+                        case DataType.FLOAT:
                             return 4;
-                        case DataItem.Type.STRING:
+                        case DataType.STRING:
                             return 4 + System.Text.ASCIIEncoding.ASCII.GetByteCount(item.ValueString);
-                        case DataItem.Type.BOOLEAN:
+                        case DataType.BOOLEAN:
                             return 1;
-                        case DataItem.Type.STRUCT:
-                            if (item.ValueStruct is DataItem.Struct valStruct)
+                        case DataType.STRUCT:
+                            if (item.ValueStruct is Struct valStruct)
                             {
                                 int result = 0;
                                 foreach (var field in valStruct.fields)
@@ -41,7 +64,7 @@ namespace IngameCoding.Bytecode
                                 return result;
                             }
                             break;
-                        case DataItem.Type.LIST:
+                        case DataType.LIST:
                             {
                                 var result = 0;
                                 foreach (var element in item.ValueList.items)
@@ -54,8 +77,8 @@ namespace IngameCoding.Bytecode
                 }
 
                 int result = 0;
-                for (int i = 0; i < stack.Count; i++)
-                { result += CalculateItemSize(stack[i]); }
+                for (int i = 0; i < Count; i++)
+                { result += CalculateItemSize(this[i]); }
                 return result;
             }
         }
@@ -64,7 +87,7 @@ namespace IngameCoding.Bytecode
 
         public DataStack(BytecodeProcessor processor) => this.processor = processor;
 
-        public void Destroy() => stack.Clear();
+        public void Destroy() => base.Clear();
 
         /// <summary>
         /// Gives the last item, and then remove
@@ -72,8 +95,8 @@ namespace IngameCoding.Bytecode
         /// <returns>The last item</returns>
         public override DataItem Pop()
         {
-            DataItem val = this.stack[^1];
-            this.stack.RemoveAt(this.stack.Count - 1);
+            DataItem val = this[^1];
+            RemoveAt(Count - 1);
             return val;
         }
         /// <returns>Adds a new item to the end</returns>
@@ -82,7 +105,7 @@ namespace IngameCoding.Bytecode
             var item = value;
             item.stack = this;
             item.heap = this.processor.Memory.Heap;
-            this.stack.Add(item);
+            base.Push(item);
         }
         /// <returns>Adds a new item to the end</returns>
         public void Push(DataItem value, string tag)
@@ -91,7 +114,7 @@ namespace IngameCoding.Bytecode
             item.stack = this;
             item.heap = this.processor.Memory.Heap;
             item.Tag = tag;
-            this.stack.Add(item);
+            base.Push(item);
         }
         /// <returns>Adds a new item to the end</returns>
         public void Push(int value, string tag = null) => Push(new DataItem(value, tag));
@@ -136,12 +159,10 @@ namespace IngameCoding.Bytecode
             item.heap = this.processor.Memory.Heap;
             if (!overrideTag)
             {
-                item.Tag = stack[index].Tag;
+                item.Tag = this[index].Tag;
             }
-            this.stack[index] = item;
+            this[index] = item;
         }
-        /// <returns>A specific item</returns>
-        public DataItem Get(int index) => this.stack[index];
     }
     internal class HEAP
     {
@@ -169,62 +190,27 @@ namespace IngameCoding.Bytecode
         internal DataItem[] ToArray() => heap.ToList().ToArray();
     }
 
+    public enum DataType
+    {
+        BYTE,
+        INT,
+        FLOAT,
+        STRING,
+        BOOLEAN,
+        STRUCT,
+        LIST,
+    }
+
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public struct DataItem
     {
-        public class UnassignedStruct : IStruct
-        {
-            public string Name => throw new RuntimeException("Struct is null");
-            public bool HaveField(string field) => throw new RuntimeException("Struct is null");
-            public void SetField(string field, DataItem value) => throw new RuntimeException("Struct is null");
-            public DataItem GetField(string field) => throw new RuntimeException("Struct is null");
-            public IStruct Copy() => new UnassignedStruct();
-            public IStruct CopyRecursive() => new UnassignedStruct();
-
-            public override string ToString() => "struct {null}";
-        }
-
-        public class Struct : IStruct
-        {
-            internal readonly Dictionary<string, DataItem> fields = new();
-
-            readonly string name;
-            public string Name => name;
-
-            public Struct(Dictionary<string, DataItem> fields, string name)
-            { this.fields = fields; this.name = name; }
-
-            public bool HaveField(string field) => fields.ContainsKey(field);
-            public void SetField(string field, DataItem value) => fields[field] = value;
-            public DataItem GetField(string field) => fields[field];
-            public IStruct Copy()
-            {
-                Dictionary<string, DataItem> fieldsClone = new();
-
-                foreach (var field in this.fields)
-                { fieldsClone.Add(field.Key, field.Value); }
-
-                return new Struct(fieldsClone, name);
-            }
-            public IStruct CopyRecursive()
-            {
-                Dictionary<string, DataItem> fieldsClone = new();
-
-                foreach (var field in this.fields)
-                { fieldsClone.Add(field.Key, field.Value.Copy()); }
-
-                return new Struct(fieldsClone, name);
-            }
-
-            public override string ToString() => "struct {...}";
-        }
-
+        [System.Diagnostics.DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
         public class List
         {
-            public Type itemTypes;
+            public DataType itemTypes;
             public List<DataItem> items = new();
 
-            public List(Type type)
+            public List(DataType type)
             {
                 this.itemTypes = type;
             }
@@ -237,7 +223,7 @@ namespace IngameCoding.Bytecode
                 }
                 else
                 {
-                    throw new RuntimeException($"Wrong type ({newItem.type.ToString().ToLower()}) of item pushed to the list {(itemTypes == Type.LIST ? "?[]" : itemTypes.ToString().ToLower()) + "[]"}");
+                    throw new RuntimeException($"Wrong type ({newItem.type.ToString().ToLower()}) of item pushed to the list {(itemTypes == DataType.LIST ? "?[]" : itemTypes.ToString().ToLower()) + "[]"}");
                 }
             }
 
@@ -268,7 +254,7 @@ namespace IngameCoding.Bytecode
 
             public override string ToString()
             {
-                return $"[{(int)itemTypes}]";
+                return $"{itemTypes.GetTypeText()}[]";
             }
 
             internal List Copy()
@@ -287,20 +273,11 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        public enum Type
-        {
-            INT,
-            FLOAT,
-            STRING,
-            BOOLEAN,
-            STRUCT,
-            LIST,
-        }
-
-        public Type type;
+        public readonly DataType type;
 
         #region Value Fields
 
+        byte? valueByte;
         int? valueInt;
         float? valueFloat;
         string valueString;
@@ -317,11 +294,25 @@ namespace IngameCoding.Bytecode
 
         #region Value Properties
 
+        public byte ValueByte
+        {
+            get
+            {
+                if (type == DataType.BYTE)
+                { return valueByte.Value; }
+
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to byte");
+            }
+            set
+            {
+                valueByte = value;
+            }
+        }
         public int ValueInt
         {
             get
             {
-                if (type == Type.INT)
+                if (type == DataType.INT)
                 { return valueInt.Value; }
 
                 throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to integer");
@@ -336,7 +327,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == Type.FLOAT)
+                if (type == DataType.FLOAT)
                 {
                     return valueFloat.Value;
                 }
@@ -352,7 +343,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == Type.STRING)
+                if (type == DataType.STRING)
                 {
                     return valueString;
                 }
@@ -368,7 +359,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == Type.BOOLEAN)
+                if (type == DataType.BOOLEAN)
                 {
                     return valueBoolean.Value;
                 }
@@ -384,7 +375,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == Type.STRUCT)
+                if (type == DataType.STRUCT)
                 {
                     return valueStruct;
                 }
@@ -400,7 +391,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == Type.LIST)
+                if (type == DataType.LIST)
                 {
                     return valueList;
                 }
@@ -420,209 +411,122 @@ namespace IngameCoding.Bytecode
 
         #region Constructors
 
-        public DataItem(int value, string tag, bool isHeapAddress = false)
+        DataItem(DataType type, string tag)
         {
-            this.type = Type.INT;
+            this.type = type;
 
+            this.IsHeapAddress = false;
+
+            this.valueInt = null;
+            this.valueByte = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+
+            this.stack = null;
+            this.heap = null;
+
+            this.Tag = tag;
+        }
+
+        public DataItem(int value, string tag, bool isHeapAddress = false) : this(DataType.INT, tag)
+        {
             this.IsHeapAddress = isHeapAddress;
-
             this.valueInt = value;
-            this.valueFloat = null;
-            this.valueString = null;
-            this.valueBoolean = null;
-            this.valueStruct = null;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(float value, string tag)
+        public DataItem(byte value, string tag) : this(DataType.BYTE, tag)
         {
-            this.type = Type.FLOAT;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
+            this.valueByte = value;
+        }
+        public DataItem(float value, string tag) : this(DataType.FLOAT, tag)
+        {
             this.valueFloat = value;
-            this.valueString = null;
-            this.valueBoolean = null;
-            this.valueStruct = null;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(string value, string tag)
+        public DataItem(string value, string tag) : this(DataType.STRING, tag)
         {
-            this.type = Type.STRING;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
             this.valueString = value;
-            this.valueBoolean = null;
-            this.valueStruct = null;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(bool value, string tag)
+        public DataItem(bool value, string tag) : this(DataType.BOOLEAN, tag)
         {
-            this.type = Type.BOOLEAN;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
-            this.valueString = null;
             this.valueBoolean = value;
-            this.valueStruct = null;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(IStruct value, string tag)
+        public DataItem(IStruct value, string tag) : this(DataType.STRUCT, tag)
         {
-            this.type = Type.STRUCT;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
-            this.valueString = null;
-            this.valueBoolean = null;
             this.valueStruct = value;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(List value, string tag)
+        public DataItem(List value, string tag) : this(DataType.LIST, tag)
         {
-            this.type = Type.LIST;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
-            this.valueString = null;
-            this.valueBoolean = null;
-            this.valueStruct = null;
             this.valueList = value;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(BBCode.TypeToken type1, string tag)
+        public DataItem(BBCode.TypeToken type1, string tag) : this(DataType.BYTE, tag)
         {
-            this.type = Type.INT;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
-            this.valueString = null;
-            this.valueBoolean = null;
-            this.valueStruct = null;
-            this.valueList = null;
-
             switch (type1.typeName)
             {
                 case BBCode.BuiltinType.INT:
-                    this.type = Type.INT;
+                    this.type = DataType.INT;
                     this.valueInt = 0;
                     break;
                 case BBCode.BuiltinType.FLOAT:
-                    this.type = Type.FLOAT;
+                    this.type = DataType.FLOAT;
                     this.valueFloat = 0f;
                     break;
                 case BBCode.BuiltinType.STRING:
-                    this.type = Type.STRING;
+                    this.type = DataType.STRING;
                     this.valueString = "";
                     break;
                 case BBCode.BuiltinType.BOOLEAN:
-                    this.type = Type.BOOLEAN;
+                    this.type = DataType.BOOLEAN;
                     this.valueBoolean = false;
                     break;
                 case BBCode.BuiltinType.STRUCT:
-                    // TODO: Ezt tesztelni:
-                    this.type = Type.STRUCT;
+                    this.type = DataType.STRUCT;
                     this.valueStruct = new UnassignedStruct();
                     break;
             }
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
         }
-        public DataItem(object value, string tag)
+        public DataItem(object value, string tag) : this(DataType.BYTE, tag)
         {
             if (value == null)
             {
                 throw new RuntimeException($"Unknown type null");
             }
 
-            this.type = Type.INT;
-
-            this.IsHeapAddress = false;
-
-            this.valueInt = null;
-            this.valueFloat = null;
-            this.valueString = null;
-            this.valueBoolean = null;
-            this.valueStruct = null;
-            this.valueList = null;
-
-            this.stack = null;
-            this.heap = null;
-
-            this.Tag = tag;
-
             if (value is int a)
             {
-                this.type = Type.INT;
+                this.type = DataType.INT;
                 this.valueInt = a;
             }
             else if (value is float b)
             {
-                this.type = Type.FLOAT;
+                this.type = DataType.FLOAT;
                 this.valueFloat = b;
             }
             else if (value is string c)
             {
-                this.type = Type.STRING;
+                this.type = DataType.STRING;
                 this.valueString = c;
             }
             else if (value is bool d)
             {
-                this.type = Type.BOOLEAN;
+                this.type = DataType.BOOLEAN;
                 this.valueBoolean = d;
             }
             else if (value is IStruct e)
             {
-                this.type = Type.STRUCT;
+                this.type = DataType.STRUCT;
                 this.valueStruct = e;
             }
             else if (value is List f)
             {
-                this.type = Type.LIST;
+                this.type = DataType.LIST;
                 this.ValueList = f;
+            }
+            else if (value is byte g)
+            {
+                this.type = DataType.BYTE;
+                this.valueByte = g;
             }
             else
             {
@@ -632,125 +536,74 @@ namespace IngameCoding.Bytecode
 
         #endregion
 
-        #region TrySet()
-
         public DataItem TrySet(DataItem value)
         {
             switch (type)
             {
-                case Type.INT:
+                case DataType.BYTE:
                     switch (value.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
+                            return new DataItem(value.ValueByte, null);
+                    }
+                    break;
+                case DataType.INT:
+                    switch (value.type)
+                    {
+                        case DataType.INT:
                             return new DataItem(value.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(Math.Round(value.ValueFloat), null);
-                        case Type.STRING:
+                        case DataType.STRING:
                             return new DataItem(int.Parse(value.ValueString), null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (value.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(value.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(value.ValueFloat, null);
                     }
                     break;
-                case Type.STRING:
+                case DataType.STRING:
                     switch (value.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(value.ValueInt.ToString(), null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(value.ValueFloat.ToString(), null);
-                        case Type.STRING:
+                        case DataType.STRING:
                             return new DataItem(value.ValueString, null);
-                        case Type.BOOLEAN:
+                        case DataType.BOOLEAN:
                             return new DataItem(value.ValueBoolean.ToString(), null);
                     }
                     break;
-                case Type.BOOLEAN:
+                case DataType.BOOLEAN:
                     switch (value.type)
                     {
-                        case Type.BOOLEAN:
+                        case DataType.BOOLEAN:
                             return new DataItem(value.ValueBoolean, null);
                     }
                     break;
-                case Type.STRUCT:
+                case DataType.STRUCT:
                     switch (value.type)
                     {
-                        case Type.STRUCT:
+                        case DataType.STRUCT:
                             return new DataItem(value.ValueStruct, null);
                     }
                     break;
-                case Type.LIST:
+                case DataType.LIST:
                     switch (value.type)
                     {
-                        case Type.LIST:
+                        case DataType.LIST:
                             return new DataItem(value.ValueList, null);
                     }
                     break;
             }
             throw new RuntimeException("Can't cast from " + value.type.ToString() + " to " + type.ToString());
         }
-        public DataItem TrySet(int value)
-        {
-            return type switch
-            {
-                Type.INT => new DataItem(value, null),
-                Type.FLOAT => new DataItem(value, null),
-                Type.STRING => new DataItem(value.ToString(), null),
-                _ => throw new RuntimeException("Can't cast from " + "INT" + " to " + type.ToString()),
-            };
-        }
-        public DataItem TrySet(float value)
-        {
-            return type switch
-            {
-                Type.INT => new DataItem(Math.Round(value), null),
-                Type.FLOAT => new DataItem(value, null),
-                Type.STRING => new DataItem(value.ToString(), null),
-                _ => throw new RuntimeException("Can't cast from " + "FLOAT" + " to " + type.ToString()),
-            };
-        }
-        public DataItem TrySet(bool value)
-        {
-            return type switch
-            {
-                Type.STRING => new DataItem(value.ToString(), null),
-                Type.BOOLEAN => new DataItem(value, null),
-                _ => throw new RuntimeException("Can't cast from " + "BOOLEAN" + " to " + type.ToString()),
-            };
-        }
-        public DataItem TrySet(string value)
-        {
-            return type switch
-            {
-                Type.STRING => new DataItem(value, null),
-                Type.INT => new DataItem(int.Parse(value), null),
-                _ => throw new RuntimeException("Can't cast from " + "STRING" + " to " + type.ToString()),
-            };
-        }
-        public DataItem TrySet(IStruct value)
-        {
-            return type switch
-            {
-                Type.STRUCT => new DataItem(value, null),
-                _ => throw new RuntimeException("Can't cast from " + "STRUCT" + " to " + type.ToString()),
-            };
-        }
-        public DataItem TrySet(List value)
-        {
-            return type switch
-            {
-                Type.LIST => new DataItem(value, null),
-                _ => throw new RuntimeException("Can't cast from " + "LIST" + " to " + type.ToString()),
-            };
-        }
-
-        #endregion
 
         #region Operators
 
@@ -758,36 +611,55 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.BYTE:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueByte + rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueByte + rightSide.ValueInt, null);
+                        case DataType.FLOAT:
+                            return new DataItem(leftSide.ValueByte + rightSide.ValueFloat, null);
+                        case DataType.STRING:
+                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
+                    }
+                    break;
+                case DataType.INT:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueInt + rightSide.ValueByte, null);
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueInt + rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueInt + rightSide.ValueFloat, null);
-                        case Type.STRING:
+                        case DataType.STRING:
                             return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueFloat + rightSide.ValueByte, null);
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueFloat + rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueFloat + rightSide.ValueFloat, null);
-                        case Type.STRING:
+                        case DataType.STRING:
                             return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
                     }
                     break;
-                case Type.STRING:
+                case DataType.STRING:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
                             return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
-                        case Type.FLOAT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
-                        case Type.STRING:
+                        case DataType.FLOAT:
+                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
+                        case DataType.STRING:
                             return new DataItem(leftSide.ValueString + rightSide.ValueString, null);
                     }
                     break;
@@ -799,21 +671,36 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.BYTE:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueByte - rightSide.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem(leftSide.ValueByte - rightSide.ValueInt, null);
+                        case DataType.FLOAT:
+                            return new DataItem(leftSide.ValueByte - rightSide.ValueFloat, null);
+                    }
+                    break;
+                case DataType.INT:
+                    switch (rightSide.type)
+                    {
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueInt - rightSide.ValueByte, null);
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueInt - rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueInt - rightSide.ValueFloat, null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.BYTE:
+                            return new DataItem(leftSide.ValueFloat - rightSide.ValueByte, null);
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueFloat - rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueFloat - rightSide.ValueFloat, null);
                     }
                     break;
@@ -826,21 +713,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueInt * rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueInt * rightSide.ValueFloat, null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueFloat * rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueFloat * rightSide.ValueFloat, null);
                     }
                     break;
@@ -852,21 +739,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueInt / rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueInt / rightSide.ValueFloat, null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueFloat / rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueFloat / rightSide.ValueFloat, null);
                     }
                     break;
@@ -878,21 +765,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueInt % rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueInt % rightSide.ValueFloat, null);
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return new DataItem(leftSide.ValueFloat % rightSide.ValueInt, null);
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return new DataItem(leftSide.ValueFloat % rightSide.ValueFloat, null);
                     }
                     break;
@@ -905,21 +792,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt < rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt < rightSide.ValueFloat;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat < rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat < rightSide.ValueFloat;
                     }
                     break;
@@ -931,21 +818,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt > rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt > rightSide.ValueFloat;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat > rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat > rightSide.ValueFloat;
                     }
                     break;
@@ -958,21 +845,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt <= rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt <= rightSide.ValueFloat;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat <= rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat <= rightSide.ValueFloat;
                     }
                     break;
@@ -984,21 +871,21 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt >= rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt >= rightSide.ValueFloat;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat >= rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat >= rightSide.ValueFloat;
                     }
                     break;
@@ -1011,41 +898,41 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt == rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt == rightSide.ValueFloat;
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueInt.ToString() == rightSide.ValueString;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat == rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat == rightSide.ValueFloat;
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueFloat.ToString() == rightSide.ValueString;
                     }
                     break;
-                case Type.STRING:
+                case DataType.STRING:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueString == rightSide.ValueInt.ToString();
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueString == rightSide.ValueFloat.ToString();
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueString == rightSide.ValueString;
                     }
                     break;
-                case Type.BOOLEAN:
-                    if (rightSide.type == Type.BOOLEAN)
+                case DataType.BOOLEAN:
+                    if (rightSide.type == DataType.BOOLEAN)
                     {
                         return leftSide.ValueBoolean == rightSide.ValueBoolean;
                     }
@@ -1058,41 +945,41 @@ namespace IngameCoding.Bytecode
         {
             switch (leftSide.type)
             {
-                case Type.INT:
+                case DataType.INT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueInt != rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueInt != rightSide.ValueFloat;
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueInt.ToString() != rightSide.ValueString;
                     }
                     break;
-                case Type.FLOAT:
+                case DataType.FLOAT:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueFloat != rightSide.ValueInt;
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueFloat != rightSide.ValueFloat;
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueFloat.ToString() != rightSide.ValueString;
                     }
                     break;
-                case Type.STRING:
+                case DataType.STRING:
                     switch (rightSide.type)
                     {
-                        case Type.INT:
+                        case DataType.INT:
                             return leftSide.ValueString != rightSide.ValueInt.ToString();
-                        case Type.FLOAT:
+                        case DataType.FLOAT:
                             return leftSide.ValueString != rightSide.ValueFloat.ToString();
-                        case Type.STRING:
+                        case DataType.STRING:
                             return leftSide.ValueString != rightSide.ValueString;
                     }
                     break;
-                case Type.BOOLEAN:
-                    if (rightSide.type == Type.BOOLEAN)
+                case DataType.BOOLEAN:
+                    if (rightSide.type == DataType.BOOLEAN)
                     {
                         return leftSide.ValueBoolean != rightSide.ValueBoolean;
                     }
@@ -1108,42 +995,72 @@ namespace IngameCoding.Bytecode
         public static bool operator ==(DataItem leftSide, bool rightSide) => (leftSide == new DataItem(rightSide, null));
         public static bool operator !=(DataItem leftSide, bool rightSide) => (leftSide != new DataItem(rightSide, null));
 
-        public static bool operator !(DataItem leftSide)
+        public static DataItem operator !(DataItem leftSide)
         {
-            if (leftSide.type == Type.BOOLEAN)
+            if (leftSide.type == DataType.BOOLEAN)
             {
-                return !leftSide.ValueBoolean;
+                return new DataItem(!leftSide.ValueBoolean, leftSide.Tag);
             }
-            throw new RuntimeException("Can't do ! operation with type " + leftSide.type.ToString());
+            throw new RuntimeException($"Can't do ! operation with type {leftSide.GetTypeText()}");
         }
-        public static bool operator |(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator |(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            try
             {
-                return (leftSide.ValueBoolean | rightSide.ValueBoolean);
+                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+
+                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
+                { return new DataItem(a.ValueBoolean | b.ValueBoolean, a.Tag); }
+                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
+                { return new DataItem(a.ValueByte | b.ValueByte, a.Tag); }
+                if (a.type == DataType.INT && b.type == DataType.INT)
+                { return new DataItem(a.ValueInt | b.ValueInt, a.Tag); }
             }
-            throw new RuntimeException("Can't do | operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+            catch (NotImplementedException)
+            { }
+
+            throw new RuntimeException($"Can't do | operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
-        public static bool operator &(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator &(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            try
             {
-                return (leftSide.ValueBoolean & rightSide.ValueBoolean);
+                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+
+                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
+                { return new DataItem(a.ValueBoolean & b.ValueBoolean, a.Tag); }
+                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
+                { return new DataItem(a.ValueByte & b.ValueByte, a.Tag); }
+                if (a.type == DataType.INT && b.type == DataType.INT)
+                { return new DataItem(a.ValueInt & b.ValueInt, a.Tag); }
             }
-            throw new RuntimeException("Can't do & operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+            catch (NotImplementedException)
+            { }
+
+            throw new RuntimeException($"Can't do & operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
-        public static bool operator ^(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == Type.BOOLEAN && rightSide.type == Type.BOOLEAN)
+            try
             {
-                return (leftSide.ValueBoolean ^ rightSide.ValueBoolean);
+                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+
+                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
+                { return new DataItem(a.ValueBoolean ^ b.ValueBoolean, a.Tag); }
+                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
+                { return new DataItem(a.ValueByte ^ b.ValueByte, a.Tag); }
+                if (a.type == DataType.INT && b.type == DataType.INT)
+                { return new DataItem(a.ValueInt ^ b.ValueInt, a.Tag); }
             }
-            throw new RuntimeException("Can't do ^ operation with type " + leftSide.type.ToString() + " and BOOLEAN");
+            catch (NotImplementedException)
+            { }
+
+            throw new RuntimeException($"Can't do ^ operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
 
         public static bool operator true(DataItem leftSide)
         {
-            if (leftSide.type == Type.BOOLEAN)
+            if (leftSide.type == DataType.BOOLEAN)
             {
                 return leftSide.ValueBoolean;
             }
@@ -1151,7 +1068,7 @@ namespace IngameCoding.Bytecode
         }
         public static bool operator false(DataItem leftSide)
         {
-            if (leftSide.type == Type.BOOLEAN)
+            if (leftSide.type == DataType.BOOLEAN)
             {
                 return leftSide.ValueBoolean;
             }
@@ -1160,31 +1077,29 @@ namespace IngameCoding.Bytecode
 
         #endregion
 
-        public string ToStringValue()
+        public string ToStringValue() => type switch
         {
-            string retStr = type switch
-            {
-                Type.INT => ValueInt.ToString(),
-                Type.FLOAT => ValueFloat.ToString().Replace(',', '.'),
-                Type.STRING => ValueString,
-                Type.BOOLEAN => ValueBoolean.ToString(),
-                Type.STRUCT => "{ ... }",
-                Type.LIST => "[ ... ]",
-                _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
-            };
-            return retStr;
-        }
+            DataType.INT => ValueInt.ToString(),
+            DataType.BYTE => ValueByte.ToString(),
+            DataType.FLOAT => ValueFloat.ToString().Replace(',', '.'),
+            DataType.STRING => ValueString,
+            DataType.BOOLEAN => ValueBoolean.ToString(),
+            DataType.STRUCT => "{ ... }",
+            DataType.LIST => "[ ... ]",
+            _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
+        };
 
         public override string ToString()
         {
             string retStr = type switch
             {
-                Type.INT => ValueInt.ToString(),
-                Type.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
-                Type.STRING => $"\"{ValueString}\"",
-                Type.BOOLEAN => ValueBoolean.ToString(),
-                Type.STRUCT => $"{ValueStruct.GetType().Name} {{...}}",
-                Type.LIST => "[...]",
+                DataType.INT => ValueInt.ToString(),
+                DataType.BYTE => ValueByte.ToString(),
+                DataType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
+                DataType.STRING => $"\"{ValueString}\"",
+                DataType.BOOLEAN => ValueBoolean.ToString(),
+                DataType.STRUCT => $"{ValueStruct.GetType().Name} {{...}}",
+                DataType.LIST => "[...]",
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             if (!string.IsNullOrEmpty(this.Tag))
@@ -1204,6 +1119,7 @@ namespace IngameCoding.Bytecode
             hash.Add(valueBoolean);
             hash.Add(valueStruct);
             hash.Add(valueList);
+            hash.Add(valueByte);
             hash.Add(IsHeapAddress);
             return hash.ToHashCode();
         }
@@ -1212,6 +1128,7 @@ namespace IngameCoding.Bytecode
         {
             return obj is DataItem item &&
                    type == item.type &&
+                   valueByte == item.valueByte &&
                    valueInt == item.valueInt &&
                    valueFloat == item.valueFloat &&
                    valueString == item.valueString &&
@@ -1223,25 +1140,175 @@ namespace IngameCoding.Bytecode
 
         public DataItem Copy() => type switch
         {
-            Type.INT => new DataItem(valueInt, Tag),
-            Type.FLOAT => new DataItem(valueFloat, Tag),
-            Type.STRING => new DataItem(valueString, Tag),
-            Type.BOOLEAN => new DataItem(valueBoolean, Tag),
-            Type.STRUCT => new DataItem(valueStruct.Copy(), Tag),
-            Type.LIST => new DataItem(valueList.Copy(), Tag),
+            DataType.BYTE => new DataItem(valueByte, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.INT => new DataItem(valueInt, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.FLOAT => new DataItem(valueFloat, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.STRING => new DataItem(valueString, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BOOLEAN => new DataItem(valueBoolean, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.STRUCT => new DataItem(valueStruct.Copy(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.LIST => new DataItem(valueList.Copy(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             _ => throw new InternalException($"Unknown type {type}"),
         };
         public DataItem CopyRecursive() => type switch
         {
-            Type.INT => new DataItem(valueInt, Tag),
-            Type.FLOAT => new DataItem(valueFloat, Tag),
-            Type.STRING => new DataItem(valueString, Tag),
-            Type.BOOLEAN => new DataItem(valueBoolean, Tag),
-            Type.STRUCT => new DataItem(valueStruct.CopyRecursive(), Tag),
-            Type.LIST => new DataItem(valueList.CopyRecursive(), Tag),
+            DataType.BYTE => new DataItem(valueByte, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.INT => new DataItem(valueInt, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.FLOAT => new DataItem(valueFloat, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.STRING => new DataItem(valueString, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BOOLEAN => new DataItem(valueBoolean, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.STRUCT => new DataItem(valueStruct.CopyRecursive(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.LIST => new DataItem(valueList.CopyRecursive(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             _ => throw new InternalException($"Unknown type {type}"),
         };
+
+        public static (DataItem, DataItem) IntoSimilarTypes(DataItem a, DataItem b)
+        {
+            switch (a.type)
+            {
+                case DataType.BYTE:
+                    {
+                        switch (b.type)
+                        {
+                            case DataType.BYTE: return (a, b);
+                            case DataType.INT: return (new DataItem((int)a.ValueByte, a.Tag), b);
+                            case DataType.FLOAT: return (new DataItem((float)a.ValueByte, a.Tag), b);
+                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.BOOLEAN:
+                            case DataType.STRUCT:
+                            case DataType.LIST:
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case DataType.INT:
+                    {
+                        switch (b.type)
+                        {
+                            case DataType.BYTE: return (a, new DataItem((byte)b.ValueByte, b.Tag));
+                            case DataType.INT: return (a, b);
+                            case DataType.FLOAT: return (new DataItem((float)a.ValueFloat, a.Tag), b);
+                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.BOOLEAN:
+                            case DataType.STRUCT:
+                            case DataType.LIST:
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case DataType.FLOAT:
+                    {
+                        switch (b.type)
+                        {
+                            case DataType.BYTE: return (a, new DataItem((float)b.ValueFloat, b.Tag));
+                            case DataType.INT: return (a, new DataItem((float)b.ValueFloat, b.Tag));
+                            case DataType.FLOAT: return (a, b);
+                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.BOOLEAN:
+                            case DataType.STRUCT:
+                            case DataType.LIST:
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case DataType.STRING:
+                    {
+                        switch (b.type)
+                        {
+                            case DataType.BYTE: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.INT: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.FLOAT: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.STRING: return (a, b);
+                            case DataType.BOOLEAN: return (new DataItem(a.ToStringValue(), a.Tag), b);
+                            case DataType.STRUCT:
+                            case DataType.LIST:
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case DataType.BOOLEAN:
+                    {
+                        switch (b.type)
+                        {
+                            case DataType.STRING: return (a, new DataItem(b.ToStringValue(), b.Tag));
+                            case DataType.BOOLEAN: return (a, b);
+                            case DataType.STRUCT:
+                            case DataType.LIST:
+                            case DataType.BYTE:
+                            case DataType.INT:
+                            case DataType.FLOAT:
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                case DataType.STRUCT:
+                case DataType.LIST:
+                default:
+                    break;
+            }
+            throw new NotImplementedException();
+        }
     }
+
+    public class UnassignedStruct : IStruct
+    {
+        public string Name => throw new RuntimeException("Struct is null");
+        public bool HaveField(string field) => throw new RuntimeException("Struct is null");
+        public void SetField(string field, DataItem value) => throw new RuntimeException("Struct is null");
+        public DataItem GetField(string field) => throw new RuntimeException("Struct is null");
+        public IStruct Copy() => new UnassignedStruct();
+        public IStruct CopyRecursive() => new UnassignedStruct();
+        public string[] GetFields() => Array.Empty<string>();
+
+        public override string ToString() => "struct {null}";
+    }
+
+    public class Struct : IStruct
+    {
+        internal readonly Dictionary<string, DataItem> fields = new();
+
+        readonly string name;
+        public string Name => name;
+
+        public Struct(Dictionary<string, DataItem> fields, string name)
+        { this.fields = fields; this.name = name; }
+
+        public bool HaveField(string field) => fields.ContainsKey(field);
+        public void SetField(string field, DataItem value) => fields[field] = value;
+        public DataItem GetField(string field) => fields[field];
+        public IStruct Copy()
+        {
+            Dictionary<string, DataItem> fieldsClone = new();
+
+            foreach (var field in this.fields)
+            { fieldsClone.Add(field.Key, field.Value); }
+
+            return new Struct(fieldsClone, name);
+        }
+        public IStruct CopyRecursive()
+        {
+            Dictionary<string, DataItem> fieldsClone = new();
+
+            foreach (var field in this.fields)
+            { fieldsClone.Add(field.Key, field.Value.Copy()); }
+
+            return new Struct(fieldsClone, name);
+        }
+
+        public override string ToString() => "struct {...}";
+
+        public string[] GetFields()
+        {
+            string[] result = new string[fields.Count];
+            for (int i = 0; i < result.Length; i++) result[i] = fields.ElementAt(i).Key;
+            return result;
+        }
+    }
+
     public interface IStruct
     {
         public string Name { get; }
@@ -1250,5 +1317,6 @@ namespace IngameCoding.Bytecode
         public DataItem GetField(string field);
         public IStruct Copy();
         public IStruct CopyRecursive();
+        string[] GetFields();
     }
 }

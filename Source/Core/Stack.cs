@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace IngameCoding.Core
 {
     internal class Stack<T>
     {
-        protected readonly List<T> stack;
+        readonly List<T> stack;
 
         public Stack() => stack = new List<T>();
 
@@ -43,5 +40,7 @@ namespace IngameCoding.Core
             get => this.stack[i];
             set => this.stack[i] = value;
         }
+
+        public virtual void Clear() => this.stack.Clear();
     }
 }

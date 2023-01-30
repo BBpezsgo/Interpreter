@@ -1,11 +1,15 @@
 ﻿using System;
 
+[Builtin("test")]
+void test();
+
 [CodeEntry]
 void Start()
 {
   string[] list2 = ["a"];
   if (list2.Contains("b")) { Console.Log("list2 contains 'b'"); }
   else { Console.Log("list2 not contains 'b'"); };
+  test();
   if (list2.Contains("a")) { Console.Log("list2 contains 'a'"); }
   else { Console.Log("list2 not contains 'a'"); };
 }

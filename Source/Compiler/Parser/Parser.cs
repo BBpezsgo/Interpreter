@@ -1875,17 +1875,17 @@ namespace IngameCoding.BBCode
                 { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
                 if (!ExpectOperator(";"))
-                { throw new SyntaxException("Expected ';' after \"for\" condition", variableDeclaration.TotalPosition()); }
+                { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition()); }
 
                 Statement expression = ExpectExpression();
                 if (expression == null)
-                { throw new SyntaxException("Expected expression after \"for\" condition", tokenZarojel); }
+                { throw new SyntaxException($"Expected expression after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
                 if (!ExpectOperator(")", out Token tokenZarojel2))
-                { throw new SyntaxException("Expected ')' after \"for\" condition", condition.TotalPosition()); }
+                { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition()); }
 
                 if (!ExpectOperator("{", out var braceletStart))
-                { throw new SyntaxException("Expected '{' after \"for\" condition", tokenZarojel2); }
+                { throw new SyntaxException($"Expected '{{' after \"for\" condition, got {CurrentToken}", tokenZarojel2); }
 
                 Statement_ForLoop forStatement = new()
                 {
@@ -2140,7 +2140,7 @@ namespace IngameCoding.BBCode
                     { break; }
 
                     if (!ExpectOperator(","))
-                    { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
+                    { throw new SyntaxException($"Expected ',' to separate parameters, got {CurrentToken}", parameter.TotalPosition()); }
                     else
                     { expectParameter = true; }
 

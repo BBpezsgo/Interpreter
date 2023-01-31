@@ -1221,7 +1221,7 @@ namespace IngameCoding.BBCode.Compiler
                     AddInstruction(Opcode.PUSH_VALUE, int.Parse(literal.Value));
                     break;
                 case BuiltinType.FLOAT:
-                    AddInstruction(Opcode.PUSH_VALUE, float.Parse(literal.Value, System.Globalization.CultureInfo.InvariantCulture));
+                    AddInstruction(Opcode.PUSH_VALUE, float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
                     break;
                 case BuiltinType.STRING:
                     AddInstruction(Opcode.PUSH_VALUE, literal.Value);

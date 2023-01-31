@@ -7,6 +7,7 @@ namespace IngameCoding.BBCode
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser.Statements;
     using IngameCoding.Core;
+    using IngameCoding.Errors;
     using IngameCoding.Tokenizer;
 
     public class TokenAnalysis
@@ -214,7 +215,9 @@ namespace IngameCoding.BBCode
 
         static readonly char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] banned = new char[] { '\r', '\u200B' };
-        static readonly string[] operators = new string[] { "<<" };
+        static readonly char[] operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
+        static readonly string[] doubleOperators = new string[] { "++", "--", "<<", ">>" };
+        static readonly char[] simpleOperators = new char[] { ';', ',', '#' };
 
         /// <param name="settings">
         /// Tokenizer settings<br/>
@@ -350,40 +353,28 @@ namespace IngameCoding.BBCode
                     EndToken(OffsetTotal);
                 }
 
-                if (CurrentToken.type != TokenType.OPERATOR)
+                if (currChar == 'f' && (CurrentToken.type == TokenType.LITERAL_NUMBER || CurrentToken.type == TokenType.LITERAL_FLOAT))
                 {
-                    bool x = false;
-                    foreach (var o in operators)
-                    {
-                        if (o.StartsWith(currChar))
-                        {
-                            EndToken(OffsetTotal);
-                            CurrentToken.type = TokenType.OPERATOR;
-                            CurrentToken.text += currChar;
-                            x = true;
-                            break;
-                        }
-                    }
-                    if (x) continue;
-                }
-                else
-                {
-                    bool x = false;
-                    foreach (var o in operators)
-                    {
-                        if (o.StartsWith(CurrentToken.text + currChar))
-                        {
-                            CurrentToken.type = TokenType.OPERATOR;
-                            CurrentToken.text += currChar;
-                            x = true;
-                            break;
-                        }
-                    }
-                    if (x) continue;
+                    CurrentToken.text += currChar;
+                    CurrentToken.type = TokenType.LITERAL_FLOAT;
                     EndToken(OffsetTotal);
                 }
-
-                if (int.TryParse(currChar.ToString(), out _))
+                else if (currChar == 'e' && (CurrentToken.type == TokenType.LITERAL_NUMBER || CurrentToken.type == TokenType.LITERAL_FLOAT))
+                {
+                    if (CurrentToken.text.Contains(currChar))
+                    { throw new TokenizerException($"Invalid float literal format", CurrentToken); }
+                    CurrentToken.text += currChar;
+                    CurrentToken.type = TokenType.LITERAL_FLOAT;
+                }
+                else if (currChar == 'x' && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                {
+                    // TODO: új token típus: hex number
+                    if (!CurrentToken.text.StartsWith('0'))
+                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken); }
+                    CurrentToken.text += currChar;
+                    CurrentToken.type = TokenType.LITERAL_NUMBER;
+                }
+                else if (int.TryParse(currChar.ToString(), out _))
                 {
                     if (CurrentToken.type == TokenType.WHITESPACE)
                     { CurrentToken.type = TokenType.LITERAL_NUMBER; }
@@ -443,21 +434,7 @@ namespace IngameCoding.BBCode
                     CurrentToken.text += currChar;
                     EndToken(OffsetTotal);
                 }
-                else if (currChar == ';')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                    EndToken(OffsetTotal);
-                }
-                else if (currChar == '#')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                    EndToken(OffsetTotal);
-                }
-                else if (currChar == ',')
+                else if (simpleOperators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.type = TokenType.OPERATOR;
@@ -466,8 +443,7 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == '=')
                 {
-                    string[] strings = new string[] { "+", "-", "*", "%", "=", "!", "|", "&", "^", "<", ">" };
-                    if (strings.Contains(CurrentToken.text))
+                    if (CurrentToken.text.Length == 1 && operators.Contains(CurrentToken.text[0]))
                     {
                         CurrentToken.text += currChar;
                         EndToken(OffsetTotal);
@@ -479,63 +455,12 @@ namespace IngameCoding.BBCode
                         CurrentToken.text += currChar;
                     }
                 }
-                else if (currChar == '<')
+                else if (doubleOperators.Contains(CurrentToken.text + currChar))
                 {
-                    if (CurrentToken.text == "<")
-                    {
-                        CurrentToken.text += currChar;
-                        EndToken(OffsetTotal);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
-                    }
+                    CurrentToken.text += currChar;
+                    EndToken(OffsetTotal);
                 }
-                else if (currChar == '>')
-                {
-                    if (CurrentToken.text == ">")
-                    {
-                        CurrentToken.text += currChar;
-                        EndToken(OffsetTotal);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
-                    }
-                }
-                else if (currChar == '-')
-                {
-                    if (CurrentToken.text == "-")
-                    {
-                        CurrentToken.text += currChar;
-                        EndToken(OffsetTotal);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
-                    }
-                }
-                else if (currChar == '+')
-                {
-                    if (CurrentToken.text == "+")
-                    {
-                        CurrentToken.text += currChar;
-                        EndToken(OffsetTotal);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
-                    }
-                }
-                else if (currChar == '*')
+                else if (currChar == '*' && CurrentToken.type == TokenType.POTENTIAL_COMMENT)
                 {
                     if (CurrentToken.type == TokenType.POTENTIAL_COMMENT)
                     {
@@ -549,43 +474,7 @@ namespace IngameCoding.BBCode
                         CurrentToken.text += currChar;
                     }
                 }
-                else if (currChar == '<')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '>')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '%')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '!')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '&')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '|')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
-                }
-                else if (currChar == '^')
+                else if (operators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.type = TokenType.OPERATOR;

@@ -130,6 +130,8 @@ namespace IngameCoding.BBCode
         IDENTIFIER,
 
         LITERAL_NUMBER,
+        LITERAL_HEX,
+        LITERAL_BIN,
         LITERAL_STRING,
         LITERAL_FLOAT,
 
@@ -368,11 +370,17 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == 'x' && CurrentToken.type == TokenType.LITERAL_NUMBER)
                 {
-                    // TODO: új token típus: hex number
                     if (!CurrentToken.text.StartsWith('0'))
                     { throw new TokenizerException($"Invalid hex number literal format", CurrentToken); }
                     CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.LITERAL_NUMBER;
+                    CurrentToken.type = TokenType.LITERAL_HEX;
+                }
+                else if (currChar == 'b' && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                {
+                    if (!CurrentToken.text.StartsWith('0'))
+                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken); }
+                    CurrentToken.text += currChar;
+                    CurrentToken.type = TokenType.LITERAL_BIN;
                 }
                 else if (int.TryParse(currChar.ToString(), out _))
                 {
@@ -391,6 +399,31 @@ namespace IngameCoding.BBCode
                             CurrentToken.type = TokenType.LITERAL_NUMBER;
                         }
                     }
+
+                    if (CurrentToken.type == TokenType.LITERAL_BIN)
+                    {
+                        if (currChar != '0' && currChar != '1')
+                        {
+                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", new Position(CurrentToken.Position, CurrentToken.AbsolutePosition));
+                        }
+                    }
+
+                    CurrentToken.text += currChar;
+                }
+                else if (CurrentToken.type == TokenType.LITERAL_HEX && new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }.Contains(currChar.ToString().ToLower()[0]))
+                {
+                    CurrentToken.text += currChar;
+                }
+                else if (CurrentToken.type == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                {
+                    CurrentToken.text += currChar;
+                }
+                else if (CurrentToken.type == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                {
+                    CurrentToken.text += currChar;
+                }
+                else if (CurrentToken.type == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                {
                     CurrentToken.text += currChar;
                 }
                 else if (currChar == '.')
@@ -524,6 +557,7 @@ namespace IngameCoding.BBCode
                 {
                     if (CurrentToken.type == TokenType.WHITESPACE ||
                         CurrentToken.type == TokenType.LITERAL_NUMBER ||
+                        CurrentToken.type == TokenType.LITERAL_HEX ||
                         CurrentToken.type == TokenType.LITERAL_FLOAT ||
                         CurrentToken.type == TokenType.OPERATOR)
                     {

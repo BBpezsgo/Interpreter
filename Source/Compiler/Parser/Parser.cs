@@ -1515,7 +1515,7 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = CurrentToken.text,
+                        Value = CurrentToken.text.Replace("_", ""),
                         Type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
                         ValueToken = CurrentToken,
                     };
@@ -1529,7 +1529,35 @@ namespace IngameCoding.BBCode
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = CurrentToken.text,
+                        Value = CurrentToken.text.Replace("_", ""),
+                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        ValueToken = CurrentToken,
+                    };
+
+                    currentTokenIndex++;
+
+                    statement = literal;
+                    return true;
+                }
+                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_HEX)
+                {
+                    Statement_Literal literal = new()
+                    {
+                        Value = Convert.ToInt32(CurrentToken.text, 16).ToString(),
+                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        ValueToken = CurrentToken,
+                    };
+
+                    currentTokenIndex++;
+
+                    statement = literal;
+                    return true;
+                }
+                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_BIN)
+                {
+                    Statement_Literal literal = new()
+                    {
+                        Value = Convert.ToInt32(CurrentToken.text[2..].Replace("_", ""), 2).ToString(),
                         Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
                         ValueToken = CurrentToken,
                     };
@@ -2532,13 +2560,25 @@ namespace IngameCoding.BBCode
 
                 if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
                 {
-                    value = float.Parse(CurrentToken.text);
+                    value = float.Parse(CurrentToken.text.Replace("_", ""));
 
                     currentTokenIndex++;
                 }
                 else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
                 {
-                    value = int.Parse(CurrentToken.text);
+                    value = int.Parse(CurrentToken.text.Replace("_", ""));
+
+                    currentTokenIndex++;
+                }
+                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_HEX)
+                {
+                    value = Convert.ToInt32(CurrentToken.text, 16);
+
+                    currentTokenIndex++;
+                }
+                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_BIN)
+                {
+                    value = Convert.ToInt32(CurrentToken.text.Replace("_", ""), 2);
 
                     currentTokenIndex++;
                 }

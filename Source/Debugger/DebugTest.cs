@@ -30,14 +30,14 @@ namespace TheProgram
 
                 switch (message.type)
                 {
-                    case "intp-update":
+                    case "intp/step":
                         {
                             interpreter.Update();
                         }
                         break;
-                    case "get-comp-res":
+                    case "comp/res":
                         {
-                            manager.Send("comp-res", new Data_CompilerResult(interpreter.Details.CompilerResult));
+                            manager.Send("comp/res", new Data_CompilerResult(interpreter.Details.CompilerResult));
                         }
                         break;
                     case "get-intp-data":
@@ -62,7 +62,7 @@ namespace TheProgram
 
             interpreter.OnOutput += (sender, message, logType) =>
             {
-                ipc.Send("con-out", new Data_Log(logType, message, new Data_Context(sender.Details)));
+                ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
             };
 
             interpreter.OnStdOut += (sender, message) =>

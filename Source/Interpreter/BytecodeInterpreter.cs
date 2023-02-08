@@ -17,6 +17,7 @@ namespace IngameCoding.Bytecode
             public DataItem[] Stack => bytecodeInterpreter.BytecodeProcessor.Memory.Stack.ToArray();
             public DataItem[] Heap => bytecodeInterpreter.BytecodeProcessor.Memory.Heap.ToArray();
             public int StackMemorySize => bytecodeInterpreter.BytecodeProcessor.Memory.Stack.UsedVirtualMemory;
+            public string[] CallStack => bytecodeInterpreter.BytecodeProcessor.Memory.CallStack.ToArray();
 
             public InterpreterDetails(BytecodeInterpreter bytecodeInterpreter)
             {

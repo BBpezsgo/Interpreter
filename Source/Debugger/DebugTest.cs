@@ -17,7 +17,7 @@ namespace TheProgram
             ArgumentParser.Settings settings = settings_;
             settings.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
 
-            var ipc = new IPC();
+            var ipc = new InterProcessCommunication();
 
             var code = File.ReadAllText(settings.File.FullName);
             var interpreter = new Interpreter();
@@ -62,7 +62,7 @@ namespace TheProgram
 
             interpreter.OnOutput += (sender, message, logType) =>
             {
-                ipc.Send("con-out", new Data_Log((logType.ToString(), message)));
+                ipc.Send("con-out", new Data_Log(logType, message, new Data_Context(sender.Details)));
             };
 
             interpreter.OnStdOut += (sender, message) =>
@@ -133,6 +133,7 @@ namespace TheProgram
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
         public int StackMemorySize { get; set; }
+        public string[] CallStack { get; set; }
         public Data_StackItem[] Stack { get; set; }
         public Data_StackItem[] Heap { get; set; }
 
@@ -140,6 +141,7 @@ namespace TheProgram
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
+            CallStack = v.CallStack;
             StackMemorySize = v.StackMemorySize;
             Stack = v.Stack.ToData(v => new Data_StackItem(v));
             Heap = v.Heap.ToData(v => new Data_StackItem(v));
@@ -170,12 +172,50 @@ namespace TheProgram
         public Data_Instruction[] CompiledCode { get; set; }
         public int SetGlobalVariablesInstruction { get; set; }
         public int ClearGlobalVariablesInstruction { get; set; }
+        public Data_DebugInfo[] DebugInfo { get; set; }
 
         public Data_CompilerResult(Compiler.CompilerResult v) : base(v)
         {
             ClearGlobalVariablesInstruction = v.clearGlobalVariablesInstruction;
             SetGlobalVariablesInstruction = v.setGlobalVariablesInstruction;
+            DebugInfo = (v.debugInfo == null) ? Array.Empty<Data_DebugInfo>() : v.debugInfo.ToData(v => new Data_DebugInfo(v));
             CompiledCode = (v.compiledCode == null) ? Array.Empty<Data_Instruction>() : v.compiledCode.ToData(v => new Data_Instruction(v));
+        }
+    }
+
+    public class Data_Position : Data_Serializable<Position>
+    {
+        public int StartLine { get; set; }
+        public int StartChar { get; set; }
+        public int EndLine { get; set; }
+        public int EndChar { get; set; }
+        public int StartTotal { get; set; }
+        public int EndTotal { get; set; }
+
+        public Data_Position(Position v) : base(v)
+        {
+            StartLine = v.Start.Line;
+            StartChar = v.Start.Character;
+
+            EndLine = v.End.Line;
+            EndChar = v.End.Character;
+
+            StartTotal = v.AbsolutePosition.Start;
+            EndTotal = v.AbsolutePosition.End;
+        }
+    }
+
+    public class Data_DebugInfo : Data_Serializable<DebugInfo>
+    {
+        public int StartOffset { get; set; }
+        public int EndOffset { get; set; }
+        public Data_Position Position { get; set; }
+
+        public Data_DebugInfo(DebugInfo v) : base(v)
+        {
+            StartOffset = v.InstructionStart;
+            EndOffset = v.InstructionEnd;
+            Position = new Data_Position(v.Position);
         }
     }
 
@@ -237,15 +277,40 @@ namespace TheProgram
         }
     }
 
-    public class Data_Log : Data_Serializable<(string, string)>
+    public class Data_Log
     {
         public string Message { get; set; }
         public string Type { get; set; }
+        public Data_Context Context { get; set; }
 
-        public Data_Log((string, string) v) : base(v)
+        public Data_Log(IngameCoding.Output.LogType type, string message, Data_Context context)
         {
-            this.Type = v.Item1;
-            this.Message = v.Item2;
+            Type = type.ToString();
+            Message = message;
+            Context = context;
+        }
+    }
+
+    public class Data_Context : Data_Serializable<Interpreter.InterpreterDetails>
+    {
+        public int CodePointer { get; set; } = -1;
+        public string[] CallStack { get; set; } = Array.Empty<string>();
+
+        public Data_Context(Interpreter.InterpreterDetails v) : base(v)
+        {
+            try
+            {
+                if (v == null) return;
+                if (v.Interpreter == null) return;
+                if (v.Interpreter.Details == null) return;
+            }
+            catch (NullReferenceException)
+            {
+                return;
+            }
+
+            CodePointer = v.Interpreter.Details.CodePointer;
+            CallStack = v.Interpreter.Details.CallStack;
         }
     }
 }

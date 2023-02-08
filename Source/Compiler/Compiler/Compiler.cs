@@ -292,11 +292,13 @@ namespace IngameCoding.BBCode.Compiler
                 string filename = @using.PathString.Replace("/", "\\");
                 if (!filename.EndsWith("." + FileExtensions.Code)) filename += "." + FileExtensions.Code;
 
-                List<string> searchForThese = new()
-                {
-                    Path.GetFullPath(basePath.Replace("/", "\\") + filename, file.Directory.FullName),
-                    Path.GetFullPath(filename, file.Directory.FullName),
-                };
+                List<string> searchForThese = new();
+                try
+                { searchForThese.Add(Path.GetFullPath(basePath.Replace("/", "\\") + filename, file.Directory.FullName)); }
+                catch (System.Exception) { }
+                try
+                { searchForThese.Add(Path.GetFullPath(filename, file.Directory.FullName)); }
+                catch (System.Exception) { }
 
                 bool found = false;
                 for (int i = 0; i < searchForThese.Count; i++)

@@ -64,7 +64,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    internal class DebugInfo
+    public class DebugInfo
     {
         internal Position Position;
         internal int InstructionStart;
@@ -1954,7 +1954,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CurrentFile = function.Value.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()}");
+            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()};{CurrentFile};{compiledCode.Count}");
 
             // Search for variables
             AddInstruction(Opcode.COMMENT, "Variables");

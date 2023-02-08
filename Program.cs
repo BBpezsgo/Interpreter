@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG
+﻿#define ENABLE_DEBUG_
 #define RELEASE_TEST_
 
 using System;
@@ -58,6 +58,9 @@ namespace TheProgram
                     break;
                 case ArgumentParser.RunType.Decompile:
                     IngameCoding.Core.EasyInterpreter.RunBinary(settings.Value);
+                    break;
+                case ArgumentParser.RunType.DebugServer:
+                    DebugAdapter.Server.Start(settings.Value);
                     break;
             }
 

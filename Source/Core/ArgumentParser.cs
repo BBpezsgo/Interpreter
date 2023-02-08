@@ -17,6 +17,7 @@ namespace TheProgram
         {
             Normal,
             Debugger,
+            DebugServer,
             Tester,
             Compile,
             Decompile,
@@ -101,18 +102,20 @@ namespace TheProgram
         /// </summary>
         /// <param name="args">The passed arguments</param>
         /// <exception cref="ArgumentException"></exception>
-        static void ParseArgs(string[] args, out string BasePath, out bool ThrowErrors, out bool LogDebugs, out bool LogSystem, out RunType RunType, out CompressionLevel CompressionLevel, out string CompileOutput, out ParserSettings parserSettings, out Compiler.CompilerSettings compilerSettings, out BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        static Settings ParseArgs(string[] args)
         {
-            ThrowErrors = false;
-            LogDebugs = true;
-            LogSystem = true;
-            BasePath = "";
-            RunType = RunType.Normal;
-            compilerSettings = Compiler.CompilerSettings.Default;
-            parserSettings = ParserSettings.Default;
-            bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
-            CompileOutput = null;
-            CompressionLevel = CompressionLevel.Optimal;
+            bool ThrowErrors = false;
+            bool LogDebugs = true;
+            bool LogSystem = true;
+            string BasePath = "";
+            RunType RunType = RunType.Normal;
+            Compiler.CompilerSettings compilerSettings = Compiler.CompilerSettings.Default;
+            ParserSettings parserSettings = ParserSettings.Default;
+            BytecodeInterpreterSettings bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
+            string CompileOutput = null;
+            CompressionLevel CompressionLevel = CompressionLevel.Optimal;
+            string PipeName = null;
+            int Port = -1;
 
             if (args.Length > 1)
             {
@@ -283,12 +286,61 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-debugserver")
+                    {
+                        if (RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.DebugServer}");
+                        RunType = RunType.DebugServer;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-pipe")
+                    {
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-pipe'"); }
+
+                        PipeName = args[i];
+
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-port")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out Port))
+                        { throw new ArgumentException("Expected int value after argument '-pipe'"); }
+                        goto ArgParseDone;
+                    }
+
                     throw new ArgumentException($"Unknown argument '{args[i]}'");
 
                 ArgParseDone:
                     i++;
                 }
             }
+
+            if (!System.IO.File.Exists(args.Last()))
+            {
+                throw new ArgumentException($"File '{args.Last()}' not found!");
+            }
+
+            return new Settings()
+            {
+                parserSettings = parserSettings,
+                compilerSettings = compilerSettings,
+                bytecodeInterpreterSettings = bytecodeInterpreterSettings,
+                ThrowErrors = ThrowErrors,
+                LogDebugs = LogDebugs,
+                LogSystem = LogSystem,
+                RunType = RunType,
+                CompileOutput = CompileOutput,
+                File = new System.IO.FileInfo(args.Last()),
+                BasePath = BasePath,
+                compressionLevel = CompressionLevel,
+                PipeName = PipeName,
+                Port = Port,
+            };
         }
 
         /// <summary>
@@ -303,6 +355,8 @@ namespace TheProgram
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
             public bool HandleErrors => !ThrowErrors;
+            public string PipeName;
+            public int Port;
             public bool LogDebugs;
             public bool LogSystem;
             public RunType RunType;
@@ -324,24 +378,15 @@ namespace TheProgram
                 return null;
             }
 
-            ParserSettings parserSettings;
-            Compiler.CompilerSettings compilerSettings;
-            BytecodeInterpreterSettings bytecodeInterpreterSettings;
-            bool ThrowErrors;
-            bool LogDebugs;
-            bool LogSystem;
-            RunType RunType;
-            string CompileOutput;
-            string BasePath;
-            CompressionLevel CompressionLevel;
-
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
             string[] normalizedArgs = normalizer.Result.ToArray();
 
+            Settings settings;
+
             try
             {
-                ParseArgs(normalizedArgs, out BasePath, out ThrowErrors, out LogDebugs, out LogSystem, out RunType, out CompressionLevel, out CompileOutput, out parserSettings, out compilerSettings, out bytecodeInterpreterSettings);
+                settings = ParseArgs(normalizedArgs);
             }
             catch (ArgumentException error)
             {
@@ -350,26 +395,7 @@ namespace TheProgram
                 return null;
             }
 
-            if (!System.IO.File.Exists(normalizedArgs.Last()))
-            {
-                Output.Error($"File '{normalizedArgs.Last()}' not found!");
-                return null;
-            }
-
-            return new Settings()
-            {
-                parserSettings = parserSettings,
-                compilerSettings = compilerSettings,
-                bytecodeInterpreterSettings = bytecodeInterpreterSettings,
-                ThrowErrors = ThrowErrors,
-                LogDebugs = LogDebugs,
-                LogSystem = LogSystem,
-                RunType = RunType,
-                CompileOutput = CompileOutput,
-                File = new System.IO.FileInfo(normalizedArgs.Last()),
-                BasePath = BasePath,
-                compressionLevel = CompressionLevel,
-            };
+            return settings;
         }
 
         public static void PrintArgs(params string[] args)

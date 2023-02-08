@@ -37,18 +37,18 @@ namespace TheProgram
                         break;
                     case "comp/res":
                         {
-                            manager.Send("comp/res", new Data_CompilerResult(interpreter.Details.CompilerResult));
+                            manager.Reply("comp/res", new Data_CompilerResult(interpreter.Details.CompilerResult), message.id);
                         }
                         break;
                     case "get-intp-data":
                         {
                             if (interpreter.Details.Interpreter == null) return;
-                            manager.Send("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter.Details));
+                            manager.Reply("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter.Details), message.id);
                         }
                         break;
                     case "get-intp2-data":
                         {
-                            manager.Send("intp2-data", new Data_CodeInterpreterDetails(interpreter.Details));
+                            manager.Reply("intp2-data", new Data_CodeInterpreterDetails(interpreter.Details), message.id);
                         }
                         break;
                     case "stdin":

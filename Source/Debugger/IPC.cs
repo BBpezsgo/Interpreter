@@ -72,7 +72,7 @@ namespace Communicating
         {
             if (message.type == "base/ping/req")
             {
-                Send("base/ping/res", DateTime.Now.ToUnix().ToString());
+                Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(), message.id);
                 return;
             }
 
@@ -84,11 +84,15 @@ namespace Communicating
             OnRecived?.Invoke(this, message);
         }
 
-        public void Send(string messageType) => Send(new IPCMessage<string>(messageType, null, ""));
-        public void Send<T>(string messageType, T messageData) => Send(new IPCMessage<T>(messageType, null, messageData));
-        public void Send<T>(IPCMessage<T> message)
+        public void Reply<T>(string messageType, T messageData, string reply)
         {
-            OutgoingMessages.Add(new IPCMessage<object>(message.type, idCounter++.ToString(), message.data));
+            OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData, reply));
+            TrySendNext();
+        }
+
+        public void Send<T>(string messageType, T messageData)
+        {
+            OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData));
             TrySendNext();
         }
 
@@ -214,13 +218,15 @@ namespace Communicating
     {
         public string type { get; set; }
         public string id { get; set; }
+        public string reply { get; set; }
         public T data { get; set; }
 
-        public IPCMessage(string type, string id, T data)
+        public IPCMessage(string type, string id, T data, string reply = null)
         {
             this.id = id;
             this.type = type;
             this.data = data;
+            this.reply = reply;
         }
 
         public string Serialize() => JsonSerializer.Serialize(this);

@@ -18,8 +18,6 @@ namespace Communicating
         public delegate void OnRecivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
         public event OnRecivedEventHandler OnRecived;
 
-        int idCounter = 0;
-
         readonly Interface @interface;
         internal Interface.Type CommunicationType => @interface.CommunicationType;
 
@@ -136,6 +134,7 @@ namespace Communicating
         internal event OnRecivedEventHandler OnRecived;
 
         Thread Listener;
+        const int BufferSize = 1024;
 
         internal enum Type
         {
@@ -178,33 +177,54 @@ namespace Communicating
 
         void ListenerThread()
         {
-            int BufferSize = 1024;
-            Stream input = Console.OpenStandardInput(BufferSize);
             Log($"Communication[Standard] Opened");
-            while (true)
+            Listen(Console.OpenStandardInput(BufferSize), Console.OpenStandardOutput(), Console.InputEncoding, Console.OutputEncoding);
+            Log($"Communication[Standard] Closed");
+        }
+
+        void Listen(Stream @in, Stream @out, Encoding inEncoding, Encoding outEncoding)
+        {
+            var outputWriter = new StreamWriter(@out, outEncoding);
+
+            while (@in.CanRead && @out.CanWrite)
             {
                 try
                 {
-                    var buffer = new byte[BufferSize];
+                    byte[] buffer = new byte[BufferSize];
                     int length;
-                    while (input.CanRead && (length = input.Read(buffer, 0, buffer.Length)) > 0)
+                    while ((length = @in.Read(buffer, 0, buffer.Length)) > 0)
                     {
-                        var payload = new byte[length];
+                        byte[] payload = new byte[length];
                         Buffer.BlockCopy(buffer, 0, payload, 0, length);
-                        string data = Encoding.UTF8.GetString(payload).Trim();
+                        string data = inEncoding.GetString(payload).Trim();
                         OnRecivedEvent(data);
 
                         while (Outgoing.Count > 0)
                         {
-                            var data_ = Outgoing.Dequeue();
-                            Console.WriteLine(data_);
+                            string data_ = Outgoing.Dequeue();
+                            outputWriter.WriteLine(data_);
+                            outputWriter.Flush();
                             Log($" >> {data_}");
                         }
                     }
                 }
-                catch (Exception) { break; }
+                catch (Exception error)
+                {
+                    Console.Error.WriteLine($"{error}");
+                    break;
+                }
             }
-            Log($"Communication[Standard] Closed");
+
+            Log($"CanWrite: {@out.CanWrite} CanRead: {@in.CanRead}");
+
+            outputWriter?.Close();
+            outputWriter?.Dispose();
+
+            @out?.Close();
+            @out?.Dispose();
+
+            @in?.Close();
+            @in?.Dispose();
         }
 
         void OnRecivedEvent(string data)

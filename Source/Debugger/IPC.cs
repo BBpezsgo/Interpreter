@@ -15,6 +15,8 @@ namespace Communicating
     {
         readonly List<IPCMessage<object>> OutgoingMessages = new();
 
+        static readonly char EOM = Convert.ToChar(4);
+
         public delegate void OnRecivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
         public event OnRecivedEventHandler OnRecived;
 
@@ -50,19 +52,21 @@ namespace Communicating
 
         private void Interface_OnRecived(string data)
         {
-            if (data.Contains('\n'))
+            if (data.Contains(EOM))
             {
-                var payloadTexts = data.Split('\n');
-                foreach (var element in payloadTexts)
+                var messages = data.Split(EOM);
+                foreach (var message in messages)
                 {
-                    var payloadMessage = JsonSerializer.Deserialize<IPCMessage<object>>(element.Trim());
-                    OnRecive(payloadMessage);
+                    if (string.IsNullOrWhiteSpace(message)) continue;
+                    if (string.IsNullOrEmpty(message)) continue;
+                    var messageObject = JsonSerializer.Deserialize<IPCMessage<object>>(message.Trim());
+                    OnRecive(messageObject);
                 }
             }
             else
             {
-                IPCMessage<object> payloadMessage = JsonSerializer.Deserialize<IPCMessage<object>>(data);
-                OnRecive(payloadMessage);
+                IPCMessage<object> messageObject = JsonSerializer.Deserialize<IPCMessage<object>>(data);
+                OnRecive(messageObject);
             }
         }
 
@@ -101,7 +105,7 @@ namespace Communicating
             try
             {
                 var data = JsonSerializer.Serialize(OutgoingMessages[0]);
-                this.@interface.Send(data);
+                this.@interface.Send(data + EOM);
             }
             catch (IngameCoding.Errors.RuntimeException)
             {
@@ -202,7 +206,7 @@ namespace Communicating
                         while (Outgoing.Count > 0)
                         {
                             string data_ = Outgoing.Dequeue();
-                            outputWriter.WriteLine(data_);
+                            outputWriter.Write(data_);
                             outputWriter.Flush();
                             Log($" >> {data_}");
                         }

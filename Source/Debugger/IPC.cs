@@ -1,21 +1,15 @@
-﻿using IngameCoding.Bytecode;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 
-using TheProgram;
-
 namespace Communicating
 {
     public class InterProcessCommunication
     {
         readonly List<IPCMessage<object>> OutgoingMessages = new();
-
-        static readonly char EOM = Convert.ToChar(4);
 
         public delegate void OnRecivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
         public event OnRecivedEventHandler OnRecived;
@@ -46,32 +40,14 @@ namespace Communicating
 
         public void Start()
         {
-            this.@interface.OnRecived += Interface_OnRecived;
+            this.@interface.OnRecived += OnRecive;
             this.@interface.Start();
         }
 
-        private void Interface_OnRecived(string data)
+        private void OnRecive(string data)
         {
-            if (data.Contains(EOM))
-            {
-                var messages = data.Split(EOM);
-                foreach (var message in messages)
-                {
-                    if (string.IsNullOrWhiteSpace(message)) continue;
-                    if (string.IsNullOrEmpty(message)) continue;
-                    var messageObject = JsonSerializer.Deserialize<IPCMessage<object>>(message.Trim());
-                    OnRecive(messageObject);
-                }
-            }
-            else
-            {
-                IPCMessage<object> messageObject = JsonSerializer.Deserialize<IPCMessage<object>>(data);
-                OnRecive(messageObject);
-            }
-        }
+            var message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim());
 
-        void OnRecive(IPCMessage<object> message)
-        {
             if (message.type == "base/ping/req")
             {
                 Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(), message.id);
@@ -104,27 +80,11 @@ namespace Communicating
 
             try
             {
-                var data = JsonSerializer.Serialize(OutgoingMessages[0]);
-                this.@interface.Send(data + EOM);
+                @interface.Send(JsonSerializer.Serialize(OutgoingMessages[0]));
             }
-            catch (IngameCoding.Errors.RuntimeException)
+            catch (System.Exception error)
             {
-                if (OutgoingMessages[0].data is Data_CompilerResult data0)
-                {
-                    for (int i = 0; i < data0.CompiledCode.Length; i++)
-                    {
-                        if (data0.CompiledCode[i].Opcode == Opcode.COMMENT.ToString()) continue;
-                        if (data0.CompiledCode[i].Parameter is int) continue;
-                        if (data0.CompiledCode[i].Parameter is float) continue;
-                        if (data0.CompiledCode[i].Parameter is string) continue;
-                        if (data0.CompiledCode[i].Parameter is bool) continue;
-                        Log(data0.CompiledCode[i].Parameter.GetType().Name);
-                    }
-                }
-                else
-                {
-                    Log(OutgoingMessages[0].data.ToString());
-                }
+                Console.Error.WriteLine($"ERROR:\r\n{error}\r\nMESSAGE:\r\n{OutgoingMessages[0]}\r\n\r\n");
                 throw;
             }
 
@@ -137,8 +97,10 @@ namespace Communicating
         internal delegate void OnRecivedEventHandler(string message);
         internal event OnRecivedEventHandler OnRecived;
 
+        static readonly char EOM = Convert.ToChar(4);
         Thread Listener;
         const int BufferSize = 1024;
+        string Incoming = "";
 
         internal enum Type
         {
@@ -176,7 +138,7 @@ namespace Communicating
 
         public void Send(string data)
         {
-            Outgoing.Enqueue(data);
+            Outgoing.Enqueue(data + EOM);
         }
 
         void ListenerThread()
@@ -201,7 +163,7 @@ namespace Communicating
                         byte[] payload = new byte[length];
                         Buffer.BlockCopy(buffer, 0, payload, 0, length);
                         string data = inEncoding.GetString(payload).Trim();
-                        OnRecivedEvent(data);
+                        OnDataRecived(data);
 
                         while (Outgoing.Count > 0)
                         {
@@ -212,9 +174,9 @@ namespace Communicating
                         }
                     }
                 }
-                catch (Exception error)
+                catch (System.Exception error)
                 {
-                    Console.Error.WriteLine($"{error}");
+                    Console.Error.WriteLine(error.ToString());
                     break;
                 }
             }
@@ -231,10 +193,28 @@ namespace Communicating
             @in?.Dispose();
         }
 
-        void OnRecivedEvent(string data)
+        void OnDataRecived(string data)
         {
-            Log($" << {data}");
-            OnRecived?.Invoke(data);
+            Incoming += data;
+
+            Incoming = Incoming.TrimStart(EOM);
+
+            int endlessSafe = 8;
+            while (data.Contains(EOM))
+            {
+                if (endlessSafe-- <= 0) { Console.Error.WriteLine($"Endless loop!!!"); break; }
+
+                Incoming = Incoming.Shift(Incoming.IndexOf(EOM), out string message);
+                if (string.IsNullOrWhiteSpace(message) || string.IsNullOrEmpty(message)) break;
+                
+                if (message.Contains(EOM))
+                {
+                    Console.Error.WriteLine($" WTF: {message}");
+                    continue;
+                }
+                Log($" << {message}");
+                OnRecived?.Invoke(message);
+            }
         }
     }
 
@@ -255,10 +235,25 @@ namespace Communicating
 
         public string Serialize() => JsonSerializer.Serialize(this);
         public static IPCMessage<T> Deserialize(string data) => JsonSerializer.Deserialize<IPCMessage<T>>(data);
+
+        public override string ToString() => $"IPCMessage<{typeof(T)}>{{ type: {type ?? "<null>"}, id: {id ?? "<null>"}, reply: {reply ?? "<null>"}, data: {{{data.ToString() ?? "<null>"}}} }}";
     }
 
     static class Extensions
     {
         public static double ToUnix(this DateTime v) => v.ToUniversalTime().Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
+        public static string Shift(this string v, int length, out string deleted)
+        {
+            if (v is null) throw new ArgumentNullException(nameof(v));
+            if (length < 0) throw new ArgumentException($"{nameof(length)} ({length}) can't negative");
+            if (length == 0)
+            {
+                deleted = "";
+                return v;
+            }
+
+            deleted = v[..length];
+            return v[length..];
+        }
     }
 }

@@ -65,20 +65,9 @@ namespace TheProgram
                 ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
             };
 
-            interpreter.OnStdOut += (sender, message) =>
-            {
-                ipc.Send("stdout", message);
-            };
-
-            interpreter.OnStdError += (sender, message) =>
-            {
-                ipc.Send("stderr", message);
-            };
-
-            interpreter.OnNeedInput += (sender) =>
-            {
-                needStdin = true;
-            };
+            interpreter.OnStdOut += (_, message) => ipc.Send("stdout", message);
+            interpreter.OnStdError += (_, message) => ipc.Send("stderr", message);
+            interpreter.OnNeedInput += _ => needStdin = true;
 
             if (interpreter.Initialize())
             {

@@ -59,9 +59,6 @@ namespace TheProgram
                 case ArgumentParser.RunType.Decompile:
                     IngameCoding.Core.EasyInterpreter.RunBinary(settings.Value);
                     break;
-                case ArgumentParser.RunType.DebugServer:
-                    DebugAdapter.Server.Start(settings.Value);
-                    break;
             }
 
         ExitProgram:

@@ -17,7 +17,6 @@ namespace TheProgram
         {
             Normal,
             Debugger,
-            DebugServer,
             Tester,
             Compile,
             Decompile,
@@ -283,14 +282,6 @@ namespace TheProgram
                         if (RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Tester}");
                         RunType = RunType.Tester;
-                        goto ArgParseDone;
-                    }
-
-                    if (args[i] == "-debugserver")
-                    {
-                        if (RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.DebugServer}");
-                        RunType = RunType.DebugServer;
                         goto ArgParseDone;
                     }
 

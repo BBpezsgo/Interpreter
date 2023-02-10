@@ -10,6 +10,8 @@ namespace TheProgram
     using IngameCoding.Bytecode;
     using IngameCoding.Core;
 
+    using System.Linq;
+
     internal static class DebugTest
     {
         public static void Run(ArgumentParser.Settings settings_)
@@ -159,6 +161,7 @@ namespace TheProgram
     public class Data_CompilerResult : Data_Serializable<Compiler.CompilerResult>
     {
         public Data_Instruction[] CompiledCode { get; set; }
+        public CompiledFunction[] Functions { get; set; }
         public int SetGlobalVariablesInstruction { get; set; }
         public int ClearGlobalVariablesInstruction { get; set; }
         public Data_DebugInfo[] DebugInfo { get; set; }
@@ -169,6 +172,19 @@ namespace TheProgram
             SetGlobalVariablesInstruction = v.setGlobalVariablesInstruction;
             DebugInfo = (v.debugInfo == null) ? Array.Empty<Data_DebugInfo>() : v.debugInfo.ToData(v => new Data_DebugInfo(v));
             CompiledCode = (v.compiledCode == null) ? Array.Empty<Data_Instruction>() : v.compiledCode.ToData(v => new Data_Instruction(v));
+            Functions = v.compiledFunctions.Values.ToArray();
+        }
+    }
+
+    public class Data_Function : Data_Serializable<CompiledFunction>
+    {
+        public string FullName { get; set; }
+        public Data_Position Position { get; set; }
+
+        public Data_Function(CompiledFunction v) : base(v)
+        {
+            this.FullName = v.FullName;
+            this.Position = new Data_Position(v.Name.GetPosition());
         }
     }
 

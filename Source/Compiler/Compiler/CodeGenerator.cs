@@ -1954,7 +1954,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CurrentFile = function.Value.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()};{CurrentFile};{compiledCode.Count}");
+            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()};{CurrentFile};{compiledCode.Count};{function.Value.Name.Position.Start.Line}");
 
             // Search for variables
             AddInstruction(Opcode.COMMENT, "Variables");

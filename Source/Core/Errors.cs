@@ -120,7 +120,7 @@ namespace IngameCoding.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        public Bytecode.BytecodeInterpreter.Context? Context;
+        internal Bytecode.BytecodeInterpreter.Context? Context;
         BBCode.Compiler.DebugInfo[] ContextDebugInfo = null;
 
         internal void FeedDebugInfo(BBCode.Compiler.DebugInfo[] DebugInfo)
@@ -137,12 +137,12 @@ namespace IngameCoding.Errors
             ContextDebugInfo = contextDebugInfo.ToArray();
         }
 
-        public RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        public RuntimeException(string message, Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
+        internal RuntimeException(string message) : base(message, Position.UnknownPosition) { }
+        internal RuntimeException(string message, Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-        public RuntimeException(string message, System.Exception inner, Bytecode.BytecodeInterpreter.Context context) : base(message, inner)
+        internal RuntimeException(string message, System.Exception inner, Bytecode.BytecodeInterpreter.Context context) : base(message, inner)
         { this.Context = context; }
 
         public override string MessageAll

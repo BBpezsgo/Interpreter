@@ -45,7 +45,7 @@ namespace TheProgram
                     case "get-intp-data":
                         {
                             if (interpreter.Details.Interpreter == null) return;
-                            manager.Reply("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter.Details), message.id);
+                            manager.Reply("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter), message.id);
                         }
                         break;
                     case "get-intp2-data":
@@ -116,10 +116,10 @@ namespace TheProgram
 
         public string State { get; private set; }
 
-        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter.InterpreterDetails v) => new(v);
+        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter v) => new(v);
     }
 
-    internal class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter.InterpreterDetails>
+    internal class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter>
     {
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
@@ -128,7 +128,7 @@ namespace TheProgram
         public Data_StackItem[] Stack { get; set; }
         public Data_StackItem[] Heap { get; set; }
 
-        internal Data_BytecodeInterpreterDetails(BytecodeInterpreter.InterpreterDetails v) : base(v)
+        internal Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
@@ -138,7 +138,7 @@ namespace TheProgram
             Heap = v.Heap.ToData(v => new Data_StackItem(v));
         }
 
-        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter.InterpreterDetails v) => new(v);
+        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter v) => new(v);
     }
 
     public class Data_StackItem : Data_Serializable<DataItem>
@@ -307,15 +307,14 @@ namespace TheProgram
             {
                 if (v == null) return;
                 if (v.Interpreter == null) return;
-                if (v.Interpreter.Details == null) return;
             }
             catch (NullReferenceException)
             {
                 return;
             }
 
-            CodePointer = v.Interpreter.Details.CodePointer;
-            CallStack = v.Interpreter.Details.CallStack;
+            CodePointer = v.Interpreter.CodePointer;
+            CallStack = v.Interpreter.CallStack;
         }
     }
 }

@@ -128,26 +128,18 @@ namespace IngameCoding.Bytecode
         public void Push(IStruct value, string tag = null) => Push(new DataItem(value, tag));
         /// <summary>Adds a list to the end</summary>
         public override void PushRange(List<DataItem> list) => PushRange(list.ToArray());
-        /// <summary>Adds a list to the end</summary>
-        public void PushRange(List<int> list)
-        {
-            var newList = new List<DataItem>();
-            for (int i = 0; i < list.Count; i++)
-            {
-                newList.Add(new DataItem(list[i], null));
-            }
-            PushRange(newList);
-        }
         /// <summary>Adds an array to the end</summary>
         public override void PushRange(DataItem[] list)
         { foreach (DataItem item in list) Push(item); }
         /// <summary>Adds a list to the end</summary>
-        public void PushRange(int[] list, string tag = "")
+        public void PushRange(DataItem[] list, string tag)
         {
-            var newList = new List<DataItem>();
+            DataItem[] newList = new DataItem[list.Length];
             for (int i = 0; i < list.Length; i++)
             {
-                newList.Add(new DataItem(list[i], (tag.Length > 0) ? tag : null));
+                DataItem item = list[i];
+                item.Tag = tag ?? item.Tag;
+                newList[i] = item;
             }
             PushRange(newList);
         }

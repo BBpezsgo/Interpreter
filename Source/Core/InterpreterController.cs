@@ -417,11 +417,11 @@ namespace IngameCoding.Core
             }, true);
             builtinFunctions.AddBuiltinFunction("test", () =>
             {
-                var d = bytecodeInterpreter.Details.Stack.ToByteArray((v) => v.ToByteArray());
+                var d = bytecodeInterpreter.Stack.ToByteArray((v) => v.ToByteArray());
                 var de = new StepList<byte>(d);
                 List<DataItem> r = new();
                 de.Next();
-                foreach (var item in bytecodeInterpreter.Details.Stack)
+                foreach (var item in bytecodeInterpreter.Stack)
                 {
                     r.Add(de.GetDataItem(item.Tag));
                 }

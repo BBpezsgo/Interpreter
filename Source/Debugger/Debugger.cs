@@ -12,7 +12,7 @@ namespace TheProgram
 
     using System.Linq;
 
-    internal static class DebugTest
+    internal static class Debugger
     {
         public static void Run(ArgumentParser.Settings settings_)
         {

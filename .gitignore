@@ -369,3 +369,4 @@ FodyWeavers.xsd
 # Custom
 /Source/package.json
 /Source/bb.bbcode-interpreter.asmdef
+/Source/BrainFuck

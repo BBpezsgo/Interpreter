@@ -45,7 +45,7 @@ namespace TheProgram
             switch (settings.Value.RunType)
             {
                 case ArgumentParser.RunType.Debugger:
-                    Debugger.Run(settings.Value);
+                    Debugger _ = new(settings.Value);
                     return;
                 case ArgumentParser.RunType.Tester:
                     IngameCoding.Tester.Tester.RunTestFile(settings.Value);

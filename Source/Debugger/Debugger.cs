@@ -5,83 +5,170 @@ namespace TheProgram
 {
     using Communicating;
 
-    using IngameCoding.BBCode;
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Bytecode;
     using IngameCoding.Core;
 
-    using System.Linq;
-
-    internal static class Debugger
+    internal class Debugger
     {
-        public static void Run(ArgumentParser.Settings settings_)
+        readonly InterProcessCommunication Ipc;
+        readonly string SourceCode;
+        Interpreter Interpreter;
+
+        int CurrentLine
         {
-            ArgumentParser.Settings settings = settings_;
-            settings.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
-
-            var ipc = new InterProcessCommunication();
-
-            var code = File.ReadAllText(settings.File.FullName);
-            var interpreter = new Interpreter();
-
-            bool needStdin = false;
-
-            ipc.OnRecived += (manager, message) =>
+            get
             {
-                if (interpreter == null) return;
+                int result = -1;
 
-                switch (message.type)
+                for (int i = 0; i < Interpreter.Details.CompilerResult.debugInfo.Length; i++)
                 {
-                    case "intp/step":
-                        {
-                            interpreter.Update();
-                        }
-                        break;
-                    case "comp/res":
-                        {
-                            manager.Reply("comp/res", new Data_CompilerResult(interpreter.Details.CompilerResult), message.id);
-                        }
-                        break;
-                    case "get-intp-data":
-                        {
-                            if (interpreter.Details.Interpreter == null) return;
-                            manager.Reply("intp-data", new Data_BytecodeInterpreterDetails(interpreter.Details.Interpreter), message.id);
-                        }
-                        break;
-                    case "get-intp2-data":
-                        {
-                            manager.Reply("intp2-data", new Data_CodeInterpreterDetails(interpreter.Details), message.id);
-                        }
-                        break;
-                    case "stdin":
-                        if (!needStdin) break;
-                        needStdin = false;
+                    DebugInfo item = Interpreter.Details.CompilerResult.debugInfo[i];
+                    if (item.InstructionStart > Interpreter.Details.Interpreter.CodePointer) continue;
+                    if (item.InstructionEnd < Interpreter.Details.Interpreter.CodePointer) continue;
 
-                        interpreter.OnInput(message.data.ToString()[0]);
-                        break;
+                    result = item.Position.Start.Line;
                 }
-            };
 
-            interpreter.OnOutput += (sender, message, logType) =>
-            {
-                ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
-            };
-
-            interpreter.OnStdOut += (_, message) => ipc.Send("stdout", message);
-            interpreter.OnStdError += (_, message) => ipc.Send("stderr", message);
-            interpreter.OnNeedInput += _ => needStdin = true;
-
-            if (interpreter.Initialize())
-            {
-                var compiledCode = interpreter.CompileCode(code, settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
-
-                if (compiledCode != null)
-                {
-                    interpreter.RunCode(compiledCode, settings.bytecodeInterpreterSettings);
-                }
+                return result;
             }
+        }
 
-            ipc.Start();
+        private bool NeedStdin;
+
+        internal Debugger(ArgumentParser.Settings settings_)
+        {
+            Ipc = new InterProcessCommunication();
+            Ipc.OnRecived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
+
+            ArgumentParser.Settings settings = ModifySettings(settings_);
+            SourceCode = File.ReadAllText(settings.File.FullName);
+            NeedStdin = false;
+            InitInterpreter(settings);
+            Ipc.Start();
+        }
+
+        void InitInterpreter(ArgumentParser.Settings settings)
+        {
+            Interpreter?.Destroy();
+            Interpreter = new Interpreter();
+
+            Interpreter.OnOutput += (sender, message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
+            Interpreter.OnStdOut += (_, message) => Ipc.Send("stdout", message);
+            Interpreter.OnStdError += (_, message) => Ipc.Send("stderr", message);
+            Interpreter.OnNeedInput += _ => NeedStdin = true;
+
+            if (!Interpreter.Initialize()) return;
+
+            Instruction[] compiledCode = Interpreter.CompileCode(SourceCode, settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
+            if (compiledCode == null) return;
+
+            Interpreter.RunCode(compiledCode, settings.bytecodeInterpreterSettings);
+        }
+
+        static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)
+        {
+            ArgumentParser.Settings result = settings;
+            result.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
+            return result;
+        }
+
+        void OnMessage(IPCMessage<object> message)
+        {
+            switch (message.type)
+            {
+                case "intp/stepline":
+                    {
+                        int startedLine = CurrentLine;
+                        int endlessSafe = 8;
+                        while (Interpreter.IsExecutingCode && startedLine == CurrentLine)
+                        {
+                            if (endlessSafe-- <= 0) break;
+                            Interpreter.Update();
+                        }
+                        Ipc.Reply("intp/updated", "null", message.id);
+                    }
+                    break;
+                case "intp/step":
+                    {
+                        Interpreter.Update();
+                        Ipc.Reply("intp/updated", "null", message.id);
+                    }
+                    break;
+                case "comp/debuginfo":
+                    {
+                        Ipc.Reply("comp/debuginfo",
+                            (Interpreter.Details.CompilerResult.debugInfo == null) ?
+                                Array.Empty<Data_DebugInfo>() :
+                                Interpreter.Details.CompilerResult.debugInfo.ToData(v => new Data_DebugInfo(v)),
+                            message.id);
+                    }
+                    break;
+                case "comp/offsets":
+                    {
+                        Ipc.Reply("comp/offsets",
+                            new CodeOffsets(Interpreter.Details.CompilerResult),
+                            message.id);
+                    }
+                    break;
+                case "comp/code":
+                    {
+                        Ipc.Reply("comp/code",
+                            (Interpreter.Details.CompilerResult.compiledCode == null) ?
+                                Array.Empty<Data_Instruction>() :
+                                Interpreter.Details.CompilerResult.compiledCode.ToData(v => new Data_Instruction(v)),
+                            message.id);
+                    }
+                    break;
+                case "get-intp-data":
+                    {
+                        if (Interpreter.Details.Interpreter == null) return;
+                        Ipc.Reply("intp-data",
+                            new Data_BytecodeInterpreterDetails(Interpreter.Details.Interpreter),
+                            message.id);
+                    }
+                    break;
+                case "intp/pointers":
+                    {
+                        if (Interpreter.Details.Interpreter == null) return;
+                        Ipc.Reply("intp/pointers",
+                            new BytecodeProcessorPointers(Interpreter.Details.Interpreter),
+                            message.id);
+                    }
+                    break;
+                case "intp/stack":
+                    {
+                        if (Interpreter.Details.Interpreter == null) return;
+                        Ipc.Reply("intp/stack",
+                            new Stack_(Interpreter.Details.Interpreter),
+                            message.id);
+                    }
+                    break;
+                case "eval":
+                    {
+                        if (Interpreter.Details.Interpreter == null) return;
+                    }
+                    break;
+                case "intp/state":
+                    {
+                        Ipc.Reply("intp/state",
+                            Interpreter.Details.State.ToString(),
+                            message.id);
+                    }
+                    break;
+                case "intp/callstack":
+                    {
+                        Ipc.Reply("intp/callstack",
+                            Interpreter.Details.Interpreter.CallStack,
+                            message.id);
+                    }
+                    break;
+                case "stdin":
+                    if (!NeedStdin) break;
+                    Interpreter.OnInput(message.data.ToString()[0]);
+                    NeedStdin = false;
+                    break;
+            }
         }
     }
 
@@ -107,34 +194,36 @@ namespace TheProgram
 #pragma warning restore IDE0060 // Remove unused parameter
     }
 
-    internal class Data_CodeInterpreterDetails : Data_Serializable<Interpreter.InterpreterDetails>
+    public struct BytecodeProcessorPointers
     {
-        internal Data_CodeInterpreterDetails(Interpreter.InterpreterDetails v) : base(v)
+        public int BasePointer { get; set; }
+        public int CodePointer { get; set; }
+
+        internal BytecodeProcessorPointers(BytecodeInterpreter v)
         {
-            this.State = v.State.ToString();
+            BasePointer = v.BasePointer;
+            CodePointer = v.CodePointer;
         }
+    }
 
-        public string State { get; private set; }
+    public struct Stack_
+    {
+        public int StackMemorySize { get; set; }
+        public Data_StackItem[] Stack { get; set; }
 
-        public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter v) => new(v);
+        internal Stack_(BytecodeInterpreter v)
+        {
+            StackMemorySize = v.StackMemorySize;
+            Stack = v.Stack.ToData(v => new Data_StackItem(v));
+        }
     }
 
     internal class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter>
     {
-        public int BasePointer { get; set; }
-        public int CodePointer { get; set; }
-        public int StackMemorySize { get; set; }
-        public string[] CallStack { get; set; }
-        public Data_StackItem[] Stack { get; set; }
         public Data_StackItem[] Heap { get; set; }
 
         internal Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
         {
-            BasePointer = v.BasePointer;
-            CodePointer = v.CodePointer;
-            CallStack = v.CallStack;
-            StackMemorySize = v.StackMemorySize;
-            Stack = v.Stack.ToData(v => new Data_StackItem(v));
             Heap = v.Heap.ToData(v => new Data_StackItem(v));
         }
 
@@ -158,21 +247,15 @@ namespace TheProgram
         }
     }
 
-    public class Data_CompilerResult : Data_Serializable<Compiler.CompilerResult>
+    public struct CodeOffsets
     {
-        public Data_Instruction[] CompiledCode { get; set; }
-        public CompiledFunction[] Functions { get; set; }
         public int SetGlobalVariablesInstruction { get; set; }
         public int ClearGlobalVariablesInstruction { get; set; }
-        public Data_DebugInfo[] DebugInfo { get; set; }
 
-        public Data_CompilerResult(Compiler.CompilerResult v) : base(v)
+        public CodeOffsets(Compiler.CompilerResult v)
         {
             ClearGlobalVariablesInstruction = v.clearGlobalVariablesInstruction;
             SetGlobalVariablesInstruction = v.setGlobalVariablesInstruction;
-            DebugInfo = (v.debugInfo == null) ? Array.Empty<Data_DebugInfo>() : v.debugInfo.ToData(v => new Data_DebugInfo(v));
-            CompiledCode = (v.compiledCode == null) ? Array.Empty<Data_Instruction>() : v.compiledCode.ToData(v => new Data_Instruction(v));
-            Functions = v.compiledFunctions.Values.ToArray();
         }
     }
 

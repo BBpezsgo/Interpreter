@@ -992,10 +992,31 @@ namespace IngameCoding.BBCode.Compiler
             AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
 
             for (int i = 0; i < functionCall.Parameters.Count; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
+            {
+                if (functionCall.Parameters[i] is Statement_Variable variable) if (GetCompiledVariable(variable.VariableName.text, out var v, out _))
+                        if (v.IsStoredInHEAP)
+                        {
+                            AddInstruction(Opcode.DEBUG_SET_TAG, "");
+                            AddInstruction(Opcode.HEAP_SET, v.offset);
+                            continue;
+                        }
+
+
+                AddInstruction(Opcode.POP_VALUE);
+            }
 
             if (functionCall.PrevStatement != null)
-            { AddInstruction(Opcode.POP_VALUE); }
+            {
+                bool x = true;
+                if (functionCall.PrevStatement is Statement_Variable variable) if (GetCompiledVariable(variable.VariableName.text, out var v, out _))
+                        if (v.IsStoredInHEAP)
+                        {
+                            AddInstruction(Opcode.DEBUG_SET_TAG, "");
+                            AddInstruction(Opcode.HEAP_SET, v.offset);
+                            x = false;
+                        }
+                if (x) AddInstruction(Opcode.POP_VALUE);
+            }
 
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
             { AddInstruction(Opcode.POP_VALUE); }
@@ -1154,6 +1175,7 @@ namespace IngameCoding.BBCode.Compiler
                             if (valueMemoryIndex.IsStoredInHEAP)
                             {
                                 AddInstruction(Opcode.HEAP_GET, valueMemoryIndex.offset);
+                                AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
                                 GenerateCodeForStatement(@operator.Right);
                                 AddInstruction(Opcode.PUSH_VALUE, field.FieldName.text);
                                 AddInstruction(Opcode.STORE_FIELD, AddressingMode.POP);
@@ -1253,6 +1275,7 @@ namespace IngameCoding.BBCode.Compiler
                 if (val.IsStoredInHEAP)
                 {
                     AddInstruction(Opcode.HEAP_GET, val.offset);
+                    AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
                 }
                 else
                 {

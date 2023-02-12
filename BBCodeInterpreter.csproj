@@ -9,12 +9,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Source\ConsoleGUI\**" />
-    <EmbeddedResource Remove="Source\ConsoleGUI\**" />
-    <None Remove="Source\ConsoleGUI\**" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <Compile Remove="ConsoleGUI.cs" />
+    <Compile Remove="Core.cs" />
     <Compile Remove="SomeTests.cs" />
   </ItemGroup>
 

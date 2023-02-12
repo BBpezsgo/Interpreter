@@ -534,12 +534,11 @@ namespace IngameCoding.Bytecode
 
         int STORE_FIELD()
         {
-            int address = GetAddress();
-
             string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
             DataItem newValue = Memory.Stack.Pop();
+            int address = GetAddress();
             IStruct item = Memory.Stack[address].ValueStruct;
 
             if (!item.HaveField(field))

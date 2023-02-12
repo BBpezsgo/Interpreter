@@ -303,7 +303,7 @@ namespace IngameCoding.Core
                 compilerSettings,
                 parserSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b),
-                BasePath);
+                BasePath ?? "");
 
             if (errors.Count > 0)
             {

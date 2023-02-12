@@ -1,4 +1,4 @@
-﻿#define ENABLE_DEBUG_
+﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
 using System;
@@ -8,17 +8,29 @@ namespace TheProgram
     internal class Program
     {
         static void Main(string[] args)
-        {
+        {            
             // TODO: valami hiba van amit nem volt kedvem debuggolni, szoval hajrá :D
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-literals.bbc";
+            var file = "test-heap.bbc";
+
+            if (true)
+            {
+                ConsoleGUI.ConsoleGUI consoleGUI = new()
+                {
+                    FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}")
+                };
+                consoleGUI.Start();
+
+                return;
+            }
+
             if (args.Length == 0) args = new string[]
             {
                 "-throw-errors",
                 "-basepath \"../CodeFiles/\"",
-                // "-c-print-instructions true",
+                 "-c-print-instructions true",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 // "-c-generate-comments false",

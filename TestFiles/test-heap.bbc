@@ -5,6 +5,11 @@ class Foo
   int v;
 }
 
+struct Hehe
+{
+  int w;
+}
+
 [CodeEntry]
 void Start()
 {
@@ -14,9 +19,21 @@ void Start()
   foo2.v = 3;
   Console.Log(foo.v);
   Console.Log(foo2.v);
+    
+  Hehe hehe = new Hehe;
+  hehe.Func();
+  Hehe hehe2 = hehe;
+  hehe2.w = 3;
+  Console.Log(hehe.w);
+  Console.Log(hehe2.w);
 }
 
 void Func(this Foo p)
 {
   p.v = 5;
+}
+
+void Func(this Hehe p)
+{
+  p.w = 5;
 }

@@ -137,6 +137,7 @@ namespace IngameCoding.BBCode.Compiler
         bool AddCommentsToCode = true;
         readonly bool TrimUnreachableCode = true;
         bool GenerateDebugInstructions = true;
+        Compiler.CompileLevel CompileLevel;
 
         string CurrentFile;
 
@@ -1134,15 +1135,20 @@ namespace IngameCoding.BBCode.Compiler
                 if (@operator.Left is Statement_Variable variable)
                 {
                     variable.VariableName.Analysis.CompilerReached = true;
-                    variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
 
                     if (GetParameter(variable.VariableName.text, out Parameter parameter))
                     {
+                        variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
+                        variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.type);
+
                         GenerateCodeForStatement(@operator.Right);
                         AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
                     }
                     else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                     {
+                        variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
+                        variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, isGlob);
+
                         GenerateCodeForStatement(@operator.Right);
                         if (valueMemoryIndex.IsStoredInHEAP)
                         { AddInstruction(Opcode.HEAP_SET, valueMemoryIndex.offset); }
@@ -1162,16 +1168,21 @@ namespace IngameCoding.BBCode.Compiler
                     if (field.PrevStatement is Statement_Variable variable1)
                     {
                         variable1.VariableName.Analysis.CompilerReached = true;
-                        variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
 
                         if (GetParameter(variable1.VariableName.text, out Parameter parameter))
                         {
+                            variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
+                            variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.type);
+
                             GenerateCodeForStatement(@operator.Right);
                             AddInstruction(Opcode.PUSH_VALUE, field.FieldName.text);
                             AddInstruction(Opcode.STORE_FIELD, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
                         }
                         else if (GetCompiledVariable(variable1.VariableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                         {
+                            variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
+                            variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, isGlob);
+
                             if (valueMemoryIndex.IsStoredInHEAP)
                             {
                                 AddInstruction(Opcode.HEAP_GET, valueMemoryIndex.offset);
@@ -1203,10 +1214,12 @@ namespace IngameCoding.BBCode.Compiler
                     if (index.PrevStatement is Statement_Variable variable1)
                     {
                         variable1.VariableName.Analysis.CompilerReached = true;
-                        variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
 
                         if (GetCompiledVariable(variable1.VariableName.text, out CompiledVariable valueMemoryIndex, out var isGlob))
                         {
+                            variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
+                            variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, isGlob);
+
                             GenerateCodeForStatement(@operator.Right);
                             AddInstruction(Opcode.LOAD_VALUE, isGlob ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, valueMemoryIndex.offset);
                             GenerateCodeForStatement(index.Expression);
@@ -2464,6 +2477,9 @@ namespace IngameCoding.BBCode.Compiler
                     if (attr.Key == "Catch") goto JumpOut;
                 }
 
+                if (CompileLevel == Compiler.CompileLevel.All) continue;
+                if (CompileLevel == Compiler.CompileLevel.Exported && f.IsExport) continue;
+
                 string readableID = element.Value.ReadableID();
 
                 printCallback?.Invoke($"      Remove function '{readableID}' ...", Output.LogType.Debug);
@@ -2487,7 +2503,8 @@ namespace IngameCoding.BBCode.Compiler
             Dictionary<string, BuiltinFunction> builtinFunctions,
             Dictionary<string, Func<IStruct>> builtinStructs,
             Compiler.CompilerSettings settings,
-            Action<string, Output.LogType> printCallback = null)
+            Action<string, Output.LogType> printCallback = null,
+            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             BlockCodeGeneration = true;
 
@@ -2502,6 +2519,7 @@ namespace IngameCoding.BBCode.Compiler
             this.OptimizeCode = !settings.DontOptimize;
             this.compiledFunctions = new();
             this.GeneratedDebugInfo.Clear();
+            this.CompileLevel = level;
 
             #region Compile test built-in functions
 

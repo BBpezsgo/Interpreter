@@ -239,6 +239,13 @@ namespace IngameCoding.BBCode.Compiler
             };
         }
 
+        public enum CompileLevel
+        {
+            Minimal,
+            Exported,
+            All,
+        }
+
         static void CompileFile(
             List<string> alreadyCompiledCodes,
             UsingDefinition @using,
@@ -251,17 +258,22 @@ namespace IngameCoding.BBCode.Compiler
             List<Error> errors,
             List<Warning> warnings,
             Action<string, Output.LogType> printCallback,
-            string basePath)
+            string basePath,
+            CompileLevel level)
         {
             string content = null;
             string path = null;
 
             if (@using.IsUrl)
             {
+                @using.Path[0].Analysis.CompilerReached = true;
+
                 if (!Uri.TryCreate(@using.Path[0].text, UriKind.Absolute, out var uri))
                 { throw new SyntaxException($"Invalid uri \"{@using.Path[0].text}\"", @using.Path[0], file.FullName); }
 
                 path = uri.ToString();
+
+                @using.CompiledUri = path;
 
                 if (alreadyCompiledCodes.Contains(path))
                 {
@@ -271,6 +283,7 @@ namespace IngameCoding.BBCode.Compiler
                 alreadyCompiledCodes.Add(path);
 
                 printCallback?.Invoke($" Download file \"{path}\" ...", Output.LogType.Debug);
+                var started = DateTime.Now;
                 System.Net.Http.HttpClient httpClient = new();
                 System.Threading.Tasks.Task<string> req;
                 try
@@ -282,6 +295,7 @@ namespace IngameCoding.BBCode.Compiler
                     throw new Exception($"HTTP GET Error", ex);
                 }
                 req.Wait();
+                @using.DownloadTime = (DateTime.Now - started).TotalMilliseconds;
 
                 printCallback?.Invoke($" File \"{path}\" downloaded", Output.LogType.Debug);
 
@@ -289,6 +303,8 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
+                for (int i = 0; i < @using.Path.Length; i++) @using.Path[i].Analysis.CompilerReached = true;
+
                 string filename = @using.PathString.Replace("/", "\\");
                 if (!filename.EndsWith("." + FileExtensions.Code)) filename += "." + FileExtensions.Code;
 
@@ -309,6 +325,8 @@ namespace IngameCoding.BBCode.Compiler
                     else
                     { found = true; break; }
                 }
+
+                @using.CompiledUri = path;
 
                 if (!found)
                 { errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path))); return; }
@@ -371,7 +389,7 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             foreach (UsingDefinition using_ in parserResult2.Usings)
-            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Classes, Hashes, errors, warnings, printCallback, basePath); }
+            { CompileFile(alreadyCompiledCodes, using_, file, parserSettings, Functions, Structs, Classes, Hashes, errors, warnings, printCallback, basePath, level); }
         }
 
         /// <summary>
@@ -412,7 +430,8 @@ namespace IngameCoding.BBCode.Compiler
             CompilerSettings settings,
             ParserSettings parserSettings,
             Action<string, Output.LogType> printCallback = null,
-            string basePath = "")
+            string basePath = "",
+            CompileLevel level = CompileLevel.Minimal)
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -426,7 +445,7 @@ namespace IngameCoding.BBCode.Compiler
             foreach (UsingDefinition usingItem in parserResult.Usings)
             {
                 List<Error> compileErrors = new();
-                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Classes, Hashes, compileErrors, warnings, printCallback, basePath);
+                CompileFile(AlreadyCompiledCodes, usingItem, file, parserSettings, Functions, Structs, Classes, Hashes, compileErrors, warnings, printCallback, basePath, level);
                 if (compileErrors.Count > 0)
                 { throw new System.Exception($"Failed to compile file {usingItem.PathString}", compileErrors[0].ToException()); }
             }
@@ -457,7 +476,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback, level);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 

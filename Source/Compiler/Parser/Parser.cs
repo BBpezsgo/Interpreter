@@ -844,6 +844,10 @@ namespace IngameCoding.BBCode
         {
             public Token[] Path;
             public Token Keyword;
+            /// <summary> Set by the Compiler </summary>
+            public string CompiledUri;
+            /// <summary> Set by the Compiler </summary>
+            public double? DownloadTime;
 
             public string PathString
             {

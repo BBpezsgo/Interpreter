@@ -267,7 +267,7 @@ namespace IngameCoding.BBCode
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = hints, informations = informations };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default, null, Compiler.Compiler.CompileLevel.Exported);
 
             var compilerResult = new Compiler.Compiler.CompilerResult()
             {

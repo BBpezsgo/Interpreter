@@ -22,7 +22,7 @@ namespace IngameCoding.BBCode
 
         string ReachedUnit => CompilerReached ? "compiled" : (ParserReached ? "parsed" : "tokenized");
 
-        public override string ToString() => $"TokenAnalysis {{ {ReachedUnit} {Subtype} {SubSubtype} {Reference} }}";
+        public override string ToString() => $"TokenAnalysis {{ {ReachedUnit} {Subtype} {SubSubtype} {(Reference == null ? "null" : Reference.ToString())} }}";
 
         public abstract class RefBase
         {

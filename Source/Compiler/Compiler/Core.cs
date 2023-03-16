@@ -341,8 +341,9 @@ namespace IngameCoding.BBCode.Compiler
         public bool IsStoredInHEAP;
         public bool IsList => ListOf != null;
         public Statement_NewVariable Declaration;
+        public bool IsGlobal;
 
-        public CompiledVariable(int offset, BuiltinType type, TypeToken listOf, Statement_NewVariable declaration)
+        public CompiledVariable(int offset, BuiltinType type, TypeToken listOf, bool isGlobal, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = type;
@@ -350,9 +351,10 @@ namespace IngameCoding.BBCode.Compiler
             this.ListOf = listOf;
             this.Declaration = declaration;
             this.IsStoredInHEAP = false;
+            this.IsGlobal = isGlobal;
         }
 
-        public CompiledVariable(int offset, string structName, TypeToken listOf, Statement_NewVariable declaration)
+        public CompiledVariable(int offset, string structName, TypeToken listOf, bool isGlobal, Statement_NewVariable declaration)
         {
             this.offset = offset;
             this.type = BuiltinType.STRUCT;
@@ -360,6 +362,7 @@ namespace IngameCoding.BBCode.Compiler
             this.ListOf = listOf;
             this.Declaration = declaration;
             this.IsStoredInHEAP = false;
+            this.IsGlobal = isGlobal;
         }
 
         public string Type

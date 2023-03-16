@@ -273,7 +273,6 @@ namespace IngameCoding.BBCode
             {
                 compiledStructs = codeGeneratorResult.compiledStructs,
                 compiledFunctions = codeGeneratorResult.compiledFunctions,
-                compiledGlobalVariables = codeGenerator.compiledGlobalVariables,
                 compiledVariables = codeGenerator.compiledVariables,
             };
 

@@ -107,27 +107,15 @@ namespace IngameCoding.BBCode.Compiler
         internal Dictionary<string, CompiledStruct> compiledStructs;
         internal Dictionary<string, CompiledClass> compiledClasses;
         internal Dictionary<string, CompiledFunction> compiledFunctions;
-        internal readonly Dictionary<string, CompiledVariable> compiledVariables = new();
+        internal Dictionary<string, CompiledVariable> compiledVariables;
         internal Dictionary<string, CompiledVariable> compiledGlobalVariables;
         internal VariableStack variableCountStack = new();
-        internal string CurrentFunction_ForRecursionProtection;
-
-        internal Dictionary<string, int> functionOffsets;
-
-        internal readonly List<DebugInfo> GeneratedDebugInfo = new();
-
-        Dictionary<string, BuiltinFunction> builtinFunctions;
         readonly Dictionary<string, Parameter> parameters = new();
 
-        public List<Error> errors;
-        public List<Warning> warnings;
-        internal List<Information> informations;
-        public List<Hint> hints;
+        Dictionary<string, BuiltinFunction> builtinFunctions;
 
         readonly List<int> returnInstructions = new();
         readonly List<List<int>> breakInstructions = new();
-
-        bool isStructMethod;
 
         List<Instruction> compiledCode;
 
@@ -138,8 +126,14 @@ namespace IngameCoding.BBCode.Compiler
         readonly bool TrimUnreachableCode = true;
         bool GenerateDebugInstructions = true;
         Compiler.CompileLevel CompileLevel;
+        internal string CurrentFunction_ForRecursionProtection;
 
+        public List<Error> errors;
+        public List<Warning> warnings;
+        internal List<Information> informations;
+        public List<Hint> hints;
         string CurrentFile;
+        internal readonly List<DebugInfo> GeneratedDebugInfo = new();
 
         #endregion
 
@@ -271,8 +265,6 @@ namespace IngameCoding.BBCode.Compiler
                 return "";
             }
         }
-
-        bool GetFunctionOffset(CompiledFunction function, out int functionOffset) => functionOffsets.TryGetValue(function.ID(), out functionOffset);
 
         bool GetCompiledStruct(Statement_NewStruct newStructStatement, out CompiledStruct compiledStruct)
         {
@@ -783,7 +775,7 @@ namespace IngameCoding.BBCode.Compiler
                 else if (functionCall.Parameters.Count == 1)
                 {
                     GenerateCodeForStatement(functionCall.Parameters[0]);
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, -2 - parameters.Count - ((isStructMethod) ? 1 : 0));
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, -2 - parameters.Count);
                 }
 
                 // Clear variables
@@ -987,10 +979,10 @@ namespace IngameCoding.BBCode.Compiler
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.name);
             }
 
-            if (!GetFunctionOffset(compiledFunction, out var functionCallOffset))
+            if (compiledFunction.InstructionOffset == -1)
             { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
-            AddInstruction(Opcode.CALL, functionCallOffset - compiledCode.Count);
+            AddInstruction(Opcode.CALL, compiledFunction.InstructionOffset - compiledCode.Count);
 
             for (int i = 0; i < functionCall.Parameters.Count; i++)
             {
@@ -1872,6 +1864,7 @@ namespace IngameCoding.BBCode.Compiler
                             newVariable.Type.text = initialType.text;
 
                             GenerateCodeForVariable(newVariable);
+                            return;
                         }
                         catch (FormatException) { throw; }
                         catch (System.Exception) { throw new NotImplementedException(); }
@@ -1883,65 +1876,22 @@ namespace IngameCoding.BBCode.Compiler
                 if (newVariable.Type.typeName == BuiltinType.AUTO)
                 { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
 
+                GenerateCodeForVariable(newVariable);
                 return;
             }
 
+            var initialValue = GenerateInitialValue(newVariable.Type);
+
             compiledVariables.Add(newVariable.VariableName.text, GetVariableInfo(newVariable, compiledVariables.Count));
-            AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type), "var." + newVariable.VariableName.text);
+            AddInstruction(Opcode.PUSH_VALUE, initialValue, "var." + newVariable.VariableName.text);
         }
         void GenerateCodeForVariable(Statement st, out int variablesAdded)
         {
             variablesAdded = 0;
-
             if (st is Statement_NewVariable newVariable)
             {
                 variablesAdded = 1;
-
-                newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false);
-
-                if (newVariable.Type.typeName == BuiltinType.AUTO)
-                {
-                    if (newVariable.InitialValue != null)
-                    {
-                        if (newVariable.InitialValue is Statement_Literal literal)
-                        {
-                            newVariable.Type.typeName = literal.Type.typeName;
-                        }
-                        else if (newVariable.InitialValue is Statement_NewStruct newStruct)
-                        {
-                            newVariable.Type.typeName = BuiltinType.STRUCT;
-                            newVariable.Type.text = newStruct.StructName.text;
-                        }
-                        else
-                        {
-                            try
-                            {
-                                var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                                var initialType = Parser.ParseType(initialTypeRaw);
-
-                                newVariable.Type.typeName = initialType.typeName;
-                                newVariable.Type.ListOf = initialType.ListOf;
-                                newVariable.Type.text = initialType.text;
-
-                                GenerateCodeForVariable(newVariable, out variablesAdded);
-                                return;
-                            }
-                            catch (FormatException) { throw; }
-                            catch (System.Exception) { throw new NotImplementedException(); }
-                        }
-                    }
-                    else
-                    { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
-
-                    if (newVariable.Type.typeName == BuiltinType.AUTO)
-                    { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
-
-                    GenerateCodeForVariable(newVariable, out variablesAdded);
-                    return;
-                }
-
-                compiledVariables.Add(newVariable.VariableName.text, GetVariableInfo(newVariable, compiledVariables.Count));
-                AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type), "var." + newVariable.VariableName.text);
+                GenerateCodeForVariable(newVariable);
             }
         }
         void GenerateCodeForVariable(Statement[] sts, out int variablesAdded)
@@ -1955,7 +1905,7 @@ namespace IngameCoding.BBCode.Compiler
         }
         void GenerateCodeForVariable(List<Statement> sts, out int variablesAdded) => GenerateCodeForVariable(sts.ToArray(), out variablesAdded);
 
-        void GenerateCodeForFunction(KeyValuePair<string, FunctionDefinition> function, bool isMethod)
+        void GenerateCodeForFunction(KeyValuePair<string, CompiledFunction> function)
         {
             function.Value.Name.Analysis.CompilerReached = true;
             function.Value.Type.Analysis.CompilerReached = true;
@@ -1966,17 +1916,11 @@ namespace IngameCoding.BBCode.Compiler
 
             function.Value.Name.Analysis.SubSubtype = TokenSubSubtype.FunctionName;
 
-            this.isStructMethod = isMethod;
-
-            if (GetFunctionInfo(function, isMethod).IsBuiltin) return;
+            if (function.Value.IsBuiltin) return;
 
             parameters.Clear();
             compiledVariables.Clear();
             returnInstructions.Clear();
-
-            functionOffsets.Add(function.Value.ID(), compiledCode.Count);
-            if (isMethod)
-            { compiledStructs[compiledStructs.Last().Key].MethodOffsets.Add(function.Value.FullName, compiledCode.Count); }
 
             // Compile parameters
             int paramIndex = 0;
@@ -2038,7 +1982,6 @@ namespace IngameCoding.BBCode.Compiler
             compiledVariables.Clear();
             returnInstructions.Clear();
 
-            this.isStructMethod = false;
             CurrentFunction_ForRecursionProtection = null;
         }
 
@@ -2076,6 +2019,7 @@ namespace IngameCoding.BBCode.Compiler
                 attributes.Add(attribute.Name.text, newAttribute);
             }
 
+#if false
             if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
             {
                 if (attributeBuiltin.parameters.Count != 1)
@@ -2114,6 +2058,7 @@ namespace IngameCoding.BBCode.Compiler
                 else
                 { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, CurrentFile); }
             }
+#endif
 
             foreach (var field in @struct.Value.Fields)
             {
@@ -2208,7 +2153,7 @@ namespace IngameCoding.BBCode.Compiler
 
         #endregion
 
-        CompiledFunction GetFunctionInfo(KeyValuePair<string, FunctionDefinition> function, bool isStructMethod = false)
+        CompiledFunction GetFunctionInfo(KeyValuePair<string, FunctionDefinition> function)
         {
             Dictionary<string, AttributeValues> attributes = new();
 
@@ -2244,7 +2189,7 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
                         {
-                            if (builtinFunction.Value.ParameterCount != function.Value.Parameters.Count + (isStructMethod ? 1 : 0))
+                            if (builtinFunction.Value.ParameterCount != function.Value.Parameters.Count)
                             { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Value.Name, function.Value.FilePath); }
                             if (builtinFunction.Value.ReturnSomething != (function.Value.Type.typeName != BuiltinType.VOID))
                             { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Value.Type, function.Value.FilePath); }
@@ -2285,7 +2230,7 @@ namespace IngameCoding.BBCode.Compiler
             { CompiledAttributes = attributes };
         }
 
-        int AnalyzeFunctions(Dictionary<string, FunctionDefinition> functions, Action<string, Output.LogType> printCallback = null)
+        int AnalyzeFunctions(Dictionary<string, CompiledFunction> functions, Action<string, Output.LogType> printCallback = null)
         {
             printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
 
@@ -2440,13 +2385,13 @@ namespace IngameCoding.BBCode.Compiler
                     { throw new NotImplementedException(); }
                 }
 
-                foreach (KeyValuePair<string, FunctionDefinition> f in functions)
+                foreach (var f in functions)
                 {
                     if (compiledFunctions.TryGetValue(f.Value.ID(), out var compiledFunction))
                     { compiledFunction.TimesUsed = 0; }
                 }
 
-                foreach (KeyValuePair<string, FunctionDefinition> f in functions)
+                foreach (var f in functions)
                 {
                     parameters.Clear();
                     foreach (ParameterDefinition parameter in f.Value.Parameters)
@@ -2512,8 +2457,8 @@ namespace IngameCoding.BBCode.Compiler
             this.AddCommentsToCode = settings.GenerateComments;
             this.compiledStructs = new();
             this.compiledClasses = new();
+            this.compiledVariables = new();
             this.compiledGlobalVariables = new();
-            this.functionOffsets = new();
             this.compiledCode = new();
             this.builtinFunctions = builtinFunctions;
             this.OptimizeCode = !settings.DontOptimize;
@@ -2684,6 +2629,8 @@ namespace IngameCoding.BBCode.Compiler
 
             #endregion
 
+            #region Compile Functions
+
             foreach (var function in functions)
             {
                 var id = function.Value.ID();
@@ -2694,11 +2641,15 @@ namespace IngameCoding.BBCode.Compiler
                 this.compiledFunctions.Add(id, GetFunctionInfo(function));
             }
 
+            #endregion
+
+            #region Remove Unused Functions
+
             int iterations = settings.RemoveUnusedFunctionsMaxIterations;
 
             for (int iteration = 0; iteration < iterations; iteration++)
             {
-                int functionsRemoved = AnalyzeFunctions(functions, printCallback);
+                int functionsRemoved = AnalyzeFunctions(this.compiledFunctions, printCallback);
                 if (functionsRemoved == 0)
                 {
                     printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
@@ -2707,6 +2658,8 @@ namespace IngameCoding.BBCode.Compiler
 
                 printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", Output.LogType.Debug);
             }
+
+            #endregion
 
             #region Code Generation
 
@@ -2724,10 +2677,12 @@ namespace IngameCoding.BBCode.Compiler
             AddInstruction(Opcode.CS_POP);
             AddInstruction(Opcode.EXIT);
 
-            foreach (KeyValuePair<string, FunctionDefinition> function in functions)
+            foreach (var function in this.compiledFunctions)
             {
+                function.Value.InstructionOffset = compiledCode.Count;
+
                 AddInstruction(Opcode.COMMENT, function.Value.FullName + ((function.Value.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Value.Statements.Count > 0) ? "" : " }"));
-                GenerateCodeForFunction(function, false);
+                GenerateCodeForFunction(function);
                 if (function.Value.Statements.Count > 0) AddInstruction(Opcode.COMMENT, "}");
             }
 
@@ -2743,7 +2698,7 @@ namespace IngameCoding.BBCode.Compiler
 
             #endregion
 
-            foreach (var item in undefinedFunctionOffsets)
+            foreach (UndefinedFunctionOffset item in undefinedFunctionOffsets)
             {
                 foreach (var pair in item.currentParameters)
                 { parameters.Add(pair.Key, pair.Value); }
@@ -2764,10 +2719,10 @@ namespace IngameCoding.BBCode.Compiler
                     throw new CompilerException("Unknown function " + searchedID + "", item.functionCallStatement.Identifier, CurrentFile);
                 }
 
-                if (GetFunctionOffset(function, out var functionCallOffset))
-                { compiledCode[item.callInstructionIndex].parameter = functionCallOffset - item.callInstructionIndex; }
-                else
-                { throw new InternalException($"Function '{item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName}' offset not found", item.CurrentFile); }
+                if (function.InstructionOffset == -1)
+                { throw new InternalException($"Function '{function.ReadableID()}' does not have instruction offset", item.CurrentFile); }
+
+                compiledCode[item.callInstructionIndex].parameter = function.InstructionOffset - item.callInstructionIndex;
 
                 parameters.Clear();
                 compiledVariables.Clear();
@@ -2792,16 +2747,17 @@ namespace IngameCoding.BBCode.Compiler
                                     clearGlobalVariablesInstruction,
                                 };
 
-                                foreach (var item in functionOffsets)
-                                { indexes.Add(item.Value); }
+                                foreach (var item in this.compiledFunctions)
+                                { indexes.Add(item.Value.InstructionOffset); }
 
                                 changedInstructions += compiledCode.RemoveInstruction(i, indexes);
                                 removedInstructions++;
 
                                 setGlobalVariablesInstruction = indexes[0];
                                 clearGlobalVariablesInstruction = indexes[1];
-                                for (int j = 0; j < functionOffsets.Count; j++)
-                                { functionOffsets[functionOffsets.ElementAt(j).Key] = indexes[2 + j]; }
+
+                                for (int j = 0; j < this.compiledFunctions.Count; j++)
+                                { this.compiledFunctions[this.compiledFunctions.ElementAt(j).Key].InstructionOffset = indexes[2 + j]; }
                             }
                         }
                     }

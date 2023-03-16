@@ -254,6 +254,8 @@ namespace IngameCoding.BBCode.Compiler
         public int TimesUsed;
         public int TimesUsedTotal;
 
+        internal int InstructionOffset = -1;
+
         public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething => this.Type.typeName != BuiltinType.VOID;
 
@@ -384,13 +386,11 @@ namespace IngameCoding.BBCode.Compiler
         public Func<IStruct> CreateBuiltinStructCallback;
         public bool IsBuiltin => CreateBuiltinStructCallback != null;
         public Dictionary<string, CompiledFunction> CompiledMethods;
-        public readonly Dictionary<string, int> MethodOffsets;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
             this.CompiledMethods = new Dictionary<string, CompiledFunction>();
-            this.MethodOffsets = new();
             this.CompiledAttributes = compiledAttributes;
             this.CreateBuiltinStructCallback = null;
 

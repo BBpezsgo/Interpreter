@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 
 namespace IngameCoding.BBCode.Compiler
@@ -48,28 +49,6 @@ namespace IngameCoding.BBCode.Compiler
 
             bool GetCompiledStruct(string structName, out CompiledStruct compiledStruct)
             { return compiledStructs.TryGetValue(structName, out compiledStruct); }
-
-            public bool GetFunctionOffset(Statement_FunctionCall functionCallStatement, out int functionOffset)
-            {
-                if (functionOffsets.TryGetValue(functionCallStatement.FunctionName, out functionOffset))
-                {
-                    return true;
-                }
-                else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
-                {
-                    return true;
-                }
-                else if (functionOffsets.TryGetValue(functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
-                {
-                    return true;
-                }
-                else if (functionOffsets.TryGetValue(functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName, out functionOffset))
-                {
-                    return true;
-                }
-                functionOffset = -1;
-                return false;
-            }
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
             {
@@ -480,6 +459,9 @@ namespace IngameCoding.BBCode.Compiler
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
+            Dictionary<string, int> functionOffsets = new();
+            foreach (var function in codeGenerator.compiledFunctions) functionOffsets.Add(function.Key, function.Value.InstructionOffset);
+
             return new CompilerResult()
             {
                 compiledCode = codeGeneratorResult.compiledCode,
@@ -492,7 +474,7 @@ namespace IngameCoding.BBCode.Compiler
 
                 clearGlobalVariablesInstruction = codeGeneratorResult.clearGlobalVariablesInstruction,
                 setGlobalVariablesInstruction = codeGeneratorResult.setGlobalVariablesInstruction,
-                functionOffsets = codeGenerator.functionOffsets,
+                functionOffsets = functionOffsets,
             };
         }
     }

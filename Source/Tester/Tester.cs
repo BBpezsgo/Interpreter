@@ -12,7 +12,7 @@ namespace IngameCoding.Tester
 {
     class Tester
     {
-        public static void RunTestFile(TheProgram.ArgumentParser.Settings settings) => RunTestFile(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.HandleErrors);
+        public static void RunTestFile(TheProgram.ArgumentParser.Settings settings) => RunTestFile(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.HandleErrors, settings.TestID);
 
         static void PrintWarnings(Warning[] warnings)
         {
@@ -26,8 +26,8 @@ namespace IngameCoding.Tester
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
             bool LogDebug = true,
             bool LogSystem = true,
-            bool HandleErrors = true
-            )
+            bool HandleErrors = true,
+            string testID = null)
         {
             List<Warning> warnings = new();
             Parser.ParserResult parserResult;
@@ -60,6 +60,33 @@ namespace IngameCoding.Tester
             }
 
             Output.Output.Debug("Start testing ...");
+
+            if (testID != null)
+            {
+                foreach (var item in compilerResult.Tests)
+                {
+                    if (item.Name.Trim() != testID) continue;
+
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                    Console.Write("\n === ");
+
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write(item.Name);
+
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                    Console.Write(" === \n");
+                    Console.ResetColor();
+
+                    Console.WriteLine();
+
+                    RunFile(new FileInfo(item.File), parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebug, LogSystem, HandleErrors);
+                    return;
+                }
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"No test found with id '{testID}'");
+                Console.ResetColor();
+                return;
+            }
 
             foreach (var item in compilerResult.Tests)
             {

@@ -23,8 +23,8 @@ namespace IngameCoding.Tester.Parser
 
     public struct ParserResult
     {
-        internal TestDefinition[] TestDefinitions;
-        internal SimpleSegment[] Disabled;
+        public TestDefinition[] TestDefinitions;
+        public SimpleSegment[] Disabled;
 
         public ParserResult(TestDefinition[] testDefinitions, SimpleSegment[] disabled)
         {
@@ -116,11 +116,11 @@ namespace IngameCoding.Tester.Parser
 
     public class TestDefinition
     {
-        internal Attribute[] Attributes = System.Array.Empty<Attribute>();
-        internal Token RightBracket;
-        internal Token LeftBracket;
-        internal Token Keyword;
-        internal Token Name;
+        public Attribute[] Attributes = System.Array.Empty<Attribute>();
+        public Token RightBracket;
+        public Token LeftBracket;
+        public Token Keyword;
+        public Token Name;
 
         public Attribute GetAttribute(string name)
         {

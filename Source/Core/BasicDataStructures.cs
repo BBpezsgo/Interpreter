@@ -54,6 +54,7 @@ namespace IngameCoding.Core
             for (int i = 1; i < tokens.Length; i++)
             {
                 Token token = tokens[i];
+                if (token == null) continue;
                 Extend(new Position(token.Position, token.AbsolutePosition));
             }
         }

@@ -115,6 +115,7 @@ namespace TheProgram
             CompressionLevel CompressionLevel = CompressionLevel.Optimal;
             string PipeName = null;
             int Port = -1;
+            string TestID = null;
 
             if (args.Length > 1)
             {
@@ -304,6 +305,15 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-test-id")
+                    {
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-test-id'"); }
+                        TestID = args[i];
+                        goto ArgParseDone;
+                    }
+
                     throw new ArgumentException($"Unknown argument '{args[i]}'");
 
                 ArgParseDone:
@@ -331,6 +341,7 @@ namespace TheProgram
                 compressionLevel = CompressionLevel,
                 PipeName = PipeName,
                 Port = Port,
+                TestID = TestID,
             };
         }
 
@@ -354,6 +365,7 @@ namespace TheProgram
             public string CompileOutput;
             public CompressionLevel compressionLevel;
             public string BasePath;
+            public string TestID;
         }
 
         /// <summary>

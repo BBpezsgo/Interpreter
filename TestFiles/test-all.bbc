@@ -1,0 +1,69 @@
+﻿using System;
+
+struct DataStructA
+{
+  byte Name;
+  DataStructB Value;
+}
+
+struct DataStructB
+{
+  int Index;
+}
+
+[CodeEntry]
+void Main()
+{
+  DataStructA data1 = new DataStructA;
+  DataStructA dataCopyBefore = data1;
+  
+  Console.Write("data1.Name: ");
+  Console.Log(data1.Name);
+  data1.Name = 66;
+  Console.Write("data1.Name: ");
+  Console.Log(data1.Name);
+  data1.Value = new DataStructB;
+
+  DataStructA dataCopy = data1;
+  
+  Console.Write("dataCopy.Name: ");
+  Console.Log(dataCopy.Name);
+  
+  Console.Write("dataCopyBefore.Name: ");
+  Console.Log(dataCopyBefore.Name);
+
+  int[][] matrix = [];
+  matrix.Push([ 0, 1, 2 ]);
+  matrix.Push([ 3, 4, 5 ]);
+  matrix.Push([ 6, 7, 8 ]);
+
+  PrintMatrix(matrix);
+
+  Heh(55);
+  
+  Console.Write("data1.Value.Index: ");
+  Console.Log(data1.Value.Index);
+  data1.Value.Index = 69;
+  Console.Write("data1.Value.Index: ");
+  Console.Log(data1.Value.Index);
+}
+
+void PrintMatrix(int[][] matrix)
+{
+  for (int y; y < matrix.Length; y++)
+  {
+	for (int x; x < matrix[y].Length; x++)
+	{
+      Console.Write(matrix[y][x].ToString() + " ");
+	};
+	Console.Write("\r\n");
+  };
+}
+
+void Heh(int valmi)
+{
+  Console.Log(valmi);
+  valmi = 66;
+  Console.Log(valmi);
+}
+

@@ -13,9 +13,9 @@ namespace TheProgram
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-heap.bbc";
+            var file = "test-all.bbc";
 
-            if (true)
+            if (false)
             {
                 ConsoleGUI.ConsoleGUI consoleGUI = new()
                 {
@@ -30,7 +30,8 @@ namespace TheProgram
             {
                 "-throw-errors",
                 "-basepath \"../CodeFiles/\"",
-                 "-c-print-instructions true",
+                "-c-print-instructions true",
+                "-c-remove-unused-functions 0",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 // "-c-generate-comments false",

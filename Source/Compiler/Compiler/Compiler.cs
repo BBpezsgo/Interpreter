@@ -24,31 +24,12 @@ namespace IngameCoding.BBCode.Compiler
 
             public Dictionary<string, CompiledFunction> compiledFunctions;
             public Dictionary<string, CompiledStruct> compiledStructs;
-            internal Dictionary<string, CompiledVariable> compiledGlobalVariables;
             internal Dictionary<string, CompiledVariable> compiledVariables;
 
             public Dictionary<string, int> functionOffsets;
             public int clearGlobalVariablesInstruction;
             public int setGlobalVariablesInstruction;
             internal DebugInfo[] debugInfo;
-
-            bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable, out bool isGlobal)
-            {
-                isGlobal = false;
-                if (compiledVariables.TryGetValue(variableName, out compiledVariable))
-                {
-                    return true;
-                }
-                else if (compiledGlobalVariables.TryGetValue(variableName, out compiledVariable))
-                {
-                    isGlobal = true;
-                    return true;
-                }
-                return false;
-            }
-
-            bool GetCompiledStruct(string structName, out CompiledStruct compiledStruct)
-            { return compiledStructs.TryGetValue(structName, out compiledStruct); }
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
             {
@@ -156,14 +137,6 @@ namespace IngameCoding.BBCode.Compiler
                     { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {func} is null"); }
                     else
                     { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {func} : {func}"); }
-                }
-                foreach (var var_ in compiledGlobalVariables)
-                {
-                    var @var = var_.Value;
-                    if (string.IsNullOrEmpty(@var.Declaration.FilePath))
-                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.Declaration.FilePath}"); }
                 }
                 foreach (var var_ in compiledVariables)
                 {

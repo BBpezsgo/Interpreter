@@ -72,13 +72,24 @@ namespace IngameCoding.BBCode
         public class RefField : Ref
         {
             public string Type;
-            public Token Name;
+            public string Name => (NameToken != null) ? NameToken.text : fieldName;
+            public Token NameToken;
             public string StructName;
+
+            readonly string fieldName;
 
             public RefField(string type, Token name, string structName, string filePath) : base(filePath)
             {
                 Type = type;
-                Name = name;
+                NameToken = name;
+                StructName = structName;
+            }
+
+            public RefField(string type, string name, string structName, string filePath) : base(filePath)
+            {
+                Type = type;
+                NameToken = null;
+                fieldName = name;
                 StructName = structName;
             }
 
@@ -119,6 +130,44 @@ namespace IngameCoding.BBCode
             }
 
             public override string ToString() => $"Ref Class";
+        }
+
+        public class RefBuiltinFunction : Ref
+        {
+            public readonly string Name;
+            public readonly string ReturnType;
+            public readonly string[] ParameterTypes;
+            public readonly string[] ParameterNames;
+
+            public RefBuiltinFunction(string name, string returnType, string[] parameterTypes, string[] parameterNames) : base(null)
+            {
+                this.Name = name;
+                this.ReturnType = returnType;
+                this.ParameterTypes = parameterTypes;
+                this.ParameterNames = parameterNames;
+            }
+
+            public override string ToString() => $"Ref BuiltinFunction";
+        }
+
+        public class RefBuiltinMethod : Ref
+        {
+            public readonly string Name;
+            public readonly string ReturnType;
+            public readonly string PrevType;
+            public readonly string[] ParameterTypes;
+            public readonly string[] ParameterNames;
+
+            public RefBuiltinMethod(string name, string returnType, string prevType, string[] parameterTypes, string[] parameterNames) : base(null)
+            {
+                this.Name = name;
+                this.ReturnType = returnType;
+                this.PrevType = prevType;
+                this.ParameterTypes = parameterTypes;
+                this.ParameterNames = parameterNames;
+            }
+
+            public override string ToString() => $"Ref BuiltinMethod";
         }
     }
 
@@ -166,6 +215,7 @@ namespace IngameCoding.BBCode
     {
         public TokenType type = TokenType.WHITESPACE;
         public string text = "";
+        public TokenAnalysis Analysis;
 
         public Token()
         {
@@ -175,8 +225,6 @@ namespace IngameCoding.BBCode
                 SubSubtype = TokenSubSubtype.None,
             };
         }
-
-        public TokenAnalysis Analysis;
 
         public Token Clone() => new()
         {

@@ -10,6 +10,7 @@ namespace IngameCoding.BBCode
 
     using System.Collections.Generic;
     using System.Globalization;
+    using System.IO;
     using System.Linq;
 
     public struct AnalysisResult
@@ -131,6 +132,61 @@ namespace IngameCoding.BBCode
         static Dictionary<string, BuiltinFunction> BuiltinFunctions => new();
         static Dictionary<string, System.Func<IStruct>> BuiltinStructs => new();
 
+        public static AnalysisResult Analyze(string code, System.IO.FileInfo file, string path)
+        {
+            if (path is null) throw new System.ArgumentNullException(nameof(path));
+
+            AnalysisResult result = AnalysisResult.Empty();
+
+            try
+            {
+                Tokenizer tokenizer = new(TokenizerSettings.Default);
+                return Analyze(tokenizer.Parse(code).Item1, file, path);
+            }
+            catch (Exception error)
+            {
+                result.TokenizerFatalError = error;
+                return result;
+            }
+            catch (System.Exception error)
+            {
+                result.TokenizerFatalError = new Exception(error.Message, error);
+                return result;
+            }
+        }
+
+        public static string[] FileReferences(System.IO.FileInfo file, string path)
+        {
+            List<string> fileReferences = new();
+
+            if (file != null)
+            {
+                System.IO.DirectoryInfo dir = file.Directory;
+                System.IO.FileInfo[] files = dir.GetFiles();
+                foreach (var file_ in files)
+                {
+                    if (file_.Extension.ToLower() != ".bbc") continue;
+                    string code_ = System.IO.File.ReadAllText(file_.FullName);
+                    Tokenizer tokenizer = new(TokenizerSettings.Default);
+                    (Token[] tokens_, _) = tokenizer.Parse(code_);
+                    if (tokens_ == null) continue;
+                    if (tokens_.Length < 3) continue;
+                    Parser.Parser parser = new();
+                    ParserResultHeader codeHeader = parser.ParseCodeHeader(tokens_, new List<Warning>());
+                    for (int i = 0; i < codeHeader.Usings.Count; i++)
+                    {
+                        var @using = codeHeader.Usings[i];
+                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + FileExtensions.Code;
+                        if (!System.IO.File.Exists(usingFile)) continue;
+                        if (usingFile.Replace('\\', '/') != path) continue;
+                        fileReferences.Add(file_.FullName);
+                    }
+                }
+            }
+
+            return fileReferences.ToArray();
+        }
+
         static Compiler.Compiler.CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, List<Error> errors, System.IO.DirectoryInfo directory, string path, List<Hint> hints, List<Information> informations)
         {
             Dictionary<string, FunctionDefinition> Functions = new();
@@ -146,15 +202,40 @@ namespace IngameCoding.BBCode
             {
                 var usingItem = parserResult.Usings[i];
                 var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
+
                 UsingAnalysis usingAnalysis = new()
                 {
                     Path = usingFile,
                     ParseTime = -1d,
                 };
 
-                if (System.IO.File.Exists(usingFile))
+                List<string> searchForThese = new();
+                string basePath = "../CodeFiles/";
+                if (basePath != null)
+                {
+                    try
+                    { searchForThese.Add(Path.GetFullPath(basePath.Replace("/", "\\") + usingItem.PathString + "." + FileExtensions.Code, directory.FullName)); }
+                    catch (System.Exception) { }
+                }
+
+                try
+                { searchForThese.Add(Path.GetFullPath(usingItem.PathString + "." + FileExtensions.Code, directory.FullName)); }
+                catch (System.Exception) { }
+
+                bool found = false;
+                for (int j = 0; j < searchForThese.Count; j++)
+                {
+                    usingFile = searchForThese[j];
+                    if (!File.Exists(usingFile))
+                    { continue; }
+                    else
+                    { found = true; break; }
+                }
+
+                if (found)
                 {
                     usingAnalysis.Found = true;
+                    usingItem.CompiledUri = usingFile;
 
                     if (parsedUsings.Contains(usingFile))
                     {
@@ -166,7 +247,7 @@ namespace IngameCoding.BBCode
 
                     System.TimeSpan parseStarted = System.DateTime.Now.TimeOfDay;
 
-                    string code = System.IO.File.ReadAllText(usingFile);
+                    string code = File.ReadAllText(usingFile);
 
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
                     (Token[] tokens, _) = tokenizer.Parse(code);
@@ -304,28 +385,17 @@ namespace IngameCoding.BBCode
 
                 return null;
             }
-        }
-
-        public static AnalysisResult Analyze(string code, System.IO.FileInfo file, string path)
-        {
-            if (path is null)
-            { throw new System.ArgumentNullException(nameof(path)); }
-
-            AnalysisResult result = AnalysisResult.Empty();
-
-            try
+            catch (System.Exception error)
             {
-                Tokenizer tokenizer = new(TokenizerSettings.Default);
-                return Analyze(tokenizer.Parse(code).Item1, file, path);
-            }
-            catch (Exception error)
-            {
-                result.TokenizerFatalError = error;
-                return result;
+                fatalError = new Exception(error.Message, error);
+                errors.AddRange(parser.Errors);
+                modifyedTokens = tokens;
+
+                return null;
             }
         }
 
-        public static AnalysisResult Analyze(Token[] tokens, System.IO.FileInfo file, string path)
+        static AnalysisResult Analyze(Token[] tokens, System.IO.FileInfo file, string path)
         {
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
@@ -351,39 +421,7 @@ namespace IngameCoding.BBCode
             return Analyze(modifyedTokens, parserResult.Value, warnings.ToArray(), file, path);
         }
 
-        public static string[] FileReferences(System.IO.FileInfo file, string path)
-        {
-            List<string> fileReferences = new();
-
-            if (file != null)
-            {
-                System.IO.DirectoryInfo dir = file.Directory;
-                System.IO.FileInfo[] files = dir.GetFiles();
-                foreach (var file_ in files)
-                {
-                    if (file_.Extension.ToLower() != ".bbc") continue;
-                    string code_ = System.IO.File.ReadAllText(file_.FullName);
-                    Tokenizer tokenizer = new(TokenizerSettings.Default);
-                    (Token[] tokens_, _) = tokenizer.Parse(code_);
-                    if (tokens_ == null) continue;
-                    if (tokens_.Length < 3) continue;
-                    Parser.Parser parser = new();
-                    ParserResultHeader codeHeader = parser.ParseCodeHeader(tokens_, new List<Warning>());
-                    for (int i = 0; i < codeHeader.Usings.Count; i++)
-                    {
-                        var @using = codeHeader.Usings[i];
-                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + FileExtensions.Code;
-                        if (!System.IO.File.Exists(usingFile)) continue;
-                        if (usingFile.Replace('\\', '/') != path) continue;
-                        fileReferences.Add(file_.FullName);
-                    }
-                }
-            }
-
-            return fileReferences.ToArray();
-        }
-
-        public static AnalysisResult Analyze(Token[] tokens, ParserResult parserResult, Warning[] warnings_, System.IO.FileInfo file, string path)
+        static AnalysisResult Analyze(Token[] tokens, ParserResult parserResult, Warning[] warnings_, System.IO.FileInfo file, string path)
         {
             if (string.IsNullOrEmpty(path))
             { throw new System.ArgumentException($"'{nameof(path)}' cannot be null or empty.", nameof(path)); }
@@ -412,6 +450,14 @@ namespace IngameCoding.BBCode
                    .SetTokenizerResult(tokens, null)
                    .SetParserResult(parserResult, null, null)
                    .SetCompilerResult(error, compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
+            }
+            catch (System.Exception error)
+            {
+                return AnalysisResult
+                   .Empty()
+                   .SetTokenizerResult(tokens, null)
+                   .SetParserResult(parserResult, null, null)
+                   .SetCompilerResult(new Exception(error.Message, error), compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
         }
     }

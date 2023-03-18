@@ -537,6 +537,8 @@ namespace IngameCoding.Bytecode
                     {
                         case DataType.BYTE:
                             return new DataItem(value.ValueByte, null);
+                        case DataType.INT:
+                            return new DataItem((byte)value.ValueInt, null);
                     }
                     break;
                 case DataType.INT:

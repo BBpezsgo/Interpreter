@@ -384,7 +384,12 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledStruct : StructDefinition
+    public interface ITypeDefinition
+    {
+
+    }
+
+    public class CompiledStruct : StructDefinition, ITypeDefinition
     {
         public Func<IStruct> CreateBuiltinStructCallback;
         public bool IsBuiltin => CreateBuiltinStructCallback != null;
@@ -405,7 +410,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledClass : ClassDefinition
+    public class CompiledClass : ClassDefinition, ITypeDefinition
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
 
@@ -449,5 +454,239 @@ namespace IngameCoding.BBCode.Compiler
                 return v;
             }
         }
+    }
+
+    class CompiledType
+    {
+        internal enum CompiledTypeType
+        {
+            NONE,
+            VOID,
+            BYTE,
+            INT,
+            FLOAT,
+            STRING,
+            BOOL,
+        }
+
+        CompiledTypeType builtinType;
+
+        CompiledStruct @struct;
+        CompiledClass @class;
+        CompiledType listOf;
+
+        internal CompiledTypeType BuiltinType => builtinType;
+
+        internal CompiledStruct Struct => @struct;
+        internal CompiledClass Class => @class;
+        internal CompiledType ListOf => listOf;
+
+        internal string Name
+        {
+            get
+            {
+                if (builtinType != CompiledTypeType.NONE) return builtinType switch
+                {
+                    CompiledTypeType.VOID => "void",
+                    CompiledTypeType.BYTE => "byte",
+                    CompiledTypeType.INT => "int",
+                    CompiledTypeType.FLOAT => "float",
+                    CompiledTypeType.STRING => "string",
+                    CompiledTypeType.BOOL => "bool",
+                    _ => throw new Errors.InternalException($"WTF???"),
+                };
+
+                if (@struct != null) return @struct.Name.text;
+                if (@class != null) return @class.Name.text;
+                if (listOf != null) return listOf.Name + "[]";
+
+                return null;
+            }
+        }
+        /// <summary><c><see cref="ListOf"/> != null</c></summary>
+        internal bool IsList => listOf != null;
+        /// <summary><c><see cref="Class"/> != null</c></summary>
+        internal bool IsClass => @class != null;
+        /// <summary><c><see cref="Struct"/> != null</c></summary>
+        internal bool IsStruct => @struct != null;
+        internal bool IsBuiltin => builtinType != CompiledTypeType.NONE;
+
+        CompiledType()
+        {
+            this.builtinType = CompiledTypeType.NONE;
+            this.@struct = null;
+            this.@class = null;
+            this.listOf = null;
+        }
+
+        internal CompiledType(CompiledStruct @struct) : this()
+        {
+            this.@struct = @struct ?? throw new ArgumentNullException(nameof(@struct));
+        }
+
+        internal CompiledType(CompiledClass @class) : this()
+        {
+            this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
+        }
+
+        internal CompiledType(CompiledTypeType type) : this()
+        {
+            this.builtinType = type;
+        }
+
+        internal CompiledType(CompiledType listOf) : this()
+        {
+            this.listOf = listOf ?? throw new ArgumentNullException(nameof(listOf));
+        }
+
+        internal CompiledType(string type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
+        {
+            if (string.IsNullOrEmpty(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or empty.", nameof(type));
+
+
+            if (type.EndsWith("[]"))
+            {
+                this.listOf = new CompiledType(type[..^2], UnknownTypeCallback);
+                return;
+            }
+
+            switch (type)
+            {
+                case "void":
+                    this.builtinType = CompiledTypeType.VOID;
+                    return;
+                case "byte":
+                    this.builtinType = CompiledTypeType.BYTE;
+                    return;
+                case "int":
+                    this.builtinType = CompiledTypeType.INT;
+                    return;
+                case "float":
+                    this.builtinType = CompiledTypeType.FLOAT;
+                    return;
+                case "string":
+                    this.builtinType = CompiledTypeType.STRING;
+                    return;
+                case "bool":
+                    this.builtinType = CompiledTypeType.BOOL;
+                    return;
+                default:
+                    break;
+            };
+
+            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
+
+            SetCustomType(type, UnknownTypeCallback);
+        }
+
+        public CompiledType(BuiltinType type) : this()
+        {
+            this.builtinType = type switch
+            {
+                BBCode.BuiltinType.VOID => CompiledTypeType.VOID,
+                BBCode.BuiltinType.BYTE => CompiledTypeType.BYTE,
+                BBCode.BuiltinType.INT => CompiledTypeType.INT,
+                BBCode.BuiltinType.FLOAT => CompiledTypeType.FLOAT,
+                BBCode.BuiltinType.STRING => CompiledTypeType.STRING,
+                BBCode.BuiltinType.BOOLEAN => CompiledTypeType.BOOL,
+                _ => throw new Errors.InternalException($"Can't cast BuiltinType {type} to CompiledType"),
+            };
+        }
+
+        public CompiledType(TypeToken type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            if (type.IsList)
+            {
+                this.listOf = new CompiledType(type.ListOf, UnknownTypeCallback);
+                return;
+            }
+
+            switch (type.typeName)
+            {
+                case BBCode.BuiltinType.VOID:
+                    this.builtinType = CompiledTypeType.VOID;
+                    return;
+                case BBCode.BuiltinType.BYTE:
+                    this.builtinType = CompiledTypeType.BYTE;
+                    return;
+                case BBCode.BuiltinType.INT:
+                    this.builtinType = CompiledTypeType.INT;
+                    return;
+                case BBCode.BuiltinType.FLOAT:
+                    this.builtinType = CompiledTypeType.FLOAT;
+                    return;
+                case BBCode.BuiltinType.STRING:
+                    this.builtinType = CompiledTypeType.STRING;
+                    return;
+                case BBCode.BuiltinType.BOOLEAN:
+                    this.builtinType = CompiledTypeType.BOOL;
+                    return;
+                default:
+                    break;
+            };
+
+            SetCustomType(type.text, UnknownTypeCallback);
+        }
+
+        public CompiledType(CompiledVariable val, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
+        {
+            if (val.IsList)
+            {
+                this.listOf = new CompiledType(val.ListOf, UnknownTypeCallback);
+                return;
+            }
+
+            switch (val.type)
+            {
+                case BBCode.BuiltinType.VOID:
+                    this.builtinType = CompiledTypeType.VOID;
+                    return;
+                case BBCode.BuiltinType.BYTE:
+                    this.builtinType = CompiledTypeType.BYTE;
+                    return;
+                case BBCode.BuiltinType.INT:
+                    this.builtinType = CompiledTypeType.INT;
+                    return;
+                case BBCode.BuiltinType.FLOAT:
+                    this.builtinType = CompiledTypeType.FLOAT;
+                    return;
+                case BBCode.BuiltinType.STRING:
+                    this.builtinType = CompiledTypeType.STRING;
+                    return;
+                case BBCode.BuiltinType.BOOLEAN:
+                    this.builtinType = CompiledTypeType.BOOL;
+                    return;
+                default:
+                    break;
+            };
+
+            if (val.structName == null) throw new Errors.InternalException($"WTF???");
+            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {val.structName} to CompiledType");
+
+            SetCustomType(val.structName, UnknownTypeCallback);
+        }
+
+        void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
+        {
+            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
+
+            ITypeDefinition customType = UnknownTypeCallback.Invoke(typeName);
+            if (customType is CompiledStruct @struct)
+            {
+                this.@struct = @struct;
+                return;
+            }
+            if (customType is CompiledClass @class)
+            {
+                this.@class = @class;
+                return;
+            }
+
+            throw new Errors.InternalException($"WTF???");
+        }
+
+        public override string ToString() => Name;
     }
 }

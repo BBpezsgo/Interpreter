@@ -208,12 +208,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{Type.text}{(Type.IsList ? "[]" : "")} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
+            return $"{Type} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{Type.text}{(Type.IsList ? "[]" : "")} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{Type} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
         }
 
         public override Position TotalPosition()

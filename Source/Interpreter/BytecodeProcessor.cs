@@ -215,8 +215,6 @@ namespace IngameCoding.Bytecode
         {
             var v = Memory.Stack.Pop();
 
-            bool successful = false;
-
             switch ((string)CurrentInstruction.parameter)
             {
                 case "int":
@@ -224,7 +222,6 @@ namespace IngameCoding.Bytecode
                         if (v.type == DataType.BYTE)
                         {
                             v = new DataItem((int)v.Value(), v.Tag);
-                            successful = true;
                         }
                         break;
                     }

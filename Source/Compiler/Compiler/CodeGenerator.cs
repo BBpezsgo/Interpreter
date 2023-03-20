@@ -119,6 +119,18 @@ namespace IngameCoding.BBCode.Compiler
         List<int> returnInstructions;
         List<List<int>> breakInstructions;
         string[] CurrentNamespace;
+        /// <summary>
+        /// Namespace.Namespace. ... .Namespace.
+        /// </summary>
+        string CurrentNamespaceText
+        {
+            get
+            {
+                if (CurrentNamespace == null) return "";
+                if (CurrentNamespace.Length == 0) return "";
+                return string.Join('.', CurrentNamespace) + ".";
+            }
+        }
 
         List<Instruction> compiledCode;
 
@@ -144,8 +156,35 @@ namespace IngameCoding.BBCode.Compiler
 
         ITypeDefinition GetCustomType(string name)
         {
-            if (compiledStructs.ContainsKey(name)) return compiledStructs[name];
-            if (compiledClasses.ContainsKey(name)) return compiledClasses[name];
+            string[] checkThese = new string[]
+            {
+                name,
+                CurrentNamespaceText + name,
+            };
+
+            foreach (var checkThis in checkThese)
+            {
+                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs[name];
+                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses[name];
+            }
+
+            throw new InternalException($"Unknown type '{name}'");
+        }
+        ITypeDefinition GetCustomType(string name, string targetNamespace)
+        {
+            string[] checkThese = new string[]
+            {
+                CurrentNamespaceText +  name,
+                name,
+                CurrentNamespace + targetNamespace + name,
+                targetNamespace + name,
+            };
+
+            foreach (var checkThis in checkThese)
+            {
+                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs[name];
+                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses[name];
+            }
 
             throw new InternalException($"Unknown type '{name}'");
         }

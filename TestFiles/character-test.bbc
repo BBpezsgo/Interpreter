@@ -1,0 +1,8 @@
+using System;
+
+[CodeEntry]
+void Start()
+{
+  Console.Log("\u0111");
+  Console.Log("đ");
+}

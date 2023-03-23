@@ -1,5 +1,17 @@
 ﻿using System;
 
+namespace Bruh
+{
+  DataStructA BruhFunction() {
+    return new DataStructA;
+  }
+
+  struct DataStructA {
+    byte Name;
+    DataStructB Value;
+  }
+}
+
 struct DataStructA
 {
   byte Name;
@@ -9,6 +21,11 @@ struct DataStructA
 struct DataStructB
 {
   int Index;
+}
+
+class DataClassB
+{
+  int ClassIndex;
 }
 
 [CodeEntry]
@@ -43,20 +60,26 @@ void Main()
   
   Console.Write("data1.Value.Index: ");
   Console.Log(data1.Value.Index);
-  data1.Value.Index = 69;
+  // data1.Value.Index = 69;
   Console.Write("data1.Value.Index: ");
   Console.Log(data1.Value.Index);
+
+  var bruh = new Bruh.DataStructA;
+  Console.Log(bruh.Name.ToString());
+
+  var bruh2 = Bruh.BruhFunction();
+  Console.Log(bruh2.Name.ToString());
 }
 
 void PrintMatrix(int[][] matrix)
 {
   for (int y; y < matrix.Length; y++)
   {
-	for (int x; x < matrix[y].Length; x++)
-	{
+    for (int x; x < matrix[y].Length; x++)
+    {
       Console.Write(matrix[y][x].ToString() + " ");
-	};
-	Console.Write("\r\n");
+    };
+    Console.Write("\r\n");
   };
 }
 

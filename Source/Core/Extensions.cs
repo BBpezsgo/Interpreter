@@ -1,5 +1,6 @@
 ﻿using IngameCoding.BBCode;
 using IngameCoding.Bytecode;
+using IngameCoding.Tokenizer;
 
 namespace IngameCoding.Core
 {
@@ -102,11 +103,8 @@ namespace IngameCoding.Core
             selfList.AddRange(values);
             return selfList.ToArray();
         }
-        public static T[] Add<T>(this T[] self, T value)
-        {
-            System.Collections.Generic.List<T> selfList = new(self);
-            selfList.Add(value);
-            return selfList.ToArray();
-        }
+        public static T[] Add<T>(this T[] self, T value) => (new System.Collections.Generic.List<T>(self) { value }).ToArray();
+
+        public static Position After(this BaseToken self) => new(new Range<SinglePosition>(new SinglePosition(self.Position.End.Line, self.Position.End.Character), new SinglePosition(self.Position.End.Line, self.Position.End.Character + 1)), new Range<int>(self.AbsolutePosition.End, self.AbsolutePosition.End + 1));
     }
 }

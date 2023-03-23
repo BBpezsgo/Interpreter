@@ -255,6 +255,20 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
+                if (string.IsNullOrEmpty(basePath))
+                {
+                    FileInfo[] configFiles = file.Directory.GetFiles("config.json");
+                    if (configFiles.Length == 1)
+                    {
+                        System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFiles[0].FullName));
+                        if (document.RootElement.TryGetProperty("base", out var v))
+                        {
+                            string b = v.GetString();
+                            if (b != null) basePath = b;
+                        }
+                    }
+                }
+
                 for (int i = 0; i < @using.Path.Length; i++) @using.Path[i].Analysis.CompilerReached = true;
 
                 string filename = @using.PathString.Replace("/", "\\");
@@ -313,9 +327,9 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var @struct in parserResult2.Structs)
             {
-                if (Structs.ContainsKey(@struct.Key))
+                if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
                 {
-                    errors.Add(new Error($"Struct '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                    errors.Add(new Error($"Type '{@struct.Value.FullName}' already exists", @struct.Value.Name));
                 }
                 else
                 {
@@ -325,9 +339,9 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var @class in parserResult2.Classes)
             {
-                if (Classes.ContainsKey(@class.Key))
+                if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
                 {
-                    errors.Add(new Error($"Class '{@class.Value.FullName}' already exists", @class.Value.Name));
+                    errors.Add(new Error($"Type '{@class.Value.FullName}' already exists", @class.Value.Name));
                 }
                 else
                 {

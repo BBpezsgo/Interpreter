@@ -10,6 +10,6 @@ void Start()
 	Console.Log(.5);
 	Console.Log("5");
 	Console.Log(5e2);
-	Console.Log(0x01);
+	Console.Log(0x0f_1);
 	Console.Log(0b0000_0010);
 }

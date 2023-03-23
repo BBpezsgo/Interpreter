@@ -3,27 +3,34 @@
 [CodeEntry]
 void Main()
 {
-	Console.Log(5<<2);
-	// byte[] bytes = BitConverter.GetByteArray(666);
-	// Console.Log(BitConverter.GetInt(bytes));
+	var bytes = 666.ToByteArray();
+	Console.Log(GetInt(bytes));
 }
 
-namespace BitConverter
+void LogArray(int[] array)
 {
-	int GetInt(byte[] bytes)
-	{
-		return bytes[3] + bytes[2] * 256 + bytes[1] * 65536 + bytes[0] * 16777216;
-	}
-	
-	byte[] GetByteArray(int v)
-	{
-		byte b0 = ToByte(0); // (v & 4278190080) - 16777215;
-		byte b1 = ToByte((v & 16711680) - 65535);
-		byte b2 = ToByte((v & 65280) - 256);
-		byte b3 = ToByte((v & 255) - 0);
+	Console.Write("[");
 
-		return [ b0, b1, b2, b3 ];
-	}
+	for (int i; i < array.Length; i++)
+	{
+	  var item = array[i];
+	  if (i > 0) { Console.Write(", "); };
+	  Console.Write(item.ToString());
+	};
+
+	Console.Log("]");
 }
 
-byte ToByte(int v) { return ParseByte(v.ToString()); }
+int GetInt(int[] bytes)
+{
+	return (bytes[0]) + (bytes[1] << 8) + (bytes[2] << 16) + (bytes[3] << 24);
+}
+
+int[] ToByteArray(this int v)
+{
+	int b0 = v & 0b00000000_00000000_00000000_11111111 >> 0;
+	int b1 = v & 0b00000000_00000000_11111111_00000000 >> 8;
+	int b2 = v & 0b00000000_11111111_00000000_00000000 >> 16;
+	int b3 = v & 0b11111111_00000000_00000000_00000000 >> 24;
+	return [ b0, b1, b2, b3 ];
+}

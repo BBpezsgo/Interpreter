@@ -55,7 +55,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             { return GetAllStatement(ifElseif.Condition, callback); }
             else if (st is Statement_If_Else)
             { }
-            else if (st is Statement_NewStruct newStruct)
+            else if (st is Statement_NewInstance newStruct)
             { }
             else if (st is Statement_Index indexStatement)
             { }
@@ -183,7 +183,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         ///  <seealso cref="Statement_Literal"></seealso>
         /// </item>
         /// <item>
-        ///  <seealso cref="Statement_NewStruct"></seealso>
+        ///  <seealso cref="Statement_NewInstance"></seealso>
         /// </item>
         /// <item>
         ///  <seealso cref="Statement_MethodCall"></seealso>
@@ -726,12 +726,13 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_NewStruct : StatementWithReturnValue
+    public class Statement_NewInstance : StatementWithReturnValue
     {
         readonly string[] namespacePath;
         readonly string[] targetNamespacePath;
-        public Token StructName;
 
+        public Token Keyword;
+        public Token TypeName;
         /// <returns> "[library].[...].[library]." </returns>
         public string NamespacePathPrefix
         {
@@ -781,23 +782,15 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
-        public Statement_NewStruct(string[] namespacePath, string[] targetNamespacePath)
+        public Statement_NewInstance(string[] namespacePath, string[] targetNamespacePath)
         {
             this.namespacePath = namespacePath;
             this.targetNamespacePath = targetNamespacePath;
         }
 
-        public override string ToString()
-        {
-            return $"new {TargetNamespacePathPrefix}{StructName}()";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{StructName}()";
-        }
-
-        public override Position TotalPosition() => new(StructName);
+        public override string ToString() => $"new {TargetNamespacePathPrefix}{TypeName}()";
+        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{TypeName}()";
+        public override Position TotalPosition() => new(TypeName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Index : StatementWithReturnValue

@@ -184,6 +184,8 @@ namespace IngameCoding.BBCode
         LITERAL_STRING,
         LITERAL_FLOAT,
 
+        UNICODE_CHARACTER,
+
         OPERATOR,
         STRING_ESCAPE_SEQUENCE,
 
@@ -246,6 +248,23 @@ namespace IngameCoding.BBCode
         }
     }
 
+    public readonly struct SimpleToken
+    {
+        public readonly string Text;
+        public readonly Range<SinglePosition> Position;
+        public readonly Range<int> AbsolutePosition;
+
+        public SimpleToken(string text, Range<SinglePosition> position, Range<int> absolutePosition)
+        {
+            Text = text;
+            Position = position;
+            AbsolutePosition = absolutePosition;
+        }
+
+        public override string ToString() => Text;
+        public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
+    }
+
     /// <summary>
     /// The tokenizer for the BBCode language
     /// </summary>
@@ -305,15 +324,47 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <returns>
-        /// Two token arrays: the first without, the second with the comments
-        /// (tokens, tokens with comments)
-        /// </returns>
         /// <exception cref="Errors.TokenizerException"/>
-        public (Token[], Token[]) Parse(string sourceCode)
+        public Token[] Parse(string sourceCode) => Parse(sourceCode, null, null, out _, out _);
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="Errors.TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings) => Parse(sourceCode, warnings, null, out _, out _);
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="Errors.TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath) => Parse(sourceCode, warnings, filePath, out _, out _);
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="Errors.TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments) => Parse(sourceCode, warnings, filePath, out tokensWithComments, out _);
+
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="Errors.TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments, out SimpleToken[] unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
             Print("Tokenizing ...", Output.LogType.Debug);
+
+            string savedUnicode = null;
+            List<SimpleToken> _unicodeCharacters = new();
 
             for (int OffsetTotal = 0; OffsetTotal < sourceCode.Length; OffsetTotal++)
             {
@@ -335,8 +386,53 @@ namespace IngameCoding.BBCode
                     CurrentToken.type = TokenType.COMMENT_MULTILINE;
                 }
 
+                if (currChar > byte.MaxValue && warnings != null)
+                {
+                    RefreshTokenPosition(OffsetTotal);
+                    if (CurrentToken.type == TokenType.LITERAL_STRING)
+                    {
+                        warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.After(), filePath));
+                    }
+                    else
+                    {
+                        warnings.Add(new Warning($"Don't use special characters.", CurrentToken.After(), filePath));
+                    }
+                }
+
+                if (CurrentToken.type == TokenType.UNICODE_CHARACTER)
+                {
+                    if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
+                    if (savedUnicode.Length == 4)
+                    {
+                        string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
+                        _unicodeCharacters.Add(new SimpleToken(
+                            unicodeChar,
+                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                            new Range<int>(OffsetTotal - 6, OffsetTotal)
+                        ));
+                        CurrentToken.text += unicodeChar;
+                        CurrentToken.type = TokenType.LITERAL_STRING;
+                        savedUnicode = null;
+                    }
+                    else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                    {
+                        throw new TokenizerException("Invalid hex digit in unicode character: '" + currChar + "' inside literal string", GetCurrentPosition(OffsetTotal));
+                    }
+                    else
+                    {
+                        savedUnicode += currChar;
+                        continue;
+                    }
+                }
+
                 if (CurrentToken.type == TokenType.STRING_ESCAPE_SEQUENCE)
                 {
+                    if (currChar == 'u')
+                    {
+                        CurrentToken.type = TokenType.UNICODE_CHARACTER;
+                        savedUnicode = "";
+                        continue;
+                    }
                     CurrentToken.text += currChar switch
                     {
                         'n' => "\n",
@@ -344,7 +440,7 @@ namespace IngameCoding.BBCode
                         't' => "\t",
                         '\\' => "\\",
                         '"' => "\"",
-                        _ => throw new Errors.TokenizerException("Unknown escape sequence: \\" + currChar.ToString() + " in string.", GetCurrentPosition(OffsetTotal)),
+                        _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in string.", GetCurrentPosition(OffsetTotal)),
                     };
                     CurrentToken.type = TokenType.LITERAL_STRING;
                     continue;
@@ -418,22 +514,25 @@ namespace IngameCoding.BBCode
                 }
                 else if (currChar == 'x' && CurrentToken.type == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.text.StartsWith('0'))
+                    if (!CurrentToken.text.EndsWith('0'))
                     { throw new TokenizerException($"Invalid hex number literal format", CurrentToken); }
                     CurrentToken.text += currChar;
                     CurrentToken.type = TokenType.LITERAL_HEX;
                 }
                 else if (currChar == 'b' && CurrentToken.type == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.text.StartsWith('0'))
+                    if (!CurrentToken.text.EndsWith('0'))
                     { throw new TokenizerException($"Invalid bin number literal format", CurrentToken); }
                     CurrentToken.text += currChar;
                     CurrentToken.type = TokenType.LITERAL_BIN;
                 }
-                else if (int.TryParse(currChar.ToString(), out _))
+                else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
                 {
                     if (CurrentToken.type == TokenType.WHITESPACE)
-                    { CurrentToken.type = TokenType.LITERAL_NUMBER; }
+                    {
+                        EndToken(OffsetTotal);
+                        CurrentToken.type = TokenType.LITERAL_NUMBER;
+                    }
                     else if (CurrentToken.type == TokenType.POTENTIAL_FLOAT)
                     { CurrentToken.type = TokenType.LITERAL_FLOAT; }
                     else if (CurrentToken.type == TokenType.OPERATOR)
@@ -452,14 +551,11 @@ namespace IngameCoding.BBCode
                     {
                         if (currChar != '0' && currChar != '1')
                         {
-                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", new Position(CurrentToken.Position, CurrentToken.AbsolutePosition));
+                            RefreshTokenPosition(OffsetTotal);
+                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", CurrentToken.After());
                         }
                     }
 
-                    CurrentToken.text += currChar;
-                }
-                else if (CurrentToken.type == TokenType.LITERAL_HEX && new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }.Contains(currChar.ToString().ToLower()[0]))
-                {
                     CurrentToken.text += currChar;
                 }
                 else if (CurrentToken.type == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
@@ -601,6 +697,15 @@ namespace IngameCoding.BBCode
                     CurrentToken.text += currChar;
                     EndToken(OffsetTotal);
                 }
+                else if (CurrentToken.type == TokenType.LITERAL_HEX)
+                {
+                    if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                    {
+                        RefreshTokenPosition(OffsetTotal);
+                        throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.After());
+                    }
+                    CurrentToken.text += currChar;
+                }
                 else
                 {
                     if (CurrentToken.type == TokenType.WHITESPACE ||
@@ -624,7 +729,16 @@ namespace IngameCoding.BBCode
 
             Print($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
-            return (NormalizeTokens(tokens, settings).ToArray(), NormalizeTokens(tokensWithComments, settings).ToArray());
+            tokensWithComments = NormalizeTokens(this.tokensWithComments, settings).ToArray();
+            unicodeCharacters = _unicodeCharacters.ToArray();
+            return NormalizeTokens(tokens, settings).ToArray();
+        }
+
+        void RefreshTokenPosition(int OffsetTotal)
+        {
+            CurrentToken.Position.End.Character = CurrentColumn;
+            CurrentToken.Position.End.Line = CurrentLine;
+            CurrentToken.AbsolutePosition.End = OffsetTotal;
         }
 
         void EndToken(int OffsetTotal)
@@ -632,6 +746,29 @@ namespace IngameCoding.BBCode
             CurrentToken.Position.End.Character = CurrentColumn;
             CurrentToken.Position.End.Line = CurrentLine;
             CurrentToken.AbsolutePosition.End = OffsetTotal;
+
+            if (CurrentToken.type == TokenType.LITERAL_FLOAT)
+            {
+                if (CurrentToken.text.EndsWith('.'))
+                {
+                    CurrentToken.Position.End.Character--;
+                    CurrentToken.Position.End.Line--;
+                    CurrentToken.AbsolutePosition.End--;
+                    CurrentToken.text = CurrentToken.text[..^1];
+                    CurrentToken.type = TokenType.LITERAL_NUMBER;
+                    tokens.Add(CurrentToken.Clone());
+
+                    CurrentToken.Position.Start.Character = CurrentToken.Position.End.Character + 1;
+                    CurrentToken.Position.Start.Line = CurrentToken.Position.End.Line + 1;
+                    CurrentToken.AbsolutePosition.Start = CurrentToken.AbsolutePosition.End + 1;
+
+                    CurrentToken.Position.End.Character++;
+                    CurrentToken.Position.End.Line++;
+                    CurrentToken.AbsolutePosition.End++;
+                    CurrentToken.type = TokenType.OPERATOR;
+                    CurrentToken.text = ".";
+                }
+            }
 
             if (CurrentToken.type != TokenType.WHITESPACE)
             {

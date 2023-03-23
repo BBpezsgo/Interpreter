@@ -1026,7 +1026,7 @@ namespace IngameCoding.BBCode
             public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Output.LogType> printCallback = null)
             {
                 var tokenizer = new Tokenizer(TokenizerSettings.Default);
-                var (tokens, _) = tokenizer.Parse(code);
+                var tokens = tokenizer.Parse(code, warnings);
 
                 DateTime parseStarted = DateTime.Now;
                 if (printCallback != null)
@@ -1648,7 +1648,7 @@ namespace IngameCoding.BBCode
             ///  <seealso cref="Statement_Literal"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_NewStruct"></seealso>
+            ///  <seealso cref="Statement_NewInstance"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="Statement_Field"></seealso>
@@ -1720,9 +1720,10 @@ namespace IngameCoding.BBCode
 
                     structName.Analysis.Subtype = TokenSubtype.Struct;
 
-                    Statement_NewStruct newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
+                    Statement_NewInstance newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
                     {
-                        StructName = structName,
+                        TypeName = structName,
+                        Keyword = newIdentifier,
                     };
 
                     returnStatement = newStructStatement;
@@ -1824,7 +1825,7 @@ namespace IngameCoding.BBCode
                     {
                         throw new SyntaxException("Unexpected kind of statement", statement.TotalPosition());
                     }
-                    else if (statement is Statement_NewStruct)
+                    else if (statement is Statement_NewInstance)
                     {
                         throw new SyntaxException("Unexpected kind of statement", statement.TotalPosition());
                     }
@@ -2193,7 +2194,7 @@ namespace IngameCoding.BBCode
             ///  <seealso cref="Statement_Literal"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_NewStruct"></seealso>
+            ///  <seealso cref="Statement_NewInstance"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="Statement_Field"></seealso>
@@ -2743,7 +2744,7 @@ namespace IngameCoding.BBCode
                 if (string.IsNullOrWhiteSpace(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or whitespace.", nameof(type));
 
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
-                Token[] tokens = tokenizer.Parse(type).Item1;
+                Token[] tokens = tokenizer.Parse(type);
 
                 TypeToken result = null;
 

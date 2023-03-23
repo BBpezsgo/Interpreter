@@ -154,37 +154,35 @@ namespace IngameCoding.BBCode.Compiler
 
         #region Helper Functions
 
-        ITypeDefinition GetCustomType(string name)
+        /// <returns>
+        /// <list type="bullet">
+        /// <item><see cref="CompiledStruct"/></item>
+        /// <item><see cref="CompiledClass"/></item>
+        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
+        /// </list>
+        /// </returns>
+        /// <exception cref="InternalException"></exception>
+        ITypeDefinition GetCustomType(string name, string targetNamespace = null, bool returnNull = false)
         {
-            string[] checkThese = new string[]
-            {
-                name,
-                CurrentNamespaceText + name,
-            };
-
-            foreach (var checkThis in checkThese)
-            {
-                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs[name];
-                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses[name];
-            }
-
-            throw new InternalException($"Unknown type '{name}'");
-        }
-        ITypeDefinition GetCustomType(string name, string targetNamespace)
-        {
-            string[] checkThese = new string[]
+            List<string> checkThese = new()
             {
                 CurrentNamespaceText +  name,
                 name,
-                CurrentNamespace + targetNamespace + name,
-                targetNamespace + name,
             };
+
+            if (!string.IsNullOrEmpty(targetNamespace))
+            {
+                checkThese.Add(CurrentNamespace + targetNamespace + name);
+                checkThese.Add(targetNamespace + name);
+            }
 
             foreach (var checkThis in checkThese)
             {
                 if (compiledStructs.ContainsKey(checkThis)) return compiledStructs[name];
                 if (compiledClasses.ContainsKey(checkThis)) return compiledClasses[name];
             }
+
+            if (returnNull) return null;
 
             throw new InternalException($"Unknown type '{name}'");
         }
@@ -303,42 +301,42 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        bool GetCompiledStruct(Statement_NewStruct newStructStatement, out CompiledStruct compiledStruct)
+        bool GetCompiledStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
         {
-            if (compiledStructs.TryGetValue(newStructStatement.StructName.text, out compiledStruct))
+            if (compiledStructs.TryGetValue(newStructStatement.TypeName.text, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.StructName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TargetNamespacePathPrefix + newStructStatement.StructName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.TargetNamespacePathPrefix + newStructStatement.StructName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
             {
                 return true;
             }
             return false;
         }
 
-        bool GetCompiledClass(Statement_NewStruct newClassStatement, out CompiledClass compiledClass)
+        bool GetCompiledClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
         {
-            if (compiledClasses.TryGetValue(newClassStatement.StructName.text, out compiledClass))
+            if (compiledClasses.TryGetValue(newClassStatement.TypeName.text, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.StructName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
             {
                 return true;
             }
@@ -544,14 +542,14 @@ namespace IngameCoding.BBCode.Compiler
             else
             { throw new CompilerException($"Unknown operator '{@operator.Operator.text}'", @operator.Operator, CurrentFile); }
         }
-        static CompiledType FindStatementType(Statement_Literal literal) => literal.Type.typeName switch
+        CompiledType FindStatementType(Statement_Literal literal) => literal.Type.typeName switch
         {
             BuiltinType.INT => new CompiledType(BuiltinType.INT),
             BuiltinType.BYTE => new CompiledType(BuiltinType.BYTE),
             BuiltinType.FLOAT => new CompiledType(BuiltinType.FLOAT),
             BuiltinType.STRING => new CompiledType(BuiltinType.STRING),
             BuiltinType.BOOLEAN => new CompiledType(BuiltinType.BOOLEAN),
-            _ => throw new NotImplementedException(),
+            _ => throw new CompilerException($"Unknown literal type {literal.Type.typeName}", literal, CurrentFile),
         };
         CompiledType FindStatementType(Statement_Variable variable)
         {
@@ -559,22 +557,18 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (variable.ListIndex != null)
                 { throw new NotImplementedException(); }
-                return new CompiledType(param.type, GetCustomType);
+                return new CompiledType(param.type, name => GetCustomType(name));
             }
             else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
             {
-                return new CompiledType(val, GetCustomType);
-            }
-            else if (variable.VariableName.text == "this")
-            {
-                throw new NotImplementedException();
+                return new CompiledType(val, name => GetCustomType(name));
             }
             else
             {
                 throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
             }
         }
-        CompiledType FindStatementType(Statement_NewStruct newStruct)
+        CompiledType FindStatementType(Statement_NewInstance newStruct)
         {
             if (GetCompiledStruct(newStruct, out var structDefinition))
             {
@@ -586,7 +580,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new CompilerException("Unknown type '" + newStruct.StructName.text + "'", newStruct.StructName, CurrentFile);
+                throw new CompilerException("Unknown type '" + newStruct.TypeName.text + "'", newStruct.TypeName, CurrentFile);
             }
         }
         CompiledType FindStatementType(TypeToken type)
@@ -597,7 +591,7 @@ namespace IngameCoding.BBCode.Compiler
                 if (compiledClasses.TryGetValue(type.text, out var @class)) return new CompiledType(@class);
             }
 
-            return new CompiledType(type, GetCustomType);
+            return new CompiledType(type, name => GetCustomType(name));
         }
         CompiledType FindStatementType(Statement_Field field)
         {
@@ -649,7 +643,7 @@ namespace IngameCoding.BBCode.Compiler
                 { return FindStatementType(literal); }
                 else if (st is Statement_Variable variable)
                 { return FindStatementType(variable); }
-                else if (st is Statement_NewStruct newStruct)
+                else if (st is Statement_NewInstance newStruct)
                 { return FindStatementType(newStruct); }
                 else if (st is Statement_Field field)
                 { return FindStatementType(field); }
@@ -665,7 +659,7 @@ namespace IngameCoding.BBCode.Compiler
                     else if (type.Name == "string") return new CompiledType(BuiltinType.STRING);
                     throw new NotImplementedException();
                 }
-                throw new NotImplementedException();
+                throw new CompilerException($"Statement without value type: {st.GetType().Name} {st}", st, CurrentFile);
             }
             catch (InternalException error)
             {
@@ -1434,43 +1428,46 @@ namespace IngameCoding.BBCode.Compiler
                 compiledCode[item].parameter = compiledCode.Count - item;
             }
         }
-        void GenerateCodeForStatement(Statement_NewStruct newObject)
+        void GenerateCodeForStatement(Statement_NewInstance newObject)
         {
-            newObject.StructName.Analysis.CompilerReached = true;
+            newObject.TypeName.Analysis.CompilerReached = true;
 
-            if (GetCompiledStruct(newObject, out var structDefinition))
+            var instanceType = GetCustomType(newObject.TypeName.text, newObject.TargetNamespacePathPrefix, true);
+
+            if (instanceType is null)
+            { throw new CompilerException("Unknown struct/class '" + newObject.TypeName.text + "'", newObject.TypeName, CurrentFile); }
+
+            if (instanceType is CompiledStruct @struct)
             {
-                newObject.StructName.Analysis.Reference = new TokenAnalysis.RefStruct(structDefinition);
+                newObject.TypeName.Analysis.Reference = new TokenAnalysis.RefStruct(@struct);
 
-                if (structDefinition.IsBuiltin)
+                if (false) //@struct.IsBuiltin)
                 {
-                    AddInstruction(Opcode.PUSH_VALUE, structDefinition.CreateBuiltinStructCallback());
+                    // AddInstruction(Opcode.PUSH_VALUE, @struct.CreateBuiltinStructCallback());
                 }
                 else
                 {
                     Dictionary<string, DataItem> fields = new();
-                    foreach (ParameterDefinition structDefFieldDefinition in structDefinition.Fields)
+                    foreach (ParameterDefinition structDefFieldDefinition in @struct.Fields)
                     {
                         fields.Add(structDefFieldDefinition.name.text, new DataItem(GenerateInitialValue(structDefFieldDefinition.type), null));
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, structDefinition.FullName));
+                    AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, @struct.FullName));
                 }
             }
-            else if (GetCompiledClass(newObject, out var classDefinition))
+            else if (instanceType is CompiledClass @class)
             {
-                newObject.StructName.Analysis.Reference = new TokenAnalysis.RefClass(classDefinition);
+                newObject.TypeName.Analysis.Reference = new TokenAnalysis.RefClass(@class);
 
                 Dictionary<string, DataItem> fields = new();
-                foreach (ParameterDefinition classDefFieldDefinition in classDefinition.Fields)
+                foreach (ParameterDefinition classDefFieldDefinition in @class.Fields)
                 {
                     fields.Add(classDefFieldDefinition.name.text, new DataItem(classDefFieldDefinition.type, null));
                 }
-                AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, classDefinition.FullName));
+                AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, @class.FullName));
             }
             else
-            {
-                throw new CompilerException("Unknown struct/class '" + newObject.StructName.text + "'", newObject.StructName, CurrentFile);
-            }
+            { throw new CompilerException("Unknown type definition " + instanceType.GetType().Name, newObject.TypeName, CurrentFile); }
         }
         void GenerateCodeForStatement(Statement_Field field)
         {
@@ -1556,7 +1553,7 @@ namespace IngameCoding.BBCode.Compiler
             { GenerateCodeForStatement(forLoop); }
             else if (st is Statement_If @if)
             { GenerateCodeForStatement(@if); }
-            else if (st is Statement_NewStruct newStruct)
+            else if (st is Statement_NewInstance newStruct)
             { GenerateCodeForStatement(newStruct); }
             else if (st is Statement_Index indexStatement)
             { GenerateCodeForStatement(indexStatement); }
@@ -1846,12 +1843,12 @@ namespace IngameCoding.BBCode.Compiler
 
                         if (newVariable.InitialValue != null)
                         {
-                            if (newVariable.InitialValue is Statement_NewStruct newStruct)
+                            if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
-                                if (newStruct.StructName.text == newVariable.Type.text)
+                                if (newStruct.TypeName.text == newVariable.Type.text)
                                 { GenerateCodeForStatement(newStruct); }
                                 else
-                                { throw new CompilerException("Can't cast " + newStruct.StructName.text + " to " + newVariable.Type.text, newStruct.TotalPosition(), newVariable.FilePath); }
+                                { throw new CompilerException("Can't cast " + newStruct.TypeName.text + " to " + newVariable.Type.text, newStruct.TotalPosition(), newVariable.FilePath); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true);
@@ -1867,10 +1864,10 @@ namespace IngameCoding.BBCode.Compiler
                             {
                                 newVariable.Type.typeName = literal.Type.typeName;
                             }
-                            else if (newVariable.InitialValue is Statement_NewStruct newStruct)
+                            else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
                                 newVariable.Type.typeName = BuiltinType.STRUCT;
-                                newVariable.Type.text = newStruct.StructName.text;
+                                newVariable.Type.text = newStruct.TypeName.text;
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true);
@@ -1897,27 +1894,22 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         newVariable.Type.typeName = literal.Type.typeName;
                     }
-                    else if (newVariable.InitialValue is Statement_NewStruct newStruct)
+                    else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                     {
                         newVariable.Type.typeName = BuiltinType.STRUCT;
-                        newVariable.Type.text = newStruct.StructName.text;
+                        newVariable.Type.text = newStruct.TypeName.text;
                     }
                     else
                     {
-                        try
-                        {
-                            var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                            var initialType = Parser.ParseType(initialTypeRaw.Name);
+                        var initialTypeRaw = FindStatementType(newVariable.InitialValue);
+                        var initialType = Parser.ParseType(initialTypeRaw.Name);
 
-                            newVariable.Type.typeName = initialType.typeName;
-                            newVariable.Type.ListOf = initialType.ListOf;
-                            newVariable.Type.text = initialType.text;
+                        newVariable.Type.typeName = initialType.typeName;
+                        newVariable.Type.ListOf = initialType.ListOf;
+                        newVariable.Type.text = initialType.text;
 
-                            GenerateCodeForVariable(newVariable, isGlobal);
-                            return;
-                        }
-                        catch (FormatException) { throw; }
-                        catch (System.Exception) { throw new NotImplementedException(); }
+                        GenerateCodeForVariable(newVariable, isGlobal);
+                        return;
                     }
                 }
                 else
@@ -2316,24 +2308,19 @@ namespace IngameCoding.BBCode.Compiler
                             {
                                 newVariable.Type.typeName = literal.Type.typeName;
                             }
-                            else if (newVariable.InitialValue is Statement_NewStruct newStruct)
+                            else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
                                 newVariable.Type.typeName = BuiltinType.STRUCT;
-                                newVariable.Type.text = newStruct.StructName.text;
+                                newVariable.Type.text = newStruct.TypeName.text;
                             }
                             else
                             {
-                                try
-                                {
-                                    var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                                    var initialType = Parser.ParseType(initialTypeRaw.Name);
+                                var initialTypeRaw = FindStatementType(newVariable.InitialValue);
+                                var initialType = Parser.ParseType(initialTypeRaw.Name);
 
-                                    newVariable.Type.typeName = initialType.typeName;
-                                    newVariable.Type.ListOf = initialType.ListOf;
-                                    newVariable.Type.text = initialType.text;
-                                }
-                                catch (FormatException) { throw; }
-                                catch (System.Exception) { throw new NotImplementedException(); }
+                                newVariable.Type.typeName = initialType.typeName;
+                                newVariable.Type.ListOf = initialType.ListOf;
+                                newVariable.Type.text = initialType.text;
                             }
                         }
                         else
@@ -2443,14 +2430,14 @@ namespace IngameCoding.BBCode.Compiler
                     { AnalyzeStatement(st9.PrevStatement); }
                     else if (st is Statement_Variable)
                     { }
-                    else if (st is Statement_NewStruct)
+                    else if (st is Statement_NewInstance)
                     { }
                     else if (st is Statement_Literal)
                     { }
                     else if (st is Statement_ListValue st10)
                     { AnalyzeStatements(st10.Values); }
                     else
-                    { throw new NotImplementedException(); }
+                    { throw new CompilerException($"Unknown statement {st.GetType().Name}", st, CurrentFile); }
                 }
 
                 foreach (var f in functions)

@@ -384,23 +384,23 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public interface ITypeDefinition
+    public interface ITypeDefinition : IDefinition
     {
 
     }
 
     public class CompiledStruct : StructDefinition, ITypeDefinition
     {
-        public Func<IStruct> CreateBuiltinStructCallback;
-        public bool IsBuiltin => CreateBuiltinStructCallback != null;
-        public Dictionary<string, CompiledFunction> CompiledMethods;
+        // public Func<IStruct> CreateBuiltinStructCallback;
+        // public bool IsBuiltin => CreateBuiltinStructCallback != null;
+        // public Dictionary<string, CompiledFunction> CompiledMethods;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
-            this.CompiledMethods = new Dictionary<string, CompiledFunction>();
+            // this.CompiledMethods = new Dictionary<string, CompiledFunction>();
             this.CompiledAttributes = compiledAttributes;
-            this.CreateBuiltinStructCallback = null;
+            // this.CreateBuiltinStructCallback = null;
 
             base.FilePath = definition.FilePath;
             base.BracketEnd = definition.BracketEnd;

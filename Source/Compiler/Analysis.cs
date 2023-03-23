@@ -23,6 +23,9 @@ namespace IngameCoding.BBCode
         public Error[] ParserErrors;
         public Error[] CompilerErrors;
 
+        public Warning[] TokenizerWarnings;
+        public SimpleToken[] TokenizerInicodeChars;
+
         public ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
         public ParserResult? parserResult;
         public Compiler.Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
@@ -108,6 +111,8 @@ namespace IngameCoding.BBCode
             TokenizerFatalError = null,
             Tokens = null,
             Warnings = System.Array.Empty<Warning>(),
+            TokenizerWarnings = System.Array.Empty<Warning>(),
+            TokenizerInicodeChars = System.Array.Empty<SimpleToken>(),
         };
 
         public bool Tokenized => Tokens != null;
@@ -132,27 +137,28 @@ namespace IngameCoding.BBCode
         static Dictionary<string, BuiltinFunction> BuiltinFunctions => new();
         static Dictionary<string, System.Func<IStruct>> BuiltinStructs => new();
 
-        public static AnalysisResult Analyze(string code, System.IO.FileInfo file, string path)
+        public static AnalysisResult Analyze(string code, FileInfo file, string path)
         {
             if (path is null) throw new System.ArgumentNullException(nameof(path));
 
             AnalysisResult result = AnalysisResult.Empty();
-
+            List<Warning> tokenizerWarnings = new();
             try
             {
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
-                return Analyze(tokenizer.Parse(code).Item1, file, path);
+                result = Analyze(tokenizer.Parse(code, tokenizerWarnings, path, out _, out var unicodeChars), file, path);
+                result.TokenizerWarnings = tokenizerWarnings.ToArray();
+                result.TokenizerInicodeChars = unicodeChars;
             }
             catch (Exception error)
             {
                 result.TokenizerFatalError = error;
-                return result;
             }
             catch (System.Exception error)
             {
                 result.TokenizerFatalError = new Exception(error.Message, error);
-                return result;
             }
+            return result;
         }
 
         public static string[] FileReferences(System.IO.FileInfo file, string path)
@@ -168,7 +174,7 @@ namespace IngameCoding.BBCode
                     if (file_.Extension.ToLower() != ".bbc") continue;
                     string code_ = System.IO.File.ReadAllText(file_.FullName);
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
-                    (Token[] tokens_, _) = tokenizer.Parse(code_);
+                    Token[] tokens_ = tokenizer.Parse(code_);
                     if (tokens_ == null) continue;
                     if (tokens_.Length < 3) continue;
                     Parser.Parser parser = new();
@@ -198,6 +204,22 @@ namespace IngameCoding.BBCode
 
             List<string> parsedUsings = new();
 
+            string basePath = null;
+
+            if (string.IsNullOrEmpty(basePath))
+            {
+                FileInfo[] configFiles = directory.GetFiles("config.json");
+                if (configFiles.Length == 1)
+                {
+                    System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFiles[0].FullName));
+                    if (document.RootElement.TryGetProperty("base", out var v))
+                    {
+                        string b = v.GetString();
+                        if (b != null) basePath = b;
+                    }
+                }
+            }
+
             for (int i = 0; i < parserResult.Usings.Count; i++)
             {
                 var usingItem = parserResult.Usings[i];
@@ -210,7 +232,7 @@ namespace IngameCoding.BBCode
                 };
 
                 List<string> searchForThese = new();
-                string basePath = "../CodeFiles/";
+
                 if (basePath != null)
                 {
                     try
@@ -250,7 +272,7 @@ namespace IngameCoding.BBCode
                     string code = File.ReadAllText(usingFile);
 
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
-                    (Token[] tokens, _) = tokenizer.Parse(code);
+                    Token[] tokens = tokenizer.Parse(code);
 
                     List<Error> parserErrors = new();
                     List<Warning> parserWarnings = new();
@@ -280,8 +302,26 @@ namespace IngameCoding.BBCode
 
                     foreach (var @struct in parserResult2_v.Structs)
                     {
-                        if (Structs.ContainsKey(@struct.Key)) continue;
-                        Structs.Add(@struct.Key, @struct.Value);
+                        if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
+                        {
+                            errors.Add(new Error($"Type '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                        }
+                        else
+                        {
+                            Structs.Add(@struct.Key, @struct.Value);
+                        }
+                    }
+
+                    foreach (var @class in parserResult2_v.Classes)
+                    {
+                        if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
+                        {
+                            errors.Add(new Error($"Type '{@class.Value.FullName}' already exists", @class.Value.Name));
+                        }
+                        else
+                        {
+                            Classes.Add(@class.Key, @class.Value);
+                        }
                     }
 
                     Hashes.AddRange(parserResult2_v.Hashes);
@@ -339,11 +379,25 @@ namespace IngameCoding.BBCode
             }
             foreach (var @struct in parserResult.Structs)
             {
-                Structs.Add(@struct.Key, @struct.Value);
+                if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
+                {
+                    errors.Add(new Error($"Type '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                }
+                else
+                {
+                    Structs.Add(@struct.Key, @struct.Value);
+                }
             }
             foreach (var @class in parserResult.Classes)
             {
-                Classes.Add(@class.Key, @class.Value);
+                if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
+                {
+                    errors.Add(new Error($"Type '{@class.Value.FullName}' already exists", @class.Value.Name));
+                }
+                else
+                {
+                    Classes.Add(@class.Key, @class.Value);
+                }
             }
 
             CodeGenerator codeGenerator = new()

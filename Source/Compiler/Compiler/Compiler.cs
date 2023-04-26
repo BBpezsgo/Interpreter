@@ -9,16 +9,16 @@ namespace IngameCoding.BBCode.Compiler
 
     using Core;
 
-    using Errors;
+    using DataUtilities.Serializer;
 
-    using IngameCoding.Serialization;
+    using Errors;
 
     using Parser;
     using Parser.Statements;
 
     public class Compiler
     {
-        public class CompilerResult : Serialization.ISerializable<CompilerResult>
+        public class CompilerResult : ISerializable<CompilerResult>
         {
             public Instruction[] compiledCode;
 

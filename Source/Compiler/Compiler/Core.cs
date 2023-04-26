@@ -5,6 +5,9 @@ namespace IngameCoding.BBCode.Compiler
 {
     using Bytecode;
 
+    using IngameCoding.Core;
+    using IngameCoding.Tokenizer;
+
     using Parser;
     using Parser.Statements;
 
@@ -247,6 +250,24 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
+    public readonly struct DefinitionReference
+    {
+        public readonly Range<SinglePosition> Source;
+        public readonly string SourceFile;
+
+        public DefinitionReference(Range<SinglePosition> source, string sourceFile)
+        {
+            Source = source;
+            SourceFile = sourceFile;
+        }
+
+        public DefinitionReference(BaseToken source, string sourceFile)
+        {
+            Source = source.Position;
+            SourceFile = sourceFile;
+        }
+    }
+
     public class CompiledFunction : FunctionDefinition
     {
         public TypeToken[] ParameterTypes;
@@ -257,7 +278,7 @@ namespace IngameCoding.BBCode.Compiler
         internal int InstructionOffset = -1;
 
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.Type.typeName != BuiltinType.VOID;
+        public bool ReturnSomething => this.TypeToken.typeName != BuiltinType.VOID;
 
         /// <summary>
         /// the first parameter is labeled as 'this'
@@ -265,6 +286,8 @@ namespace IngameCoding.BBCode.Compiler
         public bool IsMethod;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public List<DefinitionReference> References = null;
 
         public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
         public string BuiltinName
@@ -289,7 +312,7 @@ namespace IngameCoding.BBCode.Compiler
             base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
+            base.TypeToken = functionDefinition.TypeToken;
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
@@ -304,7 +327,7 @@ namespace IngameCoding.BBCode.Compiler
             base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
+            base.TypeToken = functionDefinition.TypeToken;
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
@@ -326,7 +349,7 @@ namespace IngameCoding.BBCode.Compiler
             base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
+            base.TypeToken = functionDefinition.TypeToken;
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
@@ -334,53 +357,23 @@ namespace IngameCoding.BBCode.Compiler
 
     internal struct CompiledVariable
     {
-        public int offset;
-        public BuiltinType type;
-        public string structName;
-        public TypeToken ListOf;
-        public bool IsStoredInHEAP;
-        public bool IsList => ListOf != null;
-        public Statement_NewVariable Declaration;
+        public CompiledType Type;
+
+        public int Offset;
         public bool IsGlobal;
+        public bool IsStoredInHEAP;
 
-        public CompiledVariable(int offset, BuiltinType type, TypeToken listOf, bool isGlobal, Statement_NewVariable declaration)
+        public Statement_NewVariable Declaration;
+
+        public CompiledVariable(int offset, CompiledType type, bool isGlobal, Statement_NewVariable declaration)
         {
-            this.offset = offset;
-            this.type = type;
-            this.structName = string.Empty;
-            this.ListOf = listOf;
-            this.Declaration = declaration;
+            this.Type = type;
+
+            this.Offset = offset;
             this.IsStoredInHEAP = false;
             this.IsGlobal = isGlobal;
-        }
 
-        public CompiledVariable(int offset, string structName, TypeToken listOf, bool isGlobal, Statement_NewVariable declaration)
-        {
-            this.offset = offset;
-            this.type = BuiltinType.STRUCT;
-            this.structName = structName;
-            this.ListOf = listOf;
             this.Declaration = declaration;
-            this.IsStoredInHEAP = false;
-            this.IsGlobal = isGlobal;
-        }
-
-        public string Type
-        {
-            get
-            {
-                if (IsList)
-                {
-                    var listOfText = ListOf.ToString();
-                    return listOfText + "[]";
-                }
-
-                if (type == BuiltinType.STRUCT)
-                {
-                    return structName;
-                }
-                return type.ToString().ToLower();
-            }
         }
     }
 
@@ -395,6 +388,7 @@ namespace IngameCoding.BBCode.Compiler
         // public bool IsBuiltin => CreateBuiltinStructCallback != null;
         // public Dictionary<string, CompiledFunction> CompiledMethods;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
+        public List<DefinitionReference> References = null;
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -413,6 +407,7 @@ namespace IngameCoding.BBCode.Compiler
     public class CompiledClass : ClassDefinition, ITypeDefinition
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
+        public List<DefinitionReference> References = null;
 
         public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -456,7 +451,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    class CompiledType
+    public class CompiledType
     {
         internal enum CompiledTypeType
         {
@@ -630,44 +625,6 @@ namespace IngameCoding.BBCode.Compiler
             SetCustomType(type.text, UnknownTypeCallback);
         }
 
-        public CompiledType(CompiledVariable val, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
-        {
-            if (val.IsList)
-            {
-                this.listOf = new CompiledType(val.ListOf, UnknownTypeCallback);
-                return;
-            }
-
-            switch (val.type)
-            {
-                case BBCode.BuiltinType.VOID:
-                    this.builtinType = CompiledTypeType.VOID;
-                    return;
-                case BBCode.BuiltinType.BYTE:
-                    this.builtinType = CompiledTypeType.BYTE;
-                    return;
-                case BBCode.BuiltinType.INT:
-                    this.builtinType = CompiledTypeType.INT;
-                    return;
-                case BBCode.BuiltinType.FLOAT:
-                    this.builtinType = CompiledTypeType.FLOAT;
-                    return;
-                case BBCode.BuiltinType.STRING:
-                    this.builtinType = CompiledTypeType.STRING;
-                    return;
-                case BBCode.BuiltinType.BOOLEAN:
-                    this.builtinType = CompiledTypeType.BOOL;
-                    return;
-                default:
-                    break;
-            };
-
-            if (val.structName == null) throw new Errors.InternalException($"WTF???");
-            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {val.structName} to CompiledType");
-
-            SetCustomType(val.structName, UnknownTypeCallback);
-        }
-
         void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
         {
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
@@ -688,5 +645,43 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         public override string ToString() => Name;
+        public string ToStringWithNamespaces()
+        {
+            if (builtinType != CompiledTypeType.NONE) return builtinType switch
+            {
+                CompiledTypeType.VOID => "void",
+                CompiledTypeType.BYTE => "byte",
+                CompiledTypeType.INT => "int",
+                CompiledTypeType.FLOAT => "float",
+                CompiledTypeType.STRING => "string",
+                CompiledTypeType.BOOL => "bool",
+                _ => throw new Errors.InternalException($"WTF???"),
+            };
+
+            if (@struct != null) return @struct.NamespacePathString + @struct.Name.text;
+            if (@class != null) return @class.NamespacePathString + @class.Name.text;
+            if (listOf != null) return listOf.Name + "[]";
+
+            return null;
+        }
+
+        public BuiltinType GetBuiltinType()
+        {
+            if (IsStruct) return BBCode.BuiltinType.STRUCT;
+            if (IsClass) return BBCode.BuiltinType.STRUCT;
+            if (IsList) return BBCode.BuiltinType.LISTOF;
+            if (IsBuiltin) return builtinType switch
+            {
+                CompiledTypeType.NONE => BBCode.BuiltinType.VOID,
+                CompiledTypeType.VOID => BBCode.BuiltinType.VOID,
+                CompiledTypeType.BYTE => BBCode.BuiltinType.BYTE,
+                CompiledTypeType.INT => BBCode.BuiltinType.INT,
+                CompiledTypeType.FLOAT => BBCode.BuiltinType.FLOAT,
+                CompiledTypeType.STRING => BBCode.BuiltinType.STRING,
+                CompiledTypeType.BOOL => BBCode.BuiltinType.BOOLEAN,
+                _ => BBCode.BuiltinType.VOID,
+            };
+            return BBCode.BuiltinType.VOID;
+        }
     }
 }

@@ -47,11 +47,13 @@ namespace IngameCoding.BBCode
         {
             public Statement_NewVariable Declaration;
             public bool IsGlobal;
+            public CompiledType Type;
 
-            public RefVariable(Statement_NewVariable declaration, bool isGlobal)
+            public RefVariable(Statement_NewVariable declaration, bool isGlobal, CompiledType type)
             {
                 Declaration = declaration;
                 IsGlobal = isGlobal;
+                Type = type;
             }
 
             public override string ToString() => $"Ref Variable";
@@ -82,14 +84,6 @@ namespace IngameCoding.BBCode
             {
                 Type = type;
                 NameToken = name;
-                StructName = structName;
-            }
-
-            public RefField(string type, string name, string structName, string filePath) : base(filePath)
-            {
-                Type = type;
-                NameToken = null;
-                fieldName = name;
                 StructName = structName;
             }
 

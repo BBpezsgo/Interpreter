@@ -4,6 +4,7 @@
 void Start()
 {
   Console.Log(Foo(0));
+  Console.Log(Time.tmnw());
 }
 
 int Foo(int p)

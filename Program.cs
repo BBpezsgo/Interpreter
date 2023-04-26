@@ -1,19 +1,18 @@
 ﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
-using System;
 
 namespace TheProgram
 {
     internal class Program
     {
         static void Main(string[] args)
-        {            
+        {
             // TODO: valami hiba van amit nem volt kedvem debuggolni, szoval hajrá :D
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test-all.bbc";
+            var file = "test7.bbc";
 
             if (false)
             {
@@ -30,10 +29,11 @@ namespace TheProgram
             {
                 "-throw-errors",
                 "-basepath \"../CodeFiles/\"",
-                "-c-print-instructions true",
-                "-c-remove-unused-functions 0",
+                // "-c-print-instructions true",
+                // "-c-remove-unused-functions 5",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
-                // "-hide-debug",
+                "-hide-debug",
+                "-hide-system",
                 // "-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
@@ -55,6 +55,47 @@ namespace TheProgram
             var settings = ArgumentParser.Parse(args);
             if (!settings.HasValue) goto ExitProgram;
 
+            IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
+            {
+                "-throw-errors",
+                "-basepath \"../CodeFiles/\"",
+                "-dont-optimize",
+                "-compile",
+                "\".\\output.txt\"",
+                "-compiler-type", "readable",
+                $"\"{TestConstants.TestFilesPath}{file}\""
+            }).Value);
+            IngameCoding.Core.EasyInterpreter.RunCompiledFile(ArgumentParser.Parse(new string[]
+            {
+                "-throw-errors",
+                "-basepath \"../CodeFiles/\"",
+                "-dont-optimize",
+                "-decompile",
+                "-compiler-type", "readable",
+                "\".\\output.txt\"",
+            }).Value);
+            IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
+            {
+                "-throw-errors",
+                "-basepath \"../CodeFiles/\"",
+                "-dont-optimize",
+                "-compile",
+                "\".\\output.bin\"",
+                "-compression", "no",
+                "-compiler-type", "binary",
+                $"\"{TestConstants.TestFilesPath}{file}\""
+            }).Value);
+            IngameCoding.Core.EasyInterpreter.RunCompiledFile(ArgumentParser.Parse(new string[]
+            {
+                "-throw-errors",
+                "-basepath \"../CodeFiles/\"",
+                "-dont-optimize",
+                "-decompile",
+                "-compiler-type", "binary",
+                "\".\\output.bin\"",
+            }).Value);
+            goto ExitProgram;
+
             switch (settings.Value.RunType)
             {
                 case ArgumentParser.RunType.Debugger:
@@ -70,7 +111,7 @@ namespace TheProgram
                     IngameCoding.CompileIntoFile.Compile(settings.Value);
                     break;
                 case ArgumentParser.RunType.Decompile:
-                    IngameCoding.Core.EasyInterpreter.RunBinary(settings.Value);
+                    IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
                     break;
             }
 

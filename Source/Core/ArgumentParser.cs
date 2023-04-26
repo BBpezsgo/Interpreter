@@ -22,6 +22,12 @@ namespace TheProgram
             Decompile,
         }
 
+        public enum FileType
+        {
+            Binary,
+            Readable,
+        }
+
         internal class ArgumentNormalizer
         {
             internal readonly List<string> Result;
@@ -103,19 +109,7 @@ namespace TheProgram
         /// <exception cref="ArgumentException"></exception>
         static Settings ParseArgs(string[] args)
         {
-            bool ThrowErrors = false;
-            bool LogDebugs = true;
-            bool LogSystem = true;
-            string BasePath = "";
-            RunType RunType = RunType.Normal;
-            Compiler.CompilerSettings compilerSettings = Compiler.CompilerSettings.Default;
-            ParserSettings parserSettings = ParserSettings.Default;
-            BytecodeInterpreterSettings bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default;
-            string CompileOutput = null;
-            CompressionLevel CompressionLevel = CompressionLevel.Optimal;
-            string PipeName = null;
-            int Port = -1;
-            string TestID = null;
+            Settings result = Settings.Default();
 
             if (args.Length > 1)
             {
@@ -124,31 +118,31 @@ namespace TheProgram
                 {
                     if (args[i] == "-debug")
                     {
-                        if (RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Debugger}");
-                        RunType = RunType.Debugger;
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
+                        result.RunType = RunType.Debugger;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-decompile")
                     {
-                        if (RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Decompile}");
-                        RunType = RunType.Decompile;
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Decompile}");
+                        result.RunType = RunType.Decompile;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-compile")
                     {
-                        if (RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Compile}");
-                        RunType = RunType.Compile;
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Compile}");
+                        result.RunType = RunType.Compile;
 
                         i++;
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-compile'"); }
 
-                        CompileOutput = args[i];
+                        result.CompileOutput = args[i];
 
                         goto ArgParseDone;
                     }
@@ -159,21 +153,21 @@ namespace TheProgram
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-basepath'"); }
 
-                        BasePath = args[i];
+                        result.BasePath = args[i];
 
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-compression")
                     {
-                        if (RunType != RunType.Normal && RunType != RunType.Compile)
+                        if (result.RunType != RunType.Normal && result.RunType != RunType.Compile)
                         { Output.Warning($"\"-compression\" argument is valid only in Compile mode"); }
 
                         i++;
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-compression'"); }
 
-                        CompressionLevel = args[i].ToLower() switch
+                        result.CompressionLevel = args[i].ToLower() switch
                         {
                             "no" => CompressionLevel.NoCompression,
                             "none" => CompressionLevel.NoCompression,
@@ -194,46 +188,46 @@ namespace TheProgram
 
                     if (args[i] == "-throw-errors")
                     {
-                        ThrowErrors = true;
+                        result.ThrowErrors = true;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-hide-debug")
                     {
-                        LogDebugs = false;
+                        result.LogDebugs = false;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-hide-system")
                     {
-                        LogSystem = false;
+                        result.LogSystem = false;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-dont-optimize")
                     {
-                        compilerSettings.DontOptimize = true;
+                        result.compilerSettings.DontOptimize = true;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-c-generate-comments")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out compilerSettings.GenerateComments))
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.compilerSettings.GenerateComments))
                         { throw new ArgumentException("Expected bool value after argument '-c-generate-comments'"); }
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-no-debug-info")
                     {
-                        compilerSettings.GenerateDebugInstructions = false;
+                        result.compilerSettings.GenerateDebugInstructions = false;
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-c-remove-unused-functions")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out compilerSettings.RemoveUnusedFunctionsMaxIterations))
+                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out result.compilerSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
                         goto ArgParseDone;
                     }
@@ -241,7 +235,7 @@ namespace TheProgram
                     if (args[i] == "-bc-clock")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.ClockCyclesPerUpdate))
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.ClockCyclesPerUpdate))
                         { throw new ArgumentException("Expected int value after argument '-bc-clock'"); }
                         goto ArgParseDone;
                     }
@@ -249,7 +243,7 @@ namespace TheProgram
                     if (args[i] == "-bc-instruction-limit")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.InstructionLimit))
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.InstructionLimit))
                         { throw new ArgumentException("Expected int value after argument '-bc-instruction-limit'"); }
                         goto ArgParseDone;
                     }
@@ -257,7 +251,7 @@ namespace TheProgram
                     if (args[i] == "-bc-stack-size")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out bytecodeInterpreterSettings.StackMaxSize))
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.StackMaxSize))
                         { throw new ArgumentException("Expected int value after argument '-bc-stack-size'"); }
                         goto ArgParseDone;
                     }
@@ -265,7 +259,7 @@ namespace TheProgram
                     if (args[i] == "-c-print-instructions")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out compilerSettings.PrintInstructions))
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.compilerSettings.PrintInstructions))
                         { throw new ArgumentException("Expected bool value after argument '-c-print-instructions'"); }
                         goto ArgParseDone;
                     }
@@ -273,16 +267,16 @@ namespace TheProgram
                     if (args[i] == "-p-print-info")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out parserSettings.PrintInfo))
+                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.parserSettings.PrintInfo))
                         { throw new ArgumentException("Expected bool value after argument '-p-print-info'"); }
                         goto ArgParseDone;
                     }
 
                     if (args[i] == "-test")
                     {
-                        if (RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({RunType}), but you tried to set it to {RunType.Tester}");
-                        RunType = RunType.Tester;
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Tester}");
+                        result.RunType = RunType.Tester;
                         goto ArgParseDone;
                     }
 
@@ -292,7 +286,7 @@ namespace TheProgram
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-pipe'"); }
 
-                        PipeName = args[i];
+                        result.PipeName = args[i];
 
                         goto ArgParseDone;
                     }
@@ -300,7 +294,7 @@ namespace TheProgram
                     if (args[i] == "-port")
                     {
                         i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out Port))
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.Port))
                         { throw new ArgumentException("Expected int value after argument '-pipe'"); }
                         goto ArgParseDone;
                     }
@@ -310,7 +304,26 @@ namespace TheProgram
                         i++;
                         if (i >= args.Length - 1)
                         { throw new ArgumentException("Expected string value after argument '-test-id'"); }
-                        TestID = args[i];
+                        result.TestID = args[i];
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-compiler-type")
+                    {
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-compiler-type'"); }
+                        switch (args[i])
+                        {
+                            case "binary":
+                                result.CompileToFileType = FileType.Binary;
+                                break;
+                            case "readable":
+                                result.CompileToFileType = FileType.Readable;
+                                break;
+                            default:
+                                { throw new ArgumentException($"Unknown compiler type '{args[i]}'. Possible values: 'binary', 'readable'"); }
+                        }
                         goto ArgParseDone;
                     }
 
@@ -326,23 +339,9 @@ namespace TheProgram
                 throw new ArgumentException($"File '{args.Last()}' not found!");
             }
 
-            return new Settings()
-            {
-                parserSettings = parserSettings,
-                compilerSettings = compilerSettings,
-                bytecodeInterpreterSettings = bytecodeInterpreterSettings,
-                ThrowErrors = ThrowErrors,
-                LogDebugs = LogDebugs,
-                LogSystem = LogSystem,
-                RunType = RunType,
-                CompileOutput = CompileOutput,
-                File = new System.IO.FileInfo(args.Last()),
-                BasePath = BasePath,
-                compressionLevel = CompressionLevel,
-                PipeName = PipeName,
-                Port = Port,
-                TestID = TestID,
-            };
+            result.File = new System.IO.FileInfo(args.Last());
+
+            return result;
         }
 
         /// <summary>
@@ -363,9 +362,28 @@ namespace TheProgram
             public bool LogSystem;
             public RunType RunType;
             public string CompileOutput;
-            public CompressionLevel compressionLevel;
+            public CompressionLevel CompressionLevel;
             public string BasePath;
             public string TestID;
+            public FileType CompileToFileType;
+
+            public static Settings Default() => new()
+            {
+                ThrowErrors = false,
+                LogDebugs = true,
+                LogSystem = true,
+                BasePath = "",
+                RunType = RunType.Normal,
+                compilerSettings = Compiler.CompilerSettings.Default,
+                parserSettings = ParserSettings.Default,
+                bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
+                CompileOutput = null,
+                CompressionLevel = CompressionLevel.Optimal,
+                PipeName = null,
+                Port = -1,
+                TestID = null,
+                CompileToFileType = FileType.Binary,
+            };
         }
 
         /// <summary>

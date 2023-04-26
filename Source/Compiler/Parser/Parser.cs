@@ -47,11 +47,31 @@ namespace IngameCoding.BBCode
         public BuiltinType typeName;
         public TypeToken ListOf;
         public bool IsList => ListOf != null;
+        public string NamespacePrefix;
 
-        public TypeToken(string name, BuiltinType type, Token @base) : base()
+        public TypeToken(string name, BuiltinType type, string namespacePrefix, Token @base) : base()
         {
             this.typeName = type;
+            this.NamespacePrefix = namespacePrefix;
+            base.text = name;
 
+            if (@base == null)
+            {
+                base.type = TokenType.IDENTIFIER;
+            }
+            else
+            {
+                base.AbsolutePosition = @base.AbsolutePosition;
+                base.Position = @base.Position;
+                base.Analysis = @base.Analysis;
+                base.type = @base.type;
+            }
+        }
+
+        public TypeToken(string name, BuiltinType type, List<string> namespacePrefix, Token @base) : base()
+        {
+            this.typeName = type;
+            this.NamespacePrefix = namespacePrefix.Count > 0 ? string.Join('.', namespacePrefix) + "." : "";
             base.text = name;
 
             if (@base == null)
@@ -71,7 +91,7 @@ namespace IngameCoding.BBCode
         {
             this.typeName = BuiltinType.LISTOF;
             this.ListOf = listOf;
-
+            this.NamespacePrefix = "";
             base.text = name;
 
             if (@base == null)
@@ -87,7 +107,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public new TypeToken Clone() => new(this.text, this.typeName, this)
+        public new TypeToken Clone() => new(this.text, this.typeName, this.NamespacePrefix, this)
         {
             type = this.type,
 
@@ -105,13 +125,18 @@ namespace IngameCoding.BBCode
             },
         };
 
-        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
+        public static TypeToken CreateAnonymous(string name, BuiltinType type, string namespacePrefix = "") => new(name, type, namespacePrefix, null);
         public static TypeToken CreateAnonymous(string name, TypeToken listOf) => new(name, listOf, null);
 
         public override string ToString()
         {
             if (IsList) return ListOf.ToString() + "[]";
             return text;
+        }
+        public string ToStringWithNamespaces()
+        {
+            if (IsList) return ListOf.ToStringWithNamespaces() + "[]";
+            return NamespacePrefix + text;
         }
         public new string ToFullString()
         {
@@ -182,12 +207,13 @@ namespace IngameCoding.BBCode
             public string FullName => NamespacePathString + Name.text;
             public List<ParameterDefinition> Parameters;
             public List<Statement> Statements;
-            public TypeToken Type;
+            public TypeToken TypeToken;
+            public string Type => NamespacePathString + TypeToken.ToString();
             public readonly string[] NamespacePath;
             /// <summary>
             /// <c>[Namespace].[...].</c>
             /// </summary>
-            string NamespacePathString
+            public string NamespacePathString
             {
                 get
                 {
@@ -233,7 +259,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"{(IsExport ? "export " : "")}{this.Type.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
+                return $"{(IsExport ? "export " : "")}{this.TypeToken.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
             }
 
             public string PrettyPrint(int ident = 0)
@@ -250,7 +276,7 @@ namespace IngameCoding.BBCode
                     statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}{this.Type.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+                return $"{" ".Repeat(ident)}{this.TypeToken.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
             }
 
             public string ReadableID()
@@ -281,7 +307,7 @@ namespace IngameCoding.BBCode
             public string FilePath { get; set; }
             public readonly string[] NamespacePath;
             /// <summary><c>[Namespace].[...].</c></summary>
-            string NamespacePathString
+            public string NamespacePathString
             {
                 get
                 {
@@ -355,7 +381,7 @@ namespace IngameCoding.BBCode
             public string FilePath { get; set; }
             public readonly string[] NamespacePath;
             /// <summary><c>[Namespace].[...].</c></summary>
-            string NamespacePathString
+            public string NamespacePathString
             {
                 get
                 {
@@ -650,11 +676,11 @@ namespace IngameCoding.BBCode
                     { Attribute(attr); }
 
                     Console.ForegroundColor = ConsoleColor.Blue;
-                    if (item.Type.typeName == BuiltinType.STRUCT)
+                    if (item.TypeToken.typeName == BuiltinType.STRUCT)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
-                    Console.Write($"{item.Type} ");
+                    Console.Write($"{item.TypeToken} ");
 
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.Write($"{item.FullName}");
@@ -1218,7 +1244,7 @@ namespace IngameCoding.BBCode
 
                 FunctionDefinition function = new(CurrentNamespace, possibleNameT)
                 {
-                    Type = possibleType,
+                    TypeToken = possibleType,
                     Attributes = attributes.ToArray(),
                     ExportKeyword = ExportKeyword,
                 };
@@ -2654,7 +2680,7 @@ namespace IngameCoding.BBCode
                     {
                         if (allowAnyKeyword)
                         {
-                            newType = new TypeToken("any", BuiltinType.ANY, possibleType);
+                            newType = new TypeToken("any", BuiltinType.ANY, "", possibleType);
                         }
                         else
                         {
@@ -2666,7 +2692,7 @@ namespace IngameCoding.BBCode
                     {
                         if (allowVarKeyword)
                         {
-                            newType = new TypeToken("var", BuiltinType.AUTO, possibleType);
+                            newType = new TypeToken("var", BuiltinType.AUTO, "", possibleType);
                         }
                         else
                         {
@@ -2678,17 +2704,17 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.text, out var s))
                         {
-                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT, possibleType);
+                            newType = new TypeToken(s.FullName, BuiltinType.STRUCT, s.NamespacePathString, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Struct;
                         }
                         else if (TryGetClass(possibleType.text, out var c))
                         {
-                            newType = new TypeToken(c.FullName, BuiltinType.STRUCT, possibleType);
+                            newType = new TypeToken(c.FullName, BuiltinType.STRUCT, s.NamespacePathString, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Class;
                         }
                         else
                         {
-                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT, possibleType);
+                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT, CurrentNamespace, possibleType);
                             warning = new Warning($"Type '{possibleType.text}' not found", possibleType);
                         }
                     }
@@ -2698,7 +2724,7 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    newType = new TypeToken(builtinType.text, builtinType.typeName, possibleType)
+                    newType = new TypeToken(builtinType.text, builtinType.typeName, CurrentNamespace, possibleType)
                     { ListOf = builtinType.ListOf };
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }

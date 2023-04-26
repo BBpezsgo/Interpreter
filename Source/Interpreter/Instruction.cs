@@ -1,4 +1,5 @@
-﻿using IngameCoding.Serialization;
+﻿using DataUtilities.ReadableFileFormat;
+using DataUtilities.Serializer;
 
 using System;
 using System.Collections.Generic;
@@ -16,7 +17,7 @@ namespace IngameCoding.Bytecode
 
     [Serializable]
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Instruction : ISerializable<Instruction>
+    public class Instruction : ISerializable<Instruction>, DataUtilities.ReadableFileFormat.ISerializableText, DataUtilities.ReadableFileFormat.IDeserializableText<Instruction>
     {
         public AddressingMode AddressingMode;
         public Opcode opcode;
@@ -264,6 +265,84 @@ namespace IngameCoding.Bytecode
                     throw new Errors.InternalException($"Unknown type {type}");
             }
         }
+
+        Value SerializeTextDataItem(DataItem dataItem)
+        {
+            Value result = Value.Object();
+            result["Type"] = Value.Literal((int)dataItem.type);
+            result["Tag"] = Value.Literal(dataItem.Tag);
+            switch (dataItem.type)
+            {
+                case DataType.INT:
+                    result["Value"] = Value.Literal(dataItem.ValueInt);
+                    return result;
+                case DataType.FLOAT:
+                    result["Value"] = Value.Literal(dataItem.ValueFloat);
+                    return result;
+                case DataType.STRING:
+                    result["Value"] = Value.Literal(dataItem.ValueString);
+                    return result;
+                case DataType.BOOLEAN:
+                    result["Value"] = Value.Literal(dataItem.ValueBoolean);
+                    return result;
+                case DataType.STRUCT:
+                    if (dataItem.ValueStruct is Struct strct)
+                    {
+                        string[] fieldNames = new string[strct.fields.Count];
+                        DataItem[] fieldValues = new DataItem[strct.fields.Count];
+                        for (int i = 0; i < strct.fields.Count; i++)
+                        {
+                            var pair = strct.fields.ElementAt(i);
+                            fieldNames[i] = pair.Key;
+                            fieldValues[i] = pair.Value;
+                        }
+                        result["ValueA"] = Value.Object(fieldNames);
+                        result["ValueB"] = Value.Object(fieldValues, SerializeTextDataItem);
+                        return result;
+                    }
+                    throw new NotImplementedException();
+                case DataType.LIST:
+                    result["ValueA"] = Value.Literal((int)dataItem.ValueList.itemTypes);
+                    result["ValueB"] = Value.Object(dataItem.ValueList.items.ToArray(), SerializeTextDataItem);
+                    return result;
+                default:
+                    throw new Errors.InternalException($"Unknown type {dataItem.type}");
+            }
+        }
+        DataItem DeserializeTextDataItem(Value data)
+        {
+            DataType type = (DataType)data["Type"].Int;
+            string tag = data["Tag"].String;
+
+            switch (type)
+            {
+                case DataType.INT:
+                    return new DataItem((int)data["Value"].Int, tag);
+                case DataType.FLOAT:
+                    return new DataItem((float)data["Value"].Float, tag);
+                case DataType.STRING:
+                    return new DataItem(data["Value"].String, tag);
+                case DataType.BOOLEAN:
+                    return new DataItem((bool)data["Value"].Bool, tag);
+                case DataType.STRUCT:
+                    string[] fieldNames = data["ValueA"].Array.ConvertPrimitive<string>();
+                    DataItem[] fieldValues = data["ValueB"].Array.Convert(DeserializeTextDataItem);
+                    Dictionary<string, DataItem> fields = new();
+                    for (int i = 0; i < fieldNames.Length; i++)
+                    { fields.Add(fieldNames[i], fieldValues[i]); }
+                    return new DataItem(new Struct(fields, null), tag);
+                case DataType.LIST:
+                    var itemTypes = (DataType)data["ValueA"].Int;
+                    var items = data["ValueB"].Array.Convert(DeserializeTextDataItem);
+                    var newList = new DataItem.List(itemTypes);
+                    for (int i = 0; i < items.Length; i++)
+                    { newList.Add(items[i]); }
+                    return new DataItem(newList, tag);
+                default:
+                    throw new Errors.InternalException($"Unknown type {type}");
+            }
+        }
+
         void ISerializable<Instruction>.Deserialize(Deserializer deserializer)
         {
             this.opcode = (Opcode)deserializer.DeserializeInt32();
@@ -302,6 +381,120 @@ namespace IngameCoding.Bytecode
             {
                 string[] fieldNames = deserializer.DeserializeArray<string>();
                 DataItem[] fieldValues = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                Dictionary<string, DataItem> fields = new();
+                for (int i = 0; i < fieldNames.Length; i++)
+                { fields.Add(fieldNames[i], fieldValues[i]); }
+                this.parameter = new Struct(fields, null);
+            }
+            else if (parameterType == 7)
+            {
+                this.parameter = new UnassignedStruct();
+            }
+            else
+            { throw new NotImplementedException(); }
+        }
+
+        Value ISerializableText.SerializeText()
+        {
+            Value result = Value.Object();
+
+            result["OpCode"] = Value.Literal(opcode.ToString());
+            result["AddressingMode"] = Value.Literal(AddressingMode.ToString());
+            result["Tag"] = Value.Literal(tag);
+            if (this.parameter is null)
+            {
+                result["ParameterType"] = Value.Literal(0);
+            }
+            else if (this.parameter is int @int)
+            {
+                result["ParameterType"] = Value.Literal(1);
+                result["ParameterValue"] = Value.Literal(@int);
+            }
+            else if (this.parameter is string @string)
+            {
+                result["ParameterType"] = Value.Literal(2);
+                result["ParameterValue"] = Value.Literal(@string);
+            }
+            else if (this.parameter is bool @bool)
+            {
+                result["ParameterType"] = Value.Literal(3);
+                result["ParameterValue"] = Value.Literal(@bool);
+            }
+            else if (this.parameter is float @float)
+            {
+                result["ParameterType"] = Value.Literal(4);
+                result["ParameterValue"] = Value.Literal(@float);
+            }
+            else if (this.parameter is DataItem.List list)
+            {
+                result["ParameterType"] = Value.Literal(5);
+                result["ParameterValueA"] = Value.Literal((int)list.itemTypes);
+                result["ParameterValueB"] = Value.Object(list.items.ToArray(), SerializeTextDataItem);
+            }
+            else if (this.parameter is Struct strct)
+            {
+                result["ParameterType"] = Value.Literal(6);
+                string[] fieldNames = new string[strct.fields.Count];
+                DataItem[] fieldValues = new DataItem[strct.fields.Count];
+                for (int i = 0; i < strct.fields.Count; i++)
+                {
+                    var pair = strct.fields.ElementAt(i);
+                    fieldNames[i] = pair.Key;
+                    fieldValues[i] = pair.Value;
+                }
+                result["ParameterValueA"] = Value.Object(fieldNames);
+                result["ParameterValueB"] = Value.Object(fieldValues, SerializeTextDataItem);
+            }
+            else if (this.parameter is UnassignedStruct)
+            {
+                result["ParameterType"] = Value.Literal(7);
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+
+            return result;
+        }
+
+        public void DeserializeText(Value data)
+        {
+            opcode = Enum.Parse<Opcode>(data["OpCode"].String);
+            AddressingMode = Enum.Parse<AddressingMode>(data["AddressingMode"].String);
+            tag = data["Tag"].String;
+            int parameterType = (int)data["ParameterType"].Int;
+            if (parameterType == 0)
+            {
+                this.parameter = null;
+            }
+            else if (parameterType == 1)
+            {
+                this.parameter = data["ParameterValue"].Int;
+            }
+            else if (parameterType == 2)
+            {
+                this.parameter = data["ParameterValue"].String;
+            }
+            else if (parameterType == 3)
+            {
+                this.parameter = data["ParameterValue"].Bool;
+            }
+            else if (parameterType == 4)
+            {
+                this.parameter = data["ParameterValue"].Float;
+            }
+            else if (parameterType == 5)
+            {
+                var types = (DataType)data["ParameterValueA"].Int;
+                var newList = new DataItem.List(types);
+                var items = data["ParameterValueB"].Array.Convert(DeserializeTextDataItem);
+                foreach (var item in items)
+                { newList.Add(item); }
+            }
+            else if (parameterType == 6)
+            {
+                string[] fieldNames = data["ParameterValueA"].Array.ConvertPrimitive<string>();
+                DataItem[] fieldValues = data["ParameterValueB"].Array.Convert(DeserializeTextDataItem);
                 Dictionary<string, DataItem> fields = new();
                 for (int i = 0; i < fieldNames.Length; i++)
                 { fields.Add(fieldNames[i], fieldValues[i]); }

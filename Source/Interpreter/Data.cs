@@ -202,9 +202,9 @@ namespace IngameCoding.Bytecode
             public DataType itemTypes;
             public List<DataItem> items = new();
 
-            public List(DataType type)
+            public List(DataType itemTypes)
             {
-                this.itemTypes = type;
+                this.itemTypes = itemTypes;
             }
 
             internal void Add(DataItem newItem)

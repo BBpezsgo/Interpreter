@@ -191,11 +191,21 @@ namespace IngameCoding.Core
             OnOutput?.Invoke(this, "Start code ...", LogType.Debug);
         }
 
-        public Instruction[] ReadBinary(byte[] code)
+        public Instruction[] Read(byte[] code)
+        {
+            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
+            return ReadRaw(deserializedCode);
+        }
+
+        public Instruction[] Read(string code)
+        {
+            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
+            return ReadRaw(deserializedCode);
+        }
+
+        Instruction[] ReadRaw(CompileIntoFile.SerializableCode deserializedCode)
         {
             List<Error> errors = new();
-
-            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
 
             details = new InterpreterDetails(this);
 

@@ -7,7 +7,7 @@ namespace Bruh
   }
 
   struct DataStructA {
-    byte Name;
+    string Name;
     DataStructB Value;
   }
 }
@@ -49,14 +49,17 @@ void Main()
   Console.Write("dataCopyBefore.Name: ");
   Console.Log(dataCopyBefore.Name);
 
-  int[][] matrix = [];
-  matrix.Push([ 0, 1, 2 ]);
-  matrix.Push([ 3, 4, 5 ]);
+  int[][] matrix = [
+    [ 0, 1, 2 ],
+    [ 3, 4, 5 ]
+  ];
   matrix.Push([ 6, 7, 8 ]);
 
   PrintMatrix(matrix);
 
-  Heh(55);
+  var param = 55;
+  Heh(param);
+  Console.Log(param);
   
   Console.Write("data1.Value.Index: ");
   Console.Log(data1.Value.Index);
@@ -65,10 +68,14 @@ void Main()
   Console.Log(data1.Value.Index);
 
   var bruh = new Bruh.DataStructA;
-  Console.Log(bruh.Name.ToString());
+  bruh.Name = "NAME";
+  Console.Write("bruh.Name: ");
+  Console.Log(bruh.Name);
 
   var bruh2 = Bruh.BruhFunction();
-  Console.Log(bruh2.Name.ToString());
+  bruh2.Name = "NAME2";
+  Console.Write("bruh2.Name: ");
+  Console.Log(bruh2.Name);
 }
 
 void PrintMatrix(int[][] matrix)

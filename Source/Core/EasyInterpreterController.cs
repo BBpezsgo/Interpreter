@@ -14,7 +14,7 @@ namespace IngameCoding.Core
     class EasyInterpreter
     {
         public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors, settings.BasePath);
-        public static void RunBinary(TheProgram.ArgumentParser.Settings settings) => RunBinary(settings.File, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
+        public static void RunCompiledFile(TheProgram.ArgumentParser.Settings settings) => RunCompiledFile(settings.File, settings.bytecodeInterpreterSettings, settings.CompileToFileType, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -125,16 +125,16 @@ namespace IngameCoding.Core
             }
         }
 
-        public static void RunBinary(
+        public static void RunCompiledFile(
             FileInfo file,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
+            TheProgram.ArgumentParser.FileType fileType,
             bool LogDebug = true,
             bool LogSystem = true,
             bool HandleErrors = true
             )
         {
-            if (LogDebug) Output.Output.Debug($"Run binary file '{file.FullName}'");
-            var code = CompileIntoFile.ReadFile(file.FullName);
+            if (LogDebug) Output.Output.Debug($"Run compiled file '{file.FullName}'");
             var codeInterpreter = new Interpreter();
 
             codeInterpreter.OnStdOut += (sender, data) => Output.Output.Write(data).Wait();
@@ -174,7 +174,24 @@ namespace IngameCoding.Core
                 Instruction[] compiledCode = null;
                 try
                 {
-                    compiledCode = codeInterpreter.ReadBinary(code);
+                    switch (fileType)
+                    {
+                        case TheProgram.ArgumentParser.FileType.Binary:
+                            {
+                                byte[] code = CompileIntoFile.ReadFile(file.FullName);
+                                compiledCode = codeInterpreter.Read(code);
+                                break;
+                            }
+                        case TheProgram.ArgumentParser.FileType.Readable:
+                            {
+                                string code = CompileIntoFile.ReadReadableFile(file.FullName);
+                                compiledCode = codeInterpreter.Read(code);
+                                break;
+                            }
+                        default:
+                            Output.Output.Error("Bruh");
+                            break;
+                    }
                 }
                 catch (IndexOutOfRangeException)
                 {

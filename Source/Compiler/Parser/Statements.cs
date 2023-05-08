@@ -35,7 +35,7 @@ namespace IngameCoding.BBCode.Parser.Statements
                 if (@operator.Right != null) if (GetAllStatement(@operator.Right, callback)) return true;
                 if (@operator.Left != null) return GetAllStatement(@operator.Left, callback);
             }
-            else if (st is Statement_Literal literal)
+            else if (st is Statement_Literal)
             { }
             else if (st is Statement_Variable variable)
             { if (variable.ListIndex != null) return GetAllStatement(variable.ListIndex, callback); }
@@ -55,12 +55,14 @@ namespace IngameCoding.BBCode.Parser.Statements
             { return GetAllStatement(ifElseif.Condition, callback); }
             else if (st is Statement_If_Else)
             { }
-            else if (st is Statement_NewInstance newStruct)
+            else if (st is Statement_NewInstance)
             { }
-            else if (st is Statement_Index indexStatement)
+            else if (st is Statement_Index)
             { }
             else if (st is Statement_Field field)
             { return GetAllStatement(field.PrevStatement, callback); }
+            else if (st is Statement_VariableAddressGetter)
+            { }
             else
             { throw new NotImplementedException($"{st.GetType().FullName}"); }
 
@@ -570,6 +572,29 @@ namespace IngameCoding.BBCode.Parser.Statements
             { result.Extend(ListIndex.TotalPosition()); }
             return result;
         }
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_VariableAddressGetter : StatementWithReturnValue
+    {
+        public Token OperatorToken;
+        public Token VariableName;
+
+        public override string ToString()
+        {
+            return $"{OperatorToken.text}{VariableName.text}";
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"{" ".Repeat(ident)}{OperatorToken.text}{VariableName.text}";
+        }
+
+        public Statement_VariableAddressGetter()
+        {
+
+        }
+
+        public override Position TotalPosition() => new(OperatorToken, VariableName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_WhileLoop : StatementParent

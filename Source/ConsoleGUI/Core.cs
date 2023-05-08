@@ -16,6 +16,28 @@ namespace ConsoleGUI
 
     struct MouseInfo
     {
+        public struct ControlKeyStates
+        {
+            public const uint
+                CAPSLOCK_ON = 0x0080,
+                ENHANCED_KEY = 0x0100,
+                LEFT_ALT_PRESSED = 0x0002,
+                LEFT_CTRL_PRESSED = 0x0008,
+                NUMLOCK_ON = 0x0020,
+                RIGHT_ALT_PRESSED = 0x0001,
+                RIGHT_CTRL_PRESSED = 0x0004,
+                SCROLLLOCK_ON = 0x0040,
+                SHIFT_PRESSED = 0x0010;
+        }
+        public struct FlagsValues
+        {
+            public const uint
+                DOUBLE_CLICK = 0x0002,
+                MOUSE_HWHEELED = 0x0008,
+                MOUSE_MOVED = 0x0001,
+                MOUSE_WHEELED = 0x0004;
+        }
+
         internal short X;
         internal short Y;
         internal uint Flags;

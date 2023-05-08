@@ -114,6 +114,8 @@ namespace IngameCoding.Bytecode
                 case Opcode.DEBUG_SET_TAG: return DEBUG_SET_TAG();
                 case Opcode.CS_PUSH: return CS_PUSH();
                 case Opcode.CS_POP: return CS_POP();
+
+                case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
                 #endregion
 
                 default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
@@ -130,6 +132,13 @@ namespace IngameCoding.Bytecode
         };
 
         #region Instruction Methods
+
+        int GET_BASEPOINTER()
+        {
+            Memory.Stack.Push(BasePointer);
+            Step();
+            return 1;
+        }
 
         int COPY_VALUE()
         {

@@ -86,14 +86,14 @@ namespace IngameCoding.BBCode.Compiler
             "void",
             "namespace",
             "using",
-            
+
             "byte",
             "int",
             "bool",
             "float",
             "string"
         };
-        
+
         #region Fields
 
         bool BlockCodeGeneration;
@@ -561,6 +561,7 @@ namespace IngameCoding.BBCode.Compiler
                 throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
             }
         }
+        CompiledType FindStatementType(Statement_VariableAddressGetter variable) => new CompiledType(CompiledType.CompiledTypeType.INT);
         CompiledType FindStatementType(Statement_NewInstance newStruct)
         {
             if (GetCompiledStruct(newStruct, out var structDefinition))
@@ -630,6 +631,8 @@ namespace IngameCoding.BBCode.Compiler
                 { return FindStatementType(literal); }
                 else if (st is Statement_Variable variable)
                 { return FindStatementType(variable); }
+                else if (st is Statement_VariableAddressGetter variableAddressGetter)
+                { return FindStatementType(variableAddressGetter); }
                 else if (st is Statement_NewInstance newStruct)
                 { return FindStatementType(newStruct); }
                 else if (st is Statement_Field field)
@@ -1207,6 +1210,47 @@ namespace IngameCoding.BBCode.Compiler
                 AddInstruction(Opcode.LIST_INDEX);
             }
         }
+        void GenerateCodeForStatement(Statement_VariableAddressGetter variable)
+        {
+            variable.VariableName.Analysis.CompilerReached = true;
+
+            if (GetParameter(variable.VariableName.text, out Parameter param))
+            {
+                variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
+                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
+
+                AddInstruction(Opcode.GET_BASEPOINTER);
+                AddInstruction(Opcode.PUSH_VALUE, param.RealIndex);
+                AddInstruction(Opcode.MATH_ADD);
+            }
+            else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
+            {
+                variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
+                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val.Declaration, val.IsGlobal, val.Type);
+
+                if (val.IsStoredInHEAP)
+                {
+                    AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                }
+                else
+                {
+                    if (val.IsGlobal)
+                    {
+                        AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                    }
+                    else
+                    {
+                        AddInstruction(Opcode.GET_BASEPOINTER);
+                        AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                        AddInstruction(Opcode.MATH_ADD);
+                    }
+                }
+            }
+            else
+            {
+                throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
+            }
+        }
         void GenerateCodeForStatement(Statement_WhileLoop whileLoop)
         {
             var conditionValue_ = PredictStatementValue(whileLoop.Condition);
@@ -1532,6 +1576,8 @@ namespace IngameCoding.BBCode.Compiler
             { GenerateCodeForStatement(literal); }
             else if (st is Statement_Variable variable)
             { GenerateCodeForStatement(variable); }
+            else if (st is Statement_VariableAddressGetter variableAddressGetter)
+            { GenerateCodeForStatement(variableAddressGetter); }
             else if (st is Statement_WhileLoop whileLoop)
             { GenerateCodeForStatement(whileLoop); }
             else if (st is Statement_ForLoop forLoop)
@@ -1898,7 +1944,7 @@ namespace IngameCoding.BBCode.Compiler
 
                         if (initialTypeRaw.IsStruct) newVariable.Type.NamespacePrefix = initialTypeRaw.Struct.NamespacePathString;
                         if (initialTypeRaw.IsClass) newVariable.Type.NamespacePrefix = initialTypeRaw.Class.NamespacePathString;
-                        
+
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false, initialTypeRaw);
 
                         GenerateCodeForVariable(newVariable, isGlobal);
@@ -2431,6 +2477,8 @@ namespace IngameCoding.BBCode.Compiler
                     { }
                     else if (st is Statement_Literal)
                     { }
+                    else if (st is Statement_VariableAddressGetter)
+                    { }
                     else if (st is Statement_ListValue st10)
                     { AnalyzeStatements(st10.Values); }
                     else
@@ -2756,16 +2804,17 @@ namespace IngameCoding.BBCode.Compiler
 
             BlockCodeGeneration = false;
 
-            var setGlobalVariablesInstruction = compiledCode.Count;
             AddInstruction(Opcode.COMMENT, "Global variables");
-            AddInstruction(Opcode.CS_PUSH, "state: SetGlobalVariables");
-            int globalVariableCount = 0;
-            foreach (var globalVariable in globalVariables)
+            var setGlobalVariablesInstruction = compiledCode.Count;
+            if (globalVariables.Count > 0)
             {
-                GenerateCodeForVariable(globalVariable, true);
-                globalVariableCount++;
+                AddInstruction(Opcode.CS_PUSH, "state: SetGlobalVariables");
+                foreach (var globalVariable in globalVariables)
+                {
+                    GenerateCodeForVariable(globalVariable, true);
+                }
+                AddInstruction(Opcode.CS_POP);
             }
-            AddInstruction(Opcode.CS_POP);
             AddInstruction(Opcode.EXIT);
 
             foreach (var function in this.compiledFunctions)
@@ -2777,13 +2826,16 @@ namespace IngameCoding.BBCode.Compiler
                 if (function.Value.Statements.Count > 0) AddInstruction(Opcode.COMMENT, "}");
             }
 
-            var clearGlobalVariablesInstruction = compiledCode.Count;
             AddInstruction(Opcode.COMMENT, "Clear global variables");
-            AddInstruction(Opcode.CS_PUSH, "state: DisposeGlobalVariables");
-            for (int i = 0; i < globalVariableCount; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
-            compiledVariables.Clear();
-            AddInstruction(Opcode.CS_POP);
+            var clearGlobalVariablesInstruction = compiledCode.Count;
+            if (globalVariables.Count > 0)
+            {
+                AddInstruction(Opcode.CS_PUSH, "state: DisposeGlobalVariables");
+                for (int i = 0; i < globalVariables.Count; i++)
+                { AddInstruction(Opcode.POP_VALUE); }
+                compiledVariables.Clear();
+                AddInstruction(Opcode.CS_POP);
+            }
             AddInstruction(Opcode.EXIT);
 
             BlockCodeGeneration = true;

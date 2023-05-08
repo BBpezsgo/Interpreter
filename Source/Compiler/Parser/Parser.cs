@@ -464,7 +464,7 @@ namespace IngameCoding.BBCode
             public double ParseTime;
         }
 
-        public struct ParserResult
+        public readonly struct ParserResult
         {
             public readonly List<FunctionDefinition> Functions;
             public readonly Dictionary<string, StructDefinition> Structs;
@@ -852,7 +852,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public struct ParserResultHeader
+        public readonly struct ParserResultHeader
         {
             public readonly List<UsingDefinition> Usings;
             public readonly Statement_HashInfo[] Hashes;
@@ -1779,6 +1779,18 @@ namespace IngameCoding.BBCode
                         returnStatement = variableNameStatement;
                     }
                 }
+                else if (ExpectVariableAddressGetter(out Statement_VariableAddressGetter variableAddressGetter))
+                {
+                    if (variableAddressGetter.VariableName.text == "this")
+                    { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableAddressGetter.VariableName)); }
+
+                    if (variableAddressGetter.VariableName.text == "this")
+                    { variableAddressGetter.VariableName.Analysis.Subtype = TokenSubtype.Keyword; }
+                    else
+                    { variableAddressGetter.VariableName.Analysis.Subtype = TokenSubtype.VariableName; }
+
+                    returnStatement = variableAddressGetter;
+                }
 
                 while (true)
                 {
@@ -1817,6 +1829,30 @@ namespace IngameCoding.BBCode
                 }
 
                 return returnStatement;
+            }
+
+            bool ExpectVariableAddressGetter(out Statement_VariableAddressGetter statement)
+            {
+                var parseStart = currentTokenIndex;
+                if (!ExpectOperator("&", out var refToken))
+                {
+                    statement = null;
+                    currentTokenIndex = parseStart;
+                    return false;
+                }
+                if (!ExpectIdentifier(out var variableName))
+                {
+                    statement = null;
+                    currentTokenIndex = parseStart;
+                    return false;
+                }
+
+                statement = new Statement_VariableAddressGetter()
+                {
+                    OperatorToken = refToken,
+                    VariableName = variableName,
+                };
+                return true;
             }
 
             List<Statement> ParseFunctionBody(out Token braceletStart, out Token braceletEnd)

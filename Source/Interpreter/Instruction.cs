@@ -7,6 +7,15 @@ using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
+    /// <summary>
+    /// Only used by these instructions:<br/>
+    /// <list type="bullet">
+    /// <item><see cref="Opcode.STORE_VALUE"/></item>
+    /// <item><see cref="Opcode.LOAD_VALUE"/></item>
+    /// <item><see cref="Opcode.STORE_FIELD"/></item>
+    /// <item><see cref="Opcode.LOAD_FIELD"/></item>
+    /// </list>
+    /// </summary>
     public enum AddressingMode : byte
     {
         ABSOLUTE,
@@ -17,7 +26,7 @@ namespace IngameCoding.Bytecode
 
     [Serializable]
     [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Instruction : ISerializable<Instruction>, DataUtilities.ReadableFileFormat.ISerializableText, DataUtilities.ReadableFileFormat.IDeserializableText<Instruction>
+    public class Instruction : ISerializable<Instruction>, DataUtilities.ReadableFileFormat.ISerializableText, DataUtilities.ReadableFileFormat.IDeserializableText
     {
         public AddressingMode AddressingMode;
         public Opcode opcode;
@@ -90,12 +99,30 @@ namespace IngameCoding.Bytecode
             this.parameter = parameter;
         }
 
+        /// <param name="addressingMode">
+        /// Only used by these instructions:<br/>
+        /// <list type="bullet">
+        /// <item><see cref="Opcode.STORE_VALUE"/></item>
+        /// <item><see cref="Opcode.LOAD_VALUE"/></item>
+        /// <item><see cref="Opcode.STORE_FIELD"/></item>
+        /// <item><see cref="Opcode.LOAD_FIELD"/></item>
+        /// </list>
+        /// </param>
         public Instruction(Opcode opcode, AddressingMode addressingMode)
         {
             this.opcode = opcode;
             this.AddressingMode = addressingMode;
             this.parameter = null;
         }
+        /// <param name="addressingMode">
+        /// Only used by these instructions:<br/>
+        /// <list type="bullet">
+        /// <item><see cref="Opcode.STORE_VALUE"/></item>
+        /// <item><see cref="Opcode.LOAD_VALUE"/></item>
+        /// <item><see cref="Opcode.STORE_FIELD"/></item>
+        /// <item><see cref="Opcode.LOAD_FIELD"/></item>
+        /// </list>
+        /// </param>
         public Instruction(Opcode opcode, AddressingMode addressingMode, object parameter)
         {
             this.opcode = opcode;
@@ -165,7 +192,7 @@ namespace IngameCoding.Bytecode
             {
                 serializer.Serialize((byte)5);
                 serializer.Serialize((int)list.itemTypes);
-                serializer.SerializeObjectArray(list.items.ToArray(), SerializeDataItem);
+                serializer.Serialize(list.items.ToArray(), SerializeDataItem);
             }
             else if (this.parameter is Struct strct)
             {
@@ -179,7 +206,7 @@ namespace IngameCoding.Bytecode
                     fieldValues[i] = pair.Value;
                 }
                 serializer.Serialize(fieldNames);
-                serializer.SerializeObjectArray(fieldValues, SerializeDataItem);
+                serializer.Serialize(fieldValues, SerializeDataItem);
             }
             else if (this.parameter is UnassignedStruct)
             {
@@ -220,13 +247,13 @@ namespace IngameCoding.Bytecode
                             fieldValues[i] = pair.Value;
                         }
                         serializer.Serialize(fieldNames);
-                        serializer.SerializeObjectArray(fieldValues, SerializeDataItem);
+                        serializer.Serialize(fieldValues, SerializeDataItem);
                         break;
                     }
                     throw new NotImplementedException();
                 case DataType.LIST:
                     serializer.Serialize((int)dataItem.ValueList.itemTypes);
-                    serializer.SerializeObjectArray(dataItem.ValueList.items.ToArray(), SerializeDataItem);
+                    serializer.Serialize(dataItem.ValueList.items.ToArray(), SerializeDataItem);
                     break;
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
@@ -249,14 +276,14 @@ namespace IngameCoding.Bytecode
                     return new DataItem(deserializer.DeserializeBoolean(), tag);
                 case DataType.STRUCT:
                     string[] fieldNames = deserializer.DeserializeArray<string>();
-                    DataItem[] fieldValues = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                    DataItem[] fieldValues = deserializer.DeserializeArray(DeserializeDataItem);
                     Dictionary<string, DataItem> fields = new();
                     for (int i = 0; i < fieldNames.Length; i++)
                     { fields.Add(fieldNames[i], fieldValues[i]); }
                     return new DataItem(new Struct(fields, null), tag);
                 case DataType.LIST:
                     var itemTypes = (DataType)deserializer.DeserializeInt32();
-                    var items = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                    var items = deserializer.DeserializeArray(DeserializeDataItem);
                     var newList = new DataItem.List(itemTypes);
                     for (int i = 0; i < items.Length; i++)
                     { newList.Add(items[i]); }
@@ -373,14 +400,14 @@ namespace IngameCoding.Bytecode
             {
                 var types = (DataType)deserializer.DeserializeInt32();
                 var newList = new DataItem.List(types);
-                var items = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                var items = deserializer.DeserializeArray(DeserializeDataItem);
                 foreach (var item in items)
                 { newList.Add(item); }
             }
             else if (parameterType == 6)
             {
                 string[] fieldNames = deserializer.DeserializeArray<string>();
-                DataItem[] fieldValues = deserializer.DeserializeObjectArray(DeserializeDataItem);
+                DataItem[] fieldValues = deserializer.DeserializeArray(DeserializeDataItem);
                 Dictionary<string, DataItem> fields = new();
                 for (int i = 0; i < fieldNames.Length; i++)
                 { fields.Add(fieldNames[i], fieldValues[i]); }

@@ -160,8 +160,8 @@ namespace IngameCoding.BBCode.Compiler
             {
                 serializer.Serialize(setGlobalVariablesInstruction);
                 serializer.Serialize(clearGlobalVariablesInstruction);
-                serializer.SerializeObjectArray(compiledCode);
-                serializer.Serialize(functionOffsets, false);
+                serializer.Serialize(compiledCode);
+                serializer.Serialize(functionOffsets);
             }
 
             void ISerializable<CompilerResult>.Deserialize(Deserializer deserializer)
@@ -169,7 +169,7 @@ namespace IngameCoding.BBCode.Compiler
                 this.setGlobalVariablesInstruction = deserializer.DeserializeInt32();
                 this.clearGlobalVariablesInstruction = deserializer.DeserializeInt32();
                 this.compiledCode = deserializer.DeserializeObjectArray<Instruction>();
-                this.functionOffsets = deserializer.DeserializeDictionary<string, int>(false, false);
+                this.functionOffsets = deserializer.DeserializeDictionary<string, int>();
             }
         }
 

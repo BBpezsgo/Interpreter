@@ -110,5 +110,7 @@
         /// Replaces the last element with its own recursive copy
         /// </summary>
         COPY_VALUE_RECURSIVE,
+
+        GET_BASEPOINTER,
     }
 }

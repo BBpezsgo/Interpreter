@@ -1,6 +1,7 @@
 ﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
+#pragma warning disable CS0162 // Unreachable code detected
 
 namespace TheProgram
 {
@@ -12,7 +13,7 @@ namespace TheProgram
             // fájl: test-matrix.bbc
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test7.bbc";
+            var file = "test-pointers.bbc";
 
             if (false)
             {
@@ -40,6 +41,7 @@ namespace TheProgram
                 // "-test",
                 // "-decompile",
                 // "-compile",
+                "-debug",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
                 $"\"{TestConstants.TestFilesPath}{file}\""
@@ -55,6 +57,13 @@ namespace TheProgram
             var settings = ArgumentParser.Parse(args);
             if (!settings.HasValue) goto ExitProgram;
 
+            ConsoleGUI.ConsoleGUI a = new()
+            {
+                FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
+            };
+            return;
+
+            /*
             IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
             {
                 "-throw-errors",
@@ -95,6 +104,7 @@ namespace TheProgram
                 "\".\\output.bin\"",
             }).Value);
             goto ExitProgram;
+            */
 
             switch (settings.Value.RunType)
             {

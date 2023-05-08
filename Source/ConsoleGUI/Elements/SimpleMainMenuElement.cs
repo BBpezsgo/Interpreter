@@ -131,7 +131,7 @@ namespace ConsoleGUI
         {
             if (e.bKeyDown) return;
 
-            Debug.WriteLine(e.AsciiChar);
+            // Debug.WriteLine(e.AsciiChar);
         }
 
         void ScrollTo(int value) => Scroll = 0; // Math.Clamp(value, 0, File.Split('\n').Length - Rect.Height + 1);

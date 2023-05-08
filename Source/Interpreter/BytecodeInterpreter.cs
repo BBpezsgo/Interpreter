@@ -207,6 +207,15 @@ namespace IngameCoding.Bytecode
             currentlyRunning = false;
             enable = false;
         }
+
+        internal int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
+        {
+            AddressingMode.ABSOLUTE => offset,
+            AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
+            AddressingMode.RELATIVE => BytecodeProcessor.Memory.Stack.Count + offset,
+            AddressingMode.POP => BytecodeProcessor.Memory.Stack.Count - 1,
+            _ => offset,
+        };
     }
 
     public struct BytecodeInterpreterSettings

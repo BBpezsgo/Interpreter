@@ -1,12 +1,13 @@
 ﻿using IngameCoding.Core;
 
 using System;
-using System.Diagnostics;
 using System.IO;
 
 namespace ConsoleGUI
 {
     using ConsoleLib;
+
+    using System.Collections.Generic;
 
     internal class InterpreterElement : BaseWindowElement
     {
@@ -15,6 +16,8 @@ namespace ConsoleGUI
         Interpreter Interpreter;
 
         string ConsoleText = "";
+
+        int ConsoleScrollOffset = 0;
 
         public InterpreterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
         {
@@ -47,7 +50,7 @@ namespace ConsoleGUI
             {
                 Rect = StatePanelRect
             };
-            StatePanel.OnBeforeDraw += NewElement3_OnBeforeDraw;
+            StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
             StatePanel.OnRefreshSize += (sender) =>
             {
                 var leftWidth = Console.WindowWidth / 2;
@@ -63,7 +66,7 @@ namespace ConsoleGUI
             {
                 Rect = CodePanelRect
             };
-            CodePanel.OnBeforeDraw += NewElement1_OnBeforeDraw;
+            CodePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
             CodePanel.OnRefreshSize += (sender) =>
             {
                 var leftWidth = Console.WindowWidth / 2;
@@ -90,12 +93,25 @@ namespace ConsoleGUI
 
                 sender.Rect = ConsolePanelRect;
             };
+            ConsolePanel.OnMouseEventInvoked += (sender, e) =>
+            {
+                if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
+                {
+                    ConsoleScrollOffset++;
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleText.Trim().Split('\n').Length - sender.Rect.Height), 3);
+                }
+                else if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
+                {
+                    ConsoleScrollOffset--;
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleText.Trim().Split('\n').Length - sender.Rect.Height), 3);
+                }
+            };
 
             var StackPanel = new BaseInlineElement
             {
                 Rect = StackPanelRect
             };
-            StackPanel.OnBeforeDraw += NewElement2_OnBeforeDraw;
+            StackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
             StackPanel.OnRefreshSize += (sender) =>
             {
                 var leftWidth = Console.WindowWidth / 2;
@@ -206,7 +222,8 @@ namespace ConsoleGUI
             }
 
             var lines = ConsoleText.Trim().Split('\n');
-            for (int i = Math.Max(0, lines.Length - sender.Rect.Height); i < lines.Length; i++)
+
+            for (int i = Math.Max(0, lines.Length - sender.Rect.Height + ConsoleScrollOffset); i < lines.Length; i++)
             {
                 var line = lines[i];
 
@@ -217,7 +234,7 @@ namespace ConsoleGUI
             }
         }
 
-        private void NewElement3_OnBeforeDraw(BaseInlineElement sender)
+        private void StateElement_OnBeforeDraw(BaseInlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -404,7 +421,7 @@ namespace ConsoleGUI
                 ForegroundColor = CharColors.FgDefault;
             }
         }
-        private void NewElement2_OnBeforeDraw(BaseInlineElement sender)
+        private void StackElement_OnBeforeDraw(BaseInlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -451,18 +468,70 @@ namespace ConsoleGUI
                 AddChar(' ');
             }
 
-            for (int i = 0; i < this.Interpreter.Details.Interpreter.Stack.Length; i++)
+            IngameCoding.Bytecode.Instruction instruction = null;
+            for (int cp = this.Interpreter.Details.Interpreter.CodePointer; cp < this.Interpreter.Details.CompilerResult.compiledCode.Length; cp++)
+            {
+                instruction = this.Interpreter.Details.CompilerResult.compiledCode[cp];
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT) continue;
+                break;
+            }
+
+            List<int> savedBasePointers = new();
+
+            for (int j = 0; j < this.Interpreter.Details.Interpreter.Stack.Length; j++)
+            {
+                var item = this.Interpreter.Details.Interpreter.Stack[j];
+                if (item.type != IngameCoding.Bytecode.DataType.INT) continue;
+                if (item.Tag != "saved base pointer") continue;
+                savedBasePointers.Add(item.ValueInt);
+            }
+
+            bool basepointerShown = false;
+            int i;
+            for (i = 0; i < this.Interpreter.Details.Interpreter.Stack.Length; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Stack[i];
 
-                ForegroundColor = CharColors.FgGray;
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
-                    ForegroundColor = CharColors.FgBlack;
-                    BackgroundColor = CharColors.BgGray;
+                    ForegroundColor = CharColors.FgLightBlue;
+                    AddText("►");
+                    basepointerShown = true;
+                    ForegroundColor = CharColors.FgGray;
+                }
+                else if (savedBasePointers.Contains(i))
+                {
+                    ForegroundColor = CharColors.FgGray;
+                    AddText("►");
+                    ForegroundColor = CharColors.FgGray;
+                }
+                else
+                {
+                    ForegroundColor = CharColors.FgGray;
+                    AddText(" ");
                 }
 
-                AddText(" ".Repeat(4 - i.ToString().Length));
+                bool addIndicator = false;
+                if (instruction != null)
+                {
+                    if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
+                        instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
+                        instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD ||
+                        instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
+                    {
+                        addIndicator = this.Interpreter.Details.Interpreter.GetAddress((int)instruction.parameter, instruction.AddressingMode) == i;
+                    }
+                }
+
+                if (addIndicator)
+                {
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("●");
+                    ForegroundColor = CharColors.FgGray;
+                }
+
+                AddText(" ".Repeat((addIndicator ? 2 : 3) - i.ToString().Length));
+
                 AddText(i.ToString());
                 AddSpace(5);
 
@@ -481,7 +550,7 @@ namespace ConsoleGUI
                         break;
                     case IngameCoding.Bytecode.DataType.STRING:
                         ForegroundColor = CharColors.FgYellow;
-                        AddText($"\"{item.ValueString}\"");
+                        AddText($"\"{item.ValueString.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t").Replace("\0", "\\0")}\"");
                         break;
                     case IngameCoding.Bytecode.DataType.BOOLEAN:
                         ForegroundColor = CharColors.FgDarkBlue;
@@ -489,26 +558,57 @@ namespace ConsoleGUI
                         break;
                     case IngameCoding.Bytecode.DataType.STRUCT:
                         ForegroundColor = CharColors.FgWhite;
-                        var @struct = item.ValueStruct;
-                        var fields = @struct.GetFields();
-                        string text = "{";
-                        for (int j = 0; j < fields.Length; j++)
                         {
-                            var field = fields[j];
-                            var text_ = $" {field}: {@struct.GetField(field)}";
-
-                            if ((text + text_).Length > 10)
+                            var @struct = item.ValueStruct;
+                            var fields = @struct.GetFields();
+                            string text = "{";
+                            for (int j = 0; j < fields.Length; j++)
                             {
-                                text += " ...";
-                                break;
+                                var field = fields[j];
+                                var text_ = $" {field}: {@struct.GetField(field)}";
+
+                                if ((text + text_).Length > 10)
+                                {
+                                    text += " ...";
+                                    break;
+                                }
+                                text += text_;
                             }
-                            text += text_;
+                            text += " }";
+                            AddText(text);
                         }
-                        text += " }";
-                        AddText(text);
                         break;
                     case IngameCoding.Bytecode.DataType.LIST:
-                        AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
+                        {
+                            var valueList = item.ValueList;
+                            string text = $"{valueList.itemTypes.ToString().ToLower()}";
+                            text += " [";
+
+                            int j = 0;
+                            while (text.Length < sender.Rect.Width - 10 && j < valueList.items.Count)
+                            {
+                                if (j > 0)
+                                {
+                                    text += ",";
+                                }
+
+                                text += $" ${valueList.items[j]}";
+
+                                j++;
+                            }
+                            if (j < valueList.items.Count)
+                            {
+                                if (j > 0)
+                                {
+                                    text += ",";
+                                }
+                                text += " ...";
+                            }
+
+                            text += " ]";
+
+                            AddText(text);
+                        }
                         break;
                     default:
                         ForegroundColor = CharColors.FgGray;
@@ -532,8 +632,31 @@ namespace ConsoleGUI
                 FinishLine();
                 ForegroundColor = CharColors.FgDefault;
             }
+            while (basepointerShown == false && i <= this.Interpreter.Details.Interpreter.BasePointer)
+            {
+                if (this.Interpreter.Details.Interpreter.BasePointer == i)
+                {
+                    ForegroundColor = CharColors.FgLightBlue;
+                    AddText("► " + " ".Repeat(2 - i.ToString().Length));
+                    basepointerShown = true;
+                    ForegroundColor = CharColors.FgGray;
+                }
+                else
+                {
+                    ForegroundColor = CharColors.FgGray;
+                    AddText(" ".Repeat(4 - i.ToString().Length));
+                }
+
+                AddText(i.ToString());
+                AddSpace(5);
+
+                BackgroundColor = CharColors.BgBlack;
+                FinishLine();
+                ForegroundColor = CharColors.FgDefault;
+            }
+
         }
-        private void NewElement1_OnBeforeDraw(BaseInlineElement sender)
+        private void SourceCodeElement_OnBeforeDraw(BaseInlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -645,6 +768,15 @@ namespace ConsoleGUI
                 AddText($"{instruction.opcode}");
                 AddText($" ");
 
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
+                {
+                    AddText($"{instruction.AddressingMode}");
+                    AddText($" ");
+                }
+
                 if (instruction.parameter is int || instruction.parameter is float)
                 {
                     ForegroundColor = CharColors.FgCyan;
@@ -688,18 +820,20 @@ namespace ConsoleGUI
             base.BeforeDraw();
         }
 
-        internal override void OnMouseEvent(MouseInfo mouse)
+        internal override void OnMouseEvent(MouseInfo e)
         {
-            if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
+            if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
             {
                 ClearBuffer();
                 ScrollTo(Scroll - 1);
             }
-            else if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
+            else if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
             {
                 ClearBuffer();
                 ScrollTo(Scroll + 1);
             }
+
+            // if ((e.Flags & MouseInfo.FlagsValues.MOUSE_MOVED) == 0) Debug.WriteLine($"Mouse Event {{ ButtonState: {e.ButtonState}, ControlKeyState: {e.ControlKeyState}, Flags: {e.Flags}, Pos: {{ {e.X} : {e.Y} }} }}");
         }
 
         internal override void OnKeyEvent(NativeMethods.KEY_EVENT_RECORD e)
@@ -710,10 +844,8 @@ namespace ConsoleGUI
             {
                 this.Interpreter.Update();
             }
-            else
-            {
-                Debug.WriteLine(e.AsciiChar);
-            }
+
+            // Debug.WriteLine($"Key Event {{ ASCII: {e.AsciiChar} }}");
         }
 
         void ScrollTo(int value) => Scroll = 0; // Math.Clamp(value, 0, File.Split('\n').Length - Rect.Height + 1);

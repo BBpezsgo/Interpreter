@@ -1,0 +1,9 @@
+using System;
+
+[CodeEntry]
+void Start() {
+	string value = "Hello";
+	int valueAddress = &value;
+	Console.Log(value);
+	Console.Log(valueAddress);
+}

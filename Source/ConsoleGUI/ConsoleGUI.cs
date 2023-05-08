@@ -20,8 +20,7 @@ namespace ConsoleGUI
 
         internal List<BaseWindowElement> Elements = new();
         readonly SafeFileHandle ConsoleHandle;
-
-        bool DebugLogs;
+        readonly bool DebugLogs;
 
         short width;
         short height;
@@ -347,6 +346,11 @@ namespace ConsoleGUI
             }
             if (FilledElement != null)
             {
+                for (int i = 0; i < FilledElement.Elements.Length; i++)
+                {
+                    if (!FilledElement.Elements[i].Contains(Mouse.X, Mouse.Y)) continue;
+                    FilledElement.Elements[i].OnMouseEvent(Mouse);
+                }
                 FilledElement.OnMouseEvent(Mouse);
                 FilledElement.BeforeDraw();
                 DrawElement(FilledElement);

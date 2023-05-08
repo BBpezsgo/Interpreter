@@ -58,7 +58,7 @@ namespace IngameCoding
             File.WriteAllBytes(output, dataToWriteArray);
 
             var compressionRatio = data.LongLength / (float)dataToWriteArray.LongLength;
-          
+
             if (LogDebugs) Output.Output.Debug($"Done");
             if (LogDebugs) Output.Output.Debug($" Compression Ratio: -{Math.Round((1f - compressionRatio) * 100f)}%");
             if (LogDebugs) Output.Output.Debug($" Size: {dataToWriteArray.LongLength} bytes");
@@ -112,7 +112,7 @@ namespace IngameCoding
             if (settings.LogDebugs) Output.Output.Debug($"Serialize code ...");
 
             Serializer serializer = new();
-            serializer.SerializeObject(new SerializableCode(compilerResult));
+            serializer.Serialize(new SerializableCode(compilerResult));
 
             var output = settings.CompileOutput;
             CompressionLevel compressionLevel = settings.CompressionLevel;
@@ -130,7 +130,7 @@ namespace IngameCoding
 
             var output = settings.CompileOutput;
             if (settings.LogDebugs) Output.Output.Debug($"Write text to \"{output}\" ...");
-            File.WriteAllText(output, data.ConvertToString(false));
+            File.WriteAllText(output, data.ToSDF(false));
         }
 
         internal static SerializableCode Decompile(byte[] data)
@@ -141,14 +141,13 @@ namespace IngameCoding
 
         internal static SerializableCode Decompile(string raw)
         {
-            var parser = new Parser(raw);
-            var data = parser.Parse();
+            var data = Parser.Parse(raw);
             var serializableCode = new SerializableCode();
             serializableCode.DeserializeText(data);
             return serializableCode;
         }
 
-        internal class SerializableLiteral : ISerializable<SerializableLiteral>, ISerializableText, IDeserializableText<SerializableLiteral>
+        internal class SerializableLiteral : ISerializable<SerializableLiteral>, ISerializableText, IDeserializableText
         {
             internal Literal.Type Type;
             internal bool ValueBool;
@@ -250,7 +249,7 @@ namespace IngameCoding
             }
         }
 
-        internal class SerializableAttribute : ISerializable<SerializableAttribute>, ISerializableText, IDeserializableText<SerializableAttribute>
+        internal class SerializableAttribute : ISerializable<SerializableAttribute>, ISerializableText, IDeserializableText
         {
             internal string Name;
             internal SerializableLiteral[] parameters;
@@ -276,7 +275,7 @@ namespace IngameCoding
             public void Serialize(Serializer serializer)
             {
                 serializer.Serialize(this.Name);
-                serializer.SerializeObjectArray(this.parameters);
+                serializer.Serialize(this.parameters);
             }
 
             Value ISerializableText.SerializeText()
@@ -338,7 +337,7 @@ namespace IngameCoding
             }
         }
 
-        internal class SerializableFunctionDef : ISerializable<SerializableFunctionDef>, ISerializableText, IDeserializableText<SerializableFunctionDef>
+        internal class SerializableFunctionDef : ISerializable<SerializableFunctionDef>, ISerializableText, IDeserializableText
         {
             internal string Name;
             internal string[] NamespacePath;
@@ -415,7 +414,7 @@ namespace IngameCoding
             {
                 serializer.Serialize(this.Name);
                 serializer.Serialize(this.NamespacePath);
-                serializer.SerializeObjectArray(this.Attributes);
+                serializer.Serialize(this.Attributes);
             }
 
             internal bool TryGetAttribute(string name, out SerializableAttribute attriute)
@@ -433,7 +432,7 @@ namespace IngameCoding
             }
         }
 
-        internal class SerializableCode : ISerializable<SerializableCode>, ISerializableText, IDeserializableText<SerializableCode>
+        internal class SerializableCode : ISerializable<SerializableCode>, ISerializableText, IDeserializableText
         {
             internal Instruction[] Instructions;
             internal Dictionary<string, int> FunctionOffsets;
@@ -460,7 +459,7 @@ namespace IngameCoding
             {
                 OffsetSetGlobalVariables = deserializer.DeserializeInt32();
                 OffsetClearGlobalVariables = deserializer.DeserializeInt32();
-                FunctionOffsets = deserializer.DeserializeDictionary<string, int>(false, false);
+                FunctionOffsets = deserializer.DeserializeDictionary<string, int>();
                 Instructions = deserializer.DeserializeObjectArray<Instruction>();
                 CompiledFunctions = deserializer.DeserializeObjectArray<SerializableFunctionDef>();
             }
@@ -478,9 +477,9 @@ namespace IngameCoding
             {
                 serializer.Serialize(OffsetSetGlobalVariables);
                 serializer.Serialize(OffsetClearGlobalVariables);
-                serializer.Serialize(FunctionOffsets, false);
-                serializer.SerializeObjectArray(Instructions);
-                serializer.SerializeObjectArray(CompiledFunctions);
+                serializer.Serialize(FunctionOffsets);
+                serializer.Serialize(Instructions);
+                serializer.Serialize(CompiledFunctions);
             }
 
             public Value SerializeText()

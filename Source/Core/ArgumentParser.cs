@@ -20,6 +20,7 @@ namespace TheProgram
             Tester,
             Compile,
             Decompile,
+            ConsoleGUI,
         }
 
         public enum FileType
@@ -121,6 +122,14 @@ namespace TheProgram
                         if (result.RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
                         result.RunType = RunType.Debugger;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-console-gui")
+                    {
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ConsoleGUI}");
+                        result.RunType = RunType.ConsoleGUI;
                         goto ArgParseDone;
                     }
 

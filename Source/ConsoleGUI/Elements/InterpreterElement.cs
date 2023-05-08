@@ -519,7 +519,7 @@ namespace ConsoleGUI
                         instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD ||
                         instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
                     {
-                        addIndicator = this.Interpreter.Details.Interpreter.GetAddress((int)instruction.parameter, instruction.AddressingMode) == i;
+                        addIndicator = this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode) == i;
                     }
                 }
 
@@ -561,20 +561,32 @@ namespace ConsoleGUI
                         {
                             var @struct = item.ValueStruct;
                             var fields = @struct.GetFields();
-                            string text = "{";
-                            for (int j = 0; j < fields.Length; j++)
-                            {
-                                var field = fields[j];
-                                var text_ = $" {field}: {@struct.GetField(field)}";
 
-                                if ((text + text_).Length > 10)
+                            string text = "{";
+
+                            int j = 0;
+                            while (text.Length < sender.Rect.Width - 10 && j < fields.Length)
+                            {
+                                if (j > 0)
                                 {
-                                    text += " ...";
-                                    break;
+                                    text += ";";
                                 }
-                                text += text_;
+
+                                text += $" {fields[j]}: {@struct.GetField(fields[j])}";
+
+                                j++;
                             }
+                            if (j < fields.Length)
+                            {
+                                if (j > 0)
+                                {
+                                    text += ";";
+                                }
+                                text += " ...";
+                            }
+
                             text += " }";
+
                             AddText(text);
                         }
                         break;
@@ -592,7 +604,7 @@ namespace ConsoleGUI
                                     text += ",";
                                 }
 
-                                text += $" ${valueList.items[j]}";
+                                text += $" {valueList.items[j]}";
 
                                 j++;
                             }
@@ -843,6 +855,10 @@ namespace ConsoleGUI
             if (e.AsciiChar == 9)
             {
                 this.Interpreter.Update();
+                if (!this.Interpreter.IsExecutingCode)
+                {
+                    ConsoleGUI.Instance.Destroy();
+                }
             }
 
             // Debug.WriteLine($"Key Event {{ ASCII: {e.AsciiChar} }}");

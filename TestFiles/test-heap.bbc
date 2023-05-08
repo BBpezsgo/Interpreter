@@ -19,7 +19,7 @@ void Start()
   foo2.v = 3;
   Console.Log(foo.v);
   Console.Log(foo2.v);
-    
+
   Hehe hehe = new Hehe;
   hehe.Func();
   Hehe hehe2 = hehe;

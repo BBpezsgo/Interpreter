@@ -61,7 +61,9 @@ namespace IngameCoding.BBCode.Parser.Statements
             { }
             else if (st is Statement_Field field)
             { return GetAllStatement(field.PrevStatement, callback); }
-            else if (st is Statement_VariableAddressGetter)
+            else if (st is Statement_MemoryAddressGetter)
+            { }
+            else if (st is Statement_MemoryAddressFinder)
             { }
             else
             { throw new NotImplementedException($"{st.GetType().FullName}"); }
@@ -574,27 +576,60 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_VariableAddressGetter : StatementWithReturnValue
+    public class Statement_MemoryAddressGetter : StatementWithReturnValue
     {
         public Token OperatorToken;
-        public Token VariableName;
+        internal StatementWithReturnValue PrevStatement;
 
         public override string ToString()
         {
-            return $"{OperatorToken.text}{VariableName.text}";
+            return $"{OperatorToken.text}{PrevStatement}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{OperatorToken.text}{VariableName.text}";
+            return $"{" ".Repeat(ident)}{OperatorToken.text}{PrevStatement.PrettyPrint(0)}";
         }
 
-        public Statement_VariableAddressGetter()
+        public Statement_MemoryAddressGetter()
         {
 
         }
 
-        public override Position TotalPosition() => new(OperatorToken, VariableName);
+        public override Position TotalPosition()
+        {
+            Position result = PrevStatement.TotalPosition();
+            result.Extend(OperatorToken);
+            return result;
+        }
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_MemoryAddressFinder : StatementWithReturnValue
+    {
+        public Token OperatorToken;
+        internal StatementWithReturnValue PrevStatement;
+
+        public override string ToString()
+        {
+            return $"{OperatorToken.text}{PrevStatement}";
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"{" ".Repeat(ident)}{OperatorToken.text}{PrevStatement.PrettyPrint(0)}";
+        }
+
+        public Statement_MemoryAddressFinder()
+        {
+
+        }
+
+        public override Position TotalPosition()
+        {
+            Position result = PrevStatement.TotalPosition();
+            result.Extend(OperatorToken);
+            return result;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_WhileLoop : StatementParent

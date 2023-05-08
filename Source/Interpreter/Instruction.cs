@@ -22,6 +22,7 @@ namespace IngameCoding.Bytecode
         BASEPOINTER_RELATIVE,
         RELATIVE,
         POP,
+        RUNTIME,
     }
 
     [Serializable]

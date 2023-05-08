@@ -41,7 +41,8 @@ namespace TheProgram
                 // "-test",
                 // "-decompile",
                 // "-compile",
-                "-debug",
+                // "-debug",
+                // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
                 $"\"{TestConstants.TestFilesPath}{file}\""
@@ -56,12 +57,6 @@ namespace TheProgram
 
             var settings = ArgumentParser.Parse(args);
             if (!settings.HasValue) goto ExitProgram;
-
-            ConsoleGUI.ConsoleGUI a = new()
-            {
-                FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
-            };
-            return;
 
             /*
             IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
@@ -106,10 +101,18 @@ namespace TheProgram
             goto ExitProgram;
             */
 
+            object unused;
+
             switch (settings.Value.RunType)
             {
+                case ArgumentParser.RunType.ConsoleGUI:
+                    unused = new ConsoleGUI.ConsoleGUI()
+                    {
+                        FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
+                    };
+                    return;
                 case ArgumentParser.RunType.Debugger:
-                    Debugger _ = new(settings.Value);
+                    unused = new Debugger(settings.Value);
                     return;
                 case ArgumentParser.RunType.Tester:
                     IngameCoding.Tester.Tester.RunTestFile(settings.Value);

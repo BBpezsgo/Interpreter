@@ -308,6 +308,7 @@ namespace ConsoleGUI
                             {
                                 uint numWritten = 0;
                                 WriteConsoleInput(handleIn, record, 1, ref numWritten);
+                                Console.CursorVisible = true;
                                 return;
                             }
                         }

@@ -384,17 +384,14 @@ namespace IngameCoding.BBCode.Compiler
 
     public class CompiledStruct : StructDefinition, ITypeDefinition
     {
-        // public Func<IStruct> CreateBuiltinStructCallback;
-        // public bool IsBuiltin => CreateBuiltinStructCallback != null;
-        // public Dictionary<string, CompiledFunction> CompiledMethods;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
+        internal Dictionary<string, int> FieldOffsets = new();
+        public int Size;
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
-            // this.CompiledMethods = new Dictionary<string, CompiledFunction>();
             this.CompiledAttributes = compiledAttributes;
-            // this.CreateBuiltinStructCallback = null;
 
             base.FilePath = definition.FilePath;
             base.BracketEnd = definition.BracketEnd;
@@ -408,6 +405,8 @@ namespace IngameCoding.BBCode.Compiler
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
+        internal Dictionary<string, int> FieldOffsets = new();
+        public int Size;
 
         public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -462,13 +461,17 @@ namespace IngameCoding.BBCode.Compiler
             FLOAT,
             STRING,
             BOOL,
+            /// <summary>
+            /// Only used when get a value by it's memory address!
+            /// </summary>
+            ANY,
         }
 
-        CompiledTypeType builtinType;
+        readonly CompiledTypeType builtinType;
 
         CompiledStruct @struct;
         CompiledClass @class;
-        CompiledType listOf;
+        readonly CompiledType listOf;
 
         internal CompiledTypeType BuiltinType => builtinType;
 
@@ -488,6 +491,7 @@ namespace IngameCoding.BBCode.Compiler
                     CompiledTypeType.FLOAT => "float",
                     CompiledTypeType.STRING => "string",
                     CompiledTypeType.BOOL => "bool",
+                    CompiledTypeType.ANY => "any",
                     _ => throw new Errors.InternalException($"WTF???"),
                 };
 
@@ -679,6 +683,7 @@ namespace IngameCoding.BBCode.Compiler
                 CompiledTypeType.FLOAT => BBCode.BuiltinType.FLOAT,
                 CompiledTypeType.STRING => BBCode.BuiltinType.STRING,
                 CompiledTypeType.BOOL => BBCode.BuiltinType.BOOLEAN,
+                CompiledTypeType.ANY => BBCode.BuiltinType.VOID,
                 _ => BBCode.BuiltinType.VOID,
             };
             return BBCode.BuiltinType.VOID;

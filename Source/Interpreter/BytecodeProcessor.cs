@@ -128,6 +128,7 @@ namespace IngameCoding.Bytecode
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + (int)CurrentInstruction.parameter,
             AddressingMode.RELATIVE => Memory.Stack.Count + (int)CurrentInstruction.parameter,
             AddressingMode.POP => Memory.Stack.Count - 1,
+            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
             _ => (int)CurrentInstruction.parameter,
         };
 

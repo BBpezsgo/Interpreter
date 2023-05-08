@@ -1684,11 +1684,11 @@ namespace IngameCoding.BBCode
             /// </item>
             /// </list>
             /// </returns>
-            Statement ExpectOneValue()
+            StatementWithReturnValue ExpectOneValue()
             {
                 int savedToken = currentTokenIndex;
 
-                Statement returnStatement = null;
+                StatementWithReturnValue returnStatement = null;
 
                 if (ExpectListValue(out var listValue))
                 {
@@ -1779,17 +1779,13 @@ namespace IngameCoding.BBCode
                         returnStatement = variableNameStatement;
                     }
                 }
-                else if (ExpectVariableAddressGetter(out Statement_VariableAddressGetter variableAddressGetter))
+                else if (ExpectVariableAddressGetter(out Statement_MemoryAddressGetter memoryAddressGetter))
                 {
-                    if (variableAddressGetter.VariableName.text == "this")
-                    { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableAddressGetter.VariableName)); }
-
-                    if (variableAddressGetter.VariableName.text == "this")
-                    { variableAddressGetter.VariableName.Analysis.Subtype = TokenSubtype.Keyword; }
-                    else
-                    { variableAddressGetter.VariableName.Analysis.Subtype = TokenSubtype.VariableName; }
-
-                    returnStatement = variableAddressGetter;
+                    returnStatement = memoryAddressGetter;
+                }
+                else if (ExpectVariableAddressFinder(out Statement_MemoryAddressFinder memoryAddressFinder))
+                {
+                    returnStatement = memoryAddressFinder;
                 }
 
                 while (true)
@@ -1831,7 +1827,7 @@ namespace IngameCoding.BBCode
                 return returnStatement;
             }
 
-            bool ExpectVariableAddressGetter(out Statement_VariableAddressGetter statement)
+            bool ExpectVariableAddressGetter(out Statement_MemoryAddressGetter statement)
             {
                 var parseStart = currentTokenIndex;
                 if (!ExpectOperator("&", out var refToken))
@@ -1840,17 +1836,33 @@ namespace IngameCoding.BBCode
                     currentTokenIndex = parseStart;
                     return false;
                 }
-                if (!ExpectIdentifier(out var variableName))
+
+                var prevStatement = ExpectOneValue();
+
+                statement = new Statement_MemoryAddressGetter()
+                {
+                    OperatorToken = refToken,
+                    PrevStatement = prevStatement,
+                };
+                return true;
+            }
+
+            bool ExpectVariableAddressFinder(out Statement_MemoryAddressFinder statement)
+            {
+                var parseStart = currentTokenIndex;
+                if (!ExpectOperator("*", out var refToken))
                 {
                     statement = null;
                     currentTokenIndex = parseStart;
                     return false;
                 }
 
-                statement = new Statement_VariableAddressGetter()
+                var prevStatement = ExpectOneValue();
+
+                statement = new Statement_MemoryAddressFinder()
                 {
                     OperatorToken = refToken,
-                    VariableName = variableName,
+                    PrevStatement = prevStatement,
                 };
                 return true;
             }
@@ -2270,7 +2282,7 @@ namespace IngameCoding.BBCode
             /// </list>
             /// </returns>
             /// <exception cref="SyntaxException"></exception>
-            Statement ExpectExpression()
+            StatementWithReturnValue ExpectExpression()
             {
                 if (ExpectOperator("!", out var tNotOperator))
                 {
@@ -2293,7 +2305,7 @@ namespace IngameCoding.BBCode
                 */
 
                 // Possible a variable
-                Statement leftStatement = ExpectOneValue();
+                StatementWithReturnValue leftStatement = ExpectOneValue();
                 if (leftStatement == null) return null;
 
                 if (ExpectOperator(new string[] {
@@ -2301,7 +2313,7 @@ namespace IngameCoding.BBCode
                     "&=", "|=", "^=",
                 }, out var o0))
                 {
-                    var valueToAssign = ExpectOneValue();
+                    StatementWithReturnValue valueToAssign = ExpectOneValue();
                     if (valueToAssign == null)
                     { throw new SyntaxException("Expected expression", o0); }
 
@@ -2401,20 +2413,19 @@ namespace IngameCoding.BBCode
                         return leftStatement;
                     }
 
-                    Statement rightStatement = ExpectOneValue();
+                    StatementWithReturnValue rightStatement = ExpectOneValue();
                     if (rightStatement == null)
                     {
                         currentTokenIndex--;
                         return leftStatement;
                     }
 
-                    Statement rightmostStatement = FindRightmostStatement(leftStatement, rhsPrecedence);
+                    Statement_Operator rightmostStatement = FindRightmostStatement(leftStatement, rhsPrecedence);
                     if (rightmostStatement != null)
                     {
                         if (rightmostStatement is Statement_Operator rightmostOperator)
                         {
                             Statement_Operator operatorCall = new(op, rightmostOperator.Right, rightStatement);
-
 
                             rightmostOperator.Right = operatorCall;
                         }
@@ -2745,7 +2756,7 @@ namespace IngameCoding.BBCode
                         }
                         else if (TryGetClass(possibleType.text, out var c))
                         {
-                            newType = new TypeToken(c.FullName, BuiltinType.STRUCT, s.NamespacePathString, possibleType);
+                            newType = new TypeToken(c.FullName, BuiltinType.STRUCT, c.NamespacePathString, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Class;
                         }
                         else

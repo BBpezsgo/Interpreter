@@ -1,0 +1,13 @@
+using System;
+
+struct Foo
+{
+  int field0;
+  int field1;
+}
+
+[CodeEntry]
+void Start()
+{
+  Console.Log((new Foo).field0);
+}

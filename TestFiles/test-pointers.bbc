@@ -6,4 +6,6 @@ void Start() {
 	int valueAddress = &value;
 	Console.Log(value);
 	Console.Log(valueAddress);
+	string yeah = *valueAddress;
+	Console.Log(yeah);
 }

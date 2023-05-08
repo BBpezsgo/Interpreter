@@ -7,6 +7,8 @@ namespace ConsoleGUI
 {
     using ConsoleLib;
 
+    using System.Timers;
+
     using static ConsoleLib.NativeMethods;
     using static Core;
 
@@ -21,11 +23,15 @@ namespace ConsoleGUI
         internal List<BaseWindowElement> Elements = new();
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
-
+        private readonly Timer aTimer;
+        private readonly Timer bTimer;
+        private readonly Timer cTimer;
         short width;
         short height;
         CharInfo[] ConsoleBuffer;
         SmallRect ConsoleRect;
+
+        internal static ConsoleGUI Instance = null;
 
         MouseInfo Mouse;
         internal BaseWindowElement FilledElement = null;
@@ -41,20 +47,21 @@ namespace ConsoleGUI
 
         internal ConsoleGUI(bool DebugLogs = false)
         {
+            Instance = this;
             this.DebugLogs = DebugLogs;
 
             Log("Setup timers");
-            System.Timers.Timer aTimer = new();
+            this.aTimer = new Timer();
             aTimer.Elapsed += TimerElapsed;
             aTimer.Interval = 500;
             aTimer.Enabled = true;
 
-            System.Timers.Timer bTimer = new();
+            this.bTimer = new Timer();
             bTimer.Elapsed += BTimer_Elapsed;
             bTimer.Interval = 1000;
             bTimer.Enabled = true;
 
-            System.Timers.Timer cTimer = new();
+            this.cTimer = new Timer();
             cTimer.Elapsed += (_, _) =>
             {
                 cTimer.Stop();
@@ -87,6 +94,18 @@ namespace ConsoleGUI
 
             Log("Start");
             Start();
+        }
+
+        internal void Destroy()
+        {
+            Clear();
+            aTimer?.Dispose();
+            bTimer?.Dispose();
+            cTimer?.Dispose();
+            Console.Clear();
+
+            Console.WriteLine("Destroy std handler ...");
+            ConsoleListener.Stop();
         }
 
         internal void Start()

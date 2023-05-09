@@ -41,6 +41,21 @@ namespace IngameCoding.Core
             internal BytecodeInterpreter Interpreter => interpreter.bytecodeInterpreter;
             internal State State => interpreter.state;
 
+            internal Instruction NextInstruction
+            {
+                get
+                {
+                    for (int cp = this.interpreter.bytecodeInterpreter.CodePointer; cp < this.CompilerResult.compiledCode.Length; cp++)
+                    {
+                        if (cp < 0 || cp >= this.CompilerResult.compiledCode.Length) return null;
+                        Instruction result = this.CompilerResult.compiledCode[cp];
+                        if (result.opcode == Opcode.COMMENT) continue;
+                        return result;
+                    }
+                    return null;
+                }
+            }
+
             readonly Interpreter interpreter;
 
             public InterpreterDetails(Interpreter interpreter) => this.interpreter = interpreter;

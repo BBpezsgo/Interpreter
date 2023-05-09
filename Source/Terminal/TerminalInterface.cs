@@ -169,3 +169,94 @@ namespace IngameCoding.Output
         Debug,
     }
 }
+
+namespace IngameCoding.TerminalInterface
+{
+    internal class TerminalInterface
+    {
+        internal static TerminalInterface Instance;
+        string currentInput = "";
+        int currentLineWidth = 0;
+        readonly string[] suggestions = new string[]
+        {
+            "hello",
+            "bruh"
+        };
+
+        internal TerminalInterface()
+        {
+            Instance = this;
+            while (true)
+            {
+                char inp = Console.ReadKey().KeyChar;
+                if (inp == '\r')
+                {
+                    Console.WriteLine(currentInput);
+                    ProcessInput(currentInput);
+                    currentInput = "";
+                }
+                else
+                {
+                    ClearLastLine(currentLineWidth + 3);
+
+                    currentLineWidth = currentInput.Length;
+                    if (inp == '\b')
+                    {
+                        if (currentInput.Length > 0) currentInput = currentInput[..^1];
+                    }
+                    else if (inp == '\t')
+                    {
+                        if (currentInput.Length > 0) foreach (var item in suggestions)
+                            {
+                                if (item.StartsWith(currentInput))
+                                {
+                                    currentInput = item;
+                                    currentLineWidth = currentInput.Length;
+                                    break;
+                                }
+                            }
+                    }
+                    else
+                    {
+                        currentInput += inp;
+                    }
+
+                    if (currentInput.Length > 0) foreach (var item in suggestions)
+                        {
+                            if (item.StartsWith(currentInput))
+                            {
+                                currentLineWidth += item[currentInput.Length..].Length;
+                                break;
+                            }
+                        }
+
+                    Console.Write(currentInput);
+                    if (currentInput.Length > 0) foreach (var item in suggestions)
+                        {
+                            if (item.StartsWith(currentInput))
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkCyan;
+                                Console.Write(item[currentInput.Length..]);
+                                Console.ResetColor();
+                                break;
+                            }
+                        }
+                }
+            }
+        }
+
+        void ProcessInput(string input)
+        {
+            Console.WriteLine($"Processing input \"{input}\"");
+        }
+
+        static void ClearLastLine() => ClearLastLine(Console.BufferWidth);
+        static void ClearLastLine(int width)
+        {
+            Console.Write('\r');
+            for (int i = width - 1; i >= 0; i--)
+            { Console.Write(' '); }
+            Console.Write('\r');
+        }
+    }
+}

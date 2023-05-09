@@ -15,7 +15,24 @@ namespace ConsoleGUI
         int Scroll;
         Interpreter Interpreter;
 
-        string ConsoleText = "";
+        struct ConsoleLine
+        {
+            internal string Data;
+            internal CharColors Color;
+
+            public ConsoleLine(string data, CharColors color)
+            {
+                Data = data;
+                Color = color;
+            }
+            public ConsoleLine(string data)
+            {
+                Data = data;
+                Color = CharColors.FgDefault;
+            }
+        }
+
+        List<ConsoleLine> ConsoleLines = new();
 
         int ConsoleScrollOffset = 0;
 
@@ -98,12 +115,12 @@ namespace ConsoleGUI
                 if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
                 {
                     ConsoleScrollOffset++;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleText.Trim().Split('\n').Length - sender.Rect.Height), 3);
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleLines.Count - sender.Rect.Height), 3);
                 }
                 else if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
                 {
                     ConsoleScrollOffset--;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleText.Trim().Split('\n').Length - sender.Rect.Height), 3);
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleLines.Count - sender.Rect.Height), 3);
                 }
             };
 
@@ -154,7 +171,18 @@ namespace ConsoleGUI
             var code = System.IO.File.ReadAllText(fileInfo.FullName);
             this.Interpreter = new Interpreter();
 
-            Interpreter.OnOutput += (sender, message, logType) => { ConsoleText += message + "\n"; };
+            Interpreter.OnOutput += (sender, message, logType) => ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
+            {
+                IngameCoding.Output.LogType.System => CharColors.FgDefault,
+                IngameCoding.Output.LogType.Normal => CharColors.FgDefault,
+                IngameCoding.Output.LogType.Warning => CharColors.FgYellow,
+                IngameCoding.Output.LogType.Error => CharColors.FgRed,
+                IngameCoding.Output.LogType.Debug => CharColors.FgGray,
+                _ => CharColors.FgDefault,
+            }));
+
+            Interpreter.OnStdOut += (sender, data) => ConsoleLines.Add(new ConsoleLine(data));
+            Interpreter.OnStdError += (sender, data) => ConsoleLines.Add(new ConsoleLine(data, CharColors.FgRed));
 
             Interpreter.OnNeedInput += (sender) =>
             {
@@ -221,16 +249,20 @@ namespace ConsoleGUI
                 AddChar(' ');
             }
 
-            var lines = ConsoleText.Trim().Split('\n');
-
-            for (int i = Math.Max(0, lines.Length - sender.Rect.Height + ConsoleScrollOffset); i < lines.Length; i++)
+            bool lineFinished = true;
+            for (int i = Math.Max(0, ConsoleLines.Count - sender.Rect.Height + ConsoleScrollOffset); i < ConsoleLines.Count; i++)
             {
-                var line = lines[i];
+                var line = ConsoleLines[i];
 
-                AddText("  ");
-                AddText(line);
+                if (lineFinished) AddChar(' ');
+                ForegroundColor = line.Color;
+                AddText(line.Data.TrimEnd());
+                ForegroundColor = CharColors.FgDefault;
+                BackgroundColor = CharColors.BgBlack;
 
-                FinishLine();
+                lineFinished = line.Data.EndsWith('\n');
+
+                if (lineFinished) FinishLine();
             }
         }
 
@@ -342,25 +374,72 @@ namespace ConsoleGUI
             ForegroundColor = CharColors.FgDefault;
             BackgroundColor = CharColors.BgBlack;
 
-            void LinePrefix(string lineNumber = "")
-            {
-                AddText(" ".Repeat(4 - lineNumber.Length));
-                ForegroundColor = CharColors.FgGray;
-                AddText(lineNumber);
-                ForegroundColor = CharColors.FgDefault;
-                AddSpace(5);
-            }
             void FinishLine()
             {
                 AddSpace(sender.Rect.Width - 1);
                 AddChar(' ');
             }
 
+            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+
+            List<int> loadIndicators = new();
+            List<int> storeIndicators = new();
+
+            if (instruction != null)
+            {
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
+                {
+                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                    else
+                    { storeIndicators.Add((int)instruction.parameter); }
+                }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
+                {
+                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                    else
+                    { loadIndicators.Add((int)instruction.parameter); }
+                }
+            }
+
             for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Length; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Heap[i];
 
-                LinePrefix(i.ToString());
+                bool addLoadIndicator = false;
+                bool addStoreIndicator = false;
+
+                for (int j = loadIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (loadIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("○");
+                    ForegroundColor = CharColors.FgGray;
+                    loadIndicators.RemoveAt(j);
+                    addLoadIndicator = true;
+                    break;
+                }
+
+                for (int j = storeIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (storeIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("●");
+                    ForegroundColor = CharColors.FgGray;
+                    storeIndicators.RemoveAt(j);
+                    addStoreIndicator = true;
+                    break;
+                }
+
+                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+
+
+                ForegroundColor = CharColors.FgGray;
+                AddText(i.ToString());
+                ForegroundColor = CharColors.FgDefault;
+                AddSpace(5);
 
                 switch (item.type)
                 {
@@ -468,13 +547,7 @@ namespace ConsoleGUI
                 AddChar(' ');
             }
 
-            IngameCoding.Bytecode.Instruction instruction = null;
-            for (int cp = this.Interpreter.Details.Interpreter.CodePointer; cp < this.Interpreter.Details.CompilerResult.compiledCode.Length; cp++)
-            {
-                instruction = this.Interpreter.Details.CompilerResult.compiledCode[cp];
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT) continue;
-                break;
-            }
+            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
             List<int> savedBasePointers = new();
 
@@ -487,6 +560,56 @@ namespace ConsoleGUI
             }
 
             bool basepointerShown = false;
+
+            List<int> loadIndicators = new();
+            List<int> storeIndicators = new();
+
+            if (instruction != null)
+            {
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
+                {
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode));
+                }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
+                {
+                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 2); }
+                    else
+                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1); }
+                }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD)
+                {
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode));
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length);
+                }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.PUSH_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.GET_BASEPOINTER ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
+                { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length); }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.POP_VALUE)
+                { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1); }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_ADD ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_DIV ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_MOD ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_MULT ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_SUB ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_AND ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_OR)
+                {
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1);
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 2);
+                }
+            }
+
             int i;
             for (i = 0; i < this.Interpreter.Details.Interpreter.Stack.Length; i++)
             {
@@ -511,26 +634,32 @@ namespace ConsoleGUI
                     AddText(" ");
                 }
 
-                bool addIndicator = false;
-                if (instruction != null)
+                bool addLoadIndicator = false;
+                bool addStoreIndicator = false;
+
+                for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
-                    if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
-                        instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
-                        instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD ||
-                        instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
-                    {
-                        addIndicator = this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode) == i;
-                    }
+                    if (loadIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("○");
+                    ForegroundColor = CharColors.FgGray;
+                    loadIndicators.RemoveAt(j);
+                    addLoadIndicator = true;
+                    break;
                 }
 
-                if (addIndicator)
+                for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
+                    if (storeIndicators[j] != i) continue;
                     ForegroundColor = CharColors.FgRed;
                     AddText("●");
                     ForegroundColor = CharColors.FgGray;
+                    storeIndicators.RemoveAt(j);
+                    addStoreIndicator = true;
+                    break;
                 }
 
-                AddText(" ".Repeat((addIndicator ? 2 : 3) - i.ToString().Length));
+                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
                 AddText(i.ToString());
                 AddSpace(5);
@@ -644,20 +773,48 @@ namespace ConsoleGUI
                 FinishLine();
                 ForegroundColor = CharColors.FgDefault;
             }
-            while (basepointerShown == false && i <= this.Interpreter.Details.Interpreter.BasePointer)
+
+            while ((basepointerShown == false && i <= this.Interpreter.Details.Interpreter.BasePointer) || loadIndicators.Count > 0 || storeIndicators.Count > 0)
             {
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
                     ForegroundColor = CharColors.FgLightBlue;
-                    AddText("► " + " ".Repeat(2 - i.ToString().Length));
+                    AddText("►");
                     basepointerShown = true;
                     ForegroundColor = CharColors.FgGray;
                 }
                 else
                 {
                     ForegroundColor = CharColors.FgGray;
-                    AddText(" ".Repeat(4 - i.ToString().Length));
+                    AddText(" ");
                 }
+
+                bool addLoadIndicator = false;
+                bool addStoreIndicator = false;
+
+                for (int j = loadIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (loadIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("○");
+                    ForegroundColor = CharColors.FgGray;
+                    loadIndicators.RemoveAt(j);
+                    addLoadIndicator = true;
+                    break;
+                }
+
+                for (int j = storeIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (storeIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("●");
+                    ForegroundColor = CharColors.FgGray;
+                    storeIndicators.RemoveAt(j);
+                    addStoreIndicator = true;
+                    break;
+                }
+
+                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
                 AddText(i.ToString());
                 AddSpace(5);
@@ -665,6 +822,10 @@ namespace ConsoleGUI
                 BackgroundColor = CharColors.BgBlack;
                 FinishLine();
                 ForegroundColor = CharColors.FgDefault;
+
+                i++;
+
+                break;
             }
 
         }

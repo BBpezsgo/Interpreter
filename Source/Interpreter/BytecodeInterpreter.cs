@@ -214,6 +214,7 @@ namespace IngameCoding.Bytecode
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
             AddressingMode.RELATIVE => BytecodeProcessor.Memory.Stack.Count + offset,
             AddressingMode.POP => BytecodeProcessor.Memory.Stack.Count - 1,
+            AddressingMode.RUNTIME => BytecodeProcessor.Memory.Stack.Last().ValueInt,
             _ => offset,
         };
     }

@@ -14,13 +14,18 @@ namespace IngameCoding.Bytecode
     /// <item><see cref="Opcode.LOAD_VALUE"/></item>
     /// <item><see cref="Opcode.STORE_FIELD"/></item>
     /// <item><see cref="Opcode.LOAD_FIELD"/></item>
+    /// <item><see cref="Opcode.HEAP_SET"/></item>
+    /// <item><see cref="Opcode.HEAP_GET"/></item>
     /// </list>
     /// </summary>
     public enum AddressingMode : byte
     {
         ABSOLUTE,
+        /// <summary><b>Only for stack!</b></summary>
         BASEPOINTER_RELATIVE,
+        /// <summary><b>Only for stack!</b></summary>
         RELATIVE,
+        /// <summary><b>Only for stack!</b></summary>
         POP,
         RUNTIME,
     }

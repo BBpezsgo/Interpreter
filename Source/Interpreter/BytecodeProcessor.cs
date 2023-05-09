@@ -122,14 +122,21 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        int GetAddress() => CurrentInstruction.AddressingMode switch
+        int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => (int)CurrentInstruction.parameter,
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + (int)CurrentInstruction.parameter,
             AddressingMode.RELATIVE => Memory.Stack.Count + (int)CurrentInstruction.parameter,
             AddressingMode.POP => Memory.Stack.Count - 1,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
-            _ => (int)CurrentInstruction.parameter,
+            _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
+        };
+
+        int GetHeapAddress() => CurrentInstruction.AddressingMode switch
+        {
+            AddressingMode.ABSOLUTE => (int)CurrentInstruction.parameter,
+            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+            _ => throw new System.Exception($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         #region Instruction Methods
@@ -187,7 +194,8 @@ namespace IngameCoding.Bytecode
 
         int HEAP_GET()
         {
-            var v = Memory.Heap[(int)CurrentInstruction.parameter];
+            int address = GetHeapAddress();
+            var v = Memory.Heap[address];
             Memory.Stack.Push(v);
             Step();
 
@@ -196,8 +204,9 @@ namespace IngameCoding.Bytecode
 
         int HEAP_SET()
         {
+            int address = GetHeapAddress();
             var v = Memory.Stack.Pop();
-            Memory.Heap[(int)CurrentInstruction.parameter] = v;
+            Memory.Heap[address] = v;
             Step();
 
             return 2;
@@ -519,18 +528,18 @@ namespace IngameCoding.Bytecode
 
         int STORE_VALUE()
         {
-            int address = GetAddress();
+            int address = GetStackAddress();
+            var value = Memory.Stack.Pop();
 
-            Memory.Stack.Set(address, Memory.Stack.Last());
+            Memory.Stack.Set(address, value);
 
-            Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
             Step();
 
             return 3;
         }
         int LOAD_VALUE()
         {
-            int address = GetAddress();
+            int address = GetStackAddress();
 
             Memory.Stack.Push(Memory.Stack[address], CurrentInstruction.tag);
 
@@ -545,7 +554,7 @@ namespace IngameCoding.Bytecode
             if (field.Length == 0)
             { throw new InternalException("No field name given"); }
             DataItem newValue = Memory.Stack.Pop();
-            int address = GetAddress();
+            int address = GetStackAddress();
             IStruct item = Memory.Stack[address].ValueStruct;
 
             if (!item.HaveField(field))
@@ -561,7 +570,7 @@ namespace IngameCoding.Bytecode
         }
         int LOAD_FIELD()
         {
-            int address = GetAddress();
+            int address = GetStackAddress();
 
             string field = Memory.Stack.Pop().ValueString;
             if (field.Length == 0)

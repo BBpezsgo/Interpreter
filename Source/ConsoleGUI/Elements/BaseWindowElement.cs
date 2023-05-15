@@ -2,7 +2,7 @@
 
 namespace ConsoleGUI
 {
-    internal class BaseWindowElement : BaseElement
+    internal class WindowElement : Element
     {
         public bool IsFocused { get; private set; }
         bool IsDragging;
@@ -12,66 +12,21 @@ namespace ConsoleGUI
 
         internal bool CanDrag = true;
         internal bool HasBorder = true;
-        internal BaseInlineElement[] Elements = System.Array.Empty<BaseInlineElement>();
+        internal IElement[] Elements = System.Array.Empty<IElement>();
 
-        internal override void BeforeDraw()
+        public override void BeforeDraw()
         {
             base.BeforeDraw();
-
-            foreach (var element in Elements)
-            {
-                element.BeforeDraw();
-            }
+            Elements.BeforeDraw();
         }
 
-        Character DrawElement(BaseInlineElement Element, int X, int Y)
-        {
-            if (HasBorder)
-            {
-                if (Element.Rect.Top == Y)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Left == X)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Bottom == Y)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Right == X)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
+        public override Character DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
-                return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
-            }
-
-            return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
-        }
-
-        internal override Character OnDrawContent(int X, int Y)
-        {
-            int i = X + (Y * Rect.Width);
-
-            for (int j = 0; j < Elements.Length; j++)
-            {
-                var element = Elements[j];
-                if (!element.Contains(X, Y)) continue;
-                return DrawElement(element, X, Y);
-            }
-
-            if (i < 0 || i >= DrawBuffer.Length) return ConsoleGUI.NullCharacter;
-
-            return DrawBuffer[i];
-        }
-
-        internal void OnMouseEventBase(MouseInfo mouse)
+        internal void OnMouseEventBase(MouseEvent mouse)
         {
             if (!CanDrag) return;
 
-            if (mouse.ButtonState != MouseInfo.ButtonStateEnum.Left)
+            if (mouse.ButtonState != MouseButtonState.Left)
             {
                 MouseDragStart = Point.Empty;
                 MouseDragStartPos = Point.Empty;
@@ -84,8 +39,10 @@ namespace ConsoleGUI
             if (IsDragging)
             {
                 var offset = new Point(mouse.X - MouseDragStart.X, mouse.Y - MouseDragStart.Y);
-                Rect.X = MouseDragStartPos.X + offset.X;
-                Rect.Y = MouseDragStartPos.Y + offset.Y;
+                var newRect = Rect;
+                newRect.X = MouseDragStartPos.X + offset.X;
+                newRect.Y = MouseDragStartPos.Y + offset.Y;
+                Rect = newRect;
                 return;
             }
 
@@ -95,10 +52,10 @@ namespace ConsoleGUI
             MouseDragStart = new Point(mouse.X, mouse.Y);
             IsDragging = true;
         }
-        internal override void RefreshSize()
+        public override void RefreshSize()
         {
             base.RefreshSize();
-            foreach (var element in Elements) element.RefreshSize();
+            Elements.RefreshSize();
         }
     }
 }

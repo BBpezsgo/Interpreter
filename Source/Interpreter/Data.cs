@@ -454,7 +454,7 @@ namespace IngameCoding.Bytecode
         }
         public DataItem(BBCode.TypeToken type1, string tag) : this(DataType.BYTE, tag)
         {
-            switch (type1.typeName)
+            switch (type1.Type)
             {
                 case BBCode.BuiltinType.INT:
                     this.type = DataType.INT;

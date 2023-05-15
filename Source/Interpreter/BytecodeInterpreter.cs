@@ -6,7 +6,22 @@ namespace IngameCoding.Bytecode
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    using System.Linq;
+    public readonly struct CallStackFrame
+    {
+        public readonly string Function;
+        public readonly string File;
+        public readonly string Offset;
+        public readonly string Line;
+
+        public CallStackFrame(string frame)
+        {
+            string[] parts = frame.Split(';');
+            this.Function = parts[0];
+            this.File = parts[1];
+            this.Offset = parts[2];
+            this.Line = parts[3];
+        }
+    }
 
     public class BytecodeInterpreter
     {

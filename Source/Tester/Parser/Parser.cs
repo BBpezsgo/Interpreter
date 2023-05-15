@@ -126,7 +126,7 @@ namespace IngameCoding.Tester.Parser
         {
             foreach (var attr in Attributes)
             {
-                if (attr.Name.text.ToLower() == name.ToLower())
+                if (attr.Name.Content.ToLower() == name.ToLower())
                 { return attr; }
             }
             return null;
@@ -363,19 +363,19 @@ namespace IngameCoding.Tester.Parser
         bool ExpectLiteral(out Token value)
         {
             value = null;
-            if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
+            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
                 value = CurrentToken;
                 currentTokenIndex++;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
             {
                 value = CurrentToken;
                 currentTokenIndex++;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
                 value = CurrentToken;
                 currentTokenIndex++;
@@ -390,8 +390,8 @@ namespace IngameCoding.Tester.Parser
         {
             result = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.type != TokenType.IDENTIFIER) return false;
-            if ("".Length > 0 && CurrentToken.text != "") return false;
+            if (CurrentToken.TokenType != TokenType.IDENTIFIER) return false;
+            if ("".Length > 0 && CurrentToken.Content != "") return false;
 
             Token returnToken = CurrentToken;
             result = returnToken;
@@ -403,8 +403,8 @@ namespace IngameCoding.Tester.Parser
         {
             result = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.type != TokenType.IDENTIFIER) return false;
-            if (name.Length > 0 && CurrentToken.text != name) return false;
+            if (CurrentToken.TokenType != TokenType.IDENTIFIER) return false;
+            if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             Token returnToken = CurrentToken;
             result = returnToken;
@@ -416,8 +416,8 @@ namespace IngameCoding.Tester.Parser
         Token ExpectOperator(string name)
         {
             if (CurrentToken == null) return null;
-            if (CurrentToken.type != TokenType.OPERATOR) return null;
-            if (name.Length > 0 && CurrentToken.text != name) return null;
+            if (CurrentToken.TokenType != TokenType.OPERATOR) return null;
+            if (name.Length > 0 && CurrentToken.Content != name) return null;
 
             Token returnToken = CurrentToken;
             currentTokenIndex++;
@@ -428,8 +428,8 @@ namespace IngameCoding.Tester.Parser
         {
             outToken = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.type != TokenType.OPERATOR) return false;
-            if (name.Length > 0 && CurrentToken.text != name) return false;
+            if (CurrentToken.TokenType != TokenType.OPERATOR) return false;
+            if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             Token returnToken = CurrentToken;
             outToken = returnToken;

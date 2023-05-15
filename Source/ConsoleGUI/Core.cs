@@ -12,47 +12,15 @@ using System.Text;
 
 namespace ConsoleGUI
 {
-    using static ConsoleLib.NativeMethods;
-
-    struct MouseInfo
+    public enum MouseButtonState : ulong
     {
-        public struct ControlKeyStates
-        {
-            public const uint
-                CAPSLOCK_ON = 0x0080,
-                ENHANCED_KEY = 0x0100,
-                LEFT_ALT_PRESSED = 0x0002,
-                LEFT_CTRL_PRESSED = 0x0008,
-                NUMLOCK_ON = 0x0020,
-                RIGHT_ALT_PRESSED = 0x0001,
-                RIGHT_CTRL_PRESSED = 0x0004,
-                SCROLLLOCK_ON = 0x0040,
-                SHIFT_PRESSED = 0x0010;
-        }
-        public struct FlagsValues
-        {
-            public const uint
-                DOUBLE_CLICK = 0x0002,
-                MOUSE_HWHEELED = 0x0008,
-                MOUSE_MOVED = 0x0001,
-                MOUSE_WHEELED = 0x0004;
-        }
-
-        internal short X;
-        internal short Y;
-        internal uint Flags;
-        internal uint ControlKeyState;
-        internal ButtonStateEnum ButtonState;
-
-        internal enum ButtonStateEnum : ulong
-        {
-            Left = 1,
-            Right = 2,
-            Middle = 4,
-            ScrollUp = 7864320,
-            ScrollDown = 4287102976,
-        }
+        Left = 1,
+        Right = 2,
+        Middle = 4,
+        ScrollUp = 7864320,
+        ScrollDown = 4287102976,
     }
+
     public enum CharColors : short
     {
         FgBlack = 0,
@@ -83,6 +51,78 @@ namespace ConsoleGUI
         BgWhite = FgDefault << 4,
     }
 
+    public readonly struct MouseEvent
+    {
+        public readonly Position Position;
+        public readonly MouseButtonState ButtonState;
+        public readonly uint ControlKeyState;
+        public readonly uint EventFlags;
+
+        public short X => Position.X;
+        public short Y => Position.Y;
+
+        internal MouseEvent(ConsoleLib.NativeMethods.MOUSE_EVENT_RECORD e)
+        {
+            Position = new Position(e.dwMousePosition);
+            ButtonState = (MouseButtonState)e.dwButtonState;
+            ControlKeyState = e.dwControlKeyState;
+            EventFlags = e.dwEventFlags;
+        }
+    }
+
+    public readonly struct KeyEvent
+    {
+        public readonly bool KeyDown;
+
+        public readonly ushort RepeatCount;
+        public readonly ushort VirtualKeyCode;
+        public readonly ushort VirtualScanCode;
+
+        public readonly char UnicodeChar;
+        public readonly byte AsciiChar;
+        public readonly uint ControlKeyState;
+
+        internal KeyEvent(ConsoleLib.NativeMethods.KEY_EVENT_RECORD e)
+        {
+            KeyDown = e.bKeyDown;
+            RepeatCount = e.wRepeatCount;
+            VirtualKeyCode = e.wVirtualKeyCode;
+            VirtualScanCode = e.wVirtualScanCode;
+            UnicodeChar = e.UnicodeChar;
+            AsciiChar = e.AsciiChar;
+            ControlKeyState = e.dwControlKeyState;
+        }
+    }
+
+    public readonly struct WindowBufferSizeEvent
+    {
+        public readonly short Width;
+        public readonly short Height;
+
+        internal WindowBufferSizeEvent(ConsoleLib.NativeMethods.WINDOW_BUFFER_SIZE_RECORD e)
+        {
+            Width = e.dwSize.X;
+            Height = e.dwSize.Y;
+        }
+    }
+
+    public readonly struct Position
+    {
+        public readonly short X;
+        public readonly short Y;
+
+        internal Position(ConsoleLib.NativeMethods.COORD v)
+        {
+            X = v.X;
+            Y = v.Y;
+        }
+        internal Position(short x, short y)
+        {
+            X = x;
+            Y = y;
+        }
+    }
+
     [Flags]
     public enum CharInfoAttributes : short
     {
@@ -105,17 +145,32 @@ namespace ConsoleGUI
                                            // COMMON_LVB_UNDERSCORE = 0x8000, // Underscore.
     }
 
+    public struct InputMode
+    {
+        internal const uint
+            ENABLE_MOUSE_INPUT = 0x0010,
+            ENABLE_QUICK_EDIT_MODE = 0x0040,
+            ENABLE_EXTENDED_FLAGS = 0x0080,
+            ENABLE_ECHO_INPUT = 0x0004,
+            ENABLE_WINDOW_INPUT = 0x0008;
+
+        public static void Default(ref uint mode)
+        {
+            mode &= ~InputMode.ENABLE_QUICK_EDIT_MODE;
+            mode |= InputMode.ENABLE_WINDOW_INPUT;
+            mode |= InputMode.ENABLE_MOUSE_INPUT;
+        }
+    }
+
     public static class Core
     {
         public static void SetupConsole()
         {
-            IntPtr inHandle = GetStdHandle(STD_INPUT_HANDLE);
+            IntPtr inHandle = ConsoleLib.NativeMethods.GetStdHandle(ConsoleLib.NativeMethods.STD_INPUT_HANDLE);
             uint mode = 0;
-            GetConsoleMode(inHandle, ref mode);
-            mode &= ~ENABLE_QUICK_EDIT_MODE; //disable
-            mode |= ENABLE_WINDOW_INPUT; //enable (if you want)
-            mode |= ENABLE_MOUSE_INPUT; //enable
-            SetConsoleMode(inHandle, mode);
+            ConsoleLib.NativeMethods.GetConsoleMode(inHandle, ref mode);
+            InputMode.Default(ref mode);
+            ConsoleLib.NativeMethods.SetConsoleMode(inHandle, mode);
 
             Console.CursorVisible = false;
         }
@@ -144,10 +199,10 @@ namespace ConsoleGUI
             public short X;
             public short Y;
 
-            public Coord(short X, short Y)
+            public Coord(short x, short y)
             {
-                this.X = X;
-                this.Y = Y;
+                this.X = x;
+                this.Y = y;
             }
         };
 
@@ -175,88 +230,23 @@ namespace ConsoleGUI
         }
     }
 
-    public static class Extensions
+    public struct EventType
     {
-        public static string Repeat(this string v, int n)
-        {
-            string res = "";
-            for (int i = 0; i < n; i++) res += v;
-            return res;
-        }
-
-        public static byte ToByte(this char v) => Encoding.ASCII.GetBytes(new char[] { v })[0];
-        public static byte[] ToBytes(this string v) => Encoding.ASCII.GetBytes(v);
-
-        internal static Side GetSide(this System.Drawing.Rectangle v, int x, int y)
-        {
-            if (v.Left == x)
-            {
-                if (v.Top == y)
-                {
-                    return Side.TopLeft;
-                }
-                else if (v.Bottom == y)
-                {
-                    return Side.BottomLeft;
-                }
-                return Side.Left;
-            }
-            else if (v.Right == x)
-            {
-                if (v.Top == y)
-                {
-                    return Side.TopRight;
-                }
-                else if (v.Bottom == y)
-                {
-                    return Side.BottomRight;
-                }
-                return Side.Right;
-            }
-            else if (v.Bottom == y)
-            {
-                return Side.Bottom;
-            }
-            else if (v.Top == y)
-            {
-                return Side.Top;
-            }
-            return Side.None;
-        }
-
-        internal static Character Details(this char v) => new()
-        {
-            Char = v,
-            Color = CharColors.FgDefault,
-        };
-    }
-    internal enum Side
-    {
-        None,
-        TopLeft,
-        Top,
-        TopRight,
-        Right,
-        BottomRight,
-        Bottom,
-        BottomLeft,
-        Left,
+        public const ushort KEY = 0x0001;
+        public const ushort MOUSE = 0x0002;
+        public const ushort WINDOW_BUFFER_SIZE = 0x0004;
     }
 
 #if NET6_0
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 #endif
-    struct Character
+    public struct Character
     {
         public char Char;
         public CharColors Color;
 
         public override string ToString() => Char.ToString();
-
-        private string GetDebuggerDisplay()
-        {
-            return ToString();
-        }
+        string GetDebuggerDisplay() => ToString();
     }
 
     namespace ConsoleLib
@@ -264,90 +254,69 @@ namespace ConsoleGUI
         using System.Runtime.InteropServices;
         using System.Threading;
 
-        using static ConsoleLib.NativeMethods;
-
         public static class ConsoleListener
         {
-            internal static event ConsoleMouseEvent MouseEvent;
+            public static event ConsoleEvent<MouseEvent> MouseEvent;
+            public static event ConsoleEvent<KeyEvent> KeyEvent;
+            public static event ConsoleEvent<WindowBufferSizeEvent> WindowBufferSizeEvent;
 
-            internal static event ConsoleKeyEvent KeyEvent;
-
-            internal static event ConsoleWindowBufferSizeEvent WindowBufferSizeEvent;
-
-            private static bool Run;
-
+            static bool Run;
 
             public static void Start()
             {
-                if (!Run)
+                if (Run) return;
+                Run = true;
+                IntPtr handleIn = NativeMethods.GetStdHandle(NativeMethods.STD_INPUT_HANDLE);
+                new Thread(() =>
                 {
-                    Run = true;
-                    IntPtr handleIn = GetStdHandle(STD_INPUT_HANDLE);
-                    new Thread(() =>
+                    while (true)
                     {
-                        while (true)
+                        uint numRead = 0;
+                        NativeMethods.INPUT_RECORD[] record = new NativeMethods.INPUT_RECORD[1];
+                        record[0] = new NativeMethods.INPUT_RECORD();
+                        NativeMethods.ReadConsoleInput(handleIn, record, 1, ref numRead);
+                        if (Run)
                         {
-                            uint numRead = 0;
-                            INPUT_RECORD[] record = new INPUT_RECORD[1];
-                            record[0] = new INPUT_RECORD();
-                            ReadConsoleInput(handleIn, record, 1, ref numRead);
-                            if (Run)
-                                switch (record[0].EventType)
-                                {
-                                    case INPUT_RECORD.MOUSE_EVENT:
-                                        MouseEvent?.Invoke(record[0].MouseEvent);
-                                        break;
-                                    case INPUT_RECORD.KEY_EVENT:
-                                        KeyEvent?.Invoke(record[0].KeyEvent);
-                                        break;
-                                    case INPUT_RECORD.WINDOW_BUFFER_SIZE_EVENT:
-                                        WindowBufferSizeEvent?.Invoke(record[0].WindowBufferSizeEvent);
-                                        break;
-                                }
-                            else
+                            switch (record[0].EventType)
                             {
-                                uint numWritten = 0;
-                                WriteConsoleInput(handleIn, record, 1, ref numWritten);
-                                Console.CursorVisible = true;
-                                return;
+                                case EventType.MOUSE:
+                                    MouseEvent?.Invoke(new MouseEvent(record[0].MouseEvent));
+                                    break;
+                                case EventType.KEY:
+                                    KeyEvent?.Invoke(new KeyEvent(record[0].KeyEvent));
+                                    break;
+                                case EventType.WINDOW_BUFFER_SIZE:
+                                    WindowBufferSizeEvent?.Invoke(new WindowBufferSizeEvent(record[0].WindowBufferSizeEvent));
+                                    break;
                             }
                         }
-                    }).Start();
-                }
+                        else
+                        {
+                            uint numWritten = 0;
+                            NativeMethods.WriteConsoleInput(handleIn, record, 1, ref numWritten);
+                            Console.CursorVisible = true;
+                            return;
+                        }
+                    }
+                }).Start();
             }
 
             public static void Stop() => Run = false;
-
-
-            internal delegate void ConsoleMouseEvent(MOUSE_EVENT_RECORD r);
-
-            internal delegate void ConsoleKeyEvent(KEY_EVENT_RECORD r);
-
-            internal delegate void ConsoleWindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r);
         }
 
+        public delegate void ConsoleEvent<T>(T e);
 
-        public static class NativeMethods
+        internal static class NativeMethods
         {
             internal struct COORD
             {
                 public short X;
                 public short Y;
-
-                public COORD(short x, short y)
-                {
-                    X = x;
-                    Y = y;
-                }
             }
 
             [StructLayout(LayoutKind.Explicit)]
             internal struct INPUT_RECORD
             {
-                public const ushort KEY_EVENT = 0x0001,
-                    MOUSE_EVENT = 0x0002,
-                    WINDOW_BUFFER_SIZE_EVENT = 0x0004; //more
-
                 [FieldOffset(0)]
                 public ushort EventType;
                 [FieldOffset(4)]
@@ -357,7 +326,6 @@ namespace ConsoleGUI
                 [FieldOffset(4)]
                 public WINDOW_BUFFER_SIZE_RECORD WindowBufferSizeEvent;
                 /*
-                and:
                  MENU_EVENT_RECORD MenuEvent;
                  FOCUS_EVENT_RECORD FocusEvent;
                  */
@@ -367,29 +335,8 @@ namespace ConsoleGUI
             internal struct MOUSE_EVENT_RECORD
             {
                 public COORD dwMousePosition;
-
-                public const uint FROM_LEFT_1ST_BUTTON_PRESSED = 0x0001,
-                    FROM_LEFT_2ND_BUTTON_PRESSED = 0x0004,
-                    FROM_LEFT_3RD_BUTTON_PRESSED = 0x0008,
-                    FROM_LEFT_4TH_BUTTON_PRESSED = 0x0010,
-                    RIGHTMOST_BUTTON_PRESSED = 0x0002;
                 public uint dwButtonState;
-
-                public const int CAPSLOCK_ON = 0x0080,
-                    ENHANCED_KEY = 0x0100,
-                    LEFT_ALT_PRESSED = 0x0002,
-                    LEFT_CTRL_PRESSED = 0x0008,
-                    NUMLOCK_ON = 0x0020,
-                    RIGHT_ALT_PRESSED = 0x0001,
-                    RIGHT_CTRL_PRESSED = 0x0004,
-                    SCROLLLOCK_ON = 0x0040,
-                    SHIFT_PRESSED = 0x0010;
                 public uint dwControlKeyState;
-
-                public const int DOUBLE_CLICK = 0x0002,
-                    MOUSE_HWHEELED = 0x0008,
-                    MOUSE_MOVED = 0x0001,
-                    MOUSE_WHEELED = 0x0004;
                 public uint dwEventFlags;
             }
 #pragma warning restore CS0649
@@ -409,16 +356,6 @@ namespace ConsoleGUI
                 public char UnicodeChar;
                 [FieldOffset(10)]
                 public byte AsciiChar;
-
-                public const int CAPSLOCK_ON = 0x0080,
-                    ENHANCED_KEY = 0x0100,
-                    LEFT_ALT_PRESSED = 0x0002,
-                    LEFT_CTRL_PRESSED = 0x0008,
-                    NUMLOCK_ON = 0x0020,
-                    RIGHT_ALT_PRESSED = 0x0001,
-                    RIGHT_CTRL_PRESSED = 0x0004,
-                    SCROLLLOCK_ON = 0x0040,
-                    SHIFT_PRESSED = 0x0010;
                 [FieldOffset(12)]
                 public uint dwControlKeyState;
             }
@@ -437,26 +374,18 @@ namespace ConsoleGUI
             [DllImport("kernel32.dll")]
             internal static extern IntPtr GetStdHandle(uint nStdHandle);
 
-
-            internal const uint ENABLE_MOUSE_INPUT = 0x0010,
-                ENABLE_QUICK_EDIT_MODE = 0x0040,
-                ENABLE_EXTENDED_FLAGS = 0x0080,
-                ENABLE_ECHO_INPUT = 0x0004,
-                ENABLE_WINDOW_INPUT = 0x0008; //more
-
-            [DllImportAttribute("kernel32.dll")]
+            [DllImport("kernel32.dll")]
             internal static extern bool GetConsoleMode(IntPtr hConsoleInput, ref uint lpMode);
 
-            [DllImportAttribute("kernel32.dll")]
+            [DllImport("kernel32.dll")]
             internal static extern bool SetConsoleMode(IntPtr hConsoleInput, uint dwMode);
 
 
-            [DllImportAttribute("kernel32.dll", CharSet = CharSet.Unicode)]
+            [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
             internal static extern bool ReadConsoleInput(IntPtr hConsoleInput, [Out] INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsRead);
 
-            [DllImportAttribute("kernel32.dll", CharSet = CharSet.Unicode)]
+            [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
             internal static extern bool WriteConsoleInput(IntPtr hConsoleInput, INPUT_RECORD[] lpBuffer, uint nLength, ref uint lpNumberOfEventsWritten);
-
         }
     }
 }

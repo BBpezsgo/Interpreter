@@ -373,7 +373,7 @@ namespace IngameCoding.BBCode
             {
                 var id = func.ID();
                 if (Functions.ContainsKey(id))
-                { throw new CompilerException($"Function '{id}' already exists", func.Name, path); }
+                { throw new CompilerException($"Function '{id}' already exists", func.Identifier, path); }
 
                 Functions.Add(id, func);
             }

@@ -74,7 +74,7 @@ namespace IngameCoding.BBCode
         public class RefField : Ref
         {
             public string Type;
-            public string Name => (NameToken != null) ? NameToken.text : fieldName;
+            public string Name => (NameToken != null) ? NameToken.Content : fieldName;
             public Token NameToken;
             public string StructName;
 
@@ -209,8 +209,8 @@ namespace IngameCoding.BBCode
 
     public class Token : BaseToken
     {
-        public TokenType type = TokenType.WHITESPACE;
-        public string text = "";
+        public TokenType TokenType = TokenType.WHITESPACE;
+        public string Content = "";
         public TokenAnalysis Analysis;
 
         public Token()
@@ -227,35 +227,35 @@ namespace IngameCoding.BBCode
             Position = Position,
             AbsolutePosition = AbsolutePosition,
 
-            text = text,
-            type = type,
+            Content = Content,
+            TokenType = TokenType,
             Analysis = new TokenAnalysis()
             {
                 Subtype = Analysis.Subtype,
             },
         };
-        public override string ToString() => text;
+        public override string ToString() => Content;
 
         internal string ToFullString()
         {
-            return $"Token:{type} {{ \"{text}\" {Position} {(Analysis == null ? "No analysis" : Analysis.ToString())} }}";
+            return $"Token:{TokenType} {{ \"{Content}\" {Position} {(Analysis == null ? "No analysis" : Analysis.ToString())} }}";
         }
     }
 
     public readonly struct SimpleToken
     {
-        public readonly string Text;
+        public readonly string Content;
         public readonly Range<SinglePosition> Position;
         public readonly Range<int> AbsolutePosition;
 
-        public SimpleToken(string text, Range<SinglePosition> position, Range<int> absolutePosition)
+        public SimpleToken(string content, Range<SinglePosition> position, Range<int> absolutePosition)
         {
-            Text = text;
+            Content = content;
             Position = position;
             AbsolutePosition = absolutePosition;
         }
 
-        public override string ToString() => Text;
+        public override string ToString() => Content;
         public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
     }
 
@@ -373,17 +373,17 @@ namespace IngameCoding.BBCode
 
                 if (banned.Contains(currChar)) continue;
 
-                if (currChar == '\n' && CurrentToken.type == TokenType.COMMENT_MULTILINE)
+                if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.text = "";
-                    CurrentToken.type = TokenType.COMMENT_MULTILINE;
+                    CurrentToken.Content = "";
+                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                 }
 
                 if (currChar > byte.MaxValue && warnings != null)
                 {
                     RefreshTokenPosition(OffsetTotal);
-                    if (CurrentToken.type == TokenType.LITERAL_STRING)
+                    if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
                     {
                         warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.After(), filePath));
                     }
@@ -393,7 +393,7 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                if (CurrentToken.type == TokenType.UNICODE_CHARACTER)
+                if (CurrentToken.TokenType == TokenType.UNICODE_CHARACTER)
                 {
                     if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
                     if (savedUnicode.Length == 4)
@@ -404,8 +404,8 @@ namespace IngameCoding.BBCode
                             new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
                             new Range<int>(OffsetTotal - 6, OffsetTotal)
                         ));
-                        CurrentToken.text += unicodeChar;
-                        CurrentToken.type = TokenType.LITERAL_STRING;
+                        CurrentToken.Content += unicodeChar;
+                        CurrentToken.TokenType = TokenType.LITERAL_STRING;
                         savedUnicode = null;
                     }
                     else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
@@ -419,15 +419,15 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                if (CurrentToken.type == TokenType.STRING_ESCAPE_SEQUENCE)
+                if (CurrentToken.TokenType == TokenType.STRING_ESCAPE_SEQUENCE)
                 {
                     if (currChar == 'u')
                     {
-                        CurrentToken.type = TokenType.UNICODE_CHARACTER;
+                        CurrentToken.TokenType = TokenType.UNICODE_CHARACTER;
                         savedUnicode = "";
                         continue;
                     }
-                    CurrentToken.text += currChar switch
+                    CurrentToken.Content += currChar switch
                     {
                         'n' => "\n",
                         'r' => "\r",
@@ -436,112 +436,112 @@ namespace IngameCoding.BBCode
                         '"' => "\"",
                         _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in string.", GetCurrentPosition(OffsetTotal)),
                     };
-                    CurrentToken.type = TokenType.LITERAL_STRING;
+                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
                     continue;
                 }
-                else if (CurrentToken.type == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
+                else if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
                 {
-                    CurrentToken.type = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
                     if (currChar == '=')
                     {
-                        CurrentToken.text += currChar;
+                        CurrentToken.Content += currChar;
                     }
                     EndToken(OffsetTotal);
                     continue;
                 }
-                else if (CurrentToken.type == TokenType.COMMENT && currChar != '\n')
+                else if (CurrentToken.TokenType == TokenType.COMMENT && currChar != '\n')
                 {
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                     continue;
                 }
-                else if (CurrentToken.type == TokenType.LITERAL_STRING && currChar != '"')
+                else if (CurrentToken.TokenType == TokenType.LITERAL_STRING && currChar != '"')
                 {
                     if (currChar == '\\')
                     {
-                        CurrentToken.type = TokenType.STRING_ESCAPE_SEQUENCE;
+                        CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE;
                         continue;
                     }
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                     continue;
                 }
 
-                if (CurrentToken.type == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
+                if (CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
                 {
-                    CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.COMMENT_MULTILINE;
+                    CurrentToken.Content += currChar;
+                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                     EndToken(OffsetTotal);
                     continue;
                 }
 
-                if (CurrentToken.type == TokenType.COMMENT_MULTILINE || CurrentToken.type == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
+                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
                 {
-                    CurrentToken.text += currChar;
-                    if (CurrentToken.type == TokenType.COMMENT_MULTILINE && currChar == '*')
+                    CurrentToken.Content += currChar;
+                    if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE && currChar == '*')
                     {
-                        CurrentToken.type = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
+                        CurrentToken.TokenType = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
                     }
                     else
                     {
-                        CurrentToken.type = TokenType.COMMENT_MULTILINE;
+                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                     }
                     continue;
                 }
 
-                if (CurrentToken.type == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
+                if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
                 {
-                    CurrentToken.type = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
                     EndToken(OffsetTotal);
                 }
 
-                if (currChar == 'f' && (CurrentToken.type == TokenType.LITERAL_NUMBER || CurrentToken.type == TokenType.LITERAL_FLOAT))
+                if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
-                    CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.LITERAL_FLOAT;
+                    CurrentToken.Content += currChar;
+                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                     EndToken(OffsetTotal);
                 }
-                else if (currChar == 'e' && (CurrentToken.type == TokenType.LITERAL_NUMBER || CurrentToken.type == TokenType.LITERAL_FLOAT))
+                else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
-                    if (CurrentToken.text.Contains(currChar))
+                    if (CurrentToken.Content.Contains(currChar))
                     { throw new TokenizerException($"Invalid float literal format", CurrentToken); }
-                    CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.LITERAL_FLOAT;
+                    CurrentToken.Content += currChar;
+                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
-                else if (currChar == 'x' && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.text.EndsWith('0'))
+                    if (!CurrentToken.Content.EndsWith('0'))
                     { throw new TokenizerException($"Invalid hex number literal format", CurrentToken); }
-                    CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.LITERAL_HEX;
+                    CurrentToken.Content += currChar;
+                    CurrentToken.TokenType = TokenType.LITERAL_HEX;
                 }
-                else if (currChar == 'b' && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.text.EndsWith('0'))
+                    if (!CurrentToken.Content.EndsWith('0'))
                     { throw new TokenizerException($"Invalid bin number literal format", CurrentToken); }
-                    CurrentToken.text += currChar;
-                    CurrentToken.type = TokenType.LITERAL_BIN;
+                    CurrentToken.Content += currChar;
+                    CurrentToken.TokenType = TokenType.LITERAL_BIN;
                 }
                 else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
                 {
-                    if (CurrentToken.type == TokenType.WHITESPACE)
+                    if (CurrentToken.TokenType == TokenType.WHITESPACE)
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.LITERAL_NUMBER;
+                        CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     }
-                    else if (CurrentToken.type == TokenType.POTENTIAL_FLOAT)
-                    { CurrentToken.type = TokenType.LITERAL_FLOAT; }
-                    else if (CurrentToken.type == TokenType.OPERATOR)
+                    else if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
+                    { CurrentToken.TokenType = TokenType.LITERAL_FLOAT; }
+                    else if (CurrentToken.TokenType == TokenType.OPERATOR)
                     {
-                        if (CurrentToken.text != "-")
+                        if (CurrentToken.Content != "-")
                         {
                             EndToken(OffsetTotal);
                         }
                         else
                         {
-                            CurrentToken.type = TokenType.LITERAL_NUMBER;
+                            CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                         }
                     }
 
-                    if (CurrentToken.type == TokenType.LITERAL_BIN)
+                    if (CurrentToken.TokenType == TokenType.LITERAL_BIN)
                     {
                         if (currChar != '0' && currChar != '1')
                         {
@@ -550,136 +550,136 @@ namespace IngameCoding.BBCode
                         }
                     }
 
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                 }
-                else if (CurrentToken.type == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                else if (CurrentToken.TokenType == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                 }
-                else if (CurrentToken.type == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                 }
-                else if (CurrentToken.type == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+                else if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                 }
                 else if (currChar == '.')
                 {
-                    if (CurrentToken.type == TokenType.WHITESPACE)
+                    if (CurrentToken.TokenType == TokenType.WHITESPACE)
                     {
-                        CurrentToken.type = TokenType.POTENTIAL_FLOAT;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.POTENTIAL_FLOAT;
+                        CurrentToken.Content += currChar;
                     }
-                    else if (CurrentToken.type == TokenType.LITERAL_NUMBER)
+                    else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                     {
-                        CurrentToken.type = TokenType.LITERAL_FLOAT;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                        CurrentToken.Content += currChar;
                     }
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.OPERATOR;
+                        CurrentToken.Content += currChar;
                         EndToken(OffsetTotal);
                     }
                 }
                 else if (currChar == '/')
                 {
-                    if (CurrentToken.type == TokenType.POTENTIAL_COMMENT)
+                    if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                     {
-                        CurrentToken.type = TokenType.COMMENT;
-                        CurrentToken.text = "";
+                        CurrentToken.TokenType = TokenType.COMMENT;
+                        CurrentToken.Content = "";
                     }
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.POTENTIAL_COMMENT;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.POTENTIAL_COMMENT;
+                        CurrentToken.Content += currChar;
                     }
                 }
                 else if (bracelets.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
                 }
                 else if (simpleOperators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
                 }
                 else if (currChar == '=')
                 {
-                    if (CurrentToken.text.Length == 1 && operators.Contains(CurrentToken.text[0]))
+                    if (CurrentToken.Content.Length == 1 && operators.Contains(CurrentToken.Content[0]))
                     {
-                        CurrentToken.text += currChar;
+                        CurrentToken.Content += currChar;
                         EndToken(OffsetTotal);
                     }
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.OPERATOR;
+                        CurrentToken.Content += currChar;
                     }
                 }
-                else if (doubleOperators.Contains(CurrentToken.text + currChar))
+                else if (doubleOperators.Contains(CurrentToken.Content + currChar))
                 {
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
                 }
-                else if (currChar == '*' && CurrentToken.type == TokenType.POTENTIAL_COMMENT)
+                else if (currChar == '*' && CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                 {
-                    if (CurrentToken.type == TokenType.POTENTIAL_COMMENT)
+                    if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                     {
-                        CurrentToken.type = TokenType.COMMENT_MULTILINE;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                        CurrentToken.Content += currChar;
                     }
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.OPERATOR;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.OPERATOR;
+                        CurrentToken.Content += currChar;
                     }
                 }
                 else if (operators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content += currChar;
                 }
                 else if (currChar == ' ' || currChar == '\t')
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.WHITESPACE;
-                    CurrentToken.text = currChar.ToString();
+                    CurrentToken.TokenType = TokenType.WHITESPACE;
+                    CurrentToken.Content = currChar.ToString();
                 }
                 else if (currChar == '\n')
                 {
-                    if (CurrentToken.type == TokenType.COMMENT_MULTILINE)
+                    if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.COMMENT_MULTILINE;
+                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                     }
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
-                        CurrentToken.text = currChar.ToString();
+                        CurrentToken.TokenType = settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
+                        CurrentToken.Content = currChar.ToString();
                         EndToken(OffsetTotal);
                     }
                 }
                 else if (currChar == '"')
                 {
-                    if (CurrentToken.type != TokenType.LITERAL_STRING)
+                    if (CurrentToken.TokenType != TokenType.LITERAL_STRING)
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.LITERAL_STRING;
+                        CurrentToken.TokenType = TokenType.LITERAL_STRING;
                     }
-                    else if (CurrentToken.type == TokenType.LITERAL_STRING)
+                    else if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
                     {
                         EndToken(OffsetTotal);
                     }
@@ -687,34 +687,34 @@ namespace IngameCoding.BBCode
                 else if (currChar == '\\')
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text += currChar;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
                 }
-                else if (CurrentToken.type == TokenType.LITERAL_HEX)
+                else if (CurrentToken.TokenType == TokenType.LITERAL_HEX)
                 {
                     if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
                     {
                         RefreshTokenPosition(OffsetTotal);
                         throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.After());
                     }
-                    CurrentToken.text += currChar;
+                    CurrentToken.Content += currChar;
                 }
                 else
                 {
-                    if (CurrentToken.type == TokenType.WHITESPACE ||
-                        CurrentToken.type == TokenType.LITERAL_NUMBER ||
-                        CurrentToken.type == TokenType.LITERAL_HEX ||
-                        CurrentToken.type == TokenType.LITERAL_FLOAT ||
-                        CurrentToken.type == TokenType.OPERATOR)
+                    if (CurrentToken.TokenType == TokenType.WHITESPACE ||
+                        CurrentToken.TokenType == TokenType.LITERAL_NUMBER ||
+                        CurrentToken.TokenType == TokenType.LITERAL_HEX ||
+                        CurrentToken.TokenType == TokenType.LITERAL_FLOAT ||
+                        CurrentToken.TokenType == TokenType.OPERATOR)
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.type = TokenType.IDENTIFIER;
-                        CurrentToken.text += currChar;
+                        CurrentToken.TokenType = TokenType.IDENTIFIER;
+                        CurrentToken.Content += currChar;
                     }
                     else
                     {
-                        CurrentToken.text += currChar;
+                        CurrentToken.Content += currChar;
                     }
                 }
             }
@@ -741,15 +741,15 @@ namespace IngameCoding.BBCode
             CurrentToken.Position.End.Line = CurrentLine;
             CurrentToken.AbsolutePosition.End = OffsetTotal;
 
-            if (CurrentToken.type == TokenType.LITERAL_FLOAT)
+            if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
-                if (CurrentToken.text.EndsWith('.'))
+                if (CurrentToken.Content.EndsWith('.'))
                 {
                     CurrentToken.Position.End.Character--;
                     CurrentToken.Position.End.Line--;
                     CurrentToken.AbsolutePosition.End--;
-                    CurrentToken.text = CurrentToken.text[..^1];
-                    CurrentToken.type = TokenType.LITERAL_NUMBER;
+                    CurrentToken.Content = CurrentToken.Content[..^1];
+                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     tokens.Add(CurrentToken.Clone());
 
                     CurrentToken.Position.Start.Character = CurrentToken.Position.End.Character + 1;
@@ -759,39 +759,39 @@ namespace IngameCoding.BBCode
                     CurrentToken.Position.End.Character++;
                     CurrentToken.Position.End.Line++;
                     CurrentToken.AbsolutePosition.End++;
-                    CurrentToken.type = TokenType.OPERATOR;
-                    CurrentToken.text = ".";
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content = ".";
                 }
             }
 
-            if (CurrentToken.type != TokenType.WHITESPACE)
+            if (CurrentToken.TokenType != TokenType.WHITESPACE)
             {
                 tokensWithComments.Add(CurrentToken.Clone());
-                if (CurrentToken.type != TokenType.COMMENT && CurrentToken.type != TokenType.COMMENT_MULTILINE)
+                if (CurrentToken.TokenType != TokenType.COMMENT && CurrentToken.TokenType != TokenType.COMMENT_MULTILINE)
                 {
                     tokens.Add(CurrentToken.Clone());
                 }
             }
-            else if (!string.IsNullOrEmpty(CurrentToken.text) && settings.TokenizeWhitespaces)
+            else if (!string.IsNullOrEmpty(CurrentToken.Content) && settings.TokenizeWhitespaces)
             {
                 tokensWithComments.Add(CurrentToken.Clone());
                 tokens.Add(CurrentToken.Clone());
             }
 
-            if (CurrentToken.type == TokenType.POTENTIAL_FLOAT)
+            if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
             {
-                if (CurrentToken.text.CompareTo(".") == 0)
+                if (CurrentToken.Content.CompareTo(".") == 0)
                 {
-                    CurrentToken.type = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.OPERATOR;
                 }
                 else
                 {
-                    CurrentToken.type = TokenType.LITERAL_FLOAT;
+                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
             }
 
-            CurrentToken.type = TokenType.WHITESPACE;
-            CurrentToken.text = "";
+            CurrentToken.TokenType = TokenType.WHITESPACE;
+            CurrentToken.Content = "";
             CurrentToken.Position.Start.Line = CurrentLine;
             CurrentToken.Position.Start.Character = CurrentColumn;
             CurrentToken.AbsolutePosition.Start = OffsetTotal;
@@ -814,15 +814,15 @@ namespace IngameCoding.BBCode
 
                 var lastToken = result.Last();
 
-                if (token.type == TokenType.WHITESPACE && lastToken.type == TokenType.WHITESPACE)
+                if (token.TokenType == TokenType.WHITESPACE && lastToken.TokenType == TokenType.WHITESPACE)
                 {
-                    lastToken.text += token.text;
+                    lastToken.Content += token.Content;
                     continue;
                 }
 
-                if (token.type == TokenType.LINEBREAK && lastToken.type == TokenType.LINEBREAK && settings.JoinLinebreaks)
+                if (token.TokenType == TokenType.LINEBREAK && lastToken.TokenType == TokenType.LINEBREAK && settings.JoinLinebreaks)
                 {
-                    lastToken.text += token.text;
+                    lastToken.Content += token.Content;
                     continue;
                 }
 

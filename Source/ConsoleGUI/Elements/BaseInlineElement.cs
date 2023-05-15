@@ -1,35 +1,36 @@
 ﻿namespace ConsoleGUI
 {
-    internal class BaseInlineElement : BaseElement
+    internal class InlineElement : Element, IBorderedElement, IElementWithTitle
     {
+        public bool HasBorder { get; set; } = false;
+        public string Title { get; set; }
+
         public class BeforeDrawEvent { }
 
-        public delegate void MouseEvent(BaseInlineElement sender, MouseInfo e);
-        public delegate void KeyEvent(BaseInlineElement sender, ConsoleLib.NativeMethods.KEY_EVENT_RECORD e);
-        public delegate void SimpleEvent(BaseInlineElement sender);
+        public delegate void EventHandler<T>(InlineElement sender, T e);
+        public delegate void EventHandler(InlineElement sender);
 
-        public event SimpleEvent OnBeforeDraw;
-        public event SimpleEvent OnRefreshSize;
+        public event EventHandler OnBeforeDraw;
+        public event EventHandler OnRefreshSize;
+        public event EventHandler<MouseEvent> OnMouseEventInvoked;
+        public event EventHandler<KeyEvent> OnKeyEventInvoked;
 
-        public event MouseEvent OnMouseEventInvoked;
-        public event KeyEvent OnKeyEventInvoked;
-
-        internal override void BeforeDraw()
+        public override void BeforeDraw()
         {
             base.BeforeDraw();
             OnBeforeDraw?.Invoke(this);
         }
-        internal override void RefreshSize()
+        public override void RefreshSize()
         {
             base.RefreshSize();
             OnRefreshSize?.Invoke(this);
         }
-        internal override void OnMouseEvent(MouseInfo e)
+        public override void OnMouseEvent(MouseEvent e)
         {
             base.OnMouseEvent(e);
             OnMouseEventInvoked?.Invoke(this, e);
         }
-        internal override void OnKeyEvent(ConsoleLib.NativeMethods.KEY_EVENT_RECORD e)
+        public override void OnKeyEvent(KeyEvent e)
         {
             base.OnKeyEvent(e);
             OnKeyEventInvoked?.Invoke(this, e);

@@ -1,4 +1,4 @@
-using System;
+// using System;
 
 struct Foo
 {
@@ -9,5 +9,24 @@ struct Foo
 [CodeEntry]
 void Start()
 {
-  Console.Log((new Foo).field0);
+  Foo foo;
+  foo.field0 = 55;
+  // Console.Log("foo.field0: " + foo.field0);
+  // Console.Log("&foo.field0: " + &foo.field0);
+
+  Foo foo2 = foo;
+  // Console.Log("foo.field0: " + foo.field0);
+
+  Bar(foo2, foo, 420);
+
+  // Console.Log("foo.field0: " + foo.field0);
+  // Console.Log("foo2.field0: " + foo2.field0);
+}
+
+void Bar(Foo p0, Foo p1, int p2)
+{
+  p0.field0 = 3;
+  p1.field1 = 7;
+  // int address0 = &p0.field1;
+  // int address1 = &p1.field0;
 }

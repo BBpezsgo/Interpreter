@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace ConsoleGUI
 {
-    internal class TextViewer : BaseWindowElement
+    internal class TextViewer : WindowElement
     {
         public string Text = "";
         int Scroll;
@@ -16,7 +16,7 @@ namespace ConsoleGUI
 
         new void ClearBuffer() => buf = new Character[Rect.Width * Rect.Height];
 
-        internal override void BeforeDraw()
+        public override void BeforeDraw()
         {
             if (buf.Length == 0) ClearBuffer();
 
@@ -55,7 +55,7 @@ namespace ConsoleGUI
 
             void Line(string lineNumber, string lineText)
             {
-                AddText(" ".Repeat(4 - lineNumber.Length));
+                AddText(new string(' ', 4 - lineNumber.Length));
                 Color = CharColors.FgGray;
                 AddText(lineNumber);
                 Color = CharColors.FgDefault;
@@ -121,16 +121,16 @@ namespace ConsoleGUI
             }
         }
 
-        internal override Character OnDrawContent(int X, int Y) => buf[X + (Y * Rect.Width)];
+        public override Character DrawContent(int X, int Y) => buf[X + (Y * Rect.Width)];
 
-        internal override void OnMouseEvent(MouseInfo mouse)
+        public override void OnMouseEvent(MouseEvent mouse)
         {
-            if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
+            if (mouse.ButtonState == MouseButtonState.ScrollUp)
             {
                 ClearBuffer();
                 ScrollTo(Scroll - 1);
             }
-            else if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
+            else if (mouse.ButtonState == MouseButtonState.ScrollDown)
             {
                 ClearBuffer();
                 ScrollTo(Scroll + 1);

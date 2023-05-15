@@ -9,7 +9,6 @@ namespace ConsoleGUI
 
     using System.Timers;
 
-    using static ConsoleLib.NativeMethods;
     using static Core;
 
     internal class ConsoleGUI
@@ -20,28 +19,27 @@ namespace ConsoleGUI
             Color = CharColors.BgBlack
         };
 
-        internal List<BaseWindowElement> Elements = new();
+        internal List<IElement> Elements = new();
+        internal IElement FilledElement = null;
+
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
-        private readonly Timer aTimer;
-        private readonly Timer bTimer;
-        private readonly Timer cTimer;
-        short width;
-        short height;
+        readonly Timer TimerRefreshConsole;
+        readonly Timer TimerRefreshSizes;
+        readonly Timer TimerOnStart;
+
+        short Width;
+        short Height;
         CharInfo[] ConsoleBuffer;
         SmallRect ConsoleRect;
+        Position MousePosition;
+        bool ResizeElements;
 
         internal static ConsoleGUI Instance = null;
-
-        MouseInfo Mouse;
-        internal BaseWindowElement FilledElement = null;
-
-        bool ResizeElements;
 
         void Log(string message)
         {
             if (!DebugLogs) return;
-            // Console.WriteLine(message);
             System.Diagnostics.Debug.WriteLine(message);
         }
 
@@ -51,28 +49,30 @@ namespace ConsoleGUI
             this.DebugLogs = DebugLogs;
 
             Log("Setup timers");
-            this.aTimer = new Timer();
-            aTimer.Elapsed += TimerElapsed;
-            aTimer.Interval = 500;
-            aTimer.Enabled = true;
+            TimerRefreshConsole = new Timer();
+            TimerRefreshConsole.Elapsed += (_, _) => RefreshConsole();
+            TimerRefreshConsole.Interval = 500;
+            TimerRefreshConsole.Enabled = true;
 
-            this.bTimer = new Timer();
-            bTimer.Elapsed += BTimer_Elapsed;
-            bTimer.Interval = 1000;
-            bTimer.Enabled = true;
+            TimerRefreshSizes = new Timer();
+            TimerRefreshSizes.Elapsed += (_, _) => ResizeElements = true;
+            TimerRefreshSizes.Interval = 1000;
+            TimerRefreshSizes.Enabled = true;
 
-            this.cTimer = new Timer();
-            cTimer.Elapsed += (_, _) =>
+            TimerOnStart = new Timer();
+            TimerOnStart.Elapsed += (_, _) =>
             {
-                cTimer.Stop();
-                cTimer.Dispose();
+                TimerOnStart.Stop();
+                TimerOnStart.Dispose();
 
-                foreach (var element in Elements)
-                { element.OnStart(); }
-                FilledElement?.OnStart();
+                foreach (var _element in Elements)
+                {
+                    if (_element is IElementWithEvents element) element.OnStart();
+                }
+                if (FilledElement is IElementWithEvents elementWithEvents) elementWithEvents?.OnStart();
             };
-            cTimer.Interval = 2000;
-            cTimer.Enabled = true;
+            TimerOnStart.Interval = 2000;
+            TimerOnStart.Enabled = true;
 
             Log("Setup console");
             SetupConsole();
@@ -81,16 +81,14 @@ namespace ConsoleGUI
             ConsoleListener.KeyEvent += KeyEvent;
             ConsoleListener.WindowBufferSizeEvent += WindowBufferSizeEvent;
 
-            Mouse = new MouseInfo();
-
             Log("Start console listener");
             ConsoleListener.Start();
 
             Log("Setup console handler");
             ConsoleHandle = CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, System.IO.FileMode.Open, 0, IntPtr.Zero);
 
-            width = (short)Console.WindowWidth;
-            height = (short)Console.WindowHeight;
+            Width = (short)Console.WindowWidth;
+            Height = (short)Console.WindowHeight;
 
             Log("Start");
             Start();
@@ -99,9 +97,9 @@ namespace ConsoleGUI
         internal void Destroy()
         {
             Clear();
-            aTimer?.Dispose();
-            bTimer?.Dispose();
-            cTimer?.Dispose();
+            TimerRefreshConsole?.Dispose();
+            TimerRefreshSizes?.Dispose();
+            TimerOnStart?.Dispose();
             Console.Clear();
 
             Console.WriteLine("Destroy std handler ...");
@@ -123,25 +121,22 @@ namespace ConsoleGUI
         {
             Log("Clear console");
 
-            ConsoleBuffer = new CharInfo[width * height];
+            ConsoleBuffer = new CharInfo[Width * Height];
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 ConsoleBuffer[i].Char.UnicodeChar = ' ';
             }
-            ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = width, Bottom = height };
+            ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = Width, Bottom = Height };
         }
 
-        private void BTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e) => BTimer_Elapsed();
-        private void BTimer_Elapsed() => ResizeElements = true;
-
-        private void WindowBufferSizeEvent(WINDOW_BUFFER_SIZE_RECORD r) => ResizeElements = true;
+        private void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
 
         void RefreshElementsSize(bool Force = false)
         {
             if (ResizeElements || Force)
             {
-                width = (short)Console.WindowWidth;
-                height = (short)Console.WindowHeight;
+                Width = (short)Console.WindowWidth;
+                Height = (short)Console.WindowHeight;
 
                 Clear();
 
@@ -149,7 +144,7 @@ namespace ConsoleGUI
                 foreach (var Element in Elements) Element.RefreshSize();
                 if (FilledElement != null)
                 {
-                    FilledElement.Rect = new System.Drawing.Rectangle(0, 0, Console.WindowWidth - 1, Console.WindowHeight - 1);
+                    FilledElement.Rect = new System.Drawing.Rectangle(0, 0, Width - 1, Height - 1);
                     FilledElement.RefreshSize();
                 }
             }
@@ -165,27 +160,14 @@ namespace ConsoleGUI
 
             RefreshElementsSize();
 
-            foreach (var Element in Elements) Element.BeforeDraw();
-            FilledElement?.BeforeDraw();
-
-            /*
-            for (int i = 0; i < ConsoleBuffer.Length; i++)
-            {
-                int X = i % width;
-                int Y = i / width;
-                Character chr = '-'.Details();
-
-                ConsoleBuffer[i].Attributes = (short)chr.Color;
-                ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
-            }
-            */
-
             if (FilledElement != null)
             {
+                FilledElement?.BeforeDraw();
                 DrawElement(FilledElement, true);
             }
             else
             {
+                Elements.BeforeDraw();
                 foreach (var Element in Elements)
                 {
                     DrawElement(Element);
@@ -195,50 +177,16 @@ namespace ConsoleGUI
             WriteConsole(ref ConsoleRect);
         }
 
-        static Character DrawElement(BaseWindowElement Element, int X, int Y)
-        {
-            if (Element.HasBorder)
-            {
-                if (Element.Rect.Top == Y)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Left == X)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Bottom == Y)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-                else if (Element.Rect.Right == X)
-                {
-                    return Element.OnDrawBorder(X, Y);
-                }
-
-                return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
-            }
-            return Element.OnDrawContent(X - Element.Rect.Left - 1, Y - Element.Rect.Top - 1);
-        }
-        void DrawElement(BaseWindowElement Element, bool IsFilled = false)
+        void DrawElement(IElement Element, bool IsFilled = false)
         {
             for (int x = Element.Rect.Left; x <= Element.Rect.Right; x++)
             {
                 for (int y = Element.Rect.Top; y <= Element.Rect.Bottom; y++)
                 {
-                    int i = y * width + x;
-                    if (i >= ConsoleBuffer.Length) continue;
-                    if (i < 0) continue;
+                    int i = y * Width + x;
+                    if (ConsoleBuffer.IsOutside(i)) continue;
 
-                    Character chr;
-                    if (IsFilled)
-                    {
-                        chr = Element.OnDrawContent(x, y);
-                    }
-                    else
-                    {
-                        chr = DrawElement(Element, x, y);
-                    }
+                    Character chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
                     ConsoleBuffer[i].Attributes = (short)chr.Color;
                     ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
                 }
@@ -259,13 +207,13 @@ namespace ConsoleGUI
             }
 
             WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
-                new Coord() { X = (short)Console.WindowWidth, Y = (short)Console.WindowHeight },
-                new Coord() { X = 0, Y = 0 },
+                new Coord((short)Console.WindowWidth, (short)Console.WindowHeight),
+                new Coord(0, 0),
                 ref rect);
         }
-        void KeyEvent(KEY_EVENT_RECORD e)
+        void KeyEvent(KeyEvent e)
         {
-            if (!e.bKeyDown)
+            if (!e.KeyDown)
             {
                 if (e.AsciiChar == 27)
                 {
@@ -331,58 +279,49 @@ namespace ConsoleGUI
 
             for (int i = Elements.Count - 1; i >= 0; i--)
             {
-                if (!Elements[i].Contains(Mouse.X, Mouse.Y) && !Elements[i].IsFocused) continue;
-                Elements[i].OnKeyEvent(e);
-                Elements[i].BeforeDraw();
-                DrawElement(Elements[i]);
+                if (Elements[i] is not IElementWithEvents element) continue;
+                if (!element.Contains(MousePosition.X, MousePosition.Y)) continue;
+                element.OnKeyEvent(e);
+                element.BeforeDraw();
+                DrawElement(element);
             }
-            if (FilledElement != null)
+            if (FilledElement is IElementWithEvents elementWithEvents)
             {
-                FilledElement.OnKeyEvent(e);
-                FilledElement.BeforeDraw();
-                DrawElement(FilledElement);
+                elementWithEvents.OnKeyEvent(e);
+                elementWithEvents.BeforeDraw();
+                DrawElement(elementWithEvents);
             }
-
-            // Console.WriteLine($"'{e.UnicodeChar}'             {e.AsciiChar} {e.bKeyDown} {e.dwControlKeyState} {e.wRepeatCount}");
         }
 
-        void MouseEvent(MOUSE_EVENT_RECORD e)
+        void MouseEvent(MouseEvent e)
         {
-            Mouse.X = e.dwMousePosition.X;
-            Mouse.Y = e.dwMousePosition.Y;
-            Mouse.ButtonState = (MouseInfo.ButtonStateEnum)e.dwButtonState;
-            Mouse.ControlKeyState = e.dwControlKeyState;
-            Mouse.Flags = e.dwEventFlags;
+            MousePosition = e.Position;
 
             for (int i = Elements.Count - 1; i >= 0; i--)
             {
-                if (!Elements[i].Contains(Mouse.X, Mouse.Y) && !Elements[i].IsFocused) continue;
-                Elements[i].OnMouseEvent(Mouse);
-                Elements[i].BeforeDraw();
-                DrawElement(Elements[i]);
+                if (Elements[i] is not IElementWithEvents element) continue;
+                if (!element.Contains(e.X, e.Y)) continue;
+                element.OnMouseEvent(e);
+                element.BeforeDraw();
+                DrawElement(element);
 
-                Elements[i].OnMouseEventBase(Mouse);
+                if (element is WindowElement wat) wat.OnMouseEventBase(e);
             }
-            if (FilledElement != null)
+            if (FilledElement is IElementWithEvents elementWithEvents)
             {
-                for (int i = 0; i < FilledElement.Elements.Length; i++)
+                if (FilledElement is IElementWithSubelements elementWithSubelements)
                 {
-                    if (!FilledElement.Elements[i].Contains(Mouse.X, Mouse.Y)) continue;
-                    FilledElement.Elements[i].OnMouseEvent(Mouse);
+                    for (int i = 0; i < elementWithSubelements.Elements.Length; i++)
+                    {
+                        if (elementWithSubelements.Elements[i] is not IElementWithEvents element) continue;
+                        if (!element.Contains(e.X, e.Y)) continue;
+                        element.OnMouseEvent(e);
+                    }
                 }
-                FilledElement.OnMouseEvent(Mouse);
-                FilledElement.BeforeDraw();
-                DrawElement(FilledElement);
+                elementWithEvents.OnMouseEvent(e);
+                elementWithEvents.BeforeDraw();
+                DrawElement(elementWithEvents);
             }
-
-            if (Mouse.ButtonState == MouseInfo.ButtonStateEnum.Left)
-            {
-                // CurrentIndex = PositionToIndex(Mouse.X, Mouse.Y);
-            }
-
-            // Console.WriteLine($"{e.dwButtonState} {e.dwControlKeyState} {e.dwEventFlags} {e.dwMousePosition.X} {e.dwMousePosition.Y}");
         }
-
-        void TimerElapsed(object sender, System.Timers.ElapsedEventArgs e) => RefreshConsole();
     }
 }

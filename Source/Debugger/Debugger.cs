@@ -267,7 +267,7 @@ namespace TheProgram
         public Data_Function(CompiledFunction v) : base(v)
         {
             this.FullName = v.FullName;
-            this.Position = new Data_Position(v.Name.GetPosition());
+            this.Position = new Data_Position(v.Identifier.GetPosition());
         }
     }
 

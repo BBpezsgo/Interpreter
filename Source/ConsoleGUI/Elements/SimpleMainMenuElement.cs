@@ -7,7 +7,7 @@ namespace ConsoleGUI
 
     using System.Timers;
 
-    internal class SimpleMainMenuElement : BaseWindowElement
+    internal class SimpleMainMenuElement : WindowElement
     {
         int Scroll;
 
@@ -22,7 +22,7 @@ namespace ConsoleGUI
             ClearBuffer();
         }
 
-        internal override void OnStart()
+        public override void OnStart()
         {
             base.OnStart();
 
@@ -39,7 +39,7 @@ namespace ConsoleGUI
             );
         }
 
-        internal override void BeforeDraw()
+        public override void BeforeDraw()
         {
             base.BeforeDraw();
 
@@ -113,25 +113,18 @@ namespace ConsoleGUI
             }
         }
 
-        internal override void OnMouseEvent(MouseInfo mouse)
+        public override void OnMouseEvent(MouseEvent mouse)
         {
-            if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
+            if (mouse.ButtonState == MouseButtonState.ScrollUp)
             {
                 ClearBuffer();
                 ScrollTo(Scroll - 1);
             }
-            else if (mouse.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
+            else if (mouse.ButtonState == MouseButtonState.ScrollDown)
             {
                 ClearBuffer();
                 ScrollTo(Scroll + 1);
             }
-        }
-
-        internal override void OnKeyEvent(NativeMethods.KEY_EVENT_RECORD e)
-        {
-            if (e.bKeyDown) return;
-
-            // Debug.WriteLine(e.AsciiChar);
         }
 
         void ScrollTo(int value) => Scroll = 0; // Math.Clamp(value, 0, File.Split('\n').Length - Rect.Height + 1);

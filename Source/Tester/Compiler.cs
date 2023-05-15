@@ -36,20 +36,20 @@ namespace IngameCoding.Tester
                 { throw new CompilerException("Attribute 'File' is requied for test definition", item.Keyword, path); }
                 if (attrFile.Parameters.Length != 1)
                 { throw new CompilerException("Attribute 'File' requies 1 string parameter", attrFile.Name, path); }
-                if (attrFile.Parameters[0].type != TokenType.LITERAL_STRING)
-                { throw new CompilerException($"Attribute 'File' requies 1 string parameter, passed {attrFile.Parameters[0].type}", attrFile.Name, path); }
-                if (!File.Exists(Path.Combine(directory.FullName, attrFile.Parameters[0].text)))
-                { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].text)} does not exists'", attrFile.Parameters[0]); }
-                if (names.Contains(item.Name.text))
-                { throw new CompilerException($"Test '{item.Name.text}' is already defined", item.Name, path); }
-                if (string.IsNullOrEmpty(item.Name.text) || string.IsNullOrWhiteSpace(item.Name.text) || (item.Name.text == "test" && item.Name.type != TokenType.LITERAL_STRING))
-                { throw new CompilerException($"Invalid test name '{item.Name.text}'", item.Name, path); }
-                names.Add(item.Name.text);
+                if (attrFile.Parameters[0].TokenType != TokenType.LITERAL_STRING)
+                { throw new CompilerException($"Attribute 'File' requies 1 string parameter, passed {attrFile.Parameters[0].TokenType}", attrFile.Name, path); }
+                if (!File.Exists(Path.Combine(directory.FullName, attrFile.Parameters[0].Content)))
+                { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].Content)} does not exists'", attrFile.Parameters[0]); }
+                if (names.Contains(item.Name.Content))
+                { throw new CompilerException($"Test '{item.Name.Content}' is already defined", item.Name, path); }
+                if (string.IsNullOrEmpty(item.Name.Content) || string.IsNullOrWhiteSpace(item.Name.Content) || (item.Name.Content == "test" && item.Name.TokenType != TokenType.LITERAL_STRING))
+                { throw new CompilerException($"Invalid test name '{item.Name.Content}'", item.Name, path); }
+                names.Add(item.Name.Content);
                 compiledTestDefinitions.Add(new CompiledTestDefinition()
                 {
                     Disabled = false,
-                    Name = item.Name.text,
-                    File = Path.Combine(directory.FullName, attrFile.Parameters[0].text),
+                    Name = item.Name.Content,
+                    File = Path.Combine(directory.FullName, attrFile.Parameters[0].Content),
                 });
             }
 
@@ -59,11 +59,11 @@ namespace IngameCoding.Tester
                 { throw new CompilerException("Expected 1 or more parameter after keyword 'disable'", item.Keyword, path); }
                 foreach (var param in item.Parameters)
                 {
-                    if (disabled.Contains(param.text))
-                    { warnings.Add(new Warning($"Test '{param.text}' already disabled", param, path)); }
-                    if (!names.Contains(param.text))
-                    { warnings.Add(new Warning($"Test '{param.text}' not found", param, path)); }
-                    disabled.Add(param.text);
+                    if (disabled.Contains(param.Content))
+                    { warnings.Add(new Warning($"Test '{param.Content}' already disabled", param, path)); }
+                    if (!names.Contains(param.Content))
+                    { warnings.Add(new Warning($"Test '{param.Content}' not found", param, path)); }
+                    disabled.Add(param.Content);
                 }
             }
 

@@ -102,7 +102,7 @@ namespace IngameCoding.BBCode.Compiler
         internal Dictionary<string, CompiledClass> compiledClasses;
         internal Dictionary<string, CompiledFunction> compiledFunctions;
         internal Dictionary<string, CompiledVariable> compiledVariables;
-        Dictionary<string, Parameter> parameters;
+        List<CompiledParameter> parameters;
 
         internal CleanupStack cleanupStack;
 
@@ -202,7 +202,19 @@ namespace IngameCoding.BBCode.Compiler
 
         bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable) => compiledVariables.TryGetValue(variableName, out compiledVariable);
 
-        bool GetParameter(string parameterName, out Parameter parameters) => this.parameters.TryGetValue(parameterName, out parameters);
+        bool GetParameter(string parameterName, out CompiledParameter parameters)
+        {
+            for (int i = 0; i < this.parameters.Count; i++)
+            {
+                if (this.parameters[i].Identifier.Content == parameterName)
+                {
+                    parameters = this.parameters[i];
+                    return true;
+                }
+            }
+            parameters = null;
+            return false;
+        }
 
         bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
@@ -248,17 +260,17 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (statement is Statement_Variable s1)
                 {
-                    if (GetParameter(s1.VariableName.text, out _))
+                    if (GetParameter(s1.VariableName.Content, out _))
                     {
                         return null;
                     }
-                    else if (GetCompiledVariable(s1.VariableName.text, out _))
+                    else if (GetCompiledVariable(s1.VariableName.Content, out _))
                     {
                         return null;
                     }
                     s1.VariableName.Analysis.CompilerReached = true;
                     s1.VariableName.Analysis.SubSubtype = TokenSubSubtype.Namespace;
-                    return new string[] { s1.VariableName.text };
+                    return new string[] { s1.VariableName.Content };
                 }
                 if (statement is Statement_Field s2)
                 {
@@ -269,7 +281,7 @@ namespace IngameCoding.BBCode.Compiler
                     s2.FieldName.Analysis.SubSubtype = TokenSubSubtype.Namespace;
 
                     var prev = prev_.ToList();
-                    prev.Insert(0, s2.FieldName.text);
+                    prev.Insert(0, s2.FieldName.Content);
                     return prev.ToArray();
                 }
                 return null;
@@ -296,19 +308,19 @@ namespace IngameCoding.BBCode.Compiler
 
         bool GetCompiledStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
         {
-            if (compiledStructs.TryGetValue(newStructStatement.TypeName.text, out compiledStruct))
+            if (compiledStructs.TryGetValue(newStructStatement.TypeName.Content, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
             {
                 return true;
             }
-            else if (compiledStructs.TryGetValue(newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.text, out compiledStruct))
+            else if (compiledStructs.TryGetValue(newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
             {
                 return true;
             }
@@ -317,19 +329,19 @@ namespace IngameCoding.BBCode.Compiler
 
         bool GetCompiledClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
         {
-            if (compiledClasses.TryGetValue(newClassStatement.TypeName.text, out compiledClass))
+            if (compiledClasses.TryGetValue(newClassStatement.TypeName.Content, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
             {
                 return true;
             }
-            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.text, out compiledClass))
+            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
             {
                 return true;
             }
@@ -342,11 +354,12 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (type.IsList)
             {
-                return new DataItem.List(type.ListOf.typeName.Convert());
+                throw new NotImplementedException();
+                return new DataItem.List(type.ListOf.Type.Convert());
             }
             else
             {
-                return type.typeName switch
+                return type.Type switch
                 {
                     BuiltinType.INT => 0,
                     BuiltinType.BYTE => (byte)0,
@@ -355,8 +368,8 @@ namespace IngameCoding.BBCode.Compiler
                     BuiltinType.VOID => throw new CompilerException("Invalid type", type, CurrentFile),
                     BuiltinType.STRING => "",
                     BuiltinType.BOOLEAN => false,
-                    BuiltinType.STRUCT => new UnassignedStruct(),
-                    _ => throw new InternalException($"initial value for type {type.typeName} is unimplemented", CurrentFile),
+                    BuiltinType.STRUCT => throw new NotImplementedException(),
+                    _ => throw new InternalException($"initial value for type {type.Type} is unimplemented", CurrentFile),
                 };
             }
         }
@@ -410,87 +423,87 @@ namespace IngameCoding.BBCode.Compiler
         {
             Opcode opcode = Opcode.UNKNOWN;
 
-            if (@operator.Operator.text == "!")
+            if (@operator.Operator.Content == "!")
             {
                 if (@operator.ParameterCount != 1) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NOT;
             }
-            else if (@operator.Operator.text == "+")
+            else if (@operator.Operator.Content == "+")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_ADD;
             }
-            else if (@operator.Operator.text == "<")
+            else if (@operator.Operator.Content == "<")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LT;
             }
-            else if (@operator.Operator.text == ">")
+            else if (@operator.Operator.Content == ">")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MT;
             }
-            else if (@operator.Operator.text == "-")
+            else if (@operator.Operator.Content == "-")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_SUB;
             }
-            else if (@operator.Operator.text == "*")
+            else if (@operator.Operator.Content == "*")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MULT;
             }
-            else if (@operator.Operator.text == "/")
+            else if (@operator.Operator.Content == "/")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_DIV;
             }
-            else if (@operator.Operator.text == "%")
+            else if (@operator.Operator.Content == "%")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.MATH_MOD;
             }
-            else if (@operator.Operator.text == "==")
+            else if (@operator.Operator.Content == "==")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_EQ;
             }
-            else if (@operator.Operator.text == "!=")
+            else if (@operator.Operator.Content == "!=")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_NEQ;
             }
-            else if (@operator.Operator.text == "&")
+            else if (@operator.Operator.Content == "&")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_AND;
             }
-            else if (@operator.Operator.text == "|")
+            else if (@operator.Operator.Content == "|")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_OR;
             }
-            else if (@operator.Operator.text == "^")
+            else if (@operator.Operator.Content == "^")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_XOR;
             }
-            else if (@operator.Operator.text == "<=")
+            else if (@operator.Operator.Content == "<=")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_LTEQ;
             }
-            else if (@operator.Operator.text == ">=")
+            else if (@operator.Operator.Content == ">=")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.LOGIC_MTEQ;
             }
-            else if (@operator.Operator.text == "<<")
+            else if (@operator.Operator.Content == "<<")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.BITSHIFT_LEFT;
             }
-            else if (@operator.Operator.text == ">>")
+            else if (@operator.Operator.Content == ">>")
             {
                 if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
                 opcode = Opcode.BITSHIFT_RIGHT;
@@ -508,7 +521,7 @@ namespace IngameCoding.BBCode.Compiler
                         var leftValue = GenerateInitialValue(TypeToken.CreateAnonymous(leftType.Name, leftType.GetBuiltinType()));
                         var rightValue = GenerateInitialValue(TypeToken.CreateAnonymous(rightType.Name, rightType.GetBuiltinType()));
 
-                        var predictedValue = PredictStatementValue(@operator.Operator.text, new DataItem(leftValue, null), new DataItem(rightValue, null)); ;
+                        var predictedValue = PredictStatementValue(@operator.Operator.Content, new DataItem(leftValue, null), new DataItem(rightValue, null)); ;
                         if (predictedValue.HasValue)
                         {
                             switch (predictedValue.Value.type)
@@ -528,37 +541,37 @@ namespace IngameCoding.BBCode.Compiler
                 else
                 { return leftType; }
             }
-            else if (@operator.Operator.text == "=")
+            else if (@operator.Operator.Content == "=")
             {
                 throw new NotImplementedException();
             }
             else
-            { throw new CompilerException($"Unknown operator '{@operator.Operator.text}'", @operator.Operator, CurrentFile); }
+            { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
         }
-        CompiledType FindStatementType(Statement_Literal literal) => literal.Type.typeName switch
+        CompiledType FindStatementType(Statement_Literal literal) => literal.Type.Type switch
         {
             BuiltinType.INT => new CompiledType(BuiltinType.INT),
             BuiltinType.BYTE => new CompiledType(BuiltinType.BYTE),
             BuiltinType.FLOAT => new CompiledType(BuiltinType.FLOAT),
             BuiltinType.STRING => new CompiledType(BuiltinType.STRING),
             BuiltinType.BOOLEAN => new CompiledType(BuiltinType.BOOLEAN),
-            _ => throw new CompilerException($"Unknown literal type {literal.Type.typeName}", literal, CurrentFile),
+            _ => throw new CompilerException($"Unknown literal type {literal.Type.Type}", literal, CurrentFile),
         };
         CompiledType FindStatementType(Statement_Variable variable)
         {
-            if (GetParameter(variable.VariableName.text, out Parameter param))
+            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
                 if (variable.ListIndex != null)
                 { throw new NotImplementedException(); }
-                return new CompiledType(param.type, name => GetCustomType(name));
+                return param.Type;
             }
-            else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
+            else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
             {
                 return val.Type;
             }
             else
             {
-                throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + variable.VariableName.Content + "'", variable.VariableName, CurrentFile);
             }
         }
         CompiledType FindStatementType(Statement_MemoryAddressGetter variable) => new(CompiledType.CompiledTypeType.INT);
@@ -575,7 +588,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new CompilerException("Unknown type '" + newStruct.TypeName.text + "'", newStruct.TypeName, CurrentFile);
+                throw new CompilerException("Unknown type '" + newStruct.TypeName.Content + "'", newStruct.TypeName, CurrentFile);
             }
         }
         CompiledType FindStatementType(TypeToken type)
@@ -588,7 +601,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (prevStatementType.Name == "string" || prevStatementType.Name.EndsWith("[]"))
             {
-                if (field.FieldName.text == "Length") return new CompiledType(BuiltinType.INT);
+                if (field.FieldName.Content == "Length") return new CompiledType(BuiltinType.INT);
             }
 
             foreach (var strct in compiledStructs)
@@ -597,8 +610,8 @@ namespace IngameCoding.BBCode.Compiler
 
                 foreach (var sField in strct.Value.Fields)
                 {
-                    if (sField.name.text != field.FieldName.text) continue;
-                    return FindStatementType(sField.type);
+                    if (sField.Identifier.Content != field.FieldName.Content) continue;
+                    return FindStatementType(sField.Type);
                 }
 
                 break;
@@ -610,8 +623,8 @@ namespace IngameCoding.BBCode.Compiler
 
                 foreach (var sField in @class_.Value.Fields)
                 {
-                    if (sField.name.text != field.FieldName.text) continue;
-                    return FindStatementType(sField.type);
+                    if (sField.Identifier.Content != field.FieldName.Content) continue;
+                    return FindStatementType(sField.Type);
                 }
 
                 break;
@@ -693,7 +706,7 @@ namespace IngameCoding.BBCode.Compiler
             var leftValue = PredictStatementValue(@operator.Left);
             if (!leftValue.HasValue) return null;
 
-            if (@operator.Operator.text == "!")
+            if (@operator.Operator.Content == "!")
             {
                 return !leftValue;
             }
@@ -703,14 +716,14 @@ namespace IngameCoding.BBCode.Compiler
                 var rightValue = PredictStatementValue(@operator.Right);
                 if (!rightValue.HasValue) return null;
 
-                return PredictStatementValue(@operator.Operator.text, leftValue.Value, rightValue.Value);
+                return PredictStatementValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
             }
             else
             { return leftValue; }
         }
         static DataItem? PredictStatementValue(Statement_Literal literal)
         {
-            return literal.Type.typeName switch
+            return literal.Type.Type switch
             {
                 BuiltinType.INT => new DataItem(int.Parse(literal.Value), null),
                 BuiltinType.FLOAT => new DataItem(float.Parse(literal.Value), null),
@@ -739,33 +752,35 @@ namespace IngameCoding.BBCode.Compiler
             newVariable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
             newVariable.VariableName.Analysis.CompilerReached = true;
 
-            if (!GetCompiledVariable(newVariable.VariableName.text, out CompiledVariable val_))
-            { throw new CompilerException("Unknown variable '" + newVariable.VariableName.text + "'", newVariable.VariableName, CurrentFile); }
+            if (!GetCompiledVariable(newVariable.VariableName.Content, out CompiledVariable val_))
+            { throw new CompilerException("Unknown variable '" + newVariable.VariableName.Content + "'", newVariable.VariableName, CurrentFile); }
 
-            if (newVariable.InitialValue != null)
+            if (newVariable.InitialValue == null) return;
+
+            AddInstruction(Opcode.COMMENT, $"New Variable \'{newVariable.VariableName.Content}\' {{");
+            if (newVariable.InitialValue is Statement_ListValue initialListValue)
             {
-                if (newVariable.InitialValue is Statement_ListValue initialListValue)
-                {
-                    if (initialListValue.Values.Count == 0)
-                    { AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type)); }
-                    else
-                    { GenerateCodeForStatement(newVariable.InitialValue); }
-                }
+                if (initialListValue.Values.Count == 0)
+                { AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type)); }
                 else
                 { GenerateCodeForStatement(newVariable.InitialValue); }
-                AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
             }
             else
-            { AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type)); }
+            { GenerateCodeForStatement(newVariable.InitialValue); }
 
             if (val_.IsStoredInHEAP)
-            { AddInstruction(Opcode.HEAP_SET, val_.Offset); }
+            { MemoryCopyHeap(val_.MemoryOffset, val_.Type.Size); }
             else
-            { AddInstruction(Opcode.STORE_VALUE, val_.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, val_.Offset); }
+            { MemoryCopyStack(val_.MemoryOffset, val_.Type.Size, !val_.IsGlobal); }
+
+            for (int i = 0; i < val_.Type.Size; i++)
+            { AddInstruction(Opcode.POP_VALUE); }
+
+            AddInstruction(Opcode.COMMENT, "}");
         }
         void GenerateCodeForStatement(Statement_FunctionCall functionCall)
         {
-            AddInstruction(Opcode.COMMENT, $"{functionCall.FunctionName}():");
+            AddInstruction(Opcode.COMMENT, $"Call {functionCall.FunctionName} {{");
 
             functionCall.Identifier.Analysis.CompilerReached = true;
 
@@ -775,6 +790,8 @@ namespace IngameCoding.BBCode.Compiler
                 { throw new CompilerException("Wrong number of parameters passed to 'return'", functionCall.TotalPosition(), CurrentFile); }
                 else if (functionCall.Parameters.Count == 1)
                 {
+                    AddInstruction(Opcode.COMMENT, " Param 0:");
+
                     GenerateCodeForStatement(functionCall.Parameters[0]);
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, -2 - parameters.Count);
                 }
@@ -782,14 +799,16 @@ namespace IngameCoding.BBCode.Compiler
                 // Clear variables
                 int variableCount = cleanupStack.GetAllInStatements();
                 if (AddCommentsToCode && variableCount > 0)
-                {
-                    AddInstruction(Opcode.COMMENT, "Clear variables");
-                }
+                { AddInstruction(Opcode.COMMENT, " Clear Local Variables:"); }
                 for (int i = 0; i < variableCount; i++)
                 { AddInstruction(Opcode.POP_VALUE); }
 
+                AddInstruction(Opcode.COMMENT, " Return:");
+
                 returnInstructions.Add(compiledCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
+
+                AddInstruction(Opcode.COMMENT, "}");
 
                 return;
             }
@@ -802,6 +821,8 @@ namespace IngameCoding.BBCode.Compiler
                 breakInstructions.Last().Add(compiledCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
+                AddInstruction(Opcode.COMMENT, "}");
+
                 return;
             }
 
@@ -810,8 +831,13 @@ namespace IngameCoding.BBCode.Compiler
                 if (functionCall.Parameters.Count != 1)
                 { throw new CompilerException("Wrong number of parameters passed to 'type'", functionCall.TotalPosition(), CurrentFile); }
 
+                AddInstruction(Opcode.COMMENT, " Param 0:");
                 GenerateCodeForStatement(functionCall.Parameters[0]);
+
+                AddInstruction(Opcode.COMMENT, " .:");
                 AddInstruction(Opcode.TYPE_GET);
+
+                AddInstruction(Opcode.COMMENT, "}");
 
                 return;
             }
@@ -820,11 +846,11 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (functionCall.PrevStatement is Statement_Variable prevVar)
                 {
-                    if (GetCompiledVariable(prevVar.VariableName.text, out var prevVarInfo))
+                    if (GetCompiledVariable(prevVar.VariableName.Content, out var prevVarInfo))
                     {
                         prevVar.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
                         prevVar.VariableName.Analysis.CompilerReached = true;
-                        prevVar.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(prevVarInfo.Declaration, prevVarInfo.IsGlobal, prevVarInfo.Type);
+                        prevVar.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(prevVarInfo, prevVarInfo.IsGlobal, prevVarInfo.Type);
 
                         if (prevVarInfo.Type.IsList)
                         {
@@ -834,6 +860,7 @@ namespace IngameCoding.BBCode.Compiler
                                 functionCall.Identifier.Analysis.CompilerReached = true;
                                 functionCall.Identifier.Analysis.Reference = new TokenAnalysis.RefBuiltinMethod("Push", "void", prevVarInfo.Type.Name, new string[] { prevVarInfo.Type.ListOf.Name }, new string[] { "newElement" });
 
+                                AddInstruction(Opcode.COMMENT, " Param prev:");
                                 AddInstruction(Opcode.LOAD_VALUE, prevVarInfo.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, prevVarInfo.Offset);
 
                                 if (functionCall.Parameters.Count != 1)
@@ -843,9 +870,13 @@ namespace IngameCoding.BBCode.Compiler
                                 if (paramType.Name != prevVarInfo.Type.ListOf.Name)
                                 { throw new CompilerException($"Wrong type passed to '{prevVarInfo.Type}.Push': {paramType}, expected {prevVarInfo.Type.ListOf.Name}", functionCall.Parameters[0].TotalPosition()); }
 
+                                AddInstruction(Opcode.COMMENT, " Param 0:");
                                 GenerateCodeForStatement(functionCall.Parameters[0]);
 
+                                AddInstruction(Opcode.COMMENT, " .:");
                                 AddInstruction(Opcode.LIST_PUSH_ITEM);
+
+                                AddInstruction(Opcode.COMMENT, "}");
 
                                 return;
                             }
@@ -855,12 +886,16 @@ namespace IngameCoding.BBCode.Compiler
                                 functionCall.Identifier.Analysis.CompilerReached = true;
                                 functionCall.Identifier.Analysis.Reference = new TokenAnalysis.RefBuiltinMethod("Pull", prevVarInfo.Type.ListOf.Name, prevVarInfo.Type.Name, Array.Empty<string>(), Array.Empty<string>());
 
+                                AddInstruction(Opcode.COMMENT, " Param prev:");
                                 AddInstruction(Opcode.LOAD_VALUE, prevVarInfo.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, prevVarInfo.Offset);
 
                                 if (functionCall.Parameters.Count != 0)
                                 { throw new CompilerException("Wrong number of parameters passed to '<list>.Pull'", functionCall.Identifier, CurrentFile); }
 
+                                AddInstruction(Opcode.COMMENT, " .:");
                                 AddInstruction(Opcode.LIST_PULL_ITEM);
+
+                                AddInstruction(Opcode.COMMENT, "}");
 
                                 return;
                             }
@@ -870,6 +905,7 @@ namespace IngameCoding.BBCode.Compiler
                                 functionCall.Identifier.Analysis.CompilerReached = true;
                                 functionCall.Identifier.Analysis.Reference = new TokenAnalysis.RefBuiltinMethod("Add", "void", prevVarInfo.Type.Name, new string[] { prevVarInfo.Type.ListOf.Name, "int" }, new string[] { "newElement", "index" });
 
+                                AddInstruction(Opcode.COMMENT, " Param prev:");
                                 AddInstruction(Opcode.LOAD_VALUE, prevVarInfo.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, prevVarInfo.Offset);
 
                                 if (functionCall.Parameters.Count != 2)
@@ -879,10 +915,15 @@ namespace IngameCoding.BBCode.Compiler
                                 if (paramType.Name != prevVarInfo.Type.ListOf.Name)
                                 { throw new CompilerException($"Wrong type passed to '<list>.Add': {paramType}, expected {prevVarInfo.Type.ListOf.Name}", functionCall.Parameters[0].TotalPosition()); }
 
+                                AddInstruction(Opcode.COMMENT, " Param 0:");
                                 GenerateCodeForStatement(functionCall.Parameters[0]);
+                                AddInstruction(Opcode.COMMENT, " Param 1:");
                                 GenerateCodeForStatement(functionCall.Parameters[1]);
 
+                                AddInstruction(Opcode.COMMENT, " Param .:");
                                 AddInstruction(Opcode.LIST_ADD_ITEM);
+
+                                AddInstruction(Opcode.COMMENT, "}");
 
                                 return;
                             }
@@ -892,26 +933,24 @@ namespace IngameCoding.BBCode.Compiler
                                 functionCall.Identifier.Analysis.CompilerReached = true;
                                 functionCall.Identifier.Analysis.Reference = new TokenAnalysis.RefBuiltinMethod("Remove", "void", prevVarInfo.Type.Name, new string[] { "int" }, new string[] { "index" });
 
+                                AddInstruction(Opcode.COMMENT, " Param prev:");
                                 AddInstruction(Opcode.LOAD_VALUE, prevVarInfo.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, prevVarInfo.Offset);
 
                                 if (functionCall.Parameters.Count != 1)
                                 { throw new CompilerException("Wrong number of parameters passed to '<list>.Remove'", functionCall.Identifier, CurrentFile); }
+
+                                AddInstruction(Opcode.COMMENT, " Param 0:");
                                 GenerateCodeForStatement(functionCall.Parameters[0]);
 
+                                AddInstruction(Opcode.COMMENT, " Param .:");
                                 AddInstruction(Opcode.LIST_REMOVE_ITEM);
+
+                                AddInstruction(Opcode.COMMENT, "}");
 
                                 return;
                             }
                         }
                     }
-                }
-            }
-
-            if (functionCall.FunctionName == "None")
-            {
-                foreach (var param in functionCall.Parameters)
-                {
-                    Console.WriteLine(PredictStatementValue(param));
                 }
             }
 
@@ -935,6 +974,7 @@ namespace IngameCoding.BBCode.Compiler
             if (!compiledFunction.CanUse(CurrentFile))
             {
                 errors.Add(new Error($"The {searchedID} function cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                AddInstruction(Opcode.COMMENT, "}");
                 return;
             }
 
@@ -956,30 +996,30 @@ namespace IngameCoding.BBCode.Compiler
                 if (!builtinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
                 {
                     errors.Add(new Error($"Builtin function '{compiledFunction.BuiltinName}' not found", functionCall.Identifier, CurrentFile));
-
-                    var savedBlockCodeGeneration = BlockCodeGeneration;
-                    BlockCodeGeneration = false;
-
-                    if (functionCall.PrevStatement != null)
-                    { GenerateCodeForStatement(functionCall.PrevStatement); }
-                    foreach (var param in functionCall.Parameters)
-                    { GenerateCodeForStatement(param); }
-
-                    BlockCodeGeneration = savedBlockCodeGeneration;
+                    AddInstruction(Opcode.COMMENT, "}");
                     return;
                 }
 
                 if (functionCall.PrevStatement != null)
-                { GenerateCodeForStatement(functionCall.PrevStatement); }
-                foreach (var param in functionCall.Parameters)
-                { GenerateCodeForStatement(param); }
+                {
+                    AddInstruction(Opcode.COMMENT, " Param prev:");
+                    GenerateCodeForStatement(functionCall.PrevStatement);
+                }
+                for (int i = 0; i < functionCall.Parameters.Count; i++)
+                {
+                    AddInstruction(Opcode.COMMENT, $" Param {i}:");
+                    GenerateCodeForStatement(functionCall.Parameters[i]);
+                }
 
+                AddInstruction(Opcode.COMMENT, " .:");
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName);
                 AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
 
+                AddInstruction(Opcode.COMMENT, $" Clear Return Value:");
                 if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
                 { AddInstruction(Opcode.POP_VALUE); }
 
+                AddInstruction(Opcode.COMMENT, "}");
                 return;
             }
 
@@ -988,54 +1028,67 @@ namespace IngameCoding.BBCode.Compiler
 
             if (functionCall.PrevStatement != null)
             {
+                AddInstruction(Opcode.COMMENT, " Param prev:");
+                // TODO: variable sized prev statement
                 GenerateCodeForStatement(functionCall.PrevStatement);
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
             }
+
+            int paramsSize = 0;
 
             for (int i = 0; i < functionCall.Parameters.Count; i++)
             {
                 Statement param = functionCall.Parameters[i];
                 ParameterDefinition definedParam = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
 
-                AddInstruction(Opcode.COMMENT, $"param:");
+                AddInstruction(Opcode.COMMENT, $" Param {i}:");
                 GenerateCodeForStatement(param);
-                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.name);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.Identifier);
+
+                if (definedParam.Type.Type == BuiltinType.STRUCT)
+                {
+                    var paramType = GetCustomType(definedParam.Type.ToString());
+                    if (paramType is CompiledStruct @struct)
+                    {
+                        paramsSize += @struct.Size;
+                    }
+                    else if (paramType is CompiledClass @class)
+                    {
+                        paramsSize += @class.Size;
+                    }
+                }
+                else
+                {
+                    paramsSize++;
+                }
             }
+
+            AddInstruction(Opcode.COMMENT, " .:");
 
             if (compiledFunction.InstructionOffset == -1)
             { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
             AddInstruction(Opcode.CALL, compiledFunction.InstructionOffset - compiledCode.Count);
 
-            for (int i = 0; i < functionCall.Parameters.Count; i++)
+            AddInstruction(Opcode.COMMENT, " Clear Params:");
+            for (int i = 0; i < paramsSize; i++)
             {
-                if (functionCall.Parameters[i] is Statement_Variable variable) if (GetCompiledVariable(variable.VariableName.text, out var v))
-                        if (v.IsStoredInHEAP)
-                        {
-                            AddInstruction(Opcode.DEBUG_SET_TAG, "");
-                            AddInstruction(Opcode.HEAP_SET, v.Offset);
-                            continue;
-                        }
-
-
                 AddInstruction(Opcode.POP_VALUE);
             }
 
             if (functionCall.PrevStatement != null)
             {
-                bool x = true;
-                if (functionCall.PrevStatement is Statement_Variable variable) if (GetCompiledVariable(variable.VariableName.text, out var v))
-                        if (v.IsStoredInHEAP)
-                        {
-                            AddInstruction(Opcode.DEBUG_SET_TAG, "");
-                            AddInstruction(Opcode.HEAP_SET, v.Offset);
-                            x = false;
-                        }
-                if (x) AddInstruction(Opcode.POP_VALUE);
+                // TODO: variable sized prev statement
+                AddInstruction(Opcode.POP_VALUE);
             }
 
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
-            { AddInstruction(Opcode.POP_VALUE); }
+            {
+                AddInstruction(Opcode.COMMENT, " Clear Return Value:");
+                AddInstruction(Opcode.POP_VALUE);
+            }
+
+            AddInstruction(Opcode.COMMENT, "}");
         }
         void GenerateCodeForStatement(Statement_Operator @operator)
         {
@@ -1126,10 +1179,10 @@ namespace IngameCoding.BBCode.Compiler
             };
 
 
-            if (operatorOpCodes.TryGetValue(@operator.Operator.text, out Opcode opcode))
+            if (operatorOpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
-                if (operatorParameterCounts[@operator.Operator.text] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of passed ({@operator.ParameterCount}) to operator '{@operator.Operator.text}', requied: {operatorParameterCounts[@operator.Operator.text]}", @operator.Operator, CurrentFile); }
+                if (operatorParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of passed ({@operator.ParameterCount}) to operator '{@operator.Operator.Content}', requied: {operatorParameterCounts[@operator.Operator.Content]}", @operator.Operator, CurrentFile); }
             }
             else
             {
@@ -1142,22 +1195,22 @@ namespace IngameCoding.BBCode.Compiler
                 if (@operator.Right != null) GenerateCodeForStatement(@operator.Right);
                 AddInstruction(opcode);
             }
-            else if (@operator.Operator.text == "=")
+            else if (@operator.Operator.Content == "=")
             {
                 if (@operator.ParameterCount != 2)
-                { throw new CompilerException("Wrong number of parameters passed to assigment operator '" + @operator.Operator.text + "'", @operator.Operator, CurrentFile); }
+                { throw new CompilerException("Wrong number of parameters passed to assigment operator '" + @operator.Operator.Content + "'", @operator.Operator, CurrentFile); }
 
                 GenerateCodeForValueSetter(@operator.Left, @operator.Right);
             }
             else
-            { throw new CompilerException($"Unknown operator '{@operator.Operator.text}'", @operator.Operator, CurrentFile); }
+            { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
         }
         void GenerateCodeForStatement(Statement_Literal literal)
         {
             if (literal.ValueToken != null)
             { try { literal.ValueToken.Analysis.CompilerReached = true; } catch (NullReferenceException) { } }
 
-            switch (literal.Type.typeName)
+            switch (literal.Type.Type)
             {
                 case BuiltinType.INT:
                     AddInstruction(Opcode.PUSH_VALUE, int.Parse(literal.Value));
@@ -1180,31 +1233,30 @@ namespace IngameCoding.BBCode.Compiler
         {
             variable.VariableName.Analysis.CompilerReached = true;
 
-            if (GetParameter(variable.VariableName.text, out Parameter param))
+            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
                 variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
-                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
+                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.Type.ToString());
 
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, param.RealIndex);
             }
-            else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
+            else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
             {
                 variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
-                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val.Declaration, val.IsGlobal, val.Type);
+                variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val, val.IsGlobal, val.Type);
 
                 if (val.IsStoredInHEAP)
                 {
-                    AddInstruction(Opcode.HEAP_GET, val.Offset);
-                    AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
+                    MemoryLoadHeap(val.MemoryOffset, val.Type.Size);
                 }
                 else
                 {
-                    AddInstruction(Opcode.LOAD_VALUE, val.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, val.Offset);
+                    MemoryLoadStack(val.MemoryOffset, val.Type.Size, !val.IsGlobal);
                 }
             }
             else
             {
-                throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + variable.VariableName.Content + "'", variable.VariableName, CurrentFile);
             }
 
             if (variable.ListIndex != null)
@@ -1219,42 +1271,62 @@ namespace IngameCoding.BBCode.Compiler
             {
                 variable.VariableName.Analysis.CompilerReached = true;
 
-                if (GetParameter(variable.VariableName.text, out Parameter param))
+                if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
                 {
                     variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
-                    variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.type);
+                    variable.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(param.Type.ToString());
 
                     AddInstruction(Opcode.GET_BASEPOINTER);
                     AddInstruction(Opcode.PUSH_VALUE, param.RealIndex);
                     AddInstruction(Opcode.MATH_ADD);
                 }
-                else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
+                else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
                 {
                     variable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
-                    variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val.Declaration, val.IsGlobal, val.Type);
+                    variable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(val, val.IsGlobal, val.Type);
 
                     if (val.IsStoredInHEAP)
                     {
-                        AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                        AddInstruction(Opcode.PUSH_VALUE, val.MemoryOffset);
                     }
                     else
                     {
                         if (val.IsGlobal)
                         {
-                            AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                            AddInstruction(Opcode.PUSH_VALUE, val.MemoryOffset);
                         }
                         else
                         {
                             AddInstruction(Opcode.GET_BASEPOINTER);
-                            AddInstruction(Opcode.PUSH_VALUE, val.Offset);
+                            AddInstruction(Opcode.PUSH_VALUE, val.MemoryOffset);
                             AddInstruction(Opcode.MATH_ADD);
                         }
                     }
                 }
                 else
                 {
-                    throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
+                    throw new CompilerException("Unknown variable '" + variable.VariableName.Content + "'", variable.VariableName, CurrentFile);
                 }
+            }
+
+            void GetFieldAddress(Statement_Field field)
+            {
+                var prevType = FindStatementType(field.PrevStatement);
+                if (prevType.IsStruct || prevType.IsClass)
+                {
+                    int dataOffset = GetDataAddress(field, out AddressingMode addressingMode, out bool inHeap);
+                    if (prevType.IsStruct)
+                    {
+                        AddInstruction(Opcode.PUSH_VALUE, dataOffset);
+                        if (addressingMode == AddressingMode.BASEPOINTER_RELATIVE)
+                        {
+                            AddInstruction(Opcode.GET_BASEPOINTER);
+                            AddInstruction(Opcode.MATH_ADD);
+                        }
+                        return;
+                    }
+                }
+                throw new NotImplementedException();
             }
 
             void GetAddress(Statement statement)
@@ -1262,6 +1334,11 @@ namespace IngameCoding.BBCode.Compiler
                 if (statement is Statement_Variable variable)
                 {
                     GetVariableAddress(variable);
+                    return;
+                }
+                if (statement is Statement_Field field)
+                {
+                    GetFieldAddress(field);
                     return;
                 }
                 throw new NotImplementedException();
@@ -1486,12 +1563,13 @@ namespace IngameCoding.BBCode.Compiler
         }
         void GenerateCodeForStatement(Statement_NewInstance newObject)
         {
+            AddInstruction(Opcode.COMMENT, $"new {newObject.TypeName}: {{");
             newObject.TypeName.Analysis.CompilerReached = true;
 
-            var instanceType = GetCustomType(newObject.TypeName.text, newObject.TargetNamespacePathPrefix, true);
+            var instanceType = GetCustomType(newObject.TypeName.Content, newObject.TargetNamespacePathPrefix, true);
 
             if (instanceType is null)
-            { throw new CompilerException("Unknown struct/class '" + newObject.TypeName.text + "'", newObject.TypeName, CurrentFile); }
+            { throw new CompilerException("Unknown struct/class '" + newObject.TypeName.Content + "'", newObject.TypeName, CurrentFile); }
 
             if (instanceType is CompiledStruct @struct)
             {
@@ -1499,12 +1577,12 @@ namespace IngameCoding.BBCode.Compiler
                 @struct.References?.Add(new DefinitionReference(newObject.TypeName, CurrentFile));
 
                 Dictionary<string, DataItem> fields = new();
-                foreach (ParameterDefinition structDefFieldDefinition in @struct.Fields)
+                foreach (FieldDefinition structDefFieldDefinition in @struct.Fields)
                 {
-                    // AddInstruction(Opcode.PUSH_VALUE, new DataItem(GenerateInitialValue(structDefFieldDefinition.type), $"{@struct.Name}.{structDefFieldDefinition.name}"));
-                    fields.Add(structDefFieldDefinition.name.text, new DataItem(GenerateInitialValue(structDefFieldDefinition.type), null));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(GenerateInitialValue(structDefFieldDefinition.Type), null), $"{@struct.Name}.{structDefFieldDefinition.Identifier}");
+                    fields.Add(structDefFieldDefinition.Identifier.Content, new DataItem(GenerateInitialValue(structDefFieldDefinition.Type), null));
                 }
-                AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, @struct.FullName));
+                // AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, @struct.FullName));
             }
             else if (instanceType is CompiledClass @class)
             {
@@ -1512,14 +1590,15 @@ namespace IngameCoding.BBCode.Compiler
                 @class.References?.Add(new DefinitionReference(newObject.TypeName, CurrentFile));
 
                 Dictionary<string, DataItem> fields = new();
-                foreach (ParameterDefinition classDefFieldDefinition in @class.Fields)
+                foreach (FieldDefinition classDefFieldDefinition in @class.Fields)
                 {
-                    fields.Add(classDefFieldDefinition.name.text, new DataItem(classDefFieldDefinition.type, null));
+                    fields.Add(classDefFieldDefinition.Identifier.Content, new DataItem(classDefFieldDefinition.Type, null));
                 }
                 AddInstruction(Opcode.PUSH_VALUE, new Struct(fields, @class.FullName));
             }
             else
             { throw new CompilerException("Unknown type definition " + instanceType.GetType().Name, newObject.TypeName, CurrentFile); }
+            AddInstruction(Opcode.COMMENT, "}");
         }
         void GenerateCodeForStatement(Statement_Field field)
         {
@@ -1536,11 +1615,31 @@ namespace IngameCoding.BBCode.Compiler
                     { field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(type.Name, field.FieldName, prevType.Struct.FullName, prevType.Struct.FilePath); }
                     else if (prevType.IsClass)
                     { field.FieldName.Analysis.Reference = new TokenAnalysis.RefField(type.Name, field.FieldName, prevType.Class.FullName, prevType.Class.FilePath); }
+
+                    int dataOffset = GetDataAddress(field, out AddressingMode addressingMode, out bool inHeap);
+                    if (prevType.IsStruct)
+                    {
+                        AddInstruction(Opcode.PUSH_VALUE, dataOffset);
+                        if (addressingMode == AddressingMode.BASEPOINTER_RELATIVE)
+                        {
+                            AddInstruction(Opcode.GET_BASEPOINTER);
+                            AddInstruction(Opcode.MATH_ADD);
+                        }
+                        if (inHeap)
+                        {
+                            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+                        }
+                        else
+                        {
+                            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME);
+                        }
+                        return;
+                    }
                 }
             }
 
             GenerateCodeForStatement(field.PrevStatement);
-            AddInstruction(Opcode.PUSH_VALUE, field.FieldName.text);
+            AddInstruction(Opcode.PUSH_VALUE, field.FieldName.Content);
             AddInstruction(Opcode.LOAD_FIELD, AddressingMode.POP);
         }
         void GenerateCodeForStatement(Statement_Index indexStatement)
@@ -1672,18 +1771,18 @@ namespace IngameCoding.BBCode.Compiler
         {
             statementToSet.VariableName.Analysis.CompilerReached = true;
 
-            if (GetParameter(statementToSet.VariableName.text, out Parameter parameter))
+            if (GetParameter(statementToSet.VariableName.Content, out CompiledParameter parameter))
             {
                 statementToSet.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
-                statementToSet.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.type);
+                statementToSet.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.Type.ToString());
 
                 GenerateCodeForStatement(value);
                 AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
             }
-            else if (GetCompiledVariable(statementToSet.VariableName.text, out CompiledVariable valueMemoryIndex))
+            else if (GetCompiledVariable(statementToSet.VariableName.Content, out CompiledVariable valueMemoryIndex))
             {
                 statementToSet.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
-                statementToSet.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
+                statementToSet.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
 
                 GenerateCodeForStatement(value);
                 if (valueMemoryIndex.IsStoredInHEAP)
@@ -1693,7 +1792,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             else
             {
-                throw new CompilerException("Unknown variable '" + statementToSet.VariableName.text + "'", statementToSet.VariableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + statementToSet.VariableName.Content + "'", statementToSet.VariableName, CurrentFile);
             }
         }
         void GenerateCodeForValueSetter(Statement_Field statementToSet, Statement value)
@@ -1710,6 +1809,28 @@ namespace IngameCoding.BBCode.Compiler
                     { statementToSet.FieldName.Analysis.Reference = new TokenAnalysis.RefField(type.Name, statementToSet.FieldName, prevType.Struct.FullName, prevType.Struct.FilePath); }
                     else if (prevType.IsClass)
                     { statementToSet.FieldName.Analysis.Reference = new TokenAnalysis.RefField(type.Name, statementToSet.FieldName, prevType.Class.FullName, prevType.Class.FilePath); }
+
+                    int offset = GetDataAddress(statementToSet, out var addressingMode, out var inHeap);
+                    if (prevType.IsStruct)
+                    {
+                        GenerateCodeForStatement(value);
+
+                        AddInstruction(Opcode.PUSH_VALUE, offset);
+                        if (addressingMode == AddressingMode.BASEPOINTER_RELATIVE)
+                        {
+                            AddInstruction(Opcode.GET_BASEPOINTER);
+                            AddInstruction(Opcode.MATH_ADD);
+                        }
+                        if (inHeap)
+                        {
+                            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                        }
+                        else
+                        {
+                            AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
+                        }
+                        return;
+                    }
                 }
             }
 
@@ -1717,39 +1838,39 @@ namespace IngameCoding.BBCode.Compiler
             {
                 variable1.VariableName.Analysis.CompilerReached = true;
 
-                if (GetParameter(variable1.VariableName.text, out Parameter parameter))
+                if (GetParameter(variable1.VariableName.Content, out CompiledParameter parameter))
                 {
                     variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.ParameterName;
-                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.type);
+                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefParameter(parameter.Type.ToString());
 
                     GenerateCodeForStatement(value);
-                    AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.text);
+                    AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.Content);
                     AddInstruction(Opcode.STORE_FIELD, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
                 }
-                else if (GetCompiledVariable(variable1.VariableName.text, out CompiledVariable valueMemoryIndex))
+                else if (GetCompiledVariable(variable1.VariableName.Content, out CompiledVariable valueMemoryIndex))
                 {
                     variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
-                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
+                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
 
                     if (valueMemoryIndex.IsStoredInHEAP)
                     {
                         AddInstruction(Opcode.HEAP_GET, valueMemoryIndex.Offset);
                         AddInstruction(Opcode.COPY_VALUE_RECURSIVE);
                         GenerateCodeForStatement(value);
-                        AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.text);
+                        AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.Content);
                         AddInstruction(Opcode.STORE_FIELD, AddressingMode.POP);
                         AddInstruction(Opcode.HEAP_SET, valueMemoryIndex.Offset);
                     }
                     else
                     {
                         GenerateCodeForStatement(value);
-                        AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.text);
+                        AddInstruction(Opcode.PUSH_VALUE, statementToSet.FieldName.Content);
                         AddInstruction(Opcode.STORE_FIELD, valueMemoryIndex.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, valueMemoryIndex.Offset);
                     }
                 }
                 else
                 {
-                    throw new CompilerException("Unknown variable '" + variable1.VariableName.text + "'", variable1.VariableName, CurrentFile);
+                    throw new CompilerException("Unknown variable '" + variable1.VariableName.Content + "'", variable1.VariableName, CurrentFile);
                 }
             }
             else
@@ -1762,10 +1883,10 @@ namespace IngameCoding.BBCode.Compiler
             {
                 variable1.VariableName.Analysis.CompilerReached = true;
 
-                if (GetCompiledVariable(variable1.VariableName.text, out CompiledVariable valueMemoryIndex))
+                if (GetCompiledVariable(variable1.VariableName.Content, out CompiledVariable valueMemoryIndex))
                 {
                     variable1.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
-                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex.Declaration, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
+                    variable1.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(valueMemoryIndex, valueMemoryIndex.IsGlobal, valueMemoryIndex.Type);
 
                     GenerateCodeForStatement(value);
                     AddInstruction(Opcode.LOAD_VALUE, valueMemoryIndex.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, valueMemoryIndex.Offset);
@@ -1776,7 +1897,7 @@ namespace IngameCoding.BBCode.Compiler
                 }
                 else
                 {
-                    throw new CompilerException("Unknown variable '" + variable1.VariableName.text + "'", variable1.VariableName, CurrentFile);
+                    throw new CompilerException("Unknown variable '" + variable1.VariableName.Content + "'", variable1.VariableName, CurrentFile);
                 }
             }
             { errors.Add(new Error($"Not implemented", statementToSet.TotalPosition(), CurrentFile)); }
@@ -1784,21 +1905,96 @@ namespace IngameCoding.BBCode.Compiler
 
         #endregion
 
+        void MemoryCopyHeap(int to, int size)
+        {
+            AddInstruction(Opcode.COMMENT, $"Copy to heap: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                int currentReversedOffset = size - currentOffset - 1;
+
+                AddInstruction(Opcode.COMMENT, $"Element {currentOffset}:");
+
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, (-currentReversedOffset) - 1);
+
+                AddInstruction(Opcode.PUSH_VALUE, to + size);
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+            }
+            AddInstruction(Opcode.COMMENT, "}");
+        }
+        void MemoryCopyStack(int to, int size, bool basepointerRelative)
+        {
+            AddInstruction(Opcode.COMMENT, $"Copy to stack: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                int currentReversedOffset = size - currentOffset - 1;
+
+                AddInstruction(Opcode.COMMENT, $"Element {currentOffset}:");
+
+                int loadFrom = (-currentReversedOffset) - 1;
+                int storeTo = to + currentOffset;
+
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, loadFrom);
+
+                if (basepointerRelative)
+                {
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, storeTo);
+                }
+                else
+                {
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, storeTo);
+                }
+            }
+            AddInstruction(Opcode.COMMENT, "}");
+        }
+
+        void MemoryLoadHeap(int from, int size)
+        {
+            AddInstruction(Opcode.COMMENT, $"Load from heap: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                AddInstruction(Opcode.COMMENT, $"Element {currentOffset}:");
+
+                AddInstruction(Opcode.PUSH_VALUE, currentOffset + from);
+                AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+            }
+            AddInstruction(Opcode.COMMENT, "}");
+        }
+        void MemoryLoadStack(int from, int size, bool basepointerRelative)
+        {
+            AddInstruction(Opcode.COMMENT, $"Load from stack: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                AddInstruction(Opcode.COMMENT, $"Element {currentOffset}:");
+
+                int loadFrom = from + currentOffset;
+
+                if (basepointerRelative)
+                {
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, loadFrom);
+                }
+                else
+                {
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, loadFrom);
+                }
+            }
+            AddInstruction(Opcode.COMMENT, "}");
+        }
+
         int GetDataAddress(Statement_Variable variable, out AddressingMode addressingMode, out bool heap)
         {
-            if (GetParameter(variable.VariableName.text, out Parameter param))
+            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
                 addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
                 heap = false;
                 return param.RealIndex;
             }
-            else if (GetCompiledVariable(variable.VariableName.text, out CompiledVariable val))
+            else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
             {
                 if (val.IsStoredInHEAP)
                 {
                     addressingMode = AddressingMode.ABSOLUTE;
                     heap = true;
-                    return val.Offset;
+                    return val.MemoryOffset;
                 }
                 else
                 {
@@ -1806,19 +2002,19 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         addressingMode = AddressingMode.ABSOLUTE;
                         heap = false;
-                        return val.Offset;
+                        return val.MemoryOffset;
                     }
                     else
                     {
                         addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
                         heap = false;
-                        return val.Offset;
+                        return val.MemoryOffset;
                     }
                 }
             }
             else
             {
-                throw new CompilerException("Unknown variable '" + variable.VariableName.text + "'", variable.VariableName, CurrentFile);
+                throw new CompilerException("Unknown variable '" + variable.VariableName.Content + "'", variable.VariableName, CurrentFile);
             }
         }
         int GetDataAddress(Statement_Field field, out AddressingMode addressingMode, out bool heap)
@@ -1827,42 +2023,56 @@ namespace IngameCoding.BBCode.Compiler
             if (prevType.IsStruct)
             {
                 var @struct = prevType.Struct;
-                if (@struct.FieldOffsets.TryGetValue(field.FieldName.text, out int fieldOffset))
+                if (@struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
-                    if (field.PrevStatement is Statement_Variable _prevVar) return fieldOffset + GetDataAddress(_prevVar, out addressingMode, out heap);
+                    if (field.PrevStatement is Statement_Variable _prevVar)
+                    {
+                        if (GetParameter(_prevVar.VariableName.Content, out CompiledParameter param))
+                        {
+                            int prevParamSizesSum = 0;
+                            foreach (CompiledParameter _param in parameters)
+                            {
+                                if (_param.Index < param.Index) continue;
+                                prevParamSizesSum += _param.Type.Size;
+                            }
+
+                            addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
+                            heap = false;
+
+                            return 0 - ((prevParamSizesSum - fieldOffset) + 1);
+                        }
+                        return fieldOffset + GetDataAddress(_prevVar, out addressingMode, out heap);
+                    }
                     if (field.PrevStatement is Statement_Field _prevField) return fieldOffset + GetDataAddress(_prevField, out addressingMode, out heap);
                 }
             }
             else if (prevType.IsClass)
             {
                 var @class = prevType.Class;
-                if (@class.FieldOffsets.TryGetValue(field.FieldName.text, out int fieldOffset))
+                if (@class.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
                     if (field.PrevStatement is Statement_Variable _prevVar) return fieldOffset + GetDataAddress(_prevVar, out addressingMode, out heap);
                     if (field.PrevStatement is Statement_Field _prevField) return fieldOffset + GetDataAddress(_prevField, out addressingMode, out heap);
                 }
             }
 
-            addressingMode = AddressingMode.ABSOLUTE;
-            heap = false;
-            return -1;
+            throw new NotImplementedException();
         }
 
         #region GenerateCodeFor...
 
-        void GenerateCodeForGlobalVariable(Statement st, out int globalVariablesAdded)
+        /*
+        void GenerateCodeForGlobalVariable(Statement st)
         {
-            int variableCount = 0;
-
             if (st is Statement_NewVariable newVariable)
             {
                 newVariable.VariableName.Analysis.CompilerReached = true;
                 newVariable.Type.Analysis.CompilerReached = true;
 
-                if (Keywords.Contains(newVariable.VariableName.text))
-                { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.text}'", newVariable.VariableName, newVariable.FilePath); }
+                if (Keywords.Contains(newVariable.VariableName.Content))
+                { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, newVariable.FilePath); }
 
-                switch (newVariable.Type.typeName)
+                switch (newVariable.Type.Type)
                 {
                     case BuiltinType.INT:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
@@ -1876,14 +2086,13 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                if (literal.Type.typeName == newVariable.Type.typeName)
+                                if (literal.Type.Type == newVariable.Type.Type)
                                 { initialValue1 = int.Parse(literal.Value); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        AddInstruction(Opcode.PUSH_VALUE, initialValue1, "var." + newVariable.VariableName.text);
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue1, "var." + newVariable.VariableName.Content);
                         break;
                     case BuiltinType.BYTE:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
@@ -1897,14 +2106,13 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                if (literal.Type.typeName == newVariable.Type.typeName)
+                                if (literal.Type.Type == newVariable.Type.Type)
                                 { initialValue5 = byte.Parse(literal.Value); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        AddInstruction(Opcode.PUSH_VALUE, initialValue5, "var." + newVariable.VariableName.text);
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue5, "var." + newVariable.VariableName.Content);
                         break;
                     case BuiltinType.FLOAT:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
@@ -1918,14 +2126,13 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                if (literal.Type.typeName == BuiltinType.FLOAT || literal.Type.typeName == IngameCoding.BBCode.BuiltinType.INT)
+                                if (literal.Type.Type == BuiltinType.FLOAT || literal.Type.Type == IngameCoding.BBCode.BuiltinType.INT)
                                 { initialValue2 = float.Parse(literal.Value); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        AddInstruction(Opcode.PUSH_VALUE, initialValue2, "var." + newVariable.VariableName.text);
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue2, "var." + newVariable.VariableName.Content);
                         break;
                     case BuiltinType.STRING:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
@@ -1939,14 +2146,13 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                if (literal.Type.typeName == BuiltinType.STRING)
+                                if (literal.Type.Type == BuiltinType.STRING)
                                 { initialValue3 = literal.Value; }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        AddInstruction(Opcode.PUSH_VALUE, initialValue3, "var." + newVariable.VariableName.text);
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue3, "var." + newVariable.VariableName.Content);
                         break;
                     case BuiltinType.BOOLEAN:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Type;
@@ -1960,14 +2166,13 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                if (literal.Type.typeName == newVariable.Type.typeName)
+                                if (literal.Type.Type == newVariable.Type.Type)
                                 { initialValue4 = bool.Parse(literal.Value); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        AddInstruction(Opcode.PUSH_VALUE, initialValue4, "var." + newVariable.VariableName.text);
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
+                        AddInstruction(Opcode.PUSH_VALUE, initialValue4, "var." + newVariable.VariableName.Content);
                         break;
                     case BuiltinType.STRUCT:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Struct;
@@ -1976,15 +2181,14 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
-                                if (newStruct.TypeName.text == newVariable.Type.text)
+                                if (newStruct.TypeName.Content == newVariable.Type.Content)
                                 { GenerateCodeForStatement(newStruct); }
                                 else
-                                { throw new CompilerException("Can't cast " + newStruct.TypeName.text + " to " + newVariable.Type.text, newStruct.TotalPosition(), newVariable.FilePath); }
+                                { throw new CompilerException("Can't cast " + newStruct.TypeName.Content + " to " + newVariable.Type.Content, newStruct.TotalPosition(), newVariable.FilePath); }
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, new CompiledType(newVariable.Type, v => GetCustomType(v)));
-                        compiledVariables.Add(newVariable.VariableName.text, new CompiledVariable(variableCount, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, newVariable));
-                        variableCount++;
+                        compiledVariables.Add(newVariable.VariableName.Content, new CompiledVariable(0, -1, new CompiledType(newVariable.Type, v => GetCustomType(v)), true, false, newVariable));
                         break;
                     case BuiltinType.AUTO:
                         newVariable.Type.Analysis.SubSubtype = TokenSubSubtype.Keyword;
@@ -1993,41 +2197,42 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                newVariable.Type.typeName = literal.Type.typeName;
+                                newVariable.Type.Type = literal.Type.Type;
                             }
                             else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
-                                newVariable.Type.typeName = BuiltinType.STRUCT;
-                                newVariable.Type.text = newStruct.TypeName.text;
+                                newVariable.Type.Type = BuiltinType.STRUCT;
+                                newVariable.Type.Content = newStruct.TypeName.Content;
                             }
                         }
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, true, null);
-                        if (newVariable.Type.typeName == BuiltinType.AUTO)
+                        if (newVariable.Type.Type == BuiltinType.AUTO)
                         { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
-                        GenerateCodeForGlobalVariable(newVariable, out _);
-                        variableCount++;
+                        GenerateCodeForGlobalVariable(newVariable);
                         break;
                 }
             }
-
-            globalVariablesAdded = variableCount;
         }
+        */
 
-        void GenerateCodeForVariable(Statement_NewVariable newVariable, bool isGlobal)
+        /// <returns>The variable's size</returns>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        int GenerateCodeForVariable(Statement_NewVariable newVariable, bool isGlobal)
         {
-            if (newVariable.Type.typeName == BuiltinType.AUTO)
+            if (newVariable.Type.Type == BuiltinType.AUTO)
             {
                 if (newVariable.InitialValue != null)
                 {
                     if (newVariable.InitialValue is Statement_Literal literal)
                     {
-                        newVariable.Type.typeName = literal.Type.typeName;
+                        newVariable.Type.Type = literal.Type.Type;
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false, new CompiledType(literal.Type, v => GetCustomType(v)));
                     }
                     else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                     {
-                        newVariable.Type.typeName = BuiltinType.STRUCT;
-                        newVariable.Type.text = newStruct.TypeName.text;
+                        newVariable.Type.Type = BuiltinType.STRUCT;
+                        newVariable.Type.Content = newStruct.TypeName.Content;
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false, FindStatementType(newStruct));
                     }
                     else
@@ -2035,9 +2240,9 @@ namespace IngameCoding.BBCode.Compiler
                         var initialTypeRaw = FindStatementType(newVariable.InitialValue);
 
                         var initialType = Parser.ParseType(initialTypeRaw.Name);
-                        newVariable.Type.typeName = initialType.typeName;
+                        newVariable.Type.Type = initialType.Type;
                         newVariable.Type.ListOf = initialType.ListOf;
-                        newVariable.Type.text = initialType.text;
+                        newVariable.Type.Content = initialType.Content;
 
                         if (initialTypeRaw.IsStruct) newVariable.Type.NamespacePrefix = initialTypeRaw.Struct.NamespacePathString;
                         if (initialTypeRaw.IsClass) newVariable.Type.NamespacePrefix = initialTypeRaw.Class.NamespacePathString;
@@ -2045,45 +2250,93 @@ namespace IngameCoding.BBCode.Compiler
                         newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false, initialTypeRaw);
 
                         GenerateCodeForVariable(newVariable, isGlobal);
-                        return;
+                        return 1;
                     }
                 }
                 else
                 { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
 
-                if (newVariable.Type.typeName == BuiltinType.AUTO)
+                if (newVariable.Type.Type == BuiltinType.AUTO)
                 { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
 
                 GenerateCodeForVariable(newVariable, isGlobal);
-                return;
+                return 1;
             }
 
             newVariable.VariableName.Analysis.Reference = new TokenAnalysis.RefVariable(newVariable, false, new CompiledType(newVariable.Type, v => GetCustomType(v)));
 
-            var initialValue = GenerateInitialValue(newVariable.Type);
+            compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, compiledVariables.Count, GetVariableSizesSum(), isGlobal));
 
-            compiledVariables.Add(newVariable.VariableName.text, GetVariableInfo(newVariable, compiledVariables.Count, isGlobal));
-            AddInstruction(Opcode.PUSH_VALUE, initialValue, "var." + newVariable.VariableName.text);
+            AddInstruction(Opcode.COMMENT, $"Initial value {{");
+
+            var instanceType = GetCustomType(newVariable.Type.Content, newVariable.Type.NamespacePrefix, true);
+
+            if (instanceType is null)
+            {
+                AddInstruction(Opcode.PUSH_VALUE, GenerateInitialValue(newVariable.Type), "var." + newVariable.VariableName.Content);
+
+                return 1;
+            }
+            else
+            {
+                if (instanceType is CompiledStruct @struct)
+                {
+                    int size = 0;
+                    foreach (FieldDefinition structDefFieldDefinition in @struct.Fields)
+                    {
+                        size++;
+                        AddInstruction(Opcode.PUSH_VALUE, new DataItem(GenerateInitialValue(structDefFieldDefinition.Type), null), $"var.{newVariable.VariableName.Content}.{structDefFieldDefinition.Identifier}");
+                    }
+                    AddInstruction(Opcode.COMMENT, "}");
+                    return size;
+                }
+                else if (instanceType is CompiledClass @class)
+                {
+                    throw new NotImplementedException();
+                    foreach (FieldDefinition classDefFieldDefinition in @class.Fields)
+                    {
+
+                    }
+                }
+                else
+                { throw new CompilerException("Unknown type definition " + instanceType.GetType().Name, newVariable.Type, CurrentFile); }
+            }
         }
-        void GenerateCodeForVariable(Statement st, bool isGlobal, out int variablesAdded)
+        int GenerateCodeForVariable(Statement st, bool isGlobal, out int variablesAdded)
         {
             variablesAdded = 0;
+            int size = 0;
             if (st is Statement_NewVariable newVariable)
             {
                 variablesAdded = 1;
-                GenerateCodeForVariable(newVariable, isGlobal);
+                size += GenerateCodeForVariable(newVariable, isGlobal);
             }
+            return size;
         }
-        void GenerateCodeForVariable(Statement[] sts, bool isGlobal, out int variablesAdded)
+        int GenerateCodeForVariable(Statement[] sts, bool isGlobal, out int variablesAdded)
         {
             variablesAdded = 0;
+            int size = 0;
             for (int i = 0; i < sts.Length; i++)
             {
-                GenerateCodeForVariable(sts[i], isGlobal, out var x);
+                size += GenerateCodeForVariable(sts[i], isGlobal, out var x);
                 variablesAdded += x;
             }
+            return size;
         }
-        void GenerateCodeForVariable(List<Statement> sts, bool isGlobal, out int variablesAdded) => GenerateCodeForVariable(sts.ToArray(), isGlobal, out variablesAdded);
+        int GenerateCodeForVariable(List<Statement> sts, bool isGlobal, out int variablesAdded) => GenerateCodeForVariable(sts.ToArray(), isGlobal, out variablesAdded);
+
+        int GetVariableSizesSum()
+        {
+            int sum = 0;
+            for (int i = 0; i < compiledVariables.Count; i++)
+            {
+                var key = compiledVariables.ElementAt(i).Key;
+                if (compiledVariables[key].IsGlobal) continue;
+                sum += compiledVariables[key].Type.Size;
+            }
+            return sum;
+        }
 
         void ClearLocalVariables()
         {
@@ -2097,14 +2350,14 @@ namespace IngameCoding.BBCode.Compiler
 
         void GenerateCodeForFunction(KeyValuePair<string, CompiledFunction> function)
         {
-            function.Value.Name.Analysis.CompilerReached = true;
+            function.Value.Identifier.Analysis.CompilerReached = true;
             function.Value.TypeToken.Analysis.CompilerReached = true;
             CurrentFunction_ForRecursionProtection = function.Value.ID();
 
-            if (Keywords.Contains(function.Value.Name.text))
-            { throw new CompilerException($"Illegal function name '{function.Value.Name.text}'", function.Value.Name, function.Value.FilePath); }
+            if (Keywords.Contains(function.Value.Identifier.Content))
+            { throw new CompilerException($"Illegal function name '{function.Value.Identifier.Content}'", function.Value.Identifier, function.Value.FilePath); }
 
-            function.Value.Name.Analysis.SubSubtype = TokenSubSubtype.FunctionName;
+            function.Value.Identifier.Analysis.SubSubtype = TokenSubSubtype.FunctionName;
 
             if (function.Value.IsBuiltin) return;
 
@@ -2114,22 +2367,40 @@ namespace IngameCoding.BBCode.Compiler
 
             // Compile parameters
             int paramIndex = 0;
+            int paramsSize = 0;
             foreach (ParameterDefinition parameter in function.Value.Parameters)
             {
                 paramIndex++;
-                parameter.name.Analysis.CompilerReached = true;
-                parameter.type.Analysis.CompilerReached = true;
-                parameters.Add(parameter.name.text, new Parameter(paramIndex, parameter.name.text, function.Value.Parameters.Count, parameter.type.ToString()));
+                parameter.Identifier.Analysis.CompilerReached = true;
+                parameter.Type.Analysis.CompilerReached = true;
+                parameters.Add(new CompiledParameter(paramIndex, paramsSize, function.Value.Parameters.Count, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter));
+
+                if (parameter.Type.Type == BuiltinType.STRUCT)
+                {
+                    var paramType = GetCustomType(parameter.Type.Content);
+                    if (paramType is CompiledStruct @struct)
+                    {
+                        paramsSize += @struct.Size;
+                    }
+                    else if (paramType is CompiledClass @class)
+                    {
+                        paramsSize += @class.Size;
+                    }
+                }
+                else
+                {
+                    paramsSize++;
+                }
             }
 
             CurrentNamespace = function.Value.NamespacePath;
             CurrentFile = function.Value.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()};{CurrentFile};{compiledCode.Count};{function.Value.Name.Position.Start.Line}");
+            AddInstruction(Opcode.CS_PUSH, $"{function.Value.ReadableID()};{CurrentFile};{compiledCode.Count};{function.Value.Identifier.Position.Start.Line}");
 
             // Search for variables
             AddInstruction(Opcode.COMMENT, "Variables");
-            GenerateCodeForVariable(function.Value.Statements, false, out int variableCount);
+            int variableSizesSum = GenerateCodeForVariable(function.Value.Statements, false, out int variableCount);
             cleanupStack.Push(variableCount);
             if (variableCount == 0 && AddCommentsToCode)
             { compiledCode.RemoveAt(compiledCode.Count - 1); }
@@ -2156,10 +2427,10 @@ namespace IngameCoding.BBCode.Compiler
 
             // Clear variables
             cleanupStack.Pop();
-            if (variableCount > 0)
+            if (variableSizesSum > 0)
             {
                 AddInstruction(Opcode.COMMENT, "Clear variables");
-                for (int x = 0; x < variableCount; x++)
+                for (int x = 0; x < variableSizesSum; x++)
                 {
                     AddInstruction(Opcode.POP_VALUE);
                 }
@@ -2196,8 +2467,8 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in @struct.Value.Attributes)
             {
-                attribute.Name.Analysis.CompilerReached = true;
-                attribute.Name.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.Analysis.CompilerReached = true;
+                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -2210,7 +2481,7 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
 
-                attributes.Add(attribute.Name.text, newAttribute);
+                attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
 #if false
@@ -2256,8 +2527,8 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var field in @struct.Value.Fields)
             {
-                field.name.Analysis.CompilerReached = true;
-                field.type.Analysis.CompilerReached = true;
+                field.Identifier.Analysis.CompilerReached = true;
+                field.Type.Analysis.CompilerReached = true;
             }
 
             this.compiledStructs.Add(@struct.Value.FullName, new CompiledStruct(attributes, @struct.Value)
@@ -2286,8 +2557,8 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in @class.Value.Attributes)
             {
-                attribute.Name.Analysis.CompilerReached = true;
-                attribute.Name.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.Analysis.CompilerReached = true;
+                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -2300,13 +2571,13 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
 
-                attributes.Add(attribute.Name.text, newAttribute);
+                attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
             foreach (var field in @class.Value.Fields)
             {
-                field.name.Analysis.CompilerReached = true;
-                field.type.Analysis.CompilerReached = true;
+                field.Identifier.Analysis.CompilerReached = true;
+                field.Type.Analysis.CompilerReached = true;
             }
 
             this.compiledClasses.Add(@class.Key, new CompiledClass(attributes, @class.Value)
@@ -2318,16 +2589,15 @@ namespace IngameCoding.BBCode.Compiler
 
         #endregion
 
-        CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int offset, bool isGlobal)
+        CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int offset, int memoryOffset, bool isGlobal)
         {
             newVariable.VariableName.Analysis.CompilerReached = true;
             newVariable.Type.Analysis.CompilerReached = true;
 
-            if (Keywords.Contains(newVariable.VariableName.text))
-            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.text}'", newVariable.VariableName, CurrentFile); }
+            if (Keywords.Contains(newVariable.VariableName.Content))
+            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
 
-            return new CompiledVariable(offset, new CompiledType(newVariable.Type, v => GetCustomType(v)), isGlobal, newVariable)
-            { IsStoredInHEAP = GetCompiledClass(newVariable.Type.text, out _) };
+            return new CompiledVariable(offset, memoryOffset, new CompiledType(newVariable.Type, v => GetCustomType(v)), isGlobal, GetCompiledClass(newVariable.Type.Content, out _), newVariable);
         }
 
         #region Result Structs
@@ -2352,13 +2622,13 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in function.Value.Attributes)
             {
-                attribute.Name.Analysis.CompilerReached = true;
-                attribute.Name.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.Analysis.CompilerReached = true;
+                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
 
                 AttributeValues newAttribute = new()
                 {
                     parameters = new(),
-                    NameToken = attribute.Name,
+                    Identifier = attribute.Identifier,
                 };
 
                 if (attribute.Parameters != null)
@@ -2369,13 +2639,13 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
 
-                attributes.Add(attribute.Name.text, newAttribute);
+                attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
             if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
             {
                 if (attributeBuiltin.parameters.Count != 1)
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.Value.FilePath); }
                 if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
                 {
                     foreach (var builtinFunction in builtinFunctions)
@@ -2383,31 +2653,31 @@ namespace IngameCoding.BBCode.Compiler
                         if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
                         {
                             if (builtinFunction.Value.ParameterCount != function.Value.Parameters.Count)
-                            { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Value.Name, function.Value.FilePath); }
-                            if (builtinFunction.Value.ReturnSomething != (function.Value.TypeToken.typeName != BuiltinType.VOID))
+                            { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Value.Identifier, function.Value.FilePath); }
+                            if (builtinFunction.Value.ReturnSomething != (function.Value.TypeToken.Type != BuiltinType.VOID))
                             { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Value.TypeToken, function.Value.FilePath); }
 
                             for (int i = 0; i < builtinFunction.Value.ParameterTypes.Length; i++)
                             {
-                                if (builtinFunction.Value.ParameterTypes[i].typeName == BuiltinType.ANY) continue;
+                                if (builtinFunction.Value.ParameterTypes[i].Type == BuiltinType.ANY) continue;
 
-                                if (builtinFunction.Value.ParameterTypes[i].typeName != function.Value.Parameters[i].type.typeName)
-                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].typeName.ToString().ToLower()} Passed: {function.Value.Parameters[i].type.typeName.ToString().ToLower()}", function.Value.Parameters[i].type, function.Value.FilePath); }
+                                if (builtinFunction.Value.ParameterTypes[i].Type != function.Value.Parameters[i].Type.Type)
+                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].Type.ToString().ToLower()} Passed: {function.Value.Parameters[i].Type.Type.ToString().ToLower()}", function.Value.Parameters[i].Type, function.Value.FilePath); }
                             }
 
                             return new CompiledFunction(function.Value)
                             {
-                                ParameterTypes = builtinFunction.Value.ParameterTypes,
+                                ParameterTypes = builtinFunction.Value.ParameterTypes.Select(v => new CompiledType(v, t => GetCustomType(t))).ToArray(),
                                 CompiledAttributes = attributes,
                                 References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
                             };
                         }
                     }
 
-                    errors.Add(new Error("Builtin function '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.NameToken, function.Value.FilePath));
+                    errors.Add(new Error("Builtin function '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.Identifier, function.Value.FilePath));
                     return new CompiledFunction(
-                        function.Value.Parameters.ToArray(),
                         (function.Value.Parameters.Count > 0) && function.Value.Parameters.First().withThisKeyword,
+                        function.Value.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
                         function.Value
                         )
                     {
@@ -2416,12 +2686,12 @@ namespace IngameCoding.BBCode.Compiler
                     };
                 }
                 else
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.NameToken, function.Value.FilePath); }
+                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.Value.FilePath); }
             }
 
             return new CompiledFunction(
-                function.Value.Parameters.ToArray(),
                 (function.Value.Parameters.Count > 0) && function.Value.Parameters.First().withThisKeyword,
+                function.Value.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
                 function.Value
                 )
             {
@@ -2440,36 +2710,36 @@ namespace IngameCoding.BBCode.Compiler
 
                 void AnalyzeNewVariable(Statement_NewVariable newVariable)
                 {
-                    if (newVariable.Type.typeName == BuiltinType.AUTO)
+                    if (newVariable.Type.Type == BuiltinType.AUTO)
                     {
                         if (newVariable.InitialValue != null)
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                newVariable.Type.typeName = literal.Type.typeName;
+                                newVariable.Type.Type = literal.Type.Type;
                             }
                             else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
-                                newVariable.Type.typeName = BuiltinType.STRUCT;
-                                newVariable.Type.text = newStruct.TypeName.text;
+                                newVariable.Type.Type = BuiltinType.STRUCT;
+                                newVariable.Type.Content = newStruct.TypeName.Content;
                             }
                             else
                             {
                                 var initialTypeRaw = FindStatementType(newVariable.InitialValue);
                                 var initialType = Parser.ParseType(initialTypeRaw.Name);
 
-                                newVariable.Type.typeName = initialType.typeName;
+                                newVariable.Type.Type = initialType.Type;
                                 newVariable.Type.ListOf = initialType.ListOf;
-                                newVariable.Type.text = initialType.text;
+                                newVariable.Type.Content = initialType.Content;
                             }
                         }
                         else
                         { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
 
-                        if (newVariable.Type.typeName == BuiltinType.AUTO)
+                        if (newVariable.Type.Type == BuiltinType.AUTO)
                         { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
                     }
-                    this.compiledVariables.Add(newVariable.VariableName.text, GetVariableInfo(newVariable, -1, false));
+                    this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, -1, -1, false));
                 }
                 void AnalyzeStatements(List<Statement> statements)
                 {
@@ -2594,7 +2864,7 @@ namespace IngameCoding.BBCode.Compiler
                 {
                     parameters.Clear();
                     foreach (ParameterDefinition parameter in f.Value.Parameters)
-                    { parameters.Add(parameter.name.text, new Parameter(-1, parameter.name.text, -1, parameter.type.ToString())); }
+                    { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
                     CurrentFile = f.Value.FilePath;
 
                     currentFunction = f.Value;
@@ -2627,7 +2897,7 @@ namespace IngameCoding.BBCode.Compiler
                 string readableID = element.Value.ReadableID();
 
                 printCallback?.Invoke($"      Remove function '{readableID}' ...", Output.LogType.Debug);
-                informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Value.Name, element.Value.FilePath));
+                informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Value.Identifier, element.Value.FilePath));
 
                 functions.Remove(element.Key);
                 functionsRemoved++;
@@ -2676,7 +2946,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var hash in hashes)
             {
-                switch (hash.HashName.text)
+                switch (hash.HashName.Content)
                 {
                     case "bf":
                         {
@@ -2741,7 +3011,7 @@ namespace IngameCoding.BBCode.Compiler
                             x.RemoveAt(0);
                             var pTypes = x.ToArray();
 
-                            if (parameterTypes[0].typeName == BuiltinType.VOID)
+                            if (parameterTypes[0].Type == BuiltinType.VOID)
                             {
                                 builtinFunctions.AddBuiltinFunction(bfName, pTypes, new Action<DataItem[]>((p) =>
                                 {
@@ -2754,7 +3024,7 @@ namespace IngameCoding.BBCode.Compiler
                                 {
                                     Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
 
-                                    switch (returnType.typeName)
+                                    switch (returnType.Type)
                                     {
                                         case BuiltinType.INT:
                                             self.RaiseReturnEvent(new DataItem(
@@ -2796,7 +3066,7 @@ namespace IngameCoding.BBCode.Compiler
                                         case BuiltinType.VOID:
                                         case BuiltinType.AUTO:
                                         default:
-                                            throw new RuntimeException($"Invalid return type \"{returnType.text}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\"");
+                                            throw new RuntimeException($"Invalid return type \"{returnType.Content}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\"");
                                     }
                                 }), bfName, pTypes, true));
                             }
@@ -2846,10 +3116,10 @@ namespace IngameCoding.BBCode.Compiler
 
                 foreach (var field in @struct.Value.Fields)
                 {
-                    if (compiledStructs.TryGetValue(field.type.text, out var fieldStructType))
+                    if (compiledStructs.TryGetValue(field.Type.Content, out var fieldStructType))
                     {
-                        field.type.Analysis.SubSubtype = TokenSubSubtype.Struct;
-                        field.type.Analysis.Reference = new TokenAnalysis.RefStruct(fieldStructType);
+                        field.Type.Analysis.SubSubtype = TokenSubSubtype.Struct;
+                        field.Type.Analysis.Reference = new TokenAnalysis.RefStruct(fieldStructType);
                     }
                 }
 
@@ -2894,8 +3164,8 @@ namespace IngameCoding.BBCode.Compiler
                 int currentOffset = 0;
                 foreach (var field in @struct.Fields)
                 {
-                    @struct.FieldOffsets.Add(field.name.text, currentOffset);
-                    switch (field.type.typeName)
+                    @struct.FieldOffsets.Add(field.Identifier.Content, currentOffset);
+                    switch (field.Type.Type)
                     {
                         case BuiltinType.BYTE:
                         case BuiltinType.INT:
@@ -2920,8 +3190,8 @@ namespace IngameCoding.BBCode.Compiler
                 int currentOffset = 0;
                 foreach (var field in @class.Fields)
                 {
-                    @class.FieldOffsets.Add(field.name.text, currentOffset);
-                    switch (field.type.typeName)
+                    @class.FieldOffsets.Add(field.Identifier.Content, currentOffset);
+                    switch (field.Type.Type)
                     {
                         case BuiltinType.BYTE:
                         case BuiltinType.INT:
@@ -2953,7 +3223,7 @@ namespace IngameCoding.BBCode.Compiler
                 var id = function.Value.ID();
 
                 if (this.compiledFunctions.ContainsKey(id))
-                { throw new CompilerException($"Function with name '{id}' already defined", function.Value.Name, function.Value.FilePath); }
+                { throw new CompilerException($"Function with name '{id}' already defined", function.Value.Identifier, function.Value.FilePath); }
 
                 this.compiledFunctions.Add(id, GetFunctionInfo(function));
 
@@ -3026,28 +3296,28 @@ namespace IngameCoding.BBCode.Compiler
             foreach (UndefinedFunctionOffset item in undefinedFunctionOffsets)
             {
                 foreach (var pair in item.currentParameters)
-                { parameters.Add(pair.Key, pair.Value); }
+                { parameters.Add(pair); }
                 foreach (var pair in item.currentVariables)
                 { compiledVariables.Add(pair.Key, pair.Value); }
 
-                if (!GetCompiledFunction(item.functionCallStatement, out var function))
+                if (!GetCompiledFunction(item.CallStatement, out var function))
                 {
-                    string searchedID = item.functionCallStatement.TargetNamespacePathPrefix + item.functionCallStatement.FunctionName;
+                    string searchedID = item.CallStatement.TargetNamespacePathPrefix + item.CallStatement.FunctionName;
                     searchedID += "(";
-                    for (int i = 0; i < item.functionCallStatement.Parameters.Count; i++)
+                    for (int i = 0; i < item.CallStatement.Parameters.Count; i++)
                     {
                         if (i > 0) { searchedID += ", "; }
 
-                        searchedID += FindStatementType(item.functionCallStatement.Parameters[i]);
+                        searchedID += FindStatementType(item.CallStatement.Parameters[i]);
                     }
                     searchedID += ")";
-                    throw new CompilerException("Unknown function " + searchedID + "", item.functionCallStatement.Identifier, CurrentFile);
+                    throw new CompilerException("Unknown function " + searchedID + "", item.CallStatement.Identifier, CurrentFile);
                 }
 
                 if (function.InstructionOffset == -1)
                 { throw new InternalException($"Function '{function.ReadableID()}' does not have instruction offset", item.CurrentFile); }
 
-                compiledCode[item.callInstructionIndex].parameter = function.InstructionOffset - item.callInstructionIndex;
+                compiledCode[item.CallInstructionIndex].parameter = function.InstructionOffset - item.CallInstructionIndex;
 
                 parameters.Clear();
                 compiledVariables.Clear();

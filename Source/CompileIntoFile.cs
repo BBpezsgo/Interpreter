@@ -258,7 +258,7 @@ namespace IngameCoding
             {
                 SerializableAttribute result = new()
                 {
-                    Name = v.NameToken.text,
+                    Name = v.Identifier.Content,
                     parameters = new SerializableLiteral[v.parameters.Count],
                 };
                 for (int i = 0; i < v.parameters.Count; i++)
@@ -378,7 +378,7 @@ namespace IngameCoding
 
             public SerializableFunctionDef(CompiledFunction funcDef)
             {
-                this.Name = funcDef.Name.text;
+                this.Name = funcDef.Identifier.Content;
                 this.NamespacePath = funcDef.NamespacePath;
                 this.Attributes = new SerializableAttribute[funcDef.CompiledAttributes.Count];
                 for (int i = 0; i < Attributes.Length; i++)

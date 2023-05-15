@@ -44,72 +44,73 @@ namespace IngameCoding.BBCode
     [Serializable]
     public class TypeToken : Token
     {
-        public BuiltinType typeName;
+        public BuiltinType Type;
         public TypeToken ListOf;
-        public bool IsList => ListOf != null;
         public string NamespacePrefix;
+
+        public bool IsList => ListOf != null;
 
         public TypeToken(string name, BuiltinType type, string namespacePrefix, Token @base) : base()
         {
-            this.typeName = type;
+            this.Type = type;
             this.NamespacePrefix = namespacePrefix;
-            base.text = name;
+            base.Content = name;
 
             if (@base == null)
             {
-                base.type = TokenType.IDENTIFIER;
+                base.TokenType = TokenType.IDENTIFIER;
             }
             else
             {
                 base.AbsolutePosition = @base.AbsolutePosition;
                 base.Position = @base.Position;
                 base.Analysis = @base.Analysis;
-                base.type = @base.type;
+                base.TokenType = @base.TokenType;
             }
         }
 
         public TypeToken(string name, BuiltinType type, List<string> namespacePrefix, Token @base) : base()
         {
-            this.typeName = type;
+            this.Type = type;
             this.NamespacePrefix = namespacePrefix.Count > 0 ? string.Join('.', namespacePrefix) + "." : "";
-            base.text = name;
+            base.Content = name;
 
             if (@base == null)
             {
-                base.type = TokenType.IDENTIFIER;
+                base.TokenType = TokenType.IDENTIFIER;
             }
             else
             {
                 base.AbsolutePosition = @base.AbsolutePosition;
                 base.Position = @base.Position;
                 base.Analysis = @base.Analysis;
-                base.type = @base.type;
+                base.TokenType = @base.TokenType;
             }
         }
 
         public TypeToken(string name, TypeToken listOf, Token @base) : base()
         {
-            this.typeName = BuiltinType.LISTOF;
+            this.Type = BuiltinType.LISTOF;
             this.ListOf = listOf;
             this.NamespacePrefix = "";
-            base.text = name;
+            base.Content = name;
 
             if (@base == null)
             {
-                base.type = TokenType.IDENTIFIER;
+                base.TokenType = TokenType.IDENTIFIER;
             }
             else
             {
                 base.AbsolutePosition = @base.AbsolutePosition;
                 base.Position = @base.Position;
                 base.Analysis = @base.Analysis;
-                base.type = @base.type;
+                base.TokenType = @base.TokenType;
             }
         }
 
-        public new TypeToken Clone() => new(this.text, this.typeName, this.NamespacePrefix, this)
+        public new TypeToken Clone() => new(this.Content, this.Type, this.NamespacePrefix, this)
         {
-            type = this.type,
+            TokenType = this.TokenType,
 
             AbsolutePosition = new Range<int>(this.AbsolutePosition.Start, this.AbsolutePosition.End),
             Position = new Range<SinglePosition>()
@@ -131,12 +132,12 @@ namespace IngameCoding.BBCode
         public override string ToString()
         {
             if (IsList) return ListOf.ToString() + "[]";
-            return text;
+            return Content;
         }
         public string ToStringWithNamespaces()
         {
             if (IsList) return ListOf.ToStringWithNamespaces() + "[]";
-            return NamespacePrefix + text;
+            return NamespacePrefix + Content;
         }
         public new string ToFullString()
         {
@@ -166,20 +167,23 @@ namespace IngameCoding.BBCode
         [Serializable]
         public class ParameterDefinition
         {
-            public Token name;
-            public TypeToken type;
+            public Token Identifier;
+            public TypeToken Type;
 
             public bool withThisKeyword;
 
-            public override string ToString()
-            {
-                return $"{type} {name}";
-            }
+            public override string ToString() => $"{(withThisKeyword ? "this " : "")}{Type} {Identifier}";
+            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
+        }
 
-            internal string PrettyPrint(int ident = 0)
-            {
-                return $"{" ".Repeat(ident)}{type} {name}";
-            }
+        [Serializable]
+        public class FieldDefinition
+        {
+            public Token Identifier;
+            public TypeToken Type;
+
+            public override string ToString() => $"{Type} {Identifier}";
+            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
         }
 
         public class Exportable
@@ -192,7 +196,7 @@ namespace IngameCoding.BBCode
         {
             public class Attribute
             {
-                public Token Name;
+                public Token Identifier;
                 public object[] Parameters;
             }
 
@@ -200,11 +204,11 @@ namespace IngameCoding.BBCode
             public Token BracketEnd;
 
             public Attribute[] Attributes;
-            public readonly Token Name;
+            public readonly Token Identifier;
             /// <summary>
             /// <c>[Namespace].[...].Name</c>
             /// </summary>
-            public string FullName => NamespacePathString + Name.text;
+            public string FullName => NamespacePathString + Identifier.Content;
             public List<ParameterDefinition> Parameters;
             public List<Statement> Statements;
             public TypeToken TypeToken;
@@ -245,7 +249,7 @@ namespace IngameCoding.BBCode
                 Statements = new List<Statement>();
                 Attributes = Array.Empty<Attribute>();
                 this.NamespacePath = namespacePath;
-                this.Name = name;
+                this.Identifier = name;
             }
 
             public FunctionDefinition(List<string> namespacePath, Token name)
@@ -254,12 +258,12 @@ namespace IngameCoding.BBCode
                 Statements = new List<Statement>();
                 Attributes = Array.Empty<Attribute>();
                 this.NamespacePath = namespacePath.ToArray();
-                this.Name = name;
+                this.Identifier = name;
             }
 
             public override string ToString()
             {
-                return $"{(IsExport ? "export " : "")}{this.TypeToken.text} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
+                return $"{(IsExport ? "export " : "")}{this.TypeToken.Content} {this.FullName}" + (this.Parameters.Count > 0 ? "(...)" : "()") + " " + (this.Statements.Count > 0 ? "{...}" : "{}");
             }
 
             public string PrettyPrint(int ident = 0)
@@ -276,7 +280,7 @@ namespace IngameCoding.BBCode
                     statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}{this.TypeToken.text} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+                return $"{" ".Repeat(ident)}{this.TypeToken.Content} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Count > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
             }
 
             public string ReadableID()
@@ -286,7 +290,7 @@ namespace IngameCoding.BBCode
                 for (int j = 0; j < this.Parameters.Count; j++)
                 {
                     if (j > 0) { result += ", "; }
-                    result += this.Parameters[j].type.ToString();
+                    result += this.Parameters[j].Type.ToString();
                 }
                 result += ")";
                 return result;
@@ -300,7 +304,7 @@ namespace IngameCoding.BBCode
             public readonly FunctionDefinition.Attribute[] Attributes;
             public readonly Token Name;
             /// <summary><c>[Namespace].[...].Name</c></summary>
-            public string FullName => NamespacePathString + Name.text;
+            public string FullName => NamespacePathString + Name.Content;
             public Token BracketStart;
             public Token BracketEnd;
             public List<Statement> Statements;
@@ -330,11 +334,11 @@ namespace IngameCoding.BBCode
                     return result;
                 }
             }
-            public readonly ParameterDefinition[] Fields;
+            public readonly FieldDefinition[] Fields;
             public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
             readonly Dictionary<string, FunctionDefinition> methods;
 
-            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<ParameterDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
+            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
             {
                 this.Name = name;
                 this.Fields = fields.ToArray();
@@ -346,7 +350,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"class {this.Name.text} " + "{...}";
+                return $"class {this.Name.Content} " + "{...}";
             }
 
             public string PrettyPrint(int ident = 0)
@@ -363,7 +367,7 @@ namespace IngameCoding.BBCode
                     methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}class {this.Name.text} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
+                return $"{" ".Repeat(ident)}class {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
             }
 
             public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
@@ -374,7 +378,7 @@ namespace IngameCoding.BBCode
             public readonly FunctionDefinition.Attribute[] Attributes;
             public readonly Token Name;
             /// <summary><c>[Namespace].[...].Name</c></summary>
-            public string FullName => NamespacePathString + Name.text;
+            public string FullName => NamespacePathString + Name.Content;
             public Token BracketStart;
             public Token BracketEnd;
             public List<Statement> Statements;
@@ -404,11 +408,11 @@ namespace IngameCoding.BBCode
                     return result;
                 }
             }
-            public readonly ParameterDefinition[] Fields;
+            public readonly FieldDefinition[] Fields;
             public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
             readonly Dictionary<string, FunctionDefinition> methods;
 
-            public StructDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<ParameterDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
+            public StructDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
             {
                 this.Name = name;
                 this.Fields = fields.ToArray();
@@ -420,7 +424,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"struct {this.Name.text} " + "{...}";
+                return $"struct {this.Name.Content} " + "{...}";
             }
 
             public string PrettyPrint(int ident = 0)
@@ -437,7 +441,7 @@ namespace IngameCoding.BBCode
                     methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
                 }
 
-                return $"{" ".Repeat(ident)}struct {this.Name.text} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
+                return $"{" ".Repeat(ident)}struct {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
             }
 
             public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
@@ -453,7 +457,7 @@ namespace IngameCoding.BBCode
 
             public override string ToString()
             {
-                return $"namespace {this.Name.text} " + "{ ... }";
+                return $"namespace {this.Name.Content} " + "{ ... }";
             }
         }
 
@@ -541,7 +545,7 @@ namespace IngameCoding.BBCode
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write("[");
                     Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.Write(attribute.Name);
+                    Console.Write(attribute.Identifier);
                     if (attribute.Parameters != null && attribute.Parameters.Length > 0)
                     {
                         Console.ForegroundColor = ConsoleColor.DarkGray;
@@ -630,10 +634,10 @@ namespace IngameCoding.BBCode
                     foreach (var field in item.Value.Fields)
                     {
                         Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"  {field.type} ");
+                        Console.Write($"  {field.Type} ");
 
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{field.name}");
+                        Console.Write($"{field.Identifier}");
 
                         Console.Write("\n\r");
                     }
@@ -656,10 +660,10 @@ namespace IngameCoding.BBCode
                     foreach (var field in item.Value.Fields)
                     {
                         Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"  {field.type} ");
+                        Console.Write($"  {field.Type} ");
 
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{field.name}");
+                        Console.Write($"{field.Identifier}");
 
                         Console.Write("\n\r");
                     }
@@ -676,7 +680,7 @@ namespace IngameCoding.BBCode
                     { Attribute(attr); }
 
                     Console.ForegroundColor = ConsoleColor.Blue;
-                    if (item.TypeToken.typeName == BuiltinType.STRUCT)
+                    if (item.TypeToken.Type == BuiltinType.STRUCT)
                     {
                         Console.ForegroundColor = ConsoleColor.Green;
                     }
@@ -698,11 +702,11 @@ namespace IngameCoding.BBCode
                         Console.ForegroundColor = ConsoleColor.Blue;
                         if (param.withThisKeyword)
                         { Console.Write("this "); }
-                        if (param.type.typeName == BuiltinType.STRUCT)
+                        if (param.Type.Type == BuiltinType.STRUCT)
                         { Console.ForegroundColor = ConsoleColor.Green; }
-                        Console.Write($"{param.type} ");
+                        Console.Write($"{param.Type} ");
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{param.name}");
+                        Console.Write($"{param.Identifier}");
                     }
                     Console.ForegroundColor = ConsoleColor.DarkGray;
                     Console.Write(")");
@@ -883,12 +887,12 @@ namespace IngameCoding.BBCode
                     for (int i = 0; i < Path.Length; i++)
                     {
                         if (i > 0) result += ".";
-                        result += Path[i].text;
+                        result += Path[i].Content;
                     }
                     return result;
                 }
             }
-            public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].text, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
+            public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
         }
 
         /// <summary>
@@ -1084,7 +1088,7 @@ namespace IngameCoding.BBCode
                 hashT.Analysis.Subtype = TokenSubtype.Hash;
 
                 if (!ExpectIdentifier(out var hashName))
-                { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", hashT); }
+                { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", hashT); }
 
                 hashName.Analysis.Subtype = TokenSubtype.Hash;
 
@@ -1093,7 +1097,7 @@ namespace IngameCoding.BBCode
                 while (!ExpectOperator(";"))
                 {
                     if (!ExpectLiteral(out var parameter))
-                    { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.type.ToString().ToLower()} \"{CurrentToken.text}\"", CurrentToken); }
+                    { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", CurrentToken); }
 
                     parameter.ValueToken.Analysis.Subtype = TokenSubtype.HashParameter;
                     parameters.Add(parameter);
@@ -1125,7 +1129,7 @@ namespace IngameCoding.BBCode
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 List<Token> tokens = new();
-                if (CurrentToken.type == TokenType.LITERAL_STRING)
+                if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
                 {
                     tokens.Add(CurrentToken);
                     currentTokenIndex++;
@@ -1216,7 +1220,7 @@ namespace IngameCoding.BBCode
                     bool alreadyHave = false;
                     foreach (var attribute in attributes)
                     {
-                        if (attribute.Name == attr.Name)
+                        if (attribute.Identifier == attr.Identifier)
                         {
                             alreadyHave = true;
                             break;
@@ -1227,7 +1231,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Name)); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
                 }
 
                 ExpectIdentifier("export", out Token ExportKeyword);
@@ -1272,8 +1276,8 @@ namespace IngameCoding.BBCode
 
                     ParameterDefinition parameterDefinition = new()
                     {
-                        type = possibleParameterType,
-                        name = possibleParameterNameT,
+                        Type = possibleParameterType,
+                        Identifier = possibleParameterNameT,
                         withThisKeyword = thisKeywordT != null,
                     };
                     function.Parameters.Add(parameterDefinition);
@@ -1315,7 +1319,7 @@ namespace IngameCoding.BBCode
                     if (ExpectOperator("{", out var braceletStart))
                     {
                         possibleName.Analysis.Subtype = TokenSubtype.Library;
-                        CurrentNamespace.Add(possibleName.text);
+                        CurrentNamespace.Add(possibleName.Content);
                         int endlessSafe = 0;
                         Token braceletEnd;
                         while (!ExpectOperator("}", out braceletEnd))
@@ -1353,7 +1357,7 @@ namespace IngameCoding.BBCode
                     bool alreadyHave = false;
                     foreach (var attribute in attributes)
                     {
-                        if (attribute.Name == attr.Name)
+                        if (attribute.Identifier == attr.Identifier)
                         {
                             alreadyHave = true;
                             break;
@@ -1364,7 +1368,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Name)); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Identifier)); }
                 }
 
                 ExpectIdentifier("export", out Token ExportKeyword);
@@ -1381,14 +1385,14 @@ namespace IngameCoding.BBCode
                 possibleClassName.Analysis.Subtype = TokenSubtype.Class;
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
-                List<ParameterDefinition> fields = new();
+                List<FieldDefinition> fields = new();
                 Dictionary<string, FunctionDefinition> methods = new();
 
                 int endlessSafe = 0;
                 Token braceletEnd;
                 while (!ExpectOperator("}", out braceletEnd))
                 {
-                    ParameterDefinition field = ExpectField();
+                    FieldDefinition field = ExpectField();
                     if (field == null)
                     { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
@@ -1427,7 +1431,7 @@ namespace IngameCoding.BBCode
                     bool alreadyHave = false;
                     foreach (var attribute in attributes)
                     {
-                        if (attribute.Name == attr.Name)
+                        if (attribute.Identifier == attr.Identifier)
                         {
                             alreadyHave = true;
                             break;
@@ -1438,7 +1442,7 @@ namespace IngameCoding.BBCode
                         attributes.Add(attr);
                     }
                     else
-                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Name)); }
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Identifier)); }
                 }
 
                 ExpectIdentifier("export", out Token ExportKeyword);
@@ -1455,14 +1459,14 @@ namespace IngameCoding.BBCode
                 possibleStructName.Analysis.Subtype = TokenSubtype.Struct;
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
-                List<ParameterDefinition> fields = new();
+                List<FieldDefinition> fields = new();
                 Dictionary<string, FunctionDefinition> methods = new();
 
                 int endlessSafe = 0;
                 Token braceletEnd;
                 while (!ExpectOperator("}", out braceletEnd))
                 {
-                    ParameterDefinition field = ExpectField();
+                    FieldDefinition field = ExpectField();
                     if (field == null)
                     { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
@@ -1541,11 +1545,11 @@ namespace IngameCoding.BBCode
             {
                 int savedToken = currentTokenIndex;
 
-                if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
+                if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = CurrentToken.text.Replace("_", ""),
+                        Value = CurrentToken.Content.Replace("_", ""),
                         Type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
                         ValueToken = CurrentToken,
                     };
@@ -1555,11 +1559,11 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = CurrentToken.text.Replace("_", ""),
+                        Value = CurrentToken.Content.Replace("_", ""),
                         Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
                         ValueToken = CurrentToken,
                     };
@@ -1569,11 +1573,11 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_HEX)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = Convert.ToInt32(CurrentToken.text, 16).ToString(),
+                        Value = Convert.ToInt32(CurrentToken.Content, 16).ToString(),
                         Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
                         ValueToken = CurrentToken,
                     };
@@ -1583,11 +1587,11 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_BIN)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = Convert.ToInt32(CurrentToken.text[2..].Replace("_", ""), 2).ToString(),
+                        Value = Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(),
                         Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
                         ValueToken = CurrentToken,
                     };
@@ -1597,11 +1601,11 @@ namespace IngameCoding.BBCode
                     statement = literal;
                     return true;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
                 {
                     Statement_Literal literal = new()
                     {
-                        Value = CurrentToken.text,
+                        Value = CurrentToken.Content,
                         Type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
                         ValueToken = CurrentToken,
                     };
@@ -1732,7 +1736,7 @@ namespace IngameCoding.BBCode
                         }
                         else
                         {
-                            targetLibraryPath.Add(structName.text);
+                            targetLibraryPath.Add(structName.Content);
                             targetLibraryPathTokens.Add(structName);
                             structName = libraryToken;
                         }
@@ -1756,7 +1760,7 @@ namespace IngameCoding.BBCode
                 }
                 else if (ExpectIdentifier(out Token variableName))
                 {
-                    if (variableName.text == "this")
+                    if (variableName.Content == "this")
                     { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
 
                     if (ExpectOperator("("))
@@ -1771,7 +1775,7 @@ namespace IngameCoding.BBCode
                             VariableName = variableName,
                         };
 
-                        if (variableName.text == "this")
+                        if (variableName.Content == "this")
                         { variableName.Analysis.Subtype = TokenSubtype.Keyword; }
                         else
                         { variableName.Analysis.Subtype = TokenSubtype.VariableName; }
@@ -1953,7 +1957,7 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    if (possibleType.typeName == BuiltinType.AUTO)
+                    if (possibleType.Type == BuiltinType.AUTO)
                     { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType); }
                 }
 
@@ -2321,18 +2325,18 @@ namespace IngameCoding.BBCode
                     {
                         AbsolutePosition = o0.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = o0.text.Replace("=", ""),
+                        Content = o0.Content.Replace("=", ""),
                         Position = o0.Position,
-                        type = o0.type,
+                        TokenType = o0.TokenType,
                     }, leftStatement, valueToAssign);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
                         AbsolutePosition = o0.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = "=",
+                        Content = "=",
                         Position = o0.Position,
-                        type = o0.type,
+                        TokenType = o0.TokenType,
                     }, leftStatement, statementToAssign);
 
                     return operatorCall;
@@ -2350,18 +2354,18 @@ namespace IngameCoding.BBCode
                     {
                         AbsolutePosition = t0.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = "+",
+                        Content = "+",
                         Position = t0.Position,
-                        type = t0.type,
+                        TokenType = t0.TokenType,
                     }, leftStatement, literalOne);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
                         AbsolutePosition = t0.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = "=",
+                        Content = "=",
                         Position = t0.Position,
-                        type = t0.type,
+                        TokenType = t0.TokenType,
                     }, leftStatement, statementToAssign);
 
                     return operatorCall;
@@ -2379,18 +2383,18 @@ namespace IngameCoding.BBCode
                     {
                         AbsolutePosition = t1.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = "-",
+                        Content = "-",
                         Position = t1.Position,
-                        type = t1.type,
+                        TokenType = t1.TokenType,
                     }, leftStatement, literalOne);
 
                     Statement_Operator operatorCall = new(new Token()
                     {
                         AbsolutePosition = t1.AbsolutePosition,
                         Analysis = new TokenAnalysis(),
-                        text = "=",
+                        Content = "=",
                         Position = t1.Position,
-                        type = t1.type,
+                        TokenType = t1.TokenType,
                     }, leftStatement, statementToAssign);
 
                     return operatorCall;
@@ -2406,7 +2410,7 @@ namespace IngameCoding.BBCode
                         "<", ">", ">=", "<=", "!=", "==", "&", "|", "^"
                         }, out Token op)) break;
 
-                    int rhsPrecedence = OperatorPrecedence(op.text);
+                    int rhsPrecedence = OperatorPrecedence(op.Content);
                     if (rhsPrecedence == 0)
                     {
                         currentTokenIndex--;
@@ -2450,7 +2454,7 @@ namespace IngameCoding.BBCode
             Statement_Operator FindRightmostStatement(Statement statement, int rhsPrecedence)
             {
                 if (statement is not Statement_Operator lhs) return null;
-                if (OperatorPrecedence(lhs.Operator.text) >= rhsPrecedence) return null;
+                if (OperatorPrecedence(lhs.Operator.Content) >= rhsPrecedence) return null;
                 if (lhs.InsideBracelet) return null;
 
                 var rhs = FindRightmostStatement(lhs.Right, rhsPrecedence);
@@ -2485,7 +2489,7 @@ namespace IngameCoding.BBCode
                     }
                     else
                     {
-                        targetLibraryPath.Add(possibleFunctionName.text);
+                        targetLibraryPath.Add(possibleFunctionName.Content);
                         targetLibraryPathTokens.Add(possibleFunctionName);
                         possibleFunctionName = libraryToken;
                     }
@@ -2542,7 +2546,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier(out Token possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                if (possibleFunctionName.text != name)
+                if (possibleFunctionName.Content != name)
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.Statement;
@@ -2604,11 +2608,11 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("]"))
                 { throw new SyntaxException("Unbalanced ]", t0); }
 
-                attribute.Name = attributeT;
+                attribute.Identifier = attributeT;
                 return true;
             }
 
-            ParameterDefinition ExpectField()
+            FieldDefinition ExpectField()
             {
                 int startTokenIndex = currentTokenIndex;
                 TypeToken possibleType = ExceptTypeToken();
@@ -2623,10 +2627,10 @@ namespace IngameCoding.BBCode
 
                 possibleVariableName.Analysis.Subtype = TokenSubtype.None;
 
-                ParameterDefinition field = new()
+                FieldDefinition field = new()
                 {
-                    name = possibleVariableName,
-                    type = possibleType,
+                    Identifier = possibleVariableName,
+                    Type = possibleType,
                 };
 
                 return field;
@@ -2636,33 +2640,33 @@ namespace IngameCoding.BBCode
             {
                 value = null;
 
-                if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_FLOAT)
+                if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
                 {
-                    value = float.Parse(CurrentToken.text.Replace("_", ""));
+                    value = float.Parse(CurrentToken.Content.Replace("_", ""));
 
                     currentTokenIndex++;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_NUMBER)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    value = int.Parse(CurrentToken.text.Replace("_", ""));
+                    value = int.Parse(CurrentToken.Content.Replace("_", ""));
 
                     currentTokenIndex++;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_HEX)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
                 {
-                    value = Convert.ToInt32(CurrentToken.text, 16);
+                    value = Convert.ToInt32(CurrentToken.Content, 16);
 
                     currentTokenIndex++;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_BIN)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
                 {
-                    value = Convert.ToInt32(CurrentToken.text.Replace("_", ""), 2);
+                    value = Convert.ToInt32(CurrentToken.Content.Replace("_", ""), 2);
 
                     currentTokenIndex++;
                 }
-                else if (CurrentToken != null && CurrentToken.type == TokenType.LITERAL_STRING)
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
                 {
-                    value = CurrentToken.text;
+                    value = CurrentToken.Content;
 
                     currentTokenIndex++;
                 }
@@ -2675,8 +2679,8 @@ namespace IngameCoding.BBCode
             {
                 result = null;
                 if (CurrentToken == null) return false;
-                if (CurrentToken.type != TokenType.IDENTIFIER) return false;
-                if (name.Length > 0 && CurrentToken.text != name) return false;
+                if (CurrentToken.TokenType != TokenType.IDENTIFIER) return false;
+                if (name.Length > 0 && CurrentToken.Content != name) return false;
 
                 result = CurrentToken;
                 currentTokenIndex++;
@@ -2689,8 +2693,8 @@ namespace IngameCoding.BBCode
             {
                 result = null;
                 if (CurrentToken == null) return false;
-                if (CurrentToken.type != TokenType.OPERATOR) return false;
-                if (name.Contains(CurrentToken.text) == false) return false;
+                if (CurrentToken.TokenType != TokenType.OPERATOR) return false;
+                if (name.Contains(CurrentToken.Content) == false) return false;
 
                 result = CurrentToken;
                 currentTokenIndex++;
@@ -2701,8 +2705,8 @@ namespace IngameCoding.BBCode
             {
                 result = null;
                 if (CurrentToken == null) return false;
-                if (CurrentToken.type != TokenType.OPERATOR) return false;
-                if (name.Length > 0 && CurrentToken.text != name) return false;
+                if (CurrentToken.TokenType != TokenType.OPERATOR) return false;
+                if (name.Length > 0 && CurrentToken.Content != name) return false;
 
                 result = CurrentToken;
                 currentTokenIndex++;
@@ -2721,9 +2725,9 @@ namespace IngameCoding.BBCode
 
                 TypeToken newType = null;
 
-                if (!types.TryGetValue(possibleType.text, out TypeToken builtinType))
+                if (!types.TryGetValue(possibleType.Content, out TypeToken builtinType))
                 {
-                    if (newType == null && possibleType.text == "any")
+                    if (newType == null && possibleType.Content == "any")
                     {
                         if (allowAnyKeyword)
                         {
@@ -2731,11 +2735,11 @@ namespace IngameCoding.BBCode
                         }
                         else
                         {
-                            Errors.Add(new Error($"Type '{possibleType.text}' is not valid in the current context", possibleType));
+                            Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
                         }
                     }
 
-                    if (newType == null && possibleType.text == "var")
+                    if (newType == null && possibleType.Content == "var")
                     {
                         if (allowVarKeyword)
                         {
@@ -2743,26 +2747,26 @@ namespace IngameCoding.BBCode
                         }
                         else
                         {
-                            Errors.Add(new Error($"Type '{possibleType.text}' is not valid in the current context", possibleType));
+                            Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
                         }
                     }
 
                     if (newType == null)
                     {
-                        if (TryGetStruct(possibleType.text, out var s))
+                        if (TryGetStruct(possibleType.Content, out var s))
                         {
                             newType = new TypeToken(s.FullName, BuiltinType.STRUCT, s.NamespacePathString, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Struct;
                         }
-                        else if (TryGetClass(possibleType.text, out var c))
+                        else if (TryGetClass(possibleType.Content, out var c))
                         {
                             newType = new TypeToken(c.FullName, BuiltinType.STRUCT, c.NamespacePathString, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Class;
                         }
                         else
                         {
-                            newType = new TypeToken(possibleType.text, BuiltinType.STRUCT, CurrentNamespace, possibleType);
-                            warning = new Warning($"Type '{possibleType.text}' not found", possibleType);
+                            newType = new TypeToken(possibleType.Content, BuiltinType.STRUCT, CurrentNamespace, possibleType);
+                            warning = new Warning($"Type '{possibleType.Content}' not found", possibleType);
                         }
                     }
 
@@ -2771,7 +2775,7 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    newType = new TypeToken(builtinType.text, builtinType.typeName, CurrentNamespace, possibleType)
+                    newType = new TypeToken(builtinType.Content, builtinType.Type, CurrentNamespace, possibleType)
                     { ListOf = builtinType.ListOf };
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }
@@ -2780,7 +2784,7 @@ namespace IngameCoding.BBCode
                 {
                     if (ExpectOperator("]"))
                     {
-                        newType = new TypeToken(newType.text, newType, newType);
+                        newType = new TypeToken(newType.Content, newType, newType);
                     }
                     else
                     { currentTokenIndex = parseStart; return null; }
@@ -2830,19 +2834,19 @@ namespace IngameCoding.BBCode
                     Token token = tokens[i];
                     if (i == 0)
                     {
-                        if (token.type != TokenType.IDENTIFIER) throw new FormatException();
-                        if (types.TryGetValue(token.text, out result)) continue;
-                        result = TypeToken.CreateAnonymous(token.text, BuiltinType.STRUCT);
+                        if (token.TokenType != TokenType.IDENTIFIER) throw new FormatException();
+                        if (types.TryGetValue(token.Content, out result)) continue;
+                        result = TypeToken.CreateAnonymous(token.Content, BuiltinType.STRUCT);
                         continue;
                     }
-                    if (token.type != TokenType.OPERATOR) throw new FormatException();
-                    if (token.text != "[") throw new FormatException();
+                    if (token.TokenType != TokenType.OPERATOR) throw new FormatException();
+                    if (token.Content != "[") throw new FormatException();
                     i++;
                     if (tokens.Length <= i) throw new FormatException();
                     token = tokens[i];
-                    if (token.type != TokenType.OPERATOR) throw new FormatException();
-                    if (token.text != "]") throw new FormatException();
-                    result = TypeToken.CreateAnonymous(result.text, result);
+                    if (token.TokenType != TokenType.OPERATOR) throw new FormatException();
+                    if (token.Content != "]") throw new FormatException();
+                    result = TypeToken.CreateAnonymous(result.Content, result);
                 }
 
                 return result;

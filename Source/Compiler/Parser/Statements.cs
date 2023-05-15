@@ -234,7 +234,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         readonly string[] namespacePath;
         string[] targetNamespacePath;
         public Token Identifier;
-        internal string FunctionName => Identifier.text;
+        internal string FunctionName => Identifier.Content;
         public List<Statement> Parameters = new();
         internal bool IsMethodCall => PrevStatement != null;
         public Statement PrevStatement;
@@ -404,7 +404,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override object TryGetValue()
         {
-            switch (this.Operator.text)
+            switch (this.Operator.Content)
             {
                 case "+":
                     {
@@ -519,7 +519,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            if (Type.typeName == BuiltinType.STRING)
+            if (Type.Type == BuiltinType.STRING)
             {
                 return $"{" ".Repeat(ident)}\"{Value}\"";
             }
@@ -533,7 +533,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         {
             if (Type.IsList) return null;
 
-            return Type.typeName switch
+            return Type.Type switch
             {
                 BuiltinType.INT => int.Parse(Value),
                 BuiltinType.FLOAT => float.Parse(Value),
@@ -554,12 +554,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{VariableName.text}{((ListIndex != null) ? "[...]" : "")}";
+            return $"{VariableName.Content}{((ListIndex != null) ? "[...]" : "")}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{VariableName.text}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
+            return $"{" ".Repeat(ident)}{VariableName.Content}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
         }
 
         public Statement_Variable()
@@ -583,12 +583,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{OperatorToken.text}{PrevStatement}";
+            return $"{OperatorToken.Content}{PrevStatement}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{OperatorToken.text}{PrevStatement.PrettyPrint(0)}";
+            return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
         public Statement_MemoryAddressGetter()
@@ -611,12 +611,12 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{OperatorToken.text}{PrevStatement}";
+            return $"{OperatorToken.Content}{PrevStatement}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{OperatorToken.text}{PrevStatement.PrettyPrint(0)}";
+            return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
         public Statement_MemoryAddressFinder()

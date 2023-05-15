@@ -2,49 +2,23 @@
 
 namespace ConsoleGUI
 {
-    using ConsoleLib;
-
-    internal class BaseElement
+    internal class Element : IElement, IElementWithEvents
     {
-        internal Rectangle Rect;
+        public Rectangle Rect { get; set; } = Rectangle.Empty;
 
         internal Character[] DrawBuffer = System.Array.Empty<Character>();
 
-        internal virtual Character OnDrawContent(int X, int Y)
-        {
-            int i = X + (Y * Rect.Width);
-            if (i < 0 || i >= DrawBuffer.Length) return ConsoleGUI.NullCharacter;
-            return DrawBuffer[i];
-        }
+        public virtual Character DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
         internal void ClearBuffer() => DrawBuffer = new Character[Rect.Width * Rect.Height];
 
-        internal Character OnDrawBorder(int X, int Y) => Rect.GetSide(X, Y) switch
-        {
-            Side.TopLeft => ('┌').Details(),
-            Side.Top => ('─').Details(),
-            Side.TopRight => ('┒').Details(),
-            Side.Right => '┃'.Details(),
-            Side.BottomRight => '┛'.Details(),
-            Side.Bottom => '━'.Details(),
-            Side.BottomLeft => '┕'.Details(),
-            Side.Left => '│'.Details(),
-            _ => ConsoleGUI.NullCharacter,
-        };
+        public virtual void BeforeDraw()
+        { if (DrawBuffer.Length == 0) ClearBuffer(); }
 
-        public bool Contains(int X, int Y) => Rect.Contains(X, Y) || Rect.Contains(X - 1, Y - 1) || Rect.Contains(X - 1, Y) || Rect.Contains(X, Y - 1);
+        public virtual void OnMouseEvent(MouseEvent e) { }
+        public virtual void OnKeyEvent(KeyEvent e) { }
+        public virtual void OnStart() { }
 
-        internal virtual void BeforeDraw()
-        {
-            if (DrawBuffer.Length == 0) ClearBuffer();
-        }
-
-        internal virtual void OnMouseEvent(MouseInfo mouse) { }
-
-        internal virtual void OnKeyEvent(NativeMethods.KEY_EVENT_RECORD e) { }
-
-        internal virtual void RefreshSize() { this.ClearBuffer(); }
-
-        internal virtual void OnStart() { }
+        public virtual void RefreshSize() => this.ClearBuffer();
     }
 }

@@ -33,7 +33,7 @@ namespace IngameCoding.BBCode.Compiler
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
             {
-                if (functionOffsets.TryGetValue(functionCallStatement.Name.text, out functionOffset))
+                if (functionOffsets.TryGetValue(functionCallStatement.Identifier.Content, out functionOffset))
                 {
                     return true;
                 }
@@ -141,10 +141,10 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var var_ in compiledVariables)
                 {
                     var @var = var_.Value;
-                    if (string.IsNullOrEmpty(@var.Declaration.FilePath))
+                    if (string.IsNullOrEmpty(@var.FilePath))
                     { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} is null"); }
                     else
-                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.Declaration.FilePath}"); }
+                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.FilePath}"); }
                 }
                 foreach (var struct_ in compiledStructs)
                 {
@@ -220,8 +220,8 @@ namespace IngameCoding.BBCode.Compiler
             {
                 @using.Path[0].Analysis.CompilerReached = true;
 
-                if (!Uri.TryCreate(@using.Path[0].text, UriKind.Absolute, out var uri))
-                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].text}\"", @using.Path[0], file.FullName); }
+                if (!Uri.TryCreate(@using.Path[0].Content, UriKind.Absolute, out var uri))
+                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].Content}\"", @using.Path[0], file.FullName); }
 
                 path = uri.ToString();
 
@@ -320,7 +320,7 @@ namespace IngameCoding.BBCode.Compiler
                 var id = func.ID();
 
                 if (Functions.ContainsKey(id))
-                { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
+                { errors.Add(new Error($"Function '{id}' already exists", func.Identifier)); continue; }
 
                 Functions.Add(id, func);
             }
@@ -424,7 +424,7 @@ namespace IngameCoding.BBCode.Compiler
                 var id = func.ID();
 
                 if (Functions.ContainsKey(id))
-                { errors.Add(new Error($"Function '{id}' already exists", func.Name)); continue; }
+                { errors.Add(new Error($"Function '{id}' already exists", func.Identifier)); continue; }
 
                 Functions.Add(id, func);
             }

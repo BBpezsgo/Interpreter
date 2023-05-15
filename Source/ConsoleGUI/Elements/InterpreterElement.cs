@@ -5,14 +5,12 @@ using System.IO;
 
 namespace ConsoleGUI
 {
-    using ConsoleLib;
-
     using System.Collections.Generic;
+    using System.Drawing;
 
-    internal class InterpreterElement : BaseWindowElement
+    internal sealed class InterpreterElement : WindowElement
     {
         public string File;
-        int Scroll;
         Interpreter Interpreter;
 
         struct ConsoleLine
@@ -32,135 +30,246 @@ namespace ConsoleGUI
             }
         }
 
-        List<ConsoleLine> ConsoleLines = new();
+        readonly List<ConsoleLine> ConsoleLines = new();
 
         int ConsoleScrollOffset = 0;
 
-        public InterpreterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : base()
+        InterpreterElement() : base()
         {
             ClearBuffer();
-            this.File = file;
-            SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors);
             InitElements();
+            HasBorder = false;
         }
 
-        public InterpreterElement(string file) : base()
+        public InterpreterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : this()
         {
-            ClearBuffer();
+            this.File = file;
+            SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors);
+        }
+
+        public InterpreterElement(string file) : this()
+        {
             this.File = file;
             SetupInterpreter();
-            InitElements();
+        }
+
+        void CalculateLayoutBoxes(
+            out Rectangle StatePanelRect,
+            out Rectangle ConsolePanelRect,
+            out Rectangle CodePanelRect,
+            out Rectangle StackPanelRect,
+            out Rectangle HeapPanelRect,
+            out Rectangle CallstackPanelRect
+            )
+        {
+            Rectangle left = new(0, 0, Console.WindowWidth / 2, Console.WindowHeight);
+            Rectangle right = new(left.Right + 1, 0, Console.WindowWidth - left.Right - 2, Console.WindowHeight);
+
+            StatePanelRect = left;
+            StatePanelRect.Height = 3;
+
+            ConsolePanelRect = left;
+            ConsolePanelRect.Y = StatePanelRect.Bottom + 1;
+            ConsolePanelRect.Height = (left.Height - StatePanelRect.Height) / 2;
+
+            CodePanelRect = left;
+            CodePanelRect.Y = ConsolePanelRect.Bottom + 1;
+            CodePanelRect.Height = left.Height - CodePanelRect.Y - 1;
+
+            StackPanelRect = right;
+            StackPanelRect.Height = right.Height / 3;
+
+            HeapPanelRect = right;
+            HeapPanelRect.Y = StackPanelRect.Bottom + 1;
+            HeapPanelRect.Height = right.Height / 3;
+
+            CallstackPanelRect = right;
+            CallstackPanelRect.Y = HeapPanelRect.Bottom + 1;
+            CallstackPanelRect.Height = right.Height - CallstackPanelRect.Y - 1;
         }
 
         void InitElements()
         {
+            CalculateLayoutBoxes(
+                out Rectangle StatePanelRect,
+                out Rectangle ConsolePanelRect,
+                out Rectangle CodePanelRect,
+                out Rectangle StackPanelRect,
+                out Rectangle HeapPanelRect,
+                out Rectangle CallstackPanelRect
+                );
+
+            /*
+            Rectangle left = new(0, 0, Console.WindowWidth / 2, Console.WindowHeight);
+            Rectangle right = new(left.Right + 1, 0, Console.WindowWidth - (left.Right + 1), Console.WindowHeight);
+
             var leftWidth = Console.WindowWidth / 2;
 
-            var StatePanelRect = new System.Drawing.Rectangle(0, 0, leftWidth, 3);
-            var ConsolePanelRect = new System.Drawing.Rectangle(0, StatePanelRect.Bottom + 1, leftWidth, (Console.WindowHeight - StatePanelRect.Bottom - 1) / 2);
-            var CodePanelRect = new System.Drawing.Rectangle(0, ConsolePanelRect.Bottom + 1, leftWidth, Console.WindowHeight - 2 - ConsolePanelRect.Bottom);
+            Rectangle StatePanelRect = left;
+            StatePanelRect.Height = 3;
 
-            var StackPanelRect = new System.Drawing.Rectangle(leftWidth + 1, 0, Console.WindowWidth - 2 - leftWidth, (Console.WindowHeight - 1) / 2);
-            var HeapPanelRect = new System.Drawing.Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth, Console.WindowHeight - 2 - StackPanelRect.Bottom);
+            Rectangle ConsolePanelRect = left;
+            ConsolePanelRect.Y = StatePanelRect.Bottom + 1;
+            ConsolePanelRect.Height = (left.Height - StatePanelRect.Height) / 2;
 
-            var StatePanel = new BaseInlineElement
+            Rectangle CodePanelRect = left;
+            CodePanelRect.Y = ConsolePanelRect.Bottom + 1;
+            CodePanelRect.Height = left.Height - CodePanelRect.Y;
+
+            var StackPanelRect = new Rectangle(leftWidth + 1, 0, Console.WindowWidth - 2 - leftWidth,
+                (Console.WindowHeight - 1) / 2);
+            var HeapPanelRect = new Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth,
+                (Console.WindowHeight - 2) - StackPanelRect.Bottom - 20);
+            var CallstackPanelRect = new Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth,
+                (Console.WindowHeight - 3) - HeapPanelRect.Bottom);
+            */
+
+            var StatePanel = new InlineElement
             {
-                Rect = StatePanelRect
+                HasBorder = true,
+                Rect = StatePanelRect,
+                Title = "State",
             };
             StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
             StatePanel.OnRefreshSize += (sender) =>
             {
-                var leftWidth = Console.WindowWidth / 2;
-
-                var StatePanelRect = new System.Drawing.Rectangle(0, 0, leftWidth, 3);
-                var ConsolePanelRect = new System.Drawing.Rectangle(0, StatePanelRect.Bottom + 1, leftWidth, (Console.WindowHeight - StatePanelRect.Bottom - 1) / 2);
-                var CodePanelRect = new System.Drawing.Rectangle(0, ConsolePanelRect.Bottom + 1, leftWidth, Console.WindowHeight - 2 - ConsolePanelRect.Bottom);
-
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
                 sender.Rect = StatePanelRect;
             };
 
-            var CodePanel = new BaseInlineElement
+            var CodePanel = new InlineElement
             {
-                Rect = CodePanelRect
+                HasBorder = true,
+                Rect = CodePanelRect,
+                Title = "Code",
             };
             CodePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
             CodePanel.OnRefreshSize += (sender) =>
             {
-                var leftWidth = Console.WindowWidth / 2;
-
-                var StatePanelRect = new System.Drawing.Rectangle(0, 0, leftWidth, 3);
-                var ConsolePanelRect = new System.Drawing.Rectangle(0, StatePanelRect.Bottom + 1, leftWidth, (Console.WindowHeight - StatePanelRect.Bottom - 1) / 2);
-                var CodePanelRect = new System.Drawing.Rectangle(0, ConsolePanelRect.Bottom + 1, leftWidth, Console.WindowHeight - 2 - ConsolePanelRect.Bottom);
-
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
                 sender.Rect = CodePanelRect;
             };
 
-            var ConsolePanel = new BaseInlineElement
+            var ConsolePanel = new InlineElement
             {
-                Rect = ConsolePanelRect
+                HasBorder = true,
+                Rect = ConsolePanelRect,
+                Title = "Console",
             };
             ConsolePanel.OnBeforeDraw += ConsolePanel_OnBeforeDraw;
             ConsolePanel.OnRefreshSize += (sender) =>
             {
-                var leftWidth = Console.WindowWidth / 2;
-
-                var StatePanelRect = new System.Drawing.Rectangle(0, 0, leftWidth, 3);
-                var ConsolePanelRect = new System.Drawing.Rectangle(0, StatePanelRect.Bottom + 1, leftWidth, (Console.WindowHeight - StatePanelRect.Bottom - 1) / 2);
-                var CodePanelRect = new System.Drawing.Rectangle(0, ConsolePanelRect.Bottom + 1, leftWidth, Console.WindowHeight - 2 - ConsolePanelRect.Bottom);
-
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
                 sender.Rect = ConsolePanelRect;
             };
             ConsolePanel.OnMouseEventInvoked += (sender, e) =>
             {
-                if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
+                int a = -(ConsoleLines.Count - sender.Rect.Height);
+                int b = 3;
+                int min = Math.Min(a, b);
+                int max = Math.Max(a, b);
+                if (e.ButtonState == MouseButtonState.ScrollDown)
                 {
                     ConsoleScrollOffset++;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleLines.Count - sender.Rect.Height), 3);
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
                 }
-                else if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
+                else if (e.ButtonState == MouseButtonState.ScrollUp)
                 {
                     ConsoleScrollOffset--;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, -(ConsoleLines.Count - sender.Rect.Height), 3);
+                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
                 }
             };
 
-            var StackPanel = new BaseInlineElement
+            var StackPanel = new InlineElement
             {
-                Rect = StackPanelRect
+                HasBorder = true,
+                Rect = StackPanelRect,
+                Title = "Stack",
             };
             StackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
             StackPanel.OnRefreshSize += (sender) =>
             {
-                var leftWidth = Console.WindowWidth / 2;
-
-                var StackPanelRect = new System.Drawing.Rectangle(leftWidth + 1, 0, Console.WindowWidth - 2 - leftWidth, (Console.WindowHeight - 1) / 2);
-
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
                 sender.Rect = StackPanelRect;
             };
 
-            var HeapPanel = new BaseInlineElement
+            var HeapPanel = new InlineElement
             {
-                Rect = HeapPanelRect
+                HasBorder = true,
+                Rect = HeapPanelRect,
+                Title = "HEAP",
             };
             HeapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
             HeapPanel.OnRefreshSize += (sender) =>
             {
-                var leftWidth = Console.WindowWidth / 2;
-
-                var StackPanelRect = new System.Drawing.Rectangle(leftWidth + 1, 0, Console.WindowWidth - 2 - leftWidth, (Console.WindowHeight - 1) / 2);
-                var HeapPanelRect = new System.Drawing.Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth, Console.WindowHeight - 2 - StackPanelRect.Bottom);
-
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
                 sender.Rect = HeapPanelRect;
             };
 
+            var CallstackPanel = new InlineElement
+            {
+                HasBorder = true,
+                Rect = HeapPanelRect,
+                Title = "Call Stack",
+            };
+            CallstackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
+            CallstackPanel.OnRefreshSize += (sender) =>
+            {
+                CalculateLayoutBoxes(
+                    out Rectangle StatePanelRect,
+                    out Rectangle ConsolePanelRect,
+                    out Rectangle CodePanelRect,
+                    out Rectangle StackPanelRect,
+                    out Rectangle HeapPanelRect,
+                    out Rectangle CallstackPanelRect
+                    );
+                sender.Rect = CallstackPanelRect;
+            };
 
-            this.Elements = new BaseInlineElement[]
+
+            this.Elements = new InlineElement[]
             {
                 CodePanel,
                 StackPanel,
                 HeapPanel,
                 StatePanel,
-                ConsolePanel
+                ConsolePanel,
+                CallstackPanel,
             };
         }
 
@@ -206,7 +315,164 @@ namespace ConsoleGUI
             }
         }
 
-        private void ConsolePanel_OnBeforeDraw(BaseInlineElement sender)
+        private void CallstackElement_OnBeforeDraw(InlineElement sender)
+        {
+            sender.ClearBuffer();
+
+            if (this.Interpreter.Details.Interpreter == null) return;
+
+            CharColors ForegroundColor;
+            CharColors BackgroundColor;
+
+            int BufferIndex = 0;
+
+            bool AddChar(char data)
+            {
+                if (BufferIndex >= sender.DrawBuffer.Length) return false;
+
+                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
+                sender.DrawBuffer[BufferIndex].Char = data;
+
+                BufferIndex++;
+                if (BufferIndex >= sender.DrawBuffer.Length) return false;
+
+                return true;
+            }
+            void AddText(string text)
+            {
+                for (int i = 0; i < text.Length; i++)
+                {
+                    if (!AddChar(text[i])) break;
+                }
+            }
+            void AddSpace(int to)
+            {
+                while (BufferIndex % sender.Rect.Width < to)
+                {
+                    if (!AddChar(' ')) break;
+                }
+            }
+
+            ForegroundColor = CharColors.FgDefault;
+            BackgroundColor = CharColors.BgBlack;
+
+            void FinishLine()
+            {
+                AddSpace(sender.Rect.Width - 1);
+                AddChar(' ');
+            }
+
+            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+
+            List<int> loadIndicators = new();
+            List<int> storeIndicators = new();
+
+            if (instruction != null)
+            {
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.CS_POP)
+                {
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length - 1);
+                }
+
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.CS_PUSH)
+                {
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length);
+                }
+            }
+
+            int i;
+            for (i = 0; i < this.Interpreter.Details.Interpreter.CallStack.Length; i++)
+            {
+                IngameCoding.Bytecode.CallStackFrame frame = new(this.Interpreter.Details.Interpreter.CallStack[i]);
+
+                ForegroundColor = CharColors.FgGray;
+                AddText(" ");
+
+                bool addLoadIndicator = false;
+                bool addStoreIndicator = false;
+
+                for (int j = loadIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (loadIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("○");
+                    ForegroundColor = CharColors.FgGray;
+                    loadIndicators.RemoveAt(j);
+                    addLoadIndicator = true;
+                    break;
+                }
+
+                for (int j = storeIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (storeIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("●");
+                    ForegroundColor = CharColors.FgGray;
+                    storeIndicators.RemoveAt(j);
+                    addStoreIndicator = true;
+                    break;
+                }
+
+                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+
+                AddText(i.ToString());
+                AddSpace(5);
+
+                ForegroundColor = CharColors.FgDefault;
+                BackgroundColor = CharColors.BgBlack;
+
+                AddText($"{frame.Function}");
+
+                BackgroundColor = CharColors.BgBlack;
+                FinishLine();
+                ForegroundColor = CharColors.FgDefault;
+            }
+
+            while (loadIndicators.Count > 0 || storeIndicators.Count > 0)
+            {
+                ForegroundColor = CharColors.FgDefault;
+                AddText(" ");
+
+                bool addLoadIndicator = false;
+                bool addStoreIndicator = false;
+
+                for (int j = loadIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (loadIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("○");
+                    ForegroundColor = CharColors.FgGray;
+                    loadIndicators.RemoveAt(j);
+                    addLoadIndicator = true;
+                    break;
+                }
+
+                for (int j = storeIndicators.Count - 1; j >= 0; j--)
+                {
+                    if (storeIndicators[j] != i) continue;
+                    ForegroundColor = CharColors.FgRed;
+                    AddText("●");
+                    ForegroundColor = CharColors.FgGray;
+                    storeIndicators.RemoveAt(j);
+                    addStoreIndicator = true;
+                    break;
+                }
+
+                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+
+                AddText(i.ToString());
+                AddSpace(5);
+
+                BackgroundColor = CharColors.BgBlack;
+                ForegroundColor = CharColors.FgDefault;
+
+                FinishLine();
+                break;
+            }
+
+        }
+
+        private void ConsolePanel_OnBeforeDraw(InlineElement sender)
         {
             CharColors ForegroundColor;
             CharColors BackgroundColor;
@@ -266,7 +532,7 @@ namespace ConsoleGUI
             }
         }
 
-        private void StateElement_OnBeforeDraw(BaseInlineElement sender)
+        private void StateElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -333,7 +599,7 @@ namespace ConsoleGUI
             ForegroundColor = CharColors.FgDefault;
         }
 
-        private void HeapElement_OnBeforeDraw(BaseInlineElement sender)
+        private void HeapElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -433,7 +699,7 @@ namespace ConsoleGUI
                     break;
                 }
 
-                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
 
                 ForegroundColor = CharColors.FgGray;
@@ -500,7 +766,7 @@ namespace ConsoleGUI
                 ForegroundColor = CharColors.FgDefault;
             }
         }
-        private void StackElement_OnBeforeDraw(BaseInlineElement sender)
+        private void StackElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -659,7 +925,7 @@ namespace ConsoleGUI
                     break;
                 }
 
-                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
                 AddText(i.ToString());
                 AddSpace(5);
@@ -814,7 +1080,7 @@ namespace ConsoleGUI
                     break;
                 }
 
-                AddText(" ".Repeat(((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
                 AddText(i.ToString());
                 AddSpace(5);
@@ -829,7 +1095,7 @@ namespace ConsoleGUI
             }
 
         }
-        private void SourceCodeElement_OnBeforeDraw(BaseInlineElement sender)
+        private void SourceCodeElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
 
@@ -872,7 +1138,7 @@ namespace ConsoleGUI
 
             void LinePrefix(string lineNumber = "")
             {
-                AddText(" ".Repeat(4 - lineNumber.Length));
+                AddText(new string(' ', 4 - lineNumber.Length));
                 ForegroundColor = CharColors.FgGray;
                 AddText(lineNumber);
                 ForegroundColor = CharColors.FgDefault;
@@ -917,7 +1183,7 @@ namespace ConsoleGUI
 
                     LinePrefix((i + 1).ToString());
                     ForegroundColor = CharColors.FgGray;
-                    AddText($"{"  ".Repeat(indent)}{instruction.parameter}");
+                    AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.parameter}");
                     ForegroundColor = CharColors.FgDefault;
                     BackgroundColor = CharColors.BgBlack;
                     FinishLine();
@@ -932,7 +1198,7 @@ namespace ConsoleGUI
 
                 LinePrefix((i + 1).ToString());
                 ForegroundColor = CharColors.FgOrange;
-                AddText($"{"  ".Repeat(indent)} ");
+                AddText($"{new string(' ', Math.Max(0, indent * 2))} ");
                 if (IsNextInstruction)
                 {
                     IsNextInstruction = false;
@@ -988,30 +1254,18 @@ namespace ConsoleGUI
             }
         }
 
-        internal override void BeforeDraw()
+        public override void OnMouseEvent(MouseEvent e)
         {
-            base.BeforeDraw();
+            base.OnMouseEvent(e);
+            Elements.OnMouseEvent(e);
         }
 
-        internal override void OnMouseEvent(MouseInfo e)
+        public override void OnKeyEvent(KeyEvent e)
         {
-            if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollUp)
-            {
-                ClearBuffer();
-                ScrollTo(Scroll - 1);
-            }
-            else if (e.ButtonState == MouseInfo.ButtonStateEnum.ScrollDown)
-            {
-                ClearBuffer();
-                ScrollTo(Scroll + 1);
-            }
+            base.OnKeyEvent(e);
+            Elements.OnKeyEvent(e);
 
-            // if ((e.Flags & MouseInfo.FlagsValues.MOUSE_MOVED) == 0) Debug.WriteLine($"Mouse Event {{ ButtonState: {e.ButtonState}, ControlKeyState: {e.ControlKeyState}, Flags: {e.Flags}, Pos: {{ {e.X} : {e.Y} }} }}");
-        }
-
-        internal override void OnKeyEvent(NativeMethods.KEY_EVENT_RECORD e)
-        {
-            if (e.bKeyDown) return;
+            if (e.KeyDown) return;
 
             if (e.AsciiChar == 9)
             {
@@ -1021,10 +1275,13 @@ namespace ConsoleGUI
                     ConsoleGUI.Instance.Destroy();
                 }
             }
-
-            // Debug.WriteLine($"Key Event {{ ASCII: {e.AsciiChar} }}");
         }
 
-        void ScrollTo(int value) => Scroll = 0; // Math.Clamp(value, 0, File.Split('\n').Length - Rect.Height + 1);
+        public override void RefreshSize()
+        {
+            base.RefreshSize();
+            Elements[0].Rect = Rect;
+            Elements.RefreshSize();
+        }
     }
 }

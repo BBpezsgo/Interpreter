@@ -11,9 +11,9 @@ namespace IngameCoding.BBCode.Compiler
     using Parser;
     using Parser.Statements;
 
-    static class Extensions
+    public static class Extensions
     {
-        public static DataType Convert(this BuiltinType v) => v switch
+        internal static DataType Convert(this BuiltinType v) => v switch
         {
             BuiltinType.INT => DataType.INT,
             BuiltinType.BYTE => DataType.BYTE,
@@ -24,7 +24,7 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType.LISTOF => DataType.LIST,
             _ => throw new NotImplementedException(),
         };
-        public static BuiltinType Convert(this DataType v) => v switch
+        internal static BuiltinType Convert(this DataType v) => v switch
         {
             DataType.INT => BuiltinType.INT,
             DataType.BYTE => BuiltinType.BYTE,
@@ -36,7 +36,7 @@ namespace IngameCoding.BBCode.Compiler
             _ => BuiltinType.ANY,
         };
 
-        public static int RemoveInstruction(this List<Instruction> self, int index, List<int> watchTheseIndexesToo)
+        internal static int RemoveInstruction(this List<Instruction> self, int index, List<int> watchTheseIndexesToo)
         {
             if (index < -1 || index >= self.Count) throw new IndexOutOfRangeException();
 
@@ -72,10 +72,7 @@ namespace IngameCoding.BBCode.Compiler
 
             return changedInstructions;
         }
-    }
 
-    public static class FunctionID
-    {
         public static string ID(this FunctionDefinition function)
         {
             string result = function.FullName;
@@ -83,7 +80,7 @@ namespace IngameCoding.BBCode.Compiler
             {
                 var param = function.Parameters[i];
                 // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
-                result += "," + param.type.ToString();
+                result += "," + param.Type.ToString();
             }
             return result;
         }
@@ -91,22 +88,23 @@ namespace IngameCoding.BBCode.Compiler
 
     struct UndefinedFunctionOffset
     {
-        public int callInstructionIndex;
-        public Statement_FunctionCall functionCallStatement;
-        public Dictionary<string, Parameter> currentParameters;
+        public int CallInstructionIndex;
+
+        public Statement_FunctionCall CallStatement;
+        public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
         internal string CurrentFile;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, KeyValuePair<string, Parameter>[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
-            this.callInstructionIndex = callInstructionIndex;
-            this.functionCallStatement = functionCallStatement;
+            this.CallInstructionIndex = callInstructionIndex;
+            this.CallStatement = functionCallStatement;
 
             this.currentParameters = new();
             this.currentVariables = new();
 
             foreach (var item in currentParameters)
-            { this.currentParameters.Add(item.Key, item.Value); }
+            { this.currentParameters.Add(item); }
             foreach (var item in currentVariables)
             { this.currentVariables.Add(item.Key, item.Value); }
             this.CurrentFile = file;
@@ -116,7 +114,7 @@ namespace IngameCoding.BBCode.Compiler
     public struct AttributeValues
     {
         public List<Literal> parameters;
-        public Token NameToken;
+        public Token Identifier;
 
         public bool TryGetValue(int index, out string value)
         {
@@ -164,7 +162,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public struct Literal
+    public readonly struct Literal
     {
         public enum Type
         {
@@ -270,7 +268,7 @@ namespace IngameCoding.BBCode.Compiler
 
     public class CompiledFunction : FunctionDefinition
     {
-        public TypeToken[] ParameterTypes;
+        public CompiledType[] ParameterTypes;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -278,7 +276,7 @@ namespace IngameCoding.BBCode.Compiler
         internal int InstructionOffset = -1;
 
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.TypeToken.typeName != BuiltinType.VOID;
+        public bool ReturnSomething => this.TypeToken.Type != BuiltinType.VOID;
 
         /// <summary>
         /// the first parameter is labeled as 'this'
@@ -305,7 +303,7 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        public CompiledFunction(FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
+        public CompiledFunction(FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
         {
             base.Attributes = functionDefinition.Attributes;
             base.BracketEnd = functionDefinition.BracketEnd;
@@ -316,31 +314,9 @@ namespace IngameCoding.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
-        public CompiledFunction(TypeToken[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
+        public CompiledFunction(bool isMethod, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
         {
-            this.ParameterTypes = parameters;
-            this.IsMethod = isMethod;
-            this.CompiledAttributes = new();
-
-            base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.TypeToken = functionDefinition.TypeToken;
-            base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
-        }
-        public CompiledFunction(ParameterDefinition[] parameters, bool isMethod, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Name)
-        {
-            List<TypeToken> @params = new();
-
-            foreach (var param in parameters)
-            {
-                @params.Add(param.type);
-            }
-
-            this.ParameterTypes = @params.ToArray();
+            this.ParameterTypes = parameterTypes;
             this.IsMethod = isMethod;
             this.CompiledAttributes = new();
 
@@ -355,25 +331,27 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    internal struct CompiledVariable
+    internal class CompiledVariable : Statement_NewVariable
     {
-        public CompiledType Type;
+        public readonly new CompiledType Type;
 
-        public int Offset;
-        public bool IsGlobal;
-        public bool IsStoredInHEAP;
+        public readonly int Offset;
+        public readonly int MemoryOffset;
+        public readonly bool IsGlobal;
+        public readonly bool IsStoredInHEAP;
 
-        public Statement_NewVariable Declaration;
-
-        public CompiledVariable(int offset, CompiledType type, bool isGlobal, Statement_NewVariable declaration)
+        public CompiledVariable(int offset, int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
         {
             this.Type = type;
 
+            this.MemoryOffset = memoryOffset;
             this.Offset = offset;
-            this.IsStoredInHEAP = false;
+            this.IsStoredInHEAP = storedInHeap;
             this.IsGlobal = isGlobal;
 
-            this.Declaration = declaration;
+            base.FilePath = declaration.FilePath;
+            base.InitialValue = declaration.InitialValue;
+            base.VariableName = declaration.VariableName;
         }
     }
 
@@ -382,12 +360,17 @@ namespace IngameCoding.BBCode.Compiler
 
     }
 
-    public class CompiledStruct : StructDefinition, ITypeDefinition
+    public interface IDataStructure
+    {
+        public int Size { get; }
+    }
+
+    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
-        public int Size;
+        public int Size { get; set; }
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -401,12 +384,12 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledClass : ClassDefinition, ITypeDefinition
+    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
-        public int Size;
+        public int Size { get; set; }
 
         public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -420,34 +403,36 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    class Parameter
+    public class CompiledParameter : ParameterDefinition
     {
-        public int index;
-        public string name;
+        public new CompiledType Type;
+
+        readonly int index;
         readonly int allParamCount;
-        public readonly string type;
+        readonly int currentParamsSize;
 
-        public Parameter(int index, string name, int allParamCount, string type)
-        {
-            this.index = index;
-            this.name = name;
-            this.allParamCount = allParamCount;
-            this.type = type;
-        }
-
-        public override string ToString()
-        {
-            return $"{index} {name}";
-        }
-
+        public int Index => index;
         public int RealIndex
         {
             get
             {
-                var v = -1 - ((allParamCount + 1) - (index));
+                var v = -1 - (currentParamsSize + 1 - index);
                 return v;
             }
         }
+
+        public CompiledParameter(int index, int currentParamsSize, int allParamCount, CompiledType type, ParameterDefinition definition)
+        {
+            this.index = index;
+            this.allParamCount = allParamCount;
+            this.currentParamsSize = currentParamsSize;
+            this.Type = type;
+
+            base.Identifier = definition.Identifier;
+            base.withThisKeyword = definition.withThisKeyword;
+        }
+
+        public override string ToString() => $"{index} {Identifier}";
     }
 
     public class CompiledType
@@ -495,8 +480,8 @@ namespace IngameCoding.BBCode.Compiler
                     _ => throw new Errors.InternalException($"WTF???"),
                 };
 
-                if (@struct != null) return @struct.Name.text;
-                if (@class != null) return @class.Name.text;
+                if (@struct != null) return @struct.Name.Content;
+                if (@class != null) return @class.Name.Content;
                 if (listOf != null) return listOf.Name + "[]";
 
                 return null;
@@ -509,6 +494,16 @@ namespace IngameCoding.BBCode.Compiler
         /// <summary><c><see cref="Struct"/> != null</c></summary>
         internal bool IsStruct => @struct != null;
         internal bool IsBuiltin => builtinType != CompiledTypeType.NONE;
+
+        public int Size
+        {
+            get
+            {
+                if (IsStruct) return @struct.Size;
+                if (IsClass) return @class.Size;
+                return 1;
+            }
+        }
 
         CompiledType()
         {
@@ -602,7 +597,7 @@ namespace IngameCoding.BBCode.Compiler
                 return;
             }
 
-            switch (type.typeName)
+            switch (type.Type)
             {
                 case BBCode.BuiltinType.VOID:
                     this.builtinType = CompiledTypeType.VOID;
@@ -626,7 +621,7 @@ namespace IngameCoding.BBCode.Compiler
                     break;
             };
 
-            SetCustomType(type.text, UnknownTypeCallback);
+            SetCustomType(type.Content, UnknownTypeCallback);
         }
 
         void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
@@ -662,8 +657,8 @@ namespace IngameCoding.BBCode.Compiler
                 _ => throw new Errors.InternalException($"WTF???"),
             };
 
-            if (@struct != null) return @struct.NamespacePathString + @struct.Name.text;
-            if (@class != null) return @class.NamespacePathString + @class.Name.text;
+            if (@struct != null) return @struct.NamespacePathString + @struct.Name.Content;
+            if (@class != null) return @class.NamespacePathString + @class.Name.Content;
             if (listOf != null) return listOf.Name + "[]";
 
             return null;

@@ -316,22 +316,22 @@ namespace TheProgram
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
-            if (v.parameter is IStruct)
+            if (v.Parameter is IStruct)
             {
                 Parameter = "IStruct { ... }";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is DataItem.List)
+            else if (v.Parameter is DataItem.List)
             {
                 Parameter = "[ ... ]";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is Struct)
+            else if (v.Parameter is Struct)
             {
                 Parameter = "{ ... }";
                 ParameterIsComplicated = true;
             }
-            else if (v.parameter is DataItem v2)
+            else if (v.Parameter is DataItem v2)
             {
                 switch (v2.type)
                 {
@@ -358,7 +358,7 @@ namespace TheProgram
             }
             else
             {
-                Parameter = v.parameter;
+                Parameter = v.Parameter;
                 ParameterIsComplicated = false;
             }
             Tag = v.tag;

@@ -284,6 +284,22 @@ namespace IngameCoding.Bytecode
         internal DataStack stack;
         internal HEAP heap;
 
+        public static DataItem Null => new() { };
+
+        public bool IsNull
+        {
+            get
+            {
+                if (valueByte.HasValue) return false;
+                if (valueInt.HasValue) return false;
+                if (valueFloat.HasValue) return false;
+                if (valueString != null) return false;
+                if (valueStruct != null) return false;
+                if (valueList != null) return false;
+                return true;
+            }
+        }
+
         #region Value Properties
 
         public byte ValueByte
@@ -1138,6 +1154,7 @@ namespace IngameCoding.Bytecode
 
         public override string ToString()
         {
+            if (IsNull) return null;
             string retStr = type switch
             {
                 DataType.INT => ValueInt.ToString(),

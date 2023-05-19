@@ -658,7 +658,7 @@ namespace ConsoleGUI
                     if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
                     { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
                     else
-                    { storeIndicators.Add((int)instruction.parameter); }
+                    { storeIndicators.Add(instruction.ParameterInt); }
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
@@ -666,7 +666,7 @@ namespace ConsoleGUI
                     if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
                     { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
                     else
-                    { loadIndicators.Add((int)instruction.parameter); }
+                    { loadIndicators.Add(instruction.ParameterInt); }
                 }
             }
 
@@ -707,51 +707,59 @@ namespace ConsoleGUI
                 ForegroundColor = CharColors.FgDefault;
                 AddSpace(5);
 
-                switch (item.type)
+                if (item.IsNull)
                 {
-                    case IngameCoding.Bytecode.DataType.INT:
-                        ForegroundColor = CharColors.FgCyan;
-                        AddText($"{item.ValueInt}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.FLOAT:
-                        ForegroundColor = CharColors.FgCyan;
-                        AddText($"{item.ValueFloat}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.STRING:
-                        ForegroundColor = CharColors.FgYellow;
-                        AddText($"\"{item.ValueString}\"");
-                        break;
-                    case IngameCoding.Bytecode.DataType.BOOLEAN:
-                        ForegroundColor = CharColors.FgDarkBlue;
-                        AddText($"{item.ValueBoolean}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.STRUCT:
-                        ForegroundColor = CharColors.FgWhite;
-                        var @struct = item.ValueStruct;
-                        var fields = @struct.GetFields();
-                        string text = "{";
-                        for (int j = 0; j < fields.Length; j++)
-                        {
-                            var field = fields[j];
-                            var text_ = $" {field}: {@struct.GetField(field)}";
-
-                            if ((text + text_).Length > 10)
+                    ForegroundColor = CharColors.FgGray;
+                    AddText("<null>");
+                }
+                else
+                {
+                    switch (item.type)
+                    {
+                        case IngameCoding.Bytecode.DataType.INT:
+                            ForegroundColor = CharColors.FgCyan;
+                            AddText($"{item.ValueInt}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.FLOAT:
+                            ForegroundColor = CharColors.FgCyan;
+                            AddText($"{item.ValueFloat}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.STRING:
+                            ForegroundColor = CharColors.FgYellow;
+                            AddText($"\"{item.ValueString}\"");
+                            break;
+                        case IngameCoding.Bytecode.DataType.BOOLEAN:
+                            ForegroundColor = CharColors.FgDarkBlue;
+                            AddText($"{item.ValueBoolean}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.STRUCT:
+                            ForegroundColor = CharColors.FgWhite;
+                            var @struct = item.ValueStruct;
+                            var fields = @struct.GetFields();
+                            string text = "{";
+                            for (int j = 0; j < fields.Length; j++)
                             {
-                                text += " ...";
-                                break;
+                                var field = fields[j];
+                                var text_ = $" {field}: {@struct.GetField(field)}";
+
+                                if ((text + text_).Length > 10)
+                                {
+                                    text += " ...";
+                                    break;
+                                }
+                                text += text_;
                             }
-                            text += text_;
-                        }
-                        text += " }";
-                        AddText(text);
-                        break;
-                    case IngameCoding.Bytecode.DataType.LIST:
-                        AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
-                        break;
-                    default:
-                        ForegroundColor = CharColors.FgGray;
-                        AddText("<null>");
-                        break;
+                            text += " }";
+                            AddText(text);
+                            break;
+                        case IngameCoding.Bytecode.DataType.LIST:
+                            AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
+                            break;
+                        default:
+                            ForegroundColor = CharColors.FgGray;
+                            AddText("?");
+                            break;
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(item.Tag))
@@ -835,7 +843,7 @@ namespace ConsoleGUI
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
                 {
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode));
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
@@ -851,7 +859,7 @@ namespace ConsoleGUI
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD)
                 {
-                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.parameter ?? 0), instruction.AddressingMode));
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length);
                 }
 
@@ -933,94 +941,102 @@ namespace ConsoleGUI
                 ForegroundColor = CharColors.FgDefault;
                 BackgroundColor = CharColors.BgBlack;
 
-                switch (item.type)
+                if (item.IsNull)
                 {
-                    case IngameCoding.Bytecode.DataType.INT:
-                        ForegroundColor = CharColors.FgCyan;
-                        AddText($"{item.ValueInt}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.FLOAT:
-                        ForegroundColor = CharColors.FgCyan;
-                        AddText($"{item.ValueFloat}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.STRING:
-                        ForegroundColor = CharColors.FgYellow;
-                        AddText($"\"{item.ValueString.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t").Replace("\0", "\\0")}\"");
-                        break;
-                    case IngameCoding.Bytecode.DataType.BOOLEAN:
-                        ForegroundColor = CharColors.FgDarkBlue;
-                        AddText($"{item.ValueBoolean}");
-                        break;
-                    case IngameCoding.Bytecode.DataType.STRUCT:
-                        ForegroundColor = CharColors.FgWhite;
-                        {
-                            var @struct = item.ValueStruct;
-                            var fields = @struct.GetFields();
-
-                            string text = "{";
-
-                            int j = 0;
-                            while (text.Length < sender.Rect.Width - 10 && j < fields.Length)
+                    ForegroundColor = CharColors.FgGray;
+                    AddText("<null>");
+                }
+                else
+                {
+                    switch (item.type)
+                    {
+                        case IngameCoding.Bytecode.DataType.INT:
+                            ForegroundColor = CharColors.FgCyan;
+                            AddText($"{item.ValueInt}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.FLOAT:
+                            ForegroundColor = CharColors.FgCyan;
+                            AddText($"{item.ValueFloat}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.STRING:
+                            ForegroundColor = CharColors.FgYellow;
+                            AddText($"\"{item.ValueString.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t").Replace("\0", "\\0")}\"");
+                            break;
+                        case IngameCoding.Bytecode.DataType.BOOLEAN:
+                            ForegroundColor = CharColors.FgDarkBlue;
+                            AddText($"{item.ValueBoolean}");
+                            break;
+                        case IngameCoding.Bytecode.DataType.STRUCT:
+                            ForegroundColor = CharColors.FgWhite;
                             {
-                                if (j > 0)
+                                var @struct = item.ValueStruct;
+                                var fields = @struct.GetFields();
+
+                                string text = "{";
+
+                                int j = 0;
+                                while (text.Length < sender.Rect.Width - 10 && j < fields.Length)
                                 {
-                                    text += ";";
+                                    if (j > 0)
+                                    {
+                                        text += ";";
+                                    }
+
+                                    text += $" {fields[j]}: {@struct.GetField(fields[j])}";
+
+                                    j++;
+                                }
+                                if (j < fields.Length)
+                                {
+                                    if (j > 0)
+                                    {
+                                        text += ";";
+                                    }
+                                    text += " ...";
                                 }
 
-                                text += $" {fields[j]}: {@struct.GetField(fields[j])}";
+                                text += " }";
 
-                                j++;
+                                AddText(text);
                             }
-                            if (j < fields.Length)
+                            break;
+                        case IngameCoding.Bytecode.DataType.LIST:
                             {
-                                if (j > 0)
+                                var valueList = item.ValueList;
+                                string text = $"{valueList.itemTypes.ToString().ToLower()}";
+                                text += " [";
+
+                                int j = 0;
+                                while (text.Length < sender.Rect.Width - 10 && j < valueList.items.Count)
                                 {
-                                    text += ";";
+                                    if (j > 0)
+                                    {
+                                        text += ",";
+                                    }
+
+                                    text += $" {valueList.items[j]}";
+
+                                    j++;
                                 }
-                                text += " ...";
-                            }
-
-                            text += " }";
-
-                            AddText(text);
-                        }
-                        break;
-                    case IngameCoding.Bytecode.DataType.LIST:
-                        {
-                            var valueList = item.ValueList;
-                            string text = $"{valueList.itemTypes.ToString().ToLower()}";
-                            text += " [";
-
-                            int j = 0;
-                            while (text.Length < sender.Rect.Width - 10 && j < valueList.items.Count)
-                            {
-                                if (j > 0)
+                                if (j < valueList.items.Count)
                                 {
-                                    text += ",";
+                                    if (j > 0)
+                                    {
+                                        text += ",";
+                                    }
+                                    text += " ...";
                                 }
 
-                                text += $" {valueList.items[j]}";
+                                text += " ]";
 
-                                j++;
+                                AddText(text);
                             }
-                            if (j < valueList.items.Count)
-                            {
-                                if (j > 0)
-                                {
-                                    text += ",";
-                                }
-                                text += " ...";
-                            }
-
-                            text += " ]";
-
-                            AddText(text);
-                        }
-                        break;
-                    default:
-                        ForegroundColor = CharColors.FgGray;
-                        AddText("<null>");
-                        break;
+                            break;
+                        default:
+                            ForegroundColor = CharColors.FgGray;
+                            AddText("?");
+                            break;
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(item.Tag))
@@ -1151,6 +1167,20 @@ namespace ConsoleGUI
             }
 
             int indent = 0;
+            for (int i = 0; i < this.Interpreter.Details.Interpreter.CodePointer - 5; i++)
+            {
+                var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
+                {
+                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
+                    { indent--; }
+                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
+                    { indent++; }
+
+                    continue;
+                }
+            }
+
             bool IsNextInstruction = false;
             for (int i = Math.Max(0, this.Interpreter.Details.Interpreter.CodePointer - 5); i < this.Interpreter.Details.CompilerResult.compiledCode.Length; i++)
             {
@@ -1176,19 +1206,19 @@ namespace ConsoleGUI
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
                 {
-                    if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("}"))
+                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
                     {
                         indent--;
                     }
 
                     LinePrefix((i + 1).ToString());
                     ForegroundColor = CharColors.FgGray;
-                    AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.parameter}");
+                    AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.Parameter}");
                     ForegroundColor = CharColors.FgDefault;
                     BackgroundColor = CharColors.BgBlack;
                     FinishLine();
 
-                    if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("{"))
+                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
                     {
                         indent++;
                     }
@@ -1216,28 +1246,28 @@ namespace ConsoleGUI
                     AddText($" ");
                 }
 
-                if (instruction.parameter is int || instruction.parameter is float)
+                if (instruction.Parameter is int || instruction.Parameter is float)
                 {
                     ForegroundColor = CharColors.FgCyan;
-                    AddText($"{instruction.parameter}");
+                    AddText($"{instruction.Parameter}");
                     AddText($" ");
                 }
-                else if (instruction.parameter is bool)
+                else if (instruction.Parameter is bool)
                 {
                     ForegroundColor = CharColors.FgDarkBlue;
-                    AddText($"{instruction.parameter}");
+                    AddText($"{instruction.Parameter}");
                     AddText($" ");
                 }
-                else if (instruction.parameter is string)
+                else if (instruction.Parameter is string)
                 {
                     ForegroundColor = CharColors.FgYellow;
-                    AddText($"\"{instruction.parameter}\"");
+                    AddText($"\"{instruction.Parameter}\"");
                     AddText($" ");
                 }
                 else
                 {
                     ForegroundColor = CharColors.FgWhite;
-                    AddText($"{instruction.parameter}");
+                    AddText($"{instruction.Parameter}");
                     AddText($" ");
                 }
 

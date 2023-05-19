@@ -112,5 +112,7 @@
         COPY_VALUE_RECURSIVE,
 
         GET_BASEPOINTER,
+
+        FIND_HEAP_FREE_SPACE,
     }
 }

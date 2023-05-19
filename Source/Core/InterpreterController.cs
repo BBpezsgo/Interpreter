@@ -604,19 +604,19 @@ namespace IngameCoding.Core
             #region Console
 
             builtinFunctions.AddBuiltinFunction("stdout", new TypeToken[] {
-                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
+                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
             }, (DataItem[] parameters) =>
             {
                 OnStdOut?.Invoke(this, parameters[0].ToStringValue());
             });
             builtinFunctions.AddBuiltinFunction("stderr", new TypeToken[] {
-                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
+                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
             }, (DataItem[] parameters) =>
             {
                 OnStdError?.Invoke(this, parameters[0].ToStringValue());
             });
             builtinFunctions.AddBuiltinFunction("sleep", new TypeToken[] {
-                TypeToken.CreateAnonymous("any", BuiltinType.ANY)
+                TypeToken.CreateAnonymous("int", BuiltinType.INT)
             }, (DataItem[] parameters) =>
             {
                 pauseCodeFor = parameters[0].ValueInt;

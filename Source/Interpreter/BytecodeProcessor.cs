@@ -116,6 +116,8 @@ namespace IngameCoding.Bytecode
                 case Opcode.CS_POP: return CS_POP();
 
                 case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
+
+                case Opcode.FIND_HEAP_FREE_SPACE: return FIND_HEAP_FREE_SPACE();
                 #endregion
 
                 default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
@@ -124,9 +126,9 @@ namespace IngameCoding.Bytecode
 
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.ABSOLUTE => (int)CurrentInstruction.parameter,
-            AddressingMode.BASEPOINTER_RELATIVE => BasePointer + (int)CurrentInstruction.parameter,
-            AddressingMode.RELATIVE => Memory.Stack.Count + (int)CurrentInstruction.parameter,
+            AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
+            AddressingMode.BASEPOINTER_RELATIVE => BasePointer + CurrentInstruction.ParameterInt,
+            AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
             AddressingMode.POP => Memory.Stack.Count - 1,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
             _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
@@ -134,12 +136,45 @@ namespace IngameCoding.Bytecode
 
         int GetHeapAddress() => CurrentInstruction.AddressingMode switch
         {
-            AddressingMode.ABSOLUTE => (int)CurrentInstruction.parameter,
+            AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
             _ => throw new System.Exception($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         #region Instruction Methods
+
+        int FIND_HEAP_FREE_SPACE()
+        {
+            int sizeNeeded = CurrentInstruction.ParameterInt;
+
+            int currentFreeSize = 0;
+            int freeSizeStarted = 0;
+            bool found = false;
+            for (int i = 0; i < Memory.Heap.Size; i++)
+            {
+                if (Memory.Heap[i].IsNull)
+                {
+                    currentFreeSize++;
+                    if (currentFreeSize >= sizeNeeded)
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                else
+                {
+                    currentFreeSize = 0;
+                    freeSizeStarted = i + 1;
+                }
+            }
+            if (!found) throw new RuntimeException("Out of HEAP memory");
+
+            Memory.Stack.Push(freeSizeStarted, CurrentInstruction.tag);
+
+            Step();
+
+            return 5;
+        }
 
         int GET_BASEPOINTER()
         {
@@ -168,7 +203,7 @@ namespace IngameCoding.Bytecode
 
         int CS_PUSH()
         {
-            Memory.CallStack.Push(CurrentInstruction.parameter.ToString());
+            Memory.CallStack.Push(CurrentInstruction.ParameterString);
             Step();
 
             return 1;
@@ -185,7 +220,7 @@ namespace IngameCoding.Bytecode
         int DEBUG_SET_TAG()
         {
             var last = Memory.Stack.Last();
-            last.Tag = CurrentInstruction.parameter.ToString();
+            last.Tag = CurrentInstruction.ParameterString;
             Memory.Stack.Set(Memory.Stack.Count - 1, last, true);
             Step();
 
@@ -234,7 +269,7 @@ namespace IngameCoding.Bytecode
         {
             var v = Memory.Stack.Pop();
 
-            switch ((string)CurrentInstruction.parameter)
+            switch (CurrentInstruction.ParameterString)
             {
                 case "int":
                     {
@@ -362,7 +397,7 @@ namespace IngameCoding.Bytecode
             if (builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
             {
                 List<DataItem> parameters = new();
-                for (int i = 0; i < (int)CurrentInstruction.parameter; i++)
+                for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
                 { parameters.Add(Memory.Stack.Pop()); }
                 if (builtinFunction.ReturnSomething)
                 {
@@ -492,14 +527,14 @@ namespace IngameCoding.Bytecode
             Memory.Stack.Push(BasePointer, "saved base pointer");
             Memory.ReturnAddressStack.Add(CodePointer + 1);
             BasePointer = Memory.Stack.Count;
-            Step((int)CurrentInstruction.parameter);
+            Step(CurrentInstruction.ParameterInt);
 
             return 4;
         }
 
         int JUMP_BY()
         {
-            CodePointer += (int)CurrentInstruction.parameter;
+            CodePointer += CurrentInstruction.ParameterInt;
 
             return 1;
         }
@@ -508,7 +543,7 @@ namespace IngameCoding.Bytecode
             var condition = Memory.Stack.Pop();
 
             if (condition == true)
-            { CodePointer += (int)CurrentInstruction.parameter; }
+            { CodePointer += CurrentInstruction.ParameterInt; }
             else
             { Step(); }
 
@@ -519,7 +554,7 @@ namespace IngameCoding.Bytecode
             var condition = Memory.Stack.Pop();
 
             if (condition == false)
-            { CodePointer += (int)CurrentInstruction.parameter; }
+            { CodePointer += CurrentInstruction.ParameterInt; }
             else
             { Step(); }
 
@@ -630,14 +665,10 @@ namespace IngameCoding.Bytecode
 
         int PUSH_VALUE()
         {
-            if (CurrentInstruction.parameter is DataItem dataItem)
-            {
-                Memory.Stack.Push(dataItem, CurrentInstruction.tag);
-            }
-            else
-            {
-                Memory.Stack.Push(new DataItem(CurrentInstruction.parameter, CurrentInstruction.tag), CurrentInstruction.tag);
-            }
+            DataItem value = CurrentInstruction.ParameterData;
+            value.Tag = CurrentInstruction.tag;
+
+            Memory.Stack.Push(value);
 
             Step();
 

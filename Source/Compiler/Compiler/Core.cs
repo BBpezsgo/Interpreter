@@ -46,16 +46,16 @@ namespace IngameCoding.BBCode.Compiler
                 Instruction instruction = self[instructionIndex];
                 if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_TRUE || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
-                    if (instruction.parameter is int jumpBy)
+                    if (instruction.Parameter is int jumpBy)
                     {
                         if (jumpBy + instructionIndex < index && instructionIndex < index) continue;
                         if (jumpBy + instructionIndex > index && instructionIndex > index) continue;
                         if (jumpBy + instructionIndex == index) throw new Exception($"Can't remove instruction at {index} becouse instruction {instruction} is referencing to this position");
 
                         if (instructionIndex < index)
-                        { instruction.parameter = jumpBy - 1; changedInstructions++; }
+                        { instruction.Parameter = jumpBy - 1; changedInstructions++; }
                         else if (instructionIndex > index)
-                        { instruction.parameter = jumpBy + 1; changedInstructions++; }
+                        { instruction.Parameter = jumpBy + 1; changedInstructions++; }
                     }
                 }
             }
@@ -335,17 +335,17 @@ namespace IngameCoding.BBCode.Compiler
     {
         public readonly new CompiledType Type;
 
-        public readonly int Offset;
-        public readonly int MemoryOffset;
+        public readonly int Index;
+        public readonly int MemoryAddress;
         public readonly bool IsGlobal;
         public readonly bool IsStoredInHEAP;
 
-        public CompiledVariable(int offset, int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
+        public CompiledVariable(int index, int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
         {
             this.Type = type;
 
-            this.MemoryOffset = memoryOffset;
-            this.Offset = offset;
+            this.MemoryAddress = memoryOffset;
+            this.Index = index;
             this.IsStoredInHEAP = storedInHeap;
             this.IsGlobal = isGlobal;
 
@@ -487,11 +487,11 @@ namespace IngameCoding.BBCode.Compiler
                 return null;
             }
         }
-        /// <summary><c><see cref="ListOf"/> != null</c></summary>
+        /// <summary><c><see cref="ListOf"/> != <see langword="null"/></c></summary>
         internal bool IsList => listOf != null;
-        /// <summary><c><see cref="Class"/> != null</c></summary>
+        /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
         internal bool IsClass => @class != null;
-        /// <summary><c><see cref="Struct"/> != null</c></summary>
+        /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         internal bool IsStruct => @struct != null;
         internal bool IsBuiltin => builtinType != CompiledTypeType.NONE;
 

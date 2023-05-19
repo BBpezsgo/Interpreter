@@ -68,16 +68,16 @@ namespace IngameCoding.BBCode.Compiler
                     Instruction instruction = this.compiledCode[i];
                     if (instruction.opcode == Opcode.COMMENT)
                     {
-                        if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("}"))
+                        if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
                         {
                             indent--;
                         }
 
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.parameter}");
+                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.ParameterString}");
                         Console.ResetColor();
 
-                        if (!instruction.parameter.ToString().EndsWith("{ }") && instruction.parameter.ToString().EndsWith("{"))
+                        if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
                         {
                             indent++;
                         }
@@ -89,19 +89,19 @@ namespace IngameCoding.BBCode.Compiler
                     Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
                     Console.Write($" ");
 
-                    if (instruction.parameter is int || instruction.parameter is float)
+                    if (instruction.Parameter is int || instruction.Parameter is float)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.parameter}");
+                        Console.Write($"{instruction.Parameter}");
                         Console.Write($" ");
                     }
-                    else if (instruction.parameter is bool)
+                    else if (instruction.Parameter is bool)
                     {
                         Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"{instruction.parameter}");
+                        Console.Write($"{instruction.Parameter}");
                         Console.Write($" ");
                     }
-                    else if (instruction.parameter is string parameterString)
+                    else if (instruction.Parameter is string parameterString)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.Write($"\"{parameterString.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}\"");
@@ -110,7 +110,7 @@ namespace IngameCoding.BBCode.Compiler
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{instruction.parameter}");
+                        Console.Write($"{instruction.Parameter}");
                         Console.Write($" ");
                     }
 

@@ -1,6 +1,6 @@
-// using System;
+using System;
 
-struct Foo
+class Foo
 {
   int field0;
   int field1;
@@ -14,19 +14,23 @@ void Start()
   // Console.Log("foo.field0: " + foo.field0);
   // Console.Log("&foo.field0: " + &foo.field0);
 
-  Foo foo2 = foo;
+  Foo foo2;
+  Dealloc(foo2);
+  foo2 = foo;
   // Console.Log("foo.field0: " + foo.field0);
 
-  Bar(foo2, foo, 420);
+  int res = Bar(foo2, foo, 420);
+  // Console.Log(res);
 
   // Console.Log("foo.field0: " + foo.field0);
   // Console.Log("foo2.field0: " + foo2.field0);
 }
 
-void Bar(Foo p0, Foo p1, int p2)
+int Bar(Foo p0, Foo p1, int p2)
 {
   p0.field0 = 3;
   p1.field1 = 7;
   // int address0 = &p0.field1;
   // int address1 = &p1.field0;
+  return 69;
 }

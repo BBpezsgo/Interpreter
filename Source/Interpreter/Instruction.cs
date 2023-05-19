@@ -36,30 +36,68 @@ namespace IngameCoding.Bytecode
     {
         public AddressingMode AddressingMode;
         public Opcode opcode;
+        object parameter;
+
+        public int ParameterInt
+        {
+            get
+            {
+                if (parameter == null) throw new Errors.InternalException($"Can't cast null to {nameof(Int32)}");
+                if (parameter is int @int) return @int;
+                if (parameter is DataItem dataItem && dataItem.type == DataType.INT) return dataItem.ValueInt;
+                throw new Errors.InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
+            }
+        }
+        public DataItem ParameterData
+        {
+            get
+            {
+                if (parameter == null) return DataItem.Null;
+                if (parameter is int @int) return new DataItem(@int, null);
+                if (parameter is float @float) return new DataItem(@float, null);
+                if (parameter is string @string) return new DataItem(@string, null);
+                if (parameter is byte @byte) return new DataItem(@byte, null);
+                if (parameter is DataItem dataItem) return dataItem;
+                return DataItem.Null;
+            }
+        }
+        public string ParameterString
+        {
+            get
+            {
+                if (parameter == null) return null;
+                if (parameter is DataItem dataItem) return dataItem.ToStringValue();
+                return parameter.ToString();
+            }
+        }
         /// <summary>
         /// Can be:
         /// <list type="bullet">
-        /// <dataItem><see cref="null"/></dataItem>
-        /// <dataItem><see cref="int"/></dataItem>
-        /// <dataItem><see cref="bool"/></dataItem>
-        /// <dataItem><see cref="float"/></dataItem>
-        /// <dataItem><see cref="string"/></dataItem>
-        /// <dataItem><see cref="IStruct"/></dataItem>
-        /// <dataItem><see cref="DataItem.Struct"/></dataItem>
-        /// <dataItem><see cref="DataItem.List"/></dataItem>
+        /// <item><see cref="null"/></item>
+        /// <item><see cref="int"/></item>
+        /// <item><see cref="bool"/></item>
+        /// <item><see cref="float"/></item>
+        /// <item><see cref="string"/></item>
+        /// <item><see cref="IStruct"/></item>
+        /// <item><see cref="DataItem.Struct"/></item>
+        /// <item><see cref="DataItem.List"/></item>
         /// </list>
         /// </summary>
-        public object parameter;
+        public object Parameter
+        {
+            get => parameter;
+            set => parameter = value;
+        }
 
         /// <summary>
         /// <b>Only for debugging!</b><br/>
         /// Sets the <see cref="DataItem.Tag"/> to this.<br/>
         /// Can use on:
         /// <list type="bullet">
-        /// <dataItem><see cref="Opcode.LOAD_VALUE_BR"/></dataItem>
-        /// <dataItem><see cref="Opcode.LOAD_FIELD_BR"/></dataItem>
-        /// <dataItem><see cref="Opcode.LOAD_VALUE"/></dataItem>
-        /// <dataItem><see cref="Opcode.PUSH_VALUE"/></dataItem>
+        /// <item><see cref="Opcode.LOAD_VALUE_BR"/></item>
+        /// <item><see cref="Opcode.LOAD_FIELD_BR"/></item>
+        /// <item><see cref="Opcode.LOAD_VALUE"/></item>
+        /// <item><see cref="Opcode.PUSH_VALUE"/></item>
         /// </list>
         /// </summary>
         public string tag = string.Empty;

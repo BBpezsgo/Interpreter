@@ -77,6 +77,7 @@ namespace Program
 ## Other features
 ### Structs
 > ⚠ **OUTDATED**
+
 You can create a very basic struct.
 A struct can only contain fields.<br>
 Methods are currently not supported.
@@ -159,6 +160,19 @@ export void Foo()
 `Math.Abs(v)` Returns the absolute value of `v`<br>
 `Math.Min(a, b)` Returns the smaller of `a` and `b`<br>
 `Math.Max(a, b)` Returns the larger of `a` and `b`<br>
+
+### System.Lists.bbc
+> **NOTE:**
+> Only int lists supported!
+
+`List CreateList(int length)` Creates a new list with a specified length. (Maximum length is 5)<br>
+`int List.ElementAt(int index)` Returns the element at the specified index.<br>
+`void List.Push(int element)` Adds a new element to the end of the list.<br>
+`void List.Pop()` Removes the last element from the list.<br>
+`void List.Insert(int index, int element)` Adds a new element at the specified index.<br>
+`void List.Set(int index, int element)` Sets the value of an element at the specified index.<br>
+`void List.RemoveAt(int index)` Removes the element from the specified index.<br>
+`string List.ToString()` Converts the list to a string. (ie.: "{ 3, 5, 2 }")<br>
 
 ### System.Net.bbc
 

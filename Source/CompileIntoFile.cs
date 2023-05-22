@@ -448,10 +448,10 @@ namespace IngameCoding
                 OffsetClearGlobalVariables = compilerResult.clearGlobalVariablesInstruction;
                 OffsetSetGlobalVariables = compilerResult.setGlobalVariablesInstruction;
                 FunctionOffsets = compilerResult.functionOffsets;
-                CompiledFunctions = new SerializableFunctionDef[compilerResult.compiledFunctions.Count];
-                for (int i = 0; i < compilerResult.compiledFunctions.Count; i++)
+                CompiledFunctions = new SerializableFunctionDef[compilerResult.compiledFunctions.Length];
+                for (int i = 0; i < compilerResult.compiledFunctions.Length; i++)
                 {
-                    CompiledFunctions[i] = new SerializableFunctionDef(compilerResult.compiledFunctions.ElementAt(i).Value);
+                    CompiledFunctions[i] = new SerializableFunctionDef(compilerResult.compiledFunctions[i]);
                 }
             }
 

@@ -107,6 +107,11 @@ namespace IngameCoding.Core
                     Output.Output.Error($"CompilerException: {error.MessageAll}");
                     if (!HandleErrors) throw;
                 }
+                catch (UserException error)
+                {
+                    Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
+                    if (!HandleErrors) throw;
+                }
                 catch (RuntimeException error)
                 {
                     Output.Output.Error($"RuntimeException: {error.MessageAll}");
@@ -212,6 +217,11 @@ namespace IngameCoding.Core
                 catch (CompilerException error)
                 {
                     Output.Output.Error($"CompilerException: {error.MessageAll}");
+                    if (!HandleErrors) throw;
+                }
+                catch (UserException error)
+                {
+                    Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
                     if (!HandleErrors) throw;
                 }
                 catch (RuntimeException error)

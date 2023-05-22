@@ -840,14 +840,12 @@ namespace ConsoleGUI
 
             if (instruction != null)
             {
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD)
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
                 {
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
                 {
                     if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
@@ -856,8 +854,7 @@ namespace ConsoleGUI
                     { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1); }
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD)
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE)
                 {
                     loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length);
@@ -960,10 +957,10 @@ namespace ConsoleGUI
                             break;
                         case IngameCoding.Bytecode.DataType.STRING:
                             ForegroundColor = CharColors.FgYellow;
-                            AddText($"\"{item.ValueString.Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t").Replace("\0", "\\0")}\"");
+                            AddText($"\"{item.ValueString.Escape()}\"");
                             break;
                         case IngameCoding.Bytecode.DataType.BOOLEAN:
-                            ForegroundColor = CharColors.FgDarkBlue;
+                            ForegroundColor = CharColors.FgLightBlue;
                             AddText($"{item.ValueBoolean}");
                             break;
                         case IngameCoding.Bytecode.DataType.STRUCT:
@@ -1237,9 +1234,7 @@ namespace ConsoleGUI
                 AddText($"{instruction.opcode}");
                 AddText($" ");
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_FIELD ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_FIELD ||
+                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
                 {
                     AddText($"{instruction.AddressingMode}");
@@ -1258,10 +1253,10 @@ namespace ConsoleGUI
                     AddText($"{instruction.Parameter}");
                     AddText($" ");
                 }
-                else if (instruction.Parameter is string)
+                else if (instruction.Parameter is string @string)
                 {
                     ForegroundColor = CharColors.FgYellow;
-                    AddText($"\"{instruction.Parameter}\"");
+                    AddText($"\"{@string.Escape()}\"");
                     AddText($" ");
                 }
                 else
@@ -1303,7 +1298,9 @@ namespace ConsoleGUI
                 if (!this.Interpreter.IsExecutingCode)
                 {
                     ConsoleGUI.Instance.Destroy();
+                    return;
                 }
+                ConsoleGUI.Instance.NextRefreshConsole = true;
             }
         }
 

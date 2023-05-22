@@ -168,8 +168,16 @@ namespace IngameCoding.Bytecode
         internal int Size => this.heap.Length;
         internal DataItem this[int i]
         {
-            get => heap[i];
-            set => heap[i] = value;
+            get
+            {
+                if (i == BBCode.Utils.NULL_POINTER) throw new RuntimeException($"Null pointer!");
+                return heap[i];
+            }
+            set
+            {
+                if (i == BBCode.Utils.NULL_POINTER) throw new RuntimeException($"Null pointer!");
+                heap[i] = value;
+            }
         }
 
         internal void Set(int address, int v) => heap[address].ValueInt = v;
@@ -293,6 +301,7 @@ namespace IngameCoding.Bytecode
                 if (valueByte.HasValue) return false;
                 if (valueInt.HasValue) return false;
                 if (valueFloat.HasValue) return false;
+                if (valueBoolean.HasValue) return false;
                 if (valueString != null) return false;
                 if (valueStruct != null) return false;
                 if (valueList != null) return false;
@@ -438,6 +447,25 @@ namespace IngameCoding.Bytecode
 
             this.Tag = tag;
         }
+        DataItem(DataType type)
+        {
+            this.type = type;
+
+            this.IsHeapAddress = false;
+
+            this.valueInt = null;
+            this.valueByte = null;
+            this.valueFloat = null;
+            this.valueString = null;
+            this.valueBoolean = null;
+            this.valueStruct = null;
+            this.valueList = null;
+
+            this.stack = null;
+            this.heap = null;
+
+            this.Tag = null;
+        }
 
         public DataItem(int value, string tag, bool isHeapAddress = false) : this(DataType.INT, tag)
         {
@@ -445,55 +473,36 @@ namespace IngameCoding.Bytecode
             this.valueInt = value;
         }
         public DataItem(byte value, string tag) : this(DataType.BYTE, tag)
-        {
-            this.valueByte = value;
-        }
+        { this.valueByte = value; }
         public DataItem(float value, string tag) : this(DataType.FLOAT, tag)
-        {
-            this.valueFloat = value;
-        }
+        { this.valueFloat = value; }
         public DataItem(string value, string tag) : this(DataType.STRING, tag)
-        {
-            this.valueString = value;
-        }
+        { this.valueString = value; }
         public DataItem(bool value, string tag) : this(DataType.BOOLEAN, tag)
-        {
-            this.valueBoolean = value;
-        }
+        { this.valueBoolean = value; }
         public DataItem(IStruct value, string tag) : this(DataType.STRUCT, tag)
-        {
-            this.valueStruct = value;
-        }
+        { this.valueStruct = value; }
         public DataItem(List value, string tag) : this(DataType.LIST, tag)
+        { this.valueList = value; }
+
+        public DataItem(int value, bool isHeapAddress = false) : this(DataType.INT)
         {
-            this.valueList = value;
+            this.IsHeapAddress = isHeapAddress;
+            this.valueInt = value;
         }
-        public DataItem(BBCode.TypeToken type1, string tag) : this(DataType.BYTE, tag)
-        {
-            switch (type1.Type)
-            {
-                case BBCode.BuiltinType.INT:
-                    this.type = DataType.INT;
-                    this.valueInt = 0;
-                    break;
-                case BBCode.BuiltinType.FLOAT:
-                    this.type = DataType.FLOAT;
-                    this.valueFloat = 0f;
-                    break;
-                case BBCode.BuiltinType.STRING:
-                    this.type = DataType.STRING;
-                    this.valueString = "";
-                    break;
-                case BBCode.BuiltinType.BOOLEAN:
-                    this.type = DataType.BOOLEAN;
-                    this.valueBoolean = false;
-                    break;
-                case BBCode.BuiltinType.STRUCT:
-                    this.type = DataType.STRUCT;
-                    this.valueStruct = new UnassignedStruct();
-                    break;
-            }
-        }
+        public DataItem(byte value) : this(DataType.BYTE)
+        { this.valueByte = value; }
+        public DataItem(float value) : this(DataType.FLOAT)
+        { this.valueFloat = value; }
+        public DataItem(string value) : this(DataType.STRING)
+        { this.valueString = value; }
+        public DataItem(bool value) : this(DataType.BOOLEAN)
+        { this.valueBoolean = value; }
+        public DataItem(IStruct value) : this(DataType.STRUCT)
+        { this.valueStruct = value; }
+        public DataItem(List value) : this(DataType.LIST)
+        { this.valueList = value; }
+
         public DataItem(object value, string tag) : this(DataType.BYTE, tag)
         {
             if (value == null)
@@ -563,7 +572,7 @@ namespace IngameCoding.Bytecode
                         case DataType.INT:
                             return new DataItem(value.ValueInt, null);
                         case DataType.FLOAT:
-                            return new DataItem(Math.Round(value.ValueFloat), null);
+                            return new DataItem((float)Math.Round(value.ValueFloat), null);
                         case DataType.STRING:
                             return new DataItem(int.Parse(value.ValueString), null);
                     }
@@ -1204,22 +1213,22 @@ namespace IngameCoding.Bytecode
 
         public DataItem Copy() => type switch
         {
-            DataType.BYTE => new DataItem(valueByte, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.INT => new DataItem(valueInt, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.FLOAT => new DataItem(valueFloat, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BYTE => new DataItem(valueByte ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.INT => new DataItem(valueInt ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.FLOAT => new DataItem(valueFloat ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.STRING => new DataItem(valueString, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.BOOLEAN => new DataItem(valueBoolean, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BOOLEAN => new DataItem(valueBoolean ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.STRUCT => new DataItem(valueStruct.Copy(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.LIST => new DataItem(valueList.Copy(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             _ => throw new InternalException($"Unknown type {type}"),
         };
         public DataItem CopyRecursive() => type switch
         {
-            DataType.BYTE => new DataItem(valueByte, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.INT => new DataItem(valueInt, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.FLOAT => new DataItem(valueFloat, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BYTE => new DataItem(valueByte ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.INT => new DataItem(valueInt ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.FLOAT => new DataItem(valueFloat ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.STRING => new DataItem(valueString, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
-            DataType.BOOLEAN => new DataItem(valueBoolean, Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
+            DataType.BOOLEAN => new DataItem(valueBoolean ?? throw new NullReferenceException(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.STRUCT => new DataItem(valueStruct.CopyRecursive(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             DataType.LIST => new DataItem(valueList.CopyRecursive(), Tag) { heap = heap, IsHeapAddress = IsHeapAddress, stack = stack },
             _ => throw new InternalException($"Unknown type {type}"),

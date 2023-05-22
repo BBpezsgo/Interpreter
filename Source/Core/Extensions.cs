@@ -2,6 +2,8 @@
 using IngameCoding.Bytecode;
 using IngameCoding.Tokenizer;
 
+using System;
+
 namespace IngameCoding.Core
 {
     public static class Extensions
@@ -97,13 +99,17 @@ namespace IngameCoding.Core
         public static bool IsUnset(this Range<SinglePosition> self) => self.Start.IsUnset() && self.End.IsUnset();
         public static bool IsUnset(this SinglePosition self) => self.Line == 0 && self.Character == 0;
 
+        /*
+        [Obsolete("Don't use this")]
         public static T[] Add<T>(this T[] self, params T[] values)
         {
             System.Collections.Generic.List<T> selfList = new(self);
             selfList.AddRange(values);
             return selfList.ToArray();
         }
+        [Obsolete("Don't use this")]
         public static T[] Add<T>(this T[] self, T value) => (new System.Collections.Generic.List<T>(self) { value }).ToArray();
+        */
 
         public static Position After(this BaseToken self) => new(new Range<SinglePosition>(new SinglePosition(self.Position.End.Line, self.Position.End.Character), new SinglePosition(self.Position.End.Line, self.Position.End.Character + 1)), new Range<int>(self.AbsolutePosition.End, self.AbsolutePosition.End + 1));
     }

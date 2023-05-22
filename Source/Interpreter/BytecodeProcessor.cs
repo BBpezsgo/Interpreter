@@ -49,6 +49,10 @@ namespace IngameCoding.Bytecode
             this.builtinFunctions = null;
         }
 
+        /// <exception cref="RuntimeException"></exception>
+        /// <exception cref="UserException"></exception>
+        /// <exception cref="InternalException"></exception>
+        /// <exception cref="System.Exception"></exception>
         public int Clock()
         {
             switch (CurrentInstruction.opcode)
@@ -62,9 +66,6 @@ namespace IngameCoding.Bytecode
                 case Opcode.PUSH_VALUE: return PUSH_VALUE();
                 case Opcode.POP_VALUE: return POP_VALUE();
 
-                case Opcode.COPY_VALUE: return COPY_VALUE();
-                case Opcode.COPY_VALUE_RECURSIVE: return COPY_VALUE_RECURSIVE();
-
                 case Opcode.LOAD_VALUE: return LOAD_VALUE();
                 case Opcode.STORE_VALUE: return STORE_VALUE();
 
@@ -73,9 +74,7 @@ namespace IngameCoding.Bytecode
                 case Opcode.JUMP_BY: return JUMP_BY();
                 case Opcode.CALL: return CALL();
                 case Opcode.RETURN: return RETURN();
-
-                case Opcode.LOAD_FIELD: return LOAD_FIELD();
-                case Opcode.STORE_FIELD: return STORE_FIELD();
+                case Opcode.THROW: return THROW();
 
                 case Opcode.CALL_BUILTIN: return CALL_BUILTIN();
                 case Opcode.TYPE_GET: return TYPE_GET();
@@ -124,6 +123,7 @@ namespace IngameCoding.Bytecode
             }
         }
 
+        /// <exception cref="System.Exception"></exception>
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
@@ -134,6 +134,7 @@ namespace IngameCoding.Bytecode
             _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
+        /// <exception cref="System.Exception"></exception>
         int GetHeapAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
@@ -143,6 +144,14 @@ namespace IngameCoding.Bytecode
 
         #region Instruction Methods
 
+        /// <exception cref="UserException"></exception>
+        int THROW()
+        {
+            DataItem throwValue = Memory.Stack.Pop();
+            throw new UserException("User Exception Thrown", throwValue);
+        }
+
+        /// <exception cref="RuntimeException"></exception>
         int FIND_HEAP_FREE_SPACE()
         {
             int sizeNeeded = CurrentInstruction.ParameterInt;
@@ -181,24 +190,6 @@ namespace IngameCoding.Bytecode
             Memory.Stack.Push(BasePointer);
             Step();
             return 1;
-        }
-
-        int COPY_VALUE()
-        {
-            DataItem itemToCopy = Memory.Stack.Pop();
-            Memory.Stack.Push(itemToCopy.Copy());
-            Step();
-
-            return 2;
-        }
-
-        int COPY_VALUE_RECURSIVE()
-        {
-            DataItem itemToCopy = Memory.Stack.Pop();
-            Memory.Stack.Push(itemToCopy.CopyRecursive());
-            Step();
-
-            return 3;
         }
 
         int CS_PUSH()
@@ -294,6 +285,7 @@ namespace IngameCoding.Bytecode
             return 5;
         }
 
+        /// <exception cref="RuntimeException"></exception>
         int LIST_PUSH_ITEM()
         {
             var newItem = Memory.Stack.Pop();
@@ -306,6 +298,7 @@ namespace IngameCoding.Bytecode
 
             return 4;
         }
+        /// <exception cref="RuntimeException"></exception>
         int LIST_ADD_ITEM()
         {
             var indexValue = Memory.Stack.Pop();
@@ -319,6 +312,7 @@ namespace IngameCoding.Bytecode
 
             return 5;
         }
+        /// <exception cref="RuntimeException"></exception>
         int LIST_SET_ITEM()
         {
             var indexValue = Memory.Stack.Pop().ValueInt;
@@ -333,6 +327,7 @@ namespace IngameCoding.Bytecode
 
             return 3;
         }
+        /// <exception cref="RuntimeException"></exception>
         int LIST_PULL_ITEM()
         {
             var listValue = Memory.Stack.Pop();
@@ -344,6 +339,7 @@ namespace IngameCoding.Bytecode
 
             return 3;
         }
+        /// <exception cref="RuntimeException"></exception>
         int LIST_REMOVE_ITEM()
         {
             var indexValue = Memory.Stack.Pop();
@@ -357,6 +353,7 @@ namespace IngameCoding.Bytecode
             return 4;
         }
 
+        /// <exception cref="RuntimeException"></exception>
         int LIST_INDEX()
         {
             var indexValue = Memory.Stack.Pop();
@@ -381,6 +378,8 @@ namespace IngameCoding.Bytecode
             return 4;
         }
 
+        /// <exception cref="InternalException"></exception>
+        /// <exception cref="RuntimeException"></exception>
         void OnBuiltinFunctionReturnValue(DataItem returnValue)
         {
             Output.Debug.Debug.Log(returnValue.ToString());
@@ -581,74 +580,6 @@ namespace IngameCoding.Bytecode
             Step();
 
             return 3;
-        }
-
-        int STORE_FIELD()
-        {
-            string field = Memory.Stack.Pop().ValueString;
-            if (field.Length == 0)
-            { throw new InternalException("No field name given"); }
-            DataItem newValue = Memory.Stack.Pop();
-            int address = GetStackAddress();
-            IStruct item = Memory.Stack[address].ValueStruct;
-
-            if (!item.HaveField(field))
-            { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
-
-            item.SetField(field, item.GetField(field).TrySet(newValue));
-
-            Memory.Stack.Set(address, new DataItem(item, null));
-
-            Step();
-
-            return 7;
-        }
-        int LOAD_FIELD()
-        {
-            int address = GetStackAddress();
-
-            string field = Memory.Stack.Pop().ValueString;
-            if (field.Length == 0)
-            { throw new InternalException("No field name given"); }
-            DataItem item = CurrentInstruction.AddressingMode == AddressingMode.POP ? Memory.Stack.Pop() : Memory.Stack[address];
-
-            if (item.type == DataType.STRING)
-            {
-                string value = item.ValueString;
-
-                if (field == "Length")
-                {
-                    Memory.Stack.Push(value.Length, CurrentInstruction.tag);
-                }
-                else
-                { throw new RuntimeException("Type string does not have field " + field); }
-            }
-            else if (item.type == DataType.LIST)
-            {
-                DataItem.List value = item.ValueList;
-
-                if (field == "Length")
-                {
-                    Memory.Stack.Push(value.items.Count, CurrentInstruction.tag);
-                }
-                else
-                { throw new RuntimeException("Type list does not have field " + field); }
-            }
-            else if (item.type == DataType.STRUCT)
-            {
-                IStruct value = item.ValueStruct;
-
-                if (!value.HaveField(field))
-                { throw new RuntimeException("Field " + field + " doesn't exists in this struct."); }
-
-                Memory.Stack.Push(value.GetField(field), "field." + field);
-            }
-            else
-            { throw new RuntimeException("Type " + item.type.ToString().ToLower() + " does not have field " + field); }
-
-            Step();
-
-            return 4;
         }
 
         int LOGIC_LT()

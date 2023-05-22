@@ -296,7 +296,7 @@ namespace IngameCoding.BBCode
                     {
                         var id = func.ID();
                         if (Functions.ContainsKey(id)) continue;
-                        func.Statements?.Clear();
+                        func.Statements = System.Array.Empty<Statement>();
                         Functions.Add(id, func);
                     }
 
@@ -406,9 +406,9 @@ namespace IngameCoding.BBCode
 
             var compilerResult = new Compiler.Compiler.CompilerResult()
             {
-                compiledStructs = codeGeneratorResult.compiledStructs,
-                compiledFunctions = codeGeneratorResult.compiledFunctions,
-                compiledVariables = codeGenerator.compiledVariables,
+                compiledStructs = codeGeneratorResult.compiledStructs.ToArray(),
+                compiledFunctions = codeGeneratorResult.compiledFunctions.ToArray(),
+                compiledVariables = codeGenerator.compiledVariables.ToDictionary(),
             };
 
             return compilerResult;

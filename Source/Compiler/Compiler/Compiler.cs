@@ -22,8 +22,8 @@ namespace IngameCoding.BBCode.Compiler
         {
             public Instruction[] compiledCode;
 
-            public Dictionary<string, CompiledFunction> compiledFunctions;
-            public Dictionary<string, CompiledStruct> compiledStructs;
+            public CompiledFunction[] compiledFunctions;
+            public CompiledStruct[] compiledStructs;
             internal Dictionary<string, CompiledVariable> compiledVariables;
 
             public Dictionary<string, int> functionOffsets;
@@ -130,9 +130,8 @@ namespace IngameCoding.BBCode.Compiler
 
             public void CheckFilePaths(System.Action<string> NotSetCallback)
             {
-                foreach (var func_ in compiledFunctions)
+                foreach (var func in compiledFunctions)
                 {
-                    var func = func_.Value;
                     if (string.IsNullOrEmpty(func.FilePath))
                     { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {func} is null"); }
                     else
@@ -146,9 +145,8 @@ namespace IngameCoding.BBCode.Compiler
                     else
                     { NotSetCallback?.Invoke($"GlobalVariable.FilePath {@var} : {@var.FilePath}"); }
                 }
-                foreach (var struct_ in compiledStructs)
+                foreach (var @struct in compiledStructs)
                 {
-                    var @struct = struct_.Value;
                     if (string.IsNullOrEmpty(@struct.FilePath))
                     { NotSetCallback?.Invoke($"StructDefinition.FilePath {@struct} is null"); }
                     else
@@ -447,16 +445,16 @@ namespace IngameCoding.BBCode.Compiler
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
             Dictionary<string, int> functionOffsets = new();
-            foreach (var function in codeGenerator.compiledFunctions) functionOffsets.Add(function.Key, function.Value.InstructionOffset);
+            foreach (var function in codeGenerator.compiledFunctions) functionOffsets.Add(function.Key, function.InstructionOffset);
 
             return new CompilerResult()
             {
                 compiledCode = codeGeneratorResult.compiledCode,
                 debugInfo = codeGeneratorResult.DebugInfo,
 
-                compiledStructs = codeGeneratorResult.compiledStructs,
-                compiledFunctions = codeGeneratorResult.compiledFunctions,
-                compiledVariables = codeGenerator.compiledVariables,
+                compiledStructs = codeGeneratorResult.compiledStructs.ToArray(),
+                compiledFunctions = codeGeneratorResult.compiledFunctions.ToArray(),
+                compiledVariables = codeGenerator.compiledVariables.ToDictionary(),
 
                 clearGlobalVariablesInstruction = codeGeneratorResult.clearGlobalVariablesInstruction,
                 setGlobalVariablesInstruction = codeGeneratorResult.setGlobalVariablesInstruction,

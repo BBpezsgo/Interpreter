@@ -76,15 +76,17 @@ namespace IngameCoding.BBCode
             public string Type;
             public string Name => (NameToken != null) ? NameToken.Content : fieldName;
             public Token NameToken;
-            public string StructName;
+            public string UserDefinedName;
+            public string UserDefinedKind;
 
             readonly string fieldName;
 
-            public RefField(string type, Token name, string structName, string filePath) : base(filePath)
+            public RefField(string type, Token name, string userDefinedName, string userDefinedKind, string filePath) : base(filePath)
             {
                 Type = type;
                 NameToken = name;
-                StructName = structName;
+                UserDefinedName = userDefinedName;
+                UserDefinedKind = userDefinedKind;
             }
 
             public override string ToString() => $"Ref Field";

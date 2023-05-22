@@ -35,6 +35,11 @@ namespace IngameCoding.BBCode.Parser.Statements
                 if (@operator.Right != null) if (GetAllStatement(@operator.Right, callback)) return true;
                 if (@operator.Left != null) return GetAllStatement(@operator.Left, callback);
             }
+            else if (st is Statement_Setter setter)
+            {
+                if (GetAllStatement(setter.Right, callback)) return true;
+                return GetAllStatement(setter.Left, callback);
+            }
             else if (st is Statement_Literal)
             { }
             else if (st is Statement_Variable variable)
@@ -108,7 +113,6 @@ namespace IngameCoding.BBCode.Parser.Statements
         { return this.GetType().Name; }
 
         public abstract string PrettyPrint(int ident = 0);
-        public virtual object TryGetValue() => null;
         public abstract Position TotalPosition();
     }
     public class Statement_HashInfo : Statement, IDefinition
@@ -138,6 +142,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     public abstract class StatementWithReturnValue : Statement
     {
         public bool SaveValue = true;
+        public virtual object TryGetValue() => null;
     }
 
     public abstract class StatementParent : Statement
@@ -159,12 +164,12 @@ namespace IngameCoding.BBCode.Parser.Statements
     {
         public Token BracketLeft;
         public Token BracketRight;
-        public List<Statement> Values;
-        public int Size => Values.Count;
+        public StatementWithReturnValue[] Values;
+        public int Size => Values.Length;
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}[{string.Join(", ", Values)}]";
+            return $"{" ".Repeat(ident)}[{string.Join(", ", Values.ToList())}]";
         }
 
         public override Position TotalPosition() => new(BracketLeft, BracketRight);
@@ -175,38 +180,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     {
         public TypeToken Type;
         public Token VariableName;
-        /// <summary>
-        /// <b>The value is:</b>
-        /// <seealso cref="Parser.ExpectExpression"/><br/>
-        /// <b>Wich can be:</b>
-        /// <list type="bullet">
-        /// <item>
-        ///  <seealso cref="Statement_FunctionCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_Literal"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_NewInstance"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_MethodCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_StructField"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_Variable"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Statement_Operator"></seealso>
-        /// </item>
-        /// <item>
-        ///  <c>null</c>
-        /// </item>
-        /// </list>
-        /// </summary>
-        internal Statement InitialValue;
+        internal StatementWithReturnValue InitialValue;
 
         public string FilePath { get; set; }
 
@@ -235,18 +209,18 @@ namespace IngameCoding.BBCode.Parser.Statements
         string[] targetNamespacePath;
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
-        public List<Statement> Parameters = new();
+        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
         internal bool IsMethodCall => PrevStatement != null;
-        public Statement PrevStatement;
+        public StatementWithReturnValue PrevStatement;
         internal bool TargetNamespacePathPrefixIsReversed;
 
-        internal Statement[] MethodParameters
+        internal StatementWithReturnValue[] MethodParameters
         {
             get
             {
                 if (PrevStatement == null)
                 { return Parameters.ToArray(); }
-                var newList = new List<Statement>(Parameters.ToArray());
+                var newList = new List<StatementWithReturnValue>(Parameters.ToArray());
                 newList.Insert(0, PrevStatement);
                 return newList.ToArray();
             }
@@ -318,8 +292,8 @@ namespace IngameCoding.BBCode.Parser.Statements
     public class Statement_Operator : StatementWithReturnValue
     {
         public readonly Token Operator;
-        internal readonly Statement Left;
-        internal Statement Right;
+        internal readonly StatementWithReturnValue Left;
+        internal StatementWithReturnValue Right;
         internal bool InsideBracelet;
 
         internal int ParameterCount
@@ -333,13 +307,13 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
-        public Statement_Operator(Token op, Statement left)
+        public Statement_Operator(Token op, StatementWithReturnValue left)
         {
             this.Operator = op;
             this.Left = left;
             this.Right = null;
         }
-        public Statement_Operator(Token op, Statement left, Statement right)
+        public Statement_Operator(Token op, StatementWithReturnValue left, StatementWithReturnValue right)
         {
             this.Operator = op;
             this.Left = left;
@@ -501,6 +475,34 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_Setter : Statement
+    {
+        public readonly Token Operator;
+        internal readonly StatementWithReturnValue Left;
+        internal readonly StatementWithReturnValue Right;
+
+        public Statement_Setter(Token @operator, StatementWithReturnValue left, StatementWithReturnValue right)
+        {
+            this.Operator = @operator;
+            this.Left = left;
+            this.Right = right;
+        }
+
+        public override string ToString() => $"... {Operator} ...";
+
+        public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
+
+        public override Position TotalPosition()
+        {
+            Position result = new(Operator);
+            if (Left != null)
+            { result.Extend(Left.TotalPosition()); }
+            if (Right != null)
+            { result.Extend(Right.TotalPosition()); }
+            return result;
+        }
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Literal : StatementWithReturnValue
     {
         public TypeToken Type;
@@ -519,7 +521,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            if (Type.Type == BuiltinType.STRING)
+            if (Type.Type == TypeTokenType.STRING)
             {
                 return $"{" ".Repeat(ident)}\"{Value}\"";
             }
@@ -535,10 +537,10 @@ namespace IngameCoding.BBCode.Parser.Statements
 
             return Type.Type switch
             {
-                BuiltinType.INT => int.Parse(Value),
-                BuiltinType.FLOAT => float.Parse(Value),
-                BuiltinType.STRING => Value,
-                BuiltinType.BOOLEAN => bool.Parse(Value),
+                TypeTokenType.INT => int.Parse(Value),
+                TypeTokenType.FLOAT => float.Parse(Value),
+                TypeTokenType.STRING => Value,
+                TypeTokenType.BOOLEAN => bool.Parse(Value),
                 _ => null,
             };
         }
@@ -635,7 +637,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     public class Statement_WhileLoop : StatementParent
     {
         internal Token Keyword;
-        internal Statement Condition;
+        internal StatementWithReturnValue Condition;
 
         public override string ToString()
         {
@@ -662,7 +664,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     {
         internal Token Keyword;
         internal Statement_NewVariable VariableDeclaration;
-        internal Statement Condition;
+        internal StatementWithReturnValue Condition;
         internal Statement Expression;
 
         public override string ToString()
@@ -729,7 +731,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
     public class Statement_If_If : Statement_If_Part
     {
-        internal Statement Condition;
+        internal StatementWithReturnValue Condition;
 
         public Statement_If_If()
         { Type = IfPart.If; }
@@ -749,7 +751,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     }
     public class Statement_If_ElseIf : Statement_If_Part
     {
-        internal Statement Condition;
+        internal StatementWithReturnValue Condition;
 
         public Statement_If_ElseIf()
         { Type = IfPart.ElseIf; }
@@ -848,17 +850,17 @@ namespace IngameCoding.BBCode.Parser.Statements
             this.targetNamespacePath = targetNamespacePath;
         }
 
-        public override string ToString() => $"new {TargetNamespacePathPrefix}{TypeName}()";
-        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{TypeName}()";
+        public override string ToString() => $"new {TargetNamespacePathPrefix}{TypeName}";
+        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{TypeName}";
         public override Position TotalPosition() => new(TypeName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Index : StatementWithReturnValue
     {
-        internal readonly Statement Expression;
-        internal Statement PrevStatement;
+        internal readonly StatementWithReturnValue Expression;
+        internal StatementWithReturnValue PrevStatement;
 
-        public Statement_Index(Statement indexStatement)
+        public Statement_Index(StatementWithReturnValue indexStatement)
         {
             this.Expression = indexStatement;
         }
@@ -885,7 +887,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     public class Statement_Field : StatementWithReturnValue
     {
         public Token FieldName;
-        internal Statement PrevStatement;
+        internal StatementWithReturnValue PrevStatement;
 
         public override string ToString()
         {

@@ -1,6 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 
+namespace IngameCoding.BBCode
+{
+    public static class Utils
+    {
+        public const int NULL_POINTER = -1;
+    }
+}
+
 namespace IngameCoding.BBCode.Compiler
 {
     using Bytecode;
@@ -22,6 +30,19 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType.BOOLEAN => DataType.BOOLEAN,
             BuiltinType.STRUCT => DataType.STRUCT,
             BuiltinType.LISTOF => DataType.LIST,
+            _ => throw new NotImplementedException(),
+        };
+        internal static BuiltinType Convert(this TypeTokenType v) => v switch
+        {
+            TypeTokenType.INT => BuiltinType.INT,
+            TypeTokenType.BYTE => BuiltinType.BYTE,
+            TypeTokenType.FLOAT => BuiltinType.FLOAT,
+            TypeTokenType.STRING => BuiltinType.STRING,
+            TypeTokenType.BOOLEAN => BuiltinType.BOOLEAN,
+            TypeTokenType.USER_DEFINED => BuiltinType.STRUCT,
+            TypeTokenType.AUTO => BuiltinType.AUTO,
+            TypeTokenType.VOID => BuiltinType.VOID,
+            TypeTokenType.ANY => BuiltinType.ANY,
             _ => throw new NotImplementedException(),
         };
         internal static BuiltinType Convert(this DataType v) => v switch
@@ -76,13 +97,158 @@ namespace IngameCoding.BBCode.Compiler
         public static string ID(this FunctionDefinition function)
         {
             string result = function.FullName;
-            for (int i = 0; i < function.Parameters.Count; i++)
+            for (int i = 0; i < function.Parameters.Length; i++)
             {
                 var param = function.Parameters[i];
                 // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
                 result += "," + param.Type.ToString();
             }
             return result;
+        }
+
+        public static bool TryGetValue<T>(this IEnumerable<IElementWithKey<T>> self, T key, out IElementWithKey<T> value)
+        {
+            foreach (var element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    value = element;
+                    return true;
+                }
+            }
+            value = null;
+            return false;
+        }
+        public static bool TryGetValue<T, TResult>(this IEnumerable<IElementWithKey<T>> self, T key, out TResult value)
+        {
+            bool result = self.TryGetValue<T>(key, out IElementWithKey<T> _value);
+            value = (_value == null) ? default : (TResult)_value;
+            return result;
+        }
+        public static bool ContainsKey<T>(this IEnumerable<IElementWithKey<T>> self, T key)
+        {
+            foreach (var element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        /// <exception cref="KeyNotFoundException"></exception>
+        public static IElementWithKey<T> Get<T>(this IEnumerable<IElementWithKey<T>> self, T key)
+        {
+            foreach (var element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    return element;
+                }
+            }
+            throw new KeyNotFoundException($"Key {key} not found in list {self}");
+        }
+        /// <exception cref="KeyNotFoundException"></exception>
+        public static TResult Get<T, TResult>(this IEnumerable<IElementWithKey<T>> self, T key)
+            => (TResult)self.Get<T>(key);
+
+        public static bool TryGetValue<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key, out TValue value)
+        {
+            foreach (KeyValuePair<TKey, TValue> element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    value = element.Value;
+                    return true;
+                }
+            }
+            value = default;
+            return false;
+        }
+        public static bool ContainsKey<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key)
+        {
+            foreach (KeyValuePair<TKey, TValue> element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        /// <exception cref="KeyNotFoundException"></exception>
+        public static TValue Get<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key)
+        {
+            foreach (KeyValuePair<TKey, TValue> element in self)
+            {
+                if (element.Key.Equals(key))
+                {
+                    return element.Value;
+                }
+            }
+            throw new KeyNotFoundException($"Key {key} not found in list {self}");
+        }
+        public static void Add<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key, TValue value)
+            => self.Add(new KeyValuePair<TKey, TValue>(key, value));
+        public static bool Remove<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key)
+        {
+            for (int i = self.Count - 1; i >= 0; i--)
+            {
+                KeyValuePair<TKey, TValue> element = self[i];
+                if (element.Key.Equals(key))
+                {
+                    self.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self)
+        {
+            Dictionary<TKey, TValue> result = new();
+            foreach (KeyValuePair<TKey, TValue> element in self)
+            { result.Add(element.Key, element.Value); }
+            return result;
+        }
+        public static Dictionary<TKey, IElementWithKey<TKey>> ToDictionary<TKey>(this IEnumerable<IElementWithKey<TKey>> self)
+        {
+            Dictionary<TKey, IElementWithKey<TKey>> result = new();
+            foreach (IElementWithKey<TKey> element in self)
+            { result.Add(element.Key, element); }
+            return result;
+        }
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IElementWithKey<TKey>> self)
+        {
+            Dictionary<TKey, TValue> result = new();
+            foreach (IElementWithKey<TKey> element in self)
+            { result.Add(element.Key, (TValue)element); }
+            return result;
+        }
+        public static bool Remove<TKey>(this List<IElementWithKey<TKey>> self, TKey key)
+        {
+            for (int i = self.Count - 1; i >= 0; i--)
+            {
+                IElementWithKey<TKey> element = self[i];
+                if (element.Key.Equals(key))
+                {
+                    self.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+        public static bool Remove<TKey>(this List<CompiledFunction> self, TKey key)
+        {
+            for (int i = self.Count - 1; i >= 0; i--)
+            {
+                CompiledFunction element = self[i];
+                if (element.Key.Equals(key))
+                {
+                    self.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
         }
     }
 
@@ -266,7 +432,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition
+    public class CompiledFunction : FunctionDefinition, IElementWithKey<string>
     {
         public CompiledType[] ParameterTypes;
 
@@ -276,16 +442,14 @@ namespace IngameCoding.BBCode.Compiler
         internal int InstructionOffset = -1;
 
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.TypeToken.Type != BuiltinType.VOID;
-
-        /// <summary>
-        /// the first parameter is labeled as 'this'
-        /// </summary>
-        public bool IsMethod;
+        public bool ReturnSomething => this.Type.BuiltinType != CompiledType.CompiledTypeType.VOID;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
         public List<DefinitionReference> References = null;
+
+        public new CompiledType Type;
+        public TypeToken TypeToken => base.Type;
 
         public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
         public string BuiltinName
@@ -303,21 +467,28 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        public CompiledFunction(FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
+        public readonly string ID;
+        public string Key => ID;
+
+        public CompiledFunction(string id, CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
         {
+            this.ID = id;
+            this.Type = type;
+
             base.Attributes = functionDefinition.Attributes;
             base.BracketEnd = functionDefinition.BracketEnd;
             base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
-            base.TypeToken = functionDefinition.TypeToken;
+            base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
-        public CompiledFunction(bool isMethod, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
+        public CompiledFunction(string id, CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.NamespacePath, functionDefinition.Identifier)
         {
+            this.ID = id;
+            this.Type = type;
             this.ParameterTypes = parameterTypes;
-            this.IsMethod = isMethod;
             this.CompiledAttributes = new();
 
             base.Attributes = functionDefinition.Attributes;
@@ -325,7 +496,7 @@ namespace IngameCoding.BBCode.Compiler
             base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
-            base.TypeToken = functionDefinition.TypeToken;
+            base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
@@ -365,12 +536,13 @@ namespace IngameCoding.BBCode.Compiler
         public int Size { get; }
     }
 
-    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure
+    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
+        public string Key => this.FullName;
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -384,12 +556,13 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure
+    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
     {
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
+        public string Key => this.FullName;
 
         public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
@@ -449,7 +622,7 @@ namespace IngameCoding.BBCode.Compiler
             /// <summary>
             /// Only used when get a value by it's memory address!
             /// </summary>
-            ANY,
+            UNKNOWN,
         }
 
         readonly CompiledTypeType builtinType;
@@ -476,12 +649,34 @@ namespace IngameCoding.BBCode.Compiler
                     CompiledTypeType.FLOAT => "float",
                     CompiledTypeType.STRING => "string",
                     CompiledTypeType.BOOL => "bool",
-                    CompiledTypeType.ANY => "any",
+                    CompiledTypeType.UNKNOWN => "unknown",
                     _ => throw new Errors.InternalException($"WTF???"),
                 };
 
                 if (@struct != null) return @struct.Name.Content;
                 if (@class != null) return @class.Name.Content;
+                if (listOf != null) return listOf.Name + "[]";
+
+                return null;
+            }
+        }
+        public string FullName
+        {
+            get
+            {
+                if (builtinType != CompiledTypeType.NONE) return builtinType switch
+                {
+                    CompiledTypeType.VOID => "void",
+                    CompiledTypeType.BYTE => "byte",
+                    CompiledTypeType.INT => "int",
+                    CompiledTypeType.FLOAT => "float",
+                    CompiledTypeType.STRING => "string",
+                    CompiledTypeType.BOOL => "bool",
+                    _ => throw new Errors.InternalException($"WTF???"),
+                };
+
+                if (@struct != null) return @struct.NamespacePathString + @struct.Name.Content;
+                if (@class != null) return @class.NamespacePathString + @class.Name.Content;
                 if (listOf != null) return listOf.Name + "[]";
 
                 return null;
@@ -501,6 +696,15 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (IsStruct) return @struct.Size;
                 if (IsClass) return @class.Size;
+                return 1;
+            }
+        }
+        public int SizeOnStack
+        {
+            get
+            {
+                if (IsStruct) return @struct.Size;
+                if (IsClass) return 1;
                 return 1;
             }
         }
@@ -599,22 +803,22 @@ namespace IngameCoding.BBCode.Compiler
 
             switch (type.Type)
             {
-                case BBCode.BuiltinType.VOID:
+                case TypeTokenType.VOID:
                     this.builtinType = CompiledTypeType.VOID;
                     return;
-                case BBCode.BuiltinType.BYTE:
+                case TypeTokenType.BYTE:
                     this.builtinType = CompiledTypeType.BYTE;
                     return;
-                case BBCode.BuiltinType.INT:
+                case TypeTokenType.INT:
                     this.builtinType = CompiledTypeType.INT;
                     return;
-                case BBCode.BuiltinType.FLOAT:
+                case TypeTokenType.FLOAT:
                     this.builtinType = CompiledTypeType.FLOAT;
                     return;
-                case BBCode.BuiltinType.STRING:
+                case TypeTokenType.STRING:
                     this.builtinType = CompiledTypeType.STRING;
                     return;
-                case BBCode.BuiltinType.BOOLEAN:
+                case TypeTokenType.BOOLEAN:
                     this.builtinType = CompiledTypeType.BOOL;
                     return;
                 default:
@@ -644,25 +848,6 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         public override string ToString() => Name;
-        public string ToStringWithNamespaces()
-        {
-            if (builtinType != CompiledTypeType.NONE) return builtinType switch
-            {
-                CompiledTypeType.VOID => "void",
-                CompiledTypeType.BYTE => "byte",
-                CompiledTypeType.INT => "int",
-                CompiledTypeType.FLOAT => "float",
-                CompiledTypeType.STRING => "string",
-                CompiledTypeType.BOOL => "bool",
-                _ => throw new Errors.InternalException($"WTF???"),
-            };
-
-            if (@struct != null) return @struct.NamespacePathString + @struct.Name.Content;
-            if (@class != null) return @class.NamespacePathString + @class.Name.Content;
-            if (listOf != null) return listOf.Name + "[]";
-
-            return null;
-        }
 
         public BuiltinType GetBuiltinType()
         {
@@ -671,17 +856,64 @@ namespace IngameCoding.BBCode.Compiler
             if (IsList) return BBCode.BuiltinType.LISTOF;
             if (IsBuiltin) return builtinType switch
             {
-                CompiledTypeType.NONE => BBCode.BuiltinType.VOID,
-                CompiledTypeType.VOID => BBCode.BuiltinType.VOID,
                 CompiledTypeType.BYTE => BBCode.BuiltinType.BYTE,
                 CompiledTypeType.INT => BBCode.BuiltinType.INT,
                 CompiledTypeType.FLOAT => BBCode.BuiltinType.FLOAT,
                 CompiledTypeType.STRING => BBCode.BuiltinType.STRING,
                 CompiledTypeType.BOOL => BBCode.BuiltinType.BOOLEAN,
-                CompiledTypeType.ANY => BBCode.BuiltinType.VOID,
                 _ => BBCode.BuiltinType.VOID,
             };
             return BBCode.BuiltinType.VOID;
         }
+
+        public static bool operator ==(CompiledType a, CompiledType b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null) return false;
+            if (b is null) return false;
+
+            return a.Equals(b);
+        }
+        public static bool operator !=(CompiledType a, CompiledType b) => !(a == b);
+
+        public override bool Equals(object obj)
+        {
+            if (obj is null) return false;
+            if (obj is not CompiledType _obj) return false;
+            return this.Equals(_obj);
+        }
+        public bool Equals(CompiledType b)
+        {
+            if (b is null) return false;
+
+            if (this.IsBuiltin != b.IsBuiltin) return false;
+            if (this.IsClass != b.IsClass) return false;
+            if (this.IsStruct != b.IsStruct) return false;
+            if (this.IsList != b.IsList) return false;
+
+            if (this.IsList && b.IsList) return this.listOf == b.listOf;
+
+            if (this.IsClass && b.IsClass)
+            {
+                var classA = this.@class;
+                var classB = b.@class;
+                return classA.FullName == classB.FullName;
+            }
+            if (this.IsStruct && b.IsStruct)
+            {
+                var classA = this.@class;
+                var classB = b.@class;
+                return classA.FullName == classB.FullName;
+            }
+
+            if (this.IsBuiltin && b.IsBuiltin) return this.builtinType == b.builtinType;
+
+            return true;
+        }
+    }
+
+    public interface IElementWithKey<T>
+    {
+        public T Key { get; }
     }
 }

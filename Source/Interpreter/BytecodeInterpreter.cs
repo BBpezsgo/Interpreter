@@ -10,7 +10,7 @@ namespace IngameCoding.Bytecode
     {
         public readonly string Function;
         public readonly string File;
-        public readonly string Offset;
+        public readonly string InstructionOffset;
         public readonly string Line;
 
         public CallStackFrame(string frame)
@@ -18,9 +18,28 @@ namespace IngameCoding.Bytecode
             string[] parts = frame.Split(';');
             this.Function = parts[0];
             this.File = parts[1];
-            this.Offset = parts[2];
+            this.InstructionOffset = parts[2];
             this.Line = parts[3];
         }
+
+        public override string ToString() => $"at {Function} in {File}:line {Line} instruction {InstructionOffset}";
+    }
+
+    public struct Context
+    {
+        public string[] RawCallStack;
+        public CallStackFrame[] CallStack
+        {
+            get
+            {
+                CallStackFrame[] result = new CallStackFrame[RawCallStack.Length];
+                for (int i = 0; i < result.Length; i++)
+                { result[i] = new CallStackFrame(RawCallStack[i]); }
+                return result;
+            }
+        }
+        public int CodePointer;
+        public int ExecutedInstructionCount;
     }
 
     public class BytecodeInterpreter
@@ -53,7 +72,7 @@ namespace IngameCoding.Bytecode
         public string[] CallStack => BytecodeProcessor.Memory.CallStack.ToArray();
 
         #endregion
-
+        
         internal BytecodeInterpreter(Instruction[] code, Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
         {
             this.settings = settings;
@@ -114,6 +133,7 @@ namespace IngameCoding.Bytecode
             destroyed = true;
         }
 
+        /// <exception cref="RuntimeException"></exception>
         internal void Tick()
         {
             if (!enable || destroyed) return;
@@ -129,19 +149,14 @@ namespace IngameCoding.Bytecode
 
         internal Context GetContext() => new()
         {
-            CallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
+            RawCallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
             ExecutedInstructionCount = this.endlessSafe,
             CodePointer = this.BytecodeProcessor.CodePointer,
         };
-        internal struct Context
-        {
-            public string[] CallStack;
-            public int CodePointer;
-            public int ExecutedInstructionCount;
-        }
 
         #endregion
 
+        /// <exception cref="RuntimeException"></exception>
         void ExecuteNext()
         {
             if (destroyed) return;
@@ -171,6 +186,11 @@ namespace IngameCoding.Bytecode
                 try
                 {
                     remainingClockCycles -= Math.Max(1, BytecodeProcessor.Clock());
+                }
+                catch (UserException error)
+                {
+                    error.Context = GetContext();
+                    throw;
                 }
                 catch (RuntimeException error)
                 {

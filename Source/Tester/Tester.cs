@@ -188,6 +188,10 @@ namespace IngameCoding.Tester
                     {
                         Output.Output.Error($"CompilerException: {error.MessageAll}");
                     }
+                    catch (UserException error)
+                    {
+                        Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
+                    }
                     catch (RuntimeException error)
                     {
                         Output.Output.Error($"RuntimeException: {error.MessageAll}");

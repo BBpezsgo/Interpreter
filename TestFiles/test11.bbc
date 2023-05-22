@@ -1,0 +1,17 @@
+using System;
+using System.Lists;
+
+[CodeEntry]
+void Start()
+{
+  List list = CreateList(3);
+  Console.Log(list.ToString());
+  list.Push(420);
+  Console.Log(list.ToString());
+  list.Insert(1, 69);
+  Console.Log(list.ToString());
+  list.Pop();
+  Console.Log(list.ToString());
+  list.RemoveAt(0);
+  Console.Log(list.ToString());
+}

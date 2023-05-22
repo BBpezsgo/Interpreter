@@ -13,6 +13,10 @@ namespace ConsoleGUI
 
     internal class ConsoleGUI
     {
+        const int TIMER_RESIZE_ELEMENTS = 1000;
+        const int TIMER_AUTO_REFRESH_CONSOLE = 500;
+        const int TIMER_REFRESH_CONSOLE = 100;
+
         internal static Character NullCharacter => new()
         {
             Char = ' ',
@@ -25,6 +29,7 @@ namespace ConsoleGUI
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
         readonly Timer TimerRefreshConsole;
+        readonly Timer TimerAutoRefreshConsole;
         readonly Timer TimerRefreshSizes;
         readonly Timer TimerOnStart;
 
@@ -33,7 +38,9 @@ namespace ConsoleGUI
         CharInfo[] ConsoleBuffer;
         SmallRect ConsoleRect;
         Position MousePosition;
+
         bool ResizeElements;
+        internal bool NextRefreshConsole;
 
         internal static ConsoleGUI Instance = null;
 
@@ -49,14 +56,23 @@ namespace ConsoleGUI
             this.DebugLogs = DebugLogs;
 
             Log("Setup timers");
+            TimerAutoRefreshConsole = new Timer();
+            TimerAutoRefreshConsole.Elapsed += (_, _) => RefreshConsole();
+            TimerAutoRefreshConsole.Interval = TIMER_AUTO_REFRESH_CONSOLE;
+            TimerAutoRefreshConsole.Enabled = true;
+
             TimerRefreshConsole = new Timer();
-            TimerRefreshConsole.Elapsed += (_, _) => RefreshConsole();
-            TimerRefreshConsole.Interval = 500;
+            TimerRefreshConsole.Elapsed += (_, _) =>
+            {
+                if (!NextRefreshConsole) return;
+                RefreshConsole();
+            };
+            TimerRefreshConsole.Interval = TIMER_REFRESH_CONSOLE;
             TimerRefreshConsole.Enabled = true;
 
             TimerRefreshSizes = new Timer();
             TimerRefreshSizes.Elapsed += (_, _) => ResizeElements = true;
-            TimerRefreshSizes.Interval = 1000;
+            TimerRefreshSizes.Interval = TIMER_RESIZE_ELEMENTS;
             TimerRefreshSizes.Enabled = true;
 
             TimerOnStart = new Timer();
@@ -97,7 +113,7 @@ namespace ConsoleGUI
         internal void Destroy()
         {
             Clear();
-            TimerRefreshConsole?.Dispose();
+            TimerAutoRefreshConsole?.Dispose();
             TimerRefreshSizes?.Dispose();
             TimerOnStart?.Dispose();
             Console.Clear();
@@ -152,6 +168,8 @@ namespace ConsoleGUI
 
         void RefreshConsole()
         {
+            NextRefreshConsole = false;
+
             if (ConsoleHandle.IsInvalid)
             {
                 Log("Console handler is invalid");

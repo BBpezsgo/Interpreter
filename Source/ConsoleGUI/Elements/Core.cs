@@ -194,6 +194,12 @@ namespace ConsoleGUI
             Char = v,
             Color = CharColors.FgDefault,
         };
+
+        internal static string Escape(this string v) => v
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n")
+            .Replace("\t", "\\t")
+            .Replace("\0", "\\0");
     }
 
     internal static class Utils

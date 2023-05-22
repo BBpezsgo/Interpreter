@@ -361,18 +361,18 @@ namespace IngameCoding.Core
 
             foreach (var compiledFunction in compilerResult.compiledFunctions)
             {
-                if (compiledFunction.Value.CompiledAttributes.TryGetValue("CodeEntry", out var attriute))
+                if (compiledFunction.CompiledAttributes.TryGetValue("CodeEntry", out var attriute))
                 {
                     if (attriute.parameters.Count != 0)
                     { throw new CompilerException("Attribute 'CodeEntry' requies 0 parameter", attriute.Identifier); }
-                    if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
+                    if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
                     {
                         instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
                     }
                     else
-                    { throw new InternalException($"Function '{compiledFunction.Value.FullName}' offset not found"); }
+                    { throw new InternalException($"Function '{compiledFunction.FullName}' offset not found"); }
                 }
-                else if (compiledFunction.Value.CompiledAttributes.TryGetValue("Catch", out attriute))
+                else if (compiledFunction.CompiledAttributes.TryGetValue("Catch", out attriute))
                 {
                     if (attriute.parameters.Count != 1)
                     { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", attriute.Identifier); }
@@ -380,21 +380,21 @@ namespace IngameCoding.Core
                     {
                         if (value == "update")
                         {
-                            if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                             }
                             else
-                            { throw new CompilerException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Identifier); }
+                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", compiledFunction.Identifier); }
                         }
                         else if (value == "end")
                         {
-                            if (compilerResult.GetFunctionOffset(compiledFunction.Value, out int i))
+                            if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
                             {
                                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                             }
                             else
-                            { throw new CompilerException($"Function '{compiledFunction.Value.FullName}' offset not found", compiledFunction.Value.Identifier); }
+                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", compiledFunction.Identifier); }
                         }
                         else
                         { throw new CompilerException("Unknown event '" + value + "'", attriute.Identifier); }
@@ -755,6 +755,20 @@ namespace IngameCoding.Core
             {
                 try
                 { bytecodeInterpreter.Tick(); }
+                catch (UserException error)
+                {
+                    error.FeedDebugInfo(details.CompilerResult.debugInfo);
+
+                    OnOutput?.Invoke(this, "User Exception: " + error.Value.ToStringValue(), LogType.Error);
+
+                    OnDone?.Invoke(this, false);
+                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                    OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                    bytecodeInterpreter = null;
+                    currentlyRunningCode = false;
+
+                    if (!HandleErrors) throw;
+                }
                 catch (RuntimeException error)
                 {
                     error.FeedDebugInfo(details.CompilerResult.debugInfo);

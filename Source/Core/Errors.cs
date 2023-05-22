@@ -10,7 +10,6 @@ namespace IngameCoding.Errors
     using IngameCoding.BBCode.Parser.Statements;
 
     using System.Collections.Generic;
-    using System.Reflection.PortableExecutable;
 
     using Tokenizer;
 
@@ -120,7 +119,7 @@ namespace IngameCoding.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        internal Bytecode.BytecodeInterpreter.Context? Context;
+        internal Bytecode.Context? Context;
         BBCode.Compiler.DebugInfo[] ContextDebugInfo = null;
 
         internal void FeedDebugInfo(BBCode.Compiler.DebugInfo[] DebugInfo)
@@ -138,11 +137,11 @@ namespace IngameCoding.Errors
         }
 
         internal RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        internal RuntimeException(string message, Bytecode.BytecodeInterpreter.Context context) : base(message, Position.UnknownPosition)
+        internal RuntimeException(string message, Bytecode.Context context) : base(message, Position.UnknownPosition)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-        internal RuntimeException(string message, System.Exception inner, Bytecode.BytecodeInterpreter.Context context) : base(message, inner)
+        internal RuntimeException(string message, System.Exception inner, Bytecode.Context context) : base(message, inner)
         { this.Context = context; }
 
         public override string MessageAll
@@ -156,8 +155,8 @@ namespace IngameCoding.Errors
                 result += $"\n Executed Instructions: {cont.ExecutedInstructionCount}";
                 result += $"\n Code Pointer: {cont.CodePointer}";
                 result += $"\n Call Stack:";
-                if (cont.CallStack.Length == 0) { result += " (callstack is empty)"; }
-                else { result += "\n  " + string.Join("\n  ", cont.CallStack); }
+                if (cont.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
+                else { result += "\n   " + string.Join("\n   ", cont.CallStack); }
                 if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
                 {
                     result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";
@@ -170,6 +169,22 @@ namespace IngameCoding.Errors
                 return result;
             }
         }
+
+        public override string ToString() => MessageAll;
+    }
+
+    [Serializable]
+    public class UserException : RuntimeException
+    {
+        public readonly Bytecode.DataItem Value;
+
+        public UserException(string message, Bytecode.DataItem value) : base(message)
+        {
+            this.Value = value;
+        }
+        protected UserException(
+          SerializationInfo info,
+          StreamingContext context) : base(info, context) { }
     }
 
     #endregion

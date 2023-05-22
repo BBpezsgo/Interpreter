@@ -137,7 +137,7 @@ namespace IngameCoding.Core
                         p.type != DataType.STRING &&
                         p.type != DataType.BOOLEAN)
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
-                    if (p.type != parameterTypes[i].Type.Convert())
+                    if (p.type != parameterTypes[i].Type.Convert().Convert())
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].Type.ToString().ToLower()}"); }
                     objs[i] = p.Value();
                 }
@@ -315,7 +315,7 @@ namespace IngameCoding.Core
 
             for (int i = 0; i < requied.Length; i++)
             {
-                if (!passed[i].EqualType(requied[i].Type)) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].Type.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
+                if (!passed[i].EqualType(requied[i].Type.Convert())) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].Type.ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
             }
         }
 

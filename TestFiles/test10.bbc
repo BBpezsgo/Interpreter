@@ -9,21 +9,22 @@ class Foo
 [CodeEntry]
 void Start()
 {
-  Foo foo;
+  Foo foo = Bar2();
+
   foo.field0 = 55;
-  // Console.Log("foo.field0: " + foo.field0);
-  // Console.Log("&foo.field0: " + &foo.field0);
+  Console.Log("foo.field0: " + foo.field0);
+  Console.Log("&foo.field0: " + &foo.field0);
 
   Foo foo2;
   Dealloc(foo2);
   foo2 = foo;
-  // Console.Log("foo.field0: " + foo.field0);
+  Console.Log("foo.field0: " + foo.field0);
 
   int res = Bar(foo2, foo, 420);
-  // Console.Log(res);
+  Console.Log(res);
 
-  // Console.Log("foo.field0: " + foo.field0);
-  // Console.Log("foo2.field0: " + foo2.field0);
+  Console.Log("foo.field0: " + foo.field0);
+  Console.Log("foo2.field0: " + foo2.field0);
 }
 
 int Bar(Foo p0, Foo p1, int p2)
@@ -33,4 +34,10 @@ int Bar(Foo p0, Foo p1, int p2)
   // int address0 = &p0.field1;
   // int address1 = &p1.field0;
   return 69;
+}
+
+Foo Bar2()
+{
+  Foo result = new Foo;
+  return result;
 }

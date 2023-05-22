@@ -5,21 +5,30 @@
         UNKNOWN = 0,
         COMMENT = 1,
 
-        EXIT,
+        // === DATA ===
         PUSH_VALUE,
         POP_VALUE,
+
+        LOAD_VALUE,
+        STORE_VALUE,
+        // === ===
+
+        // === CONTROL ===
+        EXIT,
 
         JUMP_BY_IF_FALSE,
         JUMP_BY_IF_TRUE,
         JUMP_BY,
 
-        LOAD_VALUE,
-        STORE_VALUE,
-
         CALL,
         RETURN,
 
         CALL_BUILTIN,
+
+        GET_BASEPOINTER,
+        
+        THROW,
+        // === ===
 
         // === ALU ===
         /// <summary> LESS_THAN </summary>
@@ -50,9 +59,28 @@
         MATH_MOD,
         // === ===
 
-        // === Structs ===
-        LOAD_FIELD,
-        STORE_FIELD,
+        // === HEAP ===
+        HEAP_GET,
+        HEAP_SET,
+        FIND_HEAP_FREE_SPACE,
+        // === ===
+
+        TYPE_GET,
+        TYPE_CAST,
+
+        // === Debug ===
+        /// <summary>
+        /// Sets the last stack item's tag
+        /// </summary>
+        DEBUG_SET_TAG,
+        /// <summary>
+        /// Call Stack Push
+        /// </summary>
+        CS_PUSH,
+        /// <summary>
+        /// Call Stack Pop
+        /// </summary>
+        CS_POP,
         // === ===
 
         // === Lists ===
@@ -78,41 +106,5 @@
         /// </summary>
         LIST_SET_ITEM,
         // === ===
-
-        // === HEAP ===
-        HEAP_GET,
-        HEAP_SET,
-        // === ===
-
-        TYPE_GET,
-        TYPE_CAST,
-
-        // === Debug ===
-        /// <summary>
-        /// Sets the last stack item's tag
-        /// </summary>
-        DEBUG_SET_TAG,
-        /// <summary>
-        /// Call Stack Push
-        /// </summary>
-        CS_PUSH,
-        /// <summary>
-        /// Call Stack Pop
-        /// </summary>
-        CS_POP,
-        // === ===
-
-        /// <summary>
-        /// Replaces the last element with its own copy
-        /// </summary>
-        COPY_VALUE,
-        /// <summary>
-        /// Replaces the last element with its own recursive copy
-        /// </summary>
-        COPY_VALUE_RECURSIVE,
-
-        GET_BASEPOINTER,
-
-        FIND_HEAP_FREE_SPACE,
     }
 }

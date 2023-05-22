@@ -76,6 +76,7 @@ namespace Program
 
 ## Other features
 ### Structs
+> ⚠ **OUTDATED**
 You can create a very basic struct.
 A struct can only contain fields.<br>
 Methods are currently not supported.
@@ -93,19 +94,6 @@ struct Foo
 Foo x = new Foo;
 ```
 > If `Console.Log` is called with a parameter of type `Struct`, it will print `{ ... }`
-### Lists
-There are also lists... What should I say?
-```
-// Define a list:
-int[] var0;
-
-// Define a list literal:
-[0, 1, 2, 3];
-
-// Combined: (Define a list with an initial value)
-int[] var2 = [0, 1, 2, 3];
-```
-> The `Console.Log` function prints all items in the list
 ### Function overloading
 Well, this is a test feature, so I don't recommend using function overloading.
 ### Method like functions

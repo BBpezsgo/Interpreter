@@ -46,7 +46,7 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
 - `-basepath [string]` Sets a new path where dll and bbc files will be searched for *using* statements. If it's not there, it will look for it next to the file.
 
-## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1SBDsPYvKi7P0UVTI9bW9rxLWqf8hb_4y) or [Mega](https://mega.nz/file/CNpUFR5S#80hrb8ofv5RNCy7uIMmxxeA43dAl5I5jbfs7t_OBanU)
+## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM)
 ![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)
 
 [Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.bbc)<br>

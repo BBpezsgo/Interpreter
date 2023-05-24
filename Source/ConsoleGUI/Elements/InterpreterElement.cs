@@ -732,29 +732,6 @@ namespace ConsoleGUI
                             ForegroundColor = CharColors.FgDarkBlue;
                             AddText($"{item.ValueBoolean}");
                             break;
-                        case IngameCoding.Bytecode.DataType.STRUCT:
-                            ForegroundColor = CharColors.FgWhite;
-                            var @struct = item.ValueStruct;
-                            var fields = @struct.GetFields();
-                            string text = "{";
-                            for (int j = 0; j < fields.Length; j++)
-                            {
-                                var field = fields[j];
-                                var text_ = $" {field}: {@struct.GetField(field)}";
-
-                                if ((text + text_).Length > 10)
-                                {
-                                    text += " ...";
-                                    break;
-                                }
-                                text += text_;
-                            }
-                            text += " }";
-                            AddText(text);
-                            break;
-                        case IngameCoding.Bytecode.DataType.LIST:
-                            AddText($"{item.ValueList.itemTypes.ToString().ToLower()} [ ... ]");
-                            break;
                         default:
                             ForegroundColor = CharColors.FgGray;
                             AddText("?");
@@ -962,72 +939,6 @@ namespace ConsoleGUI
                         case IngameCoding.Bytecode.DataType.BOOLEAN:
                             ForegroundColor = CharColors.FgLightBlue;
                             AddText($"{item.ValueBoolean}");
-                            break;
-                        case IngameCoding.Bytecode.DataType.STRUCT:
-                            ForegroundColor = CharColors.FgWhite;
-                            {
-                                var @struct = item.ValueStruct;
-                                var fields = @struct.GetFields();
-
-                                string text = "{";
-
-                                int j = 0;
-                                while (text.Length < sender.Rect.Width - 10 && j < fields.Length)
-                                {
-                                    if (j > 0)
-                                    {
-                                        text += ";";
-                                    }
-
-                                    text += $" {fields[j]}: {@struct.GetField(fields[j])}";
-
-                                    j++;
-                                }
-                                if (j < fields.Length)
-                                {
-                                    if (j > 0)
-                                    {
-                                        text += ";";
-                                    }
-                                    text += " ...";
-                                }
-
-                                text += " }";
-
-                                AddText(text);
-                            }
-                            break;
-                        case IngameCoding.Bytecode.DataType.LIST:
-                            {
-                                var valueList = item.ValueList;
-                                string text = $"{valueList.itemTypes.ToString().ToLower()}";
-                                text += " [";
-
-                                int j = 0;
-                                while (text.Length < sender.Rect.Width - 10 && j < valueList.items.Count)
-                                {
-                                    if (j > 0)
-                                    {
-                                        text += ",";
-                                    }
-
-                                    text += $" {valueList.items[j]}";
-
-                                    j++;
-                                }
-                                if (j < valueList.items.Count)
-                                {
-                                    if (j > 0)
-                                    {
-                                        text += ",";
-                                    }
-                                    text += " ...";
-                                }
-
-                                text += " ]";
-
-                                AddText(text);
-                            }
                             break;
                         default:
                             ForegroundColor = CharColors.FgGray;

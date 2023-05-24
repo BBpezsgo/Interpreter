@@ -78,9 +78,6 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="bool"/></item>
         /// <item><see cref="float"/></item>
         /// <item><see cref="string"/></item>
-        /// <item><see cref="IStruct"/></item>
-        /// <item><see cref="DataItem.Struct"/></item>
-        /// <item><see cref="DataItem.List"/></item>
         /// </list>
         /// </summary>
         public object Parameter
@@ -232,30 +229,6 @@ namespace IngameCoding.Bytecode
                 serializer.Serialize((byte)4);
                 serializer.Serialize(@float);
             }
-            else if (this.parameter is DataItem.List list)
-            {
-                serializer.Serialize((byte)5);
-                serializer.Serialize((int)list.itemTypes);
-                serializer.Serialize(list.items.ToArray(), SerializeDataItem);
-            }
-            else if (this.parameter is Struct strct)
-            {
-                serializer.Serialize((byte)6);
-                string[] fieldNames = new string[strct.fields.Count];
-                DataItem[] fieldValues = new DataItem[strct.fields.Count];
-                for (int i = 0; i < strct.fields.Count; i++)
-                {
-                    var pair = strct.fields.ElementAt(i);
-                    fieldNames[i] = pair.Key;
-                    fieldValues[i] = pair.Value;
-                }
-                serializer.Serialize(fieldNames);
-                serializer.Serialize(fieldValues, SerializeDataItem);
-            }
-            else if (this.parameter is UnassignedStruct)
-            {
-                serializer.Serialize((byte)7);
-            }
             else
             {
                 throw new NotImplementedException();
@@ -279,26 +252,6 @@ namespace IngameCoding.Bytecode
                 case DataType.BOOLEAN:
                     serializer.Serialize(dataItem.ValueBoolean);
                     break;
-                case DataType.STRUCT:
-                    if (dataItem.ValueStruct is Struct strct)
-                    {
-                        string[] fieldNames = new string[strct.fields.Count];
-                        DataItem[] fieldValues = new DataItem[strct.fields.Count];
-                        for (int i = 0; i < strct.fields.Count; i++)
-                        {
-                            var pair = strct.fields.ElementAt(i);
-                            fieldNames[i] = pair.Key;
-                            fieldValues[i] = pair.Value;
-                        }
-                        serializer.Serialize(fieldNames);
-                        serializer.Serialize(fieldValues, SerializeDataItem);
-                        break;
-                    }
-                    throw new NotImplementedException();
-                case DataType.LIST:
-                    serializer.Serialize((int)dataItem.ValueList.itemTypes);
-                    serializer.Serialize(dataItem.ValueList.items.ToArray(), SerializeDataItem);
-                    break;
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
             }
@@ -318,20 +271,6 @@ namespace IngameCoding.Bytecode
                     return new DataItem(deserializer.DeserializeString(), tag);
                 case DataType.BOOLEAN:
                     return new DataItem(deserializer.DeserializeBoolean(), tag);
-                case DataType.STRUCT:
-                    string[] fieldNames = deserializer.DeserializeArray<string>();
-                    DataItem[] fieldValues = deserializer.DeserializeArray(DeserializeDataItem);
-                    Dictionary<string, DataItem> fields = new();
-                    for (int i = 0; i < fieldNames.Length; i++)
-                    { fields.Add(fieldNames[i], fieldValues[i]); }
-                    return new DataItem(new Struct(fields, null), tag);
-                case DataType.LIST:
-                    var itemTypes = (DataType)deserializer.DeserializeInt32();
-                    var items = deserializer.DeserializeArray(DeserializeDataItem);
-                    var newList = new DataItem.List(itemTypes);
-                    for (int i = 0; i < items.Length; i++)
-                    { newList.Add(items[i]); }
-                    return new DataItem(newList, tag);
                 default:
                     throw new Errors.InternalException($"Unknown type {type}");
             }
@@ -356,26 +295,6 @@ namespace IngameCoding.Bytecode
                 case DataType.BOOLEAN:
                     result["Value"] = Value.Literal(dataItem.ValueBoolean);
                     return result;
-                case DataType.STRUCT:
-                    if (dataItem.ValueStruct is Struct strct)
-                    {
-                        string[] fieldNames = new string[strct.fields.Count];
-                        DataItem[] fieldValues = new DataItem[strct.fields.Count];
-                        for (int i = 0; i < strct.fields.Count; i++)
-                        {
-                            var pair = strct.fields.ElementAt(i);
-                            fieldNames[i] = pair.Key;
-                            fieldValues[i] = pair.Value;
-                        }
-                        result["ValueA"] = Value.Object(fieldNames);
-                        result["ValueB"] = Value.Object(fieldValues, SerializeTextDataItem);
-                        return result;
-                    }
-                    throw new NotImplementedException();
-                case DataType.LIST:
-                    result["ValueA"] = Value.Literal((int)dataItem.ValueList.itemTypes);
-                    result["ValueB"] = Value.Object(dataItem.ValueList.items.ToArray(), SerializeTextDataItem);
-                    return result;
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
             }
@@ -395,20 +314,6 @@ namespace IngameCoding.Bytecode
                     return new DataItem(data["Value"].String, tag);
                 case DataType.BOOLEAN:
                     return new DataItem((bool)data["Value"].Bool, tag);
-                case DataType.STRUCT:
-                    string[] fieldNames = data["ValueA"].Array.ConvertPrimitive<string>();
-                    DataItem[] fieldValues = data["ValueB"].Array.Convert(DeserializeTextDataItem);
-                    Dictionary<string, DataItem> fields = new();
-                    for (int i = 0; i < fieldNames.Length; i++)
-                    { fields.Add(fieldNames[i], fieldValues[i]); }
-                    return new DataItem(new Struct(fields, null), tag);
-                case DataType.LIST:
-                    var itemTypes = (DataType)data["ValueA"].Int;
-                    var items = data["ValueB"].Array.Convert(DeserializeTextDataItem);
-                    var newList = new DataItem.List(itemTypes);
-                    for (int i = 0; i < items.Length; i++)
-                    { newList.Add(items[i]); }
-                    return new DataItem(newList, tag);
                 default:
                     throw new Errors.InternalException($"Unknown type {type}");
             }
@@ -439,27 +344,6 @@ namespace IngameCoding.Bytecode
             else if (parameterType == 4)
             {
                 this.parameter = deserializer.DeserializeFloat();
-            }
-            else if (parameterType == 5)
-            {
-                var types = (DataType)deserializer.DeserializeInt32();
-                var newList = new DataItem.List(types);
-                var items = deserializer.DeserializeArray(DeserializeDataItem);
-                foreach (var item in items)
-                { newList.Add(item); }
-            }
-            else if (parameterType == 6)
-            {
-                string[] fieldNames = deserializer.DeserializeArray<string>();
-                DataItem[] fieldValues = deserializer.DeserializeArray(DeserializeDataItem);
-                Dictionary<string, DataItem> fields = new();
-                for (int i = 0; i < fieldNames.Length; i++)
-                { fields.Add(fieldNames[i], fieldValues[i]); }
-                this.parameter = new Struct(fields, null);
-            }
-            else if (parameterType == 7)
-            {
-                this.parameter = new UnassignedStruct();
             }
             else
             { throw new NotImplementedException(); }
@@ -496,30 +380,6 @@ namespace IngameCoding.Bytecode
                 result["ParameterType"] = Value.Literal(4);
                 result["ParameterValue"] = Value.Literal(@float);
             }
-            else if (this.parameter is DataItem.List list)
-            {
-                result["ParameterType"] = Value.Literal(5);
-                result["ParameterValueA"] = Value.Literal((int)list.itemTypes);
-                result["ParameterValueB"] = Value.Object(list.items.ToArray(), SerializeTextDataItem);
-            }
-            else if (this.parameter is Struct strct)
-            {
-                result["ParameterType"] = Value.Literal(6);
-                string[] fieldNames = new string[strct.fields.Count];
-                DataItem[] fieldValues = new DataItem[strct.fields.Count];
-                for (int i = 0; i < strct.fields.Count; i++)
-                {
-                    var pair = strct.fields.ElementAt(i);
-                    fieldNames[i] = pair.Key;
-                    fieldValues[i] = pair.Value;
-                }
-                result["ParameterValueA"] = Value.Object(fieldNames);
-                result["ParameterValueB"] = Value.Object(fieldValues, SerializeTextDataItem);
-            }
-            else if (this.parameter is UnassignedStruct)
-            {
-                result["ParameterType"] = Value.Literal(7);
-            }
             else
             {
                 throw new NotImplementedException();
@@ -553,27 +413,6 @@ namespace IngameCoding.Bytecode
             else if (parameterType == 4)
             {
                 this.parameter = data["ParameterValue"].Float;
-            }
-            else if (parameterType == 5)
-            {
-                var types = (DataType)data["ParameterValueA"].Int;
-                var newList = new DataItem.List(types);
-                var items = data["ParameterValueB"].Array.Convert(DeserializeTextDataItem);
-                foreach (var item in items)
-                { newList.Add(item); }
-            }
-            else if (parameterType == 6)
-            {
-                string[] fieldNames = data["ParameterValueA"].Array.ConvertPrimitive<string>();
-                DataItem[] fieldValues = data["ParameterValueB"].Array.Convert(DeserializeTextDataItem);
-                Dictionary<string, DataItem> fields = new();
-                for (int i = 0; i < fieldNames.Length; i++)
-                { fields.Add(fieldNames[i], fieldValues[i]); }
-                this.parameter = new Struct(fields, null);
-            }
-            else if (parameterType == 7)
-            {
-                this.parameter = new UnassignedStruct();
             }
             else
             { throw new NotImplementedException(); }

@@ -22,10 +22,9 @@ namespace IngameCoding.Bytecode
             DataType.FLOAT => "float",
             DataType.STRING => "string",
             DataType.BOOLEAN => "bool",
-            DataType.STRUCT => "complex",
-            _ => "",
+            _ => throw new NotImplementedException(),
         };
-        internal static string GetTypeText(this DataItem val) => val.type == DataType.LIST ? $"{(val.ValueList.itemTypes == DataType.LIST ? "?[]" : GetTypeText(val.ValueList.itemTypes))}[]" : GetTypeText(val.type);
+        internal static string GetTypeText(this DataItem val) => GetTypeText(val.type);
 
         internal static int GetInt(this StepList<byte> data)
         {
@@ -58,15 +57,6 @@ namespace IngameCoding.Bytecode
             DataType type = (DataType)data.Next();
             switch (type)
             {
-                case DataType.LIST:
-                    {
-                        DataType types = (DataType)data.Next();
-                        DataItem[] values = data.GetList(d => d.GetDataItem());
-
-                        DataItem.List value = new(types);
-                        foreach (var item in values) value.Add(item);
-                        return new DataItem(value, tag);
-                    }
                 case DataType.STRING:
                     {
                         return new DataItem(data.GetString(), tag);
@@ -83,21 +73,8 @@ namespace IngameCoding.Bytecode
                     {
                         return new DataItem(data.GetBoolean(), tag);
                     }
-                case DataType.STRUCT:
-                    {
-                        string name = data.GetString();
-                        string[] fieldNames = data.GetList(d => d.GetString());
-
-                        Dictionary<string, DataItem> fields = new();
-
-                        foreach (string fieldName in fieldNames)
-                        {
-                            fields.Add(fieldName, data.GetDataItem(null));
-                        }
-                        return new DataItem(new Struct(fields, name), tag);
-                    }
                 default:
-                    throw new Exception();
+                    throw new NotImplementedException();
             }
         }
 
@@ -141,12 +118,6 @@ namespace IngameCoding.Bytecode
             { (byte)self.type };
             switch (self.type)
             {
-                case DataType.LIST:
-                    {
-                        result.Add((byte)self.ValueList.itemTypes);
-                        result.AddRange(self.ValueList.items.ToArray().ToByteArray(item => item.ToByteArray()));
-                        break;
-                    }
                 case DataType.STRING:
                     {
                         result.AddRange(self.ValueString.ToByteArray());
@@ -167,20 +138,8 @@ namespace IngameCoding.Bytecode
                         result.AddRange(self.ValueBoolean.ToByteArray());
                         break;
                     }
-                case DataType.STRUCT:
-                    {
-                        string[] fields = self.ValueStruct.GetFields();
-                        result.AddRange(self.ValueStruct.Name.ToByteArray());
-                        result.AddRange(fields.ToByteArray(item => item.ToByteArray()));
-                        foreach (var field in fields)
-                        {
-                            result.Add((byte)self.ValueStruct.GetField(field).type);
-                            result.AddRange(self.ValueStruct.GetField(field).ToByteArray());
-                        }
-                        break;
-                    }
                 default:
-                    throw new Exception();
+                    throw new NotImplementedException();
             }
             return result.ToArray();
         }

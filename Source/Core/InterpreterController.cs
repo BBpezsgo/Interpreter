@@ -159,7 +159,6 @@ namespace IngameCoding.Core
         }
 
         readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
-        readonly Dictionary<string, Func<IStruct>> builtinStructs = new();
 
         InterpreterDetails details;
         public InterpreterDetails Details => details;
@@ -321,7 +320,6 @@ namespace IngameCoding.Core
             var compilerResult = Compiler.CompileCode(
                 parserResult,
                 builtinFunctions,
-                builtinStructs,
                 file,
                 warnings,
                 errors,
@@ -640,17 +638,7 @@ namespace IngameCoding.Core
                 TypeToken.CreateAnonymous("string", BuiltinType.STRING)
             }, (DataItem[] parameters) =>
             {
-                var splitCharacter = parameters[0].ValueString;
-                var stringToSplit = parameters[1].ValueString;
-
-                var splitResult = stringToSplit.Split(splitCharacter, StringSplitOptions.None);
-
-                var newList = new DataItem.List(DataType.STRING);
-                foreach (var item in splitResult)
-                {
-                    newList.Add(new DataItem(item, ""));
-                }
-                return new DataItem(newList, "");
+                throw new NotImplementedException();
             });
 
             #endregion

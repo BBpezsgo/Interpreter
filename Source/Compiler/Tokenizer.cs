@@ -5,167 +5,9 @@ using System.Linq;
 namespace IngameCoding.BBCode
 {
     using IngameCoding.BBCode.Compiler;
-    using IngameCoding.BBCode.Parser.Statements;
     using IngameCoding.Core;
     using IngameCoding.Errors;
     using IngameCoding.Tokenizer;
-
-    public class TokenAnalysis
-    {
-        public TokenSubtype Subtype = TokenSubtype.None;
-        public TokenSubSubtype SubSubtype = TokenSubSubtype.None;
-
-        public bool ParserReached;
-        public bool CompilerReached;
-
-        public RefBase Reference;
-
-        string ReachedUnit => CompilerReached ? "compiled" : (ParserReached ? "parsed" : "tokenized");
-
-        public override string ToString() => $"TokenAnalysis {{ {ReachedUnit} {Subtype} {SubSubtype} {(Reference == null ? "null" : Reference.ToString())} }}";
-
-        public abstract class RefBase
-        {
-            public override abstract string ToString();
-        }
-
-        public abstract class RefLocal : RefBase
-        {
-
-        }
-        public abstract class Ref : RefBase
-        {
-            public string FilePath;
-
-            public Ref(string filePath)
-            {
-                FilePath = filePath;
-            }
-        }
-
-        public class RefVariable : RefLocal
-        {
-            public Statement_NewVariable Declaration;
-            public bool IsGlobal;
-            public CompiledType Type;
-
-            public RefVariable(Statement_NewVariable declaration, bool isGlobal, CompiledType type)
-            {
-                Declaration = declaration;
-                IsGlobal = isGlobal;
-                Type = type;
-            }
-
-            public override string ToString() => $"Ref Variable";
-        }
-
-        public class RefParameter : RefLocal
-        {
-            public string Type;
-
-            public RefParameter(string type)
-            {
-                Type = type;
-            }
-
-            public override string ToString() => $"Ref Parameter";
-        }
-
-        public class RefField : Ref
-        {
-            public string Type;
-            public string Name => (NameToken != null) ? NameToken.Content : fieldName;
-            public Token NameToken;
-            public string UserDefinedName;
-            public string UserDefinedKind;
-
-            readonly string fieldName;
-
-            public RefField(string type, Token name, string userDefinedName, string userDefinedKind, string filePath) : base(filePath)
-            {
-                Type = type;
-                NameToken = name;
-                UserDefinedName = userDefinedName;
-                UserDefinedKind = userDefinedKind;
-            }
-
-            public override string ToString() => $"Ref Field";
-        }
-
-        public class RefFunction : Ref
-        {
-            public CompiledFunction Definition;
-
-            public RefFunction(CompiledFunction definition) : base(definition.FilePath)
-            {
-                Definition = definition;
-            }
-
-            public override string ToString() => $"Ref Function";
-        }
-
-        public class RefStruct : Ref
-        {
-            public CompiledStruct Definition;
-
-            public RefStruct(CompiledStruct definition) : base(definition.FilePath)
-            {
-                Definition = definition;
-            }
-
-            public override string ToString() => $"Ref Struct";
-        }
-
-        public class RefClass : Ref
-        {
-            public CompiledClass Definition;
-
-            public RefClass(CompiledClass definition) : base(definition.FilePath)
-            {
-                Definition = definition;
-            }
-
-            public override string ToString() => $"Ref Class";
-        }
-
-        public class RefBuiltinFunction : Ref
-        {
-            public readonly string Name;
-            public readonly string ReturnType;
-            public readonly string[] ParameterTypes;
-            public readonly string[] ParameterNames;
-
-            public RefBuiltinFunction(string name, string returnType, string[] parameterTypes, string[] parameterNames) : base(null)
-            {
-                this.Name = name;
-                this.ReturnType = returnType;
-                this.ParameterTypes = parameterTypes;
-                this.ParameterNames = parameterNames;
-            }
-
-            public override string ToString() => $"Ref BuiltinFunction";
-        }
-
-        public class RefBuiltinMethod : Ref
-        {
-            public readonly string Name;
-            public readonly string ReturnType;
-            public readonly string PrevType;
-            public readonly string[] ParameterTypes;
-            public readonly string[] ParameterNames;
-
-            public RefBuiltinMethod(string name, string returnType, string prevType, string[] parameterTypes, string[] parameterNames) : base(null)
-            {
-                this.Name = name;
-                this.ReturnType = returnType;
-                this.PrevType = prevType;
-                this.ParameterTypes = parameterTypes;
-                this.ParameterNames = parameterNames;
-            }
-
-            public override string ToString() => $"Ref BuiltinMethod";
-        }
-    }
 
     public enum TokenType
     {
@@ -213,7 +55,7 @@ namespace IngameCoding.BBCode
     {
         public TokenType TokenType = TokenType.WHITESPACE;
         public string Content = "";
-        public TokenAnalysis Analysis;
+        public Analysis.TokenAnalysis Analysis;
 
         public Token()
         {
@@ -231,7 +73,7 @@ namespace IngameCoding.BBCode
 
             Content = Content,
             TokenType = TokenType,
-            Analysis = new TokenAnalysis()
+            Analysis = new Analysis.TokenAnalysis()
             {
                 Subtype = Analysis.Subtype,
             },

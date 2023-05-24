@@ -28,8 +28,13 @@ namespace IngameCoding.BBCode.Compiler
             BuiltinType.FLOAT => DataType.FLOAT,
             BuiltinType.STRING => DataType.STRING,
             BuiltinType.BOOLEAN => DataType.BOOLEAN,
-            BuiltinType.STRUCT => DataType.STRUCT,
-            BuiltinType.LISTOF => DataType.LIST,
+
+            BuiltinType.ANY => throw new NotImplementedException(),
+            BuiltinType.AUTO => throw new NotImplementedException(),
+            BuiltinType.VOID => throw new NotImplementedException(),
+
+            BuiltinType.STRUCT => throw new NotImplementedException(),
+            BuiltinType.LISTOF => throw new NotImplementedException(),
             _ => throw new NotImplementedException(),
         };
         internal static BuiltinType Convert(this TypeTokenType v) => v switch
@@ -52,8 +57,6 @@ namespace IngameCoding.BBCode.Compiler
             DataType.FLOAT => BuiltinType.FLOAT,
             DataType.STRING => BuiltinType.STRING,
             DataType.BOOLEAN => BuiltinType.BOOLEAN,
-            DataType.STRUCT => BuiltinType.STRUCT,
-            DataType.LIST => BuiltinType.LISTOF,
             _ => BuiltinType.ANY,
         };
 
@@ -65,7 +68,7 @@ namespace IngameCoding.BBCode.Compiler
             for (int instructionIndex = 0; instructionIndex < self.Count; instructionIndex++)
             {
                 Instruction instruction = self[instructionIndex];
-                if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_TRUE || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
+                if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
                     if (instruction.Parameter is int jumpBy)
                     {

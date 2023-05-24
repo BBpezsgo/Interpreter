@@ -39,6 +39,7 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-test` Executes a test file.
 - `-decompile` Executes a binary file.
 - `-compile [string]` Compiles and writes the code to the given path
+- `-console-gui`
 
 **Other:**
 - `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!

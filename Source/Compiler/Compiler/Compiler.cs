@@ -387,7 +387,6 @@ namespace IngameCoding.BBCode.Compiler
         public static CompilerResult CompileCode(
             ParserResult parserResult,
             Dictionary<string, BuiltinFunction> builtinFunctions,
-            Dictionary<string, Func<IStruct>> builtinStructs,
             FileInfo file,
             List<Warning> warnings,
             List<Error> errors,
@@ -440,7 +439,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, builtinStructs, settings, printCallback, level);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, settings, printCallback, level);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 

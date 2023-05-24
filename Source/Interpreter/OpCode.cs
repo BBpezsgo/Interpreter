@@ -17,7 +17,6 @@
         EXIT,
 
         JUMP_BY_IF_FALSE,
-        JUMP_BY_IF_TRUE,
         JUMP_BY,
 
         CALL,
@@ -81,30 +80,6 @@
         /// Call Stack Pop
         /// </summary>
         CS_POP,
-        // === ===
-
-        // === Lists ===
-        LIST_INDEX,
-        /// <summary>
-        /// Adds new item to the end of list
-        /// </summary>
-        LIST_PUSH_ITEM,
-        /// <summary>
-        /// Adds new item to the list at the given index
-        /// </summary>
-        LIST_ADD_ITEM,
-        /// <summary>
-        /// Removes new item to the end of list
-        /// </summary>
-        LIST_PULL_ITEM,
-        /// <summary>
-        /// Removes new item to the list at the given index
-        /// </summary>
-        LIST_REMOVE_ITEM,
-        /// <summary>
-        /// Sets a value at the given index
-        /// </summary>
-        LIST_SET_ITEM,
         // === ===
     }
 }

@@ -1,5 +1,5 @@
 ﻿
-namespace IngameCoding.BBCode
+namespace IngameCoding.BBCode.Analysis
 {
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser;
@@ -28,8 +28,8 @@ namespace IngameCoding.BBCode
 
         public ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
         public ParserResult? parserResult;
-        public Compiler.Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
-        public Compiler.Compiler.CompilerResult compilerResult;
+        public Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
+        public Compiler.CompilerResult compilerResult;
         public Warning[] Warnings;
         public Hint[] Hints;
         public Information[] Informations;
@@ -86,7 +86,7 @@ namespace IngameCoding.BBCode
             return this;
         }
 
-        public AnalysisResult SetCompilerResult(Compiler.Compiler.CompilerResult compilerResult, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
+        public AnalysisResult SetCompilerResult(Compiler.CompilerResult compilerResult, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
         {
             this.compilerResult = compilerResult;
             this.CompilerFatalError = null;
@@ -135,7 +135,6 @@ namespace IngameCoding.BBCode
     public class Analysis
     {
         static Dictionary<string, BuiltinFunction> BuiltinFunctions => new();
-        static Dictionary<string, System.Func<IStruct>> BuiltinStructs => new();
 
         public static AnalysisResult Analyze(string code, FileInfo file, string path)
         {
@@ -177,7 +176,7 @@ namespace IngameCoding.BBCode
                     Token[] tokens_ = tokenizer.Parse(code_);
                     if (tokens_ == null) continue;
                     if (tokens_.Length < 3) continue;
-                    Parser.Parser parser = new();
+                    Parser parser = new();
                     ParserResultHeader codeHeader = parser.ParseCodeHeader(tokens_, new List<Warning>());
                     for (int i = 0; i < codeHeader.Usings.Count; i++)
                     {
@@ -193,7 +192,7 @@ namespace IngameCoding.BBCode
             return fileReferences.ToArray();
         }
 
-        static Compiler.Compiler.CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, List<Error> errors, System.IO.DirectoryInfo directory, string path, List<Hint> hints, List<Information> informations)
+        static Compiler.CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, List<Error> errors, System.IO.DirectoryInfo directory, string path, List<Hint> hints, List<Information> informations)
         {
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
@@ -402,9 +401,9 @@ namespace IngameCoding.BBCode
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = hints, informations = informations };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, BuiltinStructs, Compiler.Compiler.CompilerSettings.Default, null, Compiler.Compiler.CompileLevel.Exported, true);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, Compiler.CompilerSettings.Default, null, Compiler.CompileLevel.Exported, true);
 
-            var compilerResult = new Compiler.Compiler.CompilerResult()
+            var compilerResult = new Compiler.CompilerResult()
             {
                 compiledStructs = codeGeneratorResult.compiledStructs.ToArray(),
                 compiledFunctions = codeGeneratorResult.compiledFunctions.ToArray(),
@@ -419,7 +418,7 @@ namespace IngameCoding.BBCode
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
 
-            Parser.Parser parser = new();
+            Parser parser = new();
             fatalError = null;
 
             try

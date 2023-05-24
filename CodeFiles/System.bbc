@@ -24,28 +24,6 @@ namespace Console
   export void Log(float message)
   { Log(message.ToString()); }
 
-  export void Log(int[] message)
-  {
-    Write("[ ");
-    for (int i = 0; i < message.Length; i++)
-    {
-      if (i > 0) { Write(", "); };
-      Write(message[i].ToString());
-    };
-    Log(" ]");
-  }
-
-  export void Log(string[] message)
-  {
-    Write("[ ");
-    for (int i = 0; i < message.Length; i++)
-    {
-      if (i > 0) { Write(", "); };
-      Write("\"" + message[i] + "\"");
-    };
-    Log(" ]");
-  }
-
   [Builtin("stderr")]
   export void WriteError(string data);
     
@@ -85,7 +63,8 @@ namespace Time
 {
   [Builtin("tmnw")]
   string tmnw();
-
+  
+  /*
   export TimeSpan Now()
   {
     string[] nowSplitted;
@@ -97,6 +76,7 @@ namespace Time
     t.secs = nowSplitted[2];
     return t;
   }
+  */
 }
 
 export string ToString(this int v)
@@ -111,12 +91,13 @@ export string ToString(this float v)
 [Builtin("sleep")]
 export void Sleep(int ms);
 
-[Builtin("splitstring")]
-string[] splitstring(string a, string b);
+// [Builtin("splitstring")]
+// string[] splitstring(string a, string b);
 
-export string[] Split(this string v, string separator)
-{ return splitstring(v, separator); }
+// export string[] Split(this string v, string separator)
+// { return splitstring(v, separator); }
 
+/*
 export bool Contains(this string[] v, string search)
 {
   for (int i = 0; i < v.Length; i++)
@@ -125,6 +106,7 @@ export bool Contains(this string[] v, string search)
   };
   return false;
 }
+*/
 
 namespace Math
 {

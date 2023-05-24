@@ -525,7 +525,6 @@ namespace IngameCoding
             var compilerResult = Compiler.CompileCode(
                 parserResult,
                 new Dictionary<string, BuiltinFunction>(),
-                new Dictionary<string, Func<IStruct>>(),
                 file,
                 warnings,
                 errors,

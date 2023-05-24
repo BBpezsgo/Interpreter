@@ -1,22 +1,33 @@
 using System;
 
+struct Yes
+{
+  float YesField;
+}
+
 class Foo
 {
   int field0;
   int field1;
+  Yes yes;
 }
 
 [CodeEntry]
 void Start()
 {
   Foo foo = Bar2();
+    
+  foo.yes.YesField = 4.6;
+  
+  Yes yes2 = foo.yes;
+
+  Console.Log("foo.yes.YesField: " + foo.yes.YesField);
 
   foo.field0 = 55;
   Console.Log("foo.field0: " + foo.field0);
   Console.Log("&foo.field0: " + &foo.field0);
 
   Foo foo2;
-  Dealloc(foo2);
   foo2 = foo;
   Console.Log("foo.field0: " + foo.field0);
 

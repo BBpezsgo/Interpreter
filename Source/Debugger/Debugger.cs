@@ -243,7 +243,6 @@ namespace TheProgram
             Type = v.type.ToString();
             Value = v_v == null ? "null" : v_v.ToString();
             Tag = v.Tag;
-            IsHeapAddress = v.IsHeapAddress;
         }
     }
 
@@ -316,22 +315,7 @@ namespace TheProgram
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
-            if (v.Parameter is IStruct)
-            {
-                Parameter = "IStruct { ... }";
-                ParameterIsComplicated = true;
-            }
-            else if (v.Parameter is DataItem.List)
-            {
-                Parameter = "[ ... ]";
-                ParameterIsComplicated = true;
-            }
-            else if (v.Parameter is Struct)
-            {
-                Parameter = "{ ... }";
-                ParameterIsComplicated = true;
-            }
-            else if (v.Parameter is DataItem v2)
+            if (v.Parameter is DataItem v2)
             {
                 switch (v2.type)
                 {
@@ -347,12 +331,7 @@ namespace TheProgram
                     case DataType.BOOLEAN:
                         Parameter = "BOOLEAN";
                         break;
-                    case DataType.STRUCT:
-                        Parameter = "{ ... }";
-                        break;
-                    case DataType.LIST:
-                        Parameter = "[ ... ]";
-                        break;
+                    default: throw new NotImplementedException();
                 }
                 ParameterIsComplicated = true;
             }

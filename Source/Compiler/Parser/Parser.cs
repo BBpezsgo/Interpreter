@@ -167,10 +167,6 @@ namespace IngameCoding.BBCode
             },
 
             ListOf = this.ListOf,
-            Analysis = new TokenAnalysis()
-            {
-                Subtype = Analysis.Subtype,
-            },
         };
 
         public static TypeToken CreateAnonymous(string name, TypeTokenType type, string namespacePrefix = "") => new(name, type, namespacePrefix, null);
@@ -1711,7 +1707,7 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("[", out var token0))
                 {
                     var st = ExpectOneValue();
-                    if (ExpectOperator("]"))
+                    if (ExpectOperator("]", out var token1))
                     {
                         statement = new Statement_Index(st);
                         return true;
@@ -2443,7 +2439,6 @@ namespace IngameCoding.BBCode
                     Statement_Operator statementToAssign = new(new Token()
                     {
                         AbsolutePosition = o0.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = o0.Content.Replace("=", ""),
                         Position = o0.Position,
                         TokenType = o0.TokenType,
@@ -2452,7 +2447,6 @@ namespace IngameCoding.BBCode
                     return new Statement_Setter(new Token()
                     {
                         AbsolutePosition = o0.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = "=",
                         Position = o0.Position,
                         TokenType = o0.TokenType,
@@ -2471,7 +2465,6 @@ namespace IngameCoding.BBCode
                     Statement_Operator statementToAssign = new(new Token()
                     {
                         AbsolutePosition = t0.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = "+",
                         Position = t0.Position,
                         TokenType = t0.TokenType,
@@ -2480,7 +2473,6 @@ namespace IngameCoding.BBCode
                     return new Statement_Setter(new Token()
                     {
                         AbsolutePosition = t0.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = "=",
                         Position = t0.Position,
                         TokenType = t0.TokenType,
@@ -2499,7 +2491,6 @@ namespace IngameCoding.BBCode
                     Statement_Operator statementToAssign = new(new Token()
                     {
                         AbsolutePosition = t1.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = "-",
                         Position = t1.Position,
                         TokenType = t1.TokenType,
@@ -2508,7 +2499,6 @@ namespace IngameCoding.BBCode
                     return new Statement_Setter(new Token()
                     {
                         AbsolutePosition = t1.AbsolutePosition,
-                        Analysis = new TokenAnalysis(),
                         Content = "=",
                         Position = t1.Position,
                         TokenType = t1.TokenType,
@@ -2861,11 +2851,12 @@ namespace IngameCoding.BBCode
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }
 
-                while (ExpectOperator("["))
+                while (ExpectOperator("[", out var listToken0))
                 {
-                    if (ExpectOperator("]"))
+                    if (ExpectOperator("]", out var listToken1))
                     {
                         newType = new TypeToken(newType.Content, newType, newType);
+                        Errors.Add(new Error($"Lists aren't supported as built-in feature", new Position(listToken0, listToken1)));
                     }
                     else
                     { currentTokenIndex = parseStart; return null; }

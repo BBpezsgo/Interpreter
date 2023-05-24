@@ -20,7 +20,7 @@ namespace TheProgram
         string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test11.bbc";
+            var file = "test10.bbc";
 
             if (false)
             {
@@ -49,7 +49,7 @@ namespace TheProgram
                 // "-decompile",
                 // "-compile",
                 // "-debug",
-                // "-console-gui",
+                "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
                 $"\"{TestConstants.TestFilesPath}{file}\""

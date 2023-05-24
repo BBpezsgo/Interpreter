@@ -69,7 +69,6 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOAD_VALUE: return LOAD_VALUE();
                 case Opcode.STORE_VALUE: return STORE_VALUE();
 
-                case Opcode.JUMP_BY_IF_TRUE: return JUMP_BY_IF_TRUE();
                 case Opcode.JUMP_BY_IF_FALSE: return JUMP_BY_IF_FALSE();
                 case Opcode.JUMP_BY: return JUMP_BY();
                 case Opcode.CALL: return CALL();
@@ -99,13 +98,6 @@ namespace IngameCoding.Bytecode
                 case Opcode.LOGIC_MTEQ: return LOGIC_MTEQ();
                 case Opcode.LOGIC_XOR: return LOGIC_XOR();
                 case Opcode.LOGIC_NOT: return LOGIC_NOT();
-
-                case Opcode.LIST_INDEX: return LIST_INDEX();
-                case Opcode.LIST_PUSH_ITEM: return LIST_PUSH_ITEM();
-                case Opcode.LIST_SET_ITEM: return LIST_SET_ITEM();
-                case Opcode.LIST_ADD_ITEM: return LIST_ADD_ITEM();
-                case Opcode.LIST_PULL_ITEM: return LIST_PULL_ITEM();
-                case Opcode.LIST_REMOVE_ITEM: return LIST_REMOVE_ITEM();
 
                 case Opcode.HEAP_GET: return HEAP_GET();
                 case Opcode.HEAP_SET: return HEAP_SET();
@@ -285,99 +277,6 @@ namespace IngameCoding.Bytecode
             return 5;
         }
 
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_PUSH_ITEM()
-        {
-            var newItem = Memory.Stack.Pop();
-            var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataType.LIST)
-            { listValue.ValueList.Add(newItem); }
-            else
-            { throw new RuntimeException("The variable type is not list!"); }
-            Step();
-
-            return 4;
-        }
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_ADD_ITEM()
-        {
-            var indexValue = Memory.Stack.Pop();
-            var newItem = Memory.Stack.Pop();
-            var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataType.LIST)
-            { listValue.ValueList.Add(newItem, indexValue.ValueInt); }
-            else
-            { throw new RuntimeException("The variable type is not list!"); }
-            Step();
-
-            return 5;
-        }
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_SET_ITEM()
-        {
-            var indexValue = Memory.Stack.Pop().ValueInt;
-            var newItem = Memory.Stack.Pop();
-            var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataType.LIST)
-            { listValue.ValueList.items[indexValue] = newItem; }
-            else
-            { throw new RuntimeException("The variable type is not list!"); }
-            Memory.Stack.Push(listValue);
-            Step();
-
-            return 3;
-        }
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_PULL_ITEM()
-        {
-            var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataType.LIST)
-            { listValue.ValueList.Remove(); }
-            else
-            { throw new RuntimeException("The variable type is not list!"); }
-            Step();
-
-            return 3;
-        }
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_REMOVE_ITEM()
-        {
-            var indexValue = Memory.Stack.Pop();
-            var listValue = Memory.Stack.Pop();
-            if (listValue.type == DataType.LIST)
-            { listValue.ValueList.Remove(indexValue.ValueInt); }
-            else
-            { throw new RuntimeException("The variable type is not list!"); }
-            Step();
-
-            return 4;
-        }
-
-        /// <exception cref="RuntimeException"></exception>
-        int LIST_INDEX()
-        {
-            var indexValue = Memory.Stack.Pop();
-            var listValue = Memory.Stack.Pop();
-
-            if (listValue.type == DataType.LIST)
-            {
-                if (listValue.ValueList.items.Count <= indexValue.ValueInt || indexValue.ValueInt < 0)
-                { throw new RuntimeException("Index was out of range!"); }
-                Memory.Stack.Push(listValue.ValueList.items[indexValue.ValueInt]);
-            }
-            else if (listValue.type == DataType.STRING)
-            {
-                if (listValue.ValueString.Length <= indexValue.ValueInt || indexValue.ValueInt < 0)
-                { throw new RuntimeException("Index was out of range!"); }
-                Memory.Stack.Push(listValue.ValueString[indexValue.ValueInt].ToString());
-            }
-            else
-            { throw new RuntimeException("The variable type is not list or string!"); }
-            Step();
-
-            return 4;
-        }
-
         /// <exception cref="InternalException"></exception>
         /// <exception cref="RuntimeException"></exception>
         void OnBuiltinFunctionReturnValue(DataItem returnValue)
@@ -536,17 +435,6 @@ namespace IngameCoding.Bytecode
             CodePointer += CurrentInstruction.ParameterInt;
 
             return 1;
-        }
-        int JUMP_BY_IF_TRUE()
-        {
-            var condition = Memory.Stack.Pop();
-
-            if (condition == true)
-            { CodePointer += CurrentInstruction.ParameterInt; }
-            else
-            { Step(); }
-
-            return 3;
         }
         int JUMP_BY_IF_FALSE()
         {

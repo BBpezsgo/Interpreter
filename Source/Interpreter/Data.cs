@@ -140,12 +140,12 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (i == BBCode.Utils.NULL_POINTER) throw new RuntimeException($"Null pointer!");
+                if (i < 0) throw new RuntimeException($"Null pointer!");
                 return heap[i];
             }
             set
             {
-                if (i == BBCode.Utils.NULL_POINTER) throw new RuntimeException($"Null pointer!");
+                if (i < 0) throw new RuntimeException($"Null pointer!");
                 heap[i] = value;
             }
         }

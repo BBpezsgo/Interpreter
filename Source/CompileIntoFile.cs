@@ -437,16 +437,12 @@ namespace IngameCoding
             internal Instruction[] Instructions;
             internal Dictionary<string, int> FunctionOffsets;
             internal SerializableFunctionDef[] CompiledFunctions;
-            internal int OffsetSetGlobalVariables;
-            internal int OffsetClearGlobalVariables;
 
             public SerializableCode() { }
 
             public SerializableCode(Compiler.CompilerResult compilerResult)
             {
                 Instructions = compilerResult.compiledCode;
-                OffsetClearGlobalVariables = compilerResult.clearGlobalVariablesInstruction;
-                OffsetSetGlobalVariables = compilerResult.setGlobalVariablesInstruction;
                 FunctionOffsets = compilerResult.functionOffsets;
                 CompiledFunctions = new SerializableFunctionDef[compilerResult.compiledFunctions.Length];
                 for (int i = 0; i < compilerResult.compiledFunctions.Length; i++)
@@ -457,8 +453,6 @@ namespace IngameCoding
 
             public void Deserialize(Deserializer deserializer)
             {
-                OffsetSetGlobalVariables = deserializer.DeserializeInt32();
-                OffsetClearGlobalVariables = deserializer.DeserializeInt32();
                 FunctionOffsets = deserializer.DeserializeDictionary<string, int>();
                 Instructions = deserializer.DeserializeObjectArray<Instruction>();
                 CompiledFunctions = deserializer.DeserializeObjectArray<SerializableFunctionDef>();
@@ -466,8 +460,6 @@ namespace IngameCoding
 
             public void DeserializeText(Value data)
             {
-                OffsetSetGlobalVariables = data["OffsetSetGlobalVariables"].Int ?? -1;
-                OffsetClearGlobalVariables = data["OffsetClearGlobalVariables"].Int ?? -1;
                 FunctionOffsets = data["FunctionOffsets"].Dictionary().Convert(v => v.Int ?? -1);
                 Instructions = data["Instructions"].Array.Convert<Instruction>();
                 CompiledFunctions = data["CompiledFunctions"].Array.Convert<SerializableFunctionDef>();
@@ -475,8 +467,6 @@ namespace IngameCoding
 
             public void Serialize(Serializer serializer)
             {
-                serializer.Serialize(OffsetSetGlobalVariables);
-                serializer.Serialize(OffsetClearGlobalVariables);
                 serializer.Serialize(FunctionOffsets);
                 serializer.Serialize(Instructions);
                 serializer.Serialize(CompiledFunctions);
@@ -486,8 +476,6 @@ namespace IngameCoding
             {
                 Value result = Value.Object();
 
-                result["OffsetSetGlobalVariables"] = Value.Literal(OffsetSetGlobalVariables);
-                result["OffsetClearGlobalVariables"] = Value.Literal(OffsetClearGlobalVariables);
                 result["CompiledFunctions"] = Value.Object(CompiledFunctions);
                 result["FunctionOffsets"] = Value.Object(FunctionOffsets);
                 result["Instructions"] = Value.Object(Instructions);

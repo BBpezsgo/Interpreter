@@ -11,7 +11,7 @@ namespace ConsoleGUI
     internal sealed class InterpreterElement : WindowElement
     {
         public string File;
-        Interpreter Interpreter;
+        InterpreterDebuggabble Interpreter;
 
         struct ConsoleLine
         {
@@ -53,7 +53,7 @@ namespace ConsoleGUI
             SetupInterpreter();
         }
 
-        void CalculateLayoutBoxes(
+        static void CalculateLayoutBoxes(
             out Rectangle StatePanelRect,
             out Rectangle ConsolePanelRect,
             out Rectangle CodePanelRect,
@@ -278,7 +278,7 @@ namespace ConsoleGUI
         {
             var fileInfo = new FileInfo(File);
             var code = System.IO.File.ReadAllText(fileInfo.FullName);
-            this.Interpreter = new Interpreter();
+            this.Interpreter = new InterpreterDebuggabble();
 
             Interpreter.OnOutput += (sender, message, logType) => ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
             {
@@ -722,7 +722,7 @@ namespace ConsoleGUI
                             break;
                         case IngameCoding.Bytecode.DataType.FLOAT:
                             ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueFloat}");
+                            AddText($"{item.ValueFloat}f");
                             break;
                         case IngameCoding.Bytecode.DataType.STRING:
                             ForegroundColor = CharColors.FgYellow;
@@ -930,7 +930,7 @@ namespace ConsoleGUI
                             break;
                         case IngameCoding.Bytecode.DataType.FLOAT:
                             ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueFloat}");
+                            AddText($"{item.ValueFloat}f");
                             break;
                         case IngameCoding.Bytecode.DataType.STRING:
                             ForegroundColor = CharColors.FgYellow;
@@ -1092,23 +1092,6 @@ namespace ConsoleGUI
             bool IsNextInstruction = false;
             for (int i = Math.Max(0, this.Interpreter.Details.Interpreter.CodePointer - 5); i < this.Interpreter.Details.CompilerResult.compiledCode.Length; i++)
             {
-                if (this.Interpreter.Details.CompilerResult.clearGlobalVariablesInstruction == i)
-                {
-                    LinePrefix();
-                    ForegroundColor = CharColors.FgMagenta;
-                    AddText("ClearGlobalVariables:");
-                    ForegroundColor = CharColors.FgDefault;
-                    FinishLine();
-                }
-                if (this.Interpreter.Details.CompilerResult.setGlobalVariablesInstruction == i)
-                {
-                    LinePrefix();
-                    ForegroundColor = CharColors.FgMagenta;
-                    AddText("SetGlobalVariables:");
-                    ForegroundColor = CharColors.FgDefault;
-                    FinishLine();
-                }
-
                 if (Interpreter.Details.Interpreter != null) if (Interpreter.Details.Interpreter.CodePointer == i) IsNextInstruction = true;
 
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
@@ -1152,10 +1135,16 @@ namespace ConsoleGUI
                     AddText($" ");
                 }
 
-                if (instruction.Parameter is int || instruction.Parameter is float)
+                if (instruction.Parameter is int)
                 {
                     ForegroundColor = CharColors.FgCyan;
                     AddText($"{instruction.Parameter}");
+                    AddText($" ");
+                }
+                else if (instruction.Parameter is float)
+                {
+                    ForegroundColor = CharColors.FgCyan;
+                    AddText($"{instruction.Parameter}f");
                     AddText($" ");
                 }
                 else if (instruction.Parameter is bool)

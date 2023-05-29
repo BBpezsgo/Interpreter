@@ -2,9 +2,83 @@ using System;
 
 class List
 {
-  int pointer;
-  int capacity;
-  int length;
+    private int pointer;
+    private int capacity;
+    int length;
+
+    export int ElementAt(int index)
+    {
+        if (index < 0 | index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+        return *(this.pointer + index);
+    }
+  
+    export void Push(int value)
+    {
+        if (this.length >= this.capacity)
+        { throw "Bruh"; };
+
+        *(this.pointer + this.length) = value;
+        this.length++;
+    }
+
+    export void Pop()
+    {
+        if (this.length <= 0)
+        { throw "Bruh"; };
+
+        this.length--;
+        *(this.pointer + this.length) = 0;
+    }
+
+    export void Insert(int index, int element)
+    {
+        if (this.length >= this.capacity)
+        { throw "Bruh"; };
+        if (index < 0 | index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+  
+        for (int i = this.length - 1; i >= index; i--)
+        {
+            *(this.pointer + i + 1) = this.ElementAt(i);
+        };
+        *(this.pointer + index) = element;
+        this.length++;
+    }
+
+    export void Set(int index, int element)
+    {
+        if (index < 0 | index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+        *(this.pointer + index) = element;
+    }
+
+    export void RemoveAt(int index)
+    {
+        if (index < 0 | index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+  
+        for (int i = index; i < this.length - 1; i++)
+        {
+            *(this.pointer + i) = this.ElementAt(i + 1);
+        };
+        this.length--;
+        *(this.pointer + this.length) = 0;
+    }
+
+    export string ToString()
+    {
+        string result = "";
+        int length = this.length;
+        for (int i; i < length; i++)
+        {
+            if (i > 0) { result += ", "; };
+            int element = this.ElementAt(i);
+            result += "" + element;
+        };
+        return "{ " + result + " }";
+    }
+
 }
 
 export List CreateList(int length)
@@ -25,77 +99,4 @@ export List CreateList(int length)
     };
   };
   return result;
-}
-
-export int ElementAt(this List list, int index)
-{
-  if (index < 0 | index >= list.length)
-  { throw "Index out of range exception (index:" + index + " length:" + list.length + ")"; };
-  return *(list.pointer + index);
-}
-
-export void Push(this List list, int value)
-{
-  if (list.length >= list.capacity)
-  { throw "Bruh"; };
-
-  *(list.pointer + list.length) = value;
-  list.length++;
-}
-
-export void Pop(this List list)
-{
-  if (list.length <= 0)
-  { throw "Bruh"; };
-
-  list.length--;
-  *(list.pointer + list.length) = 0;
-}
-
-export void Insert(this List list, int index, int element)
-{
-  if (list.length >= list.capacity)
-  { throw "Bruh"; };
-  if (index < 0 | index >= list.length)
-  { throw "Index out of range exception (index:" + index + " length:" + list.length + ")"; };
-  
-  for (int i = list.length - 1; i >= index; i--)
-  {
-    *(list.pointer + i + 1) = list.ElementAt(i);
-  };
-  *(list.pointer + index) = element;
-  list.length++;
-}
-
-export void Set(this List list, int index, int element)
-{
-  if (index < 0 | index >= list.length)
-  { throw "Index out of range exception (index:" + index + " length:" + list.length + ")"; };
-  *(list.pointer + index) = element;
-}
-
-export void RemoveAt(this List list, int index)
-{
-  if (index < 0 | index >= list.length)
-  { throw "Index out of range exception (index:" + index + " length:" + list.length + ")"; };
-  
-  for (int i = index; i < list.length - 1; i++)
-  {
-    *(list.pointer + i) = list.ElementAt(i + 1);
-  };
-  list.length--;
-  *(list.pointer + list.length) = 0;
-}
-
-export string ToString(this List list)
-{
-  string result = "";
-  int length = list.length;
-  for (int i; i < length; i++)
-  {
-    if (i > 0) { result += ", "; };
-    int element = list.ElementAt(i);
-    result += "" + element;
-  };
-  return "{ " + result + " }";
 }

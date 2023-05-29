@@ -87,6 +87,8 @@ namespace ConsoleGUI
             element.Rect.Contains(x - 1, y) ||
             element.Rect.Contains(x, y - 1) ||
             element.Rect.Contains(x - 1, y - 1);
+        public static bool Contains(this IElement element, Position position)
+            => element.Contains(position.X, position.Y);
 
         public static void OnMouseEvent(this IElement[] elements, MouseEvent e)
         {
@@ -205,5 +207,6 @@ namespace ConsoleGUI
     internal static class Utils
     {
         public static int GetIndex(int x, int y, int width) => x + (y * width);
+        public static int GetIndex(Position position, int width) => position.X + (position.Y * width);
     }
 }

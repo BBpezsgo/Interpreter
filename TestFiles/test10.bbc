@@ -3,6 +3,7 @@ using System;
 struct Yes
 {
   float YesField;
+  string YesField2;
 }
 
 class Foo
@@ -15,11 +16,14 @@ class Foo
 [CodeEntry]
 void Start()
 {
-  Foo foo = Bar2();
-    
+  Foo foo = new Foo; // Bar2();
+  
   foo.yes.YesField = 4.6;
   
   Yes yes2 = foo.yes;
+  
+  Console.Log("yes2.YesField: " + yes2.YesField);
+  Console.Log("yes2.YesField2: " + yes2.YesField2);
 
   Console.Log("foo.yes.YesField: " + foo.yes.YesField);
 

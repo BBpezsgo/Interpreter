@@ -225,9 +225,10 @@ namespace IngameCoding.BBCode
         {
             public Token Identifier;
             public TypeToken Type;
+            public Token ProtectionToken;
 
-            public override string ToString() => $"{Type} {Identifier}";
-            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
+            public override string ToString() => $"{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
+            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
         }
 
         public class Exportable
@@ -238,10 +239,12 @@ namespace IngameCoding.BBCode
 
         public class FunctionDefinition : Exportable, IDefinition
         {
-            public class Attribute
+            public class Attribute : IngameCoding.BBCode.Compiler.IElementWithKey<string>
             {
                 public Token Identifier;
                 public object[] Parameters;
+
+                public string Key => Identifier.Content;
             }
 
             public Token BracketStart;
@@ -383,14 +386,14 @@ namespace IngameCoding.BBCode
                 }
             }
             public readonly FieldDefinition[] Fields;
-            public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
-            readonly Dictionary<string, FunctionDefinition> methods;
+            public IReadOnlyCollection<FunctionDefinition> Methods => methods;
+            readonly FunctionDefinition[] methods;
 
-            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
+            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<FunctionDefinition> methods)
             {
                 this.Name = name;
                 this.Fields = fields.ToArray();
-                this.methods = new Dictionary<string, FunctionDefinition>(methods);
+                this.methods = methods.ToArray();
                 this.Attributes = attributes.ToArray();
                 this.NamespacePath = namespacePath.ToArray();
                 this.Statements = new List<Statement>();
@@ -412,7 +415,7 @@ namespace IngameCoding.BBCode
                 List<string> methods = new();
                 foreach (var method in this.methods)
                 {
-                    methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
+                    methods.Add($"{" ".Repeat(ident)}" + method.PrettyPrint((ident == 0) ? 2 : ident));
                 }
 
                 return $"{" ".Repeat(ident)}class {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
@@ -529,8 +532,9 @@ namespace IngameCoding.BBCode
             /// Only used for diagnostics!
             /// </summary>
             public readonly List<NamespaceDefinition> Namespaces;
+            public readonly Statement[] TopLevelStatements;
 
-            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes, Dictionary<string, ClassDefinition> classes)
+            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes, Dictionary<string, ClassDefinition> classes, Statement[] topLevelStatements)
             {
                 Functions = functions;
                 GlobalVariables = globalVariables;
@@ -540,6 +544,7 @@ namespace IngameCoding.BBCode
                 Namespaces = namespaces;
                 Hashes = hashes.ToArray();
                 Classes = classes;
+                TopLevelStatements = topLevelStatements;
             }
 
             /// <summary>Converts the parsed AST into text</summary>
@@ -991,6 +996,7 @@ namespace IngameCoding.BBCode
             readonly List<UsingDefinition> Usings = new();
             readonly List<NamespaceDefinition> Namespaces = new();
             readonly List<Statement_HashInfo> Hashes = new();
+            readonly List<Statement> TopLevelStatements = new();
             // === ===
 
             public Parser()
@@ -1064,7 +1070,7 @@ namespace IngameCoding.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes, this.Classes);
+                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes, this.Classes, this.TopLevelStatements.ToArray());
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -1236,10 +1242,22 @@ namespace IngameCoding.BBCode
                 if (ExpectNamespaceDefinition()) { }
                 else if (ExpectStructDefinition()) { }
                 else if (ExpectClassDefinition()) { }
-                else if (ExpectFunctionDefinition()) { }
+                else if (ExpectFunctionDefinition(out var functionDefinition))
+                { Functions.Add(functionDefinition); }
                 else if (ExpectGlobalVariable()) { }
                 else
-                { throw new SyntaxException($"Expected global variable or namespace/type/function definition. Got a token {CurrentToken}", CurrentToken); }
+                {
+                    Statement statement = ExpectStatement();
+                    if (statement == null)
+                    { throw new SyntaxException($"Expected global variable or namespace/type/function definition. Got a token {CurrentToken}", CurrentToken); }
+
+                    SetStatementThings(statement);
+
+                    TopLevelStatements.Add(statement);
+
+                    if (!ExpectOperator(";"))
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
+                }
             }
 
             bool ExpectGlobalVariable()
@@ -1258,9 +1276,10 @@ namespace IngameCoding.BBCode
                 return false;
             }
 
-            bool ExpectFunctionDefinition()
+            bool ExpectFunctionDefinition(out FunctionDefinition function)
             {
                 int parseStart = currentTokenIndex;
+                function = null;
 
                 List<FunctionDefinition.Attribute> attributes = new();
                 while (ExpectAttribute(out var attr))
@@ -1334,7 +1353,7 @@ namespace IngameCoding.BBCode
                     { expectParameter = true; }
                 }
 
-                FunctionDefinition function = new(CurrentNamespace, possibleNameT)
+                function = new(CurrentNamespace, possibleNameT)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
@@ -1352,8 +1371,6 @@ namespace IngameCoding.BBCode
                 }
 
                 function.Statements = statements.ToArray();
-
-                Functions.Add(function);
 
                 return true;
             }
@@ -1437,19 +1454,26 @@ namespace IngameCoding.BBCode
                 keyword.Analysis.Subtype = TokenSubtype.Keyword;
 
                 List<FieldDefinition> fields = new();
-                Dictionary<string, FunctionDefinition> methods = new();
+                List<FunctionDefinition> methods = new();
 
                 int endlessSafe = 0;
                 Token braceletEnd;
                 while (!ExpectOperator("}", out braceletEnd))
                 {
-                    FieldDefinition field = ExpectField();
-                    if (field == null)
-                    { throw new SyntaxException($"Expected field definition", CurrentToken); }
-
-                    fields.Add(field);
-                    if (!ExpectOperator(";"))
-                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+                    if (ExpectFunctionDefinition(out var methodDefinition))
+                    {
+                        methods.Add(methodDefinition);
+                    }
+                    else if (ExpectField(out FieldDefinition field))
+                    {
+                        fields.Add(field);
+                        if (!ExpectOperator(";"))
+                        { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+                    }
+                    else
+                    {
+                        throw new SyntaxException($"Expected field definition", CurrentToken);
+                    }
 
                     endlessSafe++;
                     if (endlessSafe > 50)
@@ -1808,8 +1832,8 @@ namespace IngameCoding.BBCode
                 }
                 else if (ExpectIdentifier(out Token variableName))
                 {
-                    if (variableName.Content == "this")
-                    { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
+                    // if (variableName.Content == "this")
+                    // { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
 
                     if (ExpectOperator("("))
                     {
@@ -1931,10 +1955,10 @@ namespace IngameCoding.BBCode
 
                 if (statement is Statement_Literal)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
-                
+
                 if (statement is Statement_Variable)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
-                
+
                 if (statement is Statement_NewInstance)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
 
@@ -2452,7 +2476,7 @@ namespace IngameCoding.BBCode
                         TokenType = o0.TokenType,
                     }, leftStatement, statementToAssign);
                 }
-                
+
                 if (ExpectOperator("++", out var t0))
                 {
                     Statement_Literal literalOne = new()
@@ -2478,7 +2502,7 @@ namespace IngameCoding.BBCode
                         TokenType = t0.TokenType,
                     }, leftStatement, statementToAssign);
                 }
-                
+
                 if (ExpectOperator("--", out var t1))
                 {
                     Statement_Literal literalOne = new()
@@ -2686,6 +2710,12 @@ namespace IngameCoding.BBCode
             FieldDefinition ExpectField()
             {
                 int startTokenIndex = currentTokenIndex;
+
+                if (ExpectIdentifier("private", out Token protectionToken))
+                {
+
+                }
+
                 TypeToken possibleType = ExceptTypeToken();
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
@@ -2702,9 +2732,15 @@ namespace IngameCoding.BBCode
                 {
                     Identifier = possibleVariableName,
                     Type = possibleType,
+                    ProtectionToken = protectionToken,
                 };
 
                 return field;
+            }
+            bool ExpectField(out FieldDefinition field)
+            {
+                field = ExpectField();
+                return field != null;
             }
 
             void ExpectOneLiteral(out object value)

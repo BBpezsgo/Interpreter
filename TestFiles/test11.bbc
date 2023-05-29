@@ -14,4 +14,8 @@ void Start()
   Console.Log(list.ToString());
   list.RemoveAt(0);
   Console.Log(list.ToString());
+
+  Console.Log("Length: " + list.length);
+  Console.Log("Capacity: " + list.capacity);
+  Console.Log("Pointer: " + list.pointer);
 }

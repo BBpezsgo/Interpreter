@@ -5,7 +5,7 @@ namespace IngameCoding.BBCode
 {
     public static class Utils
     {
-        public const int NULL_POINTER = -1;
+        public const int NULL_POINTER = int.MinValue / 2;
     }
 }
 
@@ -21,6 +21,9 @@ namespace IngameCoding.BBCode.Compiler
 
     public static class Extensions
     {
+        internal static AddressingMode AddressingMode(this CompiledVariable v)
+            => v.IsGlobal ? Bytecode.AddressingMode.ABSOLUTE : Bytecode.AddressingMode.BASEPOINTER_RELATIVE;
+
         internal static DataType Convert(this BuiltinType v) => v switch
         {
             BuiltinType.INT => DataType.INT,
@@ -111,8 +114,9 @@ namespace IngameCoding.BBCode.Compiler
 
         public static bool TryGetValue<T>(this IEnumerable<IElementWithKey<T>> self, T key, out IElementWithKey<T> value)
         {
-            foreach (var element in self)
+            foreach (IElementWithKey<T> element in self)
             {
+                if (element == null) continue;
                 if (element.Key.Equals(key))
                 {
                     value = element;
@@ -130,8 +134,9 @@ namespace IngameCoding.BBCode.Compiler
         }
         public static bool ContainsKey<T>(this IEnumerable<IElementWithKey<T>> self, T key)
         {
-            foreach (var element in self)
+            foreach (IElementWithKey<T> element in self)
             {
+                if (element == null) continue;
                 if (element.Key.Equals(key))
                 {
                     return true;
@@ -142,8 +147,9 @@ namespace IngameCoding.BBCode.Compiler
         /// <exception cref="KeyNotFoundException"></exception>
         public static IElementWithKey<T> Get<T>(this IEnumerable<IElementWithKey<T>> self, T key)
         {
-            foreach (var element in self)
+            foreach (IElementWithKey<T> element in self)
             {
+                if (element == null) continue;
                 if (element.Key.Equals(key))
                 {
                     return element;
@@ -154,6 +160,32 @@ namespace IngameCoding.BBCode.Compiler
         /// <exception cref="KeyNotFoundException"></exception>
         public static TResult Get<T, TResult>(this IEnumerable<IElementWithKey<T>> self, T key)
             => (TResult)self.Get<T>(key);
+        public static bool Remove<TKey>(this IList<IElementWithKey<TKey>> self, TKey key)
+        {
+            for (int i = self.Count - 1; i >= 0; i--)
+            {
+                IElementWithKey<TKey> element = self[i];
+                if (element.Key.Equals(key))
+                {
+                    self.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
+        public static bool Remove<TKey>(this IList<CompiledFunction> self, TKey key)
+        {
+            for (int i = self.Count - 1; i >= 0; i--)
+            {
+                CompiledFunction element = self[i];
+                if (element.Key.Equals(key))
+                {
+                    self.RemoveAt(i);
+                    return true;
+                }
+            }
+            return false;
+        }
 
         public static bool TryGetValue<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key, out TValue value)
         {
@@ -206,6 +238,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             return false;
         }
+
         public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self)
         {
             Dictionary<TKey, TValue> result = new();
@@ -226,32 +259,6 @@ namespace IngameCoding.BBCode.Compiler
             foreach (IElementWithKey<TKey> element in self)
             { result.Add(element.Key, (TValue)element); }
             return result;
-        }
-        public static bool Remove<TKey>(this List<IElementWithKey<TKey>> self, TKey key)
-        {
-            for (int i = self.Count - 1; i >= 0; i--)
-            {
-                IElementWithKey<TKey> element = self[i];
-                if (element.Key.Equals(key))
-                {
-                    self.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-        public static bool Remove<TKey>(this List<CompiledFunction> self, TKey key)
-        {
-            for (int i = self.Count - 1; i >= 0; i--)
-            {
-                CompiledFunction element = self[i];
-                if (element.Key.Equals(key))
-                {
-                    self.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
         }
     }
 
@@ -438,6 +445,7 @@ namespace IngameCoding.BBCode.Compiler
     public class CompiledFunction : FunctionDefinition, IElementWithKey<string>
     {
         public CompiledType[] ParameterTypes;
+        public CompiledClass Context;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -509,17 +517,15 @@ namespace IngameCoding.BBCode.Compiler
     {
         public readonly new CompiledType Type;
 
-        public readonly int Index;
         public readonly int MemoryAddress;
         public readonly bool IsGlobal;
         public readonly bool IsStoredInHEAP;
 
-        public CompiledVariable(int index, int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
+        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
         {
             this.Type = type;
 
             this.MemoryAddress = memoryOffset;
-            this.Index = index;
             this.IsStoredInHEAP = storedInHeap;
             this.IsGlobal = isGlobal;
 
@@ -541,15 +547,17 @@ namespace IngameCoding.BBCode.Compiler
 
     public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
     {
+        public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
         public string Key => this.FullName;
 
-        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
+        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
             this.CompiledAttributes = compiledAttributes;
+            this.Fields = fields;
 
             base.FilePath = definition.FilePath;
             base.BracketEnd = definition.BracketEnd;
@@ -561,15 +569,17 @@ namespace IngameCoding.BBCode.Compiler
 
     public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
     {
+        public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
         public string Key => this.FullName;
 
-        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
+        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.NamespacePath, definition.Name, definition.Attributes, definition.Fields, definition.Methods)
         {
             this.CompiledAttributes = compiledAttributes;
+            this.Fields = fields;
 
             base.FilePath = definition.FilePath;
             base.BracketEnd = definition.BracketEnd;
@@ -611,7 +621,39 @@ namespace IngameCoding.BBCode.Compiler
         public override string ToString() => $"{index} {Identifier}";
     }
 
-    public class CompiledType
+    public enum Protection
+    {
+        Private,
+        Public,
+    }
+
+    public class CompiledField : FieldDefinition
+    {
+        public new CompiledType Type;
+        public Protection Protection
+        {
+            get
+            {
+                if (ProtectionToken == null) return Protection.Public;
+                return ProtectionToken.Content switch
+                {
+                    "private" => Protection.Private,
+                    "public" => Protection.Public,
+                    _ => Protection.Public,
+                };
+            }
+        }
+        public CompiledClass Class;
+
+        public CompiledField(FieldDefinition definition) : base()
+        {
+            base.Identifier = definition.Identifier;
+            base.Type = definition.Type;
+            base.ProtectionToken = definition.ProtectionToken;
+        }
+    }
+
+    public class CompiledType : IEquatable<CompiledType>
     {
         internal enum CompiledTypeType
         {
@@ -692,6 +734,7 @@ namespace IngameCoding.BBCode.Compiler
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         internal bool IsStruct => @struct != null;
         internal bool IsBuiltin => builtinType != CompiledTypeType.NONE;
+        internal bool InHEAP => IsClass;
 
         public int Size
         {
@@ -896,23 +939,15 @@ namespace IngameCoding.BBCode.Compiler
 
             if (this.IsList && b.IsList) return this.listOf == b.listOf;
 
-            if (this.IsClass && b.IsClass)
-            {
-                var classA = this.@class;
-                var classB = b.@class;
-                return classA.FullName == classB.FullName;
-            }
-            if (this.IsStruct && b.IsStruct)
-            {
-                var classA = this.@class;
-                var classB = b.@class;
-                return classA.FullName == classB.FullName;
-            }
+            if (this.IsClass && b.IsClass) return this.@class.FullName == b.@class.FullName;
+            if (this.IsStruct && b.IsStruct) return this.@struct.FullName == b.@struct.FullName;
 
             if (this.IsBuiltin && b.IsBuiltin) return this.builtinType == b.builtinType;
 
             return true;
         }
+
+        public override int GetHashCode() => HashCode.Combine(builtinType, @struct, @class, listOf);
     }
 
     public interface IElementWithKey<T>

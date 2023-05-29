@@ -84,6 +84,15 @@ namespace IngameCoding.BBCode
         {
             return $"Token:{TokenType} {{ \"{Content}\" {Position} {(Analysis == null ? "No analysis" : Analysis.ToString())} }}";
         }
+
+        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new()
+        {
+            AbsolutePosition = new Range<int>(0, 0),
+            Analysis = new Analysis.TokenAnalysis(),
+            Position = new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)),
+            TokenType = type,
+            Content = content,
+        };
     }
 
     public readonly struct SimpleToken

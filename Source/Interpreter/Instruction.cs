@@ -73,7 +73,7 @@ namespace IngameCoding.Bytecode
         /// <summary>
         /// Can be:
         /// <list type="bullet">
-        /// <item><see cref="null"/></item>
+        /// <item><see langword="null"/></item>
         /// <item><see cref="int"/></item>
         /// <item><see cref="bool"/></item>
         /// <item><see cref="float"/></item>

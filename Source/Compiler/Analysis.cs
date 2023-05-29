@@ -401,7 +401,7 @@ namespace IngameCoding.BBCode.Analysis
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = hints, informations = informations };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, BuiltinFunctions, Compiler.CompilerSettings.Default, null, Compiler.CompileLevel.Exported, true);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, parserResult.TopLevelStatements, BuiltinFunctions, Compiler.CompilerSettings.Default, null, Compiler.CompileLevel.Exported, true);
 
             var compilerResult = new Compiler.CompilerResult()
             {

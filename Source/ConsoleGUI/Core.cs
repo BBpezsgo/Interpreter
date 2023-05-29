@@ -3,8 +3,8 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 
 /*
  * Copy-pasted from https://stackoverflow.com/questions/2754518/how-can-i-write-fast-colored-output-to-console
@@ -106,6 +106,7 @@ namespace ConsoleGUI
         }
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public readonly struct Position
     {
         public readonly short X;
@@ -121,6 +122,25 @@ namespace ConsoleGUI
             X = x;
             Y = y;
         }
+        public Position(int x, int y)
+        {
+            X = (short)x;
+            Y = (short)y;
+        }
+
+        private string GetDebuggerDisplay() => $"{X} ; {Y}";
+
+        public static Position operator +(Position a, Position b) => new(a.X + b.X, a.Y + b.Y);
+        public static Position operator -(Position a, Position b) => new(a.X - b.X, a.Y - b.Y);
+
+        public static Position operator +(Position a, System.Drawing.Point b) => new(a.X + b.X, a.Y + b.Y);
+        public static Position operator -(Position a, System.Drawing.Point b) => new(a.X - b.X, a.Y - b.Y);
+
+        public static Position operator +(Position a, short b) => new(a.X + b, a.Y + b);
+        public static Position operator -(Position a, short b) => new(a.X - b, a.Y - b);
+
+        public static Position operator +(Position a, int b) => new(a.X + b, a.Y + b);
+        public static Position operator -(Position a, int b) => new(a.X - b, a.Y - b);
     }
 
     [Flags]
@@ -308,11 +328,13 @@ namespace ConsoleGUI
 
         internal static class NativeMethods
         {
+#pragma warning disable CS0649
             internal struct COORD
             {
                 public short X;
                 public short Y;
             }
+#pragma warning restore CS0649
 
             [StructLayout(LayoutKind.Explicit)]
             internal struct INPUT_RECORD

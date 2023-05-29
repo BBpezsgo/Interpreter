@@ -27,8 +27,6 @@ namespace IngameCoding.BBCode.Compiler
             internal Dictionary<string, CompiledVariable> compiledVariables;
 
             public Dictionary<string, int> functionOffsets;
-            public int clearGlobalVariablesInstruction;
-            public int setGlobalVariablesInstruction;
             internal DebugInfo[] debugInfo;
 
             public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
@@ -52,19 +50,6 @@ namespace IngameCoding.BBCode.Compiler
 
                 for (int i = 0; i < this.compiledCode.Length; i++)
                 {
-                    if (this.clearGlobalVariablesInstruction == i)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                        Console.WriteLine("ClearGlobalVariables:");
-                        Console.ResetColor();
-                    }
-                    if (this.setGlobalVariablesInstruction == i)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                        Console.WriteLine("SetGlobalVariables:");
-                        Console.ResetColor();
-                    }
-
                     Instruction instruction = this.compiledCode[i];
                     if (instruction.opcode == Opcode.COMMENT)
                     {
@@ -156,16 +141,12 @@ namespace IngameCoding.BBCode.Compiler
 
             void ISerializable<CompilerResult>.Serialize(Serializer serializer)
             {
-                serializer.Serialize(setGlobalVariablesInstruction);
-                serializer.Serialize(clearGlobalVariablesInstruction);
                 serializer.Serialize(compiledCode);
                 serializer.Serialize(functionOffsets);
             }
 
             void ISerializable<CompilerResult>.Deserialize(Deserializer deserializer)
             {
-                this.setGlobalVariablesInstruction = deserializer.DeserializeInt32();
-                this.clearGlobalVariablesInstruction = deserializer.DeserializeInt32();
                 this.compiledCode = deserializer.DeserializeObjectArray<Instruction>();
                 this.functionOffsets = deserializer.DeserializeDictionary<string, int>();
             }
@@ -439,7 +420,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CodeGenerator codeGenerator = new()
             { warnings = warnings, errors = errors, hints = new List<Hint>(), informations = new List<Information>() };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, builtinFunctions, settings, printCallback, level);
+            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, parserResult.TopLevelStatements, builtinFunctions, settings, printCallback, level);
 
             printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
@@ -455,8 +436,6 @@ namespace IngameCoding.BBCode.Compiler
                 compiledFunctions = codeGeneratorResult.compiledFunctions.ToArray(),
                 compiledVariables = codeGenerator.compiledVariables.ToDictionary(),
 
-                clearGlobalVariablesInstruction = codeGeneratorResult.clearGlobalVariablesInstruction,
-                setGlobalVariablesInstruction = codeGeneratorResult.setGlobalVariablesInstruction,
                 functionOffsets = functionOffsets,
             };
         }

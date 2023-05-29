@@ -104,13 +104,6 @@ namespace TheProgram
                             message.id);
                     }
                     break;
-                case "comp/offsets":
-                    {
-                        Ipc.Reply("comp/offsets",
-                            new CodeOffsets(Interpreter.Details.CompilerResult),
-                            message.id);
-                    }
-                    break;
                 case "comp/code":
                     {
                         Ipc.Reply("comp/code",
@@ -243,18 +236,6 @@ namespace TheProgram
             Type = v.type.ToString();
             Value = v_v == null ? "null" : v_v.ToString();
             Tag = v.Tag;
-        }
-    }
-
-    public struct CodeOffsets
-    {
-        public int SetGlobalVariablesInstruction { get; set; }
-        public int ClearGlobalVariablesInstruction { get; set; }
-
-        public CodeOffsets(Compiler.CompilerResult v)
-        {
-            ClearGlobalVariablesInstruction = v.clearGlobalVariablesInstruction;
-            SetGlobalVariablesInstruction = v.setGlobalVariablesInstruction;
         }
     }
 

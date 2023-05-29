@@ -14,23 +14,19 @@ namespace IngameCoding.Core
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Output;
 
-    using System.Linq;
-
     /// <summary>
     /// This compiles and runs the code
     /// </summary>
     [Serializable]
     public class Interpreter
     {
-        internal enum State
+        public enum State
         {
             Initialized,
             Destroyed,
-            SetGlobalVariables,
             CallCodeEntry,
             CallUpdate,
             CallCodeEnd,
-            DisposeGlobalVariables,
             CodeExecuted
         }
 
@@ -108,8 +104,6 @@ namespace IngameCoding.Core
                 CodeEntry,
                 CodeEnd,
                 Update,
-                ClearGlobalVariables,
-                SetGlobalVariables,
             }
 
             public Dictionary<Kind, int> Offsets;
@@ -158,29 +152,29 @@ namespace IngameCoding.Core
             public string ElapsedTime => GetEllapsedTime(ElapsedMilliseconds);
         }
 
-        readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
+        protected readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
 
-        InterpreterDetails details;
+        protected InterpreterDetails details;
         public InterpreterDetails Details => details;
 
-        State state;
+        protected State state;
 
-        bool currentlyRunningCode;
+        protected bool currentlyRunningCode;
 
-        BytecodeInterpreter bytecodeInterpreter;
-        TimeSpan codeStartedTimespan;
+        protected BytecodeInterpreter bytecodeInterpreter;
+        protected TimeSpan codeStartedTimespan;
 
-        int result;
+        protected int result;
 
-        bool pauseCode;
+        protected bool pauseCode;
 
         /// <summary> In ms </summary>
-        float pauseCodeFor;
+        protected float pauseCodeFor;
 
-        DateTime LastTime = DateTime.Now;
+        protected DateTime LastTime = DateTime.Now;
 
-        int waitForUpdatesCounter;
-        Action waitForUpdatesCallback;
+        protected int waitForUpdatesCounter;
+        protected Action waitForUpdatesCallback;
         void WaitForUpdates(int count, Action callback)
         {
             pauseCode = true;
@@ -194,7 +188,7 @@ namespace IngameCoding.Core
         /// It prepares the interpreter to run some code
         /// </summary>
         /// <param name="compiledCode"></param>
-        public void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        public virtual void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
             bytecodeInterpreter = new BytecodeInterpreter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
@@ -229,23 +223,11 @@ namespace IngameCoding.Core
 
             instructionOffsets = new() { Offsets = new() };
 
-            instructionOffsets.Set(InstructionOffsets.Kind.SetGlobalVariables, deserializedCode.OffsetSetGlobalVariables);
-            instructionOffsets.Set(InstructionOffsets.Kind.ClearGlobalVariables, deserializedCode.OffsetClearGlobalVariables);
+            instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
 
             foreach (var compiledFunction in deserializedCode.CompiledFunctions)
             {
-                if (compiledFunction.TryGetAttribute("CodeEntry", out var attriute))
-                {
-                    if (attriute.parameters.Length != 0)
-                    { throw new CompilerException("Attribute 'CodeEntry' requies 0 parameter", Position.UnknownPosition); }
-                    if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
-                    {
-                        instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
-                    }
-                    else
-                    { throw new InternalException($"Function '{compiledFunction.FullName}' offset not found"); }
-                }
-                else if (compiledFunction.TryGetAttribute("Catch", out attriute))
+                if (compiledFunction.TryGetAttribute("Catch", out var attriute))
                 {
                     if (attriute.parameters.Length != 1)
                     { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", Position.UnknownPosition); }
@@ -354,23 +336,11 @@ namespace IngameCoding.Core
 
             instructionOffsets = new() { Offsets = new() };
 
-            instructionOffsets.Set(InstructionOffsets.Kind.SetGlobalVariables, compilerResult.setGlobalVariablesInstruction);
-            instructionOffsets.Set(InstructionOffsets.Kind.ClearGlobalVariables, compilerResult.clearGlobalVariablesInstruction);
+            instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
 
             foreach (var compiledFunction in compilerResult.compiledFunctions)
             {
-                if (compiledFunction.CompiledAttributes.TryGetValue("CodeEntry", out var attriute))
-                {
-                    if (attriute.parameters.Count != 0)
-                    { throw new CompilerException("Attribute 'CodeEntry' requies 0 parameter", attriute.Identifier); }
-                    if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
-                    {
-                        instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, i);
-                    }
-                    else
-                    { throw new InternalException($"Function '{compiledFunction.FullName}' offset not found"); }
-                }
-                else if (compiledFunction.CompiledAttributes.TryGetValue("Catch", out attriute))
+                if (compiledFunction.CompiledAttributes.TryGetValue("Catch", out var attriute))
                 {
                     if (attriute.parameters.Count != 1)
                     { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", attriute.Identifier); }
@@ -661,9 +631,9 @@ namespace IngameCoding.Core
             #endregion
         }
 
-        static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
+        protected static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
 
-        static string GetEllapsedTime(double ms)
+        protected static string GetEllapsedTime(double ms)
         {
             var val = ms;
 
@@ -688,7 +658,7 @@ namespace IngameCoding.Core
             return GetGoodNumber(val).ToString(System.Globalization.CultureInfo.InvariantCulture) + " min";
         }
 
-        void OnCodeExecuted(int result)
+        protected void OnCodeExecuted(int result)
         {
             OnDone?.Invoke(this, true);
             var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
@@ -699,11 +669,9 @@ namespace IngameCoding.Core
             state = State.CodeExecuted;
         }
 
-        bool exitCalled;
-        bool globalVariablesCreated;
-        bool startCalled;
-        bool globalVariablesDisposed;
-        bool HandleErrors = true;
+        protected bool exitCalled;
+        protected bool startCalled;
+        protected bool HandleErrors = true;
         internal string BasePath;
 
         /// <summary>
@@ -739,106 +707,92 @@ namespace IngameCoding.Core
                 return;
             }
 
-            if (bytecodeInterpreter != null && !pauseCode)
+            if (bytecodeInterpreter == null || pauseCode) return;
+
+            try
+            { bytecodeInterpreter.Tick(); }
+            catch (UserException error)
             {
-                try
-                { bytecodeInterpreter.Tick(); }
-                catch (UserException error)
-                {
-                    error.FeedDebugInfo(details.CompilerResult.debugInfo);
+                error.FeedDebugInfo(details.CompilerResult.debugInfo);
 
-                    OnOutput?.Invoke(this, "User Exception: " + error.Value.ToStringValue(), LogType.Error);
+                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToStringValue(), LogType.Error);
 
-                    OnDone?.Invoke(this, false);
-                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                    bytecodeInterpreter = null;
-                    currentlyRunningCode = false;
+                OnDone?.Invoke(this, false);
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                bytecodeInterpreter = null;
+                currentlyRunningCode = false;
 
-                    if (!HandleErrors) throw;
-                }
-                catch (RuntimeException error)
-                {
-                    error.FeedDebugInfo(details.CompilerResult.debugInfo);
-
-                    OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, LogType.Error);
-
-                    OnDone?.Invoke(this, false);
-                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                    bytecodeInterpreter = null;
-                    currentlyRunningCode = false;
-
-                    if (!HandleErrors) throw;
-                }
-                catch (System.Exception error)
-                {
-                    OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
-
-                    OnDone?.Invoke(this, false);
-                    var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                    OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                    bytecodeInterpreter = null;
-                    currentlyRunningCode = false;
-
-                    if (!HandleErrors) throw;
-                }
-
-                if (bytecodeInterpreter != null && !bytecodeInterpreter.IsRunning)
-                {
-                    if (OnlyHaveCode)
-                    {
-                        OnCodeExecuted(result);
-                    }
-                    else
-                    {
-                        if (!globalVariablesCreated)
-                        {
-                            state = State.SetGlobalVariables;
-                            OnOutput?.Invoke(this, "Set Global Variables", LogType.Debug);
-
-                            globalVariablesCreated = true;
-                            bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.SetGlobalVariables));
-                        }
-                        else if (!startCalled)
-                        {
-                            state = State.CallCodeEntry;
-                            OnOutput?.Invoke(this, "Call CodeEntry", LogType.Debug);
-
-                            startCalled = true;
-                            if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out int offset))
-                            { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
-
-                            bytecodeInterpreter.Call(offset);
-                        }
-                        else if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out int offset))
-                        {
-                            state = State.CallUpdate;
-                            WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset));
-                        }
-                        else if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
-                        {
-                            state = State.CallCodeEnd;
-                            OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
-
-                            exitCalled = true;
-                            bytecodeInterpreter?.Call(offset);
-                        }
-                        else if (!globalVariablesDisposed)
-                        {
-                            state = State.DisposeGlobalVariables;
-                            OnOutput?.Invoke(this, "Dispose Global Variables", LogType.Debug);
-
-                            globalVariablesDisposed = true;
-                            bytecodeInterpreter.Jump(instructionOffsets.Get(InstructionOffsets.Kind.ClearGlobalVariables));
-                        }
-                        else
-                        {
-                            OnCodeExecuted(result);
-                        }
-                    }
-                }
+                if (!HandleErrors) throw;
             }
+            catch (RuntimeException error)
+            {
+                error.FeedDebugInfo(details.CompilerResult.debugInfo);
+
+                OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, LogType.Error);
+
+                OnDone?.Invoke(this, false);
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                bytecodeInterpreter = null;
+                currentlyRunningCode = false;
+
+                if (!HandleErrors) throw;
+            }
+            catch (System.Exception error)
+            {
+                OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
+
+                OnDone?.Invoke(this, false);
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
+                bytecodeInterpreter = null;
+                currentlyRunningCode = false;
+
+                if (!HandleErrors) throw;
+            }
+
+            if (bytecodeInterpreter == null || bytecodeInterpreter.IsRunning) return;
+
+            if (OnlyHaveCode)
+            {
+                OnCodeExecuted(result);
+                return;
+            }
+
+            int offset;
+
+            if (!startCalled)
+            {
+                state = State.CallCodeEntry;
+                OnOutput?.Invoke(this, "Call CodeEntry", LogType.Debug);
+
+                startCalled = true;
+                if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out offset))
+                { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
+
+                bytecodeInterpreter.Jump(offset);
+                return;
+            }
+            
+            if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out offset))
+            {
+                state = State.CallUpdate;
+                WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset));
+                return;
+            }
+            
+            if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
+            {
+                state = State.CallCodeEnd;
+                OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
+
+                exitCalled = true;
+                bytecodeInterpreter?.Call(offset);
+                return;
+            }
+
+            OnCodeExecuted(result);
         }
 
         #region AddBuiltinFunction()

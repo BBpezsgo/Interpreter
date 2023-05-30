@@ -577,6 +577,16 @@ namespace IngameCoding.Core
             {
                 OnStdOut?.Invoke(this, parameters[0].ToStringValue());
             });
+
+            builtinFunctions.AddBuiltinFunction<string, int, int>("stdout2", (v, x, y) =>
+            {
+                if (x < 0 || y < 0) return;
+                var (lx, ly) = Console.GetCursorPosition();
+                Console.SetCursorPosition(x, y);
+                Console.Write(v);
+                Console.SetCursorPosition(lx, ly);
+            });
+
             builtinFunctions.AddBuiltinFunction("stderr", new TypeToken[] {
                 TypeToken.CreateAnonymous("string", BuiltinType.STRING)
             }, (DataItem[] parameters) =>
@@ -589,6 +599,16 @@ namespace IngameCoding.Core
             {
                 pauseCodeFor = parameters[0].ValueInt;
             });
+
+            #endregion
+
+            #region Math
+
+            builtinFunctions.AddBuiltinFunction<float>("cos", v =>
+            { return (float)Math.Cos(v); });
+
+            builtinFunctions.AddBuiltinFunction<float>("sin", v =>
+            { return (float)Math.Sin(v); });
 
             #endregion
 
@@ -627,6 +647,15 @@ namespace IngameCoding.Core
             #endregion
 
             #region Structs
+
+            #endregion
+
+            #region Casts
+
+            builtinFunctions.AddBuiltinFunction<float>("float-to-int", @float =>
+            { return (int)@float; });
+            builtinFunctions.AddBuiltinFunction<int>("int-to-float", @int =>
+            { return (float)@int; });
 
             #endregion
         }
@@ -774,14 +803,14 @@ namespace IngameCoding.Core
                 bytecodeInterpreter.Jump(offset);
                 return;
             }
-            
+
             if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out offset))
             {
                 state = State.CallUpdate;
                 WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset));
                 return;
             }
-            
+
             if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
             {
                 state = State.CallCodeEnd;

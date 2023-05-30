@@ -255,6 +255,7 @@ namespace IngameCoding.Core
 
             builtinFunctions.AddBuiltinFunction(name, types, (args) =>
             {
+                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value());
             });

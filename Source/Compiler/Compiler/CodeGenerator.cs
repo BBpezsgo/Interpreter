@@ -910,7 +910,7 @@ namespace IngameCoding.BBCode.Compiler
             return literal.Type.Type switch
             {
                 TypeTokenType.INT => new DataItem(int.Parse(literal.Value), null),
-                TypeTokenType.FLOAT => new DataItem(float.Parse(literal.Value), null),
+                TypeTokenType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
                 TypeTokenType.BYTE => new DataItem(byte.Parse(literal.Value), null),
                 TypeTokenType.STRING => new DataItem(literal.Value, null),
                 TypeTokenType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
@@ -2273,7 +2273,15 @@ namespace IngameCoding.BBCode.Compiler
             CompiledType valueType = FindStatementType(value);
 
             if (variable.Type != valueType)
-            { throw new CompilerException($"Can not set a {valueType.FullName} type value to the {variable.Type.FullName} type variable.", value, CurrentFile); }
+            {
+                if ((variable.Type.BuiltinType != CompiledType.CompiledTypeType.INT ||
+                    valueType.BuiltinType != CompiledType.CompiledTypeType.FLOAT) &&
+                    (variable.Type.BuiltinType != CompiledType.CompiledTypeType.FLOAT ||
+                    valueType.BuiltinType != CompiledType.CompiledTypeType.INT))
+                {
+                    throw new CompilerException($"Can not set a {valueType.FullName} type value to the {variable.Type.FullName} type variable.", value, CurrentFile);
+                }
+            }
 
             GenerateCodeForStatement(value);
 

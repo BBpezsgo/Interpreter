@@ -1,0 +1,131 @@
+using System;
+using System.Math;
+
+[CodeEntry]
+void Start()
+{
+	float A = 20f;
+	float B = 20f;
+
+    int yes = 0;
+
+    while (0 == yes)
+    {
+        A += 1f;
+        B -= 1f;
+        RenderFrame(A, B);
+    };
+    
+	int screen_height = 30;
+
+    for (int y = 0; y < screen_height; y++)
+    {
+        Console.Write("\r\n");
+    };
+}
+
+void ClearConsole(int w, int h)
+{
+    for (int x = 0; x < w; x++)
+    {
+        for (int y = 0; y < h; y++)
+        {
+            Console.Set(" ", x, y);
+        };
+    };
+}
+
+void RenderFrame(float A, float B)
+{
+    float PI = 3.1415f;
+
+	int screen_width = 120;
+	int screen_height = 30;
+
+	float theta_spacing = 0.07f;
+	float phi_spacing = 0.02f;
+
+	float R1 = 1f;
+	float R2 = 2f;
+	float K2 = 5f;
+
+    float K1 = screen_width.ToFloat() * K2 * 3f / (20f * (R1 + R2));
+
+    ClearConsole(screen_width, screen_height);
+
+    // precompute sines and cosines of A and B
+    float cosA = Math.Cos(A);
+    float sinA = Math.Sin(A);
+
+    float cosB = Math.Cos(B);
+    float sinB = Math.Sin(B);
+
+    // theta goes around the cross-sectional circle of a torus
+    for (float theta = 0f; theta < 2 * PI; theta += theta_spacing)
+    {
+        // precompute sines and cosines of theta
+        float costheta = Math.Cos(theta);
+        float sintheta = Math.Sin(theta);
+
+        // phi goes around the center of revolution of a torus
+        for (float phi = 0f; phi < 2 * PI; phi += phi_spacing)
+        {
+            // precompute sines and cosines of phi
+            float cosphi = Math.Cos(phi);
+            float sinphi = Math.Sin(phi);
+
+            // the x,y coordinate of the circle, before revolving (factored
+            // out of the above equations)
+            float circlex = R2 + R1 * costheta;
+            float circley = R1 * sintheta;
+
+            // final 3D (x,y,z) coordinate after rotations, directly from
+            // our math above
+            float x = circlex * (cosB * cosphi + sinA * sinB * sinphi)
+                - circley * cosA * sinB;
+            float y = circlex * (sinB * cosphi - sinA * cosB * sinphi)
+                + circley * cosA * cosB;
+            float z = K2 + cosA * circlex * sinphi + circley * sinA;
+            float ooz = (1f / z);  // "one over z"
+
+            // x and y projection.  note that y is negated here, because y
+            // goes up in 3D space but down on 2D displays.
+            int xp = (screen_width / 2f + K1 * ooz * x).ToInt();
+            int yp = (screen_height / 2f - K1 * ooz * y).ToInt();
+
+            // calculate luminance.  ugly, but correct.
+            float L = cosphi * costheta * sinB - cosA * costheta * sinphi -
+                sinA * sintheta + cosB * (cosA * sintheta - costheta * sinA * sinphi);
+            // L ranges from -sqrt(2) to +sqrt(2).  If it's < 0, the surface
+            // is pointing away from us, so we won't bother trying to plot it.
+            if (L > 0)
+            {
+                // test against the z-buffer.  larger 1/z means the pixel is
+                // closer to the viewer than what's already plotted.
+                // if (/* !zbuffer.OutOf(xp, yp) && ooz > zbuffer[xp, yp] */ false)
+                if (xp >= 0 && yp >= 0 )
+                {
+                    // zbuffer[xp, yp] = ooz;
+                    int luminance_index = (L * 8f).ToInt();
+                    // luminance_index is now in the range 0..11 (8*sqrt(2) = 11.3)
+                    // now we lookup the character corresponding to the
+                    // luminance and plot it in our output:
+                    if (luminance_index == 0) { Console.Set(".", xp, yp); }
+                    elseif (luminance_index == 1) { Console.Set(".", xp, yp); }
+                    elseif (luminance_index == 2) { Console.Set(",", xp, yp); }
+                    elseif (luminance_index == 3) { Console.Set("-", xp, yp); }
+                    elseif (luminance_index == 4) { Console.Set("~", xp, yp); }
+                    elseif (luminance_index == 5) { Console.Set(":", xp, yp); }
+                    elseif (luminance_index == 6) { Console.Set(";", xp, yp); }
+                    elseif (luminance_index == 7) { Console.Set("=", xp, yp); }
+                    elseif (luminance_index == 8) { Console.Set("!", xp, yp); }
+                    elseif (luminance_index == 9) { Console.Set("*", xp, yp); }
+                    elseif (luminance_index == 10) { Console.Set("#", xp, yp); }
+                    elseif (luminance_index == 11) { Console.Set("$", xp, yp); }
+                    elseif (luminance_index == 12) { Console.Set("@", xp, yp); };
+                    // output[xp, yp] = ".,-~:;=!*#$@"[luminance_index];
+                };
+            };
+        };
+    };
+}

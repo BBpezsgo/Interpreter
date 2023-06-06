@@ -1,6 +1,6 @@
 using System;
 
-class List
+class Array
 {
     private int pointer;
     private int capacity;
@@ -8,7 +8,7 @@ class List
 
     export int ElementAt(int index)
     {
-        if (index < 0 | index >= this.length)
+        if (index < 0 || index >= this.length)
         { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
         return *(this.pointer + index);
     }
@@ -35,7 +35,7 @@ class List
     {
         if (this.length >= this.capacity)
         { throw "Bruh"; };
-        if (index < 0 | index >= this.length)
+        if (index < 0 || index >= this.length)
         { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
   
         for (int i = this.length - 1; i >= index; i--)
@@ -48,14 +48,14 @@ class List
 
     export void Set(int index, int element)
     {
-        if (index < 0 | index >= this.length)
+        if (index < 0 || index >= this.length)
         { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
         *(this.pointer + index) = element;
     }
 
     export void RemoveAt(int index)
     {
-        if (index < 0 | index >= this.length)
+        if (index < 0 || index >= this.length)
         { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
   
         for (int i = index; i < this.length - 1; i++)
@@ -79,17 +79,92 @@ class List
         return "{ " + result + " }";
     }
 
+    export void Deallocate()
+    {
+        Dealloc(this.pointer, this.capacity);
+        Dealloc(&this, sizeof(this));
+    }
 }
 
-export List CreateList(int length)
+export Array CreateArray(int length, int capacity)
 {
-  List result = new List;
-  result.pointer = Alloc(5);
-  result.capacity = 5;
+  Array result = new Array;
+  result.pointer = Alloc(capacity);
+  result.capacity = capacity;
   result.length = length;
   for (int i = 0; i < length; i++)
   {
     *(result.pointer + i) = i;
+  };
+  if (length < capacity)
+  {
+    for (int i = length; i < capacity; i++)
+    {
+      *(result.pointer + i) = 0;
+    };
+  };
+  return result;
+}
+
+class Map
+{
+    private int pointer;
+    private int capacity;
+    int length;
+    int width;
+
+    export int Get(int x, int y)
+    {
+        int index = y * this.width + x;
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+        return *(this.pointer + index);
+    }
+  
+    export void Set(int x, int y, int element)
+    {
+        int index = y * this.width + x;
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception (index:" + index + " length:" + this.length + ")"; };
+        *(this.pointer + index) = element;
+    }
+
+    export string ToString()
+    {
+        string result = "";
+        int length = this.length;
+        for (int i; i < length; i++)
+        {
+            if (i > 0) { result += ", "; };
+            int element = this.ElementAt(i);
+            result += "" + element;
+        };
+        return "{ " + result + " }";
+    }
+
+    export void Deallocate()
+    {
+        Dealloc(this.pointer, this.capacity);
+        Dealloc(&this, sizeof(this));
+    }
+
+    export bool OutOf(int x, int y)
+    {
+      return (x < 0 || y < 0 || x > this.width || y > (this.length / this.width));
+    }
+}
+
+export Map CreateMap(int width, int height)
+{
+  int length = height * width;
+  Map result = new Map;
+  result.pointer = Alloc(5);
+  result.capacity = 5;
+  result.length = length;
+  result.width = width;
+  for (int i = 0; i < length; i++)
+  {
+    *(result.pointer + i) = 0;
   };
   if (length < 5)
   {

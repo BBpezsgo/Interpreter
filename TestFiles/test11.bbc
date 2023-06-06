@@ -4,7 +4,8 @@ using System.Lists;
 [CodeEntry]
 void Start()
 {
-  List list = CreateList(3);
+  Array list = CreateArray(5, 10);
+
   Console.Log(list.ToString());
   list.Push(420);
   Console.Log(list.ToString());
@@ -18,4 +19,10 @@ void Start()
   Console.Log("Length: " + list.length);
   Console.Log("Capacity: " + list.capacity);
   Console.Log("Pointer: " + list.pointer);
+  
+  list.Deallocate();
+
+  Map map = CreateMap(10, 10);
+  Console.Log(map.Get(5, 5));
+  map.Set(4, 8, 333);
 }

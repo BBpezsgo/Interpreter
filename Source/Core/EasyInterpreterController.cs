@@ -72,6 +72,72 @@ namespace IngameCoding.Core
                 sender.OnInput(input.KeyChar);
             };
 
+            codeInterpreter.OnDone += (sender, success) =>
+            {
+                if (sender.Details.Interpreter == null) return;
+                var heap = sender.Details.Interpreter.Heap;
+                Console.WriteLine($"");
+                Console.WriteLine($" ===== DUMPED HEAP ===== ");
+                Console.WriteLine($"");
+
+                int elementsToShow = heap.Length;
+
+                {
+                    for (int i = heap.Length - 1; i >= 0; i--)
+                    {
+                        elementsToShow = i + 1;
+                        if (!heap[i].IsNull) break;
+                    }
+                    elementsToShow += 10;
+                }
+
+                for (int i = 0; i < elementsToShow; i++)
+                {
+                    if (heap[i].IsNull)
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write("null");
+                    }
+                    else
+                    {
+                        string v;
+                        switch (heap[i].type)
+                        {
+                            case RuntimeType.BYTE:
+                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                v = heap[i].ValueByte.ToString();
+                                break;
+                            case RuntimeType.INT:
+                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                v = heap[i].ValueInt.ToString();
+                                break;
+                            case RuntimeType.FLOAT:
+                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                v = heap[i].ValueFloat.ToString() + "f";
+                                break;
+                            case RuntimeType.BOOLEAN:
+                                Console.ForegroundColor = ConsoleColor.Blue;
+                                v = heap[i].ValueBoolean ? "true" : "false";
+                                break;
+                            case RuntimeType.CHAR:
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                v = "'" + heap[i].ValueChar.Escape() + "'";
+                                break;
+                            default:
+                                Console.ForegroundColor = ConsoleColor.Gray;
+                                v = heap[i].ToString();
+                                break;
+                        }
+                        Console.Write(v);
+                        if (4 - v.Length > 0)
+                        { Console.Write(new string(' ', 4 - v.Length)); }
+                    }
+                    Console.Write(' ');
+                    Console.ResetColor();
+                }
+                Console.WriteLine($"");
+            };
+
             if (codeInterpreter.Initialize())
             {
                 codeInterpreter.BasePath = BasePath;
@@ -109,7 +175,7 @@ namespace IngameCoding.Core
                 }
                 catch (UserException error)
                 {
-                    Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
+                    Output.Output.Error($"UserException: {error.Value.ToString()}");
                     if (!HandleErrors) throw;
                 }
                 catch (RuntimeException error)
@@ -221,7 +287,7 @@ namespace IngameCoding.Core
                 }
                 catch (UserException error)
                 {
-                    Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
+                    Output.Output.Error($"UserException: {error.Value.ToString()}");
                     if (!HandleErrors) throw;
                 }
                 catch (RuntimeException error)

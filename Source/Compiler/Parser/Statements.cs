@@ -265,7 +265,26 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            return $"{TargetNamespacePathPrefix}{FunctionName}(...)";
+            string result = "";
+            result += TargetNamespacePathPrefix;
+            result += FunctionName;
+            result += "(";
+
+            string paramsString = "";
+            for (int i = 0; i < Parameters.Length; i++)
+            {
+                if (i > 0) paramsString += ", ";
+                paramsString += Parameters[i].ToString();
+                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
+                {
+                    paramsString += ", ...";
+                    break;
+                }
+            }
+            result += paramsString;
+
+            result += ")";
+            return result;
         }
 
         public override string PrettyPrint(int ident = 0)
@@ -322,30 +341,31 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string ToString()
         {
-            string v;
+            string result = "";
             if (Left != null)
             {
+                if (Left.ToString().Length <= 50)
+                { result += Left.ToString(); }
+                else
+                { result += "..."; }
+
+                result += $" {Operator}";
+
                 if (Right != null)
                 {
-                    v = $"... {Operator} ...";
-                }
-                else
-                {
-                    v = $"... {Operator}";
+                    if (Right.ToString().Length <= 50)
+                    { result += " " + Right.ToString(); }
+                    else
+                    { result += " ..."; }
                 }
             }
             else
-            {
-                v = $"{Operator}";
-            }
+            { result = $"{Operator}"; }
+
             if (InsideBracelet)
-            {
-                return $"({v})";
-            }
+            { return $"({result})"; }
             else
-            {
-                return v;
-            }
+            { return result; }
         }
 
         public override string PrettyPrint(int ident = 0)
@@ -372,7 +392,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
             else
             {
-                return $"{" ".Repeat(ident)}{v}";
+                return $"{" ".Repeat(ident)}({v})";
             }
         }
 
@@ -521,14 +541,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            if (Type.Type == TypeTokenType.STRING)
-            {
-                return $"{" ".Repeat(ident)}\"{Value}\"";
-            }
-            else
-            {
-                return $"{" ".Repeat(ident)}{Value}";
-            }
+            return $"{" ".Repeat(ident)}{Value}";
         }
 
         public override object TryGetValue()
@@ -539,7 +552,6 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 TypeTokenType.INT => int.Parse(Value),
                 TypeTokenType.FLOAT => float.Parse(Value),
-                TypeTokenType.STRING => Value,
                 TypeTokenType.BOOLEAN => bool.Parse(Value),
                 _ => null,
             };

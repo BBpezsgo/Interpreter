@@ -1,12 +1,14 @@
-﻿using IngameCoding.Core;
-
-using System;
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 
 namespace ConsoleGUI
 {
-    using System.Collections.Generic;
-    using System.Drawing;
+    using IngameCoding.Core;
+    using IngameCoding.Output.Debug;
+
+    using System.Timers;
 
     internal sealed class InterpreterElement : WindowElement
     {
@@ -33,6 +35,9 @@ namespace ConsoleGUI
         readonly List<ConsoleLine> ConsoleLines = new();
 
         int ConsoleScrollOffset = 0;
+        int NextCodeJumpCount = 1;
+        int CurrentlyJumping = 0;
+        private Timer InterpreterTimer;
 
         InterpreterElement() : base()
         {
@@ -53,6 +58,7 @@ namespace ConsoleGUI
             SetupInterpreter();
         }
 
+        /*
         static void CalculateLayoutBoxes(
             out Rectangle StatePanelRect,
             out Rectangle ConsolePanelRect,
@@ -87,9 +93,11 @@ namespace ConsoleGUI
             CallstackPanelRect.Y = HeapPanelRect.Bottom + 1;
             CallstackPanelRect.Height = right.Height - CallstackPanelRect.Y - 1;
         }
+        */
 
         void InitElements()
         {
+            /*
             CalculateLayoutBoxes(
                 out Rectangle StatePanelRect,
                 out Rectangle ConsolePanelRect,
@@ -99,7 +107,6 @@ namespace ConsoleGUI
                 out Rectangle CallstackPanelRect
                 );
 
-            /*
             Rectangle left = new(0, 0, Console.WindowWidth / 2, Console.WindowHeight);
             Rectangle right = new(left.Right + 1, 0, Console.WindowWidth - (left.Right + 1), Console.WindowHeight);
 
@@ -127,62 +134,24 @@ namespace ConsoleGUI
             var StatePanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = StatePanelRect,
                 Title = "State",
+                Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 3),
             };
             StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
-            StatePanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = StatePanelRect;
-            };
 
             var CodePanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = CodePanelRect,
                 Title = "Code",
             };
             CodePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
-            CodePanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = CodePanelRect;
-            };
 
             var ConsolePanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = ConsolePanelRect,
                 Title = "Console",
             };
             ConsolePanel.OnBeforeDraw += ConsolePanel_OnBeforeDraw;
-            ConsolePanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = ConsolePanelRect;
-            };
             ConsolePanel.OnMouseEventInvoked += (sender, e) =>
             {
                 int a = -(ConsoleLines.Count - sender.Rect.Height);
@@ -204,64 +173,53 @@ namespace ConsoleGUI
             var StackPanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = StackPanelRect,
                 Title = "Stack",
             };
             StackPanel.OnBeforeDraw += StackElement_OnBeforeDraw;
-            StackPanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = StackPanelRect;
-            };
 
             var HeapPanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = HeapPanelRect,
                 Title = "HEAP",
+                Layout = InlineLayout.Stretchy(150),
             };
             HeapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
-            HeapPanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = HeapPanelRect;
-            };
 
             var CallstackPanel = new InlineElement
             {
                 HasBorder = true,
-                Rect = HeapPanelRect,
                 Title = "Call Stack",
             };
             CallstackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
-            CallstackPanel.OnRefreshSize += (sender) =>
-            {
-                CalculateLayoutBoxes(
-                    out Rectangle StatePanelRect,
-                    out Rectangle ConsolePanelRect,
-                    out Rectangle CodePanelRect,
-                    out Rectangle StackPanelRect,
-                    out Rectangle HeapPanelRect,
-                    out Rectangle CallstackPanelRect
-                    );
-                sender.Rect = CallstackPanelRect;
+
+            this.Elements = new IElement[]{
+            new HorizontalLayoutElement()
+                {
+                    Rect = new Rectangle(0, 0, Console.WindowWidth, Console.WindowHeight),
+                    Elements = new IElement[]
+                    {
+                        new VerticalLayoutElement()
+                        {
+                            Elements = new IElement[]
+                            {
+                                StatePanel,
+                                ConsolePanel,
+                                CodePanel,
+                            }
+                        },
+                        new VerticalLayoutElement()
+                        {
+                            Elements = new IElement[]
+                            {
+                                StackPanel,
+                                HeapPanel,
+                                CallstackPanel,
+                            }
+                        },
+                    },
+                },
             };
-
-
+            return;
             this.Elements = new InlineElement[]
             {
                 CodePanel,
@@ -276,6 +234,22 @@ namespace ConsoleGUI
         void SetupInterpreter() => SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
         void SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
+            this.InterpreterTimer = new Timer(200);
+            this.InterpreterTimer.Elapsed += (sender, e) =>
+            {
+                if (this.CurrentlyJumping <= 0) return;
+
+                this.CurrentlyJumping--;
+                this.Interpreter.Update();
+                if (!this.Interpreter.IsExecutingCode)
+                {
+                    ConsoleGUI.Instance.Destroy();
+                    return;
+                }
+                ConsoleGUI.Instance.NextRefreshConsole = true;
+            };
+            this.InterpreterTimer.Enabled = true;
+
             var fileInfo = new FileInfo(File);
             var code = System.IO.File.ReadAllText(fileInfo.FullName);
             this.Interpreter = new InterpreterDebuggabble();
@@ -310,6 +284,7 @@ namespace ConsoleGUI
                         ClockCyclesPerUpdate = 1,
                         InstructionLimit = interpreterSettings.InstructionLimit,
                         StackMaxSize = interpreterSettings.StackMaxSize,
+                        HeapSize = interpreterSettings.HeapSize,
                     });
                 }
             }
@@ -318,49 +293,11 @@ namespace ConsoleGUI
         private void CallstackElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
-
-            int BufferIndex = 0;
-
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
-
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
-            }
+            sender.DrawBuffer.ResetColor();
 
             IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
@@ -385,8 +322,8 @@ namespace ConsoleGUI
             {
                 IngameCoding.Bytecode.CallStackFrame frame = new(this.Interpreter.Details.Interpreter.CallStack[i]);
 
-                ForegroundColor = CharColors.FgGray;
-                AddText(" ");
+                sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
+                sender.DrawBuffer.AddText(" ");
 
                 bool addLoadIndicator = false;
                 bool addStoreIndicator = false;
@@ -394,9 +331,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("○");
-                    ForegroundColor = CharColors.FgGray;
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgRed;
+                    sender.DrawBuffer.AddText("○");
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -405,33 +342,33 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("●");
-                    ForegroundColor = CharColors.FgGray;
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgRed;
+                    sender.DrawBuffer.AddText("●");
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
                 }
 
-                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                sender.DrawBuffer.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
-                AddText(i.ToString());
-                AddSpace(5);
+                sender.DrawBuffer.AddText(i.ToString());
+                sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
 
-                ForegroundColor = CharColors.FgDefault;
-                BackgroundColor = CharColors.BgBlack;
+                sender.DrawBuffer.ForegroundColor = CharColors.FgDefault;
+                sender.DrawBuffer.BackgroundColor = CharColors.BgBlack;
 
-                AddText($"{frame.Function}");
+                sender.DrawBuffer.AddText($"{frame.Function}");
 
-                BackgroundColor = CharColors.BgBlack;
-                FinishLine();
-                ForegroundColor = CharColors.FgDefault;
+                sender.DrawBuffer.BackgroundColor = CharColors.BgBlack;
+                sender.DrawBuffer.FinishLine(sender.Rect.Width);
+                sender.DrawBuffer.ForegroundColor = CharColors.FgDefault;
             }
 
             while (loadIndicators.Count > 0 || storeIndicators.Count > 0)
             {
-                ForegroundColor = CharColors.FgDefault;
-                AddText(" ");
+                sender.DrawBuffer.ForegroundColor = CharColors.FgDefault;
+                sender.DrawBuffer.AddText(" ");
 
                 bool addLoadIndicator = false;
                 bool addStoreIndicator = false;
@@ -439,9 +376,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("○");
-                    ForegroundColor = CharColors.FgGray;
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgRed;
+                    sender.DrawBuffer.AddText("○");
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -450,23 +387,22 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("●");
-                    ForegroundColor = CharColors.FgGray;
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgRed;
+                    sender.DrawBuffer.AddText("●");
+                    sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
                 }
 
-                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                sender.DrawBuffer.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
-                AddText(i.ToString());
-                AddSpace(5);
+                sender.DrawBuffer.AddText(i.ToString());
+                sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
 
-                BackgroundColor = CharColors.BgBlack;
-                ForegroundColor = CharColors.FgDefault;
+                sender.DrawBuffer.ResetColor();
 
-                FinishLine();
+                sender.DrawBuffer.FinishLine(sender.Rect.Width);
                 break;
             }
 
@@ -474,177 +410,69 @@ namespace ConsoleGUI
 
         private void ConsolePanel_OnBeforeDraw(InlineElement sender)
         {
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            DrawBuffer b = sender.DrawBuffer;
+            b.StepTo(0);
 
-            int BufferIndex = 0;
-
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
-
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
-            }
+            b.ResetColor();
 
             bool lineFinished = true;
             for (int i = Math.Max(0, ConsoleLines.Count - sender.Rect.Height + ConsoleScrollOffset); i < ConsoleLines.Count; i++)
             {
                 var line = ConsoleLines[i];
 
-                if (lineFinished) AddChar(' ');
-                ForegroundColor = line.Color;
-                AddText(line.Data.TrimEnd());
-                ForegroundColor = CharColors.FgDefault;
-                BackgroundColor = CharColors.BgBlack;
+                if (lineFinished) b.AddChar(' ');
+                b.ForegroundColor = line.Color;
+                b.AddText(line.Data.TrimEnd());
+                b.ForegroundColor = CharColors.FgDefault;
+                b.BackgroundColor = CharColors.BgBlack;
 
                 lineFinished = line.Data.EndsWith('\n');
 
-                if (lineFinished) FinishLine();
+                if (lineFinished) b.FinishLine(sender.Rect.Width);
             }
         }
 
         private void StateElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            DrawBuffer b = sender.DrawBuffer;
 
-            int BufferIndex = 0;
+            b.ResetColor();
 
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
+            b.AddText("  ");
+            b.AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsRunning}");
+            b.BackgroundColor = CharColors.BgBlack;
+            b.FinishLine(sender.Rect.Width);
+            b.ForegroundColor = CharColors.FgDefault;
 
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
-
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
-            }
-
-            AddText("  ");
-            AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsRunning}");
-            BackgroundColor = CharColors.BgBlack;
-            FinishLine();
-            ForegroundColor = CharColors.FgDefault;
-
-            AddText("  ");
+            b.AddText("  ");
             if (this.Interpreter.Details.Interpreter.CodePointer == this.Interpreter.Details.CompilerResult.compiledCode.Length)
             {
-                AddText($"State: {this.Interpreter.Details.State}");
+                b.AddText($"State: {this.Interpreter.Details.State}");
             }
             else
             {
-                AddText($"State: Running...");
+                b.AddText($"State: Running...");
             }
-            BackgroundColor = CharColors.BgBlack;
-            FinishLine();
-            ForegroundColor = CharColors.FgDefault;
+            b.BackgroundColor = CharColors.BgBlack;
+            b.FinishLine(sender.Rect.Width);
+            b.ForegroundColor = CharColors.FgDefault;
         }
 
         private void HeapElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            DrawBuffer b = sender.DrawBuffer;
 
-            int BufferIndex = 0;
-
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
-
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
-            }
+            b.ResetColor();
 
             IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
@@ -680,9 +508,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("○");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("○");
+                    b.ForegroundColor = CharColors.FgGray;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -691,112 +519,76 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("●");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("●");
+                    b.ForegroundColor = CharColors.FgGray;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
                 }
 
-                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                if (((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length > 0) b.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
 
-                ForegroundColor = CharColors.FgGray;
-                AddText(i.ToString());
-                ForegroundColor = CharColors.FgDefault;
-                AddSpace(5);
+                b.ForegroundColor = CharColors.FgGray;
+                b.AddText(i.ToString());
+                b.ForegroundColor = CharColors.FgDefault;
+                b.AddSpace(5, sender.Rect.Width);
 
                 if (item.IsNull)
                 {
-                    ForegroundColor = CharColors.FgGray;
-                    AddText("<null>");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText("<null>");
                 }
                 else
                 {
                     switch (item.type)
                     {
-                        case IngameCoding.Bytecode.DataType.INT:
-                            ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueInt}");
+                        case IngameCoding.Bytecode.RuntimeType.INT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{item.ValueInt}");
                             break;
-                        case IngameCoding.Bytecode.DataType.FLOAT:
-                            ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueFloat}f");
+                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{item.ValueFloat}f");
                             break;
-                        case IngameCoding.Bytecode.DataType.STRING:
-                            ForegroundColor = CharColors.FgYellow;
-                            AddText($"\"{item.ValueString}\"");
+                        case IngameCoding.Bytecode.RuntimeType.CHAR:
+                            b.ForegroundColor = CharColors.FgYellow;
+                            b.AddText($"'{item.ValueChar.Escape()}'");
                             break;
-                        case IngameCoding.Bytecode.DataType.BOOLEAN:
-                            ForegroundColor = CharColors.FgDarkBlue;
-                            AddText($"{item.ValueBoolean}");
+                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
+                            b.ForegroundColor = CharColors.FgDarkBlue;
+                            b.AddText($"{item.ValueBoolean}");
                             break;
                         default:
-                            ForegroundColor = CharColors.FgGray;
-                            AddText("?");
+                            b.ForegroundColor = CharColors.FgGray;
+                            b.AddText("?");
                             break;
                     }
                 }
 
                 if (!string.IsNullOrEmpty(item.Tag))
                 {
-                    AddText($" ");
-                    ForegroundColor = CharColors.FgGray;
-                    AddText(item.Tag);
+                    b.AddText($" ");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText(item.Tag);
                 }
 
-                BackgroundColor = CharColors.BgBlack;
-                FinishLine();
-                ForegroundColor = CharColors.FgDefault;
+                b.BackgroundColor = CharColors.BgBlack;
+                b.FinishLine(sender.Rect.Width);
+                b.ForegroundColor = CharColors.FgDefault;
             }
         }
         private void StackElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            DrawBuffer b = sender.DrawBuffer;
 
-            int BufferIndex = 0;
-
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
-
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
-            }
+            b.ResetColor();
 
             IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
@@ -805,7 +597,7 @@ namespace ConsoleGUI
             for (int j = 0; j < this.Interpreter.Details.Interpreter.Stack.Length; j++)
             {
                 var item = this.Interpreter.Details.Interpreter.Stack[j];
-                if (item.type != IngameCoding.Bytecode.DataType.INT) continue;
+                if (item.type != IngameCoding.Bytecode.RuntimeType.INT) continue;
                 if (item.Tag != "saved base pointer") continue;
                 savedBasePointers.Add(item.ValueInt);
             }
@@ -865,21 +657,21 @@ namespace ConsoleGUI
 
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
-                    ForegroundColor = CharColors.FgLightBlue;
-                    AddText("►");
+                    b.ForegroundColor = CharColors.FgLightBlue;
+                    b.AddText("►");
                     basepointerShown = true;
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgGray;
                 }
                 else if (savedBasePointers.Contains(i))
                 {
-                    ForegroundColor = CharColors.FgGray;
-                    AddText("►");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText("►");
+                    b.ForegroundColor = CharColors.FgGray;
                 }
                 else
                 {
-                    ForegroundColor = CharColors.FgGray;
-                    AddText(" ");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText(" ");
                 }
 
                 bool addLoadIndicator = false;
@@ -888,9 +680,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("○");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("○");
+                    b.ForegroundColor = CharColors.FgGray;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -899,84 +691,84 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("●");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("●");
+                    b.ForegroundColor = CharColors.FgGray;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
                 }
 
-                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                b.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
-                AddText(i.ToString());
-                AddSpace(5);
+                b.AddText(i.ToString());
+                b.AddSpace(5, sender.Rect.Width);
 
-                ForegroundColor = CharColors.FgDefault;
-                BackgroundColor = CharColors.BgBlack;
+                b.ForegroundColor = CharColors.FgDefault;
+                b.BackgroundColor = CharColors.BgBlack;
 
                 if (item.IsNull)
                 {
-                    ForegroundColor = CharColors.FgGray;
-                    AddText("<null>");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText("<null>");
                 }
                 else
                 {
                     switch (item.type)
                     {
-                        case IngameCoding.Bytecode.DataType.INT:
-                            ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueInt}");
+                        case IngameCoding.Bytecode.RuntimeType.INT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{item.ValueInt}");
                             break;
-                        case IngameCoding.Bytecode.DataType.FLOAT:
-                            ForegroundColor = CharColors.FgCyan;
-                            AddText($"{item.ValueFloat}f");
+                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{item.ValueFloat}f");
                             break;
-                        case IngameCoding.Bytecode.DataType.STRING:
-                            ForegroundColor = CharColors.FgYellow;
-                            AddText($"\"{item.ValueString.Escape()}\"");
+                        case IngameCoding.Bytecode.RuntimeType.CHAR:
+                            b.ForegroundColor = CharColors.FgYellow;
+                            b.AddText($"'{item.ValueChar.Escape()}'");
                             break;
-                        case IngameCoding.Bytecode.DataType.BOOLEAN:
-                            ForegroundColor = CharColors.FgLightBlue;
-                            AddText($"{item.ValueBoolean}");
+                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
+                            b.ForegroundColor = CharColors.FgLightBlue;
+                            b.AddText($"{item.ValueBoolean}");
                             break;
                         default:
-                            ForegroundColor = CharColors.FgGray;
-                            AddText("?");
+                            b.ForegroundColor = CharColors.FgGray;
+                            b.AddText("?");
                             break;
                     }
                 }
 
                 if (!string.IsNullOrEmpty(item.Tag))
                 {
-                    AddText($" ");
-                    ForegroundColor = CharColors.FgGray;
-                    AddText(item.Tag);
+                    b.AddText($" ");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText(item.Tag);
                 }
 
-                if (this.Interpreter.Details.Interpreter.BasePointer == i && ForegroundColor == CharColors.FgGray)
+                if (this.Interpreter.Details.Interpreter.BasePointer == i && b.ForegroundColor == CharColors.FgGray)
                 {
-                    ForegroundColor = CharColors.FgBlack;
+                    b.ForegroundColor = CharColors.FgBlack;
                 }
 
-                BackgroundColor = CharColors.BgBlack;
-                FinishLine();
-                ForegroundColor = CharColors.FgDefault;
+                b.BackgroundColor = CharColors.BgBlack;
+                b.FinishLine(sender.Rect.Width);
+                b.ForegroundColor = CharColors.FgDefault;
             }
 
             while ((basepointerShown == false && i <= this.Interpreter.Details.Interpreter.BasePointer) || loadIndicators.Count > 0 || storeIndicators.Count > 0)
             {
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
-                    ForegroundColor = CharColors.FgLightBlue;
-                    AddText("►");
+                    b.ForegroundColor = CharColors.FgLightBlue;
+                    b.AddText("►");
                     basepointerShown = true;
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgGray;
                 }
                 else
                 {
-                    ForegroundColor = CharColors.FgGray;
-                    AddText(" ");
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText(" ");
                 }
 
                 bool addLoadIndicator = false;
@@ -985,9 +777,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("○");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("○");
+                    b.ForegroundColor = CharColors.FgGray;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -996,22 +788,22 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    ForegroundColor = CharColors.FgRed;
-                    AddText("●");
-                    ForegroundColor = CharColors.FgGray;
+                    b.ForegroundColor = CharColors.FgRed;
+                    b.AddText("●");
+                    b.ForegroundColor = CharColors.FgGray;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
                 }
 
-                AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                b.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
-                AddText(i.ToString());
-                AddSpace(5);
+                b.AddText(i.ToString());
+                b.AddSpace(5, sender.Rect.Width);
 
-                BackgroundColor = CharColors.BgBlack;
-                FinishLine();
-                ForegroundColor = CharColors.FgDefault;
+                b.BackgroundColor = CharColors.BgBlack;
+                b.FinishLine(sender.Rect.Width);
+                b.ForegroundColor = CharColors.FgDefault;
 
                 i++;
 
@@ -1022,56 +814,21 @@ namespace ConsoleGUI
         private void SourceCodeElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            DrawBuffer b = sender.DrawBuffer;
 
-            int BufferIndex = 0;
-
-            bool AddChar(char data)
-            {
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                sender.DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                sender.DrawBuffer[BufferIndex].Char = data;
-
-                BufferIndex++;
-                if (BufferIndex >= sender.DrawBuffer.Length) return false;
-
-                return true;
-            }
-            void AddText(string text)
-            {
-                for (int i = 0; i < text.Length; i++)
-                {
-                    if (!AddChar(text[i])) break;
-                }
-            }
-            void AddSpace(int to)
-            {
-                while (BufferIndex % sender.Rect.Width < to)
-                {
-                    if (!AddChar(' ')) break;
-                }
-            }
-
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
+            b.ResetColor();
 
             void LinePrefix(string lineNumber = "")
             {
-                AddText(new string(' ', 4 - lineNumber.Length));
-                ForegroundColor = CharColors.FgGray;
-                AddText(lineNumber);
-                ForegroundColor = CharColors.FgDefault;
-                AddSpace(5);
-            }
-            void FinishLine()
-            {
-                AddSpace(sender.Rect.Width - 1);
-                AddChar(' ');
+                b.AddText(new string(' ', 4 - lineNumber.Length));
+                b.ForegroundColor = CharColors.FgGray;
+                b.AddText(lineNumber);
+                b.ForegroundColor = CharColors.FgDefault;
+                b.AddSpace(5, sender.Rect.Width);
             }
 
             int indent = 0;
@@ -1080,9 +837,9 @@ namespace ConsoleGUI
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
                 {
-                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     { indent--; }
-                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
                     { indent++; }
 
                     continue;
@@ -1097,19 +854,19 @@ namespace ConsoleGUI
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
                 {
-                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     {
                         indent--;
                     }
 
                     LinePrefix((i + 1).ToString());
-                    ForegroundColor = CharColors.FgGray;
-                    AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.Parameter}");
-                    ForegroundColor = CharColors.FgDefault;
-                    BackgroundColor = CharColors.BgBlack;
-                    FinishLine();
+                    b.ForegroundColor = CharColors.FgGray;
+                    b.AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.tag}");
+                    b.ForegroundColor = CharColors.FgDefault;
+                    b.BackgroundColor = CharColors.BgBlack;
+                    b.FinishLine(sender.Rect.Width);
 
-                    if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
                     {
                         indent++;
                     }
@@ -1118,64 +875,73 @@ namespace ConsoleGUI
                 }
 
                 LinePrefix((i + 1).ToString());
-                ForegroundColor = CharColors.FgOrange;
-                AddText($"{new string(' ', Math.Max(0, indent * 2))} ");
+                b.ForegroundColor = CharColors.FgOrange;
+                b.AddText($"{new string(' ', Math.Max(0, indent * 2))} ");
                 if (IsNextInstruction)
                 {
                     IsNextInstruction = false;
-                    BackgroundColor = CharColors.BgRed;
+                    b.BackgroundColor = CharColors.BgRed;
                 }
-                AddText($"{instruction.opcode}");
-                AddText($" ");
+                b.AddText($"{instruction.opcode}");
+                b.AddText($" ");
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET ||
+                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
                 {
-                    AddText($"{instruction.AddressingMode}");
-                    AddText($" ");
+                    b.AddText($"{instruction.AddressingMode}");
+                    b.AddText($" ");
                 }
 
                 if (instruction.Parameter is int)
                 {
-                    ForegroundColor = CharColors.FgCyan;
-                    AddText($"{instruction.Parameter}");
-                    AddText($" ");
+                    b.ForegroundColor = CharColors.FgCyan;
+                    b.AddText($"{instruction.Parameter}");
+                    b.AddText($" ");
                 }
                 else if (instruction.Parameter is float)
                 {
-                    ForegroundColor = CharColors.FgCyan;
-                    AddText($"{instruction.Parameter}f");
-                    AddText($" ");
+                    b.ForegroundColor = CharColors.FgCyan;
+                    b.AddText($"{instruction.Parameter}f");
+                    b.AddText($" ");
                 }
                 else if (instruction.Parameter is bool)
                 {
-                    ForegroundColor = CharColors.FgDarkBlue;
-                    AddText($"{instruction.Parameter}");
-                    AddText($" ");
+                    b.ForegroundColor = CharColors.FgDarkBlue;
+                    b.AddText($"{instruction.Parameter}");
+                    b.AddText($" ");
                 }
                 else if (instruction.Parameter is string @string)
                 {
-                    ForegroundColor = CharColors.FgYellow;
-                    AddText($"\"{@string.Escape()}\"");
-                    AddText($" ");
+                    b.ForegroundColor = CharColors.FgYellow;
+                    b.AddText($"\"{@string.Escape()}\"");
+                    b.AddText($" ");
                 }
                 else
                 {
-                    ForegroundColor = CharColors.FgWhite;
-                    AddText($"{instruction.Parameter}");
-                    AddText($" ");
+                    b.ForegroundColor = CharColors.FgWhite;
+                    // b.AddText($"{instruction.Parameter}");
+                    b.AddText($" ");
                 }
 
                 if (!string.IsNullOrEmpty(instruction.tag))
                 {
-                    ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgGray;
-                    AddText($"{instruction.tag}");
+                    b.ForegroundColor = IsNextInstruction ? CharColors.FgBlack : CharColors.FgGray;
+                    b.AddText($"{instruction.tag}");
                 }
 
-                BackgroundColor = CharColors.BgBlack;
+                b.BackgroundColor = CharColors.BgBlack;
 
-                FinishLine();
-                ForegroundColor = CharColors.FgDefault;
+                b.FinishLine(sender.Rect.Width);
+                b.ForegroundColor = CharColors.FgDefault;
+            }
+
+            {
+                string t = CurrentlyJumping == 0 ? $" Next Jump Count: {NextCodeJumpCount} " : $" Jumping: {CurrentlyJumping} ";
+                b.ForegroundColor = CharColors.FgBlack;
+                b.BackgroundColor = CharColors.BgWhite;
+                b.SetText(t, sender.Rect.Right - (2 + t.Length));
             }
         }
 
@@ -1187,20 +953,52 @@ namespace ConsoleGUI
 
         public override void OnKeyEvent(KeyEvent e)
         {
+            Debug.Log(e.ToString());
+
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
 
-            if (e.KeyDown) return;
-
-            if (e.AsciiChar == 9)
+            if (!e.KeyDown && e.AsciiChar == 9)
             {
-                this.Interpreter.Update();
-                if (!this.Interpreter.IsExecutingCode)
+                if (this.CurrentlyJumping <= 0)
                 {
-                    ConsoleGUI.Instance.Destroy();
-                    return;
+                    this.CurrentlyJumping = this.NextCodeJumpCount;
+                    this.NextCodeJumpCount = 1;
                 }
-                ConsoleGUI.Instance.NextRefreshConsole = true;
+                else
+                {
+                    this.NextCodeJumpCount = Math.Max(1, this.CurrentlyJumping);
+                    this.CurrentlyJumping = 0;
+                }
+                return;
+            }
+
+            if (e.KeyDown && e.AsciiChar == 43)
+            {
+                if (this.CurrentlyJumping > 0)
+                {
+                    this.CurrentlyJumping++;
+                }
+                else
+                {
+                    this.NextCodeJumpCount++;
+                }
+                return;
+            }
+
+            if (e.KeyDown && e.AsciiChar == 45)
+            {
+                if (this.CurrentlyJumping > 0)
+                {
+                    this.CurrentlyJumping--;
+                    this.CurrentlyJumping = Math.Max(this.CurrentlyJumping, 0);
+                }
+                else
+                {
+                    this.NextCodeJumpCount--;
+                    this.NextCodeJumpCount = Math.Max(this.NextCodeJumpCount, 1);
+                }
+                return;
             }
         }
 
@@ -1208,7 +1006,7 @@ namespace ConsoleGUI
         {
             base.RefreshSize();
             Elements[0].Rect = Rect;
-            Elements.RefreshSize();
+            Elements[0].RefreshSize();
         }
     }
 }

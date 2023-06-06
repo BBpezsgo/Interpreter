@@ -28,17 +28,19 @@ namespace IngameCoding.BBCode
 
     public enum BuiltinType
     {
+        VOID,
         AUTO,
+        ANY,
+
         BYTE,
         INT,
         FLOAT,
-        VOID,
         STRING,
         BOOLEAN,
+
         STRUCT,
         LISTOF,
-
-        ANY,
+        CHAR,
     }
 
     public enum TypeTokenType
@@ -55,6 +57,7 @@ namespace IngameCoding.BBCode
         STRING,
         BOOLEAN,
         USER_DEFINED,
+        CHAR,
     }
 
     [Serializable]
@@ -98,6 +101,7 @@ namespace IngameCoding.BBCode
                 BuiltinType.STRUCT => TypeTokenType.USER_DEFINED,
                 BuiltinType.LISTOF => TypeTokenType.LIST,
                 BuiltinType.ANY => TypeTokenType.ANY,
+                BuiltinType.CHAR => TypeTokenType.CHAR,
                 _ => throw new NotImplementedException(),
             };
             this.NamespacePrefix = namespacePrefix;
@@ -980,7 +984,8 @@ namespace IngameCoding.BBCode
                 { "void", TypeToken.CreateAnonymous("void", BuiltinType.VOID) },
                 { "float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT) },
                 { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) },
-                { "byte", TypeToken.CreateAnonymous("byte", BuiltinType.BYTE) }
+                { "byte", TypeToken.CreateAnonymous("byte", BuiltinType.BYTE) },
+                { "char", TypeToken.CreateAnonymous("char", BuiltinType.CHAR) }
             };
             readonly Dictionary<string, int> operators = new();
             readonly List<string> CurrentNamespace = new();
@@ -1033,6 +1038,9 @@ namespace IngameCoding.BBCode
 
                 operators.Add("++", 40);
                 operators.Add("--", 40);
+
+                operators.Add("&&", 2);
+                operators.Add("||", 2);
             }
 
             /// <summary>
@@ -1683,6 +1691,20 @@ namespace IngameCoding.BBCode
                     {
                         Value = CurrentToken.Content,
                         Type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
+                        ValueToken = CurrentToken,
+                    };
+
+                    currentTokenIndex++;
+
+                    statement = literal;
+                    return true;
+                }
+                else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
+                {
+                    Statement_Literal literal = new()
+                    {
+                        Value = CurrentToken.Content,
+                        Type = TypeToken.CreateAnonymous("char", BuiltinType.CHAR),
                         ValueToken = CurrentToken,
                     };
 
@@ -2371,7 +2393,7 @@ namespace IngameCoding.BBCode
                 {
                     StatementWithReturnValue statement = ExpectOneValue();
                     if (statement == null)
-                    { throw new SyntaxException("Expected value or expression after '!' operator", tNotOperator); }
+                    { throw new SyntaxException($"Expected OneValue after operator ('{tNotOperator}'), got {CurrentToken}", CurrentToken); }
 
                     return new Statement_Operator(tNotOperator, statement);
                 }
@@ -2392,47 +2414,29 @@ namespace IngameCoding.BBCode
 
                 while (true)
                 {
-                    if (!ExpectOperator(new string[]
-                        {
+                    int parseStart = currentTokenIndex;
+                    if (!ExpectOperator(new string[] {
                         "<<", ">>",
-                        "+", "-", "*", "/", "%",
-                        "<", ">", ">=", "<=", "!=", "==", "&", "|", "^"
-                        }, out Token op)) break;
-
-                    int rhsPrecedence = OperatorPrecedence(op.Content);
-                    if (rhsPrecedence == 0)
-                    {
-                        currentTokenIndex--;
-                        return leftStatement;
-                    }
+                        "+", "-", "*", "/", "%", "&", "|",
+                        "<", ">", ">=", "<=", "!=", "==", "&&", "||", "^"
+                    }, out Token op)) break;
 
                     StatementWithReturnValue rightStatement = ExpectOneValue();
-                    if (rightStatement == null)
-                    {
-                        currentTokenIndex--;
-                        return leftStatement;
-                    }
 
-                    Statement_Operator rightmostStatement = FindRightmostStatement(leftStatement, rhsPrecedence);
+                    if (rightStatement == null)
+                    { throw new SyntaxException($"Expected OneValue after operator ('{op}'), got {CurrentToken}", CurrentToken); }
+
+                    int rightSidePrecedence = OperatorPrecedence(op.Content);
+
+                    Statement_Operator rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
                     if (rightmostStatement != null)
                     {
-                        if (rightmostStatement is Statement_Operator rightmostOperator)
-                        {
-                            Statement_Operator operatorCall = new(op, rightmostOperator.Right, rightStatement);
-
-                            rightmostOperator.Right = operatorCall;
-                        }
-                        else
-                        {
-                            Statement_Operator operatorCall = new(op, leftStatement, rightStatement);
-
-                            leftStatement = operatorCall;
-                        }
+                        Statement_Operator operatorCall = new(op, rightmostStatement.Right, rightStatement);
+                        rightmostStatement.Right = operatorCall;
                     }
                     else
                     {
                         Statement_Operator operatorCall = new(op, leftStatement, rightStatement);
-
                         leftStatement = operatorCall;
                     }
                 }
@@ -2542,24 +2546,31 @@ namespace IngameCoding.BBCode
                 return null;
             }
 
-            Statement_Operator FindRightmostStatement(Statement statement, int rhsPrecedence)
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <param name="statement"></param>
+            /// <param name="rightSidePrecedence"></param>
+            /// <returns>
+            /// <see langword="null"/> or <see cref="Statement_Operator"/>
+            /// </returns>
+            Statement_Operator FindRightmostStatement(Statement statement, int rightSidePrecedence)
             {
-                if (statement is not Statement_Operator lhs) return null;
-                if (OperatorPrecedence(lhs.Operator.Content) >= rhsPrecedence) return null;
-                if (lhs.InsideBracelet) return null;
+                if (statement is not Statement_Operator leftSide) return null;
+                if (OperatorPrecedence(leftSide.Operator.Content) >= rightSidePrecedence) return null;
+                if (leftSide.InsideBracelet) return null;
 
-                var rhs = FindRightmostStatement(lhs.Right, rhsPrecedence);
+                Statement_Operator right = FindRightmostStatement(leftSide.Right, rightSidePrecedence);
 
-                if (rhs == null) return lhs;
-                return rhs;
+                if (right == null) return leftSide;
+                return right;
             }
 
             int OperatorPrecedence(string str)
             {
                 if (operators.TryGetValue(str, out int precedence))
                 { return precedence; }
-                else
-                { return 0; }
+                else throw new InternalException($"Precedence for operator {str} not found");
             }
 
             Statement_FunctionCall ExpectFunctionCall()

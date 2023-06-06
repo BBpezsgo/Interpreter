@@ -41,10 +41,9 @@ namespace IngameCoding.Bytecode
             {
                 static int CalculateItemSize(DataItem item) => item.type switch
                 {
-                    DataType.INT => 4,
-                    DataType.FLOAT => 4,
-                    DataType.STRING => 4 + System.Text.Encoding.ASCII.GetByteCount(item.ValueString),
-                    DataType.BOOLEAN => 1,
+                    RuntimeType.INT => 4,
+                    RuntimeType.FLOAT => 4,
+                    RuntimeType.BOOLEAN => 1,
                     _ => throw new NotImplementedException(),
                 };
 
@@ -93,8 +92,6 @@ namespace IngameCoding.Bytecode
         /// <returns>Adds a new item to the end</returns>
         public void Push(float value, string tag = null) => Push(new DataItem(value, tag));
         /// <returns>Adds a new item to the end</returns>
-        public void Push(string value, string tag = null) => Push(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
         public void Push(bool value, string tag = null) => Push(new DataItem(value, tag));
         /// <summary>Adds a list to the end</summary>
         public override void PushRange(List<DataItem> list) => PushRange(list.ToArray());
@@ -141,33 +138,57 @@ namespace IngameCoding.Bytecode
             get
             {
                 if (i < 0) throw new RuntimeException($"Null pointer!");
+                if (i >= heap.Length) throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
                 return heap[i];
             }
             set
             {
                 if (i < 0) throw new RuntimeException($"Null pointer!");
+                if (i >= heap.Length) return; // throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
                 heap[i] = value;
             }
         }
 
         internal DataItem[] ToArray() => heap.ToList().ToArray();
+
+        internal string GetString(int start, int length)
+        {
+            int end = start + length;
+            string result = "";
+            for (int i = start; i < end; i++)
+            {
+                if (this[i].type != RuntimeType.CHAR)
+                {
+                    throw new InternalException($"Unexpected data type {this[i].type}, expected {nameof(RuntimeType.CHAR)}");
+                }
+                result += this[i].ValueChar;
+            }
+            return result;
+        }
+        internal string GetStringByPointer(int pointer)
+        {
+            int subpointer = this[pointer].ValueInt;
+            int length = this[pointer + 1].ValueInt;
+            return GetString(subpointer, length);
+        }
     }
 
-    public enum DataType
+    public enum RuntimeType
     {
         BYTE,
         INT,
         FLOAT,
         STRING,
         BOOLEAN,
+        CHAR,
     }
 
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
     public struct DataItem
     {
         public static DataItem Null => new() { };
 
-        public readonly DataType type;
+        public readonly RuntimeType type;
         internal DataStack stack;
         internal HEAP heap;
 
@@ -176,8 +197,8 @@ namespace IngameCoding.Bytecode
         byte? valueByte;
         int? valueInt;
         float? valueFloat;
-        string valueString;
         bool? valueBoolean;
+        char? valueChar;
 
         #endregion
 
@@ -189,7 +210,7 @@ namespace IngameCoding.Bytecode
                 if (valueInt.HasValue) return false;
                 if (valueFloat.HasValue) return false;
                 if (valueBoolean.HasValue) return false;
-                if (valueString != null) return false;
+                if (valueChar.HasValue) return false;
                 return true;
             }
         }
@@ -202,7 +223,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == DataType.BYTE)
+                if (type == RuntimeType.BYTE)
                 { return valueByte.Value; }
 
                 throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to byte");
@@ -216,7 +237,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == DataType.INT)
+                if (type == RuntimeType.INT)
                 { return valueInt.Value; }
 
                 throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to integer");
@@ -230,7 +251,7 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (type == DataType.FLOAT)
+                if (type == RuntimeType.FLOAT)
                 {
                     return valueFloat.Value;
                 }
@@ -241,26 +262,11 @@ namespace IngameCoding.Bytecode
                 valueFloat = value;
             }
         }
-        public string ValueString
-        {
-            get
-            {
-                if (type == DataType.STRING)
-                {
-                    return valueString;
-                }
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to string");
-            }
-            set
-            {
-                valueString = value;
-            }
-        }
         public bool ValueBoolean
         {
             get
             {
-                if (type == DataType.BOOLEAN)
+                if (type == RuntimeType.BOOLEAN)
                 {
                     return valueBoolean.Value;
                 }
@@ -271,35 +277,50 @@ namespace IngameCoding.Bytecode
                 valueBoolean = value;
             }
         }
+        public char ValueChar
+        {
+            get
+            {
+                if (type == RuntimeType.CHAR)
+                {
+                    return valueChar.Value;
+                }
+                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to char");
+            }
+            set
+            {
+                valueChar = value;
+            }
+        }
 
         #endregion
 
         #region Constructors
 
-        DataItem(DataType type, string tag)
+        DataItem(RuntimeType type, string tag)
         {
             this.type = type;
 
             this.valueInt = null;
             this.valueByte = null;
             this.valueFloat = null;
-            this.valueString = null;
             this.valueBoolean = null;
+            this.valueChar = null;
 
             this.stack = null;
             this.heap = null;
 
             this.Tag = tag;
         }
-        DataItem(DataType type)
+        DataItem(RuntimeType type)
         {
             this.type = type;
 
             this.valueInt = null;
             this.valueByte = null;
             this.valueFloat = null;
-            this.valueString = null;
             this.valueBoolean = null;
+            this.valueChar = null;
 
             this.stack = null;
             this.heap = null;
@@ -307,33 +328,30 @@ namespace IngameCoding.Bytecode
             this.Tag = null;
         }
 
-        public DataItem(int value, string tag) : this(DataType.INT, tag)
-        {
-            this.valueInt = value;
-        }
-        public DataItem(byte value, string tag) : this(DataType.BYTE, tag)
+        public DataItem(int value, string tag) : this(RuntimeType.INT, tag)
+        { this.valueInt = value; }
+        public DataItem(byte value, string tag) : this(RuntimeType.BYTE, tag)
         { this.valueByte = value; }
-        public DataItem(float value, string tag) : this(DataType.FLOAT, tag)
+        public DataItem(float value, string tag) : this(RuntimeType.FLOAT, tag)
         { this.valueFloat = value; }
-        public DataItem(string value, string tag) : this(DataType.STRING, tag)
-        { this.valueString = value; }
-        public DataItem(bool value, string tag) : this(DataType.BOOLEAN, tag)
+        public DataItem(bool value, string tag) : this(RuntimeType.BOOLEAN, tag)
         { this.valueBoolean = value; }
+        public DataItem(char value, string tag) : this(RuntimeType.CHAR, tag)
+        { this.valueChar = value; }
 
-        public DataItem(int value) : this(DataType.INT)
-        {
-            this.valueInt = value;
-        }
-        public DataItem(byte value) : this(DataType.BYTE)
+        public DataItem(int value) : this(RuntimeType.INT)
+        { this.valueInt = value; }
+        public DataItem(byte value) : this(RuntimeType.BYTE)
         { this.valueByte = value; }
-        public DataItem(float value) : this(DataType.FLOAT)
+        public DataItem(float value) : this(RuntimeType.FLOAT)
         { this.valueFloat = value; }
-        public DataItem(string value) : this(DataType.STRING)
-        { this.valueString = value; }
-        public DataItem(bool value) : this(DataType.BOOLEAN)
+        public DataItem(bool value) : this(RuntimeType.BOOLEAN)
         { this.valueBoolean = value; }
+        public DataItem(char value) : this(RuntimeType.CHAR)
+        { this.valueChar = value; }
 
-        public DataItem(object value, string tag) : this(DataType.BYTE, tag)
+        /// <exception cref="RuntimeException"/>
+        public DataItem(object value, string tag) : this(RuntimeType.BYTE, tag)
         {
             if (value == null)
             {
@@ -342,28 +360,28 @@ namespace IngameCoding.Bytecode
 
             if (value is int a)
             {
-                this.type = DataType.INT;
+                this.type = RuntimeType.INT;
                 this.valueInt = a;
             }
             else if (value is float b)
             {
-                this.type = DataType.FLOAT;
+                this.type = RuntimeType.FLOAT;
                 this.valueFloat = b;
-            }
-            else if (value is string c)
-            {
-                this.type = DataType.STRING;
-                this.valueString = c;
             }
             else if (value is bool d)
             {
-                this.type = DataType.BOOLEAN;
+                this.type = RuntimeType.BOOLEAN;
                 this.valueBoolean = d;
             }
             else if (value is byte g)
             {
-                this.type = DataType.BYTE;
+                this.type = RuntimeType.BYTE;
                 this.valueByte = g;
+            }
+            else if (value is char h)
+            {
+                this.type = RuntimeType.CHAR;
+                this.valueChar = h;
             }
             else
             {
@@ -375,546 +393,468 @@ namespace IngameCoding.Bytecode
 
         #region Operators
 
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.BYTE:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueByte + rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueByte + rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueByte + rightSide.ValueFloat, null);
-                        case DataType.STRING:
-                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
-                    }
-                    break;
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueInt + rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt + rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueInt + rightSide.ValueFloat, null);
-                        case DataType.STRING:
-                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueFloat + rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueFloat + rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueFloat + rightSide.ValueFloat, null);
-                        case DataType.STRING:
-                            return new DataItem(leftSide.ToStringValue() + rightSide.ValueString, null);
-                    }
-                    break;
-                case DataType.STRING:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueString + rightSide.ToStringValue(), null);
-                        case DataType.STRING:
-                            return new DataItem(leftSide.ValueString + rightSide.ValueString, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value + right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value + right.Value, leftSide.Tag); }
+            }
+
+            {
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value + right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do + operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.BYTE:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueByte - rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueByte - rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueByte - rightSide.ValueFloat, null);
-                    }
-                    break;
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueInt - rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt - rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueInt - rightSide.ValueFloat, null);
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueFloat - rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueFloat - rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueFloat - rightSide.ValueFloat, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value - right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value - right.Value, leftSide.Tag); }
+            }
+
+            {
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value - right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do - operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
 
+        /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftLeft(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.BYTE:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueByte << rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueByte << rightSide.ValueInt, null);
-                    }
-                    break;
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueInt << rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt << rightSide.ValueInt, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value << right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value << right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do << operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftRight(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.BYTE:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueByte >> rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueByte >> rightSide.ValueInt, null);
-                    }
-                    break;
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.BYTE:
-                            return new DataItem(leftSide.ValueInt >> rightSide.ValueByte, null);
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt >> rightSide.ValueInt, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value >> right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value >> right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do >> operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
 
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator *(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt * rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueInt * rightSide.ValueFloat, null);
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueFloat * rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueFloat * rightSide.ValueFloat, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value * right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value * right.Value, leftSide.Tag); }
+            }
+
+            {
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value * right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do * operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator /(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt / rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueInt / rightSide.ValueFloat, null);
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueFloat / rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueFloat / rightSide.ValueFloat, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value / right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value / right.Value, leftSide.Tag); }
+            }
+
+            {
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value / right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do / operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator %(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueInt % rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueInt % rightSide.ValueFloat, null);
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return new DataItem(leftSide.ValueFloat % rightSide.ValueInt, null);
-                        case DataType.FLOAT:
-                            return new DataItem(leftSide.ValueFloat % rightSide.ValueFloat, null);
-                    }
-                    break;
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
+
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value % right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value % right.Value, leftSide.Tag); }
+            }
+
+            {
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value % right.Value, leftSide.Tag); }
             }
 
             throw new RuntimeException("Can't do % operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
 
+        /// <exception cref="RuntimeException"/>
         public static bool operator <(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt < rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt < rightSide.ValueFloat;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat < rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat < rightSide.ValueFloat;
-                    }
-                    break;
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return left.Value < right.Value; }
             }
 
             throw new RuntimeException("Can't do < operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static bool operator >(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt > rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt > rightSide.ValueFloat;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat > rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat > rightSide.ValueFloat;
-                    }
-                    break;
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return left.Value > right.Value; }
             }
 
             throw new RuntimeException("Can't do > operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
 
+        /// <exception cref="RuntimeException"/>
         public static bool operator <=(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
-            {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt <= rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt <= rightSide.ValueFloat;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat <= rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat <= rightSide.ValueFloat;
-                    }
-                    break;
-            }
-
-            throw new RuntimeException("Can't do <= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            try
+            { return (leftSide < rightSide) || (leftSide == rightSide); }
+            catch (RuntimeException ex)
+            { throw new RuntimeException("Can't do <= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
         }
+        /// <exception cref="RuntimeException"/>
         public static bool operator >=(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
-            {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt >= rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt >= rightSide.ValueFloat;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat >= rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat >= rightSide.ValueFloat;
-                    }
-                    break;
-            }
-
-            throw new RuntimeException("Can't do >= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            try
+            { return (leftSide > rightSide) || (leftSide == rightSide); }
+            catch (RuntimeException ex)
+            { throw new RuntimeException("Can't do >= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
         }
 
+        /// <exception cref="RuntimeException"/>
         public static bool operator ==(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
             {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt == rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt == rightSide.ValueFloat;
-                        case DataType.STRING:
-                            return leftSide.ValueInt.ToString() == rightSide.ValueString;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat == rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat == rightSide.ValueFloat;
-                        case DataType.STRING:
-                            return leftSide.ValueFloat.ToString() == rightSide.ValueString;
-                    }
-                    break;
-                case DataType.STRING:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueString == rightSide.ValueInt.ToString();
-                        case DataType.FLOAT:
-                            return leftSide.ValueString == rightSide.ValueFloat.ToString();
-                        case DataType.STRING:
-                            return leftSide.ValueString == rightSide.ValueString;
-                    }
-                    break;
-                case DataType.BOOLEAN:
-                    if (rightSide.type == DataType.BOOLEAN)
-                    {
-                        return leftSide.ValueBoolean == rightSide.ValueBoolean;
-                    }
-                    break;
+                float? left = leftSide.Float;
+                float? right = rightSide.Float;
+
+                if (left.HasValue && right.HasValue)
+                { return left.Value == right.Value; }
             }
 
             throw new RuntimeException("Can't do == operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
         }
+        /// <exception cref="RuntimeException"/>
         public static bool operator !=(DataItem leftSide, DataItem rightSide)
         {
-            switch (leftSide.type)
-            {
-                case DataType.INT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueInt != rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueInt != rightSide.ValueFloat;
-                        case DataType.STRING:
-                            return leftSide.ValueInt.ToString() != rightSide.ValueString;
-                    }
-                    break;
-                case DataType.FLOAT:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueFloat != rightSide.ValueInt;
-                        case DataType.FLOAT:
-                            return leftSide.ValueFloat != rightSide.ValueFloat;
-                        case DataType.STRING:
-                            return leftSide.ValueFloat.ToString() != rightSide.ValueString;
-                    }
-                    break;
-                case DataType.STRING:
-                    switch (rightSide.type)
-                    {
-                        case DataType.INT:
-                            return leftSide.ValueString != rightSide.ValueInt.ToString();
-                        case DataType.FLOAT:
-                            return leftSide.ValueString != rightSide.ValueFloat.ToString();
-                        case DataType.STRING:
-                            return leftSide.ValueString != rightSide.ValueString;
-                    }
-                    break;
-                case DataType.BOOLEAN:
-                    if (rightSide.type == DataType.BOOLEAN)
-                    {
-                        return leftSide.ValueBoolean != rightSide.ValueBoolean;
-                    }
-                    break;
-            }
-
-            throw new RuntimeException("Can't do != operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            try
+            { return !(leftSide == rightSide); }
+            catch (RuntimeException ex)
+            { throw new RuntimeException("Can't do != operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
         }
 
-        public static bool operator ==(DataItem leftSide, bool rightSide) => (leftSide == new DataItem(rightSide, null));
-        public static bool operator !=(DataItem leftSide, bool rightSide) => (leftSide != new DataItem(rightSide, null));
-
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator !(DataItem leftSide)
         {
-            if (leftSide.type == DataType.BOOLEAN)
+            if (leftSide.type == RuntimeType.BOOLEAN)
             {
                 return new DataItem(!leftSide.ValueBoolean, leftSide.Tag);
             }
             throw new RuntimeException($"Can't do ! operation with type {leftSide.GetTypeText()}");
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem leftSide, DataItem rightSide)
         {
-            try
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
 
-                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
-                { return new DataItem(a.ValueBoolean | b.ValueBoolean, a.Tag); }
-                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
-                { return new DataItem(a.ValueByte | b.ValueByte, a.Tag); }
-                if (a.type == DataType.INT && b.type == DataType.INT)
-                { return new DataItem(a.ValueInt | b.ValueInt, a.Tag); }
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value | right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
             }
-            catch (NotImplementedException)
-            { }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value | right.Value, leftSide.Tag); }
+            }
 
             throw new RuntimeException($"Can't do | operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator &(DataItem leftSide, DataItem rightSide)
         {
-            try
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
 
-                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
-                { return new DataItem(a.ValueBoolean & b.ValueBoolean, a.Tag); }
-                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
-                { return new DataItem(a.ValueByte & b.ValueByte, a.Tag); }
-                if (a.type == DataType.INT && b.type == DataType.INT)
-                { return new DataItem(a.ValueInt & b.ValueInt, a.Tag); }
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value & right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
             }
-            catch (NotImplementedException)
-            { }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value & right.Value, leftSide.Tag); }
+            }
 
             throw new RuntimeException($"Can't do & operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
+        /// <exception cref="RuntimeException"/>
         public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
         {
-            try
+            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
             {
-                var (a, b) = IntoSimilarTypes(leftSide, rightSide);
+                byte? left = leftSide.Byte;
+                byte? right = rightSide.Byte;
 
-                if (a.type == DataType.BOOLEAN && b.type == DataType.BOOLEAN)
-                { return new DataItem(a.ValueBoolean ^ b.ValueBoolean, a.Tag); }
-                if (a.type == DataType.BYTE && b.type == DataType.BYTE)
-                { return new DataItem(a.ValueByte ^ b.ValueByte, a.Tag); }
-                if (a.type == DataType.INT && b.type == DataType.INT)
-                { return new DataItem(a.ValueInt ^ b.ValueInt, a.Tag); }
+                if (left.HasValue && right.HasValue)
+                {
+                    int r = left.Value ^ right.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r, leftSide.Tag); }
+                    else
+                    { return new DataItem((byte)r, leftSide.Tag); }
+                }
             }
-            catch (NotImplementedException)
-            { }
+
+            {
+                int? left = leftSide.Integer;
+                int? right = rightSide.Integer;
+
+                if (left.HasValue && right.HasValue)
+                { return new DataItem(left.Value ^ right.Value, leftSide.Tag); }
+            }
 
             throw new RuntimeException($"Can't do ^ operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
 
-        public static bool operator true(DataItem leftSide)
+        public bool IsFalsy() => this.type switch
         {
-            if (leftSide.type == DataType.BOOLEAN)
-            {
-                return leftSide.ValueBoolean;
-            }
-            throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
-        }
-        public static bool operator false(DataItem leftSide)
-        {
-            if (leftSide.type == DataType.BOOLEAN)
-            {
-                return leftSide.ValueBoolean;
-            }
-            throw new RuntimeException("Can't do true operation with type " + leftSide.type.ToString());
-        }
+            RuntimeType.BYTE => this.valueByte == 0,
+            RuntimeType.INT => this.valueInt.Value == 0,
+            RuntimeType.FLOAT => this.valueFloat.Value == 0f,
+            RuntimeType.STRING => false,
+            RuntimeType.BOOLEAN => !this.valueBoolean.Value,
+            RuntimeType.CHAR => (int)this.valueChar == 0,
+            _ => false,
+        };
 
         #endregion
 
-        public string ToStringValue() => type switch
+        public int? Integer => type switch
         {
-            DataType.INT => ValueInt.ToString(),
-            DataType.BYTE => ValueByte.ToString(),
-            DataType.FLOAT => ValueFloat.ToString().Replace(',', '.'),
-            DataType.STRING => ValueString,
-            DataType.BOOLEAN => ValueBoolean.ToString(),
+            RuntimeType.BYTE => this.ValueByte,
+            RuntimeType.INT => this.ValueInt,
+            RuntimeType.BOOLEAN => this.ValueBoolean ? 1 : 0,
+            RuntimeType.CHAR => this.ValueChar,
+            _ => null,
+        };
+        public byte? Byte
+        {
+            get
+            {
+                int? integer_ = this.Integer;
+                return (!integer_.HasValue || integer_.Value < byte.MinValue || integer_.Value > byte.MaxValue) ?
+                    null :
+                    (byte)integer_.Value;
+            }
+        }
+        public float? Float => type switch
+        {
+            RuntimeType.BYTE => this.ValueByte,
+            RuntimeType.INT => this.ValueInt,
+            RuntimeType.FLOAT => this.ValueFloat,
+            RuntimeType.BOOLEAN => this.ValueBoolean ? 1f : 0f,
+            RuntimeType.CHAR => this.ValueChar,
+            _ => null,
+        };
+
+        /// <exception cref="RuntimeException"/>
+        public override string ToString() => this.IsNull ? "null" : type switch
+        {
+            RuntimeType.INT => ValueInt.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.BYTE => ValueByte.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.FLOAT => ValueFloat.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.CHAR => ValueChar.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.BOOLEAN => ValueBoolean.ToString(System.Globalization.CultureInfo.InvariantCulture),
             _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
         };
 
-        public override string ToString()
+        /// <exception cref="RuntimeException"/>
+        public string GetDebuggerDisplay()
         {
             if (IsNull) return null;
             string retStr = type switch
             {
-                DataType.INT => ValueInt.ToString(),
-                DataType.BYTE => ValueByte.ToString(),
-                DataType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
-                DataType.STRING => $"\"{ValueString}\"",
-                DataType.BOOLEAN => ValueBoolean.ToString(),
+                RuntimeType.INT => ValueInt.ToString(),
+                RuntimeType.BYTE => ValueByte.ToString(),
+                RuntimeType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
+                RuntimeType.CHAR => $"'{ValueChar.Escape()}'",
+                RuntimeType.BOOLEAN => ValueBoolean.ToString(),
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             if (!string.IsNullOrEmpty(this.Tag))
@@ -930,20 +870,20 @@ namespace IngameCoding.Bytecode
             hash.Add(type);
             switch (type)
             {
-                case DataType.BYTE:
+                case RuntimeType.BYTE:
                     hash.Add(valueByte);
                     break;
-                case DataType.INT:
+                case RuntimeType.INT:
                     hash.Add(valueInt);
                     break;
-                case DataType.FLOAT:
+                case RuntimeType.FLOAT:
                     hash.Add(valueFloat);
                     break;
-                case DataType.STRING:
-                    hash.Add(valueString);
-                    break;
-                case DataType.BOOLEAN:
+                case RuntimeType.BOOLEAN:
                     hash.Add(valueBoolean);
+                    break;
+                case RuntimeType.CHAR:
+                    hash.Add(valueChar);
                     break;
                 default:
                     break;
@@ -951,97 +891,18 @@ namespace IngameCoding.Bytecode
             return hash.ToHashCode();
         }
 
+        /// <exception cref="NotImplementedException"/>
         public override bool Equals(object obj)
             => obj is DataItem value &&
             this.type == value.type &&
             this.type switch
             {
-                DataType.BYTE => valueByte == value.valueByte,
-                DataType.INT => valueInt == value.valueInt,
-                DataType.FLOAT => valueFloat == value.valueFloat,
-                DataType.STRING => valueString == value.valueString,
-                DataType.BOOLEAN => valueBoolean == value.valueBoolean,
+                RuntimeType.BYTE => valueByte == value.valueByte,
+                RuntimeType.INT => valueInt == value.valueInt,
+                RuntimeType.FLOAT => valueFloat == value.valueFloat,
+                RuntimeType.BOOLEAN => valueBoolean == value.valueBoolean,
+                RuntimeType.CHAR => valueChar == value.valueChar,
                 _ => throw new NotImplementedException(),
             };
-
-        public static (DataItem, DataItem) IntoSimilarTypes(DataItem a, DataItem b)
-        {
-            switch (a.type)
-            {
-                case DataType.BYTE:
-                    {
-                        switch (b.type)
-                        {
-                            case DataType.BYTE: return (a, b);
-                            case DataType.INT: return (new DataItem((int)a.ValueByte, a.Tag), b);
-                            case DataType.FLOAT: return (new DataItem((float)a.ValueByte, a.Tag), b);
-                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.BOOLEAN:
-                            default:
-                                break;
-                        }
-                        break;
-                    }
-                case DataType.INT:
-                    {
-                        switch (b.type)
-                        {
-                            case DataType.BYTE: return (a, new DataItem((byte)b.ValueByte, b.Tag));
-                            case DataType.INT: return (a, b);
-                            case DataType.FLOAT: return (new DataItem((float)a.ValueFloat, a.Tag), b);
-                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.BOOLEAN:
-                            default:
-                                break;
-                        }
-                        break;
-                    }
-                case DataType.FLOAT:
-                    {
-                        switch (b.type)
-                        {
-                            case DataType.BYTE: return (a, new DataItem((float)b.ValueFloat, b.Tag));
-                            case DataType.INT: return (a, new DataItem((float)b.ValueFloat, b.Tag));
-                            case DataType.FLOAT: return (a, b);
-                            case DataType.STRING: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.BOOLEAN:
-                            default:
-                                break;
-                        }
-                        break;
-                    }
-                case DataType.STRING:
-                    {
-                        switch (b.type)
-                        {
-                            case DataType.BYTE: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.INT: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.FLOAT: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            case DataType.STRING: return (a, b);
-                            case DataType.BOOLEAN: return (new DataItem(a.ToStringValue(), a.Tag), b);
-                            default:
-                                break;
-                        }
-                        break;
-                    }
-                case DataType.BOOLEAN:
-                    {
-                        switch (b.type)
-                        {
-                            case DataType.STRING: return (a, new DataItem(b.ToStringValue(), b.Tag));
-                            case DataType.BOOLEAN: return (a, b);
-                            case DataType.BYTE:
-                            case DataType.INT:
-                            case DataType.FLOAT:
-                            default:
-                                break;
-                        }
-                        break;
-                    }
-                default:
-                    break;
-            }
-            throw new NotImplementedException();
-        }
     }
 }

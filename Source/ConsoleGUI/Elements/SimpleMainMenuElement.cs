@@ -52,8 +52,11 @@ namespace ConsoleGUI
             {
                 if (BufferIndex >= DrawBuffer.Length) return false;
 
-                DrawBuffer[BufferIndex].Color = ForegroundColor | BackgroundColor;
-                DrawBuffer[BufferIndex].Char = data;
+                DrawBuffer[BufferIndex] = new Character()
+                {
+                    Color = ForegroundColor | BackgroundColor,
+                    Char = data,
+                };
 
                 BufferIndex++;
                 if (BufferIndex >= DrawBuffer.Length) return false;

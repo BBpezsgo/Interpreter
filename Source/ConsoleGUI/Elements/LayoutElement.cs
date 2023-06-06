@@ -1,13 +1,12 @@
-﻿using ConsoleGUI.ConsoleLib;
-
-using System;
+﻿using System;
 using System.Drawing;
 
 namespace ConsoleGUI
 {
-    internal class LayoutElement : Element, IElement, IElementWithSubelements, IElementWithEvents
+    internal class LayoutElement : Element, IElement, IElementWithSubelements, IElementWithEvents, IInlineLayoutElement
     {
         public IElement[] Elements { get; set; } = Array.Empty<IElement>();
+        public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();
 
         public override void BeforeDraw()
         {
@@ -17,7 +16,7 @@ namespace ConsoleGUI
 
         public override Character DrawContent(int x, int y)
         {
-            return Elements.DrawContent(x, y) ?? base.DrawContent(x, y);
+            return Elements.DrawContent(x, y) ?? Character.ErrorChar;
         }
 
         public override void OnMouseEvent(MouseEvent e)
@@ -39,7 +38,7 @@ namespace ConsoleGUI
         {
             base.RefreshSize();
 
-            int total = Rect.Height;
+            int total = Rect.Height - 1;
             int elementCount = Elements.Length;
             int currentPosition = Rect.Y;
 
@@ -48,22 +47,45 @@ namespace ConsoleGUI
                 IElement element = Elements[i];
                 Rectangle rect = element.Rect;
 
-                rect.Width = Rect.Width;
-                rect.X = Rect.X;
+                int currentHeight;
 
-                rect.Height = total / elementCount;
-                rect.Y = currentPosition;
+                if (i == elementCount - 1)
+                { currentHeight = total - currentPosition + 1; }
+                else
+                { currentHeight = total / elementCount; }
 
-                if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
+                if (Elements[i] is IInlineLayoutElement inlineLayoutElement)
                 {
-                    rect.Width -= 2;
-                    rect.Height -= 2;
-                    currentPosition = rect.Bottom + 1;
+                    var layout = inlineLayoutElement.Layout;
+                    switch (layout.SizeMode)
+                    {
+                        case InlineLayoutSizeMode.Fixed:
+                            {
+                                rect.Height = layout.Value;
+                                break;
+                            }
+                        case InlineLayoutSizeMode.Stretchy:
+                            {
+                                if (i == elementCount - 1)
+                                { rect.Height = currentHeight; }
+                                else
+                                { rect.Height = (int)Math.Round((float)currentHeight * ((float)layout.Value / 100f)); }
+                                break;
+                            }
+                        default: throw new NotImplementedException();
+                    }
+                    rect.Y = currentPosition;
                 }
                 else
                 {
-                    currentPosition = rect.Bottom + 1;
+                    rect.Height = currentHeight;
+                    rect.Y = currentPosition;
                 }
+
+                rect.Width = Rect.Width;
+                rect.X = Rect.X;
+
+                currentPosition = rect.Bottom + 1;
 
                 element.Rect = rect;
 
@@ -78,7 +100,7 @@ namespace ConsoleGUI
         {
             base.RefreshSize();
 
-            int total = Rect.Width;
+            int total = Rect.Width - 1;
             int elementCount = Elements.Length;
             int currentPosition = Rect.X;
 
@@ -87,21 +109,50 @@ namespace ConsoleGUI
                 IElement element = Elements[i];
                 Rectangle rect = element.Rect;
 
-                rect.Height = Rect.Height;
-                rect.Y = Rect.Y;
-
-                rect.Width = total / elementCount;
-                rect.X = currentPosition;
-
-                if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
+                if (Elements[i] is IInlineLayoutElement inlineLayoutElement)
                 {
-                    rect.Width -= 2;
-                    rect.Height -= 2;
-                    currentPosition = rect.Bottom + 1;
+                    var layout = inlineLayoutElement.Layout;
+                    switch (layout.SizeMode)
+                    {
+                        case InlineLayoutSizeMode.Fixed:
+                            {
+                                rect.Width = layout.Value;
+                                break;
+                            }
+                        case InlineLayoutSizeMode.Stretchy:
+                            {
+                                if (i == elementCount - 1)
+                                { rect.Width = total - currentPosition + 1; }
+                                else
+                                { rect.Width = (int)Math.Round((float)total / (float)elementCount * ((float)layout.Value / 100f)); }
+                                break;
+                            }
+                        default: throw new NotImplementedException();
+                    }
+                    rect.X = currentPosition;
                 }
                 else
                 {
-                    currentPosition = rect.Bottom + 1;
+                    if (i == elementCount - 1)
+                    { rect.Width = total - currentPosition + 1; }
+                    else
+                    { rect.Width = total / elementCount; }
+
+                    rect.X = currentPosition;
+                }
+
+                rect.Height = Rect.Height;
+                rect.Y = Rect.Y;
+
+                if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
+                {
+                    rect.Width -= 0;
+                    rect.Height -= 0;
+                    currentPosition = rect.Right + 1;
+                }
+                else
+                {
+                    currentPosition = rect.Right + 1;
                 }
 
                 element.Rect = rect;

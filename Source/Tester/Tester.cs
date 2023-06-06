@@ -190,7 +190,7 @@ namespace IngameCoding.Tester
                     }
                     catch (UserException error)
                     {
-                        Output.Output.Error($"UserException: {error.Value.ToStringValue()}");
+                        Output.Output.Error($"UserException: {error.Value.ToString()}");
                     }
                     catch (RuntimeException error)
                     {

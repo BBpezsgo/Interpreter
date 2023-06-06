@@ -141,8 +141,10 @@ namespace IngameCoding.Errors
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
-        internal RuntimeException(string message, System.Exception inner, Bytecode.Context context) : base(message, inner)
+        internal RuntimeException(string message, System.Exception inner, Bytecode.Context context) : this(message, inner)
         { this.Context = context; }
+
+        internal RuntimeException(string message, System.Exception inner) : base(message, inner) { }
 
         public override string MessageAll
         {
@@ -165,6 +167,28 @@ namespace IngameCoding.Errors
                 if (StackTrace == null) { result += " (stacktrace is null)"; }
                 else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }
                 else { result += "\n  " + string.Join("\n  ", StackTrace); }
+
+                if (Context.HasValue)
+                {
+                    result += $"\n Stack:";
+                    for (int i = 0; i < Context.Value.Stack.Count; i++)
+                    {
+                        if (Context.Value.Stack[i].IsNull)
+                        {
+                            result += $"\n{i}\t null";
+                        }
+                        else
+                        {
+                            result += $"\n{i}\t {Context.Value.Stack[i].type} {Context.Value.Stack[i].Value()} # {Context.Value.Stack[i].Tag}";
+                        }
+                    }
+
+                    result += $"\n Code:";
+                    for (int i = 0; i < Context.Value.Code.Length; i++)
+                    {
+                        result += $"\n{(i + Context.Value.CodePointer)}\t {Context.Value.Code[i].ToString()}";
+                    }
+                }
 
                 return result;
             }

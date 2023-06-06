@@ -2,7 +2,7 @@
 using IngameCoding.Bytecode;
 using IngameCoding.Tokenizer;
 
-using System;
+using System.Text;
 
 namespace IngameCoding.Core
 {
@@ -10,19 +10,19 @@ namespace IngameCoding.Core
     {
         public static object Value(this DataItem item) => item.type switch
         {
-            DataType.INT => item.ValueInt,
-            DataType.FLOAT => item.ValueFloat,
-            DataType.STRING => item.ValueString,
-            DataType.BOOLEAN => item.ValueBoolean,
+            RuntimeType.INT => item.ValueInt,
+            RuntimeType.FLOAT => item.ValueFloat,
+            RuntimeType.BOOLEAN => item.ValueBoolean,
+            RuntimeType.CHAR => item.ValueChar,
             _ => null,
         };
 
         public static bool EqualType(this DataItem item, BuiltinType type) => item.type switch
         {
-            DataType.INT => type == BuiltinType.INT,
-            DataType.FLOAT => type == BuiltinType.FLOAT,
-            DataType.STRING => type == BuiltinType.STRING,
-            DataType.BOOLEAN => type == BuiltinType.BOOLEAN,
+            RuntimeType.INT => type == BuiltinType.INT,
+            RuntimeType.FLOAT => type == BuiltinType.FLOAT,
+            RuntimeType.BOOLEAN => type == BuiltinType.BOOLEAN,
+            RuntimeType.CHAR => type == BuiltinType.CHAR,
             _ => false,
         };
 
@@ -112,5 +112,35 @@ namespace IngameCoding.Core
         */
 
         public static Position After(this BaseToken self) => new(new Range<SinglePosition>(new SinglePosition(self.Position.End.Line, self.Position.End.Character), new SinglePosition(self.Position.End.Line, self.Position.End.Character + 1)), new Range<int>(self.AbsolutePosition.End, self.AbsolutePosition.End + 1));
+
+        public static string Escape(this char v)
+        {
+            switch (v)
+            {
+                case '\"': return "\\\"";
+                case '\\': return @"\\";
+                case '\0': return @"\0";
+                case '\a': return @"\a";
+                case '\b': return @"\b";
+                case '\f': return @"\f";
+                case '\n': return @"\n";
+                case '\r': return @"\r";
+                case '\t': return @"\t";
+                case '\v': return @"\v";
+                default:
+                    if (v >= 0x20 && v <= 0x7e)
+                    { return v.ToString(); }
+                    else
+                    { return @"\u" + ((int)v).ToString("x4"); }
+            }
+        }
+        public static string Escape(this string v)
+        {
+            if (v == null) return null;
+            StringBuilder literal = new(v.Length);
+            for (int i = 0; i < v.Length; i++)
+            { literal.Append(v[i].Escape()); }
+            return literal.ToString();
+        }
     }
 }

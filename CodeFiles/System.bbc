@@ -1,115 +1,187 @@
-#bf "stdout" "void" "string";
-#bf "stderr" "void" "string";
 #bf "sleep" "void" "int";
-#bf "stdin" "string";
-#bf "tmnw" "string";
-#bf "splitstring" "string" "string" "string";
+
+#bf "console-set" "void" "char" "int" "int";
+#bf "console-clear" "void";
 
 namespace Console
 {
-  [Builtin("stdout")]
-  export void Write(string data);
+  [Builtin("stdout-char")]
+  export void Write(char data);
   
-  [Builtin("stdout2")]
-  export void Set(string data, int x, int y);
+  [Builtin("console-set")]
+  export void Set(char data, int x, int y);
 
-  export void Log(string message)
+  [Builtin("console-clear")]
+  export void Clear();
+    
+  export void Write(String message)
   {
-    Write(message + "\r\n");
+    int length = message.Length();
+    for (int i; i < length; i++)
+    {
+      Write(message.At(i));
+    };
+  }
+  
+  export void Log(String message)
+  {
+    Write(message);
+    String eol = "\r\n";
+    Write(eol);
+    eol.Deallocate();
   }
   
   export void Log(int message)
-  { Log(message.ToString()); }
+  {
+    String str = message.ToString();
+    Log(str);
+    str.Deallocate();
+  }
   
   export void Log(byte message)
-  { Log(message.ToString()); }
-  
-  export void Log(float message)
-  { Log(message.ToString()); }
-
-  [Builtin("stderr")]
-  export void WriteError(string data);
-    
-  export void LogError(string message)
   {
-    WriteError(message + "\r\n");
+    String str = message.ToString();
+    Log(str);
+    str.Deallocate();
   }
-
+  
   [Builtin("stdin")]
-  export string ReadKey();
+  export char ReadKey();
 
-  export string ReadLine() {
-    string result = "";
+  export String ReadLine() {
+    String result = CreateString(0);
     while (true)
     {
-      string inpChar = ReadKey();
-      if (inpChar == "\n") { break; };
-      result += inpChar;
+      char inpChar = ReadKey();
+      if (inpChar == '\n') { break; };
+
+      String newResult = CreateString(result.Length() + 1);
+
+      for (int i = 0; i < result.Length(); i++)
+      {
+        newResult.Set(i, result.At(i));
+      };
+
+      newResult.Set(result.Length(), inpChar);
+      
+      result.Deallocate();
+
+      result = newResult;
     };
     return result;
   }
 }
 
-export struct TimeSpan
+char DigitToChar(int digit)
 {
-  int hours;
-  int mins;
-  int secs;
+  if (digit == 0) { return '0'; }
+  elseif (digit == 1) { return '1'; }
+  elseif (digit == 2) { return '2'; }
+  elseif (digit == 3) { return '3'; }
+  elseif (digit == 4) { return '4'; }
+  elseif (digit == 5) { return '5'; }
+  elseif (digit == 6) { return '6'; }
+  elseif (digit == 7) { return '7'; }
+  elseif (digit == 8) { return '8'; }
+  elseif (digit == 9) { return '9'; };  
 }
 
-export string ToTimeSpanString(this TimeSpan self)
+char DigitToChar(byte digit)
 {
-    return self.hours + ":" + self.mins + ":" + self.secs;
+  if (digit == 0) { return '0'; }
+  elseif (digit == 1) { return '1'; }
+  elseif (digit == 2) { return '2'; }
+  elseif (digit == 3) { return '3'; }
+  elseif (digit == 4) { return '4'; }
+  elseif (digit == 5) { return '5'; }
+  elseif (digit == 6) { return '6'; }
+  elseif (digit == 7) { return '7'; }
+  elseif (digit == 8) { return '8'; }
+  elseif (digit == 9) { return '9'; };  
 }
 
-namespace Time
+export String ToString(this byte number)
 {
-  [Builtin("tmnw")]
-  string tmnw();
-  
-  /*
-  export TimeSpan Now()
-  {
-    string[] nowSplitted;
-    string now = tmnw();
-    nowSplitted = now.Split(":");
-    TimeSpan t = new TimeSpan;
-    t.hours = nowSplitted[0];
-    t.mins = nowSplitted[1];
-    t.secs = nowSplitted[2];
-    return t;
-  }
-  */
+	String result = CreateString(0);
+
+	if (number == 0) {
+	  result.Deallocate();
+	  result = "0";
+	  return result;
+	};
+
+	byte v = number;
+
+	while (v > 0)
+	{
+        byte rem = v % 10;
+		
+		String newResult = CreateString(result.Length() + 1);
+		CopyString(result, newResult);
+		newResult.Set(result.Length(), DigitToChar(rem));
+		result.Deallocate();
+		result = newResult;
+
+		v = v / 10;
+	};
+
+	String reversed = result.Reverse();
+	result.Deallocate();
+	result = reversed;
+
+	return result;
 }
 
-export string ToString(this int v)
-{ return v; }
+export String ToString(this int number)
+{
+	String result = CreateString(0);
 
-export string ToString(this byte v)
-{ return v; }
+	if (number == 0) {
+	  result.Deallocate();
+	  result = "0";
+	  return result;
+	};
 
-export string ToString(this float v)
-{ return v; }
+	int v = number;
+
+	bool isNegative = false;
+	if (v < 0)
+	{
+		isNegative = true;
+		v = 0 - v;
+	};
+
+	while (v > 0)
+	{
+        int rem = v % 10;
+		
+		String newResult = CreateString(result.Length() + 1);
+		CopyString(result, newResult);
+		newResult.Set(result.Length(), DigitToChar(rem));
+		result.Deallocate();
+		result = newResult;
+
+		v = v / 10;
+	};
+
+	if (isNegative)
+	{
+	  String newResult = CreateString(result.Length() + 1);
+	  CopyString(result, newResult);
+	  newResult.Set(result.Length(), '-');
+	  result.Deallocate();
+	  result = newResult;
+	};
+
+	String reversed = result.Reverse();
+	result.Deallocate();
+	result = reversed;
+
+	return result;
+}
 
 [Builtin("sleep")]
 export void Sleep(int ms);
-
-// [Builtin("splitstring")]
-// string[] splitstring(string a, string b);
-
-// export string[] Split(this string v, string separator)
-// { return splitstring(v, separator); }
-
-/*
-export bool Contains(this string[] v, string search)
-{
-  for (int i = 0; i < v.Length; i++)
-  {
-    if (v[i] == search) { return true; };
-  };
-  return false;
-}
-*/
 
 namespace Math
 {
@@ -143,46 +215,51 @@ namespace Math
   }
 }
 
-export string Substring(this string v, int start)
+export String Substring(this String v, int start)
 {
-  string newV = "";
-  for (int i = start; i < v.Length; i++)
+  int newLength = 0;
+  for (int i = start; i < v.Length(); i++)
   {
-    newV += v[i];
+    newLength++;
+  };
+  String newV = CreateString(newLength);
+  for (int i = start; i < v.Length(); i++)
+  {
+    newV.Set(i - start, v.At(i));
   };
   return newV;
 }
 
-export string Reverse(this string v)
+export String Reverse(this String v)
 {
-  string newV = "";
-  for (int i = 0; i < v.Length; i++)
+  String newV = CreateString(v.Length());
+  for (int i = 0; i < v.Length(); i++)
   {
-    newV += v[(v.Length - 1 - i)];
+    newV.Set(i, v.At(v.Length() - 1 - i));
   };
   return newV;
 }
 
-export string Substring(this string v, int start, int length)
+export String Substring(this String v, int start, int length)
 {
-  string newV = "";
-  for (int i = start; i < Math.Min(v.Length, start + length); i++)
+  String newV = CreateString(Math.Min(v.Length(), start + length));
+  for (int i = start; i < Math.Min(v.Length(), start + length); i++)
   {
-    newV += v[i];
+    newV.Set(i - start, v.At(i));
   };
   return newV;
 }
 
-export int ParseInt(string v)
+export int ParseInt(String v)
 {
-  bool IsNegative = (v[0] == "-");
-  string parsing = v;
+  bool IsNegative = (v.At(0) == '-');
+  String parsing = v;
   if (IsNegative) { parsing = parsing.Substring(1); };
   parsing = parsing.Reverse();
   int result = 0;
-  for (int i = 0; i < parsing.Length; i++)
+  for (int i = 0; i < parsing.Length(); i++)
   {
-    string digit = parsing[i];
+    char digit = parsing.At(i);
     result += (Math.Pow(10, i) * ParseDigit(digit));
   };
   if (IsNegative)
@@ -190,16 +267,16 @@ export int ParseInt(string v)
   return result;
 }
 
-export byte ParseByte(string v)
+export byte ParseByte(String v)
 {
-  bool IsNegative = (v[0] == "-");
-  string parsing = v;
+  bool IsNegative = (v.At(0) == '-');
+  String parsing = v;
   if (IsNegative) { parsing = parsing.Substring(1); };
   parsing = parsing.Reverse();
   int result = 0;
-  for (int i = 0; i < parsing.Length; i++)
+  for (int i = 0; i < parsing.Length(); i++)
   {
-    string digit = parsing[i];
+    char digit = parsing.At(i);
     result += (Math.Pow(10, i) * ParseDigit(digit));
   };
   if (IsNegative)
@@ -207,18 +284,18 @@ export byte ParseByte(string v)
   return result;
 }
 
-int ParseDigit(string digit)
+int ParseDigit(char digit)
 {
-  if (digit == "0") { return 0; }
-  elseif (digit == "1") { return 1; }
-  elseif (digit == "2") { return 2; }
-  elseif (digit == "3") { return 3; }
-  elseif (digit == "4") { return 4; }
-  elseif (digit == "5") { return 5; }
-  elseif (digit == "6") { return 6; }
-  elseif (digit == "7") { return 7; }
-  elseif (digit == "8") { return 8; }
-  elseif (digit == "9") { return 9; };
+  if (digit == '0') { return 0; }
+  elseif (digit == '1') { return 1; }
+  elseif (digit == '2') { return 2; }
+  elseif (digit == '3') { return 3; }
+  elseif (digit == '4') { return 4; }
+  elseif (digit == '5') { return 5; }
+  elseif (digit == '6') { return 6; }
+  elseif (digit == '7') { return 7; }
+  elseif (digit == '8') { return 8; }
+  elseif (digit == '9') { return 9; };
 }
 
 [Builtin("int-to-float")]
@@ -226,3 +303,73 @@ export float ToFloat(this int v);
 
 [Builtin("float-to-int")]
 export int ToInt(this float v);
+
+class String
+{
+    private int pointer;
+    private int length;
+
+    export int Length() { return this.length; }
+
+    export char At(int index)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        return *(this.pointer + index);
+    }
+
+    export void Set(int index, char element)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        *(this.pointer + index) = element;
+    }
+
+    export void Deallocate()
+    {
+        Dealloc(this.pointer, this.length);
+        Dealloc(&this, sizeof(this));
+    }
+}
+
+export String CreateString(int length)
+{
+  String result = new String;
+  result.pointer = Alloc(length);
+  result.length = length;
+  for (int i = 0; i < length; i++)
+  {
+    *(result.pointer + i) = '\0';
+  };
+  return result;
+}
+
+export String Combine(String a, String b)
+{
+  int al = a.Length();
+  int bl = b.Length();
+
+  int lengthSum = al + bl;
+  String result = CreateString(lengthSum);
+  
+  for (int i; i < al; i++)
+  {
+    result.Set(i, a.At(i));
+  };
+  
+  for (int i; i < bl; i++)
+  {
+    result.Set(al + i, b.At(i));
+  };
+
+  return result;
+}
+
+export void CopyString(String from, String to)
+{
+    int newLength = Math.Min(from.Length(), to.Length());
+    for (int i; i < newLength; i++)
+    {
+        to.Set(i, from.At(i));
+    };
+}

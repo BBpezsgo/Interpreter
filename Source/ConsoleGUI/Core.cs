@@ -92,6 +92,11 @@ namespace ConsoleGUI
             AsciiChar = e.AsciiChar;
             ControlKeyState = e.dwControlKeyState;
         }
+
+        public override string ToString()
+        {
+            return $"({(KeyDown ? " Down" : "")} Repeat: {RepeatCount} ASCII: {AsciiChar} Control: {ControlKeyState} )";
+        }
     }
 
     public readonly struct WindowBufferSizeEvent
@@ -265,8 +270,18 @@ namespace ConsoleGUI
         public char Char;
         public CharColors Color;
 
+        public Character(char @char, CharColors color)
+        {
+            this.Char = @char;
+            this.Color = color;
+        }
+
+        public static Character Solid(CharColors color) => new(' ', color);
+
         public override string ToString() => Char.ToString();
         string GetDebuggerDisplay() => ToString();
+
+        public static Character ErrorChar => new(' ', CharColors.BgMagenta);
     }
 
     namespace ConsoleLib

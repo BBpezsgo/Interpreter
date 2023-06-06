@@ -40,6 +40,8 @@ namespace IngameCoding.Bytecode
         }
         public int CodePointer;
         public int ExecutedInstructionCount;
+        public Instruction[] Code;
+        internal DataStack Stack;
     }
 
     public class BytecodeInterpreter
@@ -77,7 +79,7 @@ namespace IngameCoding.Bytecode
         {
             this.settings = settings;
 
-            this.BytecodeProcessor = new BytecodeProcessor(code, 0, builtinFunctions);
+            this.BytecodeProcessor = new BytecodeProcessor(code, 0, settings.HeapSize, builtinFunctions);
 
             this.argumentCount = 0;
 
@@ -152,6 +154,8 @@ namespace IngameCoding.Bytecode
             RawCallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
             ExecutedInstructionCount = this.endlessSafe,
             CodePointer = this.BytecodeProcessor.CodePointer,
+            Code = this.BytecodeProcessor.Memory.Code[Math.Clamp(this.BytecodeProcessor.CodePointer - 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)..Math.Clamp(this.BytecodeProcessor.CodePointer + 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)],
+            Stack = this.BytecodeProcessor.Memory.Stack,
         };
 
         #endregion
@@ -259,12 +263,14 @@ namespace IngameCoding.Bytecode
         internal int ClockCyclesPerUpdate;
         internal int InstructionLimit;
         internal int StackMaxSize;
+        internal int HeapSize;
 
         public static BytecodeInterpreterSettings Default => new()
         {
             ClockCyclesPerUpdate = 2,
             InstructionLimit = 8192,
             StackMaxSize = 128,
+            HeapSize = 64,
         };
     }
 

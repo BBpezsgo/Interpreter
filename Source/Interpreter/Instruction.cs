@@ -12,8 +12,6 @@ namespace IngameCoding.Bytecode
     /// <list type="bullet">
     /// <item><see cref="Opcode.STORE_VALUE"/></item>
     /// <item><see cref="Opcode.LOAD_VALUE"/></item>
-    /// <item><see cref="Opcode.STORE_FIELD"/></item>
-    /// <item><see cref="Opcode.LOAD_FIELD"/></item>
     /// <item><see cref="Opcode.HEAP_SET"/></item>
     /// <item><see cref="Opcode.HEAP_GET"/></item>
     /// </list>
@@ -44,7 +42,7 @@ namespace IngameCoding.Bytecode
             {
                 if (parameter == null) throw new Errors.InternalException($"Can't cast null to {nameof(Int32)}");
                 if (parameter is int @int) return @int;
-                if (parameter is DataItem dataItem && dataItem.type == DataType.INT) return dataItem.ValueInt;
+                if (parameter is DataItem dataItem && dataItem.type == RuntimeType.INT) return dataItem.ValueInt;
                 throw new Errors.InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
             }
         }
@@ -55,19 +53,11 @@ namespace IngameCoding.Bytecode
                 if (parameter == null) return DataItem.Null;
                 if (parameter is int @int) return new DataItem(@int, null);
                 if (parameter is float @float) return new DataItem(@float, null);
-                if (parameter is string @string) return new DataItem(@string, null);
                 if (parameter is byte @byte) return new DataItem(@byte, null);
+                if (parameter is char @char) return new DataItem(@char, null);
+                if (parameter is bool @bool) return new DataItem(@bool, null);
                 if (parameter is DataItem dataItem) return dataItem;
                 return DataItem.Null;
-            }
-        }
-        public string ParameterString
-        {
-            get
-            {
-                if (parameter == null) return null;
-                if (parameter is DataItem dataItem) return dataItem.ToStringValue();
-                return parameter.ToString();
             }
         }
         /// <summary>
@@ -78,6 +68,7 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="bool"/></item>
         /// <item><see cref="float"/></item>
         /// <item><see cref="string"/></item>
+        /// <item><see cref="char"/></item>
         /// </list>
         /// </summary>
         public object Parameter
@@ -186,14 +177,20 @@ namespace IngameCoding.Bytecode
             }
             else
             {
-                string str;
+                string str = "";
+                str += opcode.ToString();
+                if (opcode == Opcode.LOAD_VALUE ||
+                    opcode == Opcode.STORE_VALUE)
+                {
+                    str += " " + AddressingMode.ToString();
+                }
                 if (this.parameter == null)
                 {
-                    str = opcode.ToString() + " { " + "<null>";
+                    str += " { " + "<null>";
                 }
                 else
                 {
-                    str = opcode.ToString() + " { " + parameter.ToString();
+                    str += " { " + parameter.ToString();
                 }
                 str += " }";
                 return IsRunning + str;
@@ -214,11 +211,6 @@ namespace IngameCoding.Bytecode
                 serializer.Serialize((byte)1);
                 serializer.Serialize(@int);
             }
-            else if (this.parameter is string @string)
-            {
-                serializer.Serialize((byte)2);
-                serializer.Serialize(@string);
-            }
             else if (this.parameter is bool @bool)
             {
                 serializer.Serialize((byte)3);
@@ -228,6 +220,11 @@ namespace IngameCoding.Bytecode
             {
                 serializer.Serialize((byte)4);
                 serializer.Serialize(@float);
+            }
+            else if (this.parameter is char @char)
+            {
+                serializer.Serialize((byte)5);
+                serializer.Serialize(@char);
             }
             else
             {
@@ -240,17 +237,17 @@ namespace IngameCoding.Bytecode
             serializer.Serialize(dataItem.Tag);
             switch (dataItem.type)
             {
-                case DataType.INT:
+                case RuntimeType.INT:
                     serializer.Serialize(dataItem.ValueInt);
                     break;
-                case DataType.FLOAT:
+                case RuntimeType.FLOAT:
                     serializer.Serialize(dataItem.ValueFloat);
                     break;
-                case DataType.STRING:
-                    serializer.Serialize(dataItem.ValueString);
-                    break;
-                case DataType.BOOLEAN:
+                case RuntimeType.BOOLEAN:
                     serializer.Serialize(dataItem.ValueBoolean);
+                    break;
+                case RuntimeType.CHAR:
+                    serializer.Serialize(dataItem.ValueChar);
                     break;
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
@@ -258,19 +255,19 @@ namespace IngameCoding.Bytecode
         }
         DataItem DeserializeDataItem(Deserializer deserializer)
         {
-            DataType type = (DataType)deserializer.DeserializeInt32();
+            RuntimeType type = (RuntimeType)deserializer.DeserializeInt32();
             string tag = deserializer.DeserializeString();
 
             switch (type)
             {
-                case DataType.INT:
+                case RuntimeType.INT:
                     return new DataItem(deserializer.DeserializeInt32(), tag);
-                case DataType.FLOAT:
+                case RuntimeType.FLOAT:
                     return new DataItem(deserializer.DeserializeFloat(), tag);
-                case DataType.STRING:
-                    return new DataItem(deserializer.DeserializeString(), tag);
-                case DataType.BOOLEAN:
+                case RuntimeType.BOOLEAN:
                     return new DataItem(deserializer.DeserializeBoolean(), tag);
+                case RuntimeType.CHAR:
+                    return new DataItem(deserializer.DeserializeChar(), tag);
                 default:
                     throw new Errors.InternalException($"Unknown type {type}");
             }
@@ -283,17 +280,17 @@ namespace IngameCoding.Bytecode
             result["Tag"] = Value.Literal(dataItem.Tag);
             switch (dataItem.type)
             {
-                case DataType.INT:
+                case RuntimeType.INT:
                     result["Value"] = Value.Literal(dataItem.ValueInt);
                     return result;
-                case DataType.FLOAT:
+                case RuntimeType.FLOAT:
                     result["Value"] = Value.Literal(dataItem.ValueFloat);
                     return result;
-                case DataType.STRING:
-                    result["Value"] = Value.Literal(dataItem.ValueString);
-                    return result;
-                case DataType.BOOLEAN:
+                case RuntimeType.BOOLEAN:
                     result["Value"] = Value.Literal(dataItem.ValueBoolean);
+                    return result;
+                case RuntimeType.CHAR:
+                    result["Value"] = Value.Literal(dataItem.ValueChar);
                     return result;
                 default:
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
@@ -301,19 +298,19 @@ namespace IngameCoding.Bytecode
         }
         DataItem DeserializeTextDataItem(Value data)
         {
-            DataType type = (DataType)data["Type"].Int;
+            RuntimeType type = (RuntimeType)data["Type"].Int;
             string tag = data["Tag"].String;
 
             switch (type)
             {
-                case DataType.INT:
+                case RuntimeType.INT:
                     return new DataItem((int)data["Value"].Int, tag);
-                case DataType.FLOAT:
+                case RuntimeType.FLOAT:
                     return new DataItem((float)data["Value"].Float, tag);
-                case DataType.STRING:
-                    return new DataItem(data["Value"].String, tag);
-                case DataType.BOOLEAN:
+                case RuntimeType.BOOLEAN:
                     return new DataItem((bool)data["Value"].Bool, tag);
+                case RuntimeType.CHAR:
+                    return new DataItem((char)data["Value"].Int, tag);
                 default:
                     throw new Errors.InternalException($"Unknown type {type}");
             }
@@ -333,10 +330,6 @@ namespace IngameCoding.Bytecode
             {
                 this.parameter = deserializer.DeserializeInt32();
             }
-            else if (parameterType == 2)
-            {
-                this.parameter = deserializer.DeserializeString();
-            }
             else if (parameterType == 3)
             {
                 this.parameter = deserializer.DeserializeBoolean();
@@ -344,6 +337,10 @@ namespace IngameCoding.Bytecode
             else if (parameterType == 4)
             {
                 this.parameter = deserializer.DeserializeFloat();
+            }
+            else if (parameterType == 5)
+            {
+                this.parameter = deserializer.DeserializeChar();
             }
             else
             { throw new NotImplementedException(); }
@@ -365,11 +362,6 @@ namespace IngameCoding.Bytecode
                 result["ParameterType"] = Value.Literal(1);
                 result["ParameterValue"] = Value.Literal(@int);
             }
-            else if (this.parameter is string @string)
-            {
-                result["ParameterType"] = Value.Literal(2);
-                result["ParameterValue"] = Value.Literal(@string);
-            }
             else if (this.parameter is bool @bool)
             {
                 result["ParameterType"] = Value.Literal(3);
@@ -379,6 +371,11 @@ namespace IngameCoding.Bytecode
             {
                 result["ParameterType"] = Value.Literal(4);
                 result["ParameterValue"] = Value.Literal(@float);
+            }
+            else if (this.parameter is char @char)
+            {
+                result["ParameterType"] = Value.Literal(5);
+                result["ParameterValue"] = Value.Literal(@char);
             }
             else
             {
@@ -402,10 +399,6 @@ namespace IngameCoding.Bytecode
             {
                 this.parameter = data["ParameterValue"].Int;
             }
-            else if (parameterType == 2)
-            {
-                this.parameter = data["ParameterValue"].String;
-            }
             else if (parameterType == 3)
             {
                 this.parameter = data["ParameterValue"].Bool;
@@ -413,6 +406,10 @@ namespace IngameCoding.Bytecode
             else if (parameterType == 4)
             {
                 this.parameter = data["ParameterValue"].Float;
+            }
+            else if (parameterType == 5)
+            {
+                this.parameter = (char)data["ParameterValue"].Int;
             }
             else
             { throw new NotImplementedException(); }

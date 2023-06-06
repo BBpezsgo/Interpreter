@@ -14,6 +14,8 @@ namespace IngameCoding.Core
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Output;
 
+    using System.Linq;
+
     /// <summary>
     /// This compiles and runs the code
     /// </summary>
@@ -298,6 +300,7 @@ namespace IngameCoding.Core
             errors = new();
 
             var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings, (msg, lv) => OnOutput?.Invoke(this, $"  {msg}", lv));
+            Debug.WriteLine(string.Join("\r\n", parserResult.Functions[0].Statements.Select(v => v.PrettyPrint())));
             parserResult.SetFile(file.FullName);
             var compilerResult = Compiler.CompileCode(
                 parserResult,
@@ -395,30 +398,6 @@ namespace IngameCoding.Core
             this.currentlyRunningCode = true;
 
             AddBuiltins();
-            AddBuiltinFunction("stdin", Array.Empty<TypeToken>(), (DataItem[] parameters) =>
-            {
-                pauseCode = true;
-                if (OnNeedInput == null)
-                {
-                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
-                    OnInput('\0');
-                }
-                else
-                {
-                    OnNeedInput?.Invoke(this);
-                }
-            }, true);
-            builtinFunctions.AddBuiltinFunction("test", () =>
-            {
-                var d = bytecodeInterpreter.Stack.ToByteArray((v) => v.ToByteArray());
-                var de = new StepList<byte>(d);
-                List<DataItem> r = new();
-                de.Next();
-                foreach (var item in bytecodeInterpreter.Stack)
-                {
-                    r.Add(de.GetDataItem(item.Tag));
-                }
-            });
 
             details = new InterpreterDetails(this);
 
@@ -542,7 +521,7 @@ namespace IngameCoding.Core
         /// </param>
         public void OnInput(char key)
         {
-            bytecodeInterpreter.AddValueToStack(new DataItem(key.ToString(), "Console Input"));
+            bytecodeInterpreter.AddValueToStack(new DataItem(key, "Console Input"));
             pauseCode = false;
         }
 
@@ -571,14 +550,28 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            builtinFunctions.AddBuiltinFunction("stdout", new TypeToken[] {
-                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
+            builtinFunctions.AddBuiltinFunction("stdin", Array.Empty<BuiltinType>(), (DataItem[] parameters) =>
+            {
+                pauseCode = true;
+                if (OnNeedInput == null)
+                {
+                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
+                    OnInput('\0');
+                }
+                else
+                {
+                    OnNeedInput?.Invoke(this);
+                }
+            }, true);
+
+            builtinFunctions.AddBuiltinFunction("stdout-char", new BuiltinType[] {
+                BuiltinType.CHAR
             }, (DataItem[] parameters) =>
             {
-                OnStdOut?.Invoke(this, parameters[0].ToStringValue());
+                OnStdOut?.Invoke(this, parameters[0].ValueChar.ToString());
             });
 
-            builtinFunctions.AddBuiltinFunction<string, int, int>("stdout2", (v, x, y) =>
+            builtinFunctions.AddBuiltinFunction<char, int, int>("console-set", (v, x, y) =>
             {
                 if (x < 0 || y < 0) return;
                 var (lx, ly) = Console.GetCursorPosition();
@@ -587,14 +580,19 @@ namespace IngameCoding.Core
                 Console.SetCursorPosition(lx, ly);
             });
 
-            builtinFunctions.AddBuiltinFunction("stderr", new TypeToken[] {
-                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
+            builtinFunctions.AddBuiltinFunction("console-clear", () =>
+            {
+                Console.Clear();
+            });
+
+            builtinFunctions.AddBuiltinFunction("stderr-char", new BuiltinType[] {
+                BuiltinType.CHAR
             }, (DataItem[] parameters) =>
             {
-                OnStdError?.Invoke(this, parameters[0].ToStringValue());
+                OnStdError?.Invoke(this, parameters[0].ValueChar.ToString());
             });
-            builtinFunctions.AddBuiltinFunction("sleep", new TypeToken[] {
-                TypeToken.CreateAnonymous("int", BuiltinType.INT)
+            builtinFunctions.AddBuiltinFunction("sleep", new BuiltinType[] {
+                BuiltinType.INT
             }, (DataItem[] parameters) =>
             {
                 pauseCodeFor = parameters[0].ValueInt;
@@ -616,26 +614,15 @@ namespace IngameCoding.Core
 
             builtinFunctions.AddBuiltinFunction("tmnw", () =>
             {
-                return new DataItem(DateTime.Now.ToString("HH:mm:ss"), "tmnw() result");
-            });
-
-            #endregion
-
-            #region Other
-
-            this.builtinFunctions.AddBuiltinFunction("splitstring", new TypeToken[] {
-                TypeToken.CreateAnonymous("string", BuiltinType.STRING),
-                TypeToken.CreateAnonymous("string", BuiltinType.STRING)
-            }, (DataItem[] parameters) =>
-            {
                 throw new NotImplementedException();
+                return new DataItem(DateTime.Now.Ticks, "tmnw() result");
             });
 
             #endregion
 
             #region Net.Http
 
-            this.builtinFunctions.AddBuiltinFunction<string>("http_get", (url) =>
+            builtinFunctions.AddBuiltinFunction<string>("http_get", (url) =>
             {
                 System.Net.Http.HttpClient httpClient = new();
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
@@ -643,10 +630,6 @@ namespace IngameCoding.Core
                 string res = result.Content.ReadAsStringAsync().Result;
                 return res;
             });
-
-            #endregion
-
-            #region Structs
 
             #endregion
 
@@ -744,7 +727,7 @@ namespace IngameCoding.Core
             {
                 error.FeedDebugInfo(details.CompilerResult.debugInfo);
 
-                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToStringValue(), LogType.Error);
+                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToString() + "\r\n" + error.MessageAll, LogType.Error);
 
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
@@ -823,24 +806,5 @@ namespace IngameCoding.Core
 
             OnCodeExecuted(result);
         }
-
-        #region AddBuiltinFunction()
-
-        void AddBuiltinFunction(string name, TypeToken[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
-        {
-            BuiltinFunction function = new(callback, name, parameterTypes, ReturnSomething);
-
-            if (!builtinFunctions.ContainsKey(name))
-            {
-                builtinFunctions.Add(name, function);
-            }
-            else
-            {
-                builtinFunctions[name] = function;
-                Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
-            }
-        }
-
-        #endregion
     }
 }

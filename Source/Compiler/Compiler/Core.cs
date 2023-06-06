@@ -24,13 +24,13 @@ namespace IngameCoding.BBCode.Compiler
         internal static AddressingMode AddressingMode(this CompiledVariable v)
             => v.IsGlobal ? Bytecode.AddressingMode.ABSOLUTE : Bytecode.AddressingMode.BASEPOINTER_RELATIVE;
 
-        internal static DataType Convert(this BuiltinType v) => v switch
+        internal static RuntimeType Convert(this BuiltinType v) => v switch
         {
-            BuiltinType.INT => DataType.INT,
-            BuiltinType.BYTE => DataType.BYTE,
-            BuiltinType.FLOAT => DataType.FLOAT,
-            BuiltinType.STRING => DataType.STRING,
-            BuiltinType.BOOLEAN => DataType.BOOLEAN,
+            BuiltinType.INT => RuntimeType.INT,
+            BuiltinType.BYTE => RuntimeType.BYTE,
+            BuiltinType.FLOAT => RuntimeType.FLOAT,
+            BuiltinType.STRING => RuntimeType.STRING,
+            BuiltinType.BOOLEAN => RuntimeType.BOOLEAN,
 
             BuiltinType.ANY => throw new NotImplementedException(),
             BuiltinType.AUTO => throw new NotImplementedException(),
@@ -51,15 +51,15 @@ namespace IngameCoding.BBCode.Compiler
             TypeTokenType.AUTO => BuiltinType.AUTO,
             TypeTokenType.VOID => BuiltinType.VOID,
             TypeTokenType.ANY => BuiltinType.ANY,
+            TypeTokenType.CHAR => BuiltinType.CHAR,
             _ => throw new NotImplementedException(),
         };
-        internal static BuiltinType Convert(this DataType v) => v switch
+        internal static BuiltinType Convert(this RuntimeType v) => v switch
         {
-            DataType.INT => BuiltinType.INT,
-            DataType.BYTE => BuiltinType.BYTE,
-            DataType.FLOAT => BuiltinType.FLOAT,
-            DataType.STRING => BuiltinType.STRING,
-            DataType.BOOLEAN => BuiltinType.BOOLEAN,
+            RuntimeType.INT => BuiltinType.INT,
+            RuntimeType.BYTE => BuiltinType.BYTE,
+            RuntimeType.FLOAT => BuiltinType.FLOAT,
+            RuntimeType.BOOLEAN => BuiltinType.BOOLEAN,
             _ => BuiltinType.ANY,
         };
 
@@ -662,12 +662,12 @@ namespace IngameCoding.BBCode.Compiler
             BYTE,
             INT,
             FLOAT,
-            STRING,
             BOOL,
             /// <summary>
             /// Only used when get a value by it's memory address!
             /// </summary>
             UNKNOWN,
+            CHAR,
         }
 
         readonly CompiledTypeType builtinType;
@@ -682,6 +682,8 @@ namespace IngameCoding.BBCode.Compiler
         internal CompiledClass Class => @class;
         internal CompiledType ListOf => listOf;
 
+
+        /// <exception cref="Errors.InternalException"/>
         internal string Name
         {
             get
@@ -692,8 +694,8 @@ namespace IngameCoding.BBCode.Compiler
                     CompiledTypeType.BYTE => "byte",
                     CompiledTypeType.INT => "int",
                     CompiledTypeType.FLOAT => "float",
-                    CompiledTypeType.STRING => "string",
                     CompiledTypeType.BOOL => "bool",
+                    CompiledTypeType.CHAR => "char",
                     CompiledTypeType.UNKNOWN => "unknown",
                     _ => throw new Errors.InternalException($"WTF???"),
                 };
@@ -705,6 +707,7 @@ namespace IngameCoding.BBCode.Compiler
                 return null;
             }
         }
+        /// <exception cref="Errors.InternalException"/>
         public string FullName
         {
             get
@@ -715,8 +718,8 @@ namespace IngameCoding.BBCode.Compiler
                     CompiledTypeType.BYTE => "byte",
                     CompiledTypeType.INT => "int",
                     CompiledTypeType.FLOAT => "float",
-                    CompiledTypeType.STRING => "string",
                     CompiledTypeType.BOOL => "bool",
+                    CompiledTypeType.CHAR => "char",
                     _ => throw new Errors.InternalException($"WTF???"),
                 };
 
@@ -745,6 +748,14 @@ namespace IngameCoding.BBCode.Compiler
                 return 1;
             }
         }
+        public int SizeOnHeap
+        {
+            get
+            {
+                if (IsClass) return @class.Size;
+                return 0;
+            }
+        }
         public int SizeOnStack
         {
             get
@@ -763,11 +774,13 @@ namespace IngameCoding.BBCode.Compiler
             this.listOf = null;
         }
 
+        /// <exception cref="ArgumentNullException"/>
         internal CompiledType(CompiledStruct @struct) : this()
         {
             this.@struct = @struct ?? throw new ArgumentNullException(nameof(@struct));
         }
 
+        /// <exception cref="ArgumentNullException"/>
         internal CompiledType(CompiledClass @class) : this()
         {
             this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
@@ -783,6 +796,8 @@ namespace IngameCoding.BBCode.Compiler
             this.listOf = listOf ?? throw new ArgumentNullException(nameof(listOf));
         }
 
+        /// <exception cref="ArgumentException"/>
+        /// <exception cref="Errors.InternalException"/>
         internal CompiledType(string type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
         {
             if (string.IsNullOrEmpty(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or empty.", nameof(type));
@@ -808,11 +823,11 @@ namespace IngameCoding.BBCode.Compiler
                 case "float":
                     this.builtinType = CompiledTypeType.FLOAT;
                     return;
-                case "string":
-                    this.builtinType = CompiledTypeType.STRING;
-                    return;
                 case "bool":
                     this.builtinType = CompiledTypeType.BOOL;
+                    return;
+                case "char":
+                    this.builtinType = CompiledTypeType.CHAR;
                     return;
                 default:
                     break;
@@ -823,7 +838,8 @@ namespace IngameCoding.BBCode.Compiler
             SetCustomType(type, UnknownTypeCallback);
         }
 
-        public CompiledType(BuiltinType type) : this()
+        /// <exception cref="Errors.InternalException"/>
+        public CompiledType(BuiltinType type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
         {
             this.builtinType = type switch
             {
@@ -831,12 +847,19 @@ namespace IngameCoding.BBCode.Compiler
                 BBCode.BuiltinType.BYTE => CompiledTypeType.BYTE,
                 BBCode.BuiltinType.INT => CompiledTypeType.INT,
                 BBCode.BuiltinType.FLOAT => CompiledTypeType.FLOAT,
-                BBCode.BuiltinType.STRING => CompiledTypeType.STRING,
                 BBCode.BuiltinType.BOOLEAN => CompiledTypeType.BOOL,
+                BBCode.BuiltinType.CHAR => CompiledTypeType.CHAR,
+
+                BBCode.BuiltinType.STRING => CompiledTypeType.UNKNOWN,
                 _ => throw new Errors.InternalException($"Can't cast BuiltinType {type} to CompiledType"),
             };
+            if (type == BBCode.BuiltinType.STRING)
+            {
+                SetCustomType("String", UnknownTypeCallback);
+            }
         }
 
+        /// <exception cref="ArgumentNullException"/>
         public CompiledType(TypeToken type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
@@ -862,10 +885,14 @@ namespace IngameCoding.BBCode.Compiler
                     this.builtinType = CompiledTypeType.FLOAT;
                     return;
                 case TypeTokenType.STRING:
-                    this.builtinType = CompiledTypeType.STRING;
+                    this.builtinType = CompiledTypeType.UNKNOWN;
+                    SetCustomType("String", UnknownTypeCallback);
                     return;
                 case TypeTokenType.BOOLEAN:
                     this.builtinType = CompiledTypeType.BOOL;
+                    return;
+                case TypeTokenType.CHAR:
+                    this.builtinType = CompiledTypeType.CHAR;
                     return;
                 default:
                     break;
@@ -874,6 +901,7 @@ namespace IngameCoding.BBCode.Compiler
             SetCustomType(type.Content, UnknownTypeCallback);
         }
 
+        /// <exception cref="Errors.InternalException"/>
         void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
         {
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
@@ -898,15 +926,19 @@ namespace IngameCoding.BBCode.Compiler
         public BuiltinType GetBuiltinType()
         {
             if (IsStruct) return BBCode.BuiltinType.STRUCT;
-            if (IsClass) return BBCode.BuiltinType.STRUCT;
+            if (IsClass)
+            {
+                if (@class.FullName == "String") return BBCode.BuiltinType.STRING;
+                return BBCode.BuiltinType.STRUCT;
+            }
             if (IsList) return BBCode.BuiltinType.LISTOF;
             if (IsBuiltin) return builtinType switch
             {
                 CompiledTypeType.BYTE => BBCode.BuiltinType.BYTE,
                 CompiledTypeType.INT => BBCode.BuiltinType.INT,
                 CompiledTypeType.FLOAT => BBCode.BuiltinType.FLOAT,
-                CompiledTypeType.STRING => BBCode.BuiltinType.STRING,
                 CompiledTypeType.BOOL => BBCode.BuiltinType.BOOLEAN,
+                CompiledTypeType.CHAR => BBCode.BuiltinType.CHAR,
                 _ => BBCode.BuiltinType.VOID,
             };
             return BBCode.BuiltinType.VOID;

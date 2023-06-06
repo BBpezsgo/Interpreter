@@ -1,0 +1,10 @@
+using System;
+
+[CodeEntry]
+void Start()
+{
+	int number = -44;
+	String str = number.ToString();
+	Console.Write(str);
+	str.Deallocate();
+}

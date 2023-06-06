@@ -6,12 +6,12 @@ namespace ConsoleGUI
     {
         public Rectangle Rect { get; set; } = Rectangle.Empty;
 
-        internal Character[] DrawBuffer = System.Array.Empty<Character>();
+        internal DrawBuffer DrawBuffer = new();
         protected MouseEvent LastMouse;
 
         public virtual Character DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
-        internal void ClearBuffer() => DrawBuffer = new Character[Rect.Width * Rect.Height];
+        internal void ClearBuffer() => DrawBuffer = new(Rect.Width * Rect.Height);
 
         public virtual void BeforeDraw()
         { if (DrawBuffer.Length == 0) ClearBuffer(); }

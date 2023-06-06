@@ -3,11 +3,6 @@
 
 #pragma warning disable CS0162 // Unreachable code detected
 
-using IngameCoding.BBCode.Compiler;
-using IngameCoding.BBCode.Parser;
-using IngameCoding.Bytecode;
-using IngameCoding.Core;
-
 using System;
 
 namespace TheProgram
@@ -19,13 +14,10 @@ namespace TheProgram
 #else
         internal static bool Start()
         {
-            // TODO: valami hiba van amit nem volt kedvem debuggolni, szoval hajrá :D
-            // fájl: test-matrix.bbc
-
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "donught.bbc";
+            var file = "test13.bbc";
 
             if (false)
             {

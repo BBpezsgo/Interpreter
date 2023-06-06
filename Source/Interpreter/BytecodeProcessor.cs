@@ -16,7 +16,7 @@ namespace IngameCoding.Bytecode
 
         internal Instruction CurrentInstruction => Memory.Code[CodePointer];
 
-        public BytecodeProcessor(Instruction[] code, int basePointer, Dictionary<string, BuiltinFunction> builtinFunctions)
+        public BytecodeProcessor(Instruction[] code, int basePointer, int heapSize, Dictionary<string, BuiltinFunction> builtinFunctions)
         {
             for (int i = 0; i < code.Length; i++)
             {
@@ -29,7 +29,7 @@ namespace IngameCoding.Bytecode
             CodePointer = code.Length;
 
             Memory = new(
-                10,
+                heapSize,
                 code,
                 this
             );
@@ -76,8 +76,6 @@ namespace IngameCoding.Bytecode
                 case Opcode.THROW: return THROW();
 
                 case Opcode.CALL_BUILTIN: return CALL_BUILTIN();
-                case Opcode.TYPE_GET: return TYPE_GET();
-                case Opcode.TYPE_CAST: return TYPE_CAST();
 
                 case Opcode.MATH_ADD: return MATH_ADD();
                 case Opcode.MATH_SUB: return MATH_SUB();
@@ -115,7 +113,7 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        /// <exception cref="System.Exception"></exception>
+        /// <exception cref="System.Exception"/>
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
@@ -126,7 +124,7 @@ namespace IngameCoding.Bytecode
             _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
-        /// <exception cref="System.Exception"></exception>
+        /// <exception cref="System.Exception"/>
         int GetHeapAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
@@ -136,17 +134,22 @@ namespace IngameCoding.Bytecode
 
         #region Instruction Methods
 
-        /// <exception cref="UserException"></exception>
+        /// <exception cref="UserException"/>
         int THROW()
         {
             DataItem throwValue = Memory.Stack.Pop();
             throw new UserException("User Exception Thrown", throwValue);
         }
 
-        /// <exception cref="RuntimeException"></exception>
+        /// <exception cref="RuntimeException"/>
         int FIND_HEAP_FREE_SPACE()
         {
-            int sizeNeeded = CurrentInstruction.ParameterInt;
+            DataItem sizeNeededData = Memory.Stack.Pop();
+
+            if (sizeNeededData.type != RuntimeType.INT)
+            { throw new RuntimeException($"fuck you"); }
+
+            int sizeNeeded = sizeNeededData.ValueInt;
 
             int currentFreeSize = 0;
             int freeSizeStarted = 0;
@@ -186,7 +189,7 @@ namespace IngameCoding.Bytecode
 
         int CS_PUSH()
         {
-            Memory.CallStack.Push(CurrentInstruction.ParameterString);
+            Memory.CallStack.Push(CurrentInstruction.tag);
             Step();
 
             return 1;
@@ -203,7 +206,7 @@ namespace IngameCoding.Bytecode
         int DEBUG_SET_TAG()
         {
             var last = Memory.Stack.Last();
-            last.Tag = CurrentInstruction.ParameterString;
+            last.Tag = CurrentInstruction.tag;
             Memory.Stack.Set(Memory.Stack.Count - 1, last, true);
             Step();
 
@@ -239,58 +242,22 @@ namespace IngameCoding.Bytecode
             return 3;
         }
 
-        int TYPE_GET()
-        {
-            var v = Memory.Stack.Pop();
-            Memory.Stack.Push(v.GetTypeText(), "type() result");
-            Step();
-
-            return 3;
-        }
-
-        int TYPE_CAST()
-        {
-            var v = Memory.Stack.Pop();
-
-            switch (CurrentInstruction.ParameterString)
-            {
-                case "int":
-                    {
-                        if (v.type == DataType.BYTE)
-                        {
-                            v = new DataItem((int)v.Value(), v.Tag);
-                        }
-                        break;
-                    }
-                case "byte":
-                    {
-                        v = new DataItem((byte)v.Value(), v.Tag);
-                        break;
-                    }
-                default:
-                    break;
-            }
-
-            Memory.Stack.Push(v, v.Tag);
-            Step();
-
-            return 5;
-        }
-
-        /// <exception cref="InternalException"></exception>
-        /// <exception cref="RuntimeException"></exception>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="RuntimeException"/>
         void OnBuiltinFunctionReturnValue(DataItem returnValue)
         {
-            Output.Debug.Debug.Log(returnValue.ToString());
             Memory.Stack.Push(returnValue, "return v");
         }
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="RuntimeException"/>
         int CALL_BUILTIN()
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
-            if (functionNameDataItem.type != DataType.STRING)
-            { throw new InternalException($"Instruction CALL_BUILTIN need a STRING DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToStringValue()}"); }
-            string functionName = functionNameDataItem.ValueString;
+            if (functionNameDataItem.type != RuntimeType.INT)
+            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToString()}"); }
+            
+            string functionName = Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
 
             if (builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
             {
@@ -440,7 +407,7 @@ namespace IngameCoding.Bytecode
         {
             var condition = Memory.Stack.Pop();
 
-            if (condition == false)
+            if (condition.IsFalsy())
             { CodePointer += CurrentInstruction.ParameterInt; }
             else
             { Step(); }

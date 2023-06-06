@@ -3,6 +3,139 @@ using System.Drawing;
 
 namespace ConsoleGUI
 {
+    public class DrawBuffer
+    {
+        readonly Character[] v;
+
+        int currentIndex;
+        CharColors currentBgColor;
+        CharColors currentFgColor;
+
+        public DrawBuffer()
+        {
+            v = System.Array.Empty<Character>();
+            currentIndex = 0;
+        }
+
+        public DrawBuffer(int size)
+        {
+            v = new Character[System.Math.Max(size, 0)];
+            currentIndex = 0;
+        }
+
+        public int Length => v.Length;
+
+        public Character this[int index]
+        {
+            get => v[index];
+            set => v[index] = value;
+        }
+
+        public void StepTo(int index) => currentIndex = index;
+        public int Step(int steps)
+        {
+            currentIndex += steps;
+            return currentIndex;
+        }
+        public int Step() => Step(1);
+
+        public int CurrentIndex => currentIndex;
+
+        public CharColors ForegroundColor
+        {
+            get => currentFgColor;
+            set => currentFgColor = value;
+        }
+        public CharColors BackgroundColor
+        {
+            get => currentBgColor;
+            set => currentBgColor = value;
+        }
+
+        public void ResetColor()
+        {
+            this.ForegroundColor = CharColors.FgDefault;
+            this.BackgroundColor = CharColors.BgBlack;
+        }
+
+        CharColors CurrentColor
+        {
+            get => currentFgColor | currentBgColor;
+        }
+
+        public bool AddChar(char v)
+        {
+            if (currentIndex >= this.v.Length) return false;
+            if (currentIndex < 0) return false;
+
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Color = CurrentColor;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
+
+            currentIndex++;
+            if (currentIndex >= this.v.Length) return false;
+
+            return true;
+        }
+
+        public bool SetChar(char v, int i)
+        {
+            if (i >= this.v.Length) return false;
+            if (i < 0) return false;
+
+            this.v[i].Color = CurrentColor;
+            this.v[i].Char = v;
+
+            return true;
+        }
+        public void SetText(string v, int from)
+        {
+            for (int i = 0; i < v.Length; i++)
+            { if (!this.SetChar(v[i], i + from)) break; }
+        }
+
+        public bool AddChar(char v, CharColors color)
+        {
+            if (currentIndex >= this.v.Length) return false;
+
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Color = color;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
+
+            currentIndex++;
+            if (currentIndex >= this.v.Length) return false;
+
+            return true;
+        }
+
+        public void AddText(string v)
+        {
+            for (int i = 0; i < v.Length; i++)
+            { if (!this.AddChar(v[i])) break; }
+        }
+
+        public void AddSpace(int to, int totalWidth)
+        {
+            if (totalWidth == 0) return;
+            while (this.currentIndex % totalWidth < to)
+            { if (!this.AddChar(' ')) break; }
+        }
+        public void FinishLine(int totalWidth)
+        {
+            if (totalWidth == 0) return;
+            this.AddSpace(totalWidth - 1, totalWidth);
+            this.AddChar(' ');
+        }
+
+        public void Fill(CharColors color)
+        {
+            for (int i = 0; i < this.v.Length; i++)
+            {
+                this.v[i].Char = ' ';
+                this.v[i].Color = color;
+            }
+            this.currentIndex = this.v.Length;
+        }
+    }
+
     public interface IElementWithSubelements : IElement
     {
         IElement[] Elements { get; }
@@ -31,6 +164,33 @@ namespace ConsoleGUI
     public interface IBorderedElement : IElement
     {
         bool HasBorder { get; }
+    }
+
+    public enum InlineLayoutSizeMode
+    {
+        Fixed,
+        Stretchy,
+    }
+
+    public class InlineLayout
+    {
+        public InlineLayoutSizeMode SizeMode;
+        public int Value;
+
+        public InlineLayout(InlineLayoutSizeMode sizeMode, int v)
+        {
+            SizeMode = sizeMode;
+            Value = v;
+        }
+
+        public static InlineLayout Fixed(int v) => new(InlineLayoutSizeMode.Fixed, System.Math.Max(v, 1));
+        public static InlineLayout Stretchy(int percent) => new(InlineLayoutSizeMode.Stretchy, percent);
+        public static InlineLayout Stretchy() => Stretchy(100);
+    }
+
+    public interface IInlineLayoutElement
+    {
+        public InlineLayout Layout { get; }
     }
 
     public enum Side
@@ -124,7 +284,7 @@ namespace ConsoleGUI
                 return borderedElement.DrawContent(x - borderedElement.Rect.Left - 1, y - borderedElement.Rect.Top - 1);
             }
 
-            return element.DrawContent(x - element.Rect.Left, y - element.Rect.Top);
+            return element.DrawContent(x, y);
         }
 
         public static Character? DrawContent(this IElement[] elements, int x, int y)
@@ -153,6 +313,10 @@ namespace ConsoleGUI
         public static bool IsOutside<T>(this T[] v, int i) => (i < 0) || (i >= v.Length);
         public static T Clamp<T>(this T[] v, int i, T @default) => v.IsOutside(i) ? @default : v[i];
         public static T? Clamp<T>(this T[] v, int i) where T : struct => v.IsOutside(i) ? null : v[i];
+
+        public static bool IsOutside(this DrawBuffer v, int i) => (i < 0) || (i >= v.Length);
+        public static Character Clamp(this DrawBuffer v, int i, Character @default) => v.IsOutside(i) ? @default : v[i];
+        public static Character? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
         internal static Side GetSide(this System.Drawing.Rectangle v, int x, int y)
         {
@@ -196,12 +360,6 @@ namespace ConsoleGUI
             Char = v,
             Color = CharColors.FgDefault,
         };
-
-        internal static string Escape(this string v) => v
-            .Replace("\r", "\\r")
-            .Replace("\n", "\\n")
-            .Replace("\t", "\\t")
-            .Replace("\0", "\\0");
     }
 
     internal static class Utils

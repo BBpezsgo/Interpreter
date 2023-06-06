@@ -53,16 +53,16 @@ namespace IngameCoding.BBCode.Compiler
                     Instruction instruction = this.compiledCode[i];
                     if (instruction.opcode == Opcode.COMMENT)
                     {
-                        if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("}"))
+                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                         {
                             indent--;
                         }
 
                         Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.ParameterString}");
+                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
                         Console.ResetColor();
 
-                        if (!instruction.ParameterString.EndsWith("{ }") && instruction.ParameterString.EndsWith("{"))
+                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
                         {
                             indent++;
                         }

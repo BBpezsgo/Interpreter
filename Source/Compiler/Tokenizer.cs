@@ -20,12 +20,16 @@ namespace IngameCoding.BBCode
         LITERAL_HEX,
         LITERAL_BIN,
         LITERAL_STRING,
+        LITERAL_CHAR,
         LITERAL_FLOAT,
 
-        UNICODE_CHARACTER,
+        STRING_UNICODE_CHARACTER,
+        CHAR_UNICODE_CHARACTER,
 
         OPERATOR,
+
         STRING_ESCAPE_SEQUENCE,
+        CHAR_ESCAPE_SEQUENCE,
 
         POTENTIAL_FLOAT,
         POTENTIAL_COMMENT,
@@ -132,7 +136,7 @@ namespace IngameCoding.BBCode
         static readonly char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] banned = new char[] { '\r', '\u200B' };
         static readonly char[] operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
-        static readonly string[] doubleOperators = new string[] { "++", "--", "<<", ">>" };
+        static readonly string[] doubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
         static readonly char[] simpleOperators = new char[] { ';', ',', '#' };
 
         /// <param name="settings">
@@ -171,7 +175,8 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <exception cref="Errors.TokenizerException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode) => Parse(sourceCode, null, null, out _, out _);
         /// <summary>
         /// Convert source code into tokens
@@ -179,7 +184,7 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <exception cref="Errors.TokenizerException"/>
+        /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings) => Parse(sourceCode, warnings, null, out _, out _);
         /// <summary>
         /// Convert source code into tokens
@@ -187,7 +192,8 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <exception cref="Errors.TokenizerException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath) => Parse(sourceCode, warnings, filePath, out _, out _);
         /// <summary>
         /// Convert source code into tokens
@@ -195,7 +201,8 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <exception cref="Errors.TokenizerException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments) => Parse(sourceCode, warnings, filePath, out tokensWithComments, out _);
 
         /// <summary>
@@ -204,7 +211,8 @@ namespace IngameCoding.BBCode
         /// <param name="sourceCode">
         /// The source code
         /// </param>
-        /// <exception cref="Errors.TokenizerException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments, out SimpleToken[] unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
@@ -246,7 +254,7 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                if (CurrentToken.TokenType == TokenType.UNICODE_CHARACTER)
+                if (CurrentToken.TokenType == TokenType.STRING_UNICODE_CHARACTER)
                 {
                     if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
                     if (savedUnicode.Length == 4)
@@ -270,13 +278,37 @@ namespace IngameCoding.BBCode
                         savedUnicode += currChar;
                         continue;
                     }
+                } else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
+                {
+                    if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
+                    if (savedUnicode.Length == 4)
+                    {
+                        string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
+                        _unicodeCharacters.Add(new SimpleToken(
+                            unicodeChar,
+                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                            new Range<int>(OffsetTotal - 6, OffsetTotal)
+                        ));
+                        CurrentToken.Content += unicodeChar;
+                        CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                        savedUnicode = null;
+                    }
+                    else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                    {
+                        throw new TokenizerException("Invalid hex digit in unicode character: '" + currChar + "' inside literal char", GetCurrentPosition(OffsetTotal));
+                    }
+                    else
+                    {
+                        savedUnicode += currChar;
+                        continue;
+                    }
                 }
 
                 if (CurrentToken.TokenType == TokenType.STRING_ESCAPE_SEQUENCE)
                 {
                     if (currChar == 'u')
                     {
-                        CurrentToken.TokenType = TokenType.UNICODE_CHARACTER;
+                        CurrentToken.TokenType = TokenType.STRING_UNICODE_CHARACTER;
                         savedUnicode = "";
                         continue;
                     }
@@ -287,9 +319,30 @@ namespace IngameCoding.BBCode
                         't' => "\t",
                         '\\' => "\\",
                         '"' => "\"",
+                        '0' => "\0",
                         _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in string.", GetCurrentPosition(OffsetTotal)),
                     };
                     CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                    continue;
+                } else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
+                {
+                    if (currChar == 'u')
+                    {
+                        CurrentToken.TokenType = TokenType.CHAR_UNICODE_CHARACTER;
+                        savedUnicode = "";
+                        continue;
+                    }
+                    CurrentToken.Content += currChar switch
+                    {
+                        'n' => "\n",
+                        'r' => "\r",
+                        't' => "\t",
+                        '\\' => "\\",
+                        '\'' => "\'",
+                        '0' => "\0",
+                        _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in char.", GetCurrentPosition(OffsetTotal)),
+                    };
+                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
                     continue;
                 }
                 else if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
@@ -312,6 +365,16 @@ namespace IngameCoding.BBCode
                     if (currChar == '\\')
                     {
                         CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE;
+                        continue;
+                    }
+                    CurrentToken.Content += currChar;
+                    continue;
+                }
+                else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR && currChar != '\'')
+                {
+                    if (currChar == '\\')
+                    {
+                        CurrentToken.TokenType = TokenType.CHAR_ESCAPE_SEQUENCE;
                         continue;
                     }
                     CurrentToken.Content += currChar;
@@ -537,6 +600,18 @@ namespace IngameCoding.BBCode
                         EndToken(OffsetTotal);
                     }
                 }
+                else if (currChar == '\'')
+                {
+                    if (CurrentToken.TokenType != TokenType.LITERAL_CHAR)
+                    {
+                        EndToken(OffsetTotal);
+                        CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                    }
+                    else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR)
+                    {
+                        EndToken(OffsetTotal);
+                    }
+                }
                 else if (currChar == '\\')
                 {
                     EndToken(OffsetTotal);
@@ -576,9 +651,70 @@ namespace IngameCoding.BBCode
 
             Print($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
+            CheckTokens(tokens.ToArray());
+
             tokensWithComments = NormalizeTokens(this.tokensWithComments, settings).ToArray();
             unicodeCharacters = _unicodeCharacters.ToArray();
             return NormalizeTokens(tokens, settings).ToArray();
+        }
+
+        /// <exception cref="TokenizerException"></exception>
+        static void CheckTokens(Token[] tokens)
+        {
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                Token token = tokens[i];
+
+                switch (token.TokenType)
+                {
+                    case TokenType.WHITESPACE:
+                        break;
+                    case TokenType.LINEBREAK:
+                        break;
+                    case TokenType.IDENTIFIER:
+                        break;
+                    case TokenType.LITERAL_NUMBER:
+                        break;
+                    case TokenType.LITERAL_HEX:
+                        break;
+                    case TokenType.LITERAL_BIN:
+                        break;
+                    case TokenType.LITERAL_STRING:
+                        break;
+                    case TokenType.LITERAL_CHAR:
+                        {
+                            if (token.Content.Length != 1)
+                            {
+                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token);
+                            }
+                        }
+                        break;
+                    case TokenType.LITERAL_FLOAT:
+                        break;
+                    case TokenType.STRING_UNICODE_CHARACTER:
+                        break;
+                    case TokenType.CHAR_UNICODE_CHARACTER:
+                        break;
+                    case TokenType.OPERATOR:
+                        break;
+                    case TokenType.STRING_ESCAPE_SEQUENCE:
+                        break;
+                    case TokenType.CHAR_ESCAPE_SEQUENCE:
+                        break;
+                    case TokenType.POTENTIAL_FLOAT:
+                        break;
+                    case TokenType.POTENTIAL_COMMENT:
+                        break;
+                    case TokenType.POTENTIAL_END_MULTILINE_COMMENT:
+                        break;
+                    case TokenType.COMMENT:
+                        break;
+                    case TokenType.COMMENT_MULTILINE:
+                        break;
+                    default:
+                        break;
+                }
+            }
         }
 
         void RefreshTokenPosition(int OffsetTotal)

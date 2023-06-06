@@ -176,20 +176,34 @@ namespace ConsoleGUI
                 return;
             }
 
-            RefreshElementsSize();
-
-            if (FilledElement != null)
+            for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
-                FilledElement?.BeforeDraw();
-                DrawElement(FilledElement, true);
+                ConsoleBuffer[i].Char.UnicodeChar = ' ';
+                ConsoleBuffer[i].Attributes = (short)CharColors.BgMagenta;
             }
-            else
+
+            try
             {
-                Elements.BeforeDraw();
-                foreach (var Element in Elements)
+                RefreshElementsSize();
+
+                if (FilledElement != null)
                 {
-                    DrawElement(Element);
+                    FilledElement?.BeforeDraw();
+                    DrawElement(FilledElement, true);
                 }
+                else
+                {
+                    Elements.BeforeDraw();
+                    foreach (var Element in Elements)
+                    {
+                        DrawElement(Element);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                System.Diagnostics.Debug.WriteLine(exception.ToString());
+                return;
             }
 
             WriteConsole(ref ConsoleRect);
@@ -317,13 +331,18 @@ namespace ConsoleGUI
 
             for (int i = Elements.Count - 1; i >= 0; i--)
             {
-                if (Elements[i] is not IElementWithEvents element) continue;
-                if (!element.Contains(e.X, e.Y)) continue;
-                element.OnMouseEvent(e);
-                element.BeforeDraw();
-                DrawElement(element);
+                try
+                {
+                    if (Elements[i] is not IElementWithEvents element) continue;
+                    if (!element.Contains(e.X, e.Y)) continue;
+                    element.OnMouseEvent(e);
+                    element.BeforeDraw();
+                    DrawElement(element);
 
-                if (element is WindowElement wat) wat.OnMouseEventBase(e);
+                    if (element is WindowElement wat) wat.OnMouseEventBase(e);
+                }
+                catch (Exception exception)
+                { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
             }
             if (FilledElement is IElementWithEvents elementWithEvents)
             {
@@ -331,14 +350,24 @@ namespace ConsoleGUI
                 {
                     for (int i = 0; i < elementWithSubelements.Elements.Length; i++)
                     {
-                        if (elementWithSubelements.Elements[i] is not IElementWithEvents element) continue;
-                        if (!element.Contains(e.X, e.Y)) continue;
-                        element.OnMouseEvent(e);
+                        try
+                        {
+                            if (elementWithSubelements.Elements[i] is not IElementWithEvents element) continue;
+                            if (!element.Contains(e.X, e.Y)) continue;
+                            element.OnMouseEvent(e);
+                        }
+                        catch (Exception exception)
+                        { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
                     }
                 }
-                elementWithEvents.OnMouseEvent(e);
-                elementWithEvents.BeforeDraw();
-                DrawElement(elementWithEvents);
+                try
+                {
+                    elementWithEvents.OnMouseEvent(e);
+                    elementWithEvents.BeforeDraw();
+                    DrawElement(elementWithEvents);
+                }
+                catch (Exception exception)
+                { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
             }
         }
     }

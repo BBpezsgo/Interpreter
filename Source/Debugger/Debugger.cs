@@ -300,16 +300,16 @@ namespace TheProgram
             {
                 switch (v2.type)
                 {
-                    case DataType.INT:
+                    case RuntimeType.INT:
                         Parameter = "INT";
                         break;
-                    case DataType.FLOAT:
+                    case RuntimeType.FLOAT:
                         Parameter = "FLOAT";
                         break;
-                    case DataType.STRING:
+                    case RuntimeType.STRING:
                         Parameter = "STRING";
                         break;
-                    case DataType.BOOLEAN:
+                    case RuntimeType.BOOLEAN:
                         Parameter = "BOOLEAN";
                         break;
                     default: throw new NotImplementedException();

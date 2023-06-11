@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -21,9 +21,5 @@
   <ItemGroup>
     <ProjectReference Include="C:\Users\bazsi\source\repos\Data Utilities\Data Utilities.csproj" />
   </ItemGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="call post-build.bat" />
-  </Target>
 
 </Project>

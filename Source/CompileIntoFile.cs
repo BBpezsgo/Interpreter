@@ -340,46 +340,13 @@ namespace IngameCoding
         internal class SerializableFunctionDef : ISerializable<SerializableFunctionDef>, ISerializableText, IDeserializableText
         {
             internal string Name;
-            internal string[] NamespacePath;
             internal SerializableAttribute[] Attributes;
-
-            /// <summary>
-            /// <c>[Namespace].[...].Name</c>
-            /// </summary>
-            public string FullName => NamespacePathString + Name;
-            /// <summary>
-            /// <c>[Namespace].[...].</c>
-            /// </summary>
-            string NamespacePathString
-            {
-                get
-                {
-                    string val = "";
-                    for (int i = 0; i < NamespacePath.Length; i++)
-                    {
-                        if (val.Length > 0)
-                        {
-                            val += "." + NamespacePath[i].ToString();
-                        }
-                        else
-                        {
-                            val = NamespacePath[i].ToString();
-                        }
-                    }
-                    if (val.Length > 0)
-                    {
-                        val += ".";
-                    }
-                    return val;
-                }
-            }
 
             public SerializableFunctionDef() { }
 
             public SerializableFunctionDef(CompiledFunction funcDef)
             {
                 this.Name = funcDef.Identifier.Content;
-                this.NamespacePath = funcDef.NamespacePath;
                 this.Attributes = new SerializableAttribute[funcDef.CompiledAttributes.Count];
                 for (int i = 0; i < Attributes.Length; i++)
                 {
@@ -391,7 +358,6 @@ namespace IngameCoding
             {
                 Value result = Value.Object();
                 result["Name"] = Value.Literal(Name);
-                result["NamespacePath"] = Value.Object(NamespacePath);
                 result["Attributes"] = Value.Object(Attributes);
                 return result;
             }
@@ -399,21 +365,18 @@ namespace IngameCoding
             public void DeserializeText(Value data)
             {
                 this.Name = data["Name"].String;
-                this.NamespacePath = data["NamespacePath"].Array.ConvertPrimitive<string>();
                 this.Attributes = data["Attributes"].Array.Convert<SerializableAttribute>();
             }
 
             public void Deserialize(Deserializer deserializer)
             {
                 this.Name = deserializer.DeserializeString();
-                this.NamespacePath = deserializer.DeserializeArray<string>();
                 this.Attributes = deserializer.DeserializeObjectArray<SerializableAttribute>();
             }
 
             public void Serialize(Serializer serializer)
             {
                 serializer.Serialize(this.Name);
-                serializer.Serialize(this.NamespacePath);
                 serializer.Serialize(this.Attributes);
             }
 
@@ -485,18 +448,7 @@ namespace IngameCoding
 
 
             internal bool GetFunctionOffset(SerializableFunctionDef compiledFunction, out int functionOffset)
-            {
-                if (FunctionOffsets.TryGetValue(compiledFunction.Name, out functionOffset))
-                {
-                    return true;
-                }
-                else if (FunctionOffsets.TryGetValue(compiledFunction.FullName, out functionOffset))
-                {
-                    return true;
-                }
-                functionOffset = -1;
-                return false;
-            }
+                => FunctionOffsets.TryGetValue(compiledFunction.Name, out functionOffset);
         }
 
         static Compiler.CompilerResult CompileCode(
@@ -510,19 +462,33 @@ namespace IngameCoding
 
             var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings);
             parserResult.SetFile(file.FullName);
-            var compilerResult = Compiler.CompileCode(
+            var compilerResult = Compiler.Compile(
                 parserResult,
                 new Dictionary<string, BuiltinFunction>(),
                 file,
                 warnings,
                 errors,
-                compilerSettings,
                 parserSettings);
+
+            var codeGeneratorResult = CodeGenerator.Generate(
+                compilerResult,
+                parserResult.GlobalVariables,
+                parserResult.TopLevelStatements,
+                compilerSettings
+                );
 
             if (errors.Count > 0)
             { throw new System.Exception("Failed to compile", errors[0].ToException()); }
 
-            return compilerResult;
+            return new Compiler.CompilerResult()
+            {
+                compiledCode = codeGeneratorResult.Code,
+                compiledFunctions = codeGeneratorResult.Functions,
+                compiledStructs = codeGeneratorResult.Structs,
+                compiledVariables = new Dictionary<string, CompiledVariable>(),
+                debugInfo = codeGeneratorResult.DebugInfo,
+                functionOffsets = new Dictionary<string, int>(),
+            };
         }
     }
 }

@@ -69,38 +69,38 @@
         };
         internal static AnalysedToken_ComplexTypeDef Struct(this TypeToken token, CompiledStruct @struct) => new(token)
         {
-            Name = @struct.FullName,
+            Name = @struct.Name.Content,
             FilePath = @struct.FilePath,
             Kind = ComplexTypeKind.Struct,
         };
         internal static AnalysedToken_ComplexTypeDef Class(this TypeToken token, CompiledClass @class) => new(token)
         {
-            Name = @class.FullName,
+            Name = @class.Name.Content,
             FilePath = @class.FilePath,
             Kind = ComplexTypeKind.Class,
         };
         internal static AnalysedToken_ComplexType Struct(this Token token, CompiledStruct @struct) => new(token)
         {
-            Name = @struct.FullName,
+            Name = @struct.Name.Content,
             FilePath = @struct.FilePath,
             Kind = ComplexTypeKind.Struct,
         };
         internal static AnalysedToken_ComplexType Class(this Token token, CompiledClass @class) => new(token)
         {
-            Name = @class.FullName,
+            Name = @class.Name.Content,
             FilePath = @class.FilePath,
             Kind = ComplexTypeKind.Class,
         };
         internal static AnalysedToken_Field Field(this Token token, CompiledStruct @struct, Statement_Field field, CompiledType type) => new(token)
         {
-            Name = @struct.FullName,
+            Name = @struct.Name.Content,
             FilePath = @struct.FilePath,
             Type = type.FullName,
             Kind = ComplexTypeKind.Struct,
         };
         internal static AnalysedToken_Field Field(this Token token, CompiledClass @class, Statement_Field field, CompiledType type) => new(token)
         {
-            Name = @class.FullName,
+            Name = @class.Name.Content,
             FilePath = @class.FilePath,
             Type = type.FullName,
             Kind = ComplexTypeKind.Class,
@@ -120,7 +120,7 @@
 
     public class AnalysedTypeToken : TypeToken
     {
-        internal AnalysedTypeToken(TypeToken token) : base(token.Content, token.Type, token.NamespacePrefix, token)
+        internal AnalysedTypeToken(TypeToken token) : base(token.Content, token.Type, token)
         {
             AbsolutePosition = token.AbsolutePosition;
             Content = new string(token.Content);

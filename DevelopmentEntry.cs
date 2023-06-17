@@ -3,6 +3,8 @@
 
 #pragma warning disable CS0162 // Unreachable code detected
 
+using ANSIConsole;
+
 using System;
 
 namespace TheProgram
@@ -17,7 +19,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test13.bbc";
+            var file = "donught.bbc";
 
             if (false)
             {
@@ -51,6 +53,7 @@ namespace TheProgram
                 // "-compression", "no",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{TestConstants.TestFilesPath}{file}\""
+                // $"\"{TestConstants.TestFilesPath}tester.bbct\""
             };
 #endif
 #if RELEASE_TEST
@@ -126,11 +129,11 @@ namespace TheProgram
                     IngameCoding.Core.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    IngameCoding.CompileIntoFile.Compile(settings.Value);
-                    break;
+                    // IngameCoding.CompileIntoFile.Compile(settings.Value);
+                    throw new NotImplementedException();
                 case ArgumentParser.RunType.Decompile:
-                    IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
-                    break;
+                    // IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
+                    throw new NotImplementedException();
             }
 
             return true;

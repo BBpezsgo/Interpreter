@@ -125,8 +125,7 @@ namespace IngameCoding.BBCode.Analysis
 
         public void CheckFilePaths(System.Action<string> NotSetCallback)
         {
-            if (this.Compiled)
-            { this.CompilerResult.CheckFilePaths(NotSetCallback); return; }
+            if (this.Compiled) return;
             if (!this.Parsed) return;
             this.ParserResult.CheckFilePaths(NotSetCallback);
         }
@@ -145,7 +144,8 @@ namespace IngameCoding.BBCode.Analysis
             try
             {
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
-                result = Analyze(tokenizer.Parse(code, tokenizerWarnings, path, out _, out var unicodeChars), file, path);
+                result = Analyze(tokenizer.Parse(code, tokenizerWarnings, path, out var unicodeChars), file, path);
+                result.Tokens = result.Tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
                 result.TokenizerWarnings = tokenizerWarnings.ToArray();
                 result.TokenizerInicodeChars = unicodeChars;
             }
@@ -174,6 +174,7 @@ namespace IngameCoding.BBCode.Analysis
                     string code_ = System.IO.File.ReadAllText(file_.FullName);
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
                     Token[] tokens_ = tokenizer.Parse(code_);
+                    tokens_ = tokens_.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
                     if (tokens_ == null) continue;
                     if (tokens_.Length < 3) continue;
                     Parser parser = new();
@@ -272,6 +273,7 @@ namespace IngameCoding.BBCode.Analysis
 
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
                     Token[] tokens = tokenizer.Parse(code);
+                    tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
                     List<Error> parserErrors = new();
                     List<Warning> parserWarnings = new();
@@ -303,7 +305,7 @@ namespace IngameCoding.BBCode.Analysis
                     {
                         if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
                         {
-                            errors.Add(new Error($"Type '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                            errors.Add(new Error($"Type '{@struct.Value.Name.Content}' already exists", @struct.Value.Name));
                         }
                         else
                         {
@@ -315,7 +317,7 @@ namespace IngameCoding.BBCode.Analysis
                     {
                         if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
                         {
-                            errors.Add(new Error($"Type '{@class.Value.FullName}' already exists", @class.Value.Name));
+                            errors.Add(new Error($"Type '{@class.Value.Name.Content}' already exists", @class.Value.Name));
                         }
                         else
                         {
@@ -380,7 +382,7 @@ namespace IngameCoding.BBCode.Analysis
             {
                 if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
                 {
-                    errors.Add(new Error($"Type '{@struct.Value.FullName}' already exists", @struct.Value.Name));
+                    errors.Add(new Error($"Type '{@struct.Value.Name.Content}' already exists", @struct.Value.Name));
                 }
                 else
                 {
@@ -391,7 +393,7 @@ namespace IngameCoding.BBCode.Analysis
             {
                 if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
                 {
-                    errors.Add(new Error($"Type '{@class.Value.FullName}' already exists", @class.Value.Name));
+                    errors.Add(new Error($"Type '{@class.Value.Name.Content}' already exists", @class.Value.Name));
                 }
                 else
                 {
@@ -399,18 +401,29 @@ namespace IngameCoding.BBCode.Analysis
                 }
             }
 
-            CodeGenerator codeGenerator = new()
-            { warnings = warnings, errors = errors, hints = hints, informations = informations };
-            var codeGeneratorResult = codeGenerator.GenerateCode(Functions, Structs, Classes, Hashes.ToArray(), parserResult.GlobalVariables, parserResult.TopLevelStatements, BuiltinFunctions, Compiler.CompilerSettings.Default, null, Compiler.CompileLevel.Exported, true);
+            var compilerResult1 = Compiler.Compile(
+                parserResult,
+                BuiltinFunctions,
+                null,
+                ParserSettings.Default,
+                null,
+                basePath);
 
-            var compilerResult = new Compiler.CompilerResult()
+            warnings.AddRange(compilerResult1.Warnings);
+            errors.AddRange(compilerResult1.Errors);
+
+            var codeGeneratorResult = CodeGenerator.Generate(compilerResult1, Compiler.CompilerSettings.Default, null, Compiler.CompileLevel.Exported);
+
+            hints.AddRange(codeGeneratorResult.Hints);
+            informations.AddRange(codeGeneratorResult.Informations);
+            warnings.AddRange(codeGeneratorResult.Warnings);
+            errors.AddRange(codeGeneratorResult.Errors);
+
+            return new Compiler.CompilerResult()
             {
-                compiledStructs = codeGeneratorResult.compiledStructs.ToArray(),
-                compiledFunctions = codeGeneratorResult.compiledFunctions.ToArray(),
-                compiledVariables = codeGenerator.compiledVariables.ToDictionary(),
+                compiledStructs = codeGeneratorResult.Structs.ToArray(),
+                compiledFunctions = codeGeneratorResult.Functions.ToArray(),
             };
-
-            return compilerResult;
         }
 
         static ParserResult? Parse(Token[] tokens, List<Warning> warnings, List<Error> errors, string path, out Exception fatalError, out Token[] modifyedTokens)

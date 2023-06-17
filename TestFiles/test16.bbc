@@ -1,0 +1,11 @@
+using System;
+
+[CodeEntry]
+void Start()
+{
+	String message = new String(4);
+	delete message;
+	message = "Hello";
+	PrintLine(message);
+	delete message;
+}

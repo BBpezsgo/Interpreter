@@ -219,16 +219,6 @@ namespace ConsoleGUI
                     },
                 },
             };
-            return;
-            this.Elements = new InlineElement[]
-            {
-                CodePanel,
-                StackPanel,
-                HeapPanel,
-                StatePanel,
-                ConsolePanel,
-                CallstackPanel,
-            };
         }
 
         void SetupInterpreter() => SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
@@ -275,11 +265,11 @@ namespace ConsoleGUI
 
             if (Interpreter.Initialize())
             {
-                var compiledCode = Interpreter.CompileCode(code, fileInfo, compilerSettings, parserSettings, handleErrors);
+                var compiledCode = Interpreter.CompileCode(fileInfo, compilerSettings, parserSettings, handleErrors);
 
                 if (compiledCode != null)
                 {
-                    Interpreter.RunCode(compiledCode, new IngameCoding.Bytecode.BytecodeInterpreterSettings()
+                    Interpreter.ExecuteProgram(compiledCode, new IngameCoding.Bytecode.BytecodeInterpreterSettings()
                     {
                         ClockCyclesPerUpdate = 1,
                         InstructionLimit = interpreterSettings.InstructionLimit,
@@ -444,7 +434,7 @@ namespace ConsoleGUI
             b.ResetColor();
 
             b.AddText("  ");
-            b.AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsRunning}");
+            b.AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsExecuting}");
             b.BackgroundColor = CharColors.BgBlack;
             b.FinishLine(sender.Rect.Width);
             b.ForegroundColor = CharColors.FgDefault;
@@ -492,13 +482,16 @@ namespace ConsoleGUI
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
                 {
                     if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
-                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                    {
+                        if (this.Interpreter.Details.Interpreter.Stack[^1].type == IngameCoding.Bytecode.RuntimeType.INT)
+                        { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                    }
                     else
                     { loadIndicators.Add(instruction.ParameterInt); }
                 }
             }
 
-            for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Length; i++)
+            for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Size; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Heap[i];
 
@@ -594,7 +587,7 @@ namespace ConsoleGUI
 
             List<int> savedBasePointers = new();
 
-            for (int j = 0; j < this.Interpreter.Details.Interpreter.Stack.Length; j++)
+            for (int j = 0; j < this.Interpreter.Details.Interpreter.Stack.Count; j++)
             {
                 var item = this.Interpreter.Details.Interpreter.Stack[j];
                 if (item.type != IngameCoding.Bytecode.RuntimeType.INT) continue;
@@ -618,24 +611,24 @@ namespace ConsoleGUI
                     instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
                 {
                     if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
-                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 2); }
+                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 2); }
                     else
-                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1); }
+                    { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1); }
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE)
                 {
                     loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length);
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count);
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.PUSH_VALUE ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.GET_BASEPOINTER ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
-                { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length); }
+                { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count); }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.POP_VALUE)
-                { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1); }
+                { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1); }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_ADD ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_DIV ||
@@ -645,13 +638,13 @@ namespace ConsoleGUI
                     instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_AND ||
                     instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_OR)
                 {
-                    loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 1);
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Length - 2);
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1);
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 2);
                 }
             }
 
             int i;
-            for (i = 0; i < this.Interpreter.Details.Interpreter.Stack.Length; i++)
+            for (i = 0; i < this.Interpreter.Details.Interpreter.Stack.Count; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Stack[i];
 

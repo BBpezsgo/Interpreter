@@ -33,146 +33,6 @@ namespace IngameCoding.Bytecode
         internal void Reset() => Position = 0;
     }
 
-    internal class DataStack : Stack<DataItem>
-    {
-        internal int UsedVirtualMemory
-        {
-            get
-            {
-                static int CalculateItemSize(DataItem item) => item.type switch
-                {
-                    RuntimeType.INT => 4,
-                    RuntimeType.FLOAT => 4,
-                    RuntimeType.BOOLEAN => 1,
-                    _ => throw new NotImplementedException(),
-                };
-
-                int result = 0;
-                for (int i = 0; i < Count; i++)
-                { result += CalculateItemSize(this[i]); }
-                return result;
-            }
-        }
-
-        internal BytecodeProcessor processor;
-
-        public DataStack(BytecodeProcessor processor) => this.processor = processor;
-
-        public void Destroy() => base.Clear();
-
-        /// <summary>
-        /// Gives the last item, and then remove
-        /// </summary>
-        /// <returns>The last item</returns>
-        public override DataItem Pop()
-        {
-            DataItem val = this[^1];
-            RemoveAt(Count - 1);
-            return val;
-        }
-        /// <returns>Adds a new item to the end</returns>
-        public override void Push(DataItem value)
-        {
-            var item = value;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
-            base.Push(item);
-        }
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(DataItem value, string tag)
-        {
-            var item = value;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
-            item.Tag = tag;
-            base.Push(item);
-        }
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(int value, string tag = null) => Push(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(float value, string tag = null) => Push(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(bool value, string tag = null) => Push(new DataItem(value, tag));
-        /// <summary>Adds a list to the end</summary>
-        public override void PushRange(List<DataItem> list) => PushRange(list.ToArray());
-        /// <summary>Adds an array to the end</summary>
-        public override void PushRange(DataItem[] list)
-        { foreach (DataItem item in list) Push(item); }
-        /// <summary>Adds a list to the end</summary>
-        public void PushRange(DataItem[] list, string tag)
-        {
-            DataItem[] newList = new DataItem[list.Length];
-            for (int i = 0; i < list.Length; i++)
-            {
-                DataItem item = list[i];
-                item.Tag = tag ?? item.Tag;
-                newList[i] = item;
-            }
-            PushRange(newList);
-        }
-        /// <summary>Sets a specific item's value</summary>
-        public void Set(int index, DataItem val, bool overrideTag = false)
-        {
-            DataItem item = val;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
-            if (!overrideTag)
-            {
-                item.Tag = this[index].Tag;
-            }
-            this[index] = item;
-        }
-    }
-    internal class HEAP
-    {
-        readonly DataItem[] heap;
-
-        internal HEAP(int size = 0)
-        {
-            this.heap = new DataItem[size];
-        }
-
-        internal int Size => this.heap.Length;
-        internal DataItem this[int i]
-        {
-            get
-            {
-                if (i < 0) throw new RuntimeException($"Null pointer!");
-                if (i >= heap.Length) throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
-                return heap[i];
-            }
-            set
-            {
-                if (i < 0) throw new RuntimeException($"Null pointer!");
-                if (i >= heap.Length) return; // throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
-                heap[i] = value;
-            }
-        }
-
-        internal DataItem[] ToArray() => heap.ToList().ToArray();
-
-        internal string GetString(int start, int length)
-        {
-            int end = start + length;
-            string result = "";
-            for (int i = start; i < end; i++)
-            {
-                if (this[i].type != RuntimeType.CHAR)
-                {
-                    throw new InternalException($"Unexpected data type {this[i].type}, expected {nameof(RuntimeType.CHAR)}");
-                }
-                result += this[i].ValueChar;
-            }
-            return result;
-        }
-        internal string GetStringByPointer(int pointer)
-        {
-            int subpointer = this[pointer].ValueInt;
-            int length = this[pointer + 1].ValueInt;
-            return GetString(subpointer, length);
-        }
-    }
-
     public enum RuntimeType
     {
         BYTE,
@@ -224,7 +84,7 @@ namespace IngameCoding.Bytecode
             get
             {
                 if (type == RuntimeType.BYTE)
-                { return valueByte.Value; }
+                { return valueByte ?? (byte)0; }
 
                 throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to byte");
             }
@@ -284,6 +144,10 @@ namespace IngameCoding.Bytecode
                 if (type == RuntimeType.CHAR)
                 {
                     return valueChar.Value;
+                }
+                if (type == RuntimeType.INT)
+                {
+                    return (char)valueInt.Value;
                 }
                 throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to char");
             }

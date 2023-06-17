@@ -50,404 +50,38 @@ namespace IngameCoding.BBCode.Compiler
         internal int InstructionEnd;
     }
 
-    public class CodeGenerator
+    public class CodeGenerator : CodeGeneratorBase
     {
-        static readonly string[] BuiltinFunctions = new string[]
-        {
-            "return",
-            "break",
-            "type",
-        };
-        static readonly string[] Keywords = new string[]
-        {
-            "struct",
-            "class",
-
-            "void",
-            "namespace",
-            "using",
-
-            "byte",
-            "int",
-            "bool",
-            "float",
-            "string"
-        };
-
         #region Fields
 
-        bool BlockCodeGeneration;
-
-        internal CompiledStruct[] compiledStructs;
-        internal CompiledClass[] compiledClasses;
-        internal CompiledFunction[] compiledFunctions;
-        internal List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        List<CompiledParameter> parameters;
-
-        internal Stack<CleanupItem> cleanupStack;
+        Stack<CleanupItem> cleanupStack;
 
         Dictionary<string, BuiltinFunction> builtinFunctions;
 
-        CompiledFunction currentContext;
+        IInContext<CompiledClass> currentContext;
         List<int> returnInstructions;
         List<List<int>> breakInstructions;
-        string[] CurrentNamespace;
-        /// <summary>
-        /// Namespace.Namespace. ... .Namespace.
-        /// </summary>
-        string CurrentNamespaceText
-        {
-            get
-            {
-                if (CurrentNamespace == null) return "";
-                if (CurrentNamespace.Length == 0) return "";
-                return string.Join('.', CurrentNamespace) + ".";
-            }
-        }
 
-        List<Instruction> compiledCode;
+        List<Instruction> GeneratedCode;
 
         List<UndefinedFunctionOffset> undefinedFunctionOffsets;
+        List<UndefinedGeneralFunctionOffset> undefinedGeneralFunctionOffsets;
 
         bool OptimizeCode;
         bool AddCommentsToCode = true;
         readonly bool TrimUnreachableCode = true;
         bool GenerateDebugInstructions = true;
         Compiler.CompileLevel CompileLevel;
-        internal string CurrentFunction_ForRecursionProtection;
 
-        public List<Error> errors;
-        public List<Warning> warnings;
-        internal List<Information> informations;
-        public List<Hint> hints;
-        string CurrentFile;
-        bool SaveDefinitionReferences;
-        internal readonly List<DebugInfo> GeneratedDebugInfo = new();
+        List<Information> Informations;
+        public List<Hint> Hints;
+        readonly List<DebugInfo> GeneratedDebugInfo = new();
 
         #endregion
 
+        public CodeGenerator() : base() { }
+
         #region Helper Functions
-
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="InternalException"></exception>
-        ITypeDefinition GetCustomType(string name, string targetNamespace = null, bool returnNull = false)
-        {
-            List<string> checkThese = new()
-            {
-                CurrentNamespaceText + name,
-                name,
-            };
-
-            if (!string.IsNullOrEmpty(targetNamespace))
-            {
-                checkThese.Insert(0, targetNamespace + name);
-                checkThese.Insert(0, CurrentNamespaceText + targetNamespace + name);
-            }
-
-            foreach (var checkThis in checkThese)
-            {
-                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs.Get<string, ITypeDefinition>(checkThis);
-                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses.Get<string, ITypeDefinition>(checkThis);
-            }
-
-            if (returnNull) return null;
-
-            throw new InternalException($"Unknown type '{name}'");
-        }
-
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="InternalException"></exception>
-        ITypeDefinition GetCustomType(TypeToken name, bool returnNull = false)
-        {
-            List<string> checkThese = new()
-            {
-                CurrentNamespaceText + name,
-                name.Content,
-            };
-
-            if (!string.IsNullOrEmpty(name.NamespacePrefix))
-            {
-                checkThese.Insert(0, name.NamespacePrefix + name);
-                checkThese.Insert(0, CurrentNamespaceText + name.NamespacePrefix + name);
-            }
-
-            foreach (var checkThis in checkThese)
-            {
-                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs.Get<string, ITypeDefinition>(checkThis);
-                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses.Get<string, ITypeDefinition>(checkThis);
-            }
-
-            if (returnNull) return null;
-
-            throw new InternalException($"Unknown type '{name}'");
-        }
-
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="InternalException"></exception>
-        ITypeDefinition GetCustomType(string name)
-        {
-            List<string> checkThese = new()
-            {
-                CurrentNamespaceText + name,
-                name,
-            };
-
-            foreach (var checkThis in checkThese)
-            {
-                if (compiledStructs.ContainsKey(checkThis)) return compiledStructs.Get<string, ITypeDefinition>(checkThis);
-                if (compiledClasses.ContainsKey(checkThis)) return compiledClasses.Get<string, ITypeDefinition>(checkThis);
-            }
-
-            throw new InternalException($"Unknown type '{name}'");
-        }
-
-        string GetReadableID(Statement_FunctionCall functionCall)
-        {
-            string readableID = functionCall.TargetNamespacePathPrefix + functionCall.FunctionName;
-            readableID += "(";
-            bool addComma = false;
-            if (functionCall.IsMethodCall && functionCall.PrevStatement != null)
-            {
-                readableID += "this " + FindStatementType(functionCall.PrevStatement);
-                addComma = true;
-            }
-            for (int i = 0; i < functionCall.Parameters.Length; i++)
-            {
-                if (addComma) { readableID += ", "; }
-                readableID += FindStatementType(functionCall.Parameters[i]);
-                addComma = true;
-            }
-            readableID += ")";
-            return readableID;
-        }
-
-        bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable) => compiledVariables.TryGetValue(variableName, out compiledVariable);
-
-        bool GetParameter(string parameterName, out CompiledParameter parameters)
-        {
-            for (int i = 0; i < this.parameters.Count; i++)
-            {
-                if (this.parameters[i].Identifier.Content == parameterName)
-                {
-                    parameters = this.parameters[i];
-                    return true;
-                }
-            }
-            parameters = null;
-            return false;
-        }
-
-        bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
-        {
-            compiledFunction = null;
-            string callID = "";
-
-            string namespacePath = TryGetFunctionNamespacePath(functionCallStatement);
-            if (namespacePath != "")
-            {
-                if (namespacePath.EndsWith(".")) namespacePath = namespacePath[..^1];
-                functionCallStatement.TargetNamespacePathPrefix = namespacePath;
-                functionCallStatement.PrevStatement = null;
-
-                for (int i = 0; i < functionCallStatement.Parameters.Length; i++)
-                { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
-            }
-            else
-            {
-                if (functionCallStatement.PrevStatement != null)
-                { callID += "," + FindStatementType(functionCallStatement.PrevStatement); }
-                for (int i = 0; i < functionCallStatement.Parameters.Length; i++)
-                { callID += "," + FindStatementType(functionCallStatement.Parameters[i]); }
-            }
-
-            List<string> searchForThese = new()
-            {
-                functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID,
-                functionCallStatement.NamespacePathPrefix + functionCallStatement.TargetNamespacePathPrefix + functionCallStatement.FunctionName + callID
-            };
-
-            foreach (var searchName in searchForThese)
-            {
-                if (compiledFunctions.TryGetValue(searchName, out compiledFunction))
-                { return true; }
-            }
-
-            return false;
-        }
-
-        string TryGetFunctionNamespacePath(Statement_FunctionCall functionCallStatement)
-        {
-            string[] Get(Statement statement)
-            {
-                if (statement is Statement_Variable s1)
-                {
-                    if (GetParameter(s1.VariableName.Content, out _))
-                    {
-                        return null;
-                    }
-                    else if (GetCompiledVariable(s1.VariableName.Content, out _))
-                    {
-                        return null;
-                    }
-                    s1.VariableName.Analysis.CompilerReached = true;
-                    s1.VariableName.Analysis.SubSubtype = TokenSubSubtype.Namespace;
-                    return new string[] { s1.VariableName.Content };
-                }
-                if (statement is Statement_Field s2)
-                {
-                    var prev_ = Get(s2.PrevStatement);
-                    if (prev_ == null) { return null; }
-
-                    s2.FieldName.Analysis.CompilerReached = true;
-                    s2.FieldName.Analysis.SubSubtype = TokenSubSubtype.Namespace;
-
-                    var prev = prev_.ToList();
-                    prev.Insert(0, s2.FieldName.Content);
-                    return prev.ToArray();
-                }
-                return null;
-            }
-
-            if (functionCallStatement.PrevStatement != null)
-            {
-                string[] path = Get(functionCallStatement.PrevStatement);
-                if (path == null) return "";
-                if (!functionCallStatement.TargetNamespacePathPrefixIsReversed)
-                {
-                    functionCallStatement.TargetNamespacePathPrefixIsReversed = true;
-                    List<string> pathReversed = path.ToList();
-                    pathReversed.Reverse();
-                    path = pathReversed.ToArray();
-                }
-                return string.Join(".", path) + ".";
-            }
-            else
-            {
-                return "";
-            }
-        }
-
-        /// <exception cref="ArgumentNullException"></exception>
-        bool GetCompiledStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
-        {
-            if (compiledStructs.TryGetValue(newStructStatement.TypeName.Content, out compiledStruct))
-            {
-                return true;
-            }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
-            {
-                return true;
-            }
-            else if (compiledStructs.TryGetValue(newStructStatement.NamespacePathPrefix + newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
-            {
-                return true;
-            }
-            else if (compiledStructs.TryGetValue(newStructStatement.TargetNamespacePathPrefix + newStructStatement.TypeName.Content, out compiledStruct))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        /// <exception cref="ArgumentNullException"></exception>
-        bool GetCompiledClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
-        {
-            if (compiledClasses.TryGetValue(newClassStatement.TypeName.Content, out compiledClass))
-            {
-                return true;
-            }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
-            {
-                return true;
-            }
-            else if (compiledClasses.TryGetValue(newClassStatement.NamespacePathPrefix + newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
-            {
-                return true;
-            }
-            else if (compiledClasses.TryGetValue(newClassStatement.TargetNamespacePathPrefix + newClassStatement.TypeName.Content, out compiledClass))
-            {
-                return true;
-            }
-            return false;
-        }
-
-        /// <exception cref="ArgumentNullException"></exception>
-        bool GetCompiledClass(string className, out CompiledClass compiledClass) => compiledClasses.TryGetValue(className, out compiledClass);
-
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        static DataItem GetInitialValue(TypeToken type)
-        {
-            if (type.IsList)
-            {
-                throw new NotImplementedException();
-            }
-
-            return type.Type switch
-            {
-                TypeTokenType.INT => new DataItem((int)0),
-                TypeTokenType.BYTE => new DataItem((byte)0),
-                TypeTokenType.FLOAT => new DataItem((float)0f),
-                TypeTokenType.BOOLEAN => new DataItem((bool)false),
-                TypeTokenType.CHAR => new DataItem((char)'\0'),
-
-                TypeTokenType.AUTO => throw new CompilerException("Undefined type", type),
-                TypeTokenType.VOID => throw new CompilerException("Invalid type", type),
-                _ => throw new InternalException($"Initial value for type {type.Type} is unimplemented"),
-            };
-        }
-
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="InternalException"></exception>
-        static DataItem GetInitialValue(CompiledType type)
-        {
-            if (type.IsList)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (type.IsStruct)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (type.IsClass)
-            {
-                return new DataItem((int)Utils.NULL_POINTER);
-            }
-
-            return type.BuiltinType switch
-            {
-                CompiledType.CompiledTypeType.BYTE => new DataItem((byte)0),
-                CompiledType.CompiledTypeType.INT => new DataItem((int)0),
-                CompiledType.CompiledTypeType.FLOAT => new DataItem((float)0f),
-                CompiledType.CompiledTypeType.CHAR => new DataItem((char)'\0'),
-                CompiledType.CompiledTypeType.BOOL => new DataItem((bool)false),
-
-                CompiledType.CompiledTypeType.VOID => throw new NotImplementedException(),
-                CompiledType.CompiledTypeType.NONE => throw new NotImplementedException(),
-                _ => throw new InternalException($"Initial value for type {type.FullName} is unimplemented"),
-            };
-        }
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -534,11 +168,6 @@ namespace IngameCoding.BBCode.Compiler
             afterValue?.Invoke(0);
             return 1;
         }
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(CompiledType type, Action afterValue, string tag = "")
-            => GenerateInitialValue(type, v => afterValue?.Invoke(), tag);
 
         int ParameterSizeSum()
         {
@@ -568,11 +197,10 @@ namespace IngameCoding.BBCode.Compiler
 
         void AddInstruction(Instruction instruction)
         {
-            if (BlockCodeGeneration) return;
             if (instruction.opcode == Opcode.COMMENT && !AddCommentsToCode) return;
             if (instruction.opcode == Opcode.DEBUG_SET_TAG && !GenerateDebugInstructions) return;
 
-            compiledCode.Add(instruction);
+            GeneratedCode.Add(instruction);
         }
         void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
         void AddInstruction(Opcode opcode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
@@ -594,356 +222,12 @@ namespace IngameCoding.BBCode.Compiler
         void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
         #endregion
 
-        #region FindStatementType()
-        CompiledType FindStatementType(Statement_FunctionCall functionCall)
-        {
-            if (functionCall.FunctionName == "Dealloc") return new CompiledType(BuiltinType.VOID, GetCustomType);
-
-            if (functionCall.FunctionName == "Alloc") return new CompiledType(BuiltinType.INT, GetCustomType);
-
-            if (functionCall.FunctionName == "sizeof") return new CompiledType(BuiltinType.INT, GetCustomType);
-
-            if (!GetCompiledFunction(functionCall, out var calledFunc))
-            { throw new CompilerException("Function '" + GetReadableID(functionCall) + "' not found!", functionCall.Identifier, CurrentFile); }
-            return calledFunc.Type;
-        }
-        CompiledType FindStatementType(Statement_Operator @operator)
-        {
-            Opcode opcode = Opcode.UNKNOWN;
-
-            if (@operator.Operator.Content == "!")
-            {
-                if (@operator.ParameterCount != 1) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_NOT;
-            }
-            else if (@operator.Operator.Content == "+")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_ADD;
-            }
-            else if (@operator.Operator.Content == "<")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_LT;
-            }
-            else if (@operator.Operator.Content == ">")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_MT;
-            }
-            else if (@operator.Operator.Content == "-")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_SUB;
-            }
-            else if (@operator.Operator.Content == "*")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_MULT;
-            }
-            else if (@operator.Operator.Content == "/")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_DIV;
-            }
-            else if (@operator.Operator.Content == "%")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.MATH_MOD;
-            }
-            else if (@operator.Operator.Content == "==")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_EQ;
-            }
-            else if (@operator.Operator.Content == "!=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_NEQ;
-            }
-            else if (@operator.Operator.Content == "&&")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_AND;
-            }
-            else if (@operator.Operator.Content == "||")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_OR;
-            }
-            else if (@operator.Operator.Content == "^")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_XOR;
-            }
-            else if (@operator.Operator.Content == "<=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_LTEQ;
-            }
-            else if (@operator.Operator.Content == ">=")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.LOGIC_MTEQ;
-            }
-            else if (@operator.Operator.Content == "<<")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.BITSHIFT_LEFT;
-            }
-            else if (@operator.Operator.Content == ">>")
-            {
-                if (@operator.ParameterCount != 2) throw new CompilerException("Wrong number of parameters passed to operator '" + @operator.Operator + "'", @operator.Operator, CurrentFile);
-                opcode = Opcode.BITSHIFT_RIGHT;
-            }
-
-            if (opcode != Opcode.UNKNOWN)
-            {
-                var leftType = FindStatementType(@operator.Left);
-                if (@operator.Right != null)
-                {
-                    var rightType = FindStatementType(@operator.Right);
-
-                    if (leftType.IsBuiltin && rightType.IsBuiltin && leftType.GetBuiltinType() != BuiltinType.VOID && rightType.GetBuiltinType() != BuiltinType.VOID)
-                    {
-                        var leftValue = GetInitialValue(TypeToken.CreateAnonymous(leftType.Name, leftType.GetBuiltinType()));
-                        var rightValue = GetInitialValue(TypeToken.CreateAnonymous(rightType.Name, rightType.GetBuiltinType()));
-
-                        var predictedValue = PredictStatementValue(@operator.Operator.Content, leftValue, rightValue);
-                        if (predictedValue.HasValue)
-                        {
-                            switch (predictedValue.Value.type)
-                            {
-                                case RuntimeType.BYTE: return new CompiledType(BuiltinType.BYTE, GetCustomType);
-                                case RuntimeType.INT: return new CompiledType(BuiltinType.INT, GetCustomType);
-                                case RuntimeType.FLOAT: return new CompiledType(BuiltinType.FLOAT, GetCustomType);
-                                case RuntimeType.CHAR: return new CompiledType(BuiltinType.CHAR, GetCustomType);
-                                case RuntimeType.BOOLEAN: return new CompiledType(BuiltinType.BOOLEAN, GetCustomType);
-                            }
-                        }
-                    }
-
-                    warnings.Add(new Warning("Thats not good :(", @operator.TotalPosition(), CurrentFile));
-                    return null;
-                }
-                else
-                { return leftType; }
-            }
-            else if (@operator.Operator.Content == "=")
-            {
-                throw new NotImplementedException();
-            }
-            else
-            { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
-        }
-        CompiledType FindStatementType(Statement_Literal literal) => literal.Type.Type switch
-        {
-            TypeTokenType.INT => new CompiledType(BuiltinType.INT, GetCustomType),
-            TypeTokenType.BYTE => new CompiledType(BuiltinType.BYTE, GetCustomType),
-            TypeTokenType.FLOAT => new CompiledType(BuiltinType.FLOAT, GetCustomType),
-            TypeTokenType.STRING => new CompiledType("String", GetCustomType),
-            TypeTokenType.BOOLEAN => new CompiledType(BuiltinType.BOOLEAN, GetCustomType),
-            TypeTokenType.CHAR => new CompiledType(BuiltinType.CHAR, GetCustomType),
-            _ => throw new CompilerException($"Unknown literal type {literal.Type.Type}", literal, CurrentFile),
-        };
-        CompiledType FindStatementType(Statement_Variable variable)
-        {
-            if (variable.VariableName.Content == "nullptr")
-            { return new CompiledType(BuiltinType.INT, GetCustomType); }
-
-            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
-            {
-                if (variable.ListIndex != null)
-                { throw new NotImplementedException(); }
-                return param.Type;
-            }
-            else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
-            {
-                return val.Type;
-            }
-            else
-            {
-                throw new CompilerException("Unknown variable '" + variable.VariableName.Content + "'", variable.VariableName, CurrentFile);
-            }
-        }
-        CompiledType FindStatementType(Statement_MemoryAddressGetter _) => new(CompiledType.CompiledTypeType.INT);
-        CompiledType FindStatementType(Statement_MemoryAddressFinder _) => new(CompiledType.CompiledTypeType.UNKNOWN);
-        CompiledType FindStatementType(Statement_NewInstance newStruct)
-        {
-            if (GetCompiledStruct(newStruct, out var structDefinition))
-            {
-                return new CompiledType(structDefinition);
-            }
-            else if (GetCompiledClass(newStruct, out var classDefinition))
-            {
-                return new CompiledType(classDefinition);
-            }
-            else
-            {
-                throw new CompilerException("Unknown type '" + newStruct.TypeName.Content + "'", newStruct.TypeName, CurrentFile);
-            }
-        }
-        CompiledType FindStatementType(Statement_Field field)
-        {
-            var prevStatementType = FindStatementType(field.PrevStatement);
-
-            if (prevStatementType.Name == "string" || prevStatementType.Name.EndsWith("[]"))
-            {
-                if (field.FieldName.Content == "Length") return new CompiledType(BuiltinType.INT, GetCustomType);
-            }
-
-            foreach (var strct in compiledStructs)
-            {
-                if (strct.Key != prevStatementType.Name) continue;
-
-                foreach (var sField in strct.Fields)
-                {
-                    if (sField.Identifier.Content != field.FieldName.Content) continue;
-                    return sField.Type;
-                }
-
-                break;
-            }
-
-            foreach (var @class_ in compiledClasses)
-            {
-                if (@class_.Key != prevStatementType.Name) continue;
-
-                foreach (var sField in @class_.Fields)
-                {
-                    if (sField.Identifier.Content != field.FieldName.Content) continue;
-                    return sField.Type;
-                }
-
-                break;
-            }
-
-            throw new CompilerException("Unknown type '" + prevStatementType + "'", field.TotalPosition(), CurrentFile);
-        }
-
-        CompiledType FindStatementType(StatementWithReturnValue st)
-        {
-            try
-            {
-                if (st is Statement_FunctionCall functionCall)
-                { return FindStatementType(functionCall); }
-                else if (st is Statement_Operator @operator)
-                { return FindStatementType(@operator); }
-                else if (st is Statement_Literal literal)
-                { return FindStatementType(literal); }
-                else if (st is Statement_Variable variable)
-                { return FindStatementType(variable); }
-                else if (st is Statement_MemoryAddressGetter memoryAddressGetter)
-                { return FindStatementType(memoryAddressGetter); }
-                else if (st is Statement_MemoryAddressFinder memoryAddressFinder)
-                { return FindStatementType(memoryAddressFinder); }
-                else if (st is Statement_NewInstance newStruct)
-                { return FindStatementType(newStruct); }
-                else if (st is Statement_Field field)
-                { return FindStatementType(field); }
-                else if (st is Statement_ListValue list)
-                {
-                    if (list.Values.Length > 0) return new CompiledType(FindStatementType(list.Values[0]));
-                    throw new NotImplementedException();
-                }
-                else if (st is Statement_Index index)
-                {
-                    var type = FindStatementType(index.PrevStatement);
-                    if (type.IsList) return type.ListOf;
-                    throw new NotImplementedException();
-                }
-                throw new CompilerException($"Statement without value type: {st.GetType().Name} {st}", st, CurrentFile);
-            }
-            catch (InternalException error)
-            {
-                errors.Add(new Error(error.Message, st.TotalPosition()));
-                throw;
-            }
-        }
-        #endregion
-
-        #region PredictStatementValue()
-        static DataItem? PredictStatementValue(string @operator, DataItem left, DataItem right)
-        {
-            return @operator switch
-            {
-                "!" => !left,
-
-                "+" => left + right,
-                "-" => left - right,
-                "*" => left * right,
-                "/" => left,
-                "%" => left,
-
-                "&&" => new DataItem((!left.IsFalsy()) && (!right.IsFalsy()), null),
-                "||" => new DataItem((!left.IsFalsy()) || (!right.IsFalsy()), null),
-
-                "&" => left & right,
-                "|" => left | right,
-                "^" => left ^ right,
-
-                "<<" => DataItem.BitshiftLeft(left, right),
-                ">>" => DataItem.BitshiftRight(left, right),
-
-                "<" => new DataItem(left < right, null),
-                ">" => new DataItem(left > right, null),
-                "==" => new DataItem(left == right, null),
-                "!=" => new DataItem(left != right, null),
-                "<=" => new DataItem(left <= right, null),
-                ">=" => new DataItem(left >= right, null),
-                _ => null,
-            };
-        }
-        static DataItem? PredictStatementValue(Statement_Operator @operator)
-        {
-            var leftValue = PredictStatementValue(@operator.Left);
-            if (!leftValue.HasValue) return null;
-
-            if (@operator.Operator.Content == "!")
-            {
-                return !leftValue;
-            }
-
-            if (@operator.Right != null)
-            {
-                var rightValue = PredictStatementValue(@operator.Right);
-                if (!rightValue.HasValue) return null;
-
-                return PredictStatementValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
-            }
-            else
-            { return leftValue; }
-        }
-        static DataItem? PredictStatementValue(Statement_Literal literal)
-        {
-            return literal.Type.Type switch
-            {
-                TypeTokenType.INT => new DataItem(int.Parse(literal.Value), null),
-                TypeTokenType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
-                TypeTokenType.BYTE => new DataItem(byte.Parse(literal.Value), null),
-                TypeTokenType.STRING => new DataItem(literal.Value, null),
-                TypeTokenType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
-                TypeTokenType.USER_DEFINED => throw new NotImplementedException(),
-                _ => null,
-            };
-        }
-        static DataItem? PredictStatementValue(StatementWithReturnValue st)
-        {
-            if (st is Statement_Literal literal)
-            { return PredictStatementValue(literal); }
-            else if (st is Statement_Operator @operator)
-            { return PredictStatementValue(@operator); }
-
-            return null;
-        }
-        #endregion
-
         bool GetCompiledField(Statement_Field field, out CompiledField compiledField)
         {
             compiledField = null;
 
             CompiledType type = FindStatementType(field.PrevStatement);
-            if (type == null) return false;
+            if (type is null) return false;
             if (!type.IsClass) return false;
             var @class = type.Class;
             for (int i = 0; i < @class.Fields.Length; i++)
@@ -963,7 +247,7 @@ namespace IngameCoding.BBCode.Compiler
             newVariable.VariableName.Analysis.SubSubtype = TokenSubSubtype.VariableName;
             newVariable.VariableName.Analysis.CompilerReached = true;
 
-            if (!GetCompiledVariable(newVariable.VariableName.Content, out CompiledVariable variable))
+            if (!GetCompiledVariable(newVariable.VariableName.Content, out _))
             { throw new CompilerException("Unknown variable '" + newVariable.VariableName.Content + "'", newVariable.VariableName, CurrentFile); }
 
             if (newVariable.InitialValue == null) return;
@@ -974,9 +258,9 @@ namespace IngameCoding.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_FunctionCall functionCall)
+        void GenerateCodeForStatement(Statement_KeywordCall functionCall)
         {
-            AddComment($"Call {functionCall.FunctionName} {{");
+            AddComment($"Call Keyword {functionCall.FunctionName} {{");
 
             functionCall.Identifier.Analysis.CompilerReached = true;
 
@@ -1011,7 +295,7 @@ namespace IngameCoding.BBCode.Compiler
 
                 AddComment(" .:");
 
-                returnInstructions.Add(compiledCode.Count);
+                returnInstructions.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
                 AddComment("}");
@@ -1027,7 +311,7 @@ namespace IngameCoding.BBCode.Compiler
                 AddComment(" Param 0:");
 
                 StatementWithReturnValue throwValue = functionCall.Parameters[0];
-                CompiledType throwValueType = FindStatementType(throwValue);
+                // CompiledType throwValueType = FindStatementType(throwValue);
 
                 GenerateCodeForStatement(throwValue);
                 AddInstruction(Opcode.THROW);
@@ -1042,13 +326,85 @@ namespace IngameCoding.BBCode.Compiler
                 if (breakInstructions.Count <= 0)
                 { throw new CompilerException("The keyword 'break' does not avaiable in the current context", functionCall.Identifier, CurrentFile); }
 
-                breakInstructions.Last().Add(compiledCode.Count);
+                breakInstructions.Last().Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
 
                 AddComment("}");
 
                 return;
             }
+
+            if (functionCall.FunctionName == "sizeof")
+            {
+                if (functionCall.Parameters.Length != 1)
+                { throw new CompilerException("Wrong number of parameters passed to 'type'", functionCall.TotalPosition(), CurrentFile); }
+
+                StatementWithReturnValue param0 = functionCall.Parameters[0];
+                CompiledType param0Type = FindStatementType(param0);
+
+                AddInstruction(Opcode.PUSH_VALUE, param0Type.SizeOnHeap, $"sizeof({param0Type.FullName})");
+
+                functionCall.Identifier = functionCall.Identifier.BuiltinFunction("sizeof", "int", new string[] { "p" }, new string[] { "any" });
+
+                return;
+            }
+
+            if (functionCall.FunctionName == "delete")
+            {
+                if (functionCall.Parameters.Length != 1)
+                { throw new CompilerException("Wrong number of parameters passed to 'delete'", functionCall.TotalPosition(), CurrentFile); }
+
+                var paramType = FindStatementType(functionCall.Parameters[0]);
+
+                if (!paramType.IsClass)
+                {
+                    Warnings.Add(new Warning($"The 'delete' function is only working on type class so I skip this shit", functionCall.Parameters[0].TotalPosition(), CurrentFile));
+                    return;
+                }
+
+                functionCall.Identifier = functionCall.Identifier.Statement("delete", "obj", new string[] { "object" }, new string[] { "any" });
+
+                if (!GetDestructor(paramType.Class, out var destructor))
+                {
+                    return;
+                }
+
+                destructor.References?.Add(new DefinitionReference(functionCall.Identifier, CurrentFile));
+
+                if (!destructor.CanUse(CurrentFile))
+                {
+                    Errors.Add(new Error($"Destructor for type '{paramType.Class.Name.Content}' function cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                    AddComment("}");
+                    return;
+                }
+
+                AddComment(" Param0:");
+                GenerateCodeForStatement(functionCall.Parameters[0]);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
+
+                AddComment(" .:");
+
+                if (destructor.InstructionOffset == -1)
+                { undefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+
+                AddInstruction(Opcode.CALL, destructor.InstructionOffset - GeneratedCode.Count);
+
+                AddComment(" Clear Param:");
+
+                AddInstruction(Opcode.POP_VALUE);
+
+                AddComment("}");
+
+                return;
+            }
+
+            throw new CompilerException($"Unknown function (keyword) '{functionCall.FunctionName}'", functionCall.Identifier, CurrentFile);
+        }
+        void GenerateCodeForStatement(Statement_FunctionCall functionCall)
+        {
+            AddComment($"Call {functionCall.FunctionName} {{");
+
+            functionCall.Identifier.Analysis.CompilerReached = true;
 
             if (functionCall.FunctionName == "sizeof")
             {
@@ -1075,13 +431,17 @@ namespace IngameCoding.BBCode.Compiler
                     if (!GetCompiledVariable(variableStatement.VariableName.Content, out var variable))
                     { throw new CompilerException("Unknown variable '" + variableStatement.VariableName.Content + "'", variableStatement.VariableName, CurrentFile); }
 
-                    Deallocate(variable);
+                    AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+                    AddInstruction(Opcode.HEAP_DEALLOC);
 
                     functionCall.Identifier = functionCall.Identifier.BuiltinFunction("Dealloc", "void", new string[] { "variable" }, new string[] { "any" });
                 }
                 else if (functionCall.Parameters.Length == 2)
                 {
-                    DynamicDeallocate(functionCall.Parameters[0], functionCall.Parameters[1]);
+                    GenerateCodeForStatement(functionCall.Parameters[0]);
+                    AddInstruction(Opcode.HEAP_DEALLOC);
+
+                    // DynamicDeallocate(functionCall.Parameters[0], functionCall.Parameters[1]);
 
                     functionCall.Identifier = functionCall.Identifier.BuiltinFunction("Dealloc", "void", new string[] { "start", "length" }, new string[] { "int", "int" });
                 }
@@ -1098,7 +458,7 @@ namespace IngameCoding.BBCode.Compiler
 
                 GenerateCodeForStatement(functionCall.Parameters[0]);
 
-                AddInstruction(Opcode.FIND_HEAP_FREE_SPACE, "(pointer)");
+                AddInstruction(Opcode.HEAP_ALLOC, "(pointer)");
 
                 functionCall.Identifier = functionCall.Identifier.BuiltinFunction("Alloc", "int", new string[] { "int" }, new string[] { "size" });
 
@@ -1217,7 +577,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             */
 
-            string searchedID = functionCall.TargetNamespacePathPrefix + functionCall.FunctionName;
+            string searchedID = functionCall.FunctionName;
             searchedID += "(";
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
@@ -1236,14 +596,9 @@ namespace IngameCoding.BBCode.Compiler
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                errors.Add(new Error($"The {searchedID} function cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                Errors.Add(new Error($"The {searchedID} function cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
                 AddComment("}");
                 return;
-            }
-
-            if (CurrentFunction_ForRecursionProtection != null && compiledFunction.ID() == CurrentFunction_ForRecursionProtection)
-            {
-                warnings.Add(new Warning($"Potential infinite recursive call", functionCall.TotalPosition(), CurrentFile));
             }
 
             functionCall.Identifier = functionCall.Identifier.Function(compiledFunction);
@@ -1258,7 +613,7 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (!builtinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
                 {
-                    errors.Add(new Error($"Builtin function '{compiledFunction.BuiltinName}' not found", functionCall.Identifier, CurrentFile));
+                    Errors.Add(new Error($"Builtin function '{compiledFunction.BuiltinName}' not found", functionCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -1286,19 +641,42 @@ namespace IngameCoding.BBCode.Compiler
                 AddComment(" .:");
                 AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
 
-                AddComment($" Clear Return Value:");
-                if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
-                { AddInstruction(Opcode.POP_VALUE); }
+                bool thereIsReturnValue = false;
+                if (compiledFunction.ReturnSomething)
+                {
+                    if (!functionCall.SaveValue)
+                    {
+                        AddComment($" Clear Return Value:");
+                        AddInstruction(Opcode.POP_VALUE);
+                    }
+                    else
+                    { thereIsReturnValue = true; }
+                }
 
                 AddComment(" Deallocate Function Name String:");
 
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
                 AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-                AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName.Length);
-                DynamicDeallocateWithParametersAlreadyExists();
+                // AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName.Length);
+                // AddInstruction(Opcode.POP_VALUE);
+                AddInstruction(Opcode.HEAP_DEALLOC);
+                // DynamicDeallocateWithParametersAlreadyExists();
 
-                AddInstruction(Opcode.PUSH_VALUE, 2);
-                DynamicDeallocateWithParametersAlreadyExists();
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
+                // AddInstruction(Opcode.PUSH_VALUE, 2);
+                // AddInstruction(Opcode.POP_VALUE);
+                AddInstruction(Opcode.HEAP_DEALLOC);
+                // DynamicDeallocateWithParametersAlreadyExists();
+
+                if (thereIsReturnValue)
+                {
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, -2);
+                    AddInstruction(Opcode.DEBUG_SET_TAG, "Return value");
+                }
+                else
+                {
+                    AddInstruction(Opcode.POP_VALUE);
+                }
 
                 AddComment("}");
                 return;
@@ -1350,9 +728,9 @@ namespace IngameCoding.BBCode.Compiler
             AddComment(" .:");
 
             if (compiledFunction.InstructionOffset == -1)
-            { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(compiledCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+            { undefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
-            AddInstruction(Opcode.CALL, compiledFunction.InstructionOffset - compiledCode.Count);
+            AddInstruction(Opcode.CALL, compiledFunction.InstructionOffset - GeneratedCode.Count);
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -1391,25 +769,25 @@ namespace IngameCoding.BBCode.Compiler
                         case RuntimeType.BYTE:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueByte);
-                                informations.Add(new Information($"Predicted value: {predictedValue.ValueByte}", @operator.TotalPosition(), CurrentFile));
+                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueByte}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
                         case RuntimeType.INT:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueInt);
-                                informations.Add(new Information($"Predicted value: {predictedValue.ValueInt}", @operator.TotalPosition(), CurrentFile));
+                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueInt}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
                         case RuntimeType.BOOLEAN:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueBoolean);
-                                informations.Add(new Information($"Predicted value: {predictedValue.ValueBoolean}", @operator.TotalPosition(), CurrentFile));
+                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueBoolean}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
                         case RuntimeType.FLOAT:
                             {
                                 AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueFloat);
-                                informations.Add(new Information($"Predicted value: {predictedValue.ValueFloat}", @operator.TotalPosition(), CurrentFile));
+                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueFloat}", @operator.TotalPosition(), CurrentFile));
                                 return;
                             }
                         default: throw new NotImplementedException();
@@ -1529,7 +907,7 @@ namespace IngameCoding.BBCode.Compiler
             AddComment("Allocate String object {");
 
             AddInstruction(Opcode.PUSH_VALUE, 2, $"sizeof(String)");
-            AddInstruction(Opcode.FIND_HEAP_FREE_SPACE, $"(pointer String)");
+            AddInstruction(Opcode.HEAP_ALLOC, $"(pointer String)");
 
             // Allocate object fields
             {
@@ -1563,7 +941,7 @@ namespace IngameCoding.BBCode.Compiler
             // Set String.pointer
             {
                 AddInstruction(Opcode.PUSH_VALUE, literal.Length, $"sizeof(\"{literal}\")");
-                AddInstruction(Opcode.FIND_HEAP_FREE_SPACE, $"(subpointer String)");
+                AddInstruction(Opcode.HEAP_ALLOC, $"(subpointer String)");
 
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
                 AddInstruction(Opcode.PUSH_VALUE, 0);
@@ -1753,14 +1131,14 @@ namespace IngameCoding.BBCode.Compiler
             {
                 if (conditionValue_.Value.type != RuntimeType.BOOLEAN)
                 {
-                    warnings.Add(new Warning($"Condition must be boolean", whileLoop.Condition.TotalPosition(), CurrentFile));
+                    Warnings.Add(new Warning($"Condition must be boolean", whileLoop.Condition.TotalPosition(), CurrentFile));
                 }
                 else if (TrimUnreachableCode)
                 {
                     if (!conditionValue_.Value.ValueBoolean)
                     {
                         AddComment("Unreachable code not compiled");
-                        informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.BracketStart, whileLoop.BracketEnd), CurrentFile));
+                        Informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.BracketStart, whileLoop.BracketEnd), CurrentFile));
                         return;
                     }
                 }
@@ -1768,11 +1146,11 @@ namespace IngameCoding.BBCode.Compiler
 
             AddComment("while (...) {");
             AddComment("Condition");
-            int conditionOffset = compiledCode.Count;
+            int conditionOffset = GeneratedCode.Count;
             GenerateCodeForStatement(whileLoop.Condition);
 
             AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
-            int conditionJumpOffset = compiledCode.Count - 1;
+            int conditionJumpOffset = GeneratedCode.Count - 1;
 
             breakInstructions.Add(new List<int>());
 
@@ -1785,11 +1163,11 @@ namespace IngameCoding.BBCode.Compiler
             AddComment("}");
 
             AddComment("Jump Back");
-            AddInstruction(Opcode.JUMP_BY, conditionOffset - compiledCode.Count);
+            AddInstruction(Opcode.JUMP_BY, conditionOffset - GeneratedCode.Count);
 
             AddComment("}");
 
-            compiledCode[conditionJumpOffset].Parameter = compiledCode.Count - conditionJumpOffset;
+            GeneratedCode[conditionJumpOffset].Parameter = GeneratedCode.Count - conditionJumpOffset;
             List<int> currentBreakInstructions = breakInstructions.Last();
 
             if (currentBreakInstructions.Count == 0)
@@ -1800,16 +1178,16 @@ namespace IngameCoding.BBCode.Compiler
                     if (conditionValue.type == RuntimeType.BOOLEAN)
                     {
                         if (conditionValue.ValueBoolean)
-                        { warnings.Add(new Warning($"Infinity loop", whileLoop.Keyword, CurrentFile)); }
+                        { Warnings.Add(new Warning($"Infinity loop", whileLoop.Keyword, CurrentFile)); }
                         else
-                        { warnings.Add(new Warning($"Why? this will never run", whileLoop.Keyword, CurrentFile)); }
+                        { Warnings.Add(new Warning($"Why? this will never run", whileLoop.Keyword, CurrentFile)); }
                     }
                 }
             }
 
             foreach (var breakInstruction in currentBreakInstructions)
             {
-                compiledCode[breakInstruction].Parameter = compiledCode.Count - breakInstruction;
+                GeneratedCode[breakInstruction].Parameter = GeneratedCode.Count - breakInstruction;
             }
             breakInstructions.RemoveAt(breakInstructions.Count - 1);
         }
@@ -1825,10 +1203,10 @@ namespace IngameCoding.BBCode.Compiler
 
             AddComment("FOR Condition");
             // Index condition
-            int conditionOffsetFor = compiledCode.Count;
+            int conditionOffsetFor = GeneratedCode.Count;
             GenerateCodeForStatement(forLoop.Condition);
             AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
-            int conditionJumpOffsetFor = compiledCode.Count - 1;
+            int conditionJumpOffsetFor = GeneratedCode.Count - 1;
 
             breakInstructions.Add(new List<int>());
 
@@ -1846,12 +1224,12 @@ namespace IngameCoding.BBCode.Compiler
             GenerateCodeForStatement(forLoop.Expression);
 
             AddComment("Jump back");
-            AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - compiledCode.Count);
-            compiledCode[conditionJumpOffsetFor].Parameter = compiledCode.Count - conditionJumpOffsetFor;
+            AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - GeneratedCode.Count);
+            GeneratedCode[conditionJumpOffsetFor].Parameter = GeneratedCode.Count - conditionJumpOffsetFor;
 
             foreach (var breakInstruction in breakInstructions.Last())
             {
-                compiledCode[breakInstruction].Parameter = compiledCode.Count - breakInstruction;
+                GeneratedCode[breakInstruction].Parameter = GeneratedCode.Count - breakInstruction;
             }
             breakInstructions.RemoveAt(breakInstructions.Count - 1);
 
@@ -1874,7 +1252,7 @@ namespace IngameCoding.BBCode.Compiler
 
                         if (conditionValue.type != RuntimeType.BOOLEAN)
                         {
-                            warnings.Add(new Warning($"Condition must be boolean", partIf.Condition.TotalPosition(), CurrentFile));
+                            Warnings.Add(new Warning($"Condition must be boolean", partIf.Condition.TotalPosition(), CurrentFile));
                         }
                     }
 
@@ -1883,7 +1261,7 @@ namespace IngameCoding.BBCode.Compiler
                     AddComment("IF Condition");
                     GenerateCodeForStatement(partIf.Condition);
                     AddComment("IF Jump to Next");
-                    int jumpNextInstruction = compiledCode.Count;
+                    int jumpNextInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
                     cleanupStack.Push(CompileVariables(partIf, false));
@@ -1897,12 +1275,12 @@ namespace IngameCoding.BBCode.Compiler
                     CleanupVariables(cleanupStack.Pop());
 
                     AddComment("IF Jump to End");
-                    jumpOutInstructions.Add(compiledCode.Count);
+                    jumpOutInstructions.Add(GeneratedCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
                     AddComment("}");
 
-                    compiledCode[jumpNextInstruction].Parameter = compiledCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is Statement_If_ElseIf partElseif)
                 {
@@ -1911,7 +1289,7 @@ namespace IngameCoding.BBCode.Compiler
                     AddComment("ELSEIF Condition");
                     GenerateCodeForStatement(partElseif.Condition);
                     AddComment("ELSEIF Jump to Next");
-                    int jumpNextInstruction = compiledCode.Count;
+                    int jumpNextInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
                     cleanupStack.Push(CompileVariables(partElseif, false));
@@ -1925,12 +1303,12 @@ namespace IngameCoding.BBCode.Compiler
                     CleanupVariables(cleanupStack.Pop());
 
                     AddComment("IF Jump to End");
-                    jumpOutInstructions.Add(compiledCode.Count);
+                    jumpOutInstructions.Add(GeneratedCode.Count);
                     AddInstruction(Opcode.JUMP_BY, 0);
 
                     AddComment("}");
 
-                    compiledCode[jumpNextInstruction].Parameter = compiledCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is Statement_If_Else partElse)
                 {
@@ -1953,7 +1331,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var item in jumpOutInstructions)
             {
-                compiledCode[item].Parameter = compiledCode.Count - item;
+                GeneratedCode[item].Parameter = GeneratedCode.Count - item;
             }
         }
         void GenerateCodeForStatement(Statement_NewInstance newObject)
@@ -1961,7 +1339,7 @@ namespace IngameCoding.BBCode.Compiler
             AddComment($"new {newObject.TypeName}: {{");
             newObject.TypeName.Analysis.CompilerReached = true;
 
-            var instanceType = GetCustomType(newObject.TypeName.Content, newObject.TargetNamespacePathPrefix, true);
+            var instanceType = GetCustomType(newObject.TypeName.Content, true);
 
             if (instanceType is null)
             { throw new CompilerException("Unknown type '" + newObject.TypeName.Content + "'", newObject.TypeName, CurrentFile); }
@@ -1978,8 +1356,8 @@ namespace IngameCoding.BBCode.Compiler
                 newObject.TypeName = newObject.TypeName.Class(@class);
                 @class.References?.Add(new DefinitionReference(newObject.TypeName, CurrentFile));
 
-                AddInstruction(Opcode.PUSH_VALUE, @class.Size, $"sizeof({@class.FullName})");
-                AddInstruction(Opcode.FIND_HEAP_FREE_SPACE, $"(pointer {@class.FullName})");
+                AddInstruction(Opcode.PUSH_VALUE, @class.Size, $"sizeof({@class.Name.Content})");
+                AddInstruction(Opcode.HEAP_ALLOC, $"(pointer {@class.Name.Content})");
                 int currentOffset = 0;
                 for (int fieldIndex = 0; fieldIndex < @class.Fields.Length; fieldIndex++)
                 {
@@ -1993,12 +1371,106 @@ namespace IngameCoding.BBCode.Compiler
                         AddInstruction(Opcode.MATH_ADD);
                         AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
                         currentOffset++;
-                    }, $"{@class.FullName}.{field.Identifier.Content}");
+                    }, $"{@class.Name.Content}.{field.Identifier.Content}");
                     AddComment("}");
                 }
             }
             else
             { throw new CompilerException("Unknown type definition " + instanceType.GetType().Name, newObject.TypeName, CurrentFile); }
+            AddComment("}");
+        }
+        void GenerateCodeForStatement(Statement_ConstructorCall constructorCall)
+        {
+            AddComment($"new {constructorCall.TypeName}(...): {{");
+            constructorCall.TypeName.Analysis.CompilerReached = true;
+
+            var instanceType = GetCustomType(constructorCall.TypeName.Content, true);
+
+            if (instanceType is null)
+            { throw new CompilerException("Unknown type '" + constructorCall.TypeName.Content + "'", constructorCall.TypeName, CurrentFile); }
+
+            if (instanceType is CompiledStruct)
+            { throw new NotImplementedException(); }
+
+            if (instanceType is not CompiledClass @class)
+            { throw new CompilerException("Unknown type definition " + instanceType.GetType().Name, constructorCall.TypeName, CurrentFile); }
+
+
+            constructorCall.TypeName = constructorCall.TypeName.Class(@class);
+            @class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
+
+            if (!GetConstructor(constructorCall, out var constructor))
+            {
+                throw new CompilerException($"Constructor for type \"{constructorCall.TypeName}\" not found", constructorCall.TypeName, CurrentFile);
+            }
+
+            constructor.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
+
+            if (!constructor.CanUse(CurrentFile))
+            {
+                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AddComment("}");
+                return;
+            }
+
+            if (constructorCall.Parameters.Length != constructor.ParameterCount)
+            { throw new CompilerException("Wrong number of parameters passed to '" + $"\"{constructorCall.TypeName}\" constructor" + $"': requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall.TotalPosition(), CurrentFile); }
+
+            int returnValueSize = 0;
+            if (constructor.ReturnSomething)
+            {
+                returnValueSize = GenerateInitialValue(constructor.Type, "returnvalue");
+            }
+
+            int paramsSize = 0;
+
+            for (int i = 0; i < constructorCall.Parameters.Length; i++)
+            {
+                Statement param = constructorCall.Parameters[i];
+                ParameterDefinition definedParam = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
+
+                AddComment($" Param {i}:");
+                GenerateCodeForStatement(param);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.Identifier);
+
+                if (definedParam.Type.Type == TypeTokenType.USER_DEFINED)
+                {
+                    ITypeDefinition paramType = GetCustomType(definedParam.Type.ToString());
+                    if (paramType is CompiledStruct @struct_)
+                    {
+                        paramsSize += @struct_.Size;
+                    }
+                    else if (paramType is CompiledClass)
+                    {
+                        paramsSize++;
+                    }
+                }
+                else
+                {
+                    paramsSize++;
+                }
+            }
+
+            AddComment(" .:");
+
+            if (constructor.InstructionOffset == -1)
+            { undefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, constructorCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+
+            AddInstruction(Opcode.CALL, constructor.InstructionOffset - GeneratedCode.Count);
+
+            AddComment(" Clear Params:");
+            for (int i = 0; i < paramsSize; i++)
+            {
+                AddInstruction(Opcode.POP_VALUE);
+            }
+
+            if (constructor.ReturnSomething && !constructorCall.SaveValue)
+            {
+                AddComment(" Clear Return Value:");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.POP_VALUE); }
+            }
+
             AddComment("}");
         }
         void GenerateCodeForStatement(Statement_Field field)
@@ -2021,8 +1493,8 @@ namespace IngameCoding.BBCode.Compiler
                     switch (compiledField.Protection)
                     {
                         case Protection.Private:
-                            if (currentContext.Context.FullName != compiledField.Class.FullName)
-                            { throw new CompilerException($"Can not access field {compiledField.Identifier.Content} of class {compiledField.Class.FullName} due to it's protection level", field, CurrentFile); }
+                            if (currentContext.Context.Name.Content != compiledField.Class.Name.Content)
+                            { throw new CompilerException($"Can not access field {compiledField.Identifier.Content} of class {compiledField.Class.Name.Content} due to it's protection level", field, CurrentFile); }
                             break;
                         case Protection.Public:
                             break;
@@ -2102,13 +1574,15 @@ namespace IngameCoding.BBCode.Compiler
             AddComment("}");
             */
         }
+        void GenerateCodeForStatement(Statement_As @as)
+        { GenerateCodeForStatement(@as.PrevStatement); }
 
         void GenerateCodeForStatement(Statement st)
         {
             DebugInfo debugInfo = new()
             {
-                InstructionStart = compiledCode.Count,
-                InstructionEnd = compiledCode.Count,
+                InstructionStart = GeneratedCode.Count,
+                InstructionEnd = GeneratedCode.Count,
             };
             if (st is StatementParent statementParent)
             { cleanupStack.Push(CompileVariables(statementParent, false)); }
@@ -2119,6 +1593,8 @@ namespace IngameCoding.BBCode.Compiler
             { GenerateCodeForStatement(newVariable); }
             else if (st is Statement_FunctionCall functionCall)
             { GenerateCodeForStatement(functionCall); }
+            else if (st is Statement_KeywordCall keywordCall)
+            { GenerateCodeForStatement(keywordCall); }
             else if (st is Statement_Operator @operator)
             { GenerateCodeForStatement(@operator); }
             else if (st is Statement_Setter setter)
@@ -2139,10 +1615,14 @@ namespace IngameCoding.BBCode.Compiler
             { GenerateCodeForStatement(@if); }
             else if (st is Statement_NewInstance newStruct)
             { GenerateCodeForStatement(newStruct); }
+            else if (st is Statement_ConstructorCall constructorCall)
+            { GenerateCodeForStatement(constructorCall); }
             else if (st is Statement_Index indexStatement)
             { GenerateCodeForStatement(indexStatement); }
             else if (st is Statement_Field field)
             { GenerateCodeForStatement(field); }
+            else if (st is Statement_As @as)
+            { GenerateCodeForStatement(@as); }
             else
             {
                 Output.Debug.Debug.Log("[Compiler]: Unimplemented statement " + st.GetType().Name);
@@ -2153,7 +1633,7 @@ namespace IngameCoding.BBCode.Compiler
                 CleanupVariables(cleanupStack.Pop());
             }
 
-            debugInfo.InstructionEnd = compiledCode.Count - 1;
+            debugInfo.InstructionEnd = GeneratedCode.Count - 1;
             debugInfo.Position = st.TotalPosition();
             GeneratedDebugInfo.Add(debugInfo);
         }
@@ -2369,10 +1849,7 @@ namespace IngameCoding.BBCode.Compiler
         void GenerateCodeForValueSetter(Statement_MemoryAddressFinder statementToSet, StatementWithReturnValue value)
         {
             CompiledType targetType = FindStatementType(statementToSet);
-            CompiledType valueType = FindStatementType(value);
-
-            // if (targetType != valueType)
-            // { throw new CompilerException($"Can't set {targetType.FullName} to value of type {valueType.FullName}", value.TotalPosition(), CurrentFile); }
+            // CompiledType valueType = FindStatementType(value);
 
             if (targetType.SizeOnStack != 1) throw new NotImplementedException();
 
@@ -2414,6 +1891,8 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         #endregion
+
+        #region HEAP Helpers
 
         void CopyToHeap(int to, int size)
         {
@@ -2476,6 +1955,161 @@ namespace IngameCoding.BBCode.Compiler
             AddComment("}");
         }
 
+        /*
+        void Deallocate(CompiledVariable variable)
+        {
+            if (!variable.IsStoredInHEAP) return;
+            AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+            AddInstruction(Opcode.HEAP_DEALLOC);
+            return;
+            AddComment("Deallocate {");
+            for (int offset = 0; offset < variable.Type.Size; offset++)
+            {
+                AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
+                AddInstruction(Opcode.PUSH_VALUE, offset);
+                AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+                AddInstruction(Opcode.MATH_ADD);
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+            }
+            AddComment("}");
+        }
+
+        void Deallocate(int from, int length)
+        {
+            AddComment("Deallocate {");
+
+            AddInstruction(Opcode.PUSH_VALUE, from);
+            AddInstruction(Opcode.PUSH_VALUE, length);
+
+            AddComment("While _length_ != 0 :");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+            int skipIfZeroInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
+
+            AddComment($"Decrement _length_:");
+            AddInstruction(Opcode.PUSH_VALUE, -1);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Null value:");
+            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
+
+            AddComment("Calculate address (_length_ + _start_):");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Store null value:");
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+
+            AddComment("Jump back to loop:");
+            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
+
+            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
+
+            AddComment("Cleanup parameters:");
+            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.POP_VALUE);
+
+            AddComment("}");
+        }
+
+        /// <summary>
+        /// <b>Expected Stack:</b> <br/><br/>
+        /// <code>
+        /// ... <br/>
+        /// <see langword="int"/> FROM <br/>
+        /// <see langword="int"/> LENGTH <br/>
+        /// </code>
+        /// This will pop these two stack elements.
+        /// </summary>
+        void DynamicDeallocateWithParametersAlreadyExists()
+        {
+            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.HEAP_DEALLOC);
+            return;
+
+            AddComment("Deallocate {");
+
+            AddComment("While _length_ != 0 :");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+            int skipIfZeroInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
+
+            AddComment($"Decrement _length_:");
+            AddInstruction(Opcode.PUSH_VALUE, -1);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Null value:");
+            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
+
+            AddComment("Calculate address (_length_ + _start_):");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Store null value:");
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+
+            AddComment("Jump back to loop:");
+            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
+
+            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
+
+            AddComment("Cleanup parameters:");
+            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.POP_VALUE);
+
+            AddComment("}");
+        }
+
+        void DynamicDeallocate(StatementWithReturnValue from, StatementWithReturnValue length)
+        {
+            GenerateCodeForStatement(from);
+            AddInstruction(Opcode.HEAP_DEALLOC);
+
+            return;
+            AddComment("Dynamic Deallocate {");
+
+            GenerateCodeForStatement(from);
+            GenerateCodeForStatement(length);
+
+            AddComment("While _length_ != 0 :");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+            int skipIfZeroInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
+
+            AddComment($"Decrement _length_:");
+            AddInstruction(Opcode.PUSH_VALUE, -1);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Null value:");
+            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
+
+            AddComment("Calculate address (_length_ + _start_):");
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
+            AddInstruction(Opcode.MATH_ADD);
+
+            AddComment("Store null value:");
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+
+            AddComment("Jump back to loop:");
+            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
+
+            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
+
+            AddComment("Cleanup parameters:");
+            AddInstruction(Opcode.POP_VALUE);
+            AddInstruction(Opcode.POP_VALUE);
+
+            AddComment("}");
+        }
+        */
+
+        #endregion
+
+        #region Adressing Helpers
+
         int GetReturnValueAddress() => 0 - (ParameterSizeSum() + 2);
 
         /// <summary>
@@ -2496,7 +2130,7 @@ namespace IngameCoding.BBCode.Compiler
             else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
             {
                 if (val.IsStoredInHEAP)
-                { throw new InternalException($"This code should not be executed! Trying to GetDataAddress of variable \"{val.VariableName.Content}\" wich's type is {val.Type.ToString()}"); }
+                { throw new InternalException($"This code should not be executed! Trying to GetDataAddress of variable \"{val.VariableName.Content}\" wich's type is {val.Type}"); }
 
                 if (val.IsGlobal)
                 { addressingMode = AddressingMode.ABSOLUTE; }
@@ -2688,134 +2322,7 @@ namespace IngameCoding.BBCode.Compiler
             throw new NotImplementedException();
         }
 
-        void Deallocate(CompiledVariable variable)
-        {
-            if (!variable.IsStoredInHEAP) return;
-            AddComment("Deallocate {");
-            for (int offset = 0; offset < variable.Type.Size; offset++)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-                AddInstruction(Opcode.PUSH_VALUE, offset);
-                AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
-                AddInstruction(Opcode.MATH_ADD);
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-            }
-            AddComment("}");
-        }
-
-        void Deallocate(int from, int length)
-        {
-            AddComment("Deallocate {");
-
-            AddInstruction(Opcode.PUSH_VALUE, from);
-            AddInstruction(Opcode.PUSH_VALUE, length);
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = compiledCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - compiledCode.Count - 1);
-
-            compiledCode[skipIfZeroInstruction].Parameter = compiledCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
-
-        void DynamicDeallocateWithParametersAlreadyExists()
-        {
-            AddComment("Deallocate {");
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = compiledCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - compiledCode.Count - 1);
-
-            compiledCode[skipIfZeroInstruction].Parameter = compiledCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
-
-        void DynamicDeallocate(StatementWithReturnValue from, StatementWithReturnValue length)
-        {
-            AddComment("Dynamic Deallocate {");
-
-            GenerateCodeForStatement(from);
-            GenerateCodeForStatement(length);
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = compiledCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - compiledCode.Count - 1);
-
-            compiledCode[skipIfZeroInstruction].Parameter = compiledCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
+        #endregion
 
         #region GenerateCodeFor...
 
@@ -2831,13 +2338,19 @@ namespace IngameCoding.BBCode.Compiler
                     if (newVariable.InitialValue is Statement_Literal literal)
                     {
                         newVariable.Type.Type = literal.Type.Type;
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToStringWithNamespaces(), false);
+                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
-                    else if (newVariable.InitialValue is Statement_NewInstance newStruct)
+                    else if (newVariable.InitialValue is Statement_NewInstance newInstance)
                     {
                         newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                        newVariable.Type.Content = newStruct.TypeName.Content;
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToStringWithNamespaces(), false);
+                        newVariable.Type.Content = newInstance.TypeName.Content;
+                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
+                    }
+                    else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
+                    {
+                        newVariable.Type.Type = TypeTokenType.USER_DEFINED;
+                        newVariable.Type.Content = constructorCall.TypeName.Content;
+                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
                     else
                     {
@@ -2848,10 +2361,7 @@ namespace IngameCoding.BBCode.Compiler
                         newVariable.Type.ListOf = initialType.ListOf;
                         newVariable.Type.Content = initialType.Content;
 
-                        if (initialTypeRaw.IsStruct) newVariable.Type.NamespacePrefix = initialTypeRaw.Struct.NamespacePathString;
-                        if (initialTypeRaw.IsClass) newVariable.Type.NamespacePrefix = initialTypeRaw.Class.NamespacePathString;
-
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToStringWithNamespaces(), false);
+                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
 
                         GenerateCodeForVariable(newVariable, isGlobal);
                         return 1;
@@ -2867,7 +2377,7 @@ namespace IngameCoding.BBCode.Compiler
                 return 1;
             }
 
-            newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToStringWithNamespaces(), false);
+            newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
 
             compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(), isGlobal));
 
@@ -2928,7 +2438,6 @@ namespace IngameCoding.BBCode.Compiler
         {
             function.Identifier.Analysis.CompilerReached = true;
             function.TypeToken.Analysis.CompilerReached = true;
-            CurrentFunction_ForRecursionProtection = function.ID();
 
             if (Keywords.Contains(function.Identifier.Content))
             { throw new CompilerException($"Illegal function name '{function.Identifier.Content}'", function.Identifier, function.FilePath); }
@@ -2969,10 +2478,9 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            CurrentNamespace = function.NamespacePath;
             CurrentFile = function.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{compiledCode.Count};{function.Identifier.Position.Start.Line}");
+            AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
 
             // Search for variables
             AddComment("Variables");
@@ -2989,12 +2497,11 @@ namespace IngameCoding.BBCode.Compiler
             }
 
             CurrentFile = null;
-            CurrentNamespace = Array.Empty<string>();
 
-            int cleanupCodeOffset = compiledCode.Count;
+            int cleanupCodeOffset = GeneratedCode.Count;
 
             for (int i = 0; i < returnInstructions.Count; i++)
-            { compiledCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
+            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
 
             AddComment("Cleanup {");
 
@@ -3009,111 +2516,87 @@ namespace IngameCoding.BBCode.Compiler
             parameters.Clear();
             ClearLocalVariables();
             returnInstructions.Clear();
-
-            CurrentFunction_ForRecursionProtection = null;
         }
 
-        CompiledStruct CompileStruct(StructDefinition @struct)
+        void GenerateCodeForFunction(CompiledGeneralFunction function)
         {
-            CurrentFile = @struct.FilePath;
-            CurrentNamespace = @struct.NamespacePath;
+            function.Identifier.Analysis.CompilerReached = true;
 
-            @struct.Name.Analysis.CompilerReached = true;
+            if (Keywords.Contains(function.Identifier.Content))
+            { throw new CompilerException($"Illegal function name '{function.Identifier.Content}'", function.Identifier, function.FilePath); }
 
-            if (Keywords.Contains(@struct.Name.Content))
-            { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, CurrentFile); }
+            function.Identifier.Analysis.SubSubtype = TokenSubSubtype.FunctionName;
 
-            @struct.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
+            parameters.Clear();
+            ClearLocalVariables();
+            returnInstructions.Clear();
 
-            if (compiledStructs.ContainsKey(@struct.FullName))
-            { throw new CompilerException($"Struct with name '{@struct.FullName}' already exist", @struct.Name, CurrentFile); }
-
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in @struct.Attributes)
+            // Compile parameters
+            int paramIndex = 0;
+            int paramsSize = 0;
+            foreach (ParameterDefinition parameter in function.Parameters)
             {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                paramIndex++;
+                parameter.Identifier.Analysis.CompilerReached = true;
+                parameter.Type.Analysis.CompilerReached = true;
+                parameters.Add(new CompiledParameter(paramIndex, paramsSize, function.Parameters.Length, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter));
 
-                AttributeValues newAttribute = new()
-                { parameters = new() };
-
-                if (attribute.Parameters != null)
+                if (parameter.Type.Type == TypeTokenType.USER_DEFINED)
                 {
-                    foreach (object parameter in attribute.Parameters)
+                    var paramType = GetCustomType(parameter.Type.Content);
+                    if (paramType is CompiledStruct @struct)
                     {
-                        newAttribute.parameters.Add(new Literal(parameter));
+                        paramsSize += @struct.Size;
+                    }
+                    else if (paramType is CompiledClass @class)
+                    {
+                        paramsSize += 1;
                     }
                 }
-
-                attributes.Add(attribute.Identifier.Content, newAttribute);
+                else
+                {
+                    paramsSize++;
+                }
             }
 
-            foreach (var field in @struct.Fields)
+            CurrentFile = function.FilePath;
+
+            AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
+
+            // Search for variables
+            AddComment("Variables");
+            cleanupStack.Push(GenerateCodeForVariable(function.Statements, false));
+
+            // Compile statements
+            if (function.Statements.Length > 0)
             {
-                field.Identifier.Analysis.CompilerReached = true;
-                field.Type.Analysis.CompilerReached = true;
+                AddComment("Statements");
+                foreach (Statement statement in function.Statements)
+                {
+                    GenerateCodeForStatement(statement);
+                }
             }
 
             CurrentFile = null;
-            CurrentNamespace = Array.Empty<string>();
 
-            return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct)
-            {
-                References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
-            };
-        }
+            int cleanupCodeOffset = GeneratedCode.Count;
 
-        CompiledClass CompileClass(ClassDefinition @class)
-        {
-            CurrentFile = @class.FilePath;
-            CurrentNamespace = @class.NamespacePath;
+            for (int i = 0; i < returnInstructions.Count; i++)
+            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
 
-            @class.Name.Analysis.CompilerReached = true;
+            AddComment("Cleanup {");
 
-            if (Keywords.Contains(@class.Name.Content))
-            { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, CurrentFile); }
+            CleanupVariables(cleanupStack.Pop());
 
-            @class.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
+            AddComment("}");
 
-            if (compiledClasses.ContainsKey(@class.FullName))
-            { throw new CompilerException($"Class with name '{@class.FullName}' already exist", @class.Name, CurrentFile); }
+            AddComment("Return");
+            AddInstruction(Opcode.CS_POP);
+            AddInstruction(Opcode.RETURN);
 
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in @class.Attributes)
-            {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
-
-                AttributeValues newAttribute = new()
-                { parameters = new() };
-
-                if (attribute.Parameters != null)
-                {
-                    foreach (object parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-
-                attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
-
-            foreach (var field in @class.Fields)
-            {
-                field.Identifier.Analysis.CompilerReached = true;
-                field.Type.Analysis.CompilerReached = true;
-                if (field.ProtectionToken != null) field.ProtectionToken.Analysis.CompilerReached = true;
-            }
-
-            CurrentFile = null;
-            CurrentNamespace = Array.Empty<string>();
-
-            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class)
-            {
-                References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
-            };
+            parameters.Clear();
+            ClearLocalVariables();
+            returnInstructions.Clear();
         }
 
         #endregion
@@ -3139,333 +2622,27 @@ namespace IngameCoding.BBCode.Compiler
 
         #region Result Structs
 
-        public struct CodeGeneratorResult
+        public struct Result
         {
-            public Instruction[] compiledCode;
-            internal DebugInfo[] DebugInfo;
+            public Instruction[] Code;
+            public DebugInfo[] DebugInfo;
 
-            public CompiledFunction[] compiledFunctions;
-            public CompiledStruct[] compiledStructs;
+            public CompiledFunction[] Functions;
+            public CompiledGeneralFunction[] GeneralFunctions;
+            public CompiledStruct[] Structs;
+
+            public Hint[] Hints;
+            public Information[] Informations;
+            public Warning[] Warnings;
+            public Error[] Errors;
+            internal CompiledClass[] Classes;
         }
 
         #endregion
 
-        CompiledFunction GetFunctionInfo(FunctionDefinition function)
-        {
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in function.Attributes)
-            {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
-
-                AttributeValues newAttribute = new()
-                {
-                    parameters = new(),
-                    Identifier = attribute.Identifier,
-                };
-
-                if (attribute.Parameters != null)
-                {
-                    foreach (var parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-
-                attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
-
-            CompiledType type = new(function.Type, name => GetCustomType(name, function.NamespacePathString));
-
-            if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
-            {
-                if (attributeBuiltin.parameters.Count != 1)
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.FilePath); }
-                if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
-                {
-                    foreach (var builtinFunction in builtinFunctions)
-                    {
-                        if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
-                        {
-                            if (builtinFunction.Value.ParameterCount != function.Parameters.Length)
-                            { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Identifier, function.FilePath); }
-                            if (builtinFunction.Value.ReturnSomething != (function.Type.Type != TypeTokenType.VOID))
-                            { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Type, function.FilePath); }
-
-                            for (int i = 0; i < builtinFunction.Value.ParameterTypes.Length; i++)
-                            {
-                                if (builtinFunction.Value.ParameterTypes[i] == BuiltinType.ANY) continue;
-
-                                if (builtinFunction.Value.ParameterTypes[i] != function.Parameters[i].Type.Type.Convert())
-                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type.Type.ToString().ToLower()}", function.Parameters[i].Type, function.FilePath); }
-                            }
-
-                            return new CompiledFunction(function.ID(), type, function)
-                            {
-                                ParameterTypes = builtinFunction.Value.ParameterTypes.Select(v => new CompiledType(v, GetCustomType)).ToArray(),
-                                CompiledAttributes = attributes,
-                                References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
-                            };
-                        }
-                    }
-
-                    errors.Add(new Error("Builtin function '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.Identifier, function.FilePath));
-                    return new CompiledFunction(
-                        function.ID(),
-                        type,
-                        function.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
-                        function
-                        )
-                    {
-                        CompiledAttributes = attributes,
-                        References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
-                    };
-                }
-                else
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.FilePath); }
-            }
-
-            return new CompiledFunction(
-                function.ID(),
-                type,
-                function.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
-                function
-                )
-            {
-                CompiledAttributes = attributes,
-                References = SaveDefinitionReferences ? new List<DefinitionReference>() : null,
-            };
-        }
-
-        CompiledFunction[] AnalyzeFunctions(CompiledFunction[] functions, Statement[] topLevelStatements, Action<string, Output.LogType> printCallback = null)
-        {
-            printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
-
-            // Remove unused functions
-            {
-                FunctionDefinition currentFunction = null;
-
-                void AnalyzeNewVariable(Statement_NewVariable newVariable)
-                {
-                    if (newVariable.Type.Type == TypeTokenType.AUTO)
-                    {
-                        if (newVariable.InitialValue != null)
-                        {
-                            if (newVariable.InitialValue is Statement_Literal literal)
-                            {
-                                newVariable.Type.Type = literal.Type.Type;
-                            }
-                            else if (newVariable.InitialValue is Statement_NewInstance newStruct)
-                            {
-                                newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                                newVariable.Type.Content = newStruct.TypeName.Content;
-                            }
-                            else
-                            {
-                                var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                                var initialType = Parser.ParseType(initialTypeRaw.Name);
-
-                                newVariable.Type.Type = initialType.Type;
-                                newVariable.Type.ListOf = initialType.ListOf;
-                                newVariable.Type.Content = initialType.Content;
-                            }
-                        }
-                        else
-                        { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
-
-                        if (newVariable.Type.Type == TypeTokenType.AUTO)
-                        { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
-                    }
-                    this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, -1, false));
-                }
-                void AnalyzeStatements(IEnumerable<Statement> statements)
-                {
-                    int variablesAdded = 0;
-                    foreach (var st in statements)
-                    {
-                        if (st is Statement_NewVariable newVar)
-                        {
-                            AnalyzeNewVariable(newVar);
-                            variablesAdded++;
-                        }
-                        else if (st is Statement_ForLoop forLoop)
-                        {
-                            AnalyzeNewVariable(forLoop.VariableDeclaration);
-                            variablesAdded++;
-                        }
-                    }
-
-                    foreach (var st in statements)
-                    {
-                        AnalyzeStatement(st);
-                        if (st is StatementParent pr)
-                        {
-                            AnalyzeStatements(pr.Statements);
-                        }
-                    }
-
-                    for (int i = 0; i < variablesAdded; i++)
-                    {
-                        this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key);
-                    }
-                }
-
-                void AnalyzeStatement(Statement st)
-                {
-                    if (st is Statement_ForLoop st0)
-                    {
-                        AnalyzeStatement(st0.VariableDeclaration);
-                        AnalyzeStatement(st0.Condition);
-                        AnalyzeStatement(st0.Expression);
-                    }
-                    else if (st is Statement_If st1)
-                    {
-                        foreach (var st2 in st1.Parts)
-                        { AnalyzeStatement(st2); }
-                    }
-                    else if (st is Statement_If_If st2)
-                    {
-                        AnalyzeStatement(st2.Condition);
-                        AnalyzeStatements(st2.Statements);
-                    }
-                    else if (st is Statement_If_ElseIf st3)
-                    {
-                        AnalyzeStatement(st3.Condition);
-                        AnalyzeStatements(st3.Statements);
-                    }
-                    else if (st is Statement_If_Else st3a)
-                    {
-                        AnalyzeStatements(st3a.Statements);
-                    }
-                    else if (st is Statement_Index st4)
-                    {
-                        AnalyzeStatement(st4.Expression);
-                    }
-                    else if (st is Statement_NewVariable st5)
-                    {
-                        if (st5.InitialValue != null) AnalyzeStatement(st5.InitialValue);
-                    }
-                    else if (st is Statement_Operator st6)
-                    {
-                        if (st6.Left != null) AnalyzeStatement(st6.Left);
-                        if (st6.Right != null) AnalyzeStatement(st6.Right);
-                    }
-                    else if (st is Statement_Setter setter)
-                    {
-                        AnalyzeStatement(setter.Left);
-                        AnalyzeStatement(setter.Right);
-                    }
-                    else if (st is Statement_WhileLoop st7)
-                    {
-                        AnalyzeStatement(st7.Condition);
-                    }
-                    else if (st is Statement_FunctionCall st8)
-                    {
-                        foreach (var st9 in st8.Parameters)
-                        { AnalyzeStatement(st9); }
-
-                        if (st8.PrevStatement != null)
-                        { AnalyzeStatement(st8.PrevStatement); }
-
-                        if (!BuiltinFunctions.Contains(st8.FunctionName) && GetCompiledFunction(st8, out var cf))
-                        {
-                            if (currentFunction != null)
-                            {
-                                var thisID = cf.ID();
-                                var currentID = currentFunction.ID();
-                                if (thisID != currentID)
-                                {
-                                    cf.TimesUsed++;
-                                }
-                            }
-                            else
-                            {
-                                cf.TimesUsed++;
-                            }
-                            cf.TimesUsedTotal++;
-                        }
-                    }
-                    else if (st is Statement_Field st9)
-                    { AnalyzeStatement(st9.PrevStatement); }
-                    else if (st is Statement_Variable)
-                    { }
-                    else if (st is Statement_NewInstance)
-                    { }
-                    else if (st is Statement_Literal)
-                    { }
-                    else if (st is Statement_MemoryAddressGetter)
-                    { }
-                    else if (st is Statement_MemoryAddressFinder)
-                    { }
-                    else if (st is Statement_ListValue st10)
-                    { AnalyzeStatements(st10.Values); }
-                    else
-                    { throw new CompilerException($"Unknown statement {st.GetType().Name}", st, CurrentFile); }
-                }
-
-                foreach (var f in functions)
-                {
-                    if (compiledFunctions.TryGetValue(f.ID, out CompiledFunction compiledFunction))
-                    { compiledFunction.TimesUsed = 0; }
-                }
-
-                foreach (var f in functions)
-                {
-                    parameters.Clear();
-                    foreach (ParameterDefinition parameter in f.Parameters)
-                    { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
-                    CurrentFile = f.FilePath;
-
-                    currentFunction = f;
-                    AnalyzeStatements(f.Statements);
-
-                    currentFunction = null;
-                    CurrentFile = null;
-                    parameters.Clear();
-                }
-
-                AnalyzeStatements(topLevelStatements);
-            }
-
-            printCallback?.Invoke($"   Processing ...", Output.LogType.Debug);
-
-            int functionsRemoved = 0;
-
-            List<CompiledFunction> newFunctions = new(functions);
-            for (int i = newFunctions.Count - 1; i >= 0; i--)
-            {
-                var element = newFunctions.ElementAt(i);
-
-                if (!this.compiledFunctions.TryGetValue(element.ID, out CompiledFunction f)) continue;
-                if (f.TimesUsed > 0) continue;
-                foreach (var attr in f.CompiledAttributes)
-                {
-                    if (attr.Key == "CodeEntry") goto JumpOut;
-                    if (attr.Key == "Catch") goto JumpOut;
-                }
-
-                if (CompileLevel == Compiler.CompileLevel.All) continue;
-                if (CompileLevel == Compiler.CompileLevel.Exported && f.IsExport) continue;
-
-                string readableID = element.ReadableID();
-
-                printCallback?.Invoke($"      Remove function '{readableID}' ...", Output.LogType.Debug);
-                informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Identifier, element.FilePath));
-
-                bool _ = newFunctions.Remove(element.Key);
-                functionsRemoved++;
-
-            JumpOut:;
-            }
-
-            return newFunctions.ToArray();
-        }
-
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
             CurrentFile = null;
-            CurrentNamespace = Array.Empty<string>();
 
             // Search for variables
             AddComment("Variables");
@@ -3481,10 +2658,10 @@ namespace IngameCoding.BBCode.Compiler
                 }
             }
 
-            int cleanupCodeOffset = compiledCode.Count;
+            int cleanupCodeOffset = GeneratedCode.Count;
 
             for (int i = 0; i < returnInstructions.Count; i++)
-            { compiledCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
+            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
 
             AddComment("Cleanup {");
 
@@ -3493,26 +2670,17 @@ namespace IngameCoding.BBCode.Compiler
             AddComment("}");
         }
 
-        internal CodeGeneratorResult GenerateCode(
-            Dictionary<string, FunctionDefinition> functions,
-            Dictionary<string, StructDefinition> structs,
-            Dictionary<string, ClassDefinition> classes,
-            Statement_HashInfo[] hashes,
-            List<Statement_NewVariable> globalVariables,
-            Statement[] topLevelStatements,
-            Dictionary<string, BuiltinFunction> builtinFunctions,
+        Result GenerateCode(
+            Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Action<string, Output.LogType> printCallback = null,
-            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal,
-            bool saveReferences = false)
+            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
-            BlockCodeGeneration = true;
-
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
             this.compiledVariables = new();
-            this.compiledCode = new();
-            this.builtinFunctions = builtinFunctions;
+            this.GeneratedCode = new();
+            this.builtinFunctions = compilerResult.BuiltinFunctions;
             this.OptimizeCode = !settings.DontOptimize;
             this.GeneratedDebugInfo.Clear();
             this.CompileLevel = level;
@@ -3521,378 +2689,64 @@ namespace IngameCoding.BBCode.Compiler
             this.returnInstructions = new();
             this.breakInstructions = new();
             this.undefinedFunctionOffsets = new();
-            this.CurrentNamespace = Array.Empty<string>();
-            this.SaveDefinitionReferences = saveReferences;
+            this.undefinedGeneralFunctionOffsets = new();
 
-            #region Compile test built-in functions
+            this.Informations = new();
+            this.Hints = new();
+            this.Warnings = new();
+            this.Errors = new();
 
-            foreach (var hash in hashes)
-            {
-                switch (hash.HashName.Content)
-                {
-                    case "bf":
-                        {
-                            if (hash.Parameters.Length <= 1)
-                            { errors.Add(new Error($"Hash '{hash.HashName}' requies minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
-                            string bfName = hash.Parameters[0].Value;
+            this.CompiledClasses = compilerResult.Classes;
+            this.CompiledStructs = compilerResult.Structs;
+            this.CompiledGeneralFunctions = compilerResult.GeneralFunctions;
+            this.CompiledFunctions = compilerResult.Functions;
 
-                            if (builtinFunctions.ContainsKey(bfName)) break;
+            UnusedFunctionManager.RemoveUnusedFunctions(
+                compilerResult,
+                settings.RemoveUnusedFunctionsMaxIterations,
+                printCallback,
+                level
+                );
 
-                            string[] bfParams = new string[hash.Parameters.Length - 1];
-                            for (int i = 1; i < hash.Parameters.Length; i++)
-                            { bfParams[i - 1] = hash.Parameters[i].Value; }
+            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
-                            BuiltinType[] parameterTypes = new BuiltinType[bfParams.Length];
-                            for (int i = 0; i < bfParams.Length; i++)
-                            {
-                                switch (bfParams[i])
-                                {
-                                    case "void":
-                                        if (i > 0)
-                                        { errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
-                                        parameterTypes[i] = BuiltinType.VOID;
-                                        break;
-                                    case "int":
-                                        parameterTypes[i] = BuiltinType.INT;
-                                        break;
-                                    case "string":
-                                        parameterTypes[i] = BuiltinType.STRING;
-                                        break;
-                                    case "float":
-                                        parameterTypes[i] = BuiltinType.FLOAT;
-                                        break;
-                                    case "bool":
-                                        parameterTypes[i] = BuiltinType.BOOLEAN;
-                                        break;
-                                    case "byte":
-                                        parameterTypes[i] = BuiltinType.BYTE;
-                                        break;
-                                    case "char":
-                                        parameterTypes[i] = BuiltinType.CHAR;
-                                        break;
-                                    default:
-                                        errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
-                                        goto ExitBreak;
-                                }
-                            }
-
-                            var returnType = parameterTypes[0];
-                            var x = parameterTypes.ToList();
-                            x.RemoveAt(0);
-                            var pTypes = x.ToArray();
-
-                            if (parameterTypes[0] == BuiltinType.VOID)
-                            {
-                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, new Action<DataItem[]>((p) =>
-                                {
-                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
-                                }), false);
-                            }
-                            else
-                            {
-                                builtinFunctions.Add(bfName, new BuiltinFunction(new Action<DataItem[], BuiltinFunction>((p, self) =>
-                                {
-                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
-                                    DataItem returnValue = returnType switch
-                                    {
-                                        BuiltinType.INT => new DataItem((int)0),
-                                        BuiltinType.BYTE => new DataItem((byte)0),
-                                        BuiltinType.FLOAT => new DataItem((float)0),
-                                        BuiltinType.BOOLEAN => new DataItem((bool)false),
-                                        BuiltinType.CHAR => new DataItem((char)'\0'),
-                                        _ => throw new RuntimeException($"Invalid return type \"{returnType.ToString()}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\""),
-                                    };
-                                    returnValue.Tag = "return value";
-                                    self.RaiseReturnEvent(returnValue);
-                                }), bfName, pTypes, true));
-                            }
-                        }
-                        break;
-                    default:
-                        warnings.Add(new Warning($"Hash '{hash.HashName}' does not exists, so this is ignored", hash.HashName, hash.FilePath));
-                        break;
-                }
-
-            ExitBreak:
-                continue;
-            }
-
-            #endregion
-
-            #region Compile Classes
-
-            BlockCodeGeneration = false;
-
-            this.compiledClasses = new CompiledClass[classes.Count];
-            for (int i = classes.ToArray().Length - 1; i >= 0; i--)
-            { this.compiledClasses[i] = CompileClass(classes.ElementAt(i).Value); }
-
-            BlockCodeGeneration = true;
-
-            #endregion
-
-            #region Compile Structs
-
-            BlockCodeGeneration = false;
-
-            this.compiledStructs = new CompiledStruct[structs.Count];
-            for (int i = structs.ToArray().Length - 1; i >= 0; i--)
-            { this.compiledStructs[i] = CompileStruct(structs.ElementAt(i).Value); }
-
-            BlockCodeGeneration = true;
-
-            #endregion
-
-            #region Analyse Struct Fields
-
-            BlockCodeGeneration = false;
-
-            foreach (var @struct in structs)
-            {
-                CurrentFile = @struct.Value.FilePath;
-                CurrentNamespace = @struct.Value.NamespacePath;
-
-                foreach (var field in @struct.Value.Fields)
-                {
-                    if (compiledStructs.TryGetValue(field.Type.Content, out CompiledStruct fieldStructType))
-                    {
-                        field.Type = field.Type.Struct(fieldStructType);
-                    }
-                }
-
-                CurrentFile = null;
-                CurrentNamespace = Array.Empty<string>();
-            }
-
-            BlockCodeGeneration = true;
-
-            #endregion
-
-            for (int i = 0; i < compiledStructs.Length; i++)
-            {
-                for (int j = 0; j < compiledStructs[i].Fields.Length; j++)
-                {
-                    compiledStructs[i].Fields[j] = new CompiledField(((StructDefinition)compiledStructs[i]).Fields[j])
-                    {
-                        Type = new CompiledType(((StructDefinition)compiledStructs[i]).Fields[j].Type, GetCustomType),
-                    };
-                }
-            }
-            for (int i = 0; i < compiledClasses.Length; i++)
-            {
-                for (int j = 0; j < compiledClasses[i].Fields.Length; j++)
-                {
-                    compiledClasses[i].Fields[j] = new CompiledField(((ClassDefinition)compiledClasses[i]).Fields[j])
-                    {
-                        Type = new CompiledType(((ClassDefinition)compiledClasses[i]).Fields[j].Type, GetCustomType),
-                        Class = compiledClasses[i],
-                    };
-                }
-            }
-
-            #region Set DataStructure Sizes
-
-            foreach (var @struct in compiledStructs)
-            {
-                int size = 0;
-                foreach (var field in @struct.Fields)
-                {
-                    size++;
-                }
-                @struct.Size = size;
-            }
-            foreach (var @class in compiledClasses)
-            {
-                int size = 0;
-                foreach (var field in @class.Fields)
-                {
-                    size += field.Type.SizeOnStack;
-                }
-                @class.Size = size;
-            }
-
-            #endregion
-
-            #region Set Field Offsets
-
-            foreach (var @struct in compiledStructs)
-            {
-                int currentOffset = 0;
-                foreach (var field in @struct.Fields)
-                {
-                    @struct.FieldOffsets.Add(field.Identifier.Content, currentOffset);
-                    switch (field.Type.BuiltinType)
-                    {
-                        case CompiledType.CompiledTypeType.BYTE:
-                        case CompiledType.CompiledTypeType.INT:
-                        case CompiledType.CompiledTypeType.FLOAT:
-                        case CompiledType.CompiledTypeType.BOOL:
-                        case CompiledType.CompiledTypeType.CHAR:
-                            currentOffset++;
-                            break;
-                        default: throw new NotImplementedException();
-                    }
-                }
-            }
-            foreach (var @class in compiledClasses)
-            {
-                int currentOffset = 0;
-                foreach (var field in @class.Fields)
-                {
-                    @class.FieldOffsets.Add(field.Identifier.Content, currentOffset);
-                    switch (field.Type.BuiltinType)
-                    {
-                        case CompiledType.CompiledTypeType.BYTE:
-                        case CompiledType.CompiledTypeType.INT:
-                        case CompiledType.CompiledTypeType.FLOAT:
-                        case CompiledType.CompiledTypeType.BOOL:
-                        case CompiledType.CompiledTypeType.CHAR:
-                            currentOffset++;
-                            break;
-                        default: throw new NotImplementedException();
-                    }
-                }
-            }
-
-            #endregion
-
-            #region Compile Functions
-
-            {
-                List<CompiledFunction> compiledFunctions = new();
-
-                foreach (CompiledClass compiledClass in compiledClasses)
-                {
-                    CurrentFile = compiledClass.FilePath;
-                    CurrentNamespace = compiledClass.NamespacePath;
-
-                    foreach (FunctionDefinition method in compiledClass.Methods)
-                    {
-                        foreach (var parameter in method.Parameters)
-                        {
-                            if (parameter.withThisKeyword)
-                            { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, CurrentFile); }
-                        }
-                        List<ParameterDefinition> parameters = method.Parameters.ToList();
-                        parameters.Insert(0, new ParameterDefinition()
-                        {
-                            Identifier = Token.CreateAnonymous("this"),
-                            Type = TypeToken.CreateAnonymous(compiledClass.Name.Content, BuiltinType.STRUCT, compiledClass.NamespacePathString),
-                            withThisKeyword = true,
-                        });
-                        method.Parameters = parameters.ToArray();
-
-                        string id = method.ID();
-
-                        if (compiledFunctions.ContainsKey(id))
-                        { throw new CompilerException($"Function with name '{id}' already defined", method.Identifier, compiledClass.FilePath); }
-
-                        CompiledFunction methodInfo = GetFunctionInfo(method);
-                        methodInfo.Context = compiledClass;
-                        compiledFunctions.Add(methodInfo);
-                    }
-
-                    CurrentFile = null;
-                    CurrentNamespace = Array.Empty<string>();
-                }
-
-                foreach (var function in functions.Values)
-                {
-                    CurrentFile = function.FilePath;
-                    CurrentNamespace = function.NamespacePath;
-
-                    string id = function.ID();
-
-                    if (compiledFunctions.ContainsKey(id))
-                    { throw new CompilerException($"Function with name '{id}' already defined", function.Identifier, function.FilePath); }
-
-                    compiledFunctions.Add(GetFunctionInfo(function));
-
-                    CurrentFile = null;
-                    CurrentNamespace = Array.Empty<string>();
-                }
-
-                this.compiledFunctions = compiledFunctions.ToArray();
-            }
-
-            #endregion
-
-            #region Remove Unused Functions
-
-            int iterations = settings.RemoveUnusedFunctionsMaxIterations;
-
-            for (int iteration = 0; iteration < iterations; iteration++)
-            {
-                int totalFunctions = this.compiledFunctions.Length;
-                this.compiledFunctions = AnalyzeFunctions(this.compiledFunctions, topLevelStatements, printCallback);
-                int functionsRemoved = totalFunctions - this.compiledFunctions.Length;
-                if (functionsRemoved == 0)
-                {
-                    printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
-                    break;
-                }
-
-                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", Output.LogType.Debug);
-            }
-
-            #endregion
-
-            #region Code Generation
-
-            BlockCodeGeneration = false;
-
-            AddComment("Global variables");
-            if (globalVariables.Count > 0)
-            {
-                AddInstruction(Opcode.CS_PUSH, "state: SetGlobalVariables");
-                foreach (var globalVariable in globalVariables)
-                {
-                    GenerateCodeForVariable(globalVariable, true);
-                }
-                AddInstruction(Opcode.CS_POP);
-            }
-
-            GenerateCodeForTopLevelStatements(topLevelStatements);
-
-            int entryCallInstruction = compiledCode.Count;
+            int entryCallInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.CALL, -1);
 
-            AddComment("Clear global variables");
-            if (globalVariables.Count > 0)
-            {
-                AddInstruction(Opcode.CS_PUSH, "state: DisposeGlobalVariables");
-                for (int i = 0; i < globalVariables.Count; i++)
-                { AddInstruction(Opcode.POP_VALUE); }
-                compiledVariables.Clear();
-                AddInstruction(Opcode.CS_POP);
-            }
             AddInstruction(Opcode.EXIT);
 
-            foreach (var function in this.compiledFunctions)
+            foreach (var function in this.CompiledFunctions)
             {
                 currentContext = function;
-                function.InstructionOffset = compiledCode.Count;
+                function.InstructionOffset = GeneratedCode.Count;
 
                 foreach (var attribute in function.Attributes)
                 {
                     if (attribute.Identifier.Content != "CodeEntry") continue;
-                    compiledCode[entryCallInstruction].Parameter = compiledCode.Count - entryCallInstruction;
+                    GeneratedCode[entryCallInstruction].Parameter = GeneratedCode.Count - entryCallInstruction;
                 }
 
-                AddComment(function.FullName + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
                 GenerateCodeForFunction(function);
                 if (function.Statements.Length > 0) AddComment("}");
                 currentContext = null;
             }
 
-            if (compiledCode[entryCallInstruction].ParameterInt == -1)
+            foreach (var function in this.CompiledGeneralFunctions)
             {
-                compiledCode[entryCallInstruction] = new Instruction(Opcode.COMMENT, "null");
+                currentContext = function;
+                function.InstructionOffset = GeneratedCode.Count;
+
+                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                GenerateCodeForFunction(function);
+                if (function.Statements.Length > 0) AddComment("}");
+                currentContext = null;
             }
 
-            BlockCodeGeneration = true;
-
-            #endregion
+            if (GeneratedCode[entryCallInstruction].ParameterInt == -1)
+            {
+                GeneratedCode[entryCallInstruction] = new Instruction(Opcode.COMMENT, "null");
+            }
 
             foreach (UndefinedFunctionOffset item in undefinedFunctionOffsets)
             {
@@ -3903,7 +2757,7 @@ namespace IngameCoding.BBCode.Compiler
 
                 if (!GetCompiledFunction(item.CallStatement, out var function))
                 {
-                    string searchedID = item.CallStatement.TargetNamespacePathPrefix + item.CallStatement.FunctionName;
+                    string searchedID = item.CallStatement.FunctionName;
                     searchedID += "(";
                     for (int i = 0; i < item.CallStatement.Parameters.Length; i++)
                     {
@@ -3918,7 +2772,47 @@ namespace IngameCoding.BBCode.Compiler
                 if (function.InstructionOffset == -1)
                 { throw new InternalException($"Function '{function.ReadableID()}' does not have instruction offset", item.CurrentFile); }
 
-                compiledCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+
+                parameters.Clear();
+                compiledVariables.Clear();
+            }
+
+            foreach (UndefinedGeneralFunctionOffset item in undefinedGeneralFunctionOffsets)
+            {
+                foreach (var pair in item.currentParameters)
+                { parameters.Add(pair); }
+                foreach (var pair in item.currentVariables)
+                { compiledVariables.Add(pair.Key, pair.Value); }
+
+                if (item.CallStatement is Statement_ConstructorCall constructorCall)
+                {
+                    if (!GetConstructor(constructorCall, out var function))
+                    { throw new CompilerException($"Constructor for type \"{constructorCall.TypeName}\" not found", constructorCall.TypeName, CurrentFile); }
+
+                    if (function.InstructionOffset == -1)
+                    { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
+
+                    GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                }
+                else if (item.CallStatement is Statement_KeywordCall functionCall)
+                {
+                    if (functionCall.Identifier.Content == "delete")
+                    {
+                        CompiledClass @class = FindStatementType(functionCall.Parameters[0]).Class;
+                        if (!GetDestructor(@class ?? throw new NullReferenceException(), out var function))
+                        { throw new CompilerException($"Constructor for type \"{@class}\" not found", functionCall, CurrentFile); }
+
+                        if (function.InstructionOffset == -1)
+                        { throw new InternalException($"Constructor for type \"{@class}\" does not have instruction offset", item.CurrentFile); }
+
+                        GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                    }
+                    else
+                    { throw new NotImplementedException(); }
+                }
+                else
+                { throw new NotImplementedException(); }
 
                 parameters.Clear();
                 compiledVariables.Clear();
@@ -3926,42 +2820,42 @@ namespace IngameCoding.BBCode.Compiler
 
             if (OptimizeCode)
             {
-                int removedInstructions = 0;
-                int changedInstructions = 0;
-                for (int i = compiledCode.Count - 1; i >= 0; i--)
-                {
-                    var instruction = compiledCode[i];
-                    if (instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
-                    {
-                        if (instruction.Parameter is int jumpBy)
-                        {
-                            if (jumpBy == 1)
-                            {
-                                List<int> indexes = new();
-
-                                foreach (var item in this.compiledFunctions)
-                                { indexes.Add(item.InstructionOffset); }
-
-                                changedInstructions += compiledCode.RemoveInstruction(i, indexes);
-                                removedInstructions++;
-
-                                for (int j = 0; j < this.compiledFunctions.Length; j++)
-                                { this.compiledFunctions.Get<string, CompiledFunction>(this.compiledFunctions.ElementAt(j).Key).InstructionOffset = indexes[j]; }
-                            }
-                        }
-                    }
-                }
-                printCallback?.Invoke($"Optimalization: Removed {removedInstructions} & changed {changedInstructions} instructions", Output.LogType.Debug);
+                List<IFunctionThing> functionThings = new();
+                functionThings.AddRange(this.CompiledFunctions);
+                functionThings.AddRange(this.CompiledGeneralFunctions);
+                BasicOptimizer.Optimize(this.GeneratedCode, functionThings.ToArray(), printCallback);
             }
 
-            return new CodeGeneratorResult()
+            return new Result()
             {
-                compiledCode = compiledCode.ToArray(),
+                Code = GeneratedCode.ToArray(),
                 DebugInfo = GeneratedDebugInfo.ToArray(),
 
-                compiledFunctions = this.compiledFunctions.ToArray(),
-                compiledStructs = this.compiledStructs.ToArray(),
+                Functions = this.CompiledFunctions,
+                GeneralFunctions = this.CompiledGeneralFunctions,
+                Structs = this.CompiledStructs,
+                Classes = this.CompiledClasses,
+
+                Hints = this.Hints.ToArray(),
+                Informations = this.Informations.ToArray(),
+                Warnings = this.Warnings.ToArray(),
+                Errors = this.Errors.ToArray(),
             };
+        }
+
+        public static Result Generate(
+            Compiler.Result compilerResult,
+            Compiler.CompilerSettings settings,
+            Action<string, Output.LogType> printCallback = null,
+            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
+        {
+            CodeGenerator codeGenerator = new();
+            return codeGenerator.GenerateCode(
+                compilerResult,
+                settings,
+                printCallback,
+                level
+                );
         }
     }
 }

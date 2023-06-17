@@ -19,7 +19,8 @@
         public override void BeforeDraw()
         {
             base.BeforeDraw();
-            OnBeforeDraw?.Invoke(this);
+            try { OnBeforeDraw?.Invoke(this); }
+            catch (System.Exception) { }
         }
         public override void RefreshSize()
         {

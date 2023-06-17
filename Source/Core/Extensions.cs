@@ -1,13 +1,74 @@
 ﻿using IngameCoding.BBCode;
+using IngameCoding.BBCode.Compiler;
 using IngameCoding.Bytecode;
 using IngameCoding.Tokenizer;
 
+using System.Collections.Generic;
 using System.Text;
 
 namespace IngameCoding.Core
 {
     public static class Extensions
     {
+        internal static bool TryGetAttribute<T0, T1, T2>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            out T0 value0,
+            out T1 value1,
+            out T2 value2
+            )
+        {
+            value0 = default;
+            value1 = default;
+            value2 = default;
+
+            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+            if (!values.TryGetValue<T1>(1, out value1)) return false;
+            if (!values.TryGetValue<T2>(2, out value2)) return false;
+
+            return true;
+        }
+
+        internal static bool TryGetAttribute<T0, T1>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            out T0 value0,
+            out T1 value1
+            )
+        {
+            value0 = default;
+            value1 = default;
+
+            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+            if (!values.TryGetValue<T1>(1, out value1)) return false;
+
+            return true;
+        }
+
+        internal static bool TryGetAttribute<T0>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            out T0 value0
+            )
+        {
+            value0 = default;
+
+            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+
+            return true;
+        }
+
+        internal static bool TryGetAttribute(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName)
+            => attributes.TryGetValue(attributeName, out _);
+
         public static object Value(this DataItem item) => item.type switch
         {
             RuntimeType.INT => item.ValueInt,

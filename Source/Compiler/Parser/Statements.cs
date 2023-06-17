@@ -30,6 +30,14 @@ namespace IngameCoding.BBCode.Parser.Statements
 
                 return GetAllStatement(functionCall.Parameters, callback);
             }
+            else if (st is Statement_ConstructorCall constructorCall)
+            {
+                return GetAllStatement(constructorCall.Parameters, callback);
+            }
+            else if (st is Statement_KeywordCall keywordCall)
+            {
+                return GetAllStatement(keywordCall.Parameters, callback);
+            }
             else if (st is Statement_Operator @operator)
             {
                 if (@operator.Right != null) if (GetAllStatement(@operator.Right, callback)) return true;
@@ -66,6 +74,8 @@ namespace IngameCoding.BBCode.Parser.Statements
             { }
             else if (st is Statement_Field field)
             { return GetAllStatement(field.PrevStatement, callback); }
+            else if (st is Statement_As @as)
+            { return GetAllStatement(@as.PrevStatement, callback); }
             else if (st is Statement_MemoryAddressGetter)
             { }
             else if (st is Statement_MemoryAddressFinder)
@@ -93,6 +103,12 @@ namespace IngameCoding.BBCode.Parser.Statements
         public static void GetAllStatement(ParserResult parserResult, Func<Statement, bool> callback)
         {
             if (callback == null) return;
+
+            for (int i = 0; i < parserResult.TopLevelStatements.Length; i++)
+            {
+                if (parserResult.TopLevelStatements[i] == null) continue;
+                GetAllStatement(parserResult.TopLevelStatements[i], callback);
+            }
 
             for (int i = 0; i < parserResult.Functions.Count; i++)
             {
@@ -205,14 +221,11 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_FunctionCall : StatementWithReturnValue
     {
-        readonly string[] namespacePath;
-        string[] targetNamespacePath;
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
         public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
         internal bool IsMethodCall => PrevStatement != null;
         public StatementWithReturnValue PrevStatement;
-        internal bool TargetNamespacePathPrefixIsReversed;
 
         internal StatementWithReturnValue[] MethodParameters
         {
@@ -226,47 +239,9 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
         }
 
-        /// <summary> The path in which **the statement is located** </summary>
-        /// <returns> "[library].[...].[library]." </returns>
-        public string NamespacePathPrefix
-        {
-            get
-            {
-                string val = "";
-                for (int i = 0; i < namespacePath.Length; i++)
-                { val += namespacePath[i].ToString() + "."; }
-                return val;
-            }
-        }
-        /// <summary> The path to which **the statement refers** </summary>
-        /// <returns> "[library].[...].[library]." </returns>
-        public string TargetNamespacePathPrefix
-        {
-            get
-            {
-                string val = "";
-                for (int i = 0; i < targetNamespacePath.Length; i++)
-                { val += targetNamespacePath[i].ToString() + "."; }
-                return val;
-            }
-            set
-            {
-                if (value.Length == 0) { this.targetNamespacePath = Array.Empty<string>(); }
-                if (!value.Contains('.')) { this.targetNamespacePath = new string[1] { value }; }
-                this.targetNamespacePath = value.Split(".");
-            }
-        }
-
-        public Statement_FunctionCall(string[] namespacePath, string[] targetNamespacePath)
-        {
-            this.namespacePath = namespacePath;
-            this.targetNamespacePath = targetNamespacePath;
-        }
-
         public override string ToString()
         {
             string result = "";
-            result += TargetNamespacePathPrefix;
             result += FunctionName;
             result += "(";
 
@@ -294,7 +269,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 parameters.Add(arg.PrettyPrint());
             }
-            return $"{" ".Repeat(ident)}{TargetNamespacePathPrefix}{FunctionName}({(string.Join(", ", parameters))})";
+            return $"{" ".Repeat(ident)}{FunctionName}({(string.Join(", ", parameters))})";
         }
 
         public override Position TotalPosition()
@@ -304,6 +279,53 @@ namespace IngameCoding.BBCode.Parser.Statements
             {
                 result.Extend(item.TotalPosition());
             }
+            return result;
+        }
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_KeywordCall : Statement
+    {
+        public Token Identifier;
+        internal string FunctionName => Identifier.Content;
+        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
+
+        public override string ToString()
+        {
+            string result = "";
+            result += FunctionName;
+            result += " ";
+
+            string paramsString = "";
+            for (int i = 0; i < Parameters.Length; i++)
+            {
+                if (i > 0) paramsString += ", ";
+                paramsString += Parameters[i].ToString();
+                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
+                {
+                    paramsString += ", ...";
+                    break;
+                }
+            }
+            result += paramsString;
+
+            return result;
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            List<string> parameters = new();
+            foreach (var arg in this.Parameters)
+            {
+                parameters.Add(arg.PrettyPrint());
+            }
+            return $"{" ".Repeat(ident)}{FunctionName} {string.Join(" ", parameters)}";
+        }
+
+        public override Position TotalPosition()
+        {
+            Position result = new(Identifier);
+            foreach (var item in Parameters)
+            { result.Extend(item.TotalPosition()); }
             return result;
         }
     }
@@ -640,8 +662,8 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override Position TotalPosition()
         {
-            Position result = PrevStatement.TotalPosition();
-            result.Extend(OperatorToken);
+            Position result = OperatorToken.GetPosition();
+            if (PrevStatement != null) result.Extend(PrevStatement);
             return result;
         }
     }
@@ -802,68 +824,52 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_NewInstance : StatementWithReturnValue
     {
-        readonly string[] namespacePath;
-        readonly string[] targetNamespacePath;
-
         public Token Keyword;
         public Token TypeName;
-        /// <returns> "[library].[...].[library]." </returns>
-        public string NamespacePathPrefix
-        {
-            get
-            {
-                string val = "";
-                for (int i = 0; i < namespacePath.Length; i++)
-                {
-                    if (val.Length > 0)
-                    {
-                        val += "." + namespacePath[i].ToString();
-                    }
-                    else
-                    {
-                        val = namespacePath[i].ToString();
-                    }
-                }
-                if (val.Length > 0)
-                {
-                    val += ".";
-                }
-                return val;
-            }
-        }
-        /// <returns> "[library].[...].[library]." </returns>
-        public string TargetNamespacePathPrefix
-        {
-            get
-            {
-                string val = "";
-                for (int i = 0; i < targetNamespacePath.Length; i++)
-                {
-                    if (val.Length > 0)
-                    {
-                        val += "." + targetNamespacePath[i].ToString();
-                    }
-                    else
-                    {
-                        val = targetNamespacePath[i].ToString();
-                    }
-                }
-                if (val.Length > 0)
-                {
-                    val += ".";
-                }
-                return val;
-            }
-        }
 
-        public Statement_NewInstance(string[] namespacePath, string[] targetNamespacePath)
-        {
-            this.namespacePath = namespacePath;
-            this.targetNamespacePath = targetNamespacePath;
-        }
+        public override string ToString() => $"new {TypeName}";
+        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TypeName}";
+        public override Position TotalPosition() => new(TypeName);
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Statement_ConstructorCall : StatementWithReturnValue
+    {
+        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
+        public Token Keyword;
+        public Token TypeName;
 
-        public override string ToString() => $"new {TargetNamespacePathPrefix}{TypeName}";
-        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TargetNamespacePathPrefix}{TypeName}";
+        public override string ToString()
+        {
+            string result = "new ";
+            result += TypeName.Content;
+            result += "(";
+
+            string paramsString = "";
+            for (int i = 0; i < Parameters.Length; i++)
+            {
+                if (i > 0) paramsString += ", ";
+                paramsString += Parameters[i].ToString();
+                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
+                {
+                    paramsString += ", ...";
+                    break;
+                }
+            }
+            result += paramsString;
+
+            result += ")";
+            return result;
+        }
+        public override string PrettyPrint(int ident = 0)
+        {
+            List<string> parameters = new();
+            foreach (var arg in this.Parameters)
+            {
+                parameters.Add(arg.PrettyPrint());
+            }
+
+            return $"{" ".Repeat(ident)}new {TypeName}({(string.Join(", ", parameters))})";
+        }
         public override Position TotalPosition() => new(TypeName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -918,33 +924,31 @@ namespace IngameCoding.BBCode.Parser.Statements
             return result;
         }
     }
-
-#if false
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_MethodCall : Statement_FunctionCall
+    public class Statement_As : StatementWithReturnValue
     {
-        internal Token variableNameToken;
-        internal string VariableName => variableNameToken.text;
+        internal StatementWithReturnValue PrevStatement;
+        internal Token Keyword;
+        internal TypeToken Type;
 
-        public Statement_MethodCall(string[] namespacePath, string[] targetNamespacePath, bool isMethodCall = true) : base(namespacePath, targetNamespacePath, isMethodCall)
+        public Statement_As(StatementWithReturnValue prevStatement, Token keyword, TypeToken type)
         {
-            this.variableNameToken = null;
+            this.PrevStatement = prevStatement;
+            this.Keyword = keyword;
+            this.Type = type;
         }
 
-        public override string ToString()
-        {
-            return $"{VariableName}.{FunctionName}(...)";
-        }
+        public override string ToString() => $"{PrevStatement} as {Type}";
+        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{PrevStatement} as {Type}";
 
-        public override string PrettyPrint(int ident = 0)
+        public override Position TotalPosition()
         {
-            List<string> parameters = new();
-            foreach (var arg in this.parameters)
-            {
-                parameters.Add(arg.PrettyPrint());
-            }
-            return $"{" ".Repeat(ident)}{VariableName}.{FunctionName}({string.Join(", ", parameters)})";
+            Position result = Keyword.GetPosition();
+
+            if (PrevStatement != null) result.Extend(PrevStatement.TotalPosition());
+            if (Type != null) result.Extend(Type);
+
+            return result;
         }
     }
-#endif
 }

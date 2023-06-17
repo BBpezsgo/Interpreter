@@ -28,11 +28,11 @@
                     IngameCoding.Core.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    IngameCoding.CompileIntoFile.Compile(settings.Value);
-                    break;
+                    // IngameCoding.CompileIntoFile.Compile(settings.Value);
+                    throw new System.NotImplementedException();
                 case ArgumentParser.RunType.Decompile:
-                    IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
-                    break;
+                    // IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
+                    throw new System.NotImplementedException();
             }
 
         ExitProgram:

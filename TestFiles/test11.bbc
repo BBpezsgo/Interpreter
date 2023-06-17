@@ -6,23 +6,21 @@ void Start()
 {
   Array list = CreateArray(5, 10);
 
-  Console.Log(list.ToString());
+  PrintLineD(list.ToString());
   list.Push(420);
-  Console.Log(list.ToString());
+  PrintLineD(list.ToString());
   list.Insert(1, 69);
-  Console.Log(list.ToString());
+  PrintLineD(list.ToString());
   list.Pop();
-  Console.Log(list.ToString());
+  PrintLineD(list.ToString());
   list.RemoveAt(0);
-  Console.Log(list.ToString());
-
-  Console.Log("Length: " + list.length);
-  Console.Log("Capacity: " + list.capacity);
-  Console.Log("Pointer: " + list.pointer);
+  PrintLineD(list.ToString());
   
   list.Deallocate();
 
   Map map = CreateMap(10, 10);
-  Console.Log(map.Get(5, 5));
+  PrintLine(map.Get(5, 5));
   map.Set(4, 8, 333);
+  PrintLine(map.Get(4, 8));
+  map.Deallocate();
 }

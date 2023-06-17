@@ -1,8 +1,5 @@
-namespace Math
-{
-	[Builtin("cos")]
-	export float Cos(float v);
+[Builtin("cos")]
+export float Cos(float v);
 
-	[Builtin("sin")]
-	export float Sin(float v);
-}
+[Builtin("sin")]
+export float Sin(float v);

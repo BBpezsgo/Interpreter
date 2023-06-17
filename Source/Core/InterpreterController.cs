@@ -93,7 +93,6 @@ namespace IngameCoding.Core
         public delegate void OnExecutedEventHandler(Interpreter sender, OnExecutedEventArgs e);
         public event OnExecutedEventHandler OnExecuted;
 
-        bool OnlyHaveCode = true;
         /// <summary>
         /// True if the interpreter is running some code
         /// </summary>
@@ -189,11 +188,11 @@ namespace IngameCoding.Core
         /// <summary>
         /// It prepares the interpreter to run some code
         /// </summary>
-        /// <param name="compiledCode"></param>
-        public virtual void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        /// <param name="program"></param>
+        public virtual void ExecuteProgram(Instruction[] program, BytecodeInterpreterSettings settings)
         {
             codeStartedTimespan = DateTime.Now.TimeOfDay;
-            bytecodeInterpreter = new BytecodeInterpreter(compiledCode, builtinFunctions, bytecodeInterpreterSettings);
+            bytecodeInterpreter = new BytecodeInterpreter(program, builtinFunctions, settings);
             builtinFunctions.SetInterpreter(bytecodeInterpreter);
 
             state = State.Initialized;
@@ -201,6 +200,7 @@ namespace IngameCoding.Core
             OnOutput?.Invoke(this, "Start code ...", LogType.Debug);
         }
 
+        /*
         public Instruction[] Read(byte[] code)
         {
             CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
@@ -221,8 +221,6 @@ namespace IngameCoding.Core
 
             OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
 
-            OnlyHaveCode = false;
-
             instructionOffsets = new() { Offsets = new() };
 
             instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
@@ -242,7 +240,7 @@ namespace IngameCoding.Core
                                 instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                             }
                             else
-                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", Position.UnknownPosition); }
+                            { throw new CompilerException($"Function '{compiledFunction.Name}' offset not found", Position.UnknownPosition); }
                         }
                         else if (value == "end")
                         {
@@ -251,7 +249,7 @@ namespace IngameCoding.Core
                                 instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                             }
                             else
-                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", Position.UnknownPosition); }
+                            { throw new CompilerException($"Function '{compiledFunction.Name}' offset not found", Position.UnknownPosition); }
                         }
                         else
                         { throw new CompilerException("Unknown event '" + value + "'", Position.UnknownPosition); }
@@ -263,6 +261,7 @@ namespace IngameCoding.Core
 
             return deserializedCode.Instructions;
         }
+        */
 
         /// <summary>
         /// Compiles the source code into msg list of instructions<br/>
@@ -288,94 +287,75 @@ namespace IngameCoding.Core
         /// <exception cref="Exception"></exception>
         /// <exception cref="System.Exception"></exception>
         public Instruction[] CompileCode(
-            string sourceCode,
             FileInfo file,
-            List<Warning> warnings,
             Compiler.CompilerSettings compilerSettings,
-            BBCode.Parser.ParserSettings parserSettings,
-            out List<Error> errors)
+            BBCode.Parser.ParserSettings parserSettings)
         {
             OnOutput?.Invoke(this, $"Parse code: The main source code ...", LogType.Debug);
 
-            errors = new();
-
-            var parserResult = BBCode.Parser.Parser.Parse(sourceCode, warnings, (msg, lv) => OnOutput?.Invoke(this, $"  {msg}", lv));
-            Debug.WriteLine(string.Join("\r\n", parserResult.Functions[0].Statements.Select(v => v.PrettyPrint())));
-            parserResult.SetFile(file.FullName);
-            var compilerResult = Compiler.CompileCode(
-                parserResult,
-                builtinFunctions,
+            CodeGenerator.Result codeGeneratorResult = EasyCompiler.Compile(
                 file,
-                warnings,
-                errors,
-                compilerSettings,
+                builtinFunctions,
+                TokenizerSettings.Default,
                 parserSettings,
+                compilerSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b),
-                BasePath ?? "");
+                BasePath
+                );
 
-            if (errors.Count > 0)
+            Dictionary<string, int> functionOffsets = new();
+            foreach (var function in codeGeneratorResult.Functions) functionOffsets.Add(function.Key, function.InstructionOffset);
+
+            Compiler.CompilerResult compilerResult1 = new()
             {
-                var firstError = errors[0].ToException();
-                errors.Clear();
-                throw new System.Exception("Failed to compile", firstError);
-            }
+                compiledCode = codeGeneratorResult.Code,
+                debugInfo = codeGeneratorResult.DebugInfo,
 
-            details.CompilerResult = compilerResult;
+                compiledStructs = codeGeneratorResult.Structs,
+                compiledFunctions = codeGeneratorResult.Functions,
+
+                functionOffsets = functionOffsets,
+            };
+
+            details.CompilerResult = compilerResult1;
 
             if (compilerSettings.PrintInstructions)
-            { compilerResult.WriteToConsole(); }
-
-            List<string> printedWarnings = new();
-            foreach (var warning in warnings)
-            {
-                if (printedWarnings.Contains(warning.MessageAll)) continue;
-                printedWarnings.Add(warning.MessageAll);
-                OnOutput?.Invoke(this, warning.MessageAll, LogType.Warning);
-            }
+            { compilerResult1.WriteToConsole(); }
 
             OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
-
-            OnlyHaveCode = false;
 
             instructionOffsets = new() { Offsets = new() };
 
             instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
 
-            foreach (var compiledFunction in compilerResult.compiledFunctions)
+            foreach (var compiledFunction in compilerResult1.compiledFunctions)
             {
-                if (compiledFunction.CompiledAttributes.TryGetValue("Catch", out var attriute))
+                if (compiledFunction.CompiledAttributes.TryGetAttribute("Catch", out string value))
                 {
-                    if (attriute.parameters.Count != 1)
-                    { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", attriute.Identifier); }
-                    if (attriute.TryGetValue(0, out string value))
+                    if (value == "update")
                     {
-                        if (value == "update")
+                        if (compilerResult1.GetFunctionOffset(compiledFunction, out int i))
                         {
-                            if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
-                            {
-                                instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
-                            }
-                            else
-                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", compiledFunction.Identifier); }
-                        }
-                        else if (value == "end")
-                        {
-                            if (compilerResult.GetFunctionOffset(compiledFunction, out int i))
-                            {
-                                instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
-                            }
-                            else
-                            { throw new CompilerException($"Function '{compiledFunction.FullName}' offset not found", compiledFunction.Identifier); }
+                            instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                         }
                         else
-                        { throw new CompilerException("Unknown event '" + value + "'", attriute.Identifier); }
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier); }
+                    }
+                    else if (value == "end")
+                    {
+                        if (compilerResult1.GetFunctionOffset(compiledFunction, out int i))
+                        {
+                            instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
+                        }
+                        else
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier); }
                     }
                     else
-                    { throw new CompilerException("Attribute requies 1 string parameter", attriute.Identifier); }
+                    { throw new CompilerException("Unknown event '" + value + "'", Position.UnknownPosition); }
                 }
             }
 
-            return compilerResult.compiledCode;
+            return compilerResult1.compiledCode;
         }
 
         /// <summary>
@@ -429,7 +409,6 @@ namespace IngameCoding.Core
         /// <exception cref="Exception"></exception>
         /// <exception cref="System.Exception"></exception>
         public Instruction[] CompileCode(
-            string sourceCode,
             FileInfo file,
             Compiler.CompilerSettings compilerSettings,
             BBCode.Parser.ParserSettings parserSettings,
@@ -437,11 +416,9 @@ namespace IngameCoding.Core
         {
             this.HandleErrors = HandleErrors;
 
-            List<Warning> warnings = new();
-            List<Error> errors = new();
             try
             {
-                return CompileCode(sourceCode, file, warnings, compilerSettings, parserSettings, out errors);
+                return CompileCode(file, compilerSettings, parserSettings);
             }
             catch (Exception error)
             {
@@ -449,30 +426,7 @@ namespace IngameCoding.Core
                 bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
-                OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, LogType.Error);
-                IngameCoding.Output.Debug.Debug.LogError(error);
-
-                StackTrace stackTrace = new(error);
-                var stackFrames = stackTrace.GetFrames();
-
-                string StackTraceString = "";
-                foreach (var frame in stackFrames)
-                {
-                    var method = frame.GetMethod();
-                    if (method != null)
-                    {
-                        StackTraceString += "  " + method.Name + "()\r\n";
-                    }
-                }
-                OnOutput?.Invoke(this, " Stack Trace:\r\n" + StackTraceString, LogType.Error);
-
-                foreach (var warning in warnings)
-                { OnOutput?.Invoke(this, warning.MessageAll + "\r\n", LogType.Warning); }
-
-                foreach (var error_ in errors)
-                { OnOutput?.Invoke(this, error_.MessageAll + "\r\n", LogType.Error); }
-
-                OnOutput?.Invoke(this, $"Code cannot be compiled", LogType.Error);
+                PrintException(error);
 
                 if (!HandleErrors) throw;
             }
@@ -482,21 +436,38 @@ namespace IngameCoding.Core
                 bytecodeInterpreter = null;
                 currentlyRunningCode = false;
 
-                OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", LogType.Error);
-                Output.Error(error);
-
-                foreach (var warning in warnings)
-                { OnOutput?.Invoke(this, warning.MessageAll + "\r\n", LogType.Warning); }
-
-                foreach (var error_ in errors)
-                { OnOutput?.Invoke(this, error_.MessageAll + "\r\n", LogType.Error); }
-
-                OnOutput?.Invoke(this, $"Code cannot be compiled", LogType.Error);
+                PrintException(error);
 
                 if (!HandleErrors) throw;
             }
 
             return null;
+        }
+
+        void PrintException(Exception error)
+        {
+            OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, LogType.Error);
+            IngameCoding.Output.Debug.Debug.LogError(error);
+
+            StackTrace stackTrace = new(error);
+            var stackFrames = stackTrace.GetFrames();
+
+            OnOutput?.Invoke(this, " Stack Trace:", LogType.Error);
+
+            for (int i = 0; i < stackFrames.Length; i++)
+            {
+                var method = stackFrames[i].GetMethod();
+                if (method != null)
+                { OnOutput?.Invoke(this, $"  {method.Name}()", LogType.Error); }
+                else
+                { OnOutput?.Invoke(this, $"  <null>\r\n", LogType.Error); }
+            }
+        }
+
+        void PrintException(System.Exception error)
+        {
+            OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", LogType.Error);
+            Output.Error(error);
         }
 
         public void Destroy()
@@ -564,7 +535,7 @@ namespace IngameCoding.Core
                 }
             }, true);
 
-            builtinFunctions.AddBuiltinFunction("stdout-char", new BuiltinType[] {
+            builtinFunctions.AddBuiltinFunction("stdout", new BuiltinType[] {
                 BuiltinType.CHAR
             }, (DataItem[] parameters) =>
             {
@@ -585,7 +556,7 @@ namespace IngameCoding.Core
                 Console.Clear();
             });
 
-            builtinFunctions.AddBuiltinFunction("stderr-char", new BuiltinType[] {
+            builtinFunctions.AddBuiltinFunction("stderr", new BuiltinType[] {
                 BuiltinType.CHAR
             }, (DataItem[] parameters) =>
             {
@@ -615,7 +586,6 @@ namespace IngameCoding.Core
             builtinFunctions.AddBuiltinFunction("tmnw", () =>
             {
                 throw new NotImplementedException();
-                return new DataItem(DateTime.Now.Ticks, "tmnw() result");
             });
 
             #endregion
@@ -764,13 +734,7 @@ namespace IngameCoding.Core
                 if (!HandleErrors) throw;
             }
 
-            if (bytecodeInterpreter == null || bytecodeInterpreter.IsRunning) return;
-
-            if (OnlyHaveCode)
-            {
-                OnCodeExecuted(result);
-                return;
-            }
+            if (bytecodeInterpreter == null || bytecodeInterpreter.IsExecuting) return;
 
             int offset;
 
@@ -790,7 +754,7 @@ namespace IngameCoding.Core
             if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out offset))
             {
                 state = State.CallUpdate;
-                WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset));
+                WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset, null));
                 return;
             }
 
@@ -800,7 +764,7 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
 
                 exitCalled = true;
-                bytecodeInterpreter?.Call(offset);
+                bytecodeInterpreter?.Call(offset, null);
                 return;
             }
 

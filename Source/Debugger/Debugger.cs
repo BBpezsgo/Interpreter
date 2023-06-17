@@ -60,10 +60,10 @@ namespace TheProgram
 
             if (!Interpreter.Initialize()) return;
 
-            Instruction[] compiledCode = Interpreter.CompileCode(SourceCode, settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
+            Instruction[] compiledCode = Interpreter.CompileCode(settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
             if (compiledCode == null) return;
 
-            Interpreter.RunCode(compiledCode, settings.bytecodeInterpreterSettings);
+            Interpreter.ExecuteProgram(compiledCode, settings.bytecodeInterpreterSettings);
         }
 
         static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)
@@ -207,7 +207,7 @@ namespace TheProgram
         internal Stack_(BytecodeInterpreter v)
         {
             StackMemorySize = v.StackMemorySize;
-            Stack = v.Stack.ToData(v => new Data_StackItem(v));
+            Stack = v.Stack.ToArray().ToData(v => new Data_StackItem(v));
         }
     }
 
@@ -217,7 +217,7 @@ namespace TheProgram
 
         internal Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
         {
-            Heap = v.Heap.ToData(v => new Data_StackItem(v));
+            Heap = v.Heap.ToArray().ToData(v => new Data_StackItem(v));
         }
 
         public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter v) => new(v);
@@ -246,7 +246,7 @@ namespace TheProgram
 
         public Data_Function(CompiledFunction v) : base(v)
         {
-            this.FullName = v.FullName;
+            this.FullName = v.Identifier.Content;
             this.Position = new Data_Position(v.Identifier.GetPosition());
         }
     }

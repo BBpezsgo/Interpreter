@@ -39,7 +39,7 @@ void Start()
     
     for (int y = 0; y < screen_height; y++)
     {
-        Console.Write("\r\n");
+        PrintD("\r\n");
     };
 }
 
@@ -53,27 +53,27 @@ void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Map z
 	float theta_spacing = 0.2f;
 	float phi_spacing = 0.05f;
 
-    Console.Clear();
+    Clear();
 
-    float cosA = Math.Cos(A);
-    float sinA = Math.Sin(A);
+    float cosA = Cos(A);
+    float sinA = Sin(A);
 
-    float cosB = Math.Cos(B);
-    float sinB = Math.Sin(B);
+    float cosB = Cos(B);
+    float sinB = Sin(B);
 
     // theta goes around the cross-sectional circle of a torus
     for (float theta = 0f; theta < 2 * PI; theta += theta_spacing)
     {
         // precompute sines and cosines of theta
-        float costheta = Math.Cos(theta);
-        float sintheta = Math.Sin(theta);
+        float costheta = Cos(theta);
+        float sintheta = Sin(theta);
 
         // phi goes around the center of revolution of a torus
         for (float phi = 0f; phi < 2 * PI; phi += phi_spacing)
         {
             // precompute sines and cosines of phi
-            float cosphi = Math.Cos(phi);
-            float sinphi = Math.Sin(phi);
+            float cosphi = Cos(phi);
+            float sinphi = Sin(phi);
 
             // the x,y coordinate of the circle, before revolving (factored out of the above equations)
             float circlex = R2 + R1 * costheta;
@@ -99,10 +99,10 @@ void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Map z
                 {
                     zbuffer.Set(xp, yp, (ooz * 1000f).ToInt());
                     int luminance_index = (L * 2f).ToInt();
-                    if (luminance_index == 0) { Console.Set('░', xp, yp); }
-                    elseif (luminance_index == 1) { Console.Set('▒', xp, yp); }
-                    elseif (luminance_index == 2) { Console.Set('▓', xp, yp); }
-                    elseif (luminance_index == 3) { Console.Set('█', xp, yp); };
+                    if (luminance_index == 0) { Set('░', xp, yp); }
+                    elseif (luminance_index == 1) { Set('▒', xp, yp); }
+                    elseif (luminance_index == 2) { Set('▓', xp, yp); }
+                    elseif (luminance_index == 3) { Set('█', xp, yp); };
                 };
             };
         };

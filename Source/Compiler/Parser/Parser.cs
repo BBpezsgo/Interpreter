@@ -65,14 +65,12 @@ namespace IngameCoding.BBCode
     {
         public TypeTokenType Type;
         public TypeToken ListOf;
-        public string NamespacePrefix;
 
         public bool IsList => ListOf != null;
 
-        public TypeToken(string name, TypeTokenType type, string namespacePrefix, Token @base) : base()
+        public TypeToken(string name, TypeTokenType type, Token @base) : base()
         {
             this.Type = type;
-            this.NamespacePrefix = namespacePrefix;
             base.Content = name;
 
             if (@base == null)
@@ -87,7 +85,7 @@ namespace IngameCoding.BBCode
                 base.TokenType = @base.TokenType;
             }
         }
-        public TypeToken(string name, BuiltinType type, string namespacePrefix, Token @base) : base()
+        public TypeToken(string name, BuiltinType type, Token @base) : base()
         {
             this.Type = type switch
             {
@@ -104,26 +102,6 @@ namespace IngameCoding.BBCode
                 BuiltinType.CHAR => TypeTokenType.CHAR,
                 _ => throw new NotImplementedException(),
             };
-            this.NamespacePrefix = namespacePrefix;
-            base.Content = name;
-
-            if (@base == null)
-            {
-                base.TokenType = TokenType.IDENTIFIER;
-            }
-            else
-            {
-                base.AbsolutePosition = @base.AbsolutePosition;
-                base.Position = @base.Position;
-                base.Analysis = @base.Analysis;
-                base.TokenType = @base.TokenType;
-            }
-        }
-
-        public TypeToken(string name, TypeTokenType type, List<string> namespacePrefix, Token @base) : base()
-        {
-            this.Type = type;
-            this.NamespacePrefix = namespacePrefix.Count > 0 ? string.Join('.', namespacePrefix) + "." : "";
             base.Content = name;
 
             if (@base == null)
@@ -143,7 +121,6 @@ namespace IngameCoding.BBCode
         {
             this.Type = TypeTokenType.LIST;
             this.ListOf = listOf;
-            this.NamespacePrefix = "";
             base.Content = name;
 
             if (@base == null)
@@ -159,7 +136,7 @@ namespace IngameCoding.BBCode
             }
         }
 
-        public new TypeToken Clone() => new(this.Content, this.Type, this.NamespacePrefix, this)
+        public new TypeToken Clone() => new(this.Content, this.Type, this)
         {
             TokenType = this.TokenType,
 
@@ -173,8 +150,8 @@ namespace IngameCoding.BBCode
             ListOf = this.ListOf,
         };
 
-        public static TypeToken CreateAnonymous(string name, TypeTokenType type, string namespacePrefix = "") => new(name, type, namespacePrefix, null);
-        public static TypeToken CreateAnonymous(string name, BuiltinType type, string namespacePrefix = "") => new(name, type, namespacePrefix, null);
+        public static TypeToken CreateAnonymous(string name, TypeTokenType type) => new(name, type, null);
+        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
         public static TypeToken CreateAnonymous(string name, TypeToken listOf) => new(name, listOf, null);
 
         public override string ToString()
@@ -182,775 +159,15 @@ namespace IngameCoding.BBCode
             if (IsList) return ListOf.ToString() + "[]";
             return Content;
         }
-        public string ToStringWithNamespaces()
-        {
-            if (IsList) return ListOf.ToStringWithNamespaces() + "[]";
-            return NamespacePrefix + Content;
-        }
         public new string ToFullString()
         {
-            return $"TypeToken {{ {this.ToString()} {base.ToFullString()} }}";
+            return $"TypeToken {{ {this} {base.ToFullString()} }}";
         }
     }
 
     namespace Parser
     {
         using Statements;
-
-        public struct ParserSettings
-        {
-            public bool PrintInfo;
-
-            public static ParserSettings Default => new()
-            {
-                PrintInfo = false,
-            };
-        }
-
-        public interface IDefinition
-        {
-            public string FilePath { get; set; }
-        }
-
-        [Serializable]
-        public class ParameterDefinition
-        {
-            public Token Identifier;
-            public TypeToken Type;
-
-            public bool withThisKeyword;
-
-            public override string ToString() => $"{(withThisKeyword ? "this " : "")}{Type} {Identifier}";
-            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
-        }
-
-        [Serializable]
-        public class FieldDefinition
-        {
-            public Token Identifier;
-            public TypeToken Type;
-            public Token ProtectionToken;
-
-            public override string ToString() => $"{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
-            internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
-        }
-
-        public class Exportable
-        {
-            public Token ExportKeyword;
-            public bool IsExport => ExportKeyword != null;
-        }
-
-        public class FunctionDefinition : Exportable, IDefinition
-        {
-            public class Attribute : IngameCoding.BBCode.Compiler.IElementWithKey<string>
-            {
-                public Token Identifier;
-                public object[] Parameters;
-
-                public string Key => Identifier.Content;
-            }
-
-            public Token BracketStart;
-            public Token BracketEnd;
-
-            public Attribute[] Attributes;
-            public readonly Token Identifier;
-            /// <summary>
-            /// <c>[Namespace].[...].Name</c>
-            /// </summary>
-            public string FullName => NamespacePathString + Identifier.Content;
-            public ParameterDefinition[] Parameters;
-            public Statement[] Statements;
-            public TypeToken Type;
-            public readonly string[] NamespacePath;
-            /// <summary>
-            /// <c>[Namespace].[...].</c>
-            /// </summary>
-            public string NamespacePathString
-            {
-                get
-                {
-                    string val = "";
-                    for (int i = 0; i < NamespacePath.Length; i++)
-                    {
-                        if (val.Length > 0)
-                        {
-                            val += "." + NamespacePath[i].ToString();
-                        }
-                        else
-                        {
-                            val = NamespacePath[i].ToString();
-                        }
-                    }
-                    if (val.Length > 0)
-                    {
-                        val += ".";
-                    }
-                    return val;
-                }
-            }
-
-            public string FilePath { get; set; }
-
-            /// <summary>
-            /// The first parameter is labeled as 'this'
-            /// </summary>
-            public bool IsMethod => ((Parameters.Length > 0) && (Parameters[0].withThisKeyword));
-
-            public FunctionDefinition(string[] namespacePath, Token name)
-            {
-                Parameters = new ParameterDefinition[0];
-                Statements = new Statement[0];
-                Attributes = Array.Empty<Attribute>();
-                this.NamespacePath = namespacePath;
-                this.Identifier = name;
-            }
-
-            public FunctionDefinition(List<string> namespacePath, Token name)
-            {
-                Parameters = new ParameterDefinition[0];
-                Statements = new Statement[0];
-                Attributes = Array.Empty<Attribute>();
-                this.NamespacePath = namespacePath.ToArray();
-                this.Identifier = name;
-            }
-
-            public override string ToString()
-            {
-                return $"{(IsExport ? "export " : "")}{this.Type.Content} {this.FullName}" + (this.Parameters.Length > 0 ? "(...)" : "()") + " " + (this.Statements.Length > 0 ? "{...}" : "{}");
-            }
-
-            public string PrettyPrint(int ident = 0)
-            {
-                List<string> parameters = new();
-                foreach (var parameter in this.Parameters)
-                {
-                    parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
-                }
-
-                List<string> statements = new();
-                foreach (var statement in this.Statements)
-                {
-                    statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-                }
-
-                return $"{" ".Repeat(ident)}{this.Type.Content} {this.FullName}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
-            }
-
-            public string ReadableID()
-            {
-                string result = this.FullName;
-                result += "(";
-                for (int j = 0; j < this.Parameters.Length; j++)
-                {
-                    if (j > 0) { result += ", "; }
-                    result += this.Parameters[j].Type.ToString();
-                }
-                result += ")";
-                return result;
-            }
-
-            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-        }
-
-        public class ClassDefinition : Exportable, IDefinition
-        {
-            public readonly FunctionDefinition.Attribute[] Attributes;
-            public readonly Token Name;
-            /// <summary><c>[Namespace].[...].Name</c></summary>
-            public string FullName => NamespacePathString + Name.Content;
-            public Token BracketStart;
-            public Token BracketEnd;
-            public List<Statement> Statements;
-            public string FilePath { get; set; }
-            public readonly string[] NamespacePath;
-            /// <summary><c>[Namespace].[...].</c></summary>
-            public string NamespacePathString
-            {
-                get
-                {
-                    string result = "";
-                    for (int i = 0; i < NamespacePath.Length; i++)
-                    {
-                        if (result.Length > 0)
-                        {
-                            result += "." + NamespacePath[i].ToString();
-                        }
-                        else
-                        {
-                            result = NamespacePath[i].ToString();
-                        }
-                    }
-                    if (result.Length > 0)
-                    {
-                        result += ".";
-                    }
-                    return result;
-                }
-            }
-            public readonly FieldDefinition[] Fields;
-            public IReadOnlyCollection<FunctionDefinition> Methods => methods;
-            readonly FunctionDefinition[] methods;
-
-            public ClassDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<FunctionDefinition> methods)
-            {
-                this.Name = name;
-                this.Fields = fields.ToArray();
-                this.methods = methods.ToArray();
-                this.Attributes = attributes.ToArray();
-                this.NamespacePath = namespacePath.ToArray();
-                this.Statements = new List<Statement>();
-            }
-
-            public override string ToString()
-            {
-                return $"class {this.Name.Content} " + "{...}";
-            }
-
-            public string PrettyPrint(int ident = 0)
-            {
-                List<string> fields = new();
-                foreach (var field in this.Fields)
-                {
-                    fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-                }
-
-                List<string> methods = new();
-                foreach (var method in this.methods)
-                {
-                    methods.Add($"{" ".Repeat(ident)}" + method.PrettyPrint((ident == 0) ? 2 : ident));
-                }
-
-                return $"{" ".Repeat(ident)}class {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
-            }
-
-            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-        }
-
-        public class StructDefinition : Exportable, IDefinition
-        {
-            public readonly FunctionDefinition.Attribute[] Attributes;
-            public readonly Token Name;
-            /// <summary><c>[Namespace].[...].Name</c></summary>
-            public string FullName => NamespacePathString + Name.Content;
-            public Token BracketStart;
-            public Token BracketEnd;
-            public List<Statement> Statements;
-            public string FilePath { get; set; }
-            public readonly string[] NamespacePath;
-            /// <summary><c>[Namespace].[...].</c></summary>
-            public string NamespacePathString
-            {
-                get
-                {
-                    string result = "";
-                    for (int i = 0; i < NamespacePath.Length; i++)
-                    {
-                        if (result.Length > 0)
-                        {
-                            result += "." + NamespacePath[i].ToString();
-                        }
-                        else
-                        {
-                            result = NamespacePath[i].ToString();
-                        }
-                    }
-                    if (result.Length > 0)
-                    {
-                        result += ".";
-                    }
-                    return result;
-                }
-            }
-            public readonly FieldDefinition[] Fields;
-            public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
-            readonly Dictionary<string, FunctionDefinition> methods;
-
-            public StructDefinition(IEnumerable<string> namespacePath, Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
-            {
-                this.Name = name;
-                this.Fields = fields.ToArray();
-                this.methods = new Dictionary<string, FunctionDefinition>(methods);
-                this.Attributes = attributes.ToArray();
-                this.NamespacePath = namespacePath.ToArray();
-                this.Statements = new List<Statement>();
-            }
-
-            public override string ToString()
-            {
-                return $"struct {this.Name.Content} " + "{...}";
-            }
-
-            public string PrettyPrint(int ident = 0)
-            {
-                List<string> fields = new();
-                foreach (var field in this.Fields)
-                {
-                    fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-                }
-
-                List<string> methods = new();
-                foreach (var method in this.methods)
-                {
-                    methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-                }
-
-                return $"{" ".Repeat(ident)}struct {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
-            }
-
-            public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-        }
-
-        public class NamespaceDefinition : IDefinition
-        {
-            public Token Name;
-            public Token Keyword;
-            public Token BracketStart;
-            public Token BracketEnd;
-            public string FilePath { get; set; }
-
-            public override string ToString()
-            {
-                return $"namespace {this.Name.Content} " + "{ ... }";
-            }
-        }
-
-        public struct UsingAnalysis
-        {
-            public string Path;
-            public bool Found;
-            public double ParseTime;
-        }
-
-        public readonly struct ParserResult
-        {
-            public readonly List<FunctionDefinition> Functions;
-            public readonly Dictionary<string, StructDefinition> Structs;
-            public readonly Dictionary<string, ClassDefinition> Classes;
-            public readonly List<Statement_NewVariable> GlobalVariables;
-            public readonly List<UsingDefinition> Usings;
-            public readonly Statement_HashInfo[] Hashes;
-            public readonly List<UsingAnalysis> UsingsAnalytics;
-            /// <summary>
-            /// Only used for diagnostics!
-            /// </summary>
-            public readonly List<NamespaceDefinition> Namespaces;
-            public readonly Statement[] TopLevelStatements;
-
-            public ParserResult(List<FunctionDefinition> functions, List<Statement_NewVariable> globalVariables, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<NamespaceDefinition> namespaces, List<Statement_HashInfo> hashes, Dictionary<string, ClassDefinition> classes, Statement[] topLevelStatements)
-            {
-                Functions = functions;
-                GlobalVariables = globalVariables;
-                Structs = structs;
-                Usings = usings;
-                UsingsAnalytics = new();
-                Namespaces = namespaces;
-                Hashes = hashes.ToArray();
-                Classes = classes;
-                TopLevelStatements = topLevelStatements;
-            }
-
-            /// <summary>Converts the parsed AST into text</summary>
-            public string PrettyPrint()
-            {
-                var x = "";
-
-                foreach (var @using in Usings)
-                {
-                    x += "using " + @using.PathString + ";\n";
-                }
-
-                foreach (var globalVariable in GlobalVariables)
-                {
-                    x += globalVariable.PrettyPrint() + ";\n";
-                }
-
-                foreach (var @struct in Structs)
-                {
-                    x += @struct.Value.PrettyPrint() + "\n";
-                }
-
-                foreach (var @class in Classes)
-                {
-                    x += @class.Value.PrettyPrint() + "\n";
-                }
-
-                foreach (var function in Functions)
-                {
-                    x += function.PrettyPrint() + "\n";
-                }
-
-                return x;
-            }
-
-            public void WriteToConsole(string title = "PARSER INFO")
-            {
-                Console.WriteLine($"\n\r === {title} ===\n\r");
-                // int indent = 0;
-
-                /*
-                void Comment(string comment)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"{"  ".Repeat(indent)}{comment}");
-                    Console.ResetColor();
-                }
-                */
-                void Attribute(FunctionDefinition.Attribute attribute)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write("[");
-                    Console.ForegroundColor = ConsoleColor.DarkGreen;
-                    Console.Write(attribute.Identifier);
-                    if (attribute.Parameters != null && attribute.Parameters.Length > 0)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write("(");
-                        for (int i = 0; i < attribute.Parameters.Length; i++)
-                        {
-                            if (i > 0)
-                            {
-                                Console.ForegroundColor = ConsoleColor.DarkGray;
-                                Console.Write($", ");
-                            }
-                            Console.ForegroundColor = ConsoleColor.White;
-                            Value(attribute.Parameters[i]);
-                        }
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write(")");
-                    }
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write("]");
-                    Console.Write("\n\r");
-                    Console.ResetColor();
-                }
-                void Value(object v)
-                {
-                    if (v is int || v is float)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkCyan;
-                        Console.Write(v);
-                    }
-                    else if (v is bool)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write(v);
-                    }
-                    else if (v is string)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkYellow;
-                        Console.Write($"\"{v}\"");
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write(v);
-                    }
-                }
-
-                Console.WriteLine("");
-
-                foreach (var item in Usings)
-                {
-                    Console.ForegroundColor = ConsoleColor.Blue;
-                    Console.Write("using ");
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"{item}");
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("");
-
-                foreach (var item in this.GlobalVariables)
-                {
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"{item.Type} ");
-
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"{item.VariableName}");
-
-                    Console.Write("\n\r");
-
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("");
-
-                foreach (var item in this.Structs)
-                {
-                    foreach (var attr in item.Value.Attributes)
-                    { Attribute(attr); }
-
-                    Console.ForegroundColor = ConsoleColor.Blue;
-                    Console.Write("struct ");
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write($"{item.Key} ");
-                    Console.Write("\n\r");
-
-                    foreach (var field in item.Value.Fields)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"  {field.Type} ");
-
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{field.Identifier}");
-
-                        Console.Write("\n\r");
-                    }
-
-                    Console.Write("\n\r");
-                    Console.ResetColor();
-                }
-
-                foreach (var item in this.Classes)
-                {
-                    foreach (var attr in item.Value.Attributes)
-                    { Attribute(attr); }
-
-                    Console.ForegroundColor = ConsoleColor.Blue;
-                    Console.Write("class ");
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.Write($"{item.Key} ");
-                    Console.Write("\n\r");
-
-                    foreach (var field in item.Value.Fields)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"  {field.Type} ");
-
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{field.Identifier}");
-
-                        Console.Write("\n\r");
-                    }
-
-                    Console.Write("\n\r");
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("");
-
-                foreach (var item in this.Functions)
-                {
-                    foreach (var attr in item.Attributes)
-                    { Attribute(attr); }
-
-                    Console.ForegroundColor = ConsoleColor.Blue;
-                    if (item.Type.Type == TypeTokenType.USER_DEFINED)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                    }
-                    Console.Write($"{item.Type} ");
-
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write($"{item.FullName}");
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write("(");
-                    for (int i = 0; i < item.Parameters.Length; i++)
-                    {
-                        if (i > 0)
-                        {
-                            Console.ForegroundColor = ConsoleColor.DarkGray;
-                            Console.Write($", ");
-                        }
-
-                        ParameterDefinition param = item.Parameters[i];
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        if (param.withThisKeyword)
-                        { Console.Write("this "); }
-                        if (param.Type.Type == TypeTokenType.USER_DEFINED)
-                        { Console.ForegroundColor = ConsoleColor.Green; }
-                        Console.Write($"{param.Type} ");
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{param.Identifier}");
-                    }
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write(")");
-
-                    if (item.Statements.Length > 0)
-                    {
-                        int statementCount = 0;
-                        void AddStatement(Statement st)
-                        {
-                            statementCount++;
-                            if (st is Statement_ForLoop st0)
-                            {
-                                AddStatement(st0.Condition);
-                                AddStatement(st0.VariableDeclaration);
-                                AddStatement(st0.Expression);
-                            }
-                            else if (st is Statement_WhileLoop st1)
-                            {
-                                AddStatement(st1.Condition);
-                            }
-                            else if (st is Statement_FunctionCall st2)
-                            {
-                                foreach (var st3 in st2.Parameters)
-                                {
-                                    AddStatement(st3);
-                                }
-                            }
-                            else if (st is Statement_If_If st3)
-                            {
-                                AddStatement(st3.Condition);
-                            }
-                            else if (st is Statement_If_ElseIf st4)
-                            {
-                                AddStatement(st4.Condition);
-                            }
-                            else if (st is Statement_Index st5)
-                            {
-                                AddStatement(st5.Expression);
-                                statementCount++;
-                            }
-                            else if (st is Statement_NewVariable st6)
-                            {
-                                if (st6.InitialValue != null) AddStatement(st6.InitialValue);
-                            }
-                            else if (st is Statement_Operator st7)
-                            {
-                                if (st7.Left != null) AddStatement(st7.Left);
-                                if (st7.Right != null) AddStatement(st7.Right);
-                            }
-
-                            if (st is StatementParent st8)
-                            {
-                                foreach (var item in st8.Statements)
-                                {
-                                    AddStatement(st);
-                                }
-                            }
-                        }
-                        foreach (var st in item.Statements)
-                        {
-                            AddStatement(st);
-                        }
-
-                        Console.Write($"\n\r{{ {statementCount} statements }}\n\r");
-                    }
-                    else
-                    {
-                        Console.Write("\n\r");
-                    }
-
-                    Console.Write("\n\r");
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("\n\r === ===\n\r");
-            }
-
-            public void SetFile(string path)
-            {
-                if (string.IsNullOrEmpty(path))
-                { throw new ArgumentException($"'{nameof(path)}' cannot be null or empty.", nameof(path)); }
-
-                for (int i = 0; i < this.Functions.Count; i++)
-                { this.Functions[i].FilePath = path; }
-                for (int j = 0; j < this.Namespaces.Count; j++)
-                { this.Namespaces[j].FilePath = path; }
-                for (int i = 0; i < this.GlobalVariables.Count; i++)
-                { this.GlobalVariables[i].FilePath = path; }
-                for (int i = 0; i < this.Structs.Count; i++)
-                { this.Structs.ElementAt(i).Value.FilePath = path; }
-                for (int i = 0; i < this.Hashes.Length; i++)
-                { this.Hashes[i].FilePath = path; }
-                StatementFinder.GetAllStatement(this, statement =>
-                {
-                    if (statement is not IDefinition def) return false;
-                    def.FilePath = path;
-                    return false;
-                });
-            }
-
-            public void CheckFilePaths(System.Action<string> NotSetCallback)
-            {
-                for (int i = 0; i < this.Functions.Count; i++)
-                {
-                    if (string.IsNullOrEmpty(this.Functions[i].FilePath))
-                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} : {this.Functions[i].FilePath}"); }
-                }
-                for (int i = 0; i < this.Namespaces.Count; i++)
-                {
-                    if (string.IsNullOrEmpty(this.Namespaces[i].FilePath))
-                    { NotSetCallback?.Invoke($"Namespace.FilePath {this.Namespaces[i]} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"Namespace.FilePath {this.Namespaces[i]} : {this.Namespaces[i].FilePath}"); }
-                }
-                for (int i = 0; i < this.GlobalVariables.Count; i++)
-                {
-                    if (string.IsNullOrEmpty(this.GlobalVariables[i].FilePath))
-                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {this.GlobalVariables[i]} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"GlobalVariable.FilePath {this.GlobalVariables[i]} : {this.GlobalVariables[i].FilePath}"); }
-                }
-                for (int i = 0; i < this.Structs.Count; i++)
-                {
-                    if (string.IsNullOrEmpty(this.Structs.ElementAt(i).Value.FilePath))
-                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} : {this.Structs.ElementAt(i).Value.FilePath}"); }
-                }
-                for (int i = 0; i < this.Hashes.Length; i++)
-                {
-                    if (string.IsNullOrEmpty(this.Hashes[i].FilePath))
-                    { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
-                }
-                StatementFinder.GetAllStatement(this, statement =>
-                {
-                    if (statement is not IDefinition def) return false;
-                    if (string.IsNullOrEmpty(def.FilePath))
-                    { NotSetCallback?.Invoke($"IDefinition.FilePath {def} is null"); }
-                    else
-                    { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
-                    return false;
-                });
-            }
-        }
-
-        public readonly struct ParserResultHeader
-        {
-            public readonly List<UsingDefinition> Usings;
-            public readonly Statement_HashInfo[] Hashes;
-            public readonly List<UsingAnalysis> UsingsAnalytics;
-
-            public ParserResultHeader(List<UsingDefinition> usings, List<Statement_HashInfo> hashes)
-            {
-                Usings = usings;
-                UsingsAnalytics = new();
-                Hashes = hashes.ToArray();
-            }
-        }
-
-        public class UsingDefinition
-        {
-            public Token[] Path;
-            public Token Keyword;
-            /// <summary> Set by the Compiler </summary>
-            public string CompiledUri;
-            /// <summary> Set by the Compiler </summary>
-            public double? DownloadTime;
-
-            public string PathString
-            {
-                get
-                {
-                    string result = "";
-                    for (int i = 0; i < Path.Length; i++)
-                    {
-                        if (i > 0) result += ".";
-                        result += Path[i].Content;
-                    }
-                    return result;
-                }
-            }
-            public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
-        }
 
         /// <summary>
         /// The parser for the BBCode language
@@ -980,7 +197,6 @@ namespace IngameCoding.BBCode
             static readonly Dictionary<string, TypeToken> types = new()
             {
                 { "int", TypeToken.CreateAnonymous("int", BuiltinType.INT) },
-                { "string", TypeToken.CreateAnonymous("string", BuiltinType.STRING) },
                 { "void", TypeToken.CreateAnonymous("void", BuiltinType.VOID) },
                 { "float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT) },
                 { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) },
@@ -988,7 +204,6 @@ namespace IngameCoding.BBCode
                 { "char", TypeToken.CreateAnonymous("char", BuiltinType.CHAR) }
             };
             readonly Dictionary<string, int> operators = new();
-            readonly List<string> CurrentNamespace = new();
 
             List<Warning> Warnings;
             public readonly List<Error> Errors = new();
@@ -997,9 +212,7 @@ namespace IngameCoding.BBCode
             readonly List<FunctionDefinition> Functions = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly Dictionary<string, ClassDefinition> Classes = new();
-            readonly List<Statement_NewVariable> GlobalVariables = new();
             readonly List<UsingDefinition> Usings = new();
-            readonly List<NamespaceDefinition> Namespaces = new();
             readonly List<Statement_HashInfo> Hashes = new();
             readonly List<Statement> TopLevelStatements = new();
             // === ===
@@ -1078,7 +291,7 @@ namespace IngameCoding.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.GlobalVariables, this.Structs, this.Usings, this.Namespaces, this.Hashes, this.Classes, this.TopLevelStatements.ToArray());
+                return new ParserResult(this.Functions, this.Structs, this.Usings, this.Hashes, this.Classes, this.TopLevelStatements.ToArray());
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -1092,50 +305,6 @@ namespace IngameCoding.BBCode
                 ParseCodeHeader();
 
                 return new ParserResultHeader(this.Usings, this.Hashes);
-            }
-
-            /// <summary>
-            /// This will call the <see cref="Tokenizer.Parse"/> and the <see cref="Parser.Parse"/>
-            /// </summary>
-            /// <param name="code">
-            /// The source code
-            /// </param>
-            /// <param name="warnings">
-            /// A list that the tokenizer and the parser can fill with warnings
-            /// </param>
-            /// <param name="printCallback">
-            /// Optional: Print callback
-            /// </param>
-            /// <exception cref="EndlessLoopException"/>
-            /// <exception cref="SyntaxException"/>
-            /// <exception cref="Exception"/>
-            /// <exception cref="InternalException"/>
-            /// <exception cref="NotImplementedException"/>
-            /// <exception cref="System.Exception"/>
-            /// <returns>
-            /// The AST
-            /// </returns>
-            public static ParserResult Parse(string code, List<Warning> warnings, Action<string, Output.LogType> printCallback = null)
-            {
-                var tokenizer = new Tokenizer(TokenizerSettings.Default);
-                var tokens = tokenizer.Parse(code, warnings);
-
-                DateTime parseStarted = DateTime.Now;
-                if (printCallback != null)
-                { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
-
-                Parser parser = new();
-                var result = parser.Parse(tokens, warnings);
-
-                if (parser.Errors.Count > 0)
-                {
-                    throw new Exception("Failed to parse", parser.Errors[0].ToException());
-                }
-
-                if (printCallback != null)
-                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
-
-                return result;
             }
 
             #region Parse top level
@@ -1247,17 +416,15 @@ namespace IngameCoding.BBCode
 
             void ParseCodeBlock()
             {
-                if (ExpectNamespaceDefinition()) { }
-                else if (ExpectStructDefinition()) { }
+                if (ExpectStructDefinition()) { }
                 else if (ExpectClassDefinition()) { }
                 else if (ExpectFunctionDefinition(out var functionDefinition))
                 { Functions.Add(functionDefinition); }
-                else if (ExpectGlobalVariable()) { }
                 else
                 {
                     Statement statement = ExpectStatement();
                     if (statement == null)
-                    { throw new SyntaxException($"Expected global variable or namespace/type/function definition. Got a token {CurrentToken}", CurrentToken); }
+                    { throw new SyntaxException($"Expected top-level statement, type or function definition. Got a token {CurrentToken}", CurrentToken); }
 
                     SetStatementThings(statement);
 
@@ -1266,22 +433,6 @@ namespace IngameCoding.BBCode
                     if (!ExpectOperator(";"))
                     { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
                 }
-            }
-
-            bool ExpectGlobalVariable()
-            {
-                var possibleVariable = ExpectVariableDeclaration();
-                if (possibleVariable != null)
-                {
-                    GlobalVariables.Add(possibleVariable);
-
-                    if (!ExpectOperator(";"))
-                    { Errors.Add(new Error("Expected ';' at end of statement (after global variable definition)", CurrentToken)); }
-
-                    return true;
-                }
-
-                return false;
             }
 
             bool ExpectFunctionDefinition(out FunctionDefinition function)
@@ -1361,7 +512,7 @@ namespace IngameCoding.BBCode
                     { expectParameter = true; }
                 }
 
-                function = new(CurrentNamespace, possibleNameT)
+                function = new(possibleNameT)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
@@ -1383,44 +534,71 @@ namespace IngameCoding.BBCode
                 return true;
             }
 
-            bool ExpectNamespaceDefinition()
+            bool ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition function)
             {
-                if (!ExpectIdentifier("namespace", out var possibleNamespaceIdentifier))
-                { return false; }
+                int parseStart = currentTokenIndex;
+                function = null;
 
-                possibleNamespaceIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
+                ExpectIdentifier("export", out Token ExportKeyword);
 
-                if (ExpectIdentifier(out Token possibleName))
+                if (!ExpectIdentifier(out Token possibleNameT))
+                { currentTokenIndex = parseStart; return false; }
+
+                if (!ExpectOperator("("))
+                { currentTokenIndex = parseStart; return false; }
+
+                possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
+
+                List<ParameterDefinition> parameters = new();
+
+                var expectParameter = false;
+                while (!ExpectOperator(")") || expectParameter)
                 {
-                    if (ExpectOperator("{", out var braceletStart))
+                    if (ExpectIdentifier("this", out Token thisKeywordT))
+                    { throw new SyntaxException($"Keyword 'this' is not valid in general function definitions", thisKeywordT); }
+
+                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
+                    if (possibleParameterType == null)
+                    { throw new SyntaxException("Expected parameter type", CurrentToken); }
+
+                    if (!ExpectIdentifier(out Token possibleParameterNameT))
+                    { throw new SyntaxException("Expected a parameter name", CurrentToken); }
+
+                    possibleParameterNameT.Analysis.Subtype = TokenSubtype.VariableName;
+
+                    ParameterDefinition parameterDefinition = new()
                     {
-                        possibleName.Analysis.Subtype = TokenSubtype.Library;
-                        CurrentNamespace.Add(possibleName.Content);
-                        int endlessSafe = 0;
-                        Token braceletEnd;
-                        while (!ExpectOperator("}", out braceletEnd))
-                        {
-                            ParseCodeBlock();
-                            endlessSafe++;
-                            if (endlessSafe >= 100)
-                            {
-                                throw new EndlessLoopException();
-                            }
-                        }
-                        CurrentNamespace.RemoveAt(CurrentNamespace.Count - 1);
-                        Namespaces.Add(new NamespaceDefinition()
-                        {
-                            Name = possibleName,
-                            Keyword = possibleNamespaceIdentifier,
-                            BracketStart = braceletStart,
-                            BracketEnd = braceletEnd,
-                        });
-                        return true;
-                    }
-                    { throw new SyntaxException("Expected { after namespace name", possibleName); }
+                        Type = possibleParameterType,
+                        Identifier = possibleParameterNameT,
+                        withThisKeyword = thisKeywordT != null,
+                    };
+                    parameters.Add(parameterDefinition);
+
+                    if (ExpectOperator(")"))
+                    { break; }
+
+                    if (!ExpectOperator(","))
+                    { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                    else
+                    { expectParameter = true; }
                 }
-                else
-                { throw new SyntaxException("Expected namespace name", possibleNamespaceIdentifier); }
+
+                function = new(possibleNameT)
+                {
+                    ExportKeyword = ExportKeyword,
+                    Parameters = parameters.ToArray(),
+                };
+
+                if (ExpectOperator(";", out var tIdk))
+                { throw new SyntaxException($"Body is requied for general function definition", tIdk); }
+
+                List<Statement> statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                function.BracketStart = braceletStart;
+                function.BracketEnd = braceletEnd;
+
+                function.Statements = statements.ToArray();
+
+                return true;
             }
 
             bool ExpectClassDefinition()
@@ -1463,6 +641,7 @@ namespace IngameCoding.BBCode
 
                 List<FieldDefinition> fields = new();
                 List<FunctionDefinition> methods = new();
+                List<GeneralFunctionDefinition> generalMethods = new();
 
                 int endlessSafe = 0;
                 Token braceletEnd;
@@ -1471,6 +650,10 @@ namespace IngameCoding.BBCode
                     if (ExpectFunctionDefinition(out var methodDefinition))
                     {
                         methods.Add(methodDefinition);
+                    }
+                    else if (ExpectGeneralFunctionDefinition(out var generalMethodDefinition))
+                    {
+                        generalMethods.Add(generalMethodDefinition);
                     }
                     else if (ExpectField(out FieldDefinition field))
                     {
@@ -1490,14 +673,14 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                ClassDefinition classDefinition = new(CurrentNamespace, possibleClassName, attributes, fields, methods)
+                ClassDefinition classDefinition = new(possibleClassName, attributes, fields, methods, generalMethods)
                 {
                     BracketStart = braceletStart,
                     BracketEnd = braceletEnd,
                     ExportKeyword = ExportKeyword,
                 };
 
-                Classes.Add(classDefinition.FullName, classDefinition);
+                Classes.Add(classDefinition.Name.Content, classDefinition);
 
                 Warnings.Add(new Warning($"Class is experimental feature!", keyword));
 
@@ -1563,14 +746,14 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                StructDefinition structDefinition = new(CurrentNamespace, possibleStructName, attributes, fields, methods)
+                StructDefinition structDefinition = new(possibleStructName, attributes, fields, methods)
                 {
                     BracketStart = braceletStart,
                     BracketEnd = braceletEnd,
                     ExportKeyword = ExportKeyword,
                 };
 
-                Structs.Add(structDefinition.FullName, structDefinition);
+                Structs.Add(structDefinition.Name.Content, structDefinition);
 
                 return true;
             }
@@ -1748,12 +931,40 @@ namespace IngameCoding.BBCode
                 return false;
             }
 
+            bool ExpectAs(out Statement_As statement)
+            {
+                int parseStart = currentTokenIndex;
+                statement = null;
+
+                StatementWithReturnValue prevStatement = ExpectOneValue();
+                if (prevStatement == null)
+                {
+                    currentTokenIndex = parseStart;
+                    return false;
+                }
+
+                if (!ExpectIdentifier("as", out Token keyword))
+                {
+                    currentTokenIndex = parseStart;
+                    return false;
+                }
+
+                TypeToken type = ExpectTypeToken(out Warning warning, false, false);
+                if (warning != null) Warnings.Add(warning);
+
+                if (type == null)
+                { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
+
+                statement = new Statement_As(prevStatement, keyword, type);
+                return true;
+            }
+
             bool ExpectIndex(out Statement_Index statement)
             {
                 if (ExpectOperator("[", out var token0))
                 {
                     var st = ExpectOneValue();
-                    if (ExpectOperator("]", out var token1))
+                    if (ExpectOperator("]", out _))
                     {
                         statement = new Statement_Index(st);
                         return true;
@@ -1818,39 +1029,58 @@ namespace IngameCoding.BBCode
                 {
                     newIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
 
-                    if (!ExpectIdentifier(out Token structName))
-                    { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
+                    if (!ExpectIdentifier(out Token instanceTypeName))
+                    { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
 
-                    List<string> targetLibraryPath = new();
-                    List<Token> targetLibraryPathTokens = new();
+                    if (instanceTypeName == null)
+                    { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
 
-                    while (ExpectOperator(".", out Token dotToken))
+                    if (ExpectOperator("("))
                     {
-                        if (!ExpectIdentifier(out Token libraryToken))
+                        Statement_ConstructorCall newStructStatement = new()
                         {
-                            throw new SyntaxException("Expected namespace or class identifier", dotToken);
-                        }
-                        else
+                            TypeName = instanceTypeName,
+                            Keyword = newIdentifier,
+                        };
+
+                        bool expectParameter = false;
+                        List<StatementWithReturnValue> parameters = new();
+
+                        int endlessSafe = 0;
+                        while (!ExpectOperator(")") || expectParameter)
                         {
-                            targetLibraryPath.Add(structName.Content);
-                            targetLibraryPathTokens.Add(structName);
-                            structName = libraryToken;
+                            StatementWithReturnValue parameter = ExpectExpression();
+                            if (parameter == null)
+                            { throw new SyntaxException("Expected expression as parameter", newStructStatement.TotalPosition()); }
+
+                            parameters.Add(parameter);
+
+                            if (ExpectOperator(")"))
+                            { break; }
+
+                            if (!ExpectOperator(","))
+                            { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
+                            else
+                            { expectParameter = true; }
+
+                            endlessSafe++;
+                            if (endlessSafe > 100)
+                            { throw new EndlessLoopException(); }
                         }
+                        newStructStatement.Parameters = parameters.ToArray();
+
+                        returnStatement = newStructStatement;
                     }
-
-                    foreach (var token in targetLibraryPathTokens)
-                    { token.Analysis.Subtype = TokenSubtype.Library; }
-
-                    if (structName == null)
-                    { throw new SyntaxException("Expected struct constructor after keyword 'new'", newIdentifier); }
-
-                    Statement_NewInstance newStructStatement = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
+                    else
                     {
-                        TypeName = structName,
-                        Keyword = newIdentifier,
-                    };
+                        Statement_NewInstance newStructStatement = new()
+                        {
+                            TypeName = instanceTypeName,
+                            Keyword = newIdentifier,
+                        };
 
-                    returnStatement = newStructStatement;
+                        returnStatement = newStructStatement;
+                    }
                 }
                 else if (ExpectIdentifier(out Token variableName))
                 {
@@ -1920,6 +1150,19 @@ namespace IngameCoding.BBCode
                     }
 
                     break;
+                }
+
+                {
+                    if (ExpectIdentifier("as", out Token keyword))
+                    {
+                        TypeToken type = ExpectTypeToken(out Warning warning, false, false);
+                        if (warning != null) Warnings.Add(warning);
+
+                        if (type == null)
+                        { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
+
+                        returnStatement = new Statement_As(returnStatement, keyword, type);
+                    }
                 }
 
                 return returnStatement;
@@ -2021,7 +1264,7 @@ namespace IngameCoding.BBCode
             Statement_NewVariable ExpectVariableDeclaration()
             {
                 int startTokenIndex = currentTokenIndex;
-                TypeToken possibleType = ExceptTypeToken(out var structNotFoundWarning);
+                TypeToken possibleType = ExpectTypeToken(out var structNotFoundWarning);
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
@@ -2286,10 +1529,16 @@ namespace IngameCoding.BBCode
             ///  <seealso cref="Statement_FunctionCall"></seealso>
             /// </item>
             /// <item>
+            ///  <seealso cref="Statement_KeywordCall"></seealso>
+            /// </item>
+            /// <item>
             ///  <seealso cref="Statement_If"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="Statement_NewVariable"></seealso>
+            /// </item>
+            /// <item>
+            ///  <seealso cref="Statement_Setter"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="ExpectExpression"></seealso>
@@ -2303,6 +1552,7 @@ namespace IngameCoding.BBCode
                 statement ??= ExpectKeywordCall("return", true);
                 statement ??= ExpectKeywordCall("throw", true, true);
                 statement ??= ExpectKeywordCall("break");
+                statement ??= ExpectKeywordCall("delete", true, true);
                 statement ??= ExpectIfStatement();
                 statement ??= ExpectVariableDeclaration();
                 statement ??= ExpectSetter();
@@ -2330,7 +1580,7 @@ namespace IngameCoding.BBCode
 
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
 
-                methodCall = new(CurrentNamespace.ToArray(), Array.Empty<string>())
+                methodCall = new()
                 {
                     Identifier = possibleFunctionName,
                 };
@@ -2580,35 +1830,15 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier(out Token possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                List<string> targetLibraryPath = new();
-                List<Token> targetLibraryPathTokens = new();
-
-                while (ExpectOperator(".", out Token dotToken))
-                {
-                    if (!ExpectIdentifier(out Token libraryToken))
-                    {
-                        throw new SyntaxException("Expected namespace, class, method, or field identifier", dotToken);
-                    }
-                    else
-                    {
-                        targetLibraryPath.Add(possibleFunctionName.Content);
-                        targetLibraryPathTokens.Add(possibleFunctionName);
-                        possibleFunctionName = libraryToken;
-                    }
-                }
-
                 if (possibleFunctionName == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 if (!ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                foreach (var token in targetLibraryPathTokens)
-                { token.Analysis.Subtype = TokenSubtype.Library; }
-
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
 
-                Statement_FunctionCall functionCall = new(CurrentNamespace.ToArray(), targetLibraryPath.ToArray())
+                Statement_FunctionCall functionCall = new()
                 {
                     Identifier = possibleFunctionName,
                 };
@@ -2643,7 +1873,7 @@ namespace IngameCoding.BBCode
             }
 
             /// <summary> return, break, continue, etc. </summary>
-            Statement_FunctionCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
+            Statement_KeywordCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -2655,7 +1885,7 @@ namespace IngameCoding.BBCode
 
                 possibleFunctionName.Analysis.Subtype = TokenSubtype.Statement;
 
-                Statement_FunctionCall functionCall = new(Array.Empty<string>(), Array.Empty<string>())
+                Statement_KeywordCall functionCall = new()
                 {
                     Identifier = possibleFunctionName,
                 };
@@ -2668,9 +1898,7 @@ namespace IngameCoding.BBCode
                     { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
                     if (parameter != null)
-                    {
-                        parameters.Add(parameter);
-                    }
+                    { parameters.Add(parameter); }
                 }
                 functionCall.Parameters = parameters.ToArray();
                 return functionCall;
@@ -2832,7 +2060,7 @@ namespace IngameCoding.BBCode
                 return true;
             }
 
-            TypeToken ExceptTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
+            TypeToken ExpectTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
             {
                 int parseStart = currentTokenIndex;
 
@@ -2849,7 +2077,7 @@ namespace IngameCoding.BBCode
                     {
                         if (allowAnyKeyword)
                         {
-                            newType = new TypeToken("any", BuiltinType.ANY, "", possibleType);
+                            newType = new TypeToken("any", BuiltinType.ANY, possibleType);
                         }
                         else
                         {
@@ -2861,7 +2089,7 @@ namespace IngameCoding.BBCode
                     {
                         if (allowVarKeyword)
                         {
-                            newType = new TypeToken("var", BuiltinType.AUTO, "", possibleType);
+                            newType = new TypeToken("var", BuiltinType.AUTO, possibleType);
                         }
                         else
                         {
@@ -2873,18 +2101,18 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.Content, out var s))
                         {
-                            newType = new TypeToken(s.FullName, TypeTokenType.USER_DEFINED, s.NamespacePathString, possibleType);
+                            newType = new TypeToken(s.Name.Content, TypeTokenType.USER_DEFINED, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Struct;
                         }
                         else if (TryGetClass(possibleType.Content, out var c))
                         {
-                            newType = new TypeToken(c.FullName, TypeTokenType.USER_DEFINED, c.NamespacePathString, possibleType);
+                            newType = new TypeToken(c.Name.Content, TypeTokenType.USER_DEFINED, possibleType);
                             newType.Analysis.Subtype = TokenSubtype.Class;
                         }
                         else
                         {
-                            newType = new TypeToken(possibleType.Content, TypeTokenType.USER_DEFINED, CurrentNamespace, possibleType);
-                            warning = new Warning($"Type '{possibleType.Content}' not found", possibleType);
+                            newType = new TypeToken(possibleType.Content, TypeTokenType.USER_DEFINED, possibleType);
+                            // warning = new Warning($"Type '{possibleType.Content}' not found", possibleType);
                         }
                     }
 
@@ -2893,7 +2121,7 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    newType = new TypeToken(builtinType.Content, builtinType.Type, CurrentNamespace, possibleType)
+                    newType = new TypeToken(builtinType.Content, builtinType.Type, possibleType)
                     { ListOf = builtinType.ListOf };
                     newType.Analysis.Subtype = TokenSubtype.BuiltinType;
                 }
@@ -2913,7 +2141,7 @@ namespace IngameCoding.BBCode
 
                 return newType;
             }
-            TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExceptTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
+            TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExpectTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
 
             bool TryGetStruct(string name, out StructDefinition @struct)
             {
@@ -2941,6 +2169,7 @@ namespace IngameCoding.BBCode
 
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
                 Token[] tokens = tokenizer.Parse(type);
+                tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
                 TypeToken result = null;
 

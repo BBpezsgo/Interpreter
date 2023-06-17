@@ -9,6 +9,8 @@ namespace IngameCoding.Tester
 {
     using Parser;
 
+    using System.Linq;
+
     internal class Compiler
     {
         internal struct CompilerResult
@@ -20,7 +22,7 @@ namespace IngameCoding.Tester
         {
             internal string Name;
             internal bool Disabled;
-            internal string File;
+            internal string[] Files;
         }
 
         internal static CompilerResult Compile(ParserResult parserResult, List<Warning> warnings, DirectoryInfo directory, string path)
@@ -32,25 +34,47 @@ namespace IngameCoding.Tester
 
             foreach (var item in parserResult.TestDefinitions)
             {
-                if (!item.TryGetAttribute("File", out var attrFile))
-                { throw new CompilerException("Attribute 'File' is requied for test definition", item.Keyword, path); }
-                if (attrFile.Parameters.Length != 1)
-                { throw new CompilerException("Attribute 'File' requies 1 string parameter", attrFile.Name, path); }
-                if (attrFile.Parameters[0].TokenType != TokenType.LITERAL_STRING)
-                { throw new CompilerException($"Attribute 'File' requies 1 string parameter, passed {attrFile.Parameters[0].TokenType}", attrFile.Name, path); }
-                if (!File.Exists(Path.Combine(directory.FullName, attrFile.Parameters[0].Content)))
-                { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].Content)} does not exists'", attrFile.Parameters[0]); }
                 if (names.Contains(item.Name.Content))
                 { throw new CompilerException($"Test '{item.Name.Content}' is already defined", item.Name, path); }
+
                 if (string.IsNullOrEmpty(item.Name.Content) || string.IsNullOrWhiteSpace(item.Name.Content) || (item.Name.Content == "test" && item.Name.TokenType != TokenType.LITERAL_STRING))
                 { throw new CompilerException($"Invalid test name '{item.Name.Content}'", item.Name, path); }
+
                 names.Add(item.Name.Content);
-                compiledTestDefinitions.Add(new CompiledTestDefinition()
+
+                if (item.TryGetAttribute("File", out var attrFile))
                 {
-                    Disabled = false,
-                    Name = item.Name.Content,
-                    File = Path.Combine(directory.FullName, attrFile.Parameters[0].Content),
-                });
+                    if (attrFile.Parameters.Length != 1)
+                    { throw new CompilerException("Attribute 'File' requies 1 string parameter", attrFile.Name, path); }
+
+                    if (attrFile.Parameters[0].TokenType != TokenType.LITERAL_STRING)
+                    { throw new CompilerException($"Attribute 'File' requies 1 string parameter, passed {attrFile.Parameters[0].TokenType}", attrFile.Name, path); }
+
+                    if (!File.Exists(Path.Combine(directory.FullName, attrFile.Parameters[0].Content)))
+                    { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].Content)} does not exists'", attrFile.Parameters[0]); }
+
+                    compiledTestDefinitions.Add(new CompiledTestDefinition()
+                    {
+                        Disabled = false,
+                        Name = item.Name.Content,
+                        Files = new string[1] { Path.Combine(directory.FullName, attrFile.Parameters[0].Content) },
+                    });
+                }
+                else if (item.TryGetAttribute("All", out var attributeAll))
+                {
+                    if (attributeAll.Parameters.Length != 0)
+                    { throw new CompilerException("Attribute 'All' requies 0 parameter", attrFile.Name, path); }
+
+                    var files = directory.GetFiles("*.bbc");
+                    compiledTestDefinitions.Add(new CompiledTestDefinition()
+                    {
+                        Disabled = false,
+                        Name = item.Name.Content,
+                        Files = files.Select(v => v.FullName).ToArray(),
+                    });
+                }
+                else
+                { throw new CompilerException("Attribute 'File' is requied for test definition", item.Keyword, path); }
             }
 
             foreach (var item in parserResult.Disabled)

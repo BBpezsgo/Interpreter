@@ -126,7 +126,6 @@ namespace IngameCoding.BBCode
         int CurrentLine;
 
         readonly List<Token> tokens;
-        readonly List<Token> tokensWithComments;
 
         readonly TokenizerSettings settings;
         readonly Action<string, Output.LogType> printCallback;
@@ -161,7 +160,6 @@ namespace IngameCoding.BBCode
             CurrentLine = 1;
 
             tokens = new();
-            tokensWithComments = new();
 
             this.settings = settings;
             this.printCallback = printCallback;
@@ -177,33 +175,8 @@ namespace IngameCoding.BBCode
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode) => Parse(sourceCode, null, null, out _, out _);
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings) => Parse(sourceCode, warnings, null, out _, out _);
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath) => Parse(sourceCode, warnings, filePath, out _, out _);
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments) => Parse(sourceCode, warnings, filePath, out tokensWithComments, out _);
+        public Token[] Parse(string sourceCode)
+            => Parse(sourceCode, null, null, out _);
 
         /// <summary>
         /// Convert source code into tokens
@@ -213,7 +186,29 @@ namespace IngameCoding.BBCode
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out Token[] tokensWithComments, out SimpleToken[] unicodeCharacters)
+        public Token[] Parse(string sourceCode, List<Warning> warnings)
+            => Parse(sourceCode, warnings, null, out _);
+
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath)
+            => Parse(sourceCode, warnings, filePath, out _);
+
+        /// <summary>
+        /// Convert source code into tokens
+        /// </summary>
+        /// <param name="sourceCode">
+        /// The source code
+        /// </param>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out SimpleToken[] unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
             Print("Tokenizing ...", Output.LogType.Debug);
@@ -448,13 +443,8 @@ namespace IngameCoding.BBCode
                     else if (CurrentToken.TokenType == TokenType.OPERATOR)
                     {
                         if (CurrentToken.Content != "-")
-                        {
-                            EndToken(OffsetTotal);
-                        }
-                        else
-                        {
-                            CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
-                        }
+                        { EndToken(OffsetTotal); }
+                        CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     }
 
                     if (CurrentToken.TokenType == TokenType.LITERAL_BIN)
@@ -653,7 +643,6 @@ namespace IngameCoding.BBCode
 
             CheckTokens(tokens.ToArray());
 
-            tokensWithComments = NormalizeTokens(this.tokensWithComments, settings).ToArray();
             unicodeCharacters = _unicodeCharacters.ToArray();
             return NormalizeTokens(tokens, settings).ToArray();
         }
@@ -755,15 +744,10 @@ namespace IngameCoding.BBCode
 
             if (CurrentToken.TokenType != TokenType.WHITESPACE)
             {
-                tokensWithComments.Add(CurrentToken.Clone());
-                if (CurrentToken.TokenType != TokenType.COMMENT && CurrentToken.TokenType != TokenType.COMMENT_MULTILINE)
-                {
-                    tokens.Add(CurrentToken.Clone());
-                }
+                tokens.Add(CurrentToken.Clone());
             }
             else if (!string.IsNullOrEmpty(CurrentToken.Content) && settings.TokenizeWhitespaces)
             {
-                tokensWithComments.Add(CurrentToken.Clone());
                 tokens.Add(CurrentToken.Clone());
             }
 
@@ -820,6 +804,37 @@ namespace IngameCoding.BBCode
             }
 
             return result;
+        }
+    }
+
+    public static class Extensions
+    {
+        public static Token[] RemoveTokens(this IEnumerable<Token> tokens, TokenType tokenType)
+        {
+            List<Token> _tokens = new(tokens);
+
+            for (int i = _tokens.Count - 1; i >= 0; i--)
+            {
+                if (_tokens[i].TokenType != tokenType) continue;
+
+                _tokens.RemoveAt(i);
+            }
+
+            return _tokens.ToArray();
+        }
+
+        public static Token[] RemoveTokens(this IEnumerable<Token> tokens, params TokenType[] tokenTypes)
+        {
+            List<Token> _tokens = new(tokens);
+
+            for (int i = _tokens.Count - 1; i >= 0; i--)
+            {
+                if (!tokenTypes.Contains(_tokens[i].TokenType)) continue;
+
+                _tokens.RemoveAt(i);
+            }
+
+            return _tokens.ToArray();
         }
     }
 }

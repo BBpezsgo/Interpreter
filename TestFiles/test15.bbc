@@ -1,0 +1,11 @@
+using System;
+
+[CodeEntry]
+void Start()
+{
+	String g_str = new String(5);
+	
+	delete g_str;
+
+	delete new String(7);
+}

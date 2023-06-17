@@ -7,6 +7,7 @@ using IngameCoding.Errors;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace IngameCoding.Tester
 {
@@ -79,7 +80,13 @@ namespace IngameCoding.Tester
 
                     Console.WriteLine();
 
-                    RunFile(new FileInfo(item.File), parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebug, LogSystem, HandleErrors);
+                    for (int i = 0; i < item.Files.Length; i++)
+                    {
+                        Console.WriteLine(item.Files[i]);
+                        Console.WriteLine();
+
+                        RunFile(new FileInfo(item.Files[i]), parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebug, LogSystem, HandleErrors);
+                    }
                     return;
                 }
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -92,19 +99,28 @@ namespace IngameCoding.Tester
             {
                 if (item.Disabled) continue;
 
-                string testFilePath = item.File;
-                var testFile = new FileInfo(testFilePath);
+                for (int i = 0; i < item.Files.Length; i++)
+                {
+                    string testFilePath = item.Files[i];
+                    var testFile = new FileInfo(testFilePath);
 
-                Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                Console.Write("\n === ");
-                Console.ForegroundColor = ConsoleColor.Magenta;
-                Console.Write(item.Name);
-                Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                Console.Write(" === \n");
-                Console.ResetColor();
-                Console.WriteLine();
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                    Console.Write("\n === ");
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.Write(item.Name);
+                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
 
-                RunFile(testFile, parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebug, LogSystem, HandleErrors);
+                    Console.Write(" (");
+                    Console.Write(item.Files[i].Split('\\').Last());
+                    Console.Write(") ");
+
+                    Console.Write(" === \n");
+                    Console.ResetColor();
+                    Console.WriteLine();
+
+
+                    RunFile(testFile, parserSettings, compilerSettings, bytecodeInterpreterSettings, LogDebug, LogSystem, HandleErrors);
+                }
             }
         }
 
@@ -170,10 +186,10 @@ namespace IngameCoding.Tester
 
             if (codeInterpreter.Initialize())
             {
-                Instruction[] compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
+                Instruction[] compiledCode = codeInterpreter.CompileCode(file, compilerSettings, parserSettings, HandleErrors);
 
                 if (compiledCode != null)
-                { codeInterpreter.RunCode(compiledCode, bytecodeInterpreterSettings); }
+                { codeInterpreter.ExecuteProgram(compiledCode, bytecodeInterpreterSettings); }
             }
 
             while (codeInterpreter.IsExecutingCode)

@@ -1,0 +1,144 @@
+using System;
+
+export void InitializeHeap()
+{
+	*0 = 14;
+	*1 = 0;
+	PrintSegments();
+	int p0 = Allocate(5);
+		
+	PrintSegments();
+	PrintHeap();
+	
+	int p1 = Allocate(2);
+	
+	PrintSegments();
+	PrintHeap();
+	
+	Free(p0);
+	
+	PrintSegments();
+	PrintHeap();
+}
+
+void PrintHeap()
+{
+	int HEAP_SIZE = 16;
+	int i;
+	while (i < HEAP_SIZE)
+	{
+		PrintD(((*i) as int).ToString());
+		Print(' ');
+		i++;
+	};
+	Print('\n');
+}
+
+int Allocate(int size)
+{
+	int freeSpace = FindFreeSpace(size);
+	int blockSizePointer = freeSpace - 2;
+	int blockStatusPointer = freeSpace - 1;
+
+	*blockStatusPointer = 1;
+
+	int blockSize = (*blockSizePointer) as int;
+
+	if (blockSize > size)
+	{
+		*blockSizePointer = size;
+	
+		*(blockSizePointer + 2 + size) = blockSize - size - 2;
+		*(blockSizePointer + 3 + size) = 0;
+	};
+
+	return freeSpace;
+}
+
+void JoinFreeBlocks()
+{
+	int HEAP_SIZE = 16;
+	int i;
+	while (i < HEAP_SIZE)
+	{
+		int blockSize = (*i) as int;
+		int blockStatus = (*(i + 1)) as int;
+		if (blockSize == 0) { break; };
+		if (blockStatus == 0)
+		{
+			if (i != 0)
+			{
+				int lastBlockStatus = (*(i - blockSize + 2)) as int;
+				if (lastBlockStatus == 0)
+				{
+					*(i - blockSize) = blockSize + 2 + (*(i - blockSize));
+					*i = 0;
+				};
+			};
+		};
+		i += blockSize + 2;
+	};
+}
+
+void Free(int pointer)
+{
+	int blockSizePointer = pointer - 2;
+	int blockStatusPointer = pointer - 1;
+
+	*blockStatusPointer = 0;
+
+	JoinFreeBlocks();
+}
+
+int FindFreeSpace(int size)
+{
+	int HEAP_SIZE = 16;
+	int i;
+	int result = -1;
+	while (i < HEAP_SIZE)
+	{
+		int blockSize = (*i) as int;
+		int blockStatus = (*(i + 1)) as int;
+		if (blockSize == 0) {
+			break;
+		};
+		if (blockStatus == 0) {
+			if (blockSize >= size)
+			{
+				result = i + 2;
+				break;
+			};
+		};
+		i += blockSize + 2;
+	};
+	return result;
+}
+
+void PrintSegments()
+{
+	int HEAP_SIZE = 16;
+	int i;
+	while (i < HEAP_SIZE)
+	{
+		int blockSize = (*i) as int;
+		int blockStatus = (*(i + 1)) as int;
+		if (blockSize == 0) {
+			Print('E');
+			Print('O');
+			Print('H');
+			break;
+		};
+		PrintD(blockSize.ToString());
+		if (blockStatus == 0)
+		{
+			Print('F');
+		}
+		else
+		{
+			Print('A');
+		};
+		Print(' ');
+		i += blockSize + 2;
+	};
+	Print('\n');
+}

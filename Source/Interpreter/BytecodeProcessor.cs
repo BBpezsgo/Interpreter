@@ -35,6 +35,9 @@ namespace IngameCoding.Bytecode
             );
         }
 
+        /// <summary>
+        /// Returns the program size
+        /// </summary>
         public int End() => Memory.Code.Length;
 
         public void Step() => Step(1);
@@ -100,13 +103,15 @@ namespace IngameCoding.Bytecode
                 case Opcode.HEAP_GET: return HEAP_GET();
                 case Opcode.HEAP_SET: return HEAP_SET();
 
+                case Opcode.HEAP_ALLOC: return HEAP_ALLOC();
+                case Opcode.HEAP_DEALLOC: return HEAP_DEALLOC();
+
                 case Opcode.DEBUG_SET_TAG: return DEBUG_SET_TAG();
                 case Opcode.CS_PUSH: return CS_PUSH();
                 case Opcode.CS_POP: return CS_POP();
 
                 case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
 
-                case Opcode.FIND_HEAP_FREE_SPACE: return FIND_HEAP_FREE_SPACE();
                 #endregion
 
                 default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
@@ -134,6 +139,30 @@ namespace IngameCoding.Bytecode
 
         #region Instruction Methods
 
+        int HEAP_ALLOC()
+        {
+            DataItem sizeData = Memory.Stack.Pop();
+            int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.type}");
+
+            int block = Memory.Heap.Allocate(size);
+
+            Memory.Stack.Push(block, CurrentInstruction.tag);
+
+            Step();
+            return 10;
+        }
+
+        int HEAP_DEALLOC()
+        {
+            DataItem pointerData = Memory.Stack.Pop();
+            int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.type}");
+
+            Memory.Heap.Deallocate(pointer);
+
+            Step();
+            return 10;
+        }
+
         /// <exception cref="UserException"/>
         int THROW()
         {
@@ -141,6 +170,7 @@ namespace IngameCoding.Bytecode
             throw new UserException("User Exception Thrown", throwValue);
         }
 
+        /*
         /// <exception cref="RuntimeException"/>
         int FIND_HEAP_FREE_SPACE()
         {
@@ -179,6 +209,7 @@ namespace IngameCoding.Bytecode
 
             return 5;
         }
+        */
 
         int GET_BASEPOINTER()
         {
@@ -256,7 +287,7 @@ namespace IngameCoding.Bytecode
             DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.type != RuntimeType.INT)
             { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToString()}"); }
-            
+
             string functionName = Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
 
             if (builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
@@ -380,8 +411,7 @@ namespace IngameCoding.Bytecode
 
         int RETURN()
         {
-            int returnAddress = Memory.ReturnAddressStack[^1];
-            Memory.ReturnAddressStack.RemoveAt(Memory.ReturnAddressStack.Count - 1);
+            int returnAddress = Memory.ReturnAddressStack.Pop();
             BasePointer = Memory.Stack.Pop().ValueInt;
             CodePointer = returnAddress;
 
@@ -390,7 +420,7 @@ namespace IngameCoding.Bytecode
         int CALL()
         {
             Memory.Stack.Push(BasePointer, "saved base pointer");
-            Memory.ReturnAddressStack.Add(CodePointer + 1);
+            Memory.ReturnAddressStack.Push(CodePointer + 1);
             BasePointer = Memory.Stack.Count;
             Step(CurrentInstruction.ParameterInt);
 
@@ -558,7 +588,7 @@ namespace IngameCoding.Bytecode
     {
         internal DataStack Stack;
         internal HEAP Heap;
-        internal List<int> ReturnAddressStack;
+        internal Stack<int> ReturnAddressStack;
         internal Instruction[] Code;
         internal Stack<string> CallStack;
 
@@ -570,7 +600,7 @@ namespace IngameCoding.Bytecode
             Heap = new HEAP(heapSize);
 
             CallStack = new Stack<string>();
-            ReturnAddressStack = new List<int>();
+            ReturnAddressStack = new Stack<int>();
         }
     }
 }

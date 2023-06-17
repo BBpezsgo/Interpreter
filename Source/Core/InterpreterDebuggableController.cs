@@ -63,11 +63,11 @@ namespace IngameCoding.Core
         /// It prepares the interpreter to run some code
         /// </summary>
         /// <param name="compiledCode"></param>
-        public override void RunCode(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
+        public override void ExecuteProgram(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
             BytecodeInterpreterSettings settigns = bytecodeInterpreterSettings;
             settigns.ClockCyclesPerUpdate = 1;
-            base.RunCode(compiledCode, settigns);
+            base.ExecuteProgram(compiledCode, settigns);
         }
     }
 }

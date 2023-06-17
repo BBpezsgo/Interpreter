@@ -14,7 +14,7 @@ namespace IngameCoding.Core
     class EasyInterpreter
     {
         public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors, settings.BasePath);
-        public static void RunCompiledFile(TheProgram.ArgumentParser.Settings settings) => RunCompiledFile(settings.File, settings.bytecodeInterpreterSettings, settings.CompileToFileType, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
+        // public static void RunCompiledFile(TheProgram.ArgumentParser.Settings settings) => RunCompiledFile(settings.File, settings.bytecodeInterpreterSettings, settings.CompileToFileType, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -37,14 +37,14 @@ namespace IngameCoding.Core
             )
         {
             if (LogDebug) Output.Output.Debug($"Run file \"{file.FullName}\" ...");
-            var code = File.ReadAllText(file.FullName);
-            var codeInterpreter = new Interpreter();
+            string code = File.ReadAllText(file.FullName);
+            Interpreter interpreter = new();
 
-            codeInterpreter.OnStdOut += (sender, data) => Output.Output.Write(data).Wait();
-            codeInterpreter.OnStdError += (sender, data) => Output.Output.WriteError(data).Wait();
-            codeInterpreter.OnExecuted += (sender, e) => { if (LogSystem) Output.Output.Log(e.ToString()); };
+            interpreter.OnStdOut += (sender, data) => Output.Output.Write(data).Wait();
+            interpreter.OnStdError += (sender, data) => Output.Output.WriteError(data).Wait();
+            interpreter.OnExecuted += (sender, e) => { if (LogSystem) Output.Output.Log(e.ToString()); };
 
-            codeInterpreter.OnOutput += (sender, message, logType) =>
+            interpreter.OnOutput += (sender, message, logType) =>
             {
                 switch (logType)
                 {
@@ -66,107 +66,55 @@ namespace IngameCoding.Core
                 }
             };
 
-            codeInterpreter.OnNeedInput += (sender) =>
+            interpreter.OnNeedInput += (sender) =>
             {
                 var input = Console.ReadKey();
                 sender.OnInput(input.KeyChar);
             };
 
-            codeInterpreter.OnDone += (sender, success) =>
+#if DEBUG
+            interpreter.OnDone += (sender, success) =>
             {
                 if (sender.Details.Interpreter == null) return;
-                var heap = sender.Details.Interpreter.Heap;
+
                 Console.WriteLine($"");
-                Console.WriteLine($" ===== DUMPED HEAP ===== ");
+                Console.WriteLine($" ===== HEAP ===== ");
                 Console.WriteLine($"");
 
-                int elementsToShow = heap.Length;
-
-                {
-                    for (int i = heap.Length - 1; i >= 0; i--)
-                    {
-                        elementsToShow = i + 1;
-                        if (!heap[i].IsNull) break;
-                    }
-                    elementsToShow += 10;
-                }
-
-                for (int i = 0; i < elementsToShow; i++)
-                {
-                    if (heap[i].IsNull)
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write("null");
-                    }
-                    else
-                    {
-                        string v;
-                        switch (heap[i].type)
-                        {
-                            case RuntimeType.BYTE:
-                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                v = heap[i].ValueByte.ToString();
-                                break;
-                            case RuntimeType.INT:
-                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                v = heap[i].ValueInt.ToString();
-                                break;
-                            case RuntimeType.FLOAT:
-                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                v = heap[i].ValueFloat.ToString() + "f";
-                                break;
-                            case RuntimeType.BOOLEAN:
-                                Console.ForegroundColor = ConsoleColor.Blue;
-                                v = heap[i].ValueBoolean ? "true" : "false";
-                                break;
-                            case RuntimeType.CHAR:
-                                Console.ForegroundColor = ConsoleColor.Yellow;
-                                v = "'" + heap[i].ValueChar.Escape() + "'";
-                                break;
-                            default:
-                                Console.ForegroundColor = ConsoleColor.Gray;
-                                v = heap[i].ToString();
-                                break;
-                        }
-                        Console.Write(v);
-                        if (4 - v.Length > 0)
-                        { Console.Write(new string(' ', 4 - v.Length)); }
-                    }
-                    Console.Write(' ');
-                    Console.ResetColor();
-                }
-                Console.WriteLine($"");
+                sender.Details.Interpreter.Heap.DebugPrint();
+                // PrintHeap(sender.Details.Interpreter.Heap);
             };
+#endif
 
-            if (codeInterpreter.Initialize())
+            if (interpreter.Initialize())
             {
-                codeInterpreter.BasePath = BasePath;
+                interpreter.BasePath = BasePath;
 
-                var dllsFolderPath = Path.Combine(file.Directory.FullName, BasePath.Replace('/', '\\'));
+                string dllsFolderPath = Path.Combine(file.Directory.FullName, BasePath.Replace('/', '\\'));
 
                 if (Directory.Exists(dllsFolderPath))
                 {
-                    var dllsFolder = new DirectoryInfo(dllsFolderPath);
+                    DirectoryInfo dllsFolder = new(dllsFolderPath);
                     if (LogDebug) Output.Output.Debug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
-                    var dlls = dllsFolder.GetFiles("*.dll");
+                    FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
                     foreach (var dll in dlls)
-                    { codeInterpreter.LoadDLL(dll.FullName); }
+                    { interpreter.LoadDLL(dll.FullName); }
                 }
                 else
                 {
                     Output.Output.Warning($"Folder \"{dllsFolderPath}\" doesn't exists!");
                 }
 
-                Instruction[] compiledCode = codeInterpreter.CompileCode(code, file, compilerSettings, parserSettings, HandleErrors);
+                Instruction[] compiledCode = interpreter.CompileCode(file, compilerSettings, parserSettings, HandleErrors);
                 if (compiledCode != null)
-                { codeInterpreter.RunCode(compiledCode, bytecodeInterpreterSettings); }
+                { interpreter.ExecuteProgram(compiledCode, bytecodeInterpreterSettings); }
             }
 
-            while (codeInterpreter.IsExecutingCode)
+            while (interpreter.IsExecutingCode)
             {
                 try
                 {
-                    codeInterpreter.Update();
+                    interpreter.Update();
                 }
                 catch (CompilerException error)
                 {
@@ -175,7 +123,7 @@ namespace IngameCoding.Core
                 }
                 catch (UserException error)
                 {
-                    Output.Output.Error($"UserException: {error.Value.ToString()}");
+                    Output.Output.Error($"UserException: {error.Value}");
                     if (!HandleErrors) throw;
                 }
                 catch (RuntimeException error)
@@ -196,6 +144,70 @@ namespace IngameCoding.Core
             }
         }
 
+        static void PrintHeap(DataItem[] heap)
+        {
+            int elementsToShow = heap.Length;
+
+            for (int i = heap.Length - 1; i >= 0; i--)
+            {
+                elementsToShow = i + 1;
+                if (!heap[i].IsNull) break;
+            }
+            elementsToShow += 10;
+
+            for (int i = 0; i < elementsToShow; i++)
+            {
+                if (i < 0 || i >= heap.Length)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.Write("OOR");
+                }
+                else if (heap[i].IsNull)
+                {
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write("null");
+                }
+                else
+                {
+                    string v;
+                    switch (heap[i].type)
+                    {
+                        case RuntimeType.BYTE:
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            v = heap[i].ValueByte.ToString();
+                            break;
+                        case RuntimeType.INT:
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            v = heap[i].ValueInt.ToString();
+                            break;
+                        case RuntimeType.FLOAT:
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            v = heap[i].ValueFloat.ToString() + "f";
+                            break;
+                        case RuntimeType.BOOLEAN:
+                            Console.ForegroundColor = ConsoleColor.Blue;
+                            v = heap[i].ValueBoolean ? "true" : "false";
+                            break;
+                        case RuntimeType.CHAR:
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            v = "'" + heap[i].ValueChar.Escape() + "'";
+                            break;
+                        default:
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                            v = heap[i].ToString();
+                            break;
+                    }
+                    Console.Write(v);
+                    if (4 - v.Length > 0)
+                    { Console.Write(new string(' ', 4 - v.Length)); }
+                }
+                Console.Write(' ');
+                Console.ResetColor();
+            }
+            Console.WriteLine($"");
+        }
+
+        /*
         public static void RunCompiledFile(
             FileInfo file,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
@@ -307,5 +319,6 @@ namespace IngameCoding.Core
                 }
             }
         }
+        */
     }
 }

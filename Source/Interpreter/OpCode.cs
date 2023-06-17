@@ -61,7 +61,9 @@
         // === HEAP ===
         HEAP_GET,
         HEAP_SET,
-        FIND_HEAP_FREE_SPACE,
+
+        HEAP_ALLOC,
+        HEAP_DEALLOC,
         // === ===
 
         TYPE_GET,

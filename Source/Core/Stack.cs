@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace IngameCoding.Core
 {
-    internal class Stack<T>
+    internal class Stack<T> : IReadOnlyStack<T>
     {
         readonly List<T> stack;
 
@@ -30,6 +30,7 @@ namespace IngameCoding.Core
         /// <summary>Adds an array to the end</summary>
         public virtual void PushRange(T[] list)
         { foreach (T item in list) Push(item); }
+
         /// <returns>The last item</returns>
         public virtual T Last() => this.stack.Last();
 
@@ -42,5 +43,18 @@ namespace IngameCoding.Core
         }
 
         public virtual void Clear() => this.stack.Clear();
+    }
+
+    public interface IReadOnlyStack<T>
+    {
+        /// <returns>The number of items</returns>
+        public int Count { get; }
+
+        public T this[int i] { get; }
+
+        /// <returns>The last item</returns>
+        public T Last();
+
+        public T[] ToArray();
     }
 }

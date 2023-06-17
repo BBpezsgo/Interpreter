@@ -205,8 +205,9 @@ namespace IngameCoding.Tester.Parser
 
         public static ParserResult Parse(string code, List<Warning> warnings, System.Action<string, Output.LogType> printCallback = null)
         {
-            var tokenizer = new IngameCoding.BBCode.Tokenizer(TokenizerSettings.Default);
+            var tokenizer = new BBCode.Tokenizer(TokenizerSettings.Default);
             var tokens = tokenizer.Parse(code, warnings);
+            tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
             System.DateTime parseStarted = System.DateTime.Now;
             if (printCallback != null)

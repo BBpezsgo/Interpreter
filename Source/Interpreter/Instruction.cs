@@ -34,14 +34,13 @@ namespace IngameCoding.Bytecode
     {
         public AddressingMode AddressingMode;
         public Opcode opcode;
-        object parameter;
+        DataItem parameter;
 
         public int ParameterInt
         {
             get
             {
-                if (parameter == null) throw new Errors.InternalException($"Can't cast null to {nameof(Int32)}");
-                if (parameter is int @int) return @int;
+                if (parameter.IsNull) throw new Errors.InternalException($"Can't cast null to {nameof(Int32)}");
                 if (parameter is DataItem dataItem && dataItem.type == RuntimeType.INT) return dataItem.ValueInt;
                 throw new Errors.InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
             }
@@ -50,28 +49,12 @@ namespace IngameCoding.Bytecode
         {
             get
             {
-                if (parameter == null) return DataItem.Null;
-                if (parameter is int @int) return new DataItem(@int, null);
-                if (parameter is float @float) return new DataItem(@float, null);
-                if (parameter is byte @byte) return new DataItem(@byte, null);
-                if (parameter is char @char) return new DataItem(@char, null);
-                if (parameter is bool @bool) return new DataItem(@bool, null);
+                if (parameter.IsNull) return DataItem.Null;
                 if (parameter is DataItem dataItem) return dataItem;
                 return DataItem.Null;
             }
         }
-        /// <summary>
-        /// Can be:
-        /// <list type="bullet">
-        /// <item><see langword="null"/></item>
-        /// <item><see cref="int"/></item>
-        /// <item><see cref="bool"/></item>
-        /// <item><see cref="float"/></item>
-        /// <item><see cref="string"/></item>
-        /// <item><see cref="char"/></item>
-        /// </list>
-        /// </summary>
-        public object Parameter
+        public DataItem Parameter
         {
             get => parameter;
             set => parameter = value;
@@ -82,49 +65,29 @@ namespace IngameCoding.Bytecode
         /// Sets the <see cref="DataItem.Tag"/> to this.<br/>
         /// Can use on:
         /// <list type="bullet">
-        /// <item><see cref="Opcode.LOAD_VALUE_BR"/></item>
-        /// <item><see cref="Opcode.LOAD_FIELD_BR"/></item>
+        /// <item><see cref="Opcode.HEAP_GET"/></item>
+        /// <item><see cref="Opcode.HEAP_SET"/></item>
         /// <item><see cref="Opcode.LOAD_VALUE"/></item>
         /// <item><see cref="Opcode.PUSH_VALUE"/></item>
         /// </list>
         /// </summary>
         public string tag = string.Empty;
 
-        /// <summary><b>Only works at runtime!</b></summary>
-        internal int? index;
-        /// <summary><b>Only works at runtime!</b></summary>
-        internal BytecodeProcessor cpu;
-        /// <summary><b>Only works at runtime!</b></summary>
-        string IsRunning
-        {
-            get
-            {
-                if (cpu != null && index.HasValue)
-                {
-                    if (index == cpu.CodePointer)
-                    {
-                        return ">";
-                    }
-                }
-                return " ";
-            }
-        }
-
         [Obsolete("Only for deserialization", true)]
         public Instruction()
         {
             this.opcode = Opcode.UNKNOWN;
             this.AddressingMode = AddressingMode.ABSOLUTE;
-            this.parameter = null;
+            this.parameter = DataItem.Null;
         }
 
         public Instruction(Opcode opcode)
         {
             this.opcode = opcode;
             this.AddressingMode = AddressingMode.ABSOLUTE;
-            this.parameter = null;
+            this.parameter = DataItem.Null;
         }
-        public Instruction(Opcode opcode, object parameter)
+        public Instruction(Opcode opcode, DataItem parameter)
         {
             this.opcode = opcode;
             this.AddressingMode = AddressingMode.ABSOLUTE;
@@ -144,7 +107,7 @@ namespace IngameCoding.Bytecode
         {
             this.opcode = opcode;
             this.AddressingMode = addressingMode;
-            this.parameter = null;
+            this.parameter = DataItem.Null;
         }
         /// <param name="addressingMode">
         /// Only used by these instructions:<br/>
@@ -155,7 +118,7 @@ namespace IngameCoding.Bytecode
         /// <item><see cref="Opcode.LOAD_FIELD"/></item>
         /// </list>
         /// </param>
-        public Instruction(Opcode opcode, AddressingMode addressingMode, object parameter)
+        public Instruction(Opcode opcode, AddressingMode addressingMode, DataItem parameter)
         {
             this.opcode = opcode;
             this.AddressingMode = addressingMode;
@@ -166,13 +129,13 @@ namespace IngameCoding.Bytecode
         {
             if (this.opcode == Opcode.COMMENT)
             {
-                if (this.parameter == null)
+                if (this.tag == null)
                 {
                     return "# <null>";
                 }
                 else
                 {
-                    return "# " + this.parameter.ToString();
+                    return "# " + this.tag.ToString();
                 }
             }
             else
@@ -184,7 +147,7 @@ namespace IngameCoding.Bytecode
                 {
                     str += " " + AddressingMode.ToString();
                 }
-                if (this.parameter == null)
+                if (this.parameter.IsNull)
                 {
                     str += " { " + "<null>";
                 }
@@ -193,7 +156,7 @@ namespace IngameCoding.Bytecode
                     str += " { " + parameter.ToString();
                 }
                 str += " }";
-                return IsRunning + str;
+                return str;
             }
         }
 
@@ -202,38 +165,11 @@ namespace IngameCoding.Bytecode
             serializer.Serialize((int)this.opcode);
             serializer.Serialize((byte)this.AddressingMode);
             serializer.Serialize(this.tag);
-            if (this.parameter is null)
-            {
-                serializer.Serialize((byte)0);
-            }
-            else if (this.parameter is int @int)
-            {
-                serializer.Serialize((byte)1);
-                serializer.Serialize(@int);
-            }
-            else if (this.parameter is bool @bool)
-            {
-                serializer.Serialize((byte)3);
-                serializer.Serialize(@bool);
-            }
-            else if (this.parameter is float @float)
-            {
-                serializer.Serialize((byte)4);
-                serializer.Serialize(@float);
-            }
-            else if (this.parameter is char @char)
-            {
-                serializer.Serialize((byte)5);
-                serializer.Serialize(@char);
-            }
-            else
-            {
-                throw new NotImplementedException();
-            }
+            serializer.Serialize(this.parameter, SerializeDataItem);
         }
         void SerializeDataItem(Serializer serializer, DataItem dataItem)
         {
-            serializer.Serialize((int)dataItem.type);
+            serializer.Serialize((byte)dataItem.type);
             serializer.Serialize(dataItem.Tag);
             switch (dataItem.type)
             {
@@ -255,7 +191,7 @@ namespace IngameCoding.Bytecode
         }
         DataItem DeserializeDataItem(Deserializer deserializer)
         {
-            RuntimeType type = (RuntimeType)deserializer.DeserializeInt32();
+            RuntimeType type = (RuntimeType)deserializer.DeserializeByte();
             string tag = deserializer.DeserializeString();
 
             switch (type)
@@ -273,7 +209,7 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        Value SerializeTextDataItem(DataItem dataItem)
+        static Value SerializeTextDataItem(DataItem dataItem)
         {
             Value result = Value.Object();
             result["Type"] = Value.Literal((int)dataItem.type);
@@ -296,7 +232,7 @@ namespace IngameCoding.Bytecode
                     throw new Errors.InternalException($"Unknown type {dataItem.type}");
             }
         }
-        DataItem DeserializeTextDataItem(Value data)
+        static DataItem DeserializeTextDataItem(Value data)
         {
             RuntimeType type = (RuntimeType)data["Type"].Int;
             string tag = data["Tag"].String;
@@ -321,29 +257,7 @@ namespace IngameCoding.Bytecode
             this.opcode = (Opcode)deserializer.DeserializeInt32();
             this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
             this.tag = deserializer.DeserializeString();
-            var parameterType = deserializer.DeserializeByte();
-            if (parameterType == 0)
-            {
-                this.parameter = null;
-            }
-            else if (parameterType == 1)
-            {
-                this.parameter = deserializer.DeserializeInt32();
-            }
-            else if (parameterType == 3)
-            {
-                this.parameter = deserializer.DeserializeBoolean();
-            }
-            else if (parameterType == 4)
-            {
-                this.parameter = deserializer.DeserializeFloat();
-            }
-            else if (parameterType == 5)
-            {
-                this.parameter = deserializer.DeserializeChar();
-            }
-            else
-            { throw new NotImplementedException(); }
+            this.parameter = deserializer.DeserializeObject(DeserializeDataItem);
         }
 
         Value ISerializableText.SerializeText()
@@ -353,35 +267,7 @@ namespace IngameCoding.Bytecode
             result["OpCode"] = Value.Literal(opcode.ToString());
             result["AddressingMode"] = Value.Literal(AddressingMode.ToString());
             result["Tag"] = Value.Literal(tag);
-            if (this.parameter is null)
-            {
-                result["ParameterType"] = Value.Literal(0);
-            }
-            else if (this.parameter is int @int)
-            {
-                result["ParameterType"] = Value.Literal(1);
-                result["ParameterValue"] = Value.Literal(@int);
-            }
-            else if (this.parameter is bool @bool)
-            {
-                result["ParameterType"] = Value.Literal(3);
-                result["ParameterValue"] = Value.Literal(@bool);
-            }
-            else if (this.parameter is float @float)
-            {
-                result["ParameterType"] = Value.Literal(4);
-                result["ParameterValue"] = Value.Literal(@float);
-            }
-            else if (this.parameter is char @char)
-            {
-                result["ParameterType"] = Value.Literal(5);
-                result["ParameterValue"] = Value.Literal(@char);
-            }
-            else
-            {
-                throw new NotImplementedException();
-            }
-
+            result["ParameterValue"] = SerializeTextDataItem(parameter);
             return result;
         }
 
@@ -390,29 +276,7 @@ namespace IngameCoding.Bytecode
             opcode = Enum.Parse<Opcode>(data["OpCode"].String);
             AddressingMode = Enum.Parse<AddressingMode>(data["AddressingMode"].String);
             tag = data["Tag"].String;
-            int parameterType = (int)data["ParameterType"].Int;
-            if (parameterType == 0)
-            {
-                this.parameter = null;
-            }
-            else if (parameterType == 1)
-            {
-                this.parameter = data["ParameterValue"].Int;
-            }
-            else if (parameterType == 3)
-            {
-                this.parameter = data["ParameterValue"].Bool;
-            }
-            else if (parameterType == 4)
-            {
-                this.parameter = data["ParameterValue"].Float;
-            }
-            else if (parameterType == 5)
-            {
-                this.parameter = (char)data["ParameterValue"].Int;
-            }
-            else
-            { throw new NotImplementedException(); }
+            parameter = DeserializeTextDataItem(data["ParameterValue"]);
         }
     }
 }

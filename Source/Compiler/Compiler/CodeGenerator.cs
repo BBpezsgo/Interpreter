@@ -205,19 +205,19 @@ namespace IngameCoding.BBCode.Compiler
         void AddInstruction(Opcode opcode) => AddInstruction(new Instruction(opcode));
         void AddInstruction(Opcode opcode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, string tag = null) => AddInstruction(new Instruction(opcode) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
 
         void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, (object)param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, (object)param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, bool param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
+        void AddInstruction(Opcode opcode, AddressingMode addressingMode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
 
         void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
         #endregion
@@ -1167,7 +1167,7 @@ namespace IngameCoding.BBCode.Compiler
 
             AddComment("}");
 
-            GeneratedCode[conditionJumpOffset].Parameter = GeneratedCode.Count - conditionJumpOffset;
+            GeneratedCode[conditionJumpOffset].Parameter = new DataItem(GeneratedCode.Count - conditionJumpOffset);
             List<int> currentBreakInstructions = breakInstructions.Last();
 
             if (currentBreakInstructions.Count == 0)
@@ -1187,7 +1187,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var breakInstruction in currentBreakInstructions)
             {
-                GeneratedCode[breakInstruction].Parameter = GeneratedCode.Count - breakInstruction;
+                GeneratedCode[breakInstruction].Parameter = new DataItem(GeneratedCode.Count - breakInstruction);
             }
             breakInstructions.RemoveAt(breakInstructions.Count - 1);
         }
@@ -1225,11 +1225,11 @@ namespace IngameCoding.BBCode.Compiler
 
             AddComment("Jump back");
             AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - GeneratedCode.Count);
-            GeneratedCode[conditionJumpOffsetFor].Parameter = GeneratedCode.Count - conditionJumpOffsetFor;
+            GeneratedCode[conditionJumpOffsetFor].Parameter = new DataItem(GeneratedCode.Count - conditionJumpOffsetFor);
 
             foreach (var breakInstruction in breakInstructions.Last())
             {
-                GeneratedCode[breakInstruction].Parameter = GeneratedCode.Count - breakInstruction;
+                GeneratedCode[breakInstruction].Parameter = new DataItem(GeneratedCode.Count - breakInstruction);
             }
             breakInstructions.RemoveAt(breakInstructions.Count - 1);
 
@@ -1280,7 +1280,7 @@ namespace IngameCoding.BBCode.Compiler
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
                 }
                 else if (ifSegment is Statement_If_ElseIf partElseif)
                 {
@@ -1308,7 +1308,7 @@ namespace IngameCoding.BBCode.Compiler
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
                 }
                 else if (ifSegment is Statement_If_Else partElse)
                 {
@@ -1331,7 +1331,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var item in jumpOutInstructions)
             {
-                GeneratedCode[item].Parameter = GeneratedCode.Count - item;
+                GeneratedCode[item].Parameter = new DataItem(GeneratedCode.Count - item);
             }
         }
         void GenerateCodeForStatement(Statement_NewInstance newObject)
@@ -2501,7 +2501,7 @@ namespace IngameCoding.BBCode.Compiler
             int cleanupCodeOffset = GeneratedCode.Count;
 
             for (int i = 0; i < returnInstructions.Count; i++)
-            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
+            { GeneratedCode[returnInstructions[i]].Parameter = new DataItem(cleanupCodeOffset - returnInstructions[i]); }
 
             AddComment("Cleanup {");
 
@@ -2561,7 +2561,7 @@ namespace IngameCoding.BBCode.Compiler
 
             CurrentFile = function.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
+            AddInstruction(Opcode.CS_PUSH, $"{function.Type} {function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
 
             // Search for variables
             AddComment("Variables");
@@ -2582,7 +2582,7 @@ namespace IngameCoding.BBCode.Compiler
             int cleanupCodeOffset = GeneratedCode.Count;
 
             for (int i = 0; i < returnInstructions.Count; i++)
-            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
+            { GeneratedCode[returnInstructions[i]].Parameter = new DataItem(cleanupCodeOffset - returnInstructions[i]); }
 
             AddComment("Cleanup {");
 
@@ -2661,7 +2661,7 @@ namespace IngameCoding.BBCode.Compiler
             int cleanupCodeOffset = GeneratedCode.Count;
 
             for (int i = 0; i < returnInstructions.Count; i++)
-            { GeneratedCode[returnInstructions[i]].Parameter = cleanupCodeOffset - returnInstructions[i]; }
+            { GeneratedCode[returnInstructions[i]].Parameter = new DataItem(cleanupCodeOffset - returnInstructions[i]); }
 
             AddComment("Cleanup {");
 
@@ -2723,7 +2723,7 @@ namespace IngameCoding.BBCode.Compiler
                 foreach (var attribute in function.Attributes)
                 {
                     if (attribute.Identifier.Content != "CodeEntry") continue;
-                    GeneratedCode[entryCallInstruction].Parameter = GeneratedCode.Count - entryCallInstruction;
+                    GeneratedCode[entryCallInstruction].Parameter = new DataItem(GeneratedCode.Count - entryCallInstruction);
                 }
 
                 AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
@@ -2745,7 +2745,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (GeneratedCode[entryCallInstruction].ParameterInt == -1)
             {
-                GeneratedCode[entryCallInstruction] = new Instruction(Opcode.COMMENT, "null");
+                GeneratedCode[entryCallInstruction] = new Instruction(Opcode.COMMENT);
             }
 
             foreach (UndefinedFunctionOffset item in undefinedFunctionOffsets)
@@ -2772,7 +2772,7 @@ namespace IngameCoding.BBCode.Compiler
                 if (function.InstructionOffset == -1)
                 { throw new InternalException($"Function '{function.ReadableID()}' does not have instruction offset", item.CurrentFile); }
 
-                GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
 
                 parameters.Clear();
                 compiledVariables.Clear();
@@ -2793,7 +2793,7 @@ namespace IngameCoding.BBCode.Compiler
                     if (function.InstructionOffset == -1)
                     { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
 
-                    GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                    GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
                 }
                 else if (item.CallStatement is Statement_KeywordCall functionCall)
                 {
@@ -2806,7 +2806,7 @@ namespace IngameCoding.BBCode.Compiler
                         if (function.InstructionOffset == -1)
                         { throw new InternalException($"Constructor for type \"{@class}\" does not have instruction offset", item.CurrentFile); }
 
-                        GeneratedCode[item.CallInstructionIndex].Parameter = function.InstructionOffset - item.CallInstructionIndex;
+                        GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
                     }
                     else
                     { throw new NotImplementedException(); }

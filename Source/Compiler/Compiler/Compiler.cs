@@ -69,22 +69,28 @@ namespace IngameCoding.BBCode.Compiler
                     Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
                     Console.Write($" ");
 
-                    if (instruction.Parameter is int || instruction.Parameter is float)
+                    if (instruction.Parameter.type == RuntimeType.INT)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter}");
+                        Console.Write($"{instruction.Parameter.ValueInt}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter is bool)
+                    else if (instruction.Parameter.type == RuntimeType.FLOAT)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write($"{instruction.Parameter.ValueFloat}");
+                        Console.Write($" ");
+                    }
+                    else if (instruction.Parameter.type == RuntimeType.BOOLEAN)
                     {
                         Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"{instruction.Parameter}");
+                        Console.Write($"{instruction.Parameter.ValueBoolean}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter is string parameterString)
+                    else if (instruction.Parameter.type == RuntimeType.STRING)
                     {
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write($"\"{parameterString.Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}\"");
+                        Console.Write($"\"{instruction.Parameter.ToString().Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}\"");
                         Console.Write($" ");
                     }
                     else
@@ -502,14 +508,14 @@ namespace IngameCoding.BBCode.Compiler
 
                             if (parameterTypes[0] == BuiltinType.VOID)
                             {
-                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, new Action<DataItem[]>((p) =>
+                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, (DataItem[] p) =>
                                 {
                                     Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
-                                }), false);
+                                });
                             }
                             else
                             {
-                                builtinFunctions.Add(bfName, new BuiltinFunction(new Action<DataItem[], BuiltinFunction>((p, self) =>
+                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, (DataItem[] p) =>
                                 {
                                     Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
                                     DataItem returnValue = returnType switch
@@ -522,8 +528,8 @@ namespace IngameCoding.BBCode.Compiler
                                         _ => throw new RuntimeException($"Invalid return type \"{returnType}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\""),
                                     };
                                     returnValue.Tag = "return value";
-                                    self.RaiseReturnEvent(returnValue);
-                                }), bfName, pTypes, true));
+                                    return (returnValue);
+                                });
                             }
                         }
                         break;

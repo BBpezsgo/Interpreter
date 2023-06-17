@@ -200,9 +200,9 @@ namespace IngameCoding.Errors
     [Serializable]
     public class UserException : RuntimeException
     {
-        public readonly Bytecode.DataItem Value;
+        public readonly string Value;
 
-        public UserException(string message, Bytecode.DataItem value) : base(message)
+        public UserException(string message, string value) : base(message)
         {
             this.Value = value;
         }

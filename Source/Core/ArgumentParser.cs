@@ -117,6 +117,14 @@ namespace TheProgram
                 int i = 0;
                 while (i < args.Length - 1)
                 {
+                    if (args[i] == "-heap")
+                    {
+                        i++;
+                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.HeapSize))
+                        { throw new ArgumentException("Expected number value after argument '-heap'"); }
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-debug")
                     {
                         if (result.RunType != RunType.Normal) throw new ArgumentException(

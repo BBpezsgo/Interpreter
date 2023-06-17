@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace ConsoleGUI
@@ -134,6 +135,15 @@ namespace ConsoleGUI
             }
             this.currentIndex = this.v.Length;
         }
+
+        internal void FillRemaing()
+        {
+            for (int i = this.currentIndex; i < this.v.Length; i++)
+            {
+                this.v[i].Char = ' ';
+            }
+            this.currentIndex = this.v.Length;
+        }
     }
 
     public interface IElementWithSubelements : IElement
@@ -153,7 +163,7 @@ namespace ConsoleGUI
         public string Title { get; }
     }
 
-    public interface IElement
+    public interface IElement : IMainThreadThing
     {
         Rectangle Rect { get; set; }
         void RefreshSize();

@@ -61,14 +61,14 @@ export void PrintLine(byte message)
 export char ReadKey();
 
 export String ReadLine() {
-    String result = CreateString(0);
+    String result = new String(0);
     while (true)
     {
         char inpChar = ReadKey();
         if (inpChar == '\n') { break; };
         if (inpChar == '\r') { break; };
 
-        String newResult = CreateString(result.Length() + 1);
+        String newResult = new String(result.Length() + 1);
 
         for (int i = 0; i < result.Length(); i++)
         {

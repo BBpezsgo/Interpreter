@@ -9,7 +9,7 @@ namespace IngameCoding.Bytecode
     {
         internal readonly Memory Memory;
 
-        internal Dictionary<string, BuiltinFunction> builtinFunctions;
+        internal Dictionary<string, BuiltinFunction> BuiltinFunctions;
 
         internal int CodePointer;
         internal int BasePointer;
@@ -18,12 +18,7 @@ namespace IngameCoding.Bytecode
 
         public BytecodeProcessor(Instruction[] code, int basePointer, int heapSize, Dictionary<string, BuiltinFunction> builtinFunctions)
         {
-            for (int i = 0; i < code.Length; i++)
-            {
-                code[i].index = i;
-                code[i].cpu = this;
-            }
-            this.builtinFunctions = builtinFunctions;
+            this.BuiltinFunctions = builtinFunctions;
 
             BasePointer = basePointer;
             CodePointer = code.Length;
@@ -49,7 +44,7 @@ namespace IngameCoding.Bytecode
             Memory.ReturnAddressStack.Clear();
             Memory.Stack = null;
             Memory.ReturnAddressStack = null;
-            this.builtinFunctions = null;
+            this.BuiltinFunctions = null;
         }
 
         /// <exception cref="RuntimeException"></exception>
@@ -167,7 +162,11 @@ namespace IngameCoding.Bytecode
         int THROW()
         {
             DataItem throwValue = Memory.Stack.Pop();
-            throw new UserException("User Exception Thrown", throwValue);
+            string v = null;
+            try
+            { v = Memory.Heap.GetStringByPointer(throwValue.ValueInt); }
+            catch (System.Exception) { }
+            throw new UserException("User Exception Thrown", v);
         }
 
         /*
@@ -273,9 +272,7 @@ namespace IngameCoding.Bytecode
             return 3;
         }
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
-        void OnBuiltinFunctionReturnValue(DataItem returnValue)
+        void OnExternalReturnValue(DataItem returnValue)
         {
             Memory.Stack.Push(returnValue, "return v");
         }
@@ -286,26 +283,34 @@ namespace IngameCoding.Bytecode
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.type != RuntimeType.INT)
-            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem.ToString()}"); }
+            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem}"); }
 
             string functionName = Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
 
-            if (builtinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            if (!BuiltinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            { throw new RuntimeException($"Undefined function \"{functionName}\""); }
+
+            List<DataItem> parameters = new();
+            for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
+            { parameters.Add(Memory.Stack.Pop()); }
+
+            if (builtinFunction is ManagedBuiltinFunction managedBuiltinFunction)
             {
-                List<DataItem> parameters = new();
-                for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
-                { parameters.Add(Memory.Stack.Pop()); }
-                if (builtinFunction.ReturnSomething)
-                {
-                    builtinFunction.OnReturn += OnBuiltinFunctionReturnValue;
-                    builtinFunction.Callback(parameters.ToArray());
-                    builtinFunction.OnReturn -= OnBuiltinFunctionReturnValue;
-                }
-                else
-                { builtinFunction.Callback(parameters.ToArray()); }
+                managedBuiltinFunction.OnReturn = OnExternalReturnValue;
+                managedBuiltinFunction.Callback(parameters.ToArray());
             }
             else
-            { throw new RuntimeException($"Undefined function \"{functionName}\""); }
+            {
+                if (builtinFunction.ReturnSomething)
+                {
+                    var returnValue = builtinFunction.Callback(parameters.ToArray());
+                    Memory.Stack.Push(returnValue, "return v");
+                }
+                else
+                {
+                    builtinFunction.Callback(parameters.ToArray());
+                }
+            }
 
             Step();
 

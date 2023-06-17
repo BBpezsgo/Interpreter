@@ -1,6 +1,6 @@
 ﻿namespace IngameCoding.Bytecode
 {
-    public enum Opcode
+    public enum Opcode : byte
     {
         UNKNOWN = 0,
         COMMENT = 1,

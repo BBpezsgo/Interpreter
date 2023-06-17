@@ -9,8 +9,6 @@
             var settings = ArgumentParser.Parse(args);
             if (!settings.HasValue) goto ExitProgram;
 
-            object unused;
-
             switch (settings.Value.RunType)
             {
                 case ArgumentParser.RunType.ConsoleGUI:
@@ -19,8 +17,9 @@
                     System.Console.ResetColor();
                     return;
                 case ArgumentParser.RunType.Debugger:
-                    unused = new Debugger(settings.Value);
-                    return;
+                    // unused = new Debugger(settings.Value);
+                    throw new System.NotImplementedException();
+                    // return;
                 case ArgumentParser.RunType.Tester:
                     IngameCoding.Tester.Tester.RunTestFile(settings.Value);
                     break;

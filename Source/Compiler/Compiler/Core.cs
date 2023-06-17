@@ -73,16 +73,16 @@ namespace IngameCoding.BBCode.Compiler
                 Instruction instruction = self[instructionIndex];
                 if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
-                    if (instruction.Parameter is int jumpBy)
+                    if (instruction.Parameter.type ==   RuntimeType.INT)
                     {
-                        if (jumpBy + instructionIndex < index && instructionIndex < index) continue;
-                        if (jumpBy + instructionIndex > index && instructionIndex > index) continue;
-                        if (jumpBy + instructionIndex == index) throw new Exception($"Can't remove instruction at {index} becouse instruction {instruction} is referencing to this position");
+                        if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index) continue;
+                        if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index) continue;
+                        if (instruction.Parameter.ValueInt + instructionIndex == index) throw new Exception($"Can't remove instruction at {index} becouse instruction {instruction} is referencing to this position");
 
                         if (instructionIndex < index)
-                        { instruction.Parameter = jumpBy - 1; changedInstructions++; }
+                        { instruction.Parameter = new DataItem(instruction.Parameter.ValueInt - 1); changedInstructions++; }
                         else if (instructionIndex > index)
-                        { instruction.Parameter = jumpBy + 1; changedInstructions++; }
+                        { instruction.Parameter = new DataItem(instruction.Parameter.ValueInt + 1); changedInstructions++; }
                     }
                 }
             }

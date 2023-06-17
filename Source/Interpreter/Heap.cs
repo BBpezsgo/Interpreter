@@ -5,15 +5,20 @@ namespace IngameCoding.Bytecode
 {
     using IngameCoding.Errors;
 
+    using System.Collections.Generic;
+
     internal class HEAP : IHeap
     {
         readonly DataItem[] heap;
 
         internal HEAP(int size = 0)
         {
-            this.heap = new DataItem[size];
+            ushort _size = (ushort)size;
+            FixSize(ref _size);
 
-            this.heap[0] = GetHeader(size - 1, false);
+            this.heap = new DataItem[_size];
+
+            this.heap[0] = GetHeader((ushort)(_size - 1), false);
         }
 
         public int Size => this.heap.Length;
@@ -56,11 +61,19 @@ namespace IngameCoding.Bytecode
             return GetString(subpointer, length);
         }
 
-        const int BLOCK_SIZE_MASK = int.MaxValue << 1;
-        const int BLOCK_STATUS_MASK = 1;
+        const int BLOCK_SIZE_MASK = 0b_0000_0000_0000_0000_1111_1111_1111_1111;
+        const int BLOCK_STAT_MASK = 0b_0000_0000_0000_1111_0000_0000_0000_0000;
 
-        static DataItem GetHeader(int size, bool used) => new((size & BLOCK_SIZE_MASK) | ((used ? 1 : 0) & BLOCK_STATUS_MASK));
-        static (int, bool) GetHeader(DataItem header) => (header.ValueInt & BLOCK_SIZE_MASK, (header.ValueInt & BLOCK_STATUS_MASK) != 0);
+        public static DataItem GetHeader(ushort size, bool used)
+            => new((size & BLOCK_SIZE_MASK) | (used ? BLOCK_STAT_MASK : 0));
+        public static (ushort, bool) GetHeader(DataItem header)
+            => ((ushort)(header.ValueInt & BLOCK_SIZE_MASK), (header.ValueInt & BLOCK_STAT_MASK) != 0);
+
+        static void FixSize(ref ushort size)
+        {
+            while (size == 0)
+            { size++; }
+        }
 
         public void DebugPrint()
         {
@@ -86,9 +99,11 @@ namespace IngameCoding.Bytecode
 
                     for (int j = i + 1; j < (blockSize + i + 1); j++)
                     {
-                        Console.Write(heap[j]);
+                        heap[j].DebugPrint();
                         Console.Write(" ");
                     }
+                    Console.WriteLine();
+                    Console.WriteLine();
                 }
                 else
                 {
@@ -106,95 +121,135 @@ namespace IngameCoding.Bytecode
 #endif
         }
 
-        static int FixSize(int size)
+        public const int BLOCK_HEADER_SIZE = 1;
+
+        public int Allocate(int sizeNeed)
         {
-            if ((size % 2) != 0)
-            { size++; }
-            return size;
+            if (sizeNeed < ushort.MinValue || sizeNeed > ushort.MaxValue)
+            { throw new OverflowException(); }
+
+            return Allocate((ushort)sizeNeed);
         }
 
-        public void AllocateBlock(int headerPointer, int size)
+        int Allocate(ushort sizeNeed)
         {
-            if (size != (size & BLOCK_SIZE_MASK))
-            { throw new RuntimeException($"HEAP error: Invalid size {size} while allocating block {headerPointer}"); }
+            FixSize(ref sizeNeed);
+            // if (sizeNeed <= 0)
+            // { throw new RuntimeException($"HEAP error: Invalid size {sizeNeed} while allocating block"); }
 
-            int oldSize = heap[headerPointer].ValueInt & BLOCK_SIZE_MASK;
-
-            heap[headerPointer] = GetHeader(size, true);
-
-            if (headerPointer + 1 + size < heap.Length)
-            {
-                int newSize = FixSize(oldSize - size - 1);
-
-                if (newSize != (newSize & BLOCK_SIZE_MASK))
-                { throw new RuntimeException($"HEAP error: Invalid size {newSize} while allocating block {headerPointer}"); }
-
-                heap[headerPointer + 1 + size] = GetHeader(newSize, false);
-            }
-        }
-
-        public int Allocate(int size)
-        {
-            size = FixSize(size);
             int endlessSafe = heap.Length;
-            int i = 0;
-            while (i < heap.Length)
+            int headerPointer = 0;
+            while (headerPointer < heap.Length)
             {
-                (int blockSize, bool blockUsed) = GetHeader(heap[i]);
+                (ushort blockSize, bool blockUsed) = GetHeader(heap[headerPointer]);
+                int dataPointer = headerPointer + BLOCK_HEADER_SIZE;
 
-                if (blockSize >= size && !blockUsed)
+                if (!blockUsed)
                 {
-                    AllocateBlock(i, size);
-                    return i + 1;
+                    // If the block's size is perfect
+                    if (blockSize == sizeNeed)
+                    {
+                        // Update the current block's header
+                        heap[headerPointer] = GetHeader(sizeNeed, true);
+
+                        return dataPointer;
+                    }
+
+                    // If the block's size is larger than needed
+                    if (blockSize > sizeNeed)
+                    {
+                        // Update the current block's header
+                        heap[headerPointer] = GetHeader(sizeNeed, true);
+
+                        int nextHeaderPointer = dataPointer + sizeNeed;
+
+                        // If the next block is exists
+                        if (nextHeaderPointer < heap.Length)
+                        {
+                            // Calculate remaing size
+                            int _remaingSize = blockSize - sizeNeed - BLOCK_HEADER_SIZE;
+
+                            // If a larger block is allocated than needed
+                            if (_remaingSize >= 0)
+                            {
+                                ushort remaingSize = (ushort)_remaingSize;
+                                // Update the next block's header
+                                heap[nextHeaderPointer] = GetHeader(remaingSize, false);
+                            }
+                        }
+
+                        return dataPointer;
+                    }
                 }
 
-                i += blockSize + 1;
+                headerPointer += blockSize + BLOCK_HEADER_SIZE;
 
                 if (endlessSafe-- < 0) throw new EndlessLoopException();
             }
-            throw new RuntimeException($"HEAP error: Failed to get find free space (size {size})");
+
+            throw new RuntimeException($"HEAP error: Failed to find free space (size {sizeNeed})");
         }
 
         public void Deallocate(int pointer)
         {
-            (int blockSize, _) = GetHeader(heap[pointer - 1]);
-            heap[pointer - 1] = GetHeader(blockSize, false);
+            int headerPointer = pointer - BLOCK_HEADER_SIZE;
+
+            (ushort blockSize, _) = GetHeader(heap[headerPointer]);
+            heap[headerPointer] = GetHeader(blockSize, false);
 
             Clear(pointer, blockSize);
 
-            JoinFreeBlocks();
+            int joinIterations = 2;
+            for (int i = 0; i < joinIterations; i++)
+            {
+                bool joined = JoinFreeBlocks();
+                if (!joined) break;
+            }
         }
 
-        public bool JoinFreeBlocks()
+        /// <returns>
+        /// <see langword="true"/> if any block has been joined, <see langword="false"/> otherwise
+        /// </returns>
+        /// <exception cref="EndlessLoopException"/>
+        bool JoinFreeBlocks()
         {
             int endlessSafe = heap.Length;
-            int i = 0;
+
+            int offset = 0;
             int prevBlockSize = 0;
-            while (i < heap.Length)
+            while (offset < heap.Length)
             {
-                (int blockSize, bool blockUsed) = GetHeader(heap[i]);
+                (int blockSize, bool blockUsed) = GetHeader(heap[offset]);
+                int prevOffset = offset - prevBlockSize - BLOCK_HEADER_SIZE;
 
-                if (i != 0 && !blockUsed)
+                // This is a free block that is not at the begining of the heap
+                if (offset != 0 && !blockUsed)
                 {
-                    (_, bool prevBlockUsed) = GetHeader(heap[i - prevBlockSize - 1]);
+                    (_, bool prevBlockUsed) = GetHeader(heap[prevOffset]);
 
+                    // The previous block is also free
                     if (!prevBlockUsed)
                     {
-                        heap[i - prevBlockSize - 1] = GetHeader(blockSize + prevBlockSize + 1, false);
-                        heap[i] = DataItem.Null;
+                        // Update the previous block's header
+                        heap[prevOffset] = GetHeader((ushort)((ushort)blockSize + (ushort)prevBlockSize + (ushort)BLOCK_HEADER_SIZE), false);
+                        // Remove the current block's header
+                        heap[offset] = DataItem.Null;
+
                         return true;
                     }
                 }
 
                 prevBlockSize = blockSize;
-                i += blockSize + 1;
+
+                // Jump to the next block's header offset
+                offset += blockSize + BLOCK_HEADER_SIZE;
 
                 if (endlessSafe-- < 0) throw new EndlessLoopException();
             }
             return false;
         }
 
-        public void Clear(int from, int length)
+        void Clear(int from, int length)
         {
             for (int i = from; i < from + length; i++)
             { heap[i] = DataItem.Null; }

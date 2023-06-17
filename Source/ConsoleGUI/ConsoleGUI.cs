@@ -7,9 +7,80 @@ namespace ConsoleGUI
 {
     using ConsoleLib;
 
-    using System.Timers;
-
     using static Core;
+
+    internal delegate void MainThreadTimerCallback();
+    internal delegate void MainThreadEventCallback<T>(T e);
+
+    internal static class MainThreadExtensions
+    {
+        public static void Tick(this IMainThreadThing[] mainThreadThings, double deltaTime)
+        {
+            for (int i = 0; i < mainThreadThings.Length; i++)
+            { mainThreadThings[i]?.Tick(deltaTime); }
+        }
+    }
+
+    public interface IMainThreadThing
+    {
+        public void Tick(double deltaTime);
+    }
+
+    internal class MainThreadTimer : IMainThreadThing
+    {
+        double Timer;
+        readonly double Interval;
+
+        internal bool Enabled;
+        internal event MainThreadTimerCallback Elapsed;
+
+        public MainThreadTimer(double interval)
+        {
+            this.Interval = interval;
+            this.Enabled = false;
+        }
+
+        public void Tick(double deltaTime)
+        {
+            if (!this.Enabled) return;
+
+            this.Timer += deltaTime;
+            if (this.Timer >= this.Interval)
+            {
+                this.Elapsed?.Invoke();
+            }
+        }
+
+        public void Stop()
+        {
+            this.Timer = 0d;
+            this.Enabled = false;
+        }
+    }
+
+    internal class MainThreadEvents<T> : IMainThreadThing
+    {
+        readonly Queue<T> EventQueue;
+
+        public event MainThreadEventCallback<T> Callback;
+
+        public MainThreadEvents()
+        {
+            EventQueue = new Queue<T>();
+        }
+
+        public void Tick(double _)
+        {
+            while (EventQueue.Count > 0)
+            {
+                T parameter = EventQueue.Dequeue();
+                Callback?.Invoke(parameter);
+            }
+        }
+
+        public void Clear() => EventQueue.Clear();
+        public void Add(T parameter) => EventQueue.Enqueue(parameter);
+    }
 
     internal class ConsoleGUI
     {
@@ -23,15 +94,20 @@ namespace ConsoleGUI
             Color = CharColors.BgBlack
         };
 
-        internal List<IElement> Elements = new();
+        internal IElement[] Elements = Array.Empty<IElement>();
         internal IElement FilledElement = null;
 
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
-        readonly Timer TimerRefreshConsole;
-        readonly Timer TimerAutoRefreshConsole;
-        readonly Timer TimerRefreshSizes;
-        readonly Timer TimerOnStart;
+        readonly MainThreadTimer TimerRefreshConsole;
+        readonly MainThreadTimer TimerAutoRefreshConsole;
+        readonly MainThreadTimer TimerRefreshSizes;
+        readonly MainThreadTimer TimerOnStart;
+
+        readonly MainThreadEvents<KeyEvent> KeyEvents;
+        readonly MainThreadEvents<MouseEvent> MouseEvents;
+
+        readonly IMainThreadThing[] MainThreadThings;
 
         short Width;
         short Height;
@@ -43,6 +119,9 @@ namespace ConsoleGUI
         internal bool NextRefreshConsole;
 
         internal static ConsoleGUI Instance = null;
+
+        double LastTick;
+        bool Destroyed;
 
         void Log(string message)
         {
@@ -56,30 +135,27 @@ namespace ConsoleGUI
             this.DebugLogs = DebugLogs;
 
             Log("Setup timers");
-            TimerAutoRefreshConsole = new Timer();
-            TimerAutoRefreshConsole.Elapsed += (_, _) => RefreshConsole();
-            TimerAutoRefreshConsole.Interval = TIMER_AUTO_REFRESH_CONSOLE;
+
+            TimerAutoRefreshConsole = new MainThreadTimer(TIMER_AUTO_REFRESH_CONSOLE);
+            TimerAutoRefreshConsole.Elapsed += RefreshConsole;
             TimerAutoRefreshConsole.Enabled = true;
 
-            TimerRefreshConsole = new Timer();
-            TimerRefreshConsole.Elapsed += (_, _) =>
+            TimerRefreshConsole = new MainThreadTimer(TIMER_REFRESH_CONSOLE);
+            TimerRefreshConsole.Elapsed += () =>
             {
                 if (!NextRefreshConsole) return;
                 RefreshConsole();
             };
-            TimerRefreshConsole.Interval = TIMER_REFRESH_CONSOLE;
             TimerRefreshConsole.Enabled = true;
 
-            TimerRefreshSizes = new Timer();
-            TimerRefreshSizes.Elapsed += (_, _) => ResizeElements = true;
-            TimerRefreshSizes.Interval = TIMER_RESIZE_ELEMENTS;
+            TimerRefreshSizes = new MainThreadTimer(TIMER_RESIZE_ELEMENTS);
+            TimerRefreshSizes.Elapsed += () => ResizeElements = true;
             TimerRefreshSizes.Enabled = true;
 
-            TimerOnStart = new Timer();
-            TimerOnStart.Elapsed += (_, _) =>
+            TimerOnStart = new MainThreadTimer(2000);
+            TimerOnStart.Elapsed += () =>
             {
                 TimerOnStart.Stop();
-                TimerOnStart.Dispose();
 
                 foreach (var _element in Elements)
                 {
@@ -87,14 +163,31 @@ namespace ConsoleGUI
                 }
                 if (FilledElement is IElementWithEvents elementWithEvents) elementWithEvents?.OnStart();
             };
-            TimerOnStart.Interval = 2000;
             TimerOnStart.Enabled = true;
+
+            this.LastTick = DateTime.UtcNow.TimeOfDay.TotalMilliseconds;
+
+            this.KeyEvents = new MainThreadEvents<KeyEvent>();
+            this.MouseEvents = new MainThreadEvents<MouseEvent>();
+
+            this.KeyEvents.Callback += KeyEvent;
+            this.MouseEvents.Callback += MouseEvent;
+
+            this.MainThreadThings = new IMainThreadThing[]
+            {
+                this.TimerAutoRefreshConsole,
+                this.TimerRefreshConsole,
+                this.TimerRefreshSizes,
+                this.TimerOnStart,
+                this.KeyEvents,
+                this.MouseEvents,
+            };
 
             Log("Setup console");
             SetupConsole();
 
-            ConsoleListener.MouseEvent += MouseEvent;
-            ConsoleListener.KeyEvent += KeyEvent;
+            ConsoleListener.MouseEvent += MouseEventThread;
+            ConsoleListener.KeyEvent += KeyEventThread;
             ConsoleListener.WindowBufferSizeEvent += WindowBufferSizeEvent;
 
             Log("Start console listener");
@@ -112,10 +205,12 @@ namespace ConsoleGUI
 
         internal void Destroy()
         {
+            if (Destroyed) return;
+            Destroyed = true;
             Clear();
-            TimerAutoRefreshConsole?.Dispose();
-            TimerRefreshSizes?.Dispose();
-            TimerOnStart?.Dispose();
+            TimerAutoRefreshConsole?.Stop();
+            TimerRefreshSizes?.Stop();
+            TimerOnStart?.Stop();
             Console.Clear();
 
             Console.WriteLine("Destroy std handler ...");
@@ -145,8 +240,6 @@ namespace ConsoleGUI
             ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = Width, Bottom = Height };
         }
 
-        private void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
-
         void RefreshElementsSize(bool Force = false)
         {
             if (ResizeElements || Force)
@@ -163,6 +256,25 @@ namespace ConsoleGUI
                     FilledElement.Rect = new System.Drawing.Rectangle(0, 0, Width - 1, Height - 1);
                     FilledElement.RefreshSize();
                 }
+            }
+        }
+
+        internal void Tick()
+        {
+            double now = DateTime.UtcNow.TimeOfDay.TotalMilliseconds;
+            double deltaTime = now - this.LastTick;
+            this.LastTick = now;
+
+            this.MainThreadThings.Tick(deltaTime);
+
+
+            if (FilledElement != null)
+            {
+                FilledElement?.Tick(deltaTime);
+            }
+            else
+            {
+                Elements.Tick(deltaTime);
             }
         }
 
@@ -224,7 +336,6 @@ namespace ConsoleGUI
                 }
             }
         }
-
         void WriteConsole(ref SmallRect rect)
         {
             if (ConsoleHandle.IsInvalid)
@@ -243,6 +354,11 @@ namespace ConsoleGUI
                 new Coord(0, 0),
                 ref rect);
         }
+
+        void KeyEventThread(KeyEvent e) => KeyEvents.Add(e);
+        void MouseEventThread(MouseEvent e) => MouseEvents.Add(e);
+
+        void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
         void KeyEvent(KeyEvent e)
         {
             if (!e.KeyDown)
@@ -309,7 +425,7 @@ namespace ConsoleGUI
 #endif
             }
 
-            for (int i = Elements.Count - 1; i >= 0; i--)
+            for (int i = Elements.Length - 1; i >= 0; i--)
             {
                 if (Elements[i] is not IElementWithEvents element) continue;
                 if (!element.Contains(MousePosition.X, MousePosition.Y)) continue;
@@ -324,12 +440,11 @@ namespace ConsoleGUI
                 DrawElement(elementWithEvents);
             }
         }
-
         void MouseEvent(MouseEvent e)
         {
             MousePosition = e.Position;
 
-            for (int i = Elements.Count - 1; i >= 0; i--)
+            for (int i = Elements.Length - 1; i >= 0; i--)
             {
                 try
                 {

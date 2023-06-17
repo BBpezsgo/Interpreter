@@ -168,6 +168,7 @@ namespace IngameCoding.Core
         protected int result;
 
         protected bool pauseCode;
+        IReturnValueConsumer ReturnValueConsumer;
 
         /// <summary> In ms </summary>
         protected float pauseCodeFor;
@@ -492,7 +493,12 @@ namespace IngameCoding.Core
         /// </param>
         public void OnInput(char key)
         {
-            bytecodeInterpreter.AddValueToStack(new DataItem(key, "Console Input"));
+            if (ReturnValueConsumer != null)
+            {
+                ReturnValueConsumer.Return(new DataItem(key, "Console Input"));
+                ReturnValueConsumer = null;
+            }
+
             pauseCode = false;
         }
 
@@ -509,7 +515,7 @@ namespace IngameCoding.Core
                 foreach (var method in methods)
                 {
                     var newFunction = builtinFunctions.AddBuiltinFunction(method);
-                    OnOutput?.Invoke(this, $" Added function {newFunction.ReadableID()}", LogType.Debug);
+                    OnOutput?.Invoke(this, $" Added function {newFunction.ID}", LogType.Debug);
                     functionsAdded++;
                 }
             }
@@ -521,69 +527,71 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            builtinFunctions.AddBuiltinFunction("stdin", Array.Empty<BuiltinType>(), (DataItem[] parameters) =>
+            builtinFunctions.AddManagedBuiltinFunction("stdin", Array.Empty<BuiltinType>(), (DataItem[] parameters, ManagedBuiltinFunction function) =>
             {
-                pauseCode = true;
-                if (OnNeedInput == null)
+                this.pauseCode = true;
+                this.ReturnValueConsumer = function;
+                if (this.OnNeedInput == null)
                 {
-                    OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
-                    OnInput('\0');
+                    this.OnOutput?.Invoke(this, "Event OnNeedInput does not have listeners", LogType.Warning);
+                    this.OnInput('\0');
                 }
                 else
                 {
-                    OnNeedInput?.Invoke(this);
+                    this.OnNeedInput?.Invoke(this);
                 }
-            }, true);
-
-            builtinFunctions.AddBuiltinFunction("stdout", new BuiltinType[] {
-                BuiltinType.CHAR
-            }, (DataItem[] parameters) =>
-            {
-                OnStdOut?.Invoke(this, parameters[0].ValueChar.ToString());
             });
 
-            builtinFunctions.AddBuiltinFunction<char, int, int>("console-set", (v, x, y) =>
-            {
-                if (x < 0 || y < 0) return;
-                var (lx, ly) = Console.GetCursorPosition();
-                Console.SetCursorPosition(x, y);
-                Console.Write(v);
-                Console.SetCursorPosition(lx, ly);
-            });
+            builtinFunctions.AddBuiltinFunction("stdout",
+                (char @char) =>
+                {
+                    OnStdOut?.Invoke(this, @char.ToString());
+                });
+
+            builtinFunctions.AddBuiltinFunction("console-set",
+                (char @char, int x, int y) =>
+                {
+                    if (x < 0 || y < 0) return;
+                    var (lx, ly) = Console.GetCursorPosition();
+                    Console.SetCursorPosition(x, y);
+                    Console.Write(@char);
+                    Console.SetCursorPosition(lx, ly);
+                });
 
             builtinFunctions.AddBuiltinFunction("console-clear", () =>
             {
                 Console.Clear();
             });
 
-            builtinFunctions.AddBuiltinFunction("stderr", new BuiltinType[] {
-                BuiltinType.CHAR
-            }, (DataItem[] parameters) =>
-            {
-                OnStdError?.Invoke(this, parameters[0].ValueChar.ToString());
-            });
-            builtinFunctions.AddBuiltinFunction("sleep", new BuiltinType[] {
-                BuiltinType.INT
-            }, (DataItem[] parameters) =>
-            {
-                pauseCodeFor = parameters[0].ValueInt;
-            });
+            builtinFunctions.AddBuiltinFunction("stderr",
+                (char @char) =>
+                {
+                    OnStdError?.Invoke(this, @char.ToString());
+                });
+
+            builtinFunctions.AddBuiltinFunction("sleep",
+                (int t) =>
+                {
+                    pauseCodeFor = t;
+                });
 
             #endregion
 
             #region Math
 
-            builtinFunctions.AddBuiltinFunction<float>("cos", v =>
-            { return (float)Math.Cos(v); });
+            builtinFunctions.AddBuiltinFunction("cos",
+                (float v) =>
+                { return MathF.Cos(v); });
 
-            builtinFunctions.AddBuiltinFunction<float>("sin", v =>
-            { return (float)Math.Sin(v); });
+            builtinFunctions.AddBuiltinFunction("sin",
+                (float v) =>
+                { return MathF.Sin(v); });
 
             #endregion
 
             #region Enviroment
 
-            builtinFunctions.AddBuiltinFunction("tmnw", () =>
+            builtinFunctions.AddBuiltinFunction("time", () =>
             {
                 throw new NotImplementedException();
             });
@@ -592,23 +600,26 @@ namespace IngameCoding.Core
 
             #region Net.Http
 
-            builtinFunctions.AddBuiltinFunction<string>("http_get", (url) =>
-            {
-                System.Net.Http.HttpClient httpClient = new();
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
-                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(url).Result;
-                string res = result.Content.ReadAsStringAsync().Result;
-                return res;
-            });
+            builtinFunctions.AddBuiltinFunction("http_get",
+                (string url) =>
+                {
+                    System.Net.Http.HttpClient httpClient = new();
+                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
+                    System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(url).Result;
+                    string res = result.Content.ReadAsStringAsync().Result;
+                    return res;
+                });
 
             #endregion
 
             #region Casts
 
-            builtinFunctions.AddBuiltinFunction<float>("float-to-int", @float =>
-            { return (int)@float; });
-            builtinFunctions.AddBuiltinFunction<int>("int-to-float", @int =>
-            { return (float)@int; });
+            builtinFunctions.AddBuiltinFunction("float-to-int",
+                (float @float) =>
+                { return (int)@float; });
+            builtinFunctions.AddBuiltinFunction("int-to-float",
+                (int @int) =>
+                { return (float)@int; });
 
             #endregion
         }

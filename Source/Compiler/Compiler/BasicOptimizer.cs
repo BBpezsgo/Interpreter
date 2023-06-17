@@ -21,9 +21,9 @@ namespace IngameCoding.BBCode.Compiler
                 var instruction = GeneratedCode[i];
                 if (instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
-                    if (instruction.Parameter is int jumpBy)
+                    if (instruction.Parameter.type == RuntimeType.INT)
                     {
-                        if (jumpBy == 1)
+                        if (instruction.Parameter.ValueInt == 1)
                         {
                             List<int> indexes = new();
 

@@ -3,8 +3,6 @@
 
 #pragma warning disable CS0162 // Unreachable code detected
 
-using ANSIConsole;
-
 using System;
 
 namespace TheProgram
@@ -19,7 +17,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "donught.bbc";
+            var file = "test17.bbc";
 
             if (false)
             {
@@ -48,9 +46,10 @@ namespace TheProgram
                 // "-decompile",
                 // "-compile",
                 // "-debug",
-                // "-console-gui",
+                 "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
+                "-heap 16",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{TestConstants.TestFilesPath}{file}\""
                 // $"\"{TestConstants.TestFilesPath}tester.bbct\""
@@ -109,19 +108,22 @@ namespace TheProgram
             return true;
             */
 
-            object unused;
-
             switch (settings.Value.RunType)
             {
                 case ArgumentParser.RunType.ConsoleGUI:
-                    unused = new ConsoleGUI.ConsoleGUI()
+                    ConsoleGUI.ConsoleGUI gui = new()
                     {
                         FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
                     };
+                    while (true)
+                    {
+                        gui.Tick();
+                    }
                     return true;
                 case ArgumentParser.RunType.Debugger:
-                    unused = new Debugger(settings.Value);
-                    return true;
+                    // unused = new Debugger(settings.Value);
+                    throw new NotImplementedException();
+                    // return true;
                 case ArgumentParser.RunType.Tester:
                     IngameCoding.Tester.Tester.RunTestFile(settings.Value);
                     break;

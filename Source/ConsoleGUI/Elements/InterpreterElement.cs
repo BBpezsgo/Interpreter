@@ -8,8 +8,6 @@ namespace ConsoleGUI
     using IngameCoding.Core;
     using IngameCoding.Output.Debug;
 
-    using System.Timers;
-
     internal sealed class InterpreterElement : WindowElement
     {
         public string File;
@@ -37,7 +35,7 @@ namespace ConsoleGUI
         int ConsoleScrollOffset = 0;
         int NextCodeJumpCount = 1;
         int CurrentlyJumping = 0;
-        private Timer InterpreterTimer;
+        MainThreadTimer InterpreterTimer;
 
         InterpreterElement() : base()
         {
@@ -56,6 +54,11 @@ namespace ConsoleGUI
         {
             this.File = file;
             SetupInterpreter();
+        }
+
+        public override void Tick(double deltaTime)
+        {
+            this.InterpreterTimer?.Tick(deltaTime);
         }
 
         /*
@@ -224,8 +227,8 @@ namespace ConsoleGUI
         void SetupInterpreter() => SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
         void SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
-            this.InterpreterTimer = new Timer(200);
-            this.InterpreterTimer.Elapsed += (sender, e) =>
+            this.InterpreterTimer = new MainThreadTimer(200);
+            this.InterpreterTimer.Elapsed += () =>
             {
                 if (this.CurrentlyJumping <= 0) return;
 
@@ -491,9 +494,18 @@ namespace ConsoleGUI
                 }
             }
 
+            int nextHeader = 0;
             for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Size; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Heap[i];
+                bool isHeader = ((nextHeader == i) && (!this.Interpreter.Details.Interpreter.Heap[i].IsNull) && (this.Interpreter.Details.Interpreter.Heap is IngameCoding.Bytecode.HEAP));
+                (int, bool) header = (default, default);
+
+                if (isHeader)
+                {
+                    header = IngameCoding.Bytecode.HEAP.GetHeader(item);
+                    nextHeader += header.Item1 + IngameCoding.Bytecode.HEAP.BLOCK_HEADER_SIZE;
+                }
 
                 bool addLoadIndicator = false;
                 bool addStoreIndicator = false;
@@ -522,49 +534,69 @@ namespace ConsoleGUI
 
                 if (((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length > 0) b.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
 
-
                 b.ForegroundColor = CharColors.FgGray;
                 b.AddText(i.ToString());
                 b.ForegroundColor = CharColors.FgDefault;
                 b.AddSpace(5, sender.Rect.Width);
 
-                if (item.IsNull)
+                if (isHeader)
                 {
-                    b.ForegroundColor = CharColors.FgGray;
-                    b.AddText("<null>");
+                    b.BackgroundColor = CharColors.BgGray;
+                    b.AddText("HEADER | ");
+                    b.AddText(header.Item1.ToString());
+                    b.AddText(" | ");
+                    if (header.Item2)
+                    {
+                        b.BackgroundColor = CharColors.BgYellow;
+                        b.ForegroundColor = CharColors.FgBlack;
+                    }
+                    else
+                    {
+                        b.BackgroundColor = CharColors.BgGreen;
+                        b.ForegroundColor = CharColors.FgWhite;
+                    }
+                    b.AddText(header.Item2 ? "USED" : "FREE");
                 }
                 else
                 {
-                    switch (item.type)
+                    if (item.IsNull)
                     {
-                        case IngameCoding.Bytecode.RuntimeType.INT:
-                            b.ForegroundColor = CharColors.FgCyan;
-                            b.AddText($"{item.ValueInt}");
-                            break;
-                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
-                            b.ForegroundColor = CharColors.FgCyan;
-                            b.AddText($"{item.ValueFloat}f");
-                            break;
-                        case IngameCoding.Bytecode.RuntimeType.CHAR:
-                            b.ForegroundColor = CharColors.FgYellow;
-                            b.AddText($"'{item.ValueChar.Escape()}'");
-                            break;
-                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
-                            b.ForegroundColor = CharColors.FgDarkBlue;
-                            b.AddText($"{item.ValueBoolean}");
-                            break;
-                        default:
-                            b.ForegroundColor = CharColors.FgGray;
-                            b.AddText("?");
-                            break;
+                        b.ForegroundColor = CharColors.FgGray;
+                        b.AddText("<null>");
                     }
-                }
+                    else
+                    {
+                        switch (item.type)
+                        {
+                            case IngameCoding.Bytecode.RuntimeType.INT:
+                                b.ForegroundColor = CharColors.FgCyan;
+                                b.AddText($"{item.ValueInt}");
+                                break;
+                            case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                                b.ForegroundColor = CharColors.FgCyan;
+                                b.AddText($"{item.ValueFloat}f");
+                                break;
+                            case IngameCoding.Bytecode.RuntimeType.CHAR:
+                                b.ForegroundColor = CharColors.FgYellow;
+                                b.AddText($"'{item.ValueChar.Escape()}'");
+                                break;
+                            case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
+                                b.ForegroundColor = CharColors.FgDarkBlue;
+                                b.AddText($"{item.ValueBoolean}");
+                                break;
+                            default:
+                                b.ForegroundColor = CharColors.FgGray;
+                                b.AddText("?");
+                                break;
+                        }
+                    }
 
-                if (!string.IsNullOrEmpty(item.Tag))
-                {
-                    b.AddText($" ");
-                    b.ForegroundColor = CharColors.FgGray;
-                    b.AddText(item.Tag);
+                    if (!string.IsNullOrEmpty(item.Tag))
+                    {
+                        b.AddText($" ");
+                        b.ForegroundColor = CharColors.FgGray;
+                        b.AddText(item.Tag);
+                    }
                 }
 
                 b.BackgroundColor = CharColors.BgBlack;
@@ -604,7 +636,7 @@ namespace ConsoleGUI
             {
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
                 {
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
+                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                 }
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
@@ -618,7 +650,7 @@ namespace ConsoleGUI
 
                 if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE)
                 {
-                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress((int)(instruction.Parameter ?? 0), instruction.AddressingMode));
+                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count);
                 }
 
@@ -806,7 +838,7 @@ namespace ConsoleGUI
         }
         private void SourceCodeElement_OnBeforeDraw(InlineElement sender)
         {
-            sender.ClearBuffer();
+            // sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
             if (this.Interpreter.Details.Interpreter == null) return;
@@ -887,36 +919,41 @@ namespace ConsoleGUI
                     b.AddText($" ");
                 }
 
-                if (instruction.Parameter is int)
-                {
-                    b.ForegroundColor = CharColors.FgCyan;
-                    b.AddText($"{instruction.Parameter}");
-                    b.AddText($" ");
-                }
-                else if (instruction.Parameter is float)
-                {
-                    b.ForegroundColor = CharColors.FgCyan;
-                    b.AddText($"{instruction.Parameter}f");
-                    b.AddText($" ");
-                }
-                else if (instruction.Parameter is bool)
-                {
-                    b.ForegroundColor = CharColors.FgDarkBlue;
-                    b.AddText($"{instruction.Parameter}");
-                    b.AddText($" ");
-                }
-                else if (instruction.Parameter is string @string)
-                {
-                    b.ForegroundColor = CharColors.FgYellow;
-                    b.AddText($"\"{@string.Escape()}\"");
-                    b.AddText($" ");
-                }
-                else
-                {
-                    b.ForegroundColor = CharColors.FgWhite;
-                    // b.AddText($"{instruction.Parameter}");
-                    b.AddText($" ");
-                }
+                if (!instruction.Parameter.IsNull) switch (instruction.Parameter.type)
+                    {
+                        case IngameCoding.Bytecode.RuntimeType.BYTE:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{instruction.Parameter.ValueByte}");
+                            b.AddText($" ");
+                            break;
+                        case IngameCoding.Bytecode.RuntimeType.INT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{instruction.Parameter.ValueInt}");
+                            b.AddText($" ");
+                            break;
+                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{instruction.Parameter.ValueFloat}f");
+                            b.AddText($" ");
+                            break;
+                        case IngameCoding.Bytecode.RuntimeType.STRING:
+                            break;
+                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
+                            b.ForegroundColor = CharColors.FgDarkBlue;
+                            b.AddText($"{instruction.Parameter.ValueBoolean}");
+                            b.AddText($" ");
+                            break;
+                        case IngameCoding.Bytecode.RuntimeType.CHAR:
+                            b.ForegroundColor = CharColors.FgYellow;
+                            b.AddText($"'{instruction.Parameter.ValueChar.Escape()}'");
+                            b.AddText($" ");
+                            break;
+                        default:
+                            b.ForegroundColor = CharColors.FgWhite;
+                            b.AddText($"{instruction.Parameter}");
+                            b.AddText($" ");
+                            break;
+                    }
 
                 if (!string.IsNullOrEmpty(instruction.tag))
                 {
@@ -936,6 +973,8 @@ namespace ConsoleGUI
                 b.BackgroundColor = CharColors.BgWhite;
                 b.SetText(t, sender.Rect.Right - (2 + t.Length));
             }
+
+            b.FillRemaing();
         }
 
         public override void OnMouseEvent(MouseEvent e)
@@ -990,6 +1029,32 @@ namespace ConsoleGUI
                 {
                     this.NextCodeJumpCount--;
                     this.NextCodeJumpCount = Math.Max(this.NextCodeJumpCount, 1);
+                }
+                return;
+            }
+
+            if (e.KeyDown && e.AsciiChar == 42)
+            {
+                if (this.CurrentlyJumping > 0)
+                {
+                    this.CurrentlyJumping = int.MaxValue;
+                }
+                else
+                {
+                    this.NextCodeJumpCount = int.MaxValue;
+                }
+                return;
+            }
+
+            if (e.KeyDown && e.AsciiChar == 47)
+            {
+                if (this.CurrentlyJumping > 0)
+                {
+                    this.CurrentlyJumping = 0;
+                }
+                else
+                {
+                    this.NextCodeJumpCount = 0;
                 }
                 return;
             }

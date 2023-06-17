@@ -46,16 +46,12 @@ namespace IngameCoding.Bytecode
         public override void Push(DataItem value)
         {
             var item = value;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
             base.Push(item);
         }
         /// <returns>Adds a new item to the end</returns>
         public void Push(DataItem value, string tag)
         {
             var item = value;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
             item.Tag = tag;
             base.Push(item);
         }
@@ -86,8 +82,6 @@ namespace IngameCoding.Bytecode
         public void Set(int index, DataItem val, bool overrideTag = false)
         {
             DataItem item = val;
-            item.stack = this;
-            item.heap = this.processor.Memory.Heap;
             if (!overrideTag)
             {
                 item.Tag = this[index].Tag;

@@ -13,81 +13,86 @@ namespace IngameCoding.Core
         public readonly BuiltinType[] ParameterTypes;
         public readonly string Name;
 
-        readonly Action<DataItem[], BuiltinFunction> callback;
-
-        public delegate void ReturnEventHandler(DataItem returnValue);
-        public event ReturnEventHandler OnReturn;
-
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething;
+        public readonly bool ReturnSomething;
 
         internal BytecodeInterpreter BytecodeInterpreter;
 
-        public void RaiseReturnEvent(DataItem returnValue)
-        {
-            OnReturn?.Invoke(returnValue);
-        }
+        protected Func<DataItem[], DataItem> callback;
 
-        public BuiltinFunction()
-        { }
-
-        /// <summary>
-        /// Function without return value
-        /// </summary>
-        /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[], BuiltinFunction> callback, string name, BuiltinType[] parameters, bool returnSomething = false)
+        protected BuiltinFunction(string name, BuiltinType[] parameters, bool returnSomething)
         {
             this.Name = name;
             this.ParameterTypes = parameters;
+            this.ReturnSomething = returnSomething;
+        }
+
+        /// <param name="callback">Callback when the interpreter process this function</param>
+        public BuiltinFunction(Action<DataItem[]> callback, string name, BuiltinType[] parameters)
+                 : this(name, parameters, false)
+        {
+            this.callback = new Func<DataItem[], DataItem>((p) =>
+            {
+                callback?.Invoke(p);
+                return DataItem.Null;
+            });
+        }
+
+        /// <param name="callback">Callback when the interpreter process this function</param>
+        public BuiltinFunction(Func<DataItem[], DataItem> callback, string name, BuiltinType[] parameters)
+                 : this(name, parameters, true)
+        {
             this.callback = callback;
-            this.ReturnSomething = returnSomething;
-        }
-
-        /// <summary>
-        /// Function without return value
-        /// </summary>
-        /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[]> callback, string name, BuiltinType[] parameters, bool returnSomething = false)
-        {
-            this.Name = name;
-            this.ParameterTypes = parameters;
-            this.callback = new Action<DataItem[], BuiltinFunction>((a, b) =>
-            { callback?.Invoke(a); });
-            this.ReturnSomething = returnSomething;
         }
 
         /// <exception cref="InternalException"></exception>
-        public void Callback(DataItem[] parameters)
+        public DataItem Callback(DataItem[] parameters)
         {
-            if (ReturnSomething)
-            {
-                if (callback != null)
-                {
-                    callback(parameters, this);
-                }
-                else
-                {
-                    throw new InternalException("Callback is null");
-                }
-            }
-            else
-            {
-                callback(parameters, this);
-            }
+            if (callback == null)
+            { throw new InternalException("Callback is null"); }
+
+            return callback.Invoke(parameters);
         }
 
-        internal object ReadableID()
+        internal object ID
         {
-            string result = Name;
-            result += "(";
-            for (int j = 0; j < ParameterTypes.Length; j++)
+            get
             {
-                if (j > 0) { result += ", "; }
-                result += ParameterTypes[j].ToString().ToLower();
+                string result = Name;
+                result += "(";
+                for (int j = 0; j < ParameterTypes.Length; j++)
+                {
+                    if (j > 0) { result += ", "; }
+                    result += ParameterTypes[j].ToString().ToLower();
+                }
+                result += ")";
+                return result;
             }
-            result += ")";
-            return result;
         }
+    }
+
+    public class ManagedBuiltinFunction : BuiltinFunction, IReturnValueConsumer
+    {
+        public delegate void ReturnEvent(DataItem returnValue);
+        public ReturnEvent OnReturn;
+
+        /// <param name="callback">Callback when the interpreter process this function</param>
+        public ManagedBuiltinFunction(Action<DataItem[], ManagedBuiltinFunction> callback, string name, BuiltinType[] parameters)
+                 : base(name, parameters, true)
+        {
+            base.callback = new Func<DataItem[], DataItem>((p) =>
+            {
+                callback?.Invoke(p, this);
+                return DataItem.Null;
+            });
+        }
+
+        public void Return(DataItem returnValue) => OnReturn?.Invoke(returnValue);
+    }
+
+    public interface IReturnValueConsumer
+    {
+        public void Return(DataItem returnValue);
     }
 
     public static class BuiltinFunctionGenerator
@@ -126,6 +131,8 @@ namespace IngameCoding.Core
                 }
             }
 
+            bool returnSomething = method.ReturnType != typeof(void);
+
             BuiltinFunction function = new((ps) =>
             {
                 if (ps.Length != parameters.Length)
@@ -145,7 +152,7 @@ namespace IngameCoding.Core
                 }
 
                 method.Invoke(null, objs);
-            }, method.Name, parameterTypes, method.ReturnType != typeof(void));
+            }, method.Name, parameterTypes);
 
             if (!builtinFunctions.ContainsKey(method.Name))
             {
@@ -160,18 +167,23 @@ namespace IngameCoding.Core
             return function;
         }
 
+        public static void AddManagedBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Action<DataItem[], ManagedBuiltinFunction> callback)
+        {
+            ManagedBuiltinFunction function = new(callback, name, parameterTypes);
+
+            if (!builtinFunctions.ContainsKey(name))
+            {
+                builtinFunctions.Add(name, function);
+            }
+            else
+            {
+                builtinFunctions[name] = function;
+                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+            }
+        }
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Func<DataItem[], DataItem> callback)
         {
-            BuiltinFunction function = new(new Action<DataItem[], BuiltinFunction>((p, self) =>
-            {
-                DataItem x = callback(p);
-                if (self.BytecodeInterpreter == null)
-                {
-                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpreter is null");
-                    return;
-                }
-                self.BytecodeInterpreter.AddValueToStack(x);
-            }), name, parameterTypes, true);
+            BuiltinFunction function = new(callback, name, parameterTypes);
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -185,16 +197,10 @@ namespace IngameCoding.Core
         }
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<DataItem> callback)
         {
-            BuiltinFunction function = new(new Action<DataItem[], BuiltinFunction>((_, self) =>
+            BuiltinFunction function = new(p =>
             {
-                var x = callback();
-                if (self.BytecodeInterpreter == null)
-                {
-                    Output.Output.Error($"The built-in function '{name}' can not return a value: bytecode interpreter is null");
-                    return;
-                }
-                self.BytecodeInterpreter.AddValueToStack(x);
-            }), name, Array.Empty<BuiltinType>(), true);
+                return callback.Invoke();
+            }, name, Array.Empty<BuiltinType>());
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -206,9 +212,9 @@ namespace IngameCoding.Core
                 Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Action<DataItem[]> callback, bool ReturnSomething = false)
+        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Action<DataItem[]> callback)
         {
-            BuiltinFunction function = new(callback, name, parameterTypes, ReturnSomething);
+            BuiltinFunction function = new(callback, name, parameterTypes);
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -241,7 +247,8 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value());
+                callback?.Invoke(
+                    (T0)args[0].Value());
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -253,7 +260,9 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value());
+                callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value());
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -265,7 +274,61 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value());
+                callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value());
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value());
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3, T4>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3, T4> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value(),
+                    (T4)args[4].Value());
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value(),
+                    (T4)args[4].Value(),
+                    (T5)args[5].Value());
             });
         }
 
@@ -289,7 +352,9 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value()
+                    ), $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -301,7 +366,10 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value()
+                    ), $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -313,7 +381,65 @@ namespace IngameCoding.Core
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
-                return new DataItem(callback?.Invoke((T0)args[0].Value(), (T1)args[1].Value(), (T2)args[2].Value()), $"{name}() result");
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value()
+                    ), $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, object> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value()
+                    ), $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3, T4>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, T4, object> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value(),
+                    (T4)args[4].Value()
+                    ), $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddBuiltinFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, T4, T5, object> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+
+            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                return new DataItem(callback?.Invoke(
+                    (T0)args[0].Value(),
+                    (T1)args[1].Value(),
+                    (T2)args[2].Value(),
+                    (T3)args[3].Value(),
+                    (T4)args[4].Value(),
+                    (T5)args[5].Value()
+                    ), $"{name}() result");
             });
         }
 

@@ -1,0 +1,4 @@
+using System;
+
+String inp = ReadLine();
+delete inp;

@@ -33,7 +33,7 @@ namespace IngameCoding.Bytecode
         internal void Reset() => Position = 0;
     }
 
-    public enum RuntimeType
+    public enum RuntimeType : byte
     {
         BYTE,
         INT,
@@ -49,8 +49,6 @@ namespace IngameCoding.Bytecode
         public static DataItem Null => new() { };
 
         public readonly RuntimeType type;
-        internal DataStack stack;
-        internal HEAP heap;
 
         #region Value Fields
 
@@ -171,9 +169,6 @@ namespace IngameCoding.Bytecode
             this.valueBoolean = null;
             this.valueChar = null;
 
-            this.stack = null;
-            this.heap = null;
-
             this.Tag = tag;
         }
         DataItem(RuntimeType type)
@@ -185,9 +180,6 @@ namespace IngameCoding.Bytecode
             this.valueFloat = null;
             this.valueBoolean = null;
             this.valueChar = null;
-
-            this.stack = null;
-            this.heap = null;
 
             this.Tag = null;
         }
@@ -768,5 +760,54 @@ namespace IngameCoding.Bytecode
                 RuntimeType.CHAR => valueChar == value.valueChar,
                 _ => throw new NotImplementedException(),
             };
+
+        public void DebugPrint()
+        {
+            ConsoleColor savedFgColor = Console.ForegroundColor;
+            ConsoleColor savedBgColor = Console.BackgroundColor;
+            IFormatProvider ci = System.Globalization.CultureInfo.InvariantCulture;
+
+            if (IsNull)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGray;
+                Console.Write("null");
+            }
+            else
+            {
+                switch (type)
+                {
+                    case RuntimeType.BYTE:
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write(this.valueByte?.ToString(ci));
+                        break;
+                    case RuntimeType.INT:
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write(this.valueInt?.ToString(ci));
+                        break;
+                    case RuntimeType.FLOAT:
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write(this.valueFloat?.ToString(ci));
+                        break;
+                    case RuntimeType.STRING:
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write("???");
+                        break;
+                    case RuntimeType.BOOLEAN:
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.Write(this.valueBoolean?.ToString(ci));
+                        break;
+                    case RuntimeType.CHAR:
+                        Console.ForegroundColor = ConsoleColor.Yellow;
+                        Console.Write("'" + this.valueChar?.ToString(ci) + "'");
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            Console.ResetColor();
+            Console.ForegroundColor = savedFgColor;
+            Console.BackgroundColor = savedBgColor;
+        }
     }
 }

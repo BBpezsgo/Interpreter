@@ -14,7 +14,7 @@ namespace ConsoleGUI
         internal void ClearBuffer() => DrawBuffer = new(Rect.Width * Rect.Height);
 
         public virtual void BeforeDraw()
-        { if (DrawBuffer.Length == 0) ClearBuffer(); }
+        { /*if (DrawBuffer.Length == 0) ClearBuffer();*/ }
 
         public virtual void OnMouseEvent(MouseEvent e)
         {
@@ -24,5 +24,7 @@ namespace ConsoleGUI
         public virtual void OnStart() { }
 
         public virtual void RefreshSize() => this.ClearBuffer();
+
+        public virtual void Tick(double deltaTime) { }
     }
 }

@@ -36,8 +36,6 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (@using.IsUrl)
             {
-                @using.Path[0].Analysis.CompilerReached = true;
-
                 if (!System.Uri.TryCreate(@using.Path[0].Content, System.UriKind.Absolute, out var uri))
                 { throw new SyntaxException($"Invalid uri \"{@using.Path[0].Content}\"", @using.Path[0], file.FullName); }
 
@@ -88,8 +86,6 @@ namespace IngameCoding.BBCode.Compiler
                         }
                     }
                 }
-
-                for (int i = 0; i < @using.Path.Length; i++) @using.Path[i].Analysis.CompilerReached = true;
 
                 string filename = @using.PathString.Replace("/", "\\");
                 if (!filename.EndsWith("." + FileExtensions.Code)) filename += "." + FileExtensions.Code;
@@ -189,7 +185,7 @@ namespace IngameCoding.BBCode.Compiler
             ParserSettings parserSettings,
             string basePath)
         {
-            if (parserResult.Usings.Count > 0)
+            if (parserResult.Usings.Length > 0)
             { PrintCallback?.Invoke("Parse usings ...", Output.LogType.Debug); }
 
             List<CollectedAST> collectedASTs = new();

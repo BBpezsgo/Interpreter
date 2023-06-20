@@ -17,7 +17,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test17.bbc";
+            var file = "tcp-server.bbc";
 
             if (false)
             {
@@ -49,7 +49,7 @@ namespace TheProgram
                  "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                "-heap 16",
+                "-heap 64",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{TestConstants.TestFilesPath}{file}\""
                 // $"\"{TestConstants.TestFilesPath}tester.bbct\""

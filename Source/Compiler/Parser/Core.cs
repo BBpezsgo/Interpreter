@@ -7,6 +7,28 @@ namespace IngameCoding.BBCode.Parser
     using IngameCoding.BBCode.Parser.Statements;
     using IngameCoding.Core;
 
+    public enum LiteralType
+    {
+        INT,
+        FLOAT,
+        BOOLEAN,
+        STRING,
+        CHAR,
+    }
+
+    public static class LiteralTypeExtensions
+    {
+        public static string ToStringRepresentation(this LiteralType literalType) => literalType switch
+        {
+            LiteralType.INT => "int",
+            LiteralType.FLOAT => "float",
+            LiteralType.BOOLEAN => "bool",
+            LiteralType.STRING => "string",
+            LiteralType.CHAR => "char",
+            _ => throw new NotImplementedException(),
+        };
+    }
+
     public struct ParserSettings
     {
         public bool PrintInfo;
@@ -22,23 +44,23 @@ namespace IngameCoding.BBCode.Parser
         public string FilePath { get; set; }
     }
 
-    [Serializable]
-    public class ParameterDefinition
+    public class ParameterDefinition : Compiler.IElementWithKey<string>
     {
         public Token Identifier;
-        public TypeToken Type;
+        public TypeInstance Type;
 
         public bool withThisKeyword;
+
+        public string Key => Identifier.Content;
 
         public override string ToString() => $"{(withThisKeyword ? "this " : "")}{Type} {Identifier}";
         internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
     }
 
-    [Serializable]
     public class FieldDefinition
     {
         public Token Identifier;
-        public TypeToken Type;
+        public TypeInstance Type;
         public Token ProtectionToken;
 
         public override string ToString() => $"{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
@@ -51,9 +73,28 @@ namespace IngameCoding.BBCode.Parser
         public bool IsExport => ExportKeyword != null;
     }
 
-    public class FunctionDefinition : Exportable, IDefinition
+    public class EnumMemberDefinition : Compiler.IElementWithKey<string>
     {
-        public class Attribute : IngameCoding.BBCode.Compiler.IElementWithKey<string>
+        public Token Identifier;
+        public Statement_Literal Value;
+
+        public string Key => Identifier.Content;
+    }
+
+    public class EnumDefinition : IDefinition, Compiler.IElementWithKey<string>
+    {
+        public string FilePath { get; set; }
+
+        public string Key => Identifier.Content;
+
+        public Token Identifier;
+        public EnumMemberDefinition[] Members;
+        public FunctionDefinition.Attribute[] Attributes;
+    }
+
+    public class FunctionDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<FunctionDefinition>
+    {
+        public class Attribute : Compiler.IElementWithKey<string>
         {
             public Token Identifier;
             public object[] Parameters;
@@ -68,7 +109,7 @@ namespace IngameCoding.BBCode.Parser
         public readonly Token Identifier;
         public ParameterDefinition[] Parameters;
         public Statement[] Statements;
-        public TypeToken Type;
+        public TypeInstance Type;
 
         public string FilePath { get; set; }
 
@@ -87,7 +128,7 @@ namespace IngameCoding.BBCode.Parser
 
         public override string ToString()
         {
-            return $"{(IsExport ? "export " : "")}{this.Type.Content} {this.Identifier}" + (this.Parameters.Length > 0 ? "(...)" : "()") + " " + (this.Statements.Length > 0 ? "{...}" : "{}");
+            return $"{(IsExport ? "export " : "")}{this.Type.Identifier.Content} {this.Identifier}" + (this.Parameters.Length > 0 ? "(...)" : "()") + " " + (this.Statements.Length > 0 ? "{...}" : "{}");
         }
 
         public string PrettyPrint(int ident = 0)
@@ -104,7 +145,7 @@ namespace IngameCoding.BBCode.Parser
                 statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
             }
 
-            return $"{" ".Repeat(ident)}{this.Type.Content} {this.Identifier}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+            return $"{" ".Repeat(ident)}{this.Type.Identifier.Content} {this.Identifier}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
         }
 
         public string ReadableID()
@@ -121,6 +162,17 @@ namespace IngameCoding.BBCode.Parser
         }
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+
+        public bool IsSame(FunctionDefinition other)
+        {
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
+            }
+            return true;
+        }
     }
 
     public class GeneralFunctionDefinition : Exportable, IDefinition
@@ -184,7 +236,7 @@ namespace IngameCoding.BBCode.Parser
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }
 
-    public class ClassDefinition : Exportable, IDefinition
+    public class ClassDefinition : Exportable, IDefinition, Compiler.IElementWithKey<string>
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
@@ -193,6 +245,8 @@ namespace IngameCoding.BBCode.Parser
         public List<Statement> Statements;
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
+
+        public string Key => Name.Content;
 
         public IReadOnlyCollection<FunctionDefinition> Methods => methods;
         public IReadOnlyCollection<GeneralFunctionDefinition> GeneralMethods => generalMethods;
@@ -241,15 +295,19 @@ namespace IngameCoding.BBCode.Parser
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }
 
-    public class StructDefinition : Exportable, IDefinition
+    public class StructDefinition : Exportable, IDefinition, Compiler.IElementWithKey<string>
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
         public Token BracketStart;
         public Token BracketEnd;
         public List<Statement> Statements;
+
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
+
+        public string Key => Name.Content;
+
         public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
         readonly Dictionary<string, FunctionDefinition> methods;
 
@@ -296,23 +354,25 @@ namespace IngameCoding.BBCode.Parser
 
     public readonly struct ParserResult
     {
-        public readonly List<FunctionDefinition> Functions;
-        public readonly Dictionary<string, StructDefinition> Structs;
-        public readonly Dictionary<string, ClassDefinition> Classes;
-        public readonly List<UsingDefinition> Usings;
+        public readonly FunctionDefinition[] Functions;
+        public readonly StructDefinition[] Structs;
+        public readonly ClassDefinition[] Classes;
+        public readonly UsingDefinition[] Usings;
         public readonly Statement_HashInfo[] Hashes;
         public readonly List<UsingAnalysis> UsingsAnalytics;
         public readonly Statement[] TopLevelStatements;
+        public readonly EnumDefinition[] Enums;
 
-        public ParserResult(List<FunctionDefinition> functions, Dictionary<string, StructDefinition> structs, List<UsingDefinition> usings, List<Statement_HashInfo> hashes, Dictionary<string, ClassDefinition> classes, Statement[] topLevelStatements)
+        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement_HashInfo> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
         {
-            Functions = functions;
-            Structs = structs;
-            Usings = usings;
+            Functions = functions.ToArray();
+            Structs = structs.ToArray();
+            Usings = usings.ToArray();
             UsingsAnalytics = new();
             Hashes = hashes.ToArray();
-            Classes = classes;
-            TopLevelStatements = topLevelStatements;
+            Classes = classes.ToArray();
+            TopLevelStatements = topLevelStatements.ToArray();
+            Enums = enums.ToArray();
         }
 
         /// <summary>Converts the parsed AST into text</summary>
@@ -327,12 +387,12 @@ namespace IngameCoding.BBCode.Parser
 
             foreach (var @struct in Structs)
             {
-                x += @struct.Value.PrettyPrint() + "\n";
+                x += @struct.PrettyPrint() + "\n";
             }
 
             foreach (var @class in Classes)
             {
-                x += @class.Value.PrettyPrint() + "\n";
+                x += @class.PrettyPrint() + "\n";
             }
 
             foreach (var function in Functions)
@@ -423,16 +483,16 @@ namespace IngameCoding.BBCode.Parser
 
             foreach (var item in this.Structs)
             {
-                foreach (var attr in item.Value.Attributes)
+                foreach (var attr in item.Attributes)
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
                 Console.Write("struct ");
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"{item.Key} ");
+                Console.Write($"{item.Name} ");
                 Console.Write("\n\r");
 
-                foreach (var field in item.Value.Fields)
+                foreach (var field in item.Fields)
                 {
                     Console.ForegroundColor = ConsoleColor.Blue;
                     Console.Write($"  {field.Type} ");
@@ -449,16 +509,16 @@ namespace IngameCoding.BBCode.Parser
 
             foreach (var item in this.Classes)
             {
-                foreach (var attr in item.Value.Attributes)
+                foreach (var attr in item.Attributes)
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
                 Console.Write("class ");
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write($"{item.Key} ");
+                Console.Write($"{item.Name} ");
                 Console.Write("\n\r");
 
-                foreach (var field in item.Value.Fields)
+                foreach (var field in item.Fields)
                 {
                     Console.ForegroundColor = ConsoleColor.Blue;
                     Console.Write($"  {field.Type} ");
@@ -481,7 +541,7 @@ namespace IngameCoding.BBCode.Parser
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
-                if (item.Type.Type == TypeTokenType.USER_DEFINED)
+                if (!Compiler.CodeGeneratorBase.BuiltinTypes.Contains(item.Type.Identifier.Content))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                 }
@@ -503,7 +563,7 @@ namespace IngameCoding.BBCode.Parser
                     Console.ForegroundColor = ConsoleColor.Blue;
                     if (param.withThisKeyword)
                     { Console.Write("this "); }
-                    if (param.Type.Type == TypeTokenType.USER_DEFINED)
+                    if (!Compiler.CodeGeneratorBase.BuiltinTypes.Contains(param.Type.Identifier.Content))
                     { Console.ForegroundColor = ConsoleColor.Green; }
                     Console.Write($"{param.Type} ");
                     Console.ForegroundColor = ConsoleColor.White;
@@ -594,10 +654,30 @@ namespace IngameCoding.BBCode.Parser
             if (string.IsNullOrEmpty(path))
             { throw new ArgumentException($"'{nameof(path)}' cannot be null or empty.", nameof(path)); }
 
-            for (int i = 0; i < this.Functions.Count; i++)
+            for (int i = 0; i < this.Functions.Length; i++)
             { this.Functions[i].FilePath = path; }
-            for (int i = 0; i < this.Structs.Count; i++)
-            { this.Structs.ElementAt(i).Value.FilePath = path; }
+            for (int i = 0; i < this.Enums.Length; i++)
+            { this.Enums[i].FilePath = path; }
+            for (int i = 0; i < this.Structs.Length; i++)
+            {
+                this.Structs[i].FilePath = path;
+                for (int j = 0; j < this.Structs[i].Methods.Count; j++)
+                {
+                    this.Structs[i].Methods.ElementAt(j).Value.FilePath = path;
+                }
+            }
+            for (int i = 0; i < this.Classes.Length; i++)
+            {
+                this.Classes[i].FilePath = path;
+                for (int j = 0; j < this.Classes[i].Methods.Count; j++)
+                {
+                    this.Classes[i].Methods.ElementAt(j).FilePath = path;
+                }
+                for (int j = 0; j < this.Classes[i].GeneralMethods.Count; j++)
+                {
+                    this.Classes[i].GeneralMethods.ElementAt(j).FilePath = path;
+                }
+            }
             for (int i = 0; i < this.Hashes.Length; i++)
             { this.Hashes[i].FilePath = path; }
             StatementFinder.GetAllStatement(this, statement =>
@@ -610,19 +690,19 @@ namespace IngameCoding.BBCode.Parser
 
         public void CheckFilePaths(System.Action<string> NotSetCallback)
         {
-            for (int i = 0; i < this.Functions.Count; i++)
+            for (int i = 0; i < this.Functions.Length; i++)
             {
                 if (string.IsNullOrEmpty(this.Functions[i].FilePath))
                 { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} is null"); }
                 else
                 { NotSetCallback?.Invoke($"FunctionDefinition.FilePath {this.Functions[i]} : {this.Functions[i].FilePath}"); }
             }
-            for (int i = 0; i < this.Structs.Count; i++)
+            for (int i = 0; i < this.Structs.Length; i++)
             {
-                if (string.IsNullOrEmpty(this.Structs.ElementAt(i).Value.FilePath))
-                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} is null"); }
+                if (string.IsNullOrEmpty(this.Structs[i].FilePath))
+                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs[i]} is null"); }
                 else
-                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs.ElementAt(i).Value} : {this.Structs.ElementAt(i).Value.FilePath}"); }
+                { NotSetCallback?.Invoke($"StructDefinition.FilePath {this.Structs[i]} : {this.Structs[i].FilePath}"); }
             }
             for (int i = 0; i < this.Hashes.Length; i++)
             {

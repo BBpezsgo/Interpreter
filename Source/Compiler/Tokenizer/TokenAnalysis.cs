@@ -3,19 +3,6 @@
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser.Statements;
 
-    public class TokenAnalysis
-    {
-        public TokenSubtype Subtype = TokenSubtype.None;
-        public TokenSubSubtype SubSubtype = TokenSubSubtype.None;
-
-        public bool ParserReached;
-        public bool CompilerReached;
-
-        string ReachedUnit => CompilerReached ? "compiled" : (ParserReached ? "parsed" : "tokenized");
-
-        public override string ToString() => $"TokenAnalysis {{ {ReachedUnit} {Subtype} {SubSubtype} }}";
-    }
-
     public static class Extensions
     {
         internal static AnalysedToken_Function BuiltinFunction(this Token token, string name, string type, string[] paramNames, string[] paramTypes) => new(token)
@@ -58,26 +45,14 @@
         {
             FilePath = variable.FilePath,
             Name = variable.VariableName.Content,
-            Type = variable.Type.FullName,
+            Type = variable.Type.Name,
             Kind = variable.IsGlobal ? VariableKind.Global : VariableKind.Local,
         };
         internal static AnalysedToken_Variable Variable(this Token token, CompiledParameter parameter) => new(token)
         {
             Name = parameter.Identifier.Content,
-            Type = parameter.Type.FullName,
+            Type = parameter.Type.Name,
             Kind = VariableKind.Parameter,
-        };
-        internal static AnalysedToken_ComplexTypeDef Struct(this TypeToken token, CompiledStruct @struct) => new(token)
-        {
-            Name = @struct.Name.Content,
-            FilePath = @struct.FilePath,
-            Kind = ComplexTypeKind.Struct,
-        };
-        internal static AnalysedToken_ComplexTypeDef Class(this TypeToken token, CompiledClass @class) => new(token)
-        {
-            Name = @class.Name.Content,
-            FilePath = @class.FilePath,
-            Kind = ComplexTypeKind.Class,
         };
         internal static AnalysedToken_ComplexType Struct(this Token token, CompiledStruct @struct) => new(token)
         {
@@ -95,14 +70,14 @@
         {
             Name = @struct.Name.Content,
             FilePath = @struct.FilePath,
-            Type = type.FullName,
+            Type = type.Name,
             Kind = ComplexTypeKind.Struct,
         };
         internal static AnalysedToken_Field Field(this Token token, CompiledClass @class, Statement_Field field, CompiledType type) => new(token)
         {
             Name = @class.Name.Content,
             FilePath = @class.FilePath,
-            Type = type.FullName,
+            Type = type.Name,
             Kind = ComplexTypeKind.Class,
         };
     }
@@ -115,18 +90,6 @@
             Content = new string(token.Content);
             Position = token.Position;
             TokenType = token.TokenType;
-        }
-    }
-
-    public class AnalysedTypeToken : TypeToken
-    {
-        internal AnalysedTypeToken(TypeToken token) : base(token.Content, token.Type, token)
-        {
-            AbsolutePosition = token.AbsolutePosition;
-            Content = new string(token.Content);
-            Position = token.Position;
-            TokenType = token.TokenType;
-            ListOf = token.ListOf;
         }
     }
 
@@ -195,15 +158,6 @@
     {
         Struct,
         Class,
-    }
-
-    public class AnalysedToken_ComplexTypeDef : AnalysedTypeToken
-    {
-        public string FilePath;
-        public string Name;
-        public ComplexTypeKind Kind;
-
-        internal AnalysedToken_ComplexTypeDef(TypeToken token) : base(token) { }
     }
 
     public class AnalysedToken_ComplexType : AnalysedToken

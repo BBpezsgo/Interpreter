@@ -151,21 +151,7 @@ namespace IngameCoding.Tester.Parser
         readonly List<Token> tokens = new();
         public Token[] Tokens => tokens.ToArray();
 
-        Token CurrentToken
-        {
-            get
-            {
-                if (currentTokenIndex < tokens.Count)
-                {
-                    tokens[currentTokenIndex].Analysis.ParserReached = true;
-                    return tokens[currentTokenIndex];
-                }
-                else
-                {
-                    return null;
-                }
-            }
-        }
+        Token CurrentToken => (currentTokenIndex >= 0 && currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
 
         List<Warning> Warnings;
         public readonly List<Error> Errors = new();

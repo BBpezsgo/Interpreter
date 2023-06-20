@@ -109,11 +109,7 @@ namespace IngameCoding.Core
             {
                 System.Reflection.ParameterInfo parameter = parameters[i];
                 Type paramType = parameter.ParameterType;
-                if (paramType == typeof(string))
-                {
-                    parameterTypes[i] = BuiltinType.STRING;
-                }
-                else if (paramType == typeof(int))
+                if (paramType == typeof(int))
                 {
                     parameterTypes[i] = BuiltinType.INT;
                 }
@@ -146,8 +142,19 @@ namespace IngameCoding.Core
                         p.type != RuntimeType.FLOAT &&
                         p.type != RuntimeType.BOOLEAN)
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
-                    if (p.type != parameterTypes[i].Convert())
+
+                    RuntimeType convertedType = parameterTypes[i] switch
+                    {
+                        BuiltinType.INT => RuntimeType.INT,
+                        BuiltinType.BYTE => RuntimeType.BYTE,
+                        BuiltinType.FLOAT => RuntimeType.FLOAT,
+                        BuiltinType.BOOLEAN => RuntimeType.BOOLEAN,
+                        _ => throw new NotImplementedException(),
+                    };
+
+                    if (p.type != convertedType)
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].ToString().ToLower()}"); }
+
                     objs[i] = p.Value();
                 }
 
@@ -248,7 +255,7 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value());
+                    GetValue<T0>(args[0]));
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -261,8 +268,8 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value());
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]));
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -275,9 +282,9 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value());
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]));
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -290,10 +297,10 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value());
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3]));
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -306,11 +313,11 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value(),
-                    (T4)args[4].Value());
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3]),
+                    GetValue<T4>(args[4]));
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -323,13 +330,41 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value(),
-                    (T4)args[4].Value(),
-                    (T5)args[5].Value());
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3]),
+                    GetValue<T4>(args[4]),
+                    GetValue<T5>(args[5]));
             });
+        }
+
+        static T GetValue<T>(DataItem data)
+        {
+            Type type_ = typeof(T);
+
+            if (type_ == typeof(byte))
+            {
+                return (T)(object)(data.Byte ?? (byte)0);
+            }
+            if (type_ == typeof(int))
+            {
+                return (T)(object)(data.Integer ?? 0);
+            }
+            if (type_ == typeof(float))
+            {
+                return (T)(object)(data.Float ?? 0f);
+            }
+            if (type_ == typeof(bool))
+            {
+                return (T)(object)((data.Integer ?? 0) != 0);
+            }
+            if (type_ == typeof(char))
+            {
+                return (T)(object)(char)(data.Integer ?? 0);
+            }
+
+            throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }
 
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<object> callback)
@@ -353,7 +388,7 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value()
+                    GetValue<T0>(args[0])
                     ), $"{name}() result");
             });
         }
@@ -367,8 +402,8 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value()
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1])
                     ), $"{name}() result");
             });
         }
@@ -382,9 +417,9 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value()
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2])
                     ), $"{name}() result");
             });
         }
@@ -398,10 +433,10 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value()
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3])
                     ), $"{name}() result");
             });
         }
@@ -415,11 +450,11 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value(),
-                    (T4)args[4].Value()
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3]),
+                    GetValue<T4>(args[4])
                     ), $"{name}() result");
             });
         }
@@ -433,12 +468,12 @@ namespace IngameCoding.Core
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
                 return new DataItem(callback?.Invoke(
-                    (T0)args[0].Value(),
-                    (T1)args[1].Value(),
-                    (T2)args[2].Value(),
-                    (T3)args[3].Value(),
-                    (T4)args[4].Value(),
-                    (T5)args[5].Value()
+                    GetValue<T0>(args[0]),
+                    GetValue<T1>(args[1]),
+                    GetValue<T2>(args[2]),
+                    GetValue<T3>(args[3]),
+                    GetValue<T4>(args[4]),
+                    GetValue<T5>(args[5])
                     ), $"{name}() result");
             });
         }
@@ -455,6 +490,8 @@ namespace IngameCoding.Core
         static void CheckParameters(string functionName, BuiltinType[] requied, DataItem[] passed)
         {
             if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
+
+            return;
 
             for (int i = 0; i < requied.Length; i++)
             {
@@ -521,8 +558,6 @@ namespace IngameCoding.Core
             { return BuiltinType.FLOAT; }
             if (type_ == typeof(bool))
             { return BuiltinType.BOOLEAN; }
-            if (type_ == typeof(string))
-            { return BuiltinType.STRING; }
             if (type_ == typeof(char))
             { return BuiltinType.CHAR; }
 

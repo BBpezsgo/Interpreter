@@ -15,6 +15,12 @@ export void Set(char data, int x, int y);
 [Builtin("console-clear")]
 export void Clear();
 
+enum Bool
+{
+    True = 1,
+    False = 0,
+}
+
 export void Print(String message)
 {
     int length = message.Length();
@@ -313,6 +319,7 @@ export float ToFloat(this int v);
 [Builtin("float-to-int")]
 export int ToInt(this float v);
 
+[Define("string")]
 class String
 {
     private int pointer;

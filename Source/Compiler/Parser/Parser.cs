@@ -4,165 +4,82 @@ using System.Linq;
 
 namespace IngameCoding.BBCode
 {
+    using IngameCoding.BBCode.Compiler;
+    using IngameCoding.BBCode.Parser;
     using IngameCoding.Core;
     using IngameCoding.Errors;
-
-    public enum TokenSubtype
-    {
-        None,
-        MethodName,
-        Keyword,
-        Type,
-        VariableName,
-        /// <summary>
-        /// while, for, if, etc.
-        /// </summary>
-        Statement,
-        Library,
-        Struct,
-        BuiltinType,
-        Hash,
-        HashParameter,
-        Class,
-    }
 
     public enum BuiltinType
     {
         VOID,
+
         AUTO,
         ANY,
 
         BYTE,
         INT,
         FLOAT,
-        STRING,
+
         BOOLEAN,
 
-        STRUCT,
-        LISTOF,
         CHAR,
     }
 
-    public enum TypeTokenType
+    public class TypeInstance : IEquatable<TypeInstance>
     {
-        AUTO,
-        VOID,
-        ANY,
+        public Token Identifier;
 
-        LIST,
-
-        BYTE,
-        INT,
-        FLOAT,
-        STRING,
-        BOOLEAN,
-        USER_DEFINED,
-        CHAR,
-    }
-
-    [Serializable]
-    public class TypeToken : Token
-    {
-        public TypeTokenType Type;
-        public TypeToken ListOf;
-
-        public bool IsList => ListOf != null;
-
-        public TypeToken(string name, TypeTokenType type, Token @base) : base()
+        public TypeInstance(Token identifier) : base()
         {
-            this.Type = type;
-            base.Content = name;
-
-            if (@base == null)
-            {
-                base.TokenType = TokenType.IDENTIFIER;
-            }
+            this.Identifier = identifier;
+        }
+        public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string> typeDefinitionReplacer)
+            => TypeInstance.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
+        public static TypeInstance CreateAnonymous(string name, Func<string, string> typeDefinitionReplacer)
+        {
+            string definedType = typeDefinitionReplacer?.Invoke(name);
+            if (definedType == null)
+            { return new TypeInstance(Token.CreateAnonymous(name)); }
             else
-            {
-                base.AbsolutePosition = @base.AbsolutePosition;
-                base.Position = @base.Position;
-                base.Analysis = @base.Analysis;
-                base.TokenType = @base.TokenType;
-            }
+            { return new TypeInstance(Token.CreateAnonymous(definedType)); }
         }
-        public TypeToken(string name, BuiltinType type, Token @base) : base()
+        public static TypeInstance CreateAnonymous(CompiledType compiledType)
         {
-            this.Type = type switch
-            {
-                BuiltinType.AUTO => TypeTokenType.AUTO,
-                BuiltinType.BYTE => TypeTokenType.BYTE,
-                BuiltinType.INT => TypeTokenType.INT,
-                BuiltinType.FLOAT => TypeTokenType.FLOAT,
-                BuiltinType.VOID => TypeTokenType.VOID,
-                BuiltinType.STRING => TypeTokenType.STRING,
-                BuiltinType.BOOLEAN => TypeTokenType.BOOLEAN,
-                BuiltinType.STRUCT => TypeTokenType.USER_DEFINED,
-                BuiltinType.LISTOF => TypeTokenType.LIST,
-                BuiltinType.ANY => TypeTokenType.ANY,
-                BuiltinType.CHAR => TypeTokenType.CHAR,
-                _ => throw new NotImplementedException(),
-            };
-            base.Content = name;
-
-            if (@base == null)
-            {
-                base.TokenType = TokenType.IDENTIFIER;
-            }
-            else
-            {
-                base.AbsolutePosition = @base.AbsolutePosition;
-                base.Position = @base.Position;
-                base.Analysis = @base.Analysis;
-                base.TokenType = @base.TokenType;
-            }
+            if (compiledType is null) throw new ArgumentNullException(nameof(compiledType));
+            return new TypeInstance(Token.CreateAnonymous(compiledType.Name));
         }
 
-        public TypeToken(string name, TypeToken listOf, Token @base) : base()
-        {
-            this.Type = TypeTokenType.LIST;
-            this.ListOf = listOf;
-            base.Content = name;
+        public override string ToString() => this.Identifier.Content;
 
-            if (@base == null)
-            {
-                base.TokenType = TokenType.IDENTIFIER;
-            }
-            else
-            {
-                base.AbsolutePosition = @base.AbsolutePosition;
-                base.Position = @base.Position;
-                base.Analysis = @base.Analysis;
-                base.TokenType = @base.TokenType;
-            }
+        public static bool operator ==(TypeInstance a, string b)
+        {
+            if (a is null && b is null) return true;
+            if (a is not null && b is null) return false;
+            if (a is null && b is not null) return false;
+            return a.Identifier.Content == b;
+        }
+        public static bool operator !=(TypeInstance a, string b) => !(a == b);
+
+        public static bool operator ==(string a, TypeInstance b) => b == a;
+        public static bool operator !=(string a, TypeInstance b) => !(b == a);
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(this, obj))
+            { return true; }
+
+            if (obj is null)
+            { return false; }
+
+            if (obj is TypeInstance other)
+            { return this.Equals(other); }
+
+            return false;
         }
 
-        public new TypeToken Clone() => new(this.Content, this.Type, this)
-        {
-            TokenType = this.TokenType,
+        public bool Equals(TypeInstance other) => other is not null && this.Identifier.Equals(other.Identifier);
 
-            AbsolutePosition = new Range<int>(this.AbsolutePosition.Start, this.AbsolutePosition.End),
-            Position = new Range<SinglePosition>()
-            {
-                Start = new SinglePosition(Position.Start.Line, Position.Start.Character),
-                End = new SinglePosition(Position.End.Line, Position.End.Character),
-            },
-
-            ListOf = this.ListOf,
-        };
-
-        public static TypeToken CreateAnonymous(string name, TypeTokenType type) => new(name, type, null);
-        public static TypeToken CreateAnonymous(string name, BuiltinType type) => new(name, type, null);
-        public static TypeToken CreateAnonymous(string name, TypeToken listOf) => new(name, listOf, null);
-
-        public override string ToString()
-        {
-            if (IsList) return ListOf.ToString() + "[]";
-            return Content;
-        }
-        public new string ToFullString()
-        {
-            return $"TypeToken {{ {this} {base.ToFullString()} }}";
-        }
+        public override int GetHashCode() => HashCode.Combine(Identifier);
     }
 
     namespace Parser
@@ -178,30 +95,16 @@ namespace IngameCoding.BBCode
             readonly List<Token> tokens = new();
             public Token[] Tokens => tokens.ToArray();
 
-            Token CurrentToken
-            {
-                get
-                {
-                    if (currentTokenIndex < tokens.Count)
-                    {
-                        tokens[currentTokenIndex].Analysis.ParserReached = true;
-                        return tokens[currentTokenIndex];
-                    }
-                    else
-                    {
-                        return null;
-                    }
-                }
-            }
+            Token CurrentToken => (currentTokenIndex >= 0 && currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
 
-            static readonly Dictionary<string, TypeToken> types = new()
+            static readonly string[] types = new string[]
             {
-                { "int", TypeToken.CreateAnonymous("int", BuiltinType.INT) },
-                { "void", TypeToken.CreateAnonymous("void", BuiltinType.VOID) },
-                { "float", TypeToken.CreateAnonymous("float", BuiltinType.FLOAT) },
-                { "bool", TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN) },
-                { "byte", TypeToken.CreateAnonymous("byte", BuiltinType.BYTE) },
-                { "char", TypeToken.CreateAnonymous("char", BuiltinType.CHAR) }
+                "int",
+                "void",
+                "float",
+                "bool",
+                "byte",
+                "char",
             };
             readonly Dictionary<string, int> operators = new();
 
@@ -210,6 +113,7 @@ namespace IngameCoding.BBCode
 
             // === Result ===
             readonly List<FunctionDefinition> Functions = new();
+            readonly List<EnumDefinition> Enums = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly Dictionary<string, ClassDefinition> Classes = new();
             readonly List<UsingDefinition> Usings = new();
@@ -291,7 +195,7 @@ namespace IngameCoding.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.Structs, this.Usings, this.Hashes, this.Classes, this.TopLevelStatements.ToArray());
+                return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -316,12 +220,12 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("#", out var hashT))
                 { return false; }
 
-                hashT.Analysis.Subtype = TokenSubtype.Hash;
+                hashT.AnalysedType = TokenAnalysedType.Hash;
 
                 if (!ExpectIdentifier(out var hashName))
                 { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", hashT); }
 
-                hashName.Analysis.Subtype = TokenSubtype.Hash;
+                hashName.AnalysedType = TokenAnalysedType.Hash;
 
                 List<Statement_Literal> parameters = new();
                 int endlessSafe = 50;
@@ -330,7 +234,7 @@ namespace IngameCoding.BBCode
                     if (!ExpectLiteral(out var parameter))
                     { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", CurrentToken); }
 
-                    parameter.ValueToken.Analysis.Subtype = TokenSubtype.HashParameter;
+                    parameter.ValueToken.AnalysedType = TokenAnalysedType.HashParameter;
                     parameters.Add(parameter);
 
                     if (ExpectOperator(";"))
@@ -357,7 +261,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier("using", out var keyword))
                 { return false; }
 
-                keyword.Analysis.Subtype = TokenSubtype.Keyword;
+                keyword.AnalysedType = TokenAnalysedType.Keyword;
 
                 List<Token> tokens = new();
                 if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
@@ -370,7 +274,7 @@ namespace IngameCoding.BBCode
                     int endlessSafe = 50;
                     while (ExpectIdentifier(out Token pathIdentifier))
                     {
-                        pathIdentifier.Analysis.Subtype = TokenSubtype.Library;
+                        pathIdentifier.AnalysedType = TokenAnalysedType.Library;
                         tokens.Add(pathIdentifier);
 
                         ExpectOperator(".");
@@ -420,6 +324,8 @@ namespace IngameCoding.BBCode
                 else if (ExpectClassDefinition()) { }
                 else if (ExpectFunctionDefinition(out var functionDefinition))
                 { Functions.Add(functionDefinition); }
+                else if (ExpectEnumDefinition(out var enumDefinition))
+                { Enums.Add(enumDefinition); }
                 else
                 {
                     Statement statement = ExpectStatement();
@@ -433,6 +339,85 @@ namespace IngameCoding.BBCode
                     if (!ExpectOperator(";"))
                     { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
                 }
+            }
+
+            bool ExpectEnumDefinition(out EnumDefinition enumDefinition)
+            {
+                int parseStart = currentTokenIndex;
+                enumDefinition = null;
+
+                List<FunctionDefinition.Attribute> attributes = new();
+                while (ExpectAttribute(out var attr))
+                {
+                    bool alreadyHave = false;
+                    foreach (var attribute in attributes)
+                    {
+                        if (attribute.Identifier == attr.Identifier)
+                        {
+                            alreadyHave = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyHave)
+                    {
+                        attributes.Add(attr);
+                    }
+                    else
+                    { Errors.Add(new Error($"Attribute \"{attr}\" already applied", attr.Identifier)); }
+                }
+
+                if (!ExpectIdentifier("enum", out Token keyword))
+                { currentTokenIndex = parseStart; return false; }
+
+                keyword.AnalysedType = TokenAnalysedType.Keyword;
+
+                if (!ExpectIdentifier(out Token identifier))
+                { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.After()); }
+
+                if (!ExpectOperator("{"))
+                { throw new SyntaxException($"Expected '{{' after enum identifier", identifier.After()); }
+
+                identifier.AnalysedType = TokenAnalysedType.Enum;
+
+                List<EnumMemberDefinition> members = new();
+
+                while (!ExpectOperator("}"))
+                {
+                    if (!ExpectIdentifier(out Token enumMemberIdentifier))
+                    { throw new SyntaxException("Expected a parameter name", CurrentToken); }
+
+                    enumMemberIdentifier.AnalysedType = TokenAnalysedType.EnumMember;
+
+                    EnumMemberDefinition newMember = new();
+                    newMember.Identifier = enumMemberIdentifier;
+
+                    if (ExpectOperator("=", out Token assignOperator))
+                    {
+                        if (!ExpectLiteral(out Statement_Literal value))
+                        { throw new SyntaxException($"Expected literal after enum member assignment", assignOperator.After()); }
+
+                        newMember.Value = value;
+                    }
+
+                    members.Add(newMember);
+
+                    if (ExpectOperator("}"))
+                    { break; }
+
+                    if (ExpectOperator(","))
+                    { continue; }
+
+                    throw new SyntaxException("Expected ',' or '}'", CurrentToken);
+                }
+
+                enumDefinition = new()
+                {
+                    Identifier = identifier,
+                    Attributes = attributes.ToArray(),
+                    Members = members.ToArray(),
+                };
+
+                return true;
             }
 
             bool ExpectFunctionDefinition(out FunctionDefinition function)
@@ -462,7 +447,7 @@ namespace IngameCoding.BBCode
 
                 ExpectIdentifier("export", out Token ExportKeyword);
 
-                TypeToken possibleType = ExceptTypeToken(false);
+                TypeInstance possibleType = ExpectType(false);
                 if (possibleType == null)
                 { currentTokenIndex = parseStart; return false; }
 
@@ -472,7 +457,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("("))
                 { currentTokenIndex = parseStart; return false; }
 
-                possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
+                possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
 
                 List<ParameterDefinition> parameters = new();
 
@@ -481,19 +466,19 @@ namespace IngameCoding.BBCode
                 {
                     if (ExpectIdentifier("this", out Token thisKeywordT))
                     {
-                        thisKeywordT.Analysis.Subtype = TokenSubtype.Keyword;
+                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
                         if (parameters.Count > 0)
                         { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
                     }
 
-                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
+                    TypeInstance possibleParameterType = ExpectType(false, true);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
                     if (!ExpectIdentifier(out Token possibleParameterNameT))
                     { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                    possibleParameterNameT.Analysis.Subtype = TokenSubtype.VariableName;
+                    possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
 
                     ParameterDefinition parameterDefinition = new()
                     {
@@ -547,7 +532,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("("))
                 { currentTokenIndex = parseStart; return false; }
 
-                possibleNameT.Analysis.Subtype = TokenSubtype.MethodName;
+                possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
 
                 List<ParameterDefinition> parameters = new();
 
@@ -557,14 +542,14 @@ namespace IngameCoding.BBCode
                     if (ExpectIdentifier("this", out Token thisKeywordT))
                     { throw new SyntaxException($"Keyword 'this' is not valid in general function definitions", thisKeywordT); }
 
-                    TypeToken possibleParameterType = ExceptTypeToken(false, true);
+                    TypeInstance possibleParameterType = ExpectType(false, true);
                     if (possibleParameterType == null)
                     { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
                     if (!ExpectIdentifier(out Token possibleParameterNameT))
                     { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                    possibleParameterNameT.Analysis.Subtype = TokenSubtype.VariableName;
+                    possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
 
                     ParameterDefinition parameterDefinition = new()
                     {
@@ -636,8 +621,8 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("{", out var braceletStart))
                 { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
 
-                possibleClassName.Analysis.Subtype = TokenSubtype.Class;
-                keyword.Analysis.Subtype = TokenSubtype.Keyword;
+                possibleClassName.AnalysedType = TokenAnalysedType.Class;
+                keyword.AnalysedType = TokenAnalysedType.Keyword;
 
                 List<FieldDefinition> fields = new();
                 List<FunctionDefinition> methods = new();
@@ -722,7 +707,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("{", out var braceletStart))
                 { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
-                keyword.Analysis.Subtype = TokenSubtype.Keyword;
+                keyword.AnalysedType = TokenAnalysedType.Keyword;
 
                 List<FieldDefinition> fields = new();
                 Dictionary<string, FunctionDefinition> methods = new();
@@ -817,7 +802,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = CurrentToken.Content.Replace("_", ""),
-                        Type = TypeToken.CreateAnonymous("float", BuiltinType.FLOAT),
+                        Type = LiteralType.FLOAT,
                         ValueToken = CurrentToken,
                     };
 
@@ -831,7 +816,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = CurrentToken.Content.Replace("_", ""),
-                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        Type = LiteralType.INT,
                         ValueToken = CurrentToken,
                     };
 
@@ -845,7 +830,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = Convert.ToInt32(CurrentToken.Content, 16).ToString(),
-                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        Type = LiteralType.INT,
                         ValueToken = CurrentToken,
                     };
 
@@ -859,7 +844,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(),
-                        Type = TypeToken.CreateAnonymous("int", BuiltinType.INT),
+                        Type = LiteralType.INT,
                         ValueToken = CurrentToken,
                     };
 
@@ -873,7 +858,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = CurrentToken.Content,
-                        Type = TypeToken.CreateAnonymous("string", BuiltinType.STRING),
+                        Type = LiteralType.STRING,
                         ValueToken = CurrentToken,
                     };
 
@@ -887,7 +872,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = CurrentToken.Content,
-                        Type = TypeToken.CreateAnonymous("char", BuiltinType.CHAR),
+                        Type = LiteralType.CHAR,
                         ValueToken = CurrentToken,
                     };
 
@@ -901,11 +886,11 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = "true",
-                        Type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
+                        Type = LiteralType.BOOLEAN,
                         ValueToken = CurrentToken,
                     };
 
-                    tTrue.Analysis.Subtype = TokenSubtype.Keyword;
+                    tTrue.AnalysedType = TokenAnalysedType.Keyword;
 
                     statement = literal;
                     return true;
@@ -915,11 +900,11 @@ namespace IngameCoding.BBCode
                     Statement_Literal literal = new()
                     {
                         Value = "false",
-                        Type = TypeToken.CreateAnonymous("bool", BuiltinType.BOOLEAN),
+                        Type = LiteralType.BOOLEAN,
                         ValueToken = CurrentToken,
                     };
 
-                    tFalse.Analysis.Subtype = TokenSubtype.Keyword;
+                    tFalse.AnalysedType = TokenAnalysedType.Keyword;
 
                     statement = literal;
                     return true;
@@ -949,8 +934,7 @@ namespace IngameCoding.BBCode
                     return false;
                 }
 
-                TypeToken type = ExpectTypeToken(out Warning warning, false, false);
-                if (warning != null) Warnings.Add(warning);
+                TypeInstance type = ExpectType(false, false);
 
                 if (type == null)
                 { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
@@ -1027,7 +1011,7 @@ namespace IngameCoding.BBCode
                 }
                 else if (ExpectIdentifier("new", out Token newIdentifier))
                 {
-                    newIdentifier.Analysis.Subtype = TokenSubtype.Keyword;
+                    newIdentifier.AnalysedType = TokenAnalysedType.Keyword;
 
                     if (!ExpectIdentifier(out Token instanceTypeName))
                     { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
@@ -1100,9 +1084,9 @@ namespace IngameCoding.BBCode
                         };
 
                         if (variableName.Content == "this")
-                        { variableName.Analysis.Subtype = TokenSubtype.Keyword; }
+                        { variableName.AnalysedType = TokenAnalysedType.Keyword; }
                         else
-                        { variableName.Analysis.Subtype = TokenSubtype.VariableName; }
+                        { variableName.AnalysedType = TokenAnalysedType.VariableName; }
 
                         returnStatement = variableNameStatement;
                     }
@@ -1155,8 +1139,7 @@ namespace IngameCoding.BBCode
                 {
                     if (ExpectIdentifier("as", out Token keyword))
                     {
-                        TypeToken type = ExpectTypeToken(out Warning warning, false, false);
-                        if (warning != null) Warnings.Add(warning);
+                        TypeInstance type = ExpectType(false, false);
 
                         if (type == null)
                         { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
@@ -1264,14 +1247,14 @@ namespace IngameCoding.BBCode
             Statement_NewVariable ExpectVariableDeclaration()
             {
                 int startTokenIndex = currentTokenIndex;
-                TypeToken possibleType = ExpectTypeToken(out var structNotFoundWarning);
+                TypeInstance possibleType = ExpectType();
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 if (!ExpectIdentifier(out Token possibleVariableName))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleVariableName.Analysis.Subtype = TokenSubtype.VariableName;
+                possibleVariableName.AnalysedType = TokenAnalysedType.VariableName;
 
                 Statement_NewVariable statement = new()
                 {
@@ -1279,17 +1262,14 @@ namespace IngameCoding.BBCode
                     Type = possibleType,
                 };
 
-                if (structNotFoundWarning != null)
-                { Warnings.Add(structNotFoundWarning); }
-
                 if (ExpectOperator("=", out var eqT))
                 {
                     statement.InitialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
                 }
                 else
                 {
-                    if (possibleType.Type == TypeTokenType.AUTO)
-                    { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType); }
+                    if (possibleType.Identifier.Content == "var")
+                    { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Identifier); }
                 }
 
                 return statement;
@@ -1300,7 +1280,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier("for", out Token tokenFor))
                 { return null; }
 
-                tokenFor.Analysis.Subtype = TokenSubtype.Statement;
+                tokenFor.AnalysedType = TokenAnalysedType.Statement;
 
                 if (!ExpectOperator("(", out Token tokenZarojel))
                 { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor); }
@@ -1366,7 +1346,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier("while", out Token tokenWhile))
                 { return null; }
 
-                tokenWhile.Analysis.Subtype = TokenSubtype.Statement;
+                tokenWhile.AnalysedType = TokenAnalysedType.Statement;
 
                 if (!ExpectOperator("(", out Token tokenZarojel))
                 { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
@@ -1443,7 +1423,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier(ifSegmentName, out Token tokenIf))
                 { return null; }
 
-                tokenIf.Analysis.Subtype = TokenSubtype.Statement;
+                tokenIf.AnalysedType = TokenAnalysedType.Statement;
 
                 StatementWithReturnValue condition = null;
                 if (needParameters)
@@ -1578,7 +1558,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
+                possibleFunctionName.AnalysedType = TokenAnalysedType.FunctionName;
 
                 methodCall = new()
                 {
@@ -1736,7 +1716,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literalOne = new()
                     {
                         Value = "1",
-                        Type = types["int"],
+                        Type = LiteralType.INT,
                         ImagineryPosition = t0.GetPosition(),
                     };
 
@@ -1762,7 +1742,7 @@ namespace IngameCoding.BBCode
                     Statement_Literal literalOne = new()
                     {
                         Value = "1",
-                        Type = types["int"],
+                        Type = LiteralType.INT,
                         ImagineryPosition = t1.GetPosition(),
                     };
 
@@ -1836,7 +1816,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleFunctionName.Analysis.Subtype = TokenSubtype.MethodName;
+                possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
 
                 Statement_FunctionCall functionCall = new()
                 {
@@ -1883,7 +1863,7 @@ namespace IngameCoding.BBCode
                 if (possibleFunctionName.Content != name)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleFunctionName.Analysis.Subtype = TokenSubtype.Statement;
+                possibleFunctionName.AnalysedType = TokenAnalysedType.Statement;
 
                 Statement_KeywordCall functionCall = new()
                 {
@@ -1917,7 +1897,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier(out Token attributeT))
                 { currentTokenIndex = parseStart; return false; }
 
-                attributeT.Analysis.Subtype = TokenSubtype.Type;
+                attributeT.AnalysedType = TokenAnalysedType.Attribute;
 
                 if (ExpectOperator("(", out var t3))
                 {
@@ -1955,7 +1935,7 @@ namespace IngameCoding.BBCode
 
                 }
 
-                TypeToken possibleType = ExceptTypeToken();
+                TypeInstance possibleType = ExpectType();
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
@@ -1965,7 +1945,7 @@ namespace IngameCoding.BBCode
                 if (ExpectOperator("("))
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                possibleVariableName.Analysis.Subtype = TokenSubtype.None;
+                possibleVariableName.AnalysedType = TokenAnalysedType.None;
 
                 FieldDefinition field = new()
                 {
@@ -2060,24 +2040,23 @@ namespace IngameCoding.BBCode
                 return true;
             }
 
-            TypeToken ExpectTypeToken(out Warning warning, bool allowVarKeyword = true, bool allowAnyKeyword = false)
+            TypeInstance ExpectType(bool allowVarKeyword = true, bool allowAnyKeyword = false)
             {
                 int parseStart = currentTokenIndex;
 
-                warning = null;
                 if (!ExpectIdentifier(out Token possibleType)) return null;
 
-                possibleType.Analysis.Subtype = TokenSubtype.Keyword;
+                possibleType.AnalysedType = TokenAnalysedType.Keyword;
 
-                TypeToken newType = null;
+                TypeInstance newType = null;
 
-                if (!types.TryGetValue(possibleType.Content, out TypeToken builtinType))
+                if (!types.Contains(possibleType.Content))
                 {
                     if (newType == null && possibleType.Content == "any")
                     {
                         if (allowAnyKeyword)
                         {
-                            newType = new TypeToken("any", BuiltinType.ANY, possibleType);
+                            newType = new TypeInstance(possibleType);
                         }
                         else
                         {
@@ -2089,7 +2068,7 @@ namespace IngameCoding.BBCode
                     {
                         if (allowVarKeyword)
                         {
-                            newType = new TypeToken("var", BuiltinType.AUTO, possibleType);
+                            newType = new TypeInstance(possibleType);
                         }
                         else
                         {
@@ -2101,17 +2080,17 @@ namespace IngameCoding.BBCode
                     {
                         if (TryGetStruct(possibleType.Content, out var s))
                         {
-                            newType = new TypeToken(s.Name.Content, TypeTokenType.USER_DEFINED, possibleType);
-                            newType.Analysis.Subtype = TokenSubtype.Struct;
+                            newType = new TypeInstance(possibleType);
+                            newType.Identifier.AnalysedType = TokenAnalysedType.Struct;
                         }
                         else if (TryGetClass(possibleType.Content, out var c))
                         {
-                            newType = new TypeToken(c.Name.Content, TypeTokenType.USER_DEFINED, possibleType);
-                            newType.Analysis.Subtype = TokenSubtype.Class;
+                            newType = new TypeInstance(possibleType);
+                            newType.Identifier.AnalysedType = TokenAnalysedType.Class;
                         }
                         else
                         {
-                            newType = new TypeToken(possibleType.Content, TypeTokenType.USER_DEFINED, possibleType);
+                            newType = new TypeInstance(possibleType);
                             // warning = new Warning($"Type '{possibleType.Content}' not found", possibleType);
                         }
                     }
@@ -2121,27 +2100,25 @@ namespace IngameCoding.BBCode
                 }
                 else
                 {
-                    newType = new TypeToken(builtinType.Content, builtinType.Type, possibleType)
-                    { ListOf = builtinType.ListOf };
-                    newType.Analysis.Subtype = TokenSubtype.BuiltinType;
+                    newType = new TypeInstance(possibleType);
+                    newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType;
                 }
 
                 while (ExpectOperator("[", out var listToken0))
                 {
                     if (ExpectOperator("]", out var listToken1))
                     {
-                        newType = new TypeToken(newType.Content, newType, newType);
+                        // newType = new TypeToken(newType.Content, newType, newType);
                         Errors.Add(new Error($"Lists aren't supported as built-in feature", new Position(listToken0, listToken1)));
                     }
                     else
                     { currentTokenIndex = parseStart; return null; }
                 }
 
-                tokens[currentTokenIndex - 1] = newType;
+                // tokens[currentTokenIndex - 1] = newType;
 
                 return newType;
             }
-            TypeToken ExceptTypeToken(bool allowVarKeyword = true, bool allowAnyKeyword = false) => ExpectTypeToken(out Warning _, allowVarKeyword, allowAnyKeyword);
 
             bool TryGetStruct(string name, out StructDefinition @struct)
             {
@@ -2161,44 +2138,6 @@ namespace IngameCoding.BBCode
             }
 
             #endregion
-
-            public static TypeToken ParseType(string type)
-            {
-                if (string.IsNullOrEmpty(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or empty.", nameof(type));
-                if (string.IsNullOrWhiteSpace(type)) throw new ArgumentException($"'{nameof(type)}' cannot be null or whitespace.", nameof(type));
-
-                Tokenizer tokenizer = new(TokenizerSettings.Default);
-                Token[] tokens = tokenizer.Parse(type);
-                tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
-
-                TypeToken result = null;
-
-                int i = -1;
-                while (i < tokens.Length)
-                {
-                    i++;
-                    if (tokens.Length <= i) break;
-
-                    Token token = tokens[i];
-                    if (i == 0)
-                    {
-                        if (token.TokenType != TokenType.IDENTIFIER) throw new FormatException();
-                        if (types.TryGetValue(token.Content, out result)) continue;
-                        result = TypeToken.CreateAnonymous(token.Content, BuiltinType.STRUCT);
-                        continue;
-                    }
-                    if (token.TokenType != TokenType.OPERATOR) throw new FormatException();
-                    if (token.Content != "[") throw new FormatException();
-                    i++;
-                    if (tokens.Length <= i) throw new FormatException();
-                    token = tokens[i];
-                    if (token.TokenType != TokenType.OPERATOR) throw new FormatException();
-                    if (token.Content != "]") throw new FormatException();
-                    result = TypeToken.CreateAnonymous(result.Content, result);
-                }
-
-                return result;
-            }
         }
     }
 }

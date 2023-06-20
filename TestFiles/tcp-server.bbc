@@ -1,0 +1,14 @@
+using System;
+using System.Streams;
+
+[CodeEntry]
+void Start()
+{
+	Stream stream = new Stream();
+	while (stream.HasData())
+	{
+		var data = stream.Read();
+		Print(data as char);
+	};
+	delete stream;
+}

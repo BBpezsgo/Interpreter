@@ -234,6 +234,7 @@ namespace ConsoleGUI
 
                 this.CurrentlyJumping--;
                 this.Interpreter.Update();
+                this.Interpreter.SampleHeap();
                 if (!this.Interpreter.IsExecutingCode)
                 {
                     ConsoleGUI.Instance.Destroy();
@@ -456,6 +457,51 @@ namespace ConsoleGUI
             b.ForegroundColor = CharColors.FgDefault;
         }
 
+        private void HeapDiagnosticsElement_OnBeforeDraw(InlineElement sender)
+        {
+            sender.ClearBuffer();
+            sender.DrawBuffer.StepTo(0);
+
+            if (this.Interpreter.HeapUsage == null) return;
+            if (this.Interpreter.HeapUsage.Count < 2) return;
+
+            DrawBuffer b = sender.DrawBuffer;
+
+            b.ResetColor();
+
+            TimeSpan start = this.Interpreter.HeapUsage[0].Time;
+            TimeSpan end = this.Interpreter.HeapUsage[^1].Time;
+
+            List<(int, int)> points = new();
+            (int, int) prevPoint = (0, 0);
+
+            for (int i = 0; i < this.Interpreter.HeapUsage.Count; i++)
+            {
+                Record<float> record = this.Interpreter.HeapUsage[i];
+                float t = (float)(record.Time.Ticks - start.Ticks) / (float)(end.Ticks - start.Ticks);
+
+                int x = (int)MathF.Round(sender.Rect.Width * t);
+                x = Math.Clamp(x, 0, sender.Rect.Width - 1);
+
+                int y = (int)MathF.Round(sender.Rect.Height * (1f - record.Value));
+                y = Math.Clamp(y, 0, sender.Rect.Height - 1);
+                y--;
+
+                (int, int) p = (x, y);
+                if (i > 0)
+                {
+                    points.Add((prevPoint.Item1, prevPoint.Item2));
+                    points.Add((prevPoint.Item1, y));
+                    points.Add((prevPoint.Item1, y));
+                    points.Add((x, y));
+                }
+
+                prevPoint = p;
+            }
+
+            b.DrawLine(points.ToArray(), CharColors.FgWhite);
+        }
+
         private void HeapElement_OnBeforeDraw(InlineElement sender)
         {
             sender.ClearBuffer();
@@ -568,6 +614,10 @@ namespace ConsoleGUI
                     {
                         switch (item.type)
                         {
+                            case IngameCoding.Bytecode.RuntimeType.BYTE:
+                                b.ForegroundColor = CharColors.FgCyan;
+                                b.AddText($"{item.ValueByte}");
+                                break;
                             case IngameCoding.Bytecode.RuntimeType.INT:
                                 b.ForegroundColor = CharColors.FgCyan;
                                 b.AddText($"{item.ValueInt}");
@@ -741,6 +791,10 @@ namespace ConsoleGUI
                 {
                     switch (item.type)
                     {
+                        case IngameCoding.Bytecode.RuntimeType.BYTE:
+                            b.ForegroundColor = CharColors.FgCyan;
+                            b.AddText($"{item.ValueByte}");
+                            break;
                         case IngameCoding.Bytecode.RuntimeType.INT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{item.ValueInt}");
@@ -936,8 +990,6 @@ namespace ConsoleGUI
                             b.AddText($"{instruction.Parameter.ValueFloat}f");
                             b.AddText($" ");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.STRING:
-                            break;
                         case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
                             b.ForegroundColor = CharColors.FgDarkBlue;
                             b.AddText($"{instruction.Parameter.ValueBoolean}");
@@ -985,7 +1037,7 @@ namespace ConsoleGUI
 
         public override void OnKeyEvent(KeyEvent e)
         {
-            Debug.Log(e.ToString());
+            // Debug.Log(e.ToString());
 
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
@@ -1054,7 +1106,7 @@ namespace ConsoleGUI
                 }
                 else
                 {
-                    this.NextCodeJumpCount = 0;
+                    this.NextCodeJumpCount = 1;
                 }
                 return;
             }

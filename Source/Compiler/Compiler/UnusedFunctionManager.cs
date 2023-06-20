@@ -30,35 +30,29 @@ namespace IngameCoding.BBCode.Compiler
         /// <exception cref="InternalException"></exception>
         int GenerateCodeForVariable(Statement_NewVariable newVariable, bool isGlobal)
         {
-            if (newVariable.Type.Type == TypeTokenType.AUTO)
+            if (newVariable.Type == "var")
             {
                 if (newVariable.InitialValue != null)
                 {
                     if (newVariable.InitialValue is Statement_Literal literal)
                     {
-                        newVariable.Type.Type = literal.Type.Type;
+                        newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
                     else if (newVariable.InitialValue is Statement_NewInstance newInstance)
                     {
-                        newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                        newVariable.Type.Content = newInstance.TypeName.Content;
+                        newVariable.Type = TypeInstance.CreateAnonymous(newInstance.TypeName.Content, TypeDefinitionReplacer);
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
                     else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
                     {
-                        newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                        newVariable.Type.Content = constructorCall.TypeName.Content;
+                        newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
                     else
                     {
-                        var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-
-                        var initialType = Parser.ParseType(initialTypeRaw.Name);
-                        newVariable.Type.Type = initialType.Type;
-                        newVariable.Type.ListOf = initialType.ListOf;
-                        newVariable.Type.Content = initialType.Content;
+                        CompiledType initialTypeRaw = FindStatementType(newVariable.InitialValue);
+                        newVariable.Type = TypeInstance.CreateAnonymous(initialTypeRaw);
 
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
 
@@ -67,9 +61,9 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
                 else
-                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
+                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type.Identifier); }
 
-                if (newVariable.Type.Type == TypeTokenType.AUTO)
+                if (newVariable.Type == "var")
                 { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
 
                 GenerateCodeForVariable(newVariable, isGlobal);
@@ -100,13 +94,10 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int memoryOffset, bool isGlobal)
         {
-            newVariable.VariableName.Analysis.CompilerReached = true;
-            newVariable.Type.Analysis.CompilerReached = true;
-
             if (Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
 
-            bool inHeap = GetCompiledClass(newVariable.Type.Content, out _);
+            bool inHeap = GetCompiledClass(newVariable.Type.Identifier.Content, out _);
             CompiledType type = new(newVariable.Type, GetCustomType);
 
             return new CompiledVariable(
@@ -127,38 +118,32 @@ namespace IngameCoding.BBCode.Compiler
 
                 void AnalyzeNewVariable(Statement_NewVariable newVariable)
                 {
-                    if (newVariable.Type.Type == TypeTokenType.AUTO)
+                    if (newVariable.Type == "var")
                     {
                         if (newVariable.InitialValue != null)
                         {
                             if (newVariable.InitialValue is Statement_Literal literal)
                             {
-                                newVariable.Type.Type = literal.Type.Type;
+                                newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
                             }
                             else if (newVariable.InitialValue is Statement_NewInstance newStruct)
                             {
-                                newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                                newVariable.Type.Content = newStruct.TypeName.Content;
+                                newVariable.Type = TypeInstance.CreateAnonymous(newStruct.TypeName.Content, TypeDefinitionReplacer);
                             }
                             else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
                             {
-                                newVariable.Type.Type = TypeTokenType.USER_DEFINED;
-                                newVariable.Type.Content = constructorCall.TypeName.Content;
+                                newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
                             }
                             else
                             {
-                                var initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                                var initialType = Parser.ParseType(initialTypeRaw.Name);
-
-                                newVariable.Type.Type = initialType.Type;
-                                newVariable.Type.ListOf = initialType.ListOf;
-                                newVariable.Type.Content = initialType.Content;
+                                CompiledType initialTypeRaw = FindStatementType(newVariable.InitialValue);
+                                newVariable.Type = TypeInstance.CreateAnonymous(initialTypeRaw);
                             }
                         }
                         else
-                        { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type); }
+                        { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type.Identifier); }
 
-                        if (newVariable.Type.Type == TypeTokenType.AUTO)
+                        if (newVariable.Type == "var")
                         { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
                     }
                     this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, -1, false));
@@ -411,6 +396,7 @@ namespace IngameCoding.BBCode.Compiler
                 CompiledClasses = compilerResult.Classes,
                 CompiledStructs = compilerResult.Structs,
                 CompiledFunctions = compilerResult.Functions,
+                CompiledEnums = compilerResult.Enums,
 
                 Informations = new List<Information>(),
             };

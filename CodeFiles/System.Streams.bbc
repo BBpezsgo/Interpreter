@@ -1,0 +1,89 @@
+class Stream
+{
+	int Pointer;
+	int Length;
+
+	int ID;
+	int MemoryAddress;
+	int BufferSize;
+
+	export constructor()
+	{
+		int bufferSize = 8;
+		int bufferMemoryAddress = Alloc(bufferSize);
+
+		Stream stream = new Stream;
+		stream.ID = CreateStream(bufferSize, bufferMemoryAddress);
+		stream.MemoryAddress = bufferMemoryAddress;
+		stream.BufferSize = bufferSize;
+		return stream;
+	}
+
+	export destructor()
+	{
+		DisposeStream(this.ID);
+		Dealloc(this.MemoryAddress, this.BufferSize);
+        Dealloc(&this, sizeof(this));
+	}
+
+	export void Flush()
+	{
+		FlushStream(this.ID, this.Pointer);
+		this.Pointer = 0;
+	}
+
+	export void Buffer()
+	{
+		this.Length = GetStreamLength(this.ID);
+	}
+
+	export void Write(int data)
+	{
+		if (this.Pointer >= this.BufferSize)
+		{ throw "Buffer overflow"; };
+		*(this.MemoryAddress + this.Pointer) = data;
+		this.Pointer++;
+	}
+
+	export int Read()
+	{
+		this.Length = GetStreamLength(this.ID);
+
+		if ((this.Length - this.Pointer) <= 0)
+		{ throw "No data"; };
+
+		int result = (*(this.MemoryAddress + this.Pointer)) as int;
+		this.Pointer++;
+
+		if (this.Pointer >= this.BufferSize)
+		{
+			ClearStreamBuffer(this.ID);
+			this.Length = GetStreamLength(this.ID);
+			this.Pointer = 0;
+		};
+
+		return result;
+	}
+
+	export bool HasData()
+	{
+		this.Length = GetStreamLength(this.ID);
+
+		return ((this.Length - this.Pointer) > 0);
+	}
+}
+
+[Builtin("stream-d")]
+void DisposeStream(int id);
+
+[Builtin("stream-f")]
+void FlushStream(int id, int count);
+
+[Builtin("stream-c")]
+int CreateStream(int bufferSize, int bufferMemoryAddress);
+
+[Builtin("stream-l")]
+int GetStreamLength(int id);
+
+[Builtin("stream-r")]
+void ClearStreamBuffer(int id);

@@ -110,7 +110,7 @@ namespace IngameCoding.BBCode.Parser.Statements
                 GetAllStatement(parserResult.TopLevelStatements[i], callback);
             }
 
-            for (int i = 0; i < parserResult.Functions.Count; i++)
+            for (int i = 0; i < parserResult.Functions.Length; i++)
             {
                 if (parserResult.Functions[i].Statements == null) continue;
                 GetAllStatement(parserResult.Functions[i].Statements, callback);
@@ -194,7 +194,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_NewVariable : Statement, IDefinition
     {
-        public TypeToken Type;
+        public TypeInstance Type;
         public Token VariableName;
         internal StatementWithReturnValue InitialValue;
 
@@ -212,7 +212,7 @@ namespace IngameCoding.BBCode.Parser.Statements
 
         public override Position TotalPosition()
         {
-            Position result = new(Type, VariableName);
+            Position result = new(Type.Identifier, VariableName);
             if (InitialValue != null)
             { result.Extend(InitialValue.TotalPosition()); }
             return result;
@@ -547,7 +547,7 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Literal : StatementWithReturnValue
     {
-        public TypeToken Type;
+        public LiteralType Type;
         internal string Value;
         /// <summary>
         /// If there is no <c>ValueToken</c>:<br/>
@@ -567,17 +567,13 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
 
         public override object TryGetValue()
-        {
-            if (Type.IsList) return null;
-
-            return Type.Type switch
+            => Type switch
             {
-                TypeTokenType.INT => int.Parse(Value),
-                TypeTokenType.FLOAT => float.Parse(Value),
-                TypeTokenType.BOOLEAN => bool.Parse(Value),
+                LiteralType.INT => int.Parse(Value),
+                LiteralType.FLOAT => float.Parse(Value),
+                LiteralType.BOOLEAN => bool.Parse(Value),
                 _ => null,
             };
-        }
 
         public override Position TotalPosition() => ValueToken == null ? ImagineryPosition : new Position(ValueToken);
     }
@@ -929,9 +925,9 @@ namespace IngameCoding.BBCode.Parser.Statements
     {
         internal StatementWithReturnValue PrevStatement;
         internal Token Keyword;
-        internal TypeToken Type;
+        internal TypeInstance Type;
 
-        public Statement_As(StatementWithReturnValue prevStatement, Token keyword, TypeToken type)
+        public Statement_As(StatementWithReturnValue prevStatement, Token keyword, TypeInstance type)
         {
             this.PrevStatement = prevStatement;
             this.Keyword = keyword;
@@ -946,7 +942,7 @@ namespace IngameCoding.BBCode.Parser.Statements
             Position result = Keyword.GetPosition();
 
             if (PrevStatement != null) result.Extend(PrevStatement.TotalPosition());
-            if (Type != null) result.Extend(Type);
+            if (Type != null) result.Extend(Type.Identifier);
 
             return result;
         }

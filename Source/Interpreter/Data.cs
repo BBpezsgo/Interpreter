@@ -38,8 +38,9 @@ namespace IngameCoding.Bytecode
         BYTE,
         INT,
         FLOAT,
-        STRING,
+
         BOOLEAN,
+
         CHAR,
     }
 
@@ -653,7 +654,6 @@ namespace IngameCoding.Bytecode
             RuntimeType.BYTE => this.valueByte == 0,
             RuntimeType.INT => this.valueInt.Value == 0,
             RuntimeType.FLOAT => this.valueFloat.Value == 0f,
-            RuntimeType.STRING => false,
             RuntimeType.BOOLEAN => !this.valueBoolean.Value,
             RuntimeType.CHAR => (int)this.valueChar == 0,
             _ => false,
@@ -787,10 +787,6 @@ namespace IngameCoding.Bytecode
                     case RuntimeType.FLOAT:
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.Write(this.valueFloat?.ToString(ci));
-                        break;
-                    case RuntimeType.STRING:
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("???");
                         break;
                     case RuntimeType.BOOLEAN:
                         Console.ForegroundColor = ConsoleColor.Blue;

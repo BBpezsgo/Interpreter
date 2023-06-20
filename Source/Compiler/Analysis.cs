@@ -220,7 +220,7 @@ namespace IngameCoding.BBCode.Analysis
                 }
             }
 
-            for (int i = 0; i < parserResult.Usings.Count; i++)
+            for (int i = 0; i < parserResult.Usings.Length; i++)
             {
                 var usingItem = parserResult.Usings[i];
                 var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
@@ -303,25 +303,25 @@ namespace IngameCoding.BBCode.Analysis
 
                     foreach (var @struct in parserResult2_v.Structs)
                     {
-                        if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
+                        if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content))
                         {
-                            errors.Add(new Error($"Type '{@struct.Value.Name.Content}' already exists", @struct.Value.Name));
+                            errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name));
                         }
                         else
                         {
-                            Structs.Add(@struct.Key, @struct.Value);
+                            Structs.Add(@struct.Name.Content, @struct);
                         }
                     }
 
                     foreach (var @class in parserResult2_v.Classes)
                     {
-                        if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
+                        if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content))
                         {
-                            errors.Add(new Error($"Type '{@class.Value.Name.Content}' already exists", @class.Value.Name));
+                            errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name));
                         }
                         else
                         {
-                            Classes.Add(@class.Key, @class.Value);
+                            Classes.Add(@class.Name.Content, @class);
                         }
                     }
 
@@ -380,24 +380,24 @@ namespace IngameCoding.BBCode.Analysis
             }
             foreach (var @struct in parserResult.Structs)
             {
-                if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
+                if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content))
                 {
-                    errors.Add(new Error($"Type '{@struct.Value.Name.Content}' already exists", @struct.Value.Name));
+                    errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name));
                 }
                 else
                 {
-                    Structs.Add(@struct.Key, @struct.Value);
+                    Structs.Add(@struct.Name.Content, @struct);
                 }
             }
             foreach (var @class in parserResult.Classes)
             {
-                if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
+                if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content))
                 {
-                    errors.Add(new Error($"Type '{@class.Value.Name.Content}' already exists", @class.Value.Name));
+                    errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name));
                 }
                 else
                 {
-                    Classes.Add(@class.Key, @class.Value);
+                    Classes.Add(@class.Name.Content, @class);
                 }
             }
 

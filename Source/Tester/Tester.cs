@@ -141,19 +141,7 @@ namespace IngameCoding.Tester
             codeInterpreter.OnExecuted += (sender, e) =>
             {
                 Console.WriteLine();
-                if (e.ExitCode == -1)
-                {
-                    Console.Write($"Time: {e.ElapsedTime}, Exit code: ");
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write(e.ExitCode);
-                    Console.ResetColor();
-                }
-                else
-                {
-                    Console.Write($"Time: {e.ElapsedTime}, Exit code: ");
-                    Console.Write(e.ExitCode);
-                }
-                Console.WriteLine();
+                Console.WriteLine($"Time: {e.ElapsedTime}");
             };
 
             codeInterpreter.OnOutput += (sender, message, logType) =>

@@ -9,19 +9,23 @@ namespace ConsoleGUI
         readonly Character[] v;
 
         int currentIndex;
+        readonly int Width;
+        readonly int Height;
         CharColors currentBgColor;
         CharColors currentFgColor;
 
         public DrawBuffer()
         {
-            v = System.Array.Empty<Character>();
-            currentIndex = 0;
+            this.v = System.Array.Empty<Character>();
+            this.currentIndex = 0;
         }
 
-        public DrawBuffer(int size)
+        public DrawBuffer(int width, int height)
         {
-            v = new Character[System.Math.Max(size, 0)];
-            currentIndex = 0;
+            this.v = new Character[System.Math.Max(width * height, 0)];
+            this.currentIndex = 0;
+            this.Width = width;
+            this.Height = height;
         }
 
         public int Length => v.Length;
@@ -30,6 +34,149 @@ namespace ConsoleGUI
         {
             get => v[index];
             set => v[index] = value;
+        }
+
+        public Character this[int x, int y]
+        {
+            get => this[x + (y * Width)];
+            set => this[x + (y * Width)] = value;
+        }
+
+        static readonly (int x, int y, char character)[] LineSegments = new (int, int, char)[]
+        {
+            (-1, -1, '┐'),
+            (-1, 0, '─'),
+            (-1, 1, '┘'),
+
+            (0, -1, '│'),
+            (0, 0, '+'),
+            (0, 1, '│'),
+
+            (1, -1, '┌'),
+            (1, 0, '─'),
+            (1, 1, '└'),
+        };
+
+        static (int x, int y)[] SimplifyLine_((int x, int y)[] line)
+        {
+            List<(int x, int y)> result = new();
+            (int x, int y) dirOld = (0, 0);
+
+            for (int i = 1; i < line.Length; i++)
+            {
+                (int x, int y) dirNew = new(line[i - 1].x - line[i].x, line[i - 1].y - line[i].y);
+
+                if (dirNew == (0, 0)) continue;
+
+                if (dirNew != dirOld)
+                {
+                    result.Add(line[i]);
+                }
+
+                dirOld = dirNew;
+            }
+            return result.ToArray();
+        }
+
+        static (int x, int y)[] SimplifyLine((int x, int y)[] points)
+        {
+            if (points.Length < 2) return points;
+
+            List<(int x, int y)> newPoints = new(points);
+
+            (int x, int y) prevP = newPoints[^1];
+
+            for (int i = newPoints.Count - 2; i >= 0; i--)
+            {
+                (int x, int y) p = newPoints[i];
+
+                if (p == prevP)
+                { newPoints.RemoveAt(i); continue; }
+
+                prevP.x = p.x;
+                prevP.y = p.y;
+            }
+
+            return newPoints.ToArray();
+        }
+
+        public void DrawLine((int x, int y)[] points, CharColors color)
+        {
+            if (points.Length == 0) return;
+
+            points = SimplifyLine(points);
+
+            if (points.Length == 1)
+            {
+                this[points[0].x, points[0].y] = new Character(' ', color);
+                return;
+            }
+
+            for (int i = 1; i < points.Length; i++)
+            {
+                (int x, int y) _prevPoint = points[i - 1];
+                (int x, int y) _point = points[i];
+
+                (int x, int y) prevPoint = (Math.Min(_prevPoint.x, _point.x), Math.Min(_prevPoint.y, _point.y));
+                (int x, int y) point = (Math.Max(_prevPoint.x, _point.x), Math.Max(_prevPoint.y, _point.y));
+
+                for (int x = prevPoint.x; x <= point.x; x++)
+                {
+                    for (int y = prevPoint.y; y <= point.y; y++)
+                    {
+                        char c = '█';
+                        /*
+                        if (i + 1 < points.Length)
+                        {
+                            // (int x, int y) nextPoint = (points[i + 1].x, points[i + 1].y);
+
+                            // (int x, int y) dir = (Math.Clamp(prevPoint.x - point.x, -1, 1), Math.Clamp(prevPoint.y - point.y, -1, 1));
+                            // (int x, int y) nextDir = (Math.Clamp(point.x - nextPoint.x, -1, 1), Math.Clamp(point.y - nextPoint.y, -1, 1));
+
+                            c = '█';
+                        }
+                        */
+
+                        this[x, y] = new Character(c, color);
+                    }
+                }
+            }
+        }
+        public void DrawLine((int, int) p1, (int, int) p2, CharColors color)
+            => DrawLine(p1.Item1, p1.Item2, p2.Item1, p2.Item2, color);
+        public void DrawLine(int x1, int y1, int x2, int y2, CharColors color)
+        {
+            (int, int)? prev = (x1, y1);
+            for (int x = x1; x <= x2; x++)
+            {
+                for (int y = y1; y <= y2; y++)
+                {
+                    char c = '+';
+                    if (prev != null)
+                    {
+                        int dx = x - prev.Value.Item1;
+                        int dy = y - prev.Value.Item2;
+                        for (int segment = 0; segment < LineSegments.Length; segment++)
+                        {
+                            if (LineSegments[segment].Item1 == dx &&
+                                LineSegments[segment].Item2 == dy)
+                            {
+                                c = LineSegments[segment].Item3;
+                                break;
+                            }
+                        }
+
+                        if (c == '+')
+                        {
+
+                        }
+                    }
+
+                    this[x, y] = new Character(c, color);
+
+                    prev = (x, y);
+                }
+            }
         }
 
         public void StepTo(int index) => currentIndex = index;

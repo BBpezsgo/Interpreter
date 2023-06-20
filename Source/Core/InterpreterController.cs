@@ -14,12 +14,9 @@ namespace IngameCoding.Core
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Output;
 
-    using System.Linq;
-
     /// <summary>
     /// This compiles and runs the code
     /// </summary>
-    [Serializable]
     public class Interpreter
     {
         public enum State
@@ -32,18 +29,117 @@ namespace IngameCoding.Core
             CodeExecuted
         }
 
+        protected abstract class Stream
+        {
+            internal int ID;
+            internal int MemoryAddress;
+            internal int BufferSize;
+
+            public Stream(int id, int memoryAddress, int bufferSize)
+            {
+                ID = id;
+                MemoryAddress = memoryAddress;
+                BufferSize = bufferSize;
+            }
+
+            internal abstract void Dispose();
+
+            internal abstract void Tick(IHeap heap);
+        }
+
+        protected class InputStream : Stream
+        {
+            internal int Length;
+
+            internal System.IO.Stream SystemStream;
+
+            internal bool SystemHasData => (SystemStream.Position >= SystemStream.Length);
+            internal int RemaingBufferSize => (BufferSize - Length);
+
+            public InputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
+                : base(id, memoryAddress, bufferSize)
+            {
+                SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
+            }
+
+            internal override void Dispose()
+            {
+                this.SystemStream?.Close();
+                this.SystemStream?.Dispose();
+
+                Debug.WriteLine($"[STREAM {ID}]: Disposed");
+            }
+
+            internal void ClearBuffer()
+            {
+                this.Length = 0;
+
+                Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
+            }
+
+            internal override void Tick(IHeap heap)
+            {
+                if (RemaingBufferSize == 0) return;
+                if (SystemHasData) return;
+
+                byte[] buffer = new byte[RemaingBufferSize];
+                int readedCount = SystemStream.Read(buffer, 0, RemaingBufferSize);
+
+                for (int i = 0; i < readedCount; i++)
+                {
+                    heap[i + MemoryAddress] = new DataItem(buffer[i]);
+                }
+                Length += readedCount;
+
+                Debug.WriteLine($"[STREAM {ID}]: (AUTO) Readed {readedCount} bytes");
+            }
+        }
+
+        protected class OutputStream : Stream
+        {
+            internal int Pointer;
+
+            internal System.IO.Stream SystemStream;
+
+            public OutputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
+                : base(id, memoryAddress, bufferSize)
+            {
+                SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
+            }
+
+            internal override void Dispose()
+            {
+                this.SystemStream?.Close();
+                this.SystemStream?.Dispose();
+
+                Debug.WriteLine($"[STREAM {ID}]: Disposed");
+            }
+
+            internal void Flush(byte[] buffer)
+            {
+                this.Pointer = 0;
+
+                this.SystemStream.Write(buffer, 0, buffer.Length);
+                this.SystemStream.Flush();
+
+                Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
+            }
+
+            internal override void Tick(IHeap heap) { }
+        }
+
         public class InterpreterDetails
         {
             internal Compiler.CompilerResult CompilerResult;
             internal InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
-            internal BytecodeInterpreter Interpreter => interpreter.bytecodeInterpreter;
+            internal BytecodeInterpreter Interpreter => interpreter.BytecodeInterpreter;
             internal State State => interpreter.state;
 
             internal Instruction NextInstruction
             {
                 get
                 {
-                    for (int cp = this.interpreter.bytecodeInterpreter.CodePointer; cp < this.CompilerResult.compiledCode.Length; cp++)
+                    for (int cp = this.interpreter.BytecodeInterpreter.CodePointer; cp < this.CompilerResult.compiledCode.Length; cp++)
                     {
                         if (cp < 0 || cp >= this.CompilerResult.compiledCode.Length) return null;
                         Instruction result = this.CompilerResult.compiledCode[cp];
@@ -96,7 +192,7 @@ namespace IngameCoding.Core
         /// <summary>
         /// True if the interpreter is running some code
         /// </summary>
-        public bool IsExecutingCode => currentlyRunningCode;
+        public bool IsExecutingCode => CurrentlyRunningCode;
 
         internal struct InstructionOffsets
         {
@@ -141,16 +237,14 @@ namespace IngameCoding.Core
         public struct OnExecutedEventArgs
         {
             public double ElapsedMilliseconds;
-            public int ExitCode;
 
-            public OnExecutedEventArgs(double elapsedMilliseconds, int exitCode)
+            public OnExecutedEventArgs(double elapsedMilliseconds)
             {
                 ElapsedMilliseconds = elapsedMilliseconds;
-                ExitCode = exitCode;
             }
 
-            public override string ToString() => $"Code executed in {ElapsedTime} with exit code {ExitCode}";
-            public string ElapsedTime => GetEllapsedTime(ElapsedMilliseconds);
+            public override string ToString() => $"Code executed in {ElapsedTime}";
+            public string ElapsedTime => IngameCoding.Utils.GetEllapsedTime(ElapsedMilliseconds);
         }
 
         protected readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
@@ -160,26 +254,32 @@ namespace IngameCoding.Core
 
         protected State state;
 
-        protected bool currentlyRunningCode;
+        protected bool CurrentlyRunningCode;
 
-        protected BytecodeInterpreter bytecodeInterpreter;
-        protected TimeSpan codeStartedTimespan;
+        protected BytecodeInterpreter BytecodeInterpreter;
+        protected TimeSpan CodeStartedTimespan;
 
-        protected int result;
-
-        protected bool pauseCode;
+        protected bool PauseCode;
         IReturnValueConsumer ReturnValueConsumer;
 
+        protected List<Stream> Streams;
+
         /// <summary> In ms </summary>
-        protected float pauseCodeFor;
+        protected float PauseCodeTime;
 
         protected DateTime LastTime = DateTime.Now;
 
+        protected bool exitCalled;
+        protected bool startCalled;
+        protected bool HandleErrors = true;
+        internal string BasePath;
+
         protected int waitForUpdatesCounter;
         protected Action waitForUpdatesCallback;
+
         void WaitForUpdates(int count, Action callback)
         {
-            pauseCode = true;
+            PauseCode = true;
             waitForUpdatesCounter = count;
             waitForUpdatesCallback = callback;
         }
@@ -192,9 +292,9 @@ namespace IngameCoding.Core
         /// <param name="program"></param>
         public virtual void ExecuteProgram(Instruction[] program, BytecodeInterpreterSettings settings)
         {
-            codeStartedTimespan = DateTime.Now.TimeOfDay;
-            bytecodeInterpreter = new BytecodeInterpreter(program, builtinFunctions, settings);
-            builtinFunctions.SetInterpreter(bytecodeInterpreter);
+            CodeStartedTimespan = DateTime.Now.TimeOfDay;
+            BytecodeInterpreter = new BytecodeInterpreter(program, builtinFunctions, settings);
+            builtinFunctions.SetInterpreter(BytecodeInterpreter);
 
             state = State.Initialized;
 
@@ -371,12 +471,21 @@ namespace IngameCoding.Core
         /// </returns>
         public bool Initialize()
         {
-            if (currentlyRunningCode)
+            if (CurrentlyRunningCode)
             {
                 OnOutput?.Invoke(this, "Can't run the program: currently running another", LogType.Warning);
                 return false;
             }
-            this.currentlyRunningCode = true;
+            this.CurrentlyRunningCode = true;
+
+            if (Streams == null)
+            { Streams = new List<Stream>(); }
+            else
+            {
+                for (int i = 0; i < Streams.Count; i++)
+                { Streams[i].Dispose(); }
+                Streams.Clear();
+            }
 
             AddBuiltins();
 
@@ -424,8 +533,8 @@ namespace IngameCoding.Core
             catch (Exception error)
             {
                 OnDone?.Invoke(this, false);
-                bytecodeInterpreter = null;
-                currentlyRunningCode = false;
+                BytecodeInterpreter = null;
+                CurrentlyRunningCode = false;
 
                 PrintException(error);
 
@@ -434,8 +543,8 @@ namespace IngameCoding.Core
             catch (System.Exception error)
             {
                 OnDone?.Invoke(this, false);
-                bytecodeInterpreter = null;
-                currentlyRunningCode = false;
+                BytecodeInterpreter = null;
+                CurrentlyRunningCode = false;
 
                 PrintException(error);
 
@@ -473,12 +582,12 @@ namespace IngameCoding.Core
 
         public void Destroy()
         {
-            currentlyRunningCode = false;
+            CurrentlyRunningCode = false;
 
-            if (bytecodeInterpreter != null)
+            if (BytecodeInterpreter != null)
             {
-                bytecodeInterpreter.Destroy();
-                bytecodeInterpreter = null;
+                BytecodeInterpreter.Destroy();
+                BytecodeInterpreter = null;
             }
 
             state = State.Destroyed;
@@ -499,7 +608,7 @@ namespace IngameCoding.Core
                 ReturnValueConsumer = null;
             }
 
-            pauseCode = false;
+            PauseCode = false;
         }
 
         public void LoadDLL(string path)
@@ -529,7 +638,7 @@ namespace IngameCoding.Core
 
             builtinFunctions.AddManagedBuiltinFunction("stdin", Array.Empty<BuiltinType>(), (DataItem[] parameters, ManagedBuiltinFunction function) =>
             {
-                this.pauseCode = true;
+                this.PauseCode = true;
                 this.ReturnValueConsumer = function;
                 if (this.OnNeedInput == null)
                 {
@@ -572,7 +681,7 @@ namespace IngameCoding.Core
             builtinFunctions.AddBuiltinFunction("sleep",
                 (int t) =>
                 {
-                    pauseCodeFor = t;
+                    PauseCodeTime = t;
                 });
 
             #endregion
@@ -598,20 +707,6 @@ namespace IngameCoding.Core
 
             #endregion
 
-            #region Net.Http
-
-            builtinFunctions.AddBuiltinFunction("http_get",
-                (string url) =>
-                {
-                    System.Net.Http.HttpClient httpClient = new();
-                    httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
-                    System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(url).Result;
-                    string res = result.Content.ReadAsStringAsync().Result;
-                    return res;
-                });
-
-            #endregion
-
             #region Casts
 
             builtinFunctions.AddBuiltinFunction("float-to-int",
@@ -622,50 +717,123 @@ namespace IngameCoding.Core
                 { return (float)@int; });
 
             #endregion
+
+            #region Streams
+
+            builtinFunctions.AddBuiltinFunction("stream-c",
+                (int bufferSize, int bufferMemoryAddress) =>
+                {
+                    int newID = 1;
+                    while (true)
+                    {
+                        bool idIsUnique = true;
+                        for (int i = 0; i < Streams.Count; i++)
+                        {
+                            if (Streams[i].ID == newID)
+                            {
+                                newID++;
+                                idIsUnique = false;
+                                break;
+                            }
+                        }
+                        if (idIsUnique) break;
+                    }
+
+                    Stream newStream = new InputStream(newID, bufferMemoryAddress, bufferSize, System.IO.File.Open(@"C:\Users\bazsi\Desktop\test.txt", FileMode.OpenOrCreate));
+
+                    Streams.Add(newStream);
+
+                    return newID;
+                });
+            builtinFunctions.AddBuiltinFunction("stream-d",
+                (int id) =>
+                {
+                    for (int i = Streams.Count - 1; i >= 0; i--)
+                    {
+                        if (Streams[i].ID != id) continue;
+
+                        Stream stream = Streams[i];
+                        stream.Dispose();
+                        Streams.RemoveAt(i);
+
+                        return;
+                    }
+
+                    throw new RuntimeException($"Stream {id} not found");
+                });
+            builtinFunctions.AddBuiltinFunction("stream-f",
+                (int id, int count) =>
+                {
+                    for (int i = 0; i < Streams.Count; i++)
+                    {
+                        if (Streams[i].ID != id) continue;
+
+                        if (Streams[i] is not OutputStream stream)
+                        { throw new RuntimeException($"Stream {id} is not OutputStream"); }
+
+                        byte[] buffer = new byte[count];
+                        for (int j = 0; j < count; j++)
+                        {
+                            buffer[j] = ((IHeap)BytecodeInterpreter.Heap)[j + stream.MemoryAddress].Byte ?? 0;
+                        }
+
+                        stream.Flush(buffer);
+
+                        return;
+                    }
+
+                    throw new RuntimeException($"Stream {id} not found");
+                });
+            builtinFunctions.AddBuiltinFunction("stream-l",
+                (int id) =>
+                {
+                    for (int i = 0; i < Streams.Count; i++)
+                    {
+                        if (Streams[i].ID != id) continue;
+
+                        if (Streams[i] is not InputStream stream)
+                        { throw new RuntimeException($"Stream {id} is not InputStream"); }
+
+                        return stream.Length;
+                    }
+
+                    throw new RuntimeException($"Stream {id} not found");
+                });
+            builtinFunctions.AddBuiltinFunction("stream-r",
+                (int id) =>
+                {
+                    for (int i = 0; i < Streams.Count; i++)
+                    {
+                        if (Streams[i].ID != id) continue;
+
+                        if (Streams[i] is not InputStream stream)
+                        { throw new RuntimeException($"Stream {id} is not InputStream"); }
+
+                        stream.ClearBuffer();
+
+                        return;
+                    }
+
+                    throw new RuntimeException($"Stream {id} not found");
+                });
+
+            #endregion
         }
 
-        protected static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
-
-        protected static string GetEllapsedTime(double ms)
-        {
-            var val = ms;
-
-            if (val > 750)
-            {
-                val /= 1000;
-            }
-            else
-            {
-                return GetGoodNumber(val).ToString(System.Globalization.CultureInfo.InvariantCulture) + " ms";
-            }
-
-            if (val > 50)
-            {
-                val /= 50;
-            }
-            else
-            {
-                return GetGoodNumber(val).ToString(System.Globalization.CultureInfo.InvariantCulture) + " sec";
-            }
-
-            return GetGoodNumber(val).ToString(System.Globalization.CultureInfo.InvariantCulture) + " min";
-        }
-
-        protected void OnCodeExecuted(int result)
+        protected void OnCodeExecuted()
         {
             OnDone?.Invoke(this, true);
-            var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-            OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, result));
-            bytecodeInterpreter = null;
-            currentlyRunningCode = false;
+            var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+            OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+            BytecodeInterpreter = null;
+            CurrentlyRunningCode = false;
 
             state = State.CodeExecuted;
-        }
 
-        protected bool exitCalled;
-        protected bool startCalled;
-        protected bool HandleErrors = true;
-        internal string BasePath;
+            for (int i = 0; i < Streams.Count; i++)
+            { Streams[i].Dispose(); }
+            Streams.Clear();
+        }
 
         /// <summary>
         /// Interpret the next instructions
@@ -683,9 +851,15 @@ namespace IngameCoding.Core
         {
             LastTime = DateTime.Now;
 
-            if (pauseCodeFor > 0f)
+            if (BytecodeInterpreter != null && BytecodeInterpreter.Heap != null)
             {
-                pauseCodeFor -= deltaTime;
+                for (int i = 0; i < Streams.Count; i++)
+                { Streams[i].Tick((IHeap)BytecodeInterpreter.Heap); }
+            }
+
+            if (PauseCodeTime > 0f)
+            {
+                PauseCodeTime -= deltaTime;
                 return;
             }
 
@@ -695,15 +869,15 @@ namespace IngameCoding.Core
                 if (waitForUpdatesCounter <= 0)
                 {
                     waitForUpdatesCallback?.Invoke();
-                    pauseCode = false;
+                    PauseCode = false;
                 }
                 return;
             }
 
-            if (bytecodeInterpreter == null || pauseCode) return;
+            if (BytecodeInterpreter == null || PauseCode) return;
 
             try
-            { bytecodeInterpreter.Tick(); }
+            { BytecodeInterpreter.Tick(); }
             catch (UserException error)
             {
                 error.FeedDebugInfo(details.CompilerResult.debugInfo);
@@ -711,10 +885,10 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, "User Exception: " + error.Value.ToString() + "\r\n" + error.MessageAll, LogType.Error);
 
                 OnDone?.Invoke(this, false);
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                bytecodeInterpreter = null;
-                currentlyRunningCode = false;
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                BytecodeInterpreter = null;
+                CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
             }
@@ -725,10 +899,10 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, LogType.Error);
 
                 OnDone?.Invoke(this, false);
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                bytecodeInterpreter = null;
-                currentlyRunningCode = false;
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                BytecodeInterpreter = null;
+                CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
             }
@@ -737,15 +911,15 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
 
                 OnDone?.Invoke(this, false);
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - codeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds, -1));
-                bytecodeInterpreter = null;
-                currentlyRunningCode = false;
+                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                BytecodeInterpreter = null;
+                CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
             }
 
-            if (bytecodeInterpreter == null || bytecodeInterpreter.IsExecuting) return;
+            if (BytecodeInterpreter == null || BytecodeInterpreter.IsExecuting) return;
 
             int offset;
 
@@ -756,16 +930,16 @@ namespace IngameCoding.Core
 
                 startCalled = true;
                 if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out offset))
-                { result = -1; throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
+                { throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
 
-                bytecodeInterpreter.Jump(offset);
+                BytecodeInterpreter.Jump(offset);
                 return;
             }
 
             if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out offset))
             {
                 state = State.CallUpdate;
-                WaitForUpdates(10, () => bytecodeInterpreter?.Call(offset, null));
+                WaitForUpdates(10, () => BytecodeInterpreter?.Call(offset, null));
                 return;
             }
 
@@ -775,11 +949,11 @@ namespace IngameCoding.Core
                 OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
 
                 exitCalled = true;
-                bytecodeInterpreter?.Call(offset, null);
+                BytecodeInterpreter?.Call(offset, null);
                 return;
             }
 
-            OnCodeExecuted(result);
+            OnCodeExecuted();
         }
     }
 }

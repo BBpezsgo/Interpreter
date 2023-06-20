@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace IngameCoding.BBCode
 {
+    using IngameCoding.BBCode.Analysis;
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.Core;
     using IngameCoding.Errors;
@@ -39,6 +40,28 @@ namespace IngameCoding.BBCode
         COMMENT_MULTILINE,
     }
 
+    public enum TokenAnalysedType
+    {
+        None,
+        Attribute,
+        Type,
+        Struct,
+        Keyword,
+        FunctionName,
+        VariableName,
+        FieldName,
+        ParameterName,
+        Namespace,
+        Hash,
+        HashParameter,
+        Library,
+        Class,
+        Statement,
+        BuiltinType,
+        Enum,
+        EnumMember,
+    }
+
     public struct TokenizerSettings
     {
         /// <summary> The Tokenizer will produce <see cref="TokenType.WHITESPACE"/> </summary>
@@ -55,19 +78,18 @@ namespace IngameCoding.BBCode
         };
     }
 
-    public class Token : BaseToken
+    public class Token : BaseToken, IEquatable<Token>
     {
-        public TokenType TokenType = TokenType.WHITESPACE;
-        public string Content = "";
-        public Analysis.TokenAnalysis Analysis;
+        public TokenType TokenType;
+        public TokenAnalysedType AnalysedType;
+
+        public string Content;
 
         public Token()
         {
-            Analysis = new()
-            {
-                Subtype = TokenSubtype.None,
-                SubSubtype = TokenSubSubtype.None,
-            };
+            TokenType = TokenType.WHITESPACE;
+            AnalysedType = TokenAnalysedType.None;
+            Content = "";
         }
 
         public Token Clone() => new()
@@ -75,28 +97,47 @@ namespace IngameCoding.BBCode
             Position = Position,
             AbsolutePosition = AbsolutePosition,
 
-            Content = Content,
             TokenType = TokenType,
-            Analysis = new Analysis.TokenAnalysis()
-            {
-                Subtype = Analysis.Subtype,
-            },
+            AnalysedType = AnalysedType,
+
+            Content = Content,
         };
         public override string ToString() => Content;
 
         internal string ToFullString()
         {
-            return $"Token:{TokenType} {{ \"{Content}\" {Position} {(Analysis == null ? "No analysis" : Analysis.ToString())} }}";
+            return $"Token:{TokenType} {{ \"{Content}\" {Position} {AnalysedType} }}";
         }
 
         public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new()
         {
             AbsolutePosition = new Range<int>(0, 0),
-            Analysis = new Analysis.TokenAnalysis(),
             Position = new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)),
             TokenType = type,
             Content = content,
         };
+
+        public override bool Equals(object obj) => obj is Token other && Equals(other);
+
+        public bool Equals(Token other) =>
+            other is not null &&
+            Position.Equals(other.Position) &&
+            AbsolutePosition.Equals(other.AbsolutePosition) &&
+            TokenType == other.TokenType &&
+            Content == other.Content;
+
+        public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
+
+        public static bool operator ==(Token a, string b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null && b is not null) return false;
+            if (a is not null && b is null) return false;
+            return a.Content == b;
+        }
+        public static bool operator !=(Token a, string b) => !(a == b);
+        public static bool operator ==(string a, Token b) => b == a;
+        public static bool operator !=(string a, Token b) => b != a;
     }
 
     public readonly struct SimpleToken

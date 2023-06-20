@@ -10,6 +10,7 @@ namespace IngameCoding.BBCode.Compiler
     using Core;
 
     using DataUtilities.Serializer;
+    using BBCode.Compiler;
 
     using Errors;
 
@@ -87,12 +88,6 @@ namespace IngameCoding.BBCode.Compiler
                         Console.Write($"{instruction.Parameter.ValueBoolean}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter.type == RuntimeType.STRING)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write($"\"{instruction.Parameter.ToString().Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n")}\"");
-                        Console.Write($" ");
-                    }
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.White;
@@ -152,35 +147,21 @@ namespace IngameCoding.BBCode.Compiler
             All,
         }
 
-        static readonly string[] Keywords = new string[]
-        {
-            "struct",
-            "class",
-
-            "void",
-            "namespace",
-            "using",
-
-            "byte",
-            "int",
-            "bool",
-            "float",
-            "string"
-        };
-
         List<Error> Errors;
         List<Warning> Warnings;
 
-        Action<string, Output.LogType> PrintCallback;
+        // Action<string, Output.LogType> PrintCallback;
 
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
         CompiledFunction[] CompiledFunctions;
         CompiledGeneralFunction[] CompiledGeneralFunctions;
+        CompiledEnum[] CompiledEnums;
 
-        Dictionary<string, FunctionDefinition> Functions;
-        Dictionary<string, StructDefinition> Structs;
-        Dictionary<string, ClassDefinition> Classes;
+        List<FunctionDefinition> Functions;
+        List<StructDefinition> Structs;
+        List<ClassDefinition> Classes;
+        List<EnumDefinition> Enums;
 
         List<Statement_HashInfo> Hashes;
 
@@ -194,6 +175,31 @@ namespace IngameCoding.BBCode.Compiler
             throw new InternalException($"Unknown type '{name}'");
         }
 
+        protected string TypeDefinitionReplacer(string typeName)
+        {
+            foreach (var @struct in CompiledStructs)
+            {
+                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                {
+                    if (definedType == typeName)
+                    {
+                        return @struct.Name.Content;
+                    }
+                }
+            }
+            foreach (var @class in CompiledClasses)
+            {
+                if (@class.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                {
+                    if (definedType == typeName)
+                    {
+                        return @class.Name.Content;
+                    }
+                }
+            }
+            return null;
+        }
+
         public struct Result
         {
             public CompiledFunction[] Functions;
@@ -204,6 +210,7 @@ namespace IngameCoding.BBCode.Compiler
             public CompiledStruct[] Structs;
             public CompiledClass[] Classes;
             public Statement_HashInfo[] Hashes;
+            public CompiledEnum[] Enums;
 
             public Error[] Errors;
             public Warning[] Warnings;
@@ -212,12 +219,10 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
-            @struct.Name.Analysis.CompilerReached = true;
-
-            if (Keywords.Contains(@struct.Name.Content))
+            if (CodeGeneratorBase.Keywords.Contains(@struct.Name.Content))
             { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
 
-            @struct.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
+            @struct.Name.AnalysedType = TokenAnalysedType.Struct;
 
             if (CompiledStructs.ContainsKey(@struct.Name.Content))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
@@ -226,8 +231,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in @struct.Attributes)
             {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -241,12 +245,6 @@ namespace IngameCoding.BBCode.Compiler
                 }
 
                 attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
-
-            foreach (var field in @struct.Fields)
-            {
-                field.Identifier.Analysis.CompilerReached = true;
-                field.Type.Analysis.CompilerReached = true;
             }
 
             return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct)
@@ -257,12 +255,10 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledClass CompileClass(ClassDefinition @class)
         {
-            @class.Name.Analysis.CompilerReached = true;
-
-            if (Keywords.Contains(@class.Name.Content))
+            if (CodeGeneratorBase.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
-            @class.Name.Analysis.SubSubtype = TokenSubSubtype.Struct;
+            @class.Name.AnalysedType = TokenAnalysedType.Struct;
 
             if (CompiledClasses.ContainsKey(@class.Name.Content))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
@@ -271,8 +267,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in @class.Attributes)
             {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -286,13 +281,6 @@ namespace IngameCoding.BBCode.Compiler
                 }
 
                 attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
-
-            foreach (var field in @class.Fields)
-            {
-                field.Identifier.Analysis.CompilerReached = true;
-                field.Type.Analysis.CompilerReached = true;
-                if (field.ProtectionToken != null) field.ProtectionToken.Analysis.CompilerReached = true;
             }
 
             return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class)
@@ -307,8 +295,7 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var attribute in function.Attributes)
             {
-                attribute.Identifier.Analysis.CompilerReached = true;
-                attribute.Identifier.Analysis.SubSubtype = TokenSubSubtype.Attribute;
+                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 {
@@ -327,7 +314,7 @@ namespace IngameCoding.BBCode.Compiler
                 attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
-            CompiledType type = new(function.Type, name => GetCustomType(name));
+            CompiledType type = new(function.Type, GetCustomType);
 
             if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
             {
@@ -341,20 +328,25 @@ namespace IngameCoding.BBCode.Compiler
                         {
                             if (builtinFunction.Value.ParameterCount != function.Parameters.Length)
                             { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Identifier, function.FilePath); }
-                            if (builtinFunction.Value.ReturnSomething != (function.Type.Type != TypeTokenType.VOID))
-                            { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Type, function.FilePath); }
+                            if (builtinFunction.Value.ReturnSomething != (type != "void"))
+                            { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Type.Identifier, function.FilePath); }
 
                             for (int i = 0; i < builtinFunction.Value.ParameterTypes.Length; i++)
                             {
                                 if (builtinFunction.Value.ParameterTypes[i] == BuiltinType.ANY) continue;
 
-                                if (builtinFunction.Value.ParameterTypes[i] != function.Parameters[i].Type.Type.Convert())
-                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type.Type.ToString().ToLower()}", function.Parameters[i].Type, function.FilePath); }
+                                if (CodeGeneratorBase.BuiltinTypeMap1.TryGetValue(function.Parameters[i].Type.Identifier.Content, out BuiltinType builtinType))
+                                {
+                                    if (builtinFunction.Value.ParameterTypes[i] != builtinType)
+                                    { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                                }
+                                else
+                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                             }
 
                             return new CompiledFunction(function.ID(), type, function)
                             {
-                                ParameterTypes = builtinFunction.Value.ParameterTypes.Select(v => new CompiledType(v, GetCustomType)).ToArray(),
+                                ParameterTypes = builtinFunction.Value.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                                 CompiledAttributes = attributes,
                                 References = new List<DefinitionReference>(),
                             };
@@ -401,32 +393,81 @@ namespace IngameCoding.BBCode.Compiler
             };
         }
 
+        CompiledEnum CompileEnum(EnumDefinition @enum)
+        {
+            CompiledEnum compiledEnum = new CompiledEnum()
+            {
+                Attributes = @enum.Attributes,
+                FilePath = @enum.FilePath,
+                Identifier = @enum.Identifier,
+                Members = new CompiledEnumMember[@enum.Members.Length],
+            };
+
+            for (int i = 0; i < @enum.Members.Length; i++)
+            {
+                EnumMemberDefinition member = @enum.Members[i];
+                CompiledEnumMember compiledMember = new()
+                {
+                    Identifier = member.Identifier,
+                };
+                switch (member.Value.Type)
+                {
+                    case LiteralType.INT:
+                        compiledMember.Value = new DataItem(int.Parse(member.Value.Value));
+                        break;
+                    case LiteralType.FLOAT:
+                        compiledMember.Value = new DataItem(float.Parse(member.Value.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
+                        break;
+                    case LiteralType.BOOLEAN:
+                        compiledMember.Value = new DataItem(bool.Parse(member.Value.Value));
+                        break;
+                    case LiteralType.CHAR:
+                        if (member.Value.Value.Length != 1) throw new InternalException($"Literal char contains {member.Value.Value.Length} characters but only 1 allowed", @enum.FilePath);
+                        compiledMember.Value = new DataItem(member.Value.Value[0]);
+                        break;
+                    case LiteralType.STRING:
+                        throw new CompilerException($"String literal is not valid for a enum member value", member.Value, @enum.FilePath);
+                    default:
+                        throw new NotImplementedException();
+                }
+                compiledEnum.Members[i] = compiledMember;
+            }
+
+            return compiledEnum;
+        }
+
         void CompileFile(SourceCodeManager.CollectedAST collectedAST)
         {
             foreach (var func in collectedAST.ParserResult.Functions)
             {
-                var id = func.ID();
+                if (Functions.ContainsSameDefinition(func))
+                { Errors.Add(new Error($"Function '{func.ReadableID()}' already exists", func.Identifier)); continue; }
 
-                if (Functions.ContainsKey(id))
-                { Errors.Add(new Error($"Function '{id}' already exists", func.Identifier)); continue; }
-
-                Functions.Add(id, func);
+                Functions.Add(func);
             }
 
             foreach (var @struct in collectedAST.ParserResult.Structs)
             {
-                if (Classes.ContainsKey(@struct.Key) || Structs.ContainsKey(@struct.Key))
-                { Errors.Add(new Error($"Type '{@struct.Value.Name.Content}' already exists", @struct.Value.Name)); }
+                if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content) || Enums.ContainsKey(@struct.Name.Content))
+                { Errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name)); }
                 else
-                { Structs.Add(@struct.Key, @struct.Value); }
+                { Structs.Add(@struct); }
             }
 
             foreach (var @class in collectedAST.ParserResult.Classes)
             {
-                if (Classes.ContainsKey(@class.Key) || Structs.ContainsKey(@class.Key))
-                { Errors.Add(new Error($"Type '{@class.Value.Name.Content}' already exists", @class.Value.Name)); }
+                if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content) || Enums.ContainsKey(@class.Name.Content))
+                { Errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name)); }
                 else
-                { Classes.Add(@class.Key, @class.Value); }
+                { Classes.Add(@class); }
+            }
+
+            foreach (var @enum in collectedAST.ParserResult.Enums)
+            {
+                if (Classes.ContainsKey(@enum.Identifier.Content) || Structs.ContainsKey(@enum.Identifier.Content) || Enums.ContainsKey(@enum.Identifier.Content))
+                { Errors.Add(new Error($"Type '{@enum.Identifier.Content}' already exists", @enum.Identifier)); }
+                else
+                { Enums.Add(@enum); }
             }
 
             Hashes.AddRange(collectedAST.ParserResult.Hashes);
@@ -442,7 +483,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
-            Functions.AddRange(parserResult.Functions, v => v.ID());
+            Functions.AddRange(parserResult.Functions);
 
             SourceCodeManager.Result collectorResult = SourceCodeManager.Collect(parserResult, file, parserSettings, printCallback, basePath);
 
@@ -547,16 +588,24 @@ namespace IngameCoding.BBCode.Compiler
             #region Compile Classes
 
             this.CompiledClasses = new CompiledClass[Classes.Count];
-            for (int i = Classes.Count - 1; i >= 0; i--)
-            { this.CompiledClasses[i] = CompileClass(Classes.ElementAt(i).Value); }
+            for (int i = 0; i < Classes.Count; i++)
+            { this.CompiledClasses[i] = CompileClass(Classes[i]); }
+
+            #endregion
+
+            #region Compile Enums
+
+            this.CompiledEnums = new CompiledEnum[Enums.Count];
+            for (int i = 0; i < Enums.Count; i++)
+            { this.CompiledEnums[i] = CompileEnum(Enums[i]); }
 
             #endregion
 
             #region Compile Structs
 
             this.CompiledStructs = new CompiledStruct[Structs.Count];
-            for (int i = Structs.Count - 1; i >= 0; i--)
-            { this.CompiledStructs[i] = CompileStruct(Structs.ElementAt(i).Value); }
+            for (int i = 0; i < Structs.Count; i++)
+            { this.CompiledStructs[i] = CompileStruct(Structs[i]); }
 
             #endregion
 
@@ -564,11 +613,11 @@ namespace IngameCoding.BBCode.Compiler
 
             foreach (var @struct in Structs)
             {
-                foreach (var field in @struct.Value.Fields)
+                foreach (var field in @struct.Fields)
                 {
-                    if (CompiledStructs.TryGetValue(field.Type.Content, out CompiledStruct fieldStructType))
+                    if (CompiledStructs.TryGetValue(field.Type.Identifier.Content, out CompiledStruct fieldStructType))
                     {
-                        field.Type = field.Type.Struct(fieldStructType);
+                        field.Type.Identifier = field.Type.Identifier.Struct(fieldStructType);
                     }
                 }
             }
@@ -685,7 +734,7 @@ namespace IngameCoding.BBCode.Compiler
                             parameters.Insert(0, new ParameterDefinition()
                             {
                                 Identifier = Token.CreateAnonymous("this"),
-                                Type = TypeToken.CreateAnonymous(compiledClass.Name.Content, BuiltinType.STRUCT),
+                                Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
                                 withThisKeyword = true,
                             });
                             method.Parameters = parameters.ToArray();
@@ -711,7 +760,7 @@ namespace IngameCoding.BBCode.Compiler
                         parameters.Insert(0, new ParameterDefinition()
                         {
                             Identifier = Token.CreateAnonymous("this"),
-                            Type = TypeToken.CreateAnonymous(compiledClass.Name.Content, BuiltinType.STRUCT),
+                            Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
                             withThisKeyword = true,
                         });
                         method.Parameters = parameters.ToArray();
@@ -726,7 +775,7 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
 
-                foreach (var function in Functions.Values)
+                foreach (var function in Functions)
                 {
                     var compiledFunction = CompileFunction(function);
 
@@ -749,6 +798,7 @@ namespace IngameCoding.BBCode.Compiler
                 BuiltinFunctions = builtinFunctions,
                 Classes = this.CompiledClasses,
                 Structs = this.CompiledStructs,
+                Enums = this.CompiledEnums,
                 Hashes = this.Hashes.ToArray(),
                 TopLevelStatements = parserResult.TopLevelStatements,
 
@@ -794,15 +844,16 @@ namespace IngameCoding.BBCode.Compiler
         {
             Compiler compiler = new()
             {
-                Functions = new Dictionary<string, FunctionDefinition>(),
-                Structs = new Dictionary<string, StructDefinition>(),
-                Classes = new Dictionary<string, ClassDefinition>(),
+                Functions = new List<FunctionDefinition>(),
+                Structs = new List<StructDefinition>(),
+                Classes = new List<ClassDefinition>(),
+                Enums = new List<EnumDefinition>(),
                 Hashes = new List<Statement_HashInfo>(),
 
                 BuiltinFunctions = builtinFunctions,
                 Warnings = new List<Warning>(),
                 Errors = new List<Error>(),
-                PrintCallback = printCallback,
+                // PrintCallback = printCallback,
             };
             return compiler.CompileMainFile(
                 parserResult,

@@ -1,6 +1,7 @@
 ﻿using IngameCoding.BBCode;
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace IngameCoding.Core
@@ -140,7 +141,7 @@ namespace IngameCoding.Core
         public override int GetHashCode() => HashCode.Combine(Line, Character);
     }
 
-    public struct Range<T>
+    public struct Range<T> : IEquatable<Range<T>> where T : IEquatable<T>
     {
         public T Start;
         public T End;
@@ -170,7 +171,21 @@ namespace IngameCoding.Core
             return result;
         }
 
+        public override bool Equals(object obj)
+            => obj is Range<T> other && Equals(other);
+
+        public bool Equals(Range<T> other) =>
+            Start.Equals(other.Start) &&
+            End.Equals(other.End);
+
+        public override int GetHashCode() => HashCode.Combine(Start, End);
+
         public override string ToString() => $"Range{{start: {Start}, end: {End}}}";
+
+        public static bool operator ==(Range<T> left, Range<T> right) =>
+            (IEquatable<T>)left.Start == (IEquatable<T>)right.Start &&
+            (IEquatable<T>)left.End == (IEquatable<T>)right.End;
+        public static bool operator !=(Range<T> left, Range<T> right) => !(left == right);
     }
 
     public struct Couples<T1, T2>

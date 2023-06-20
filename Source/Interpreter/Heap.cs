@@ -254,6 +254,38 @@ namespace IngameCoding.Bytecode
             for (int i = from; i < from + length; i++)
             { heap[i] = DataItem.Null; }
         }
+
+        /// <returns>
+        /// (used, free, headersSize)
+        /// </returns>
+        /// <exception cref="EndlessLoopException"/>
+        public (int, int, int) Diagnostics()
+        {
+            int used = 0;
+            int free = 0;
+            int headersSize = 0;
+
+            int endlessSafe = heap.Length;
+            int i = 0;
+            int blockIndex = 0;
+            while (i + 1 < heap.Length)
+            {
+                (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
+
+                headersSize += BLOCK_HEADER_SIZE;
+                if (blockIsUsed)
+                { used += blockSize; }
+                else
+                { free += blockSize; }
+
+                i += blockSize + 1;
+                blockIndex++;
+
+                if (endlessSafe-- < 0) throw new EndlessLoopException();
+            }
+
+            return (used, free, headersSize);
+        }
     }
 
     public interface IHeap : IReadOnlyHeap

@@ -258,7 +258,6 @@ namespace IngameCoding.BBCode
                     int endlessSafe = 50;
                     while (ExpectIdentifier(out Token pathIdentifier))
                     {
-                        pathIdentifier.AnalysedType = TokenAnalysedType.Library;
                         tokens.Add(pathIdentifier);
 
                         ExpectOperator(".");
@@ -283,7 +282,7 @@ namespace IngameCoding.BBCode
                 }
 
                 if (!ExpectOperator(";"))
-                { throw new SyntaxException("Expected ';' at end of statement (after 'using')", keyword); }
+                { throw new SyntaxException("Expected ';' at end of statement (after 'using')", keyword.After()); }
 
                 usingDefinition = new UsingDefinition
                 {
@@ -321,7 +320,7 @@ namespace IngameCoding.BBCode
                     TopLevelStatements.Add(statement);
 
                     if (!ExpectOperator(";"))
-                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
                 }
             }
 
@@ -737,7 +736,7 @@ namespace IngameCoding.BBCode
                     {
                         fields.Add(field);
                         if (!ExpectOperator(";"))
-                        { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+                        { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
                     }
                     else
                     {
@@ -815,7 +814,7 @@ namespace IngameCoding.BBCode
 
                     fields.Add(field);
                     if (!ExpectOperator(";"))
-                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", new Position(CurrentToken.Position.Start.Line))); }
+                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
 
                     endlessSafe++;
                     if (endlessSafe > 50)
@@ -1331,7 +1330,7 @@ namespace IngameCoding.BBCode
                     statements.Add(statement);
 
                     if (!ExpectOperator(";"))
-                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
 
 
                     endlessSafe++;
@@ -1380,31 +1379,31 @@ namespace IngameCoding.BBCode
                 tokenFor.AnalysedType = TokenAnalysedType.Statement;
 
                 if (!ExpectOperator("(", out Token tokenZarojel))
-                { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor); }
+                { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
 
                 var variableDeclaration = ExpectVariableDeclaration();
                 if (variableDeclaration == null)
                 { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
                 if (!ExpectOperator(";"))
-                { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition()); }
+                { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition().After()); }
 
                 StatementWithReturnValue condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
                 if (!ExpectOperator(";"))
-                { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition()); }
+                { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition().After()); }
 
                 Statement_Setter expression = ExpectSetter();
                 if (expression == null)
                 { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
                 if (!ExpectOperator(")", out Token tokenZarojel2))
-                { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition()); }
+                { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition().After()); }
 
                 if (!ExpectOperator("{", out var braceletStart))
-                { throw new SyntaxException($"Expected '{{' after \"for\" condition, got {CurrentToken}", tokenZarojel2); }
+                { throw new SyntaxException($"Expected '{{' after \"for\" condition, got {CurrentToken}", tokenZarojel2.After()); }
 
                 Statement_ForLoop forStatement = new()
                 {
@@ -1474,7 +1473,7 @@ namespace IngameCoding.BBCode
                     SetStatementThings(statement);
 
                     if (!ExpectOperator(";"))
-                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.TotalPosition())); }
+                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.TotalPosition().After())); }
 
                     whileStatement.Statements.Add(statement);
 
@@ -1581,7 +1580,7 @@ namespace IngameCoding.BBCode
                         if (statement == null)
                         { throw new SyntaxException("Expected a statement", CurrentToken); }
                         else
-                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
+                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
                     }
 
                     ifStatement.Statements.Add(statement);

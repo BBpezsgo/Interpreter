@@ -1,3 +1,9 @@
+#bf "stream-d" "void" "int";
+#bf "stream-f" "void" "int" "int";
+#bf "stream-c" "int" "int" "int";
+#bf "stream-l" "int" "int";
+#bf "stream-r" "void" "int";
+
 class Stream
 {
 	int Pointer;

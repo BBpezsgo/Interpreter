@@ -15,7 +15,7 @@ namespace IngameCoding.Core
         public SinglePosition Start;
         public SinglePosition End;
 
-        public Range<SinglePosition> Range => new(Start, End);
+        public readonly Range<SinglePosition> Range => new(Start, End);
 
         public Position(int line)
         {
@@ -97,12 +97,14 @@ namespace IngameCoding.Core
         internal void Extend(Tokenizer.BaseToken token) => AbsolutePosition.Extend(token.AbsolutePosition);
         internal void Extend(BBCode.Parser.Statements.Statement statement) => AbsolutePosition.Extend(statement.TotalPosition().AbsolutePosition);
 
-        public string ToMinString()
+        public readonly string ToMinString()
         {
             if (Start == End) return Start.ToMinString();
             if (Start.Line == End.Line) return $"{Start.Line}:({Start.Character}-{End.Character})";
             return $"{Start.ToMinString()}-{End.ToMinString()}";
         }
+
+        public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.End.Line, this.End.Character), new SinglePosition(this.End.Line, this.End.Character + 1)), new Range<int>(this.AbsolutePosition.End, this.AbsolutePosition.End + 1));
     }
 
     [DebuggerDisplay($"{{{nameof(ToMinString)}(),nq}}")]
@@ -134,11 +136,11 @@ namespace IngameCoding.Core
             return false;
         }
 
-        public override string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
-        public string ToMinString() => $"{Line}:{Character}";
-        public override bool Equals(object obj) => obj is SinglePosition position && Equals(position);
-        public bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
-        public override int GetHashCode() => HashCode.Combine(Line, Character);
+        public override readonly string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
+        public readonly string ToMinString() => $"{Line}:{Character}";
+        public override readonly bool Equals(object obj) => obj is SinglePosition position && Equals(position);
+        public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
+        public override readonly int GetHashCode() => HashCode.Combine(Line, Character);
     }
 
     public struct Range<T> : IEquatable<Range<T>> where T : IEquatable<T>
@@ -178,9 +180,9 @@ namespace IngameCoding.Core
             Start.Equals(other.Start) &&
             End.Equals(other.End);
 
-        public override int GetHashCode() => HashCode.Combine(Start, End);
+        public override readonly int GetHashCode() => HashCode.Combine(Start, End);
 
-        public override string ToString() => $"Range{{start: {Start}, end: {End}}}";
+        public override readonly string ToString() => $"Range{{start: {Start}, end: {End}}}";
 
         public static bool operator ==(Range<T> left, Range<T> right) =>
             (IEquatable<T>)left.Start == (IEquatable<T>)right.Start &&

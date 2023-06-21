@@ -1,4 +1,5 @@
 ﻿using IngameCoding.BBCode.Compiler;
+using IngameCoding.BBCode.Parser;
 using IngameCoding.Core;
 using IngameCoding.Errors;
 
@@ -8,7 +9,7 @@ using System.IO;
 
 namespace IngameCoding.BBCode
 {
-    internal class EasyCompiler
+    public class EasyCompiler
     {
         Dictionary<string, BuiltinFunction> builtinFunctions;
         string BasePath;
@@ -16,7 +17,15 @@ namespace IngameCoding.BBCode
         Parser.ParserSettings parserSettings;
         Compiler.Compiler.CompilerSettings compilerSettings;
 
-        CodeGenerator.Result Compile_(
+        public struct Result
+        {
+            public CodeGenerator.Result CodeGeneratorResult;
+            public Compiler.Compiler.Result CompilerResult;
+            public ParserResult ParserResult;
+            public Token[] TokenizerResult;
+        }
+
+        Result Compile_(
             FileInfo file,
             Action<string, Output.LogType> printCallback
             )
@@ -103,10 +112,16 @@ namespace IngameCoding.BBCode
                 printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
             }
 
-            return codeGeneratorResult;
+            return new Result()
+            {
+                TokenizerResult = tokens,
+                ParserResult = parserResult,
+                CompilerResult = compilerResult,
+                CodeGeneratorResult = codeGeneratorResult,
+            };
         }
 
-        internal static CodeGenerator.Result Compile(
+        public static Result Compile(
             FileInfo file,
             Dictionary<string, BuiltinFunction> builtinFunctions,
             TokenizerSettings tokenizerSettings,

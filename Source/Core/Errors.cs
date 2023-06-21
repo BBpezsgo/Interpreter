@@ -30,11 +30,11 @@ namespace IngameCoding.Errors
                 }
                 else if (Position.Start.Character == -1)
                 {
-                    return $"{Message} at line {Position.Start.Character}";
+                    return $"{Message} at line {Position.Start.Character} {InnerException}";
                 }
                 else
                 {
-                    return $"{Message} at line {Position.Start.Line} at col {Position.Start.Character}";
+                    return $"{Message} at line {Position.Start.Line} at col {Position.Start.Character} {InnerException}";
                 }
             }
         }

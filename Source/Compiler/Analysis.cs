@@ -4,12 +4,10 @@ namespace IngameCoding.BBCode.Analysis
     using IngameCoding.BBCode.Compiler;
     using IngameCoding.BBCode.Parser;
     using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Bytecode;
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
     using System.Collections.Generic;
-    using System.Globalization;
     using System.IO;
     using System.Linq;
 
@@ -26,7 +24,7 @@ namespace IngameCoding.BBCode.Analysis
         public Warning[] TokenizerWarnings;
         public SimpleToken[] TokenizerInicodeChars;
 
-        public ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
+        public readonly ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
         public ParserResult? parserResult;
         public Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
         public Compiler.CompilerResult compilerResult;
@@ -115,15 +113,15 @@ namespace IngameCoding.BBCode.Analysis
             TokenizerInicodeChars = System.Array.Empty<SimpleToken>(),
         };
 
-        public bool Tokenized => Tokens != null;
-        public bool Parsed => parserResult.HasValue;
-        public bool Compiled => compilerResult != null;
+        public readonly bool Tokenized => Tokens != null;
+        public readonly bool Parsed => parserResult.HasValue;
+        public readonly bool Compiled => compilerResult != null;
 
-        public bool TokenizingSuccess => TokenizerFatalError == null && TokenizerErrors.Length == 0;
-        public bool ParsingSuccess => ParserFatalError == null && ParserErrors.Length == 0 && TokenizingSuccess;
-        public bool CompilingSuccess => CompilerFatalError == null && CompilerErrors.Length == 0 && ParsingSuccess;
+        public readonly bool TokenizingSuccess => TokenizerFatalError == null && TokenizerErrors.Length == 0;
+        public readonly bool ParsingSuccess => ParserFatalError == null && ParserErrors.Length == 0 && TokenizingSuccess;
+        public readonly bool CompilingSuccess => CompilerFatalError == null && CompilerErrors.Length == 0 && ParsingSuccess;
 
-        public void CheckFilePaths(System.Action<string> NotSetCallback)
+        public readonly void CheckFilePaths(System.Action<string> NotSetCallback)
         {
             if (this.Compiled) return;
             if (!this.Parsed) return;

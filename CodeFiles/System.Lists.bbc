@@ -12,7 +12,7 @@ class Array
         { throw "Index out of range exception"; };
         return *(this.pointer + index);
     }
-  
+
     export void Push(int value)
     {
         if (this.length >= this.capacity)

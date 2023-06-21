@@ -404,7 +404,7 @@ namespace IngameCoding.Core
                 compilerSettings,
                 (a, b) => OnOutput?.Invoke(this, a, b),
                 BasePath
-                );
+                ).CodeGeneratorResult;
 
             Dictionary<string, int> functionOffsets = new();
             foreach (var function in codeGeneratorResult.Functions) functionOffsets.Add(function.Key, function.InstructionOffset);

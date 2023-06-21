@@ -1,7 +1,14 @@
 #bf "sleep" "void" "int";
 
+#bf "stdout" "void" "char";
+#bf "stderr" "void" "char";
+#bf "stdin" "char";
+
 #bf "console-set" "void" "char" "int" "int";
 #bf "console-clear" "void";
+
+#bf "int-to-float" "float" "int";
+#bf "float-to-int" "int" "float";
 
 [Builtin("stdout")]
 export void Print(char data);

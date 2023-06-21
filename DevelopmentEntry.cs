@@ -17,7 +17,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "tcp-server.bbc";
+            var file = "test16.bbc";
 
             if (false)
             {
@@ -39,7 +39,7 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 "-hide-debug",
                 "-hide-system",
-                // "-c-generate-comments false",
+                "-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
                 // "-test",

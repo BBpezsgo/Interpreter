@@ -139,6 +139,8 @@ namespace IngameCoding.Core
             {
                 get
                 {
+                    if (this.interpreter == null) return null;
+                    if (this.interpreter.BytecodeInterpreter == null) return null;
                     for (int cp = this.interpreter.BytecodeInterpreter.CodePointer; cp < this.CompilerResult.compiledCode.Length; cp++)
                     {
                         if (cp < 0 || cp >= this.CompilerResult.compiledCode.Length) return null;
@@ -618,7 +620,7 @@ namespace IngameCoding.Core
             var exportedTypes = dll.GetExportedTypes();
             int functionsAdded = 0;
 
-            foreach (Type type in exportedTypes)
+            foreach (System.Type type in exportedTypes)
             {
                 var methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
                 foreach (var method in methods)
@@ -636,7 +638,7 @@ namespace IngameCoding.Core
         {
             #region Console
 
-            builtinFunctions.AddManagedBuiltinFunction("stdin", Array.Empty<BuiltinType>(), (DataItem[] parameters, ManagedBuiltinFunction function) =>
+            builtinFunctions.AddManagedBuiltinFunction("stdin", Array.Empty<Type>(), (DataItem[] parameters, ManagedBuiltinFunction function) =>
             {
                 this.PauseCode = true;
                 this.ReturnValueConsumer = function;

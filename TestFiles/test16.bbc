@@ -5,7 +5,7 @@ void Start()
 {
 	String message = new String(4);
 	delete message;
-	message = "Hello";
+	message = (clone "Hello") + " World";
 	PrintLine(message);
 	delete message;
 }

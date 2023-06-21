@@ -285,7 +285,9 @@ namespace IngameCoding.Bytecode
             if (functionNameDataItem.type != RuntimeType.INT)
             { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem}"); }
 
-            string functionName = Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
+            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
+
+            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
 
             if (!BuiltinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }

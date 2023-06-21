@@ -73,12 +73,12 @@ class Array
         for (int i; i < length; i++)
         {
             if (i > 0) {
-                result = CombineD(result, ", ");
+                result = result + ", ";
             };
             int element = this.ElementAt(i);
-            result = CombineD(result, element.ToString());
+            result = result + element.ToString();
         };
-        return CombineD(CombineD("{ ", result), " }");
+        return "{ " + result + " }";
     }
 
     export destructor()
@@ -144,12 +144,12 @@ class Map
         for (int i; i < length; i++)
         {
             if (i > 0) {
-                result = CombineD(result, ", ");
+                result = result + ", ";
             };
             int element = this.Get(i);
-            result = CombineD(result, element.ToString());
+            result = result + element.ToString();
         };
-        return CombineD(CombineD("{ ", result), " }");
+        return "{ " + result + " }";
     }
 
     export destructor()

@@ -184,10 +184,6 @@ namespace IngameCoding.Core
                             Console.ForegroundColor = ConsoleColor.Cyan;
                             v = heap[i].ValueFloat.ToString() + "f";
                             break;
-                        case RuntimeType.BOOLEAN:
-                            Console.ForegroundColor = ConsoleColor.Blue;
-                            v = heap[i].ValueBoolean ? "true" : "false";
-                            break;
                         case RuntimeType.CHAR:
                             Console.ForegroundColor = ConsoleColor.Yellow;
                             v = "'" + heap[i].ValueChar.Escape() + "'";

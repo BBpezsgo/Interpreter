@@ -9,22 +9,6 @@ namespace IngameCoding.BBCode
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    public enum BuiltinType
-    {
-        VOID,
-
-        AUTO,
-        ANY,
-
-        BYTE,
-        INT,
-        FLOAT,
-
-        BOOLEAN,
-
-        CHAR,
-    }
-
     public class TypeInstance : IEquatable<TypeInstance>
     {
         public Token Identifier;
@@ -420,6 +404,110 @@ namespace IngameCoding.BBCode
                 return true;
             }
 
+            bool ExpectOperatorDefinition(out FunctionDefinition function)
+            {
+                int parseStart = currentTokenIndex;
+                function = null;
+
+                List<FunctionDefinition.Attribute> attributes = new();
+                while (ExpectAttribute(out var attr))
+                {
+                    bool alreadyHave = false;
+                    foreach (var attribute in attributes)
+                    {
+                        if (attribute.Identifier == attr.Identifier)
+                        {
+                            alreadyHave = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyHave)
+                    {
+                        attributes.Add(attr);
+                    }
+                    else
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
+                }
+
+                ExpectIdentifier("export", out Token ExportKeyword);
+
+                TypeInstance possibleType = ExpectType(false);
+                if (possibleType == null)
+                { currentTokenIndex = parseStart; return false; }
+
+                if (!ExpectOperator(new string[]
+                {
+                    "<<", ">>",
+                    "+", "-", "*", "/", "%", "&", "|",
+                    "<", ">", ">=", "<=", "!=", "==", "&&", "||", "^"
+                }, out Token possibleName))
+                { currentTokenIndex = parseStart; return false; }
+
+                if (!ExpectOperator("("))
+                { currentTokenIndex = parseStart; return false; }
+
+                possibleName.AnalysedType = TokenAnalysedType.FunctionName;
+
+                List<ParameterDefinition> parameters = new();
+
+                var expectParameter = false;
+                while (!ExpectOperator(")") || expectParameter)
+                {
+                    if (ExpectIdentifier("this", out Token thisKeywordT))
+                    {
+                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
+                        if (parameters.Count > 0)
+                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
+                    }
+
+                    TypeInstance possibleParameterType = ExpectType(false, true);
+                    if (possibleParameterType == null)
+                    { throw new SyntaxException("Expected parameter type", CurrentToken); }
+
+                    if (!ExpectIdentifier(out Token possibleParameterNameT))
+                    { throw new SyntaxException("Expected a parameter name", CurrentToken); }
+
+                    possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
+
+                    ParameterDefinition parameterDefinition = new()
+                    {
+                        Type = possibleParameterType,
+                        Identifier = possibleParameterNameT,
+                        withThisKeyword = thisKeywordT != null,
+                    };
+                    parameters.Add(parameterDefinition);
+
+                    if (ExpectOperator(")"))
+                    { break; }
+
+                    if (!ExpectOperator(","))
+                    { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                    else
+                    { expectParameter = true; }
+                }
+
+                function = new(possibleName)
+                {
+                    Type = possibleType,
+                    Attributes = attributes.ToArray(),
+                    ExportKeyword = ExportKeyword,
+                    Parameters = parameters.ToArray(),
+                };
+
+                List<Statement> statements = new();
+
+                if (!ExpectOperator(";"))
+                {
+                    statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                    function.BracketStart = braceletStart;
+                    function.BracketEnd = braceletEnd;
+                }
+
+                function.Statements = statements.ToArray();
+
+                return true;
+            }
+
             bool ExpectFunctionDefinition(out FunctionDefinition function)
             {
                 int parseStart = currentTokenIndex;
@@ -626,13 +714,18 @@ namespace IngameCoding.BBCode
 
                 List<FieldDefinition> fields = new();
                 List<FunctionDefinition> methods = new();
+                List<FunctionDefinition> operators = new();
                 List<GeneralFunctionDefinition> generalMethods = new();
 
                 int endlessSafe = 0;
                 Token braceletEnd;
                 while (!ExpectOperator("}", out braceletEnd))
                 {
-                    if (ExpectFunctionDefinition(out var methodDefinition))
+                    if (ExpectOperatorDefinition(out var operatorDefinition))
+                    {
+                        operators.Add(operatorDefinition);
+                    }
+                    else if (ExpectFunctionDefinition(out var methodDefinition))
                     {
                         methods.Add(methodDefinition);
                     }
@@ -658,7 +751,7 @@ namespace IngameCoding.BBCode
                     }
                 }
 
-                ClassDefinition classDefinition = new(possibleClassName, attributes, fields, methods, generalMethods)
+                ClassDefinition classDefinition = new(possibleClassName, attributes, fields, methods, generalMethods, operators)
                 {
                     BracketStart = braceletStart,
                     BracketEnd = braceletEnd,
@@ -987,7 +1080,11 @@ namespace IngameCoding.BBCode
 
                 StatementWithReturnValue returnStatement = null;
 
-                if (ExpectListValue(out var listValue))
+                returnStatement ??= ExpectKeywordCall("clone", true, true);
+
+                if (returnStatement != null)
+                { }
+                else if (ExpectListValue(out var listValue))
                 {
                     returnStatement = listValue;
                 }
@@ -1299,9 +1396,9 @@ namespace IngameCoding.BBCode
                 if (!ExpectOperator(";"))
                 { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition()); }
 
-                Statement expression = ExpectSetter();
+                Statement_Setter expression = ExpectSetter();
                 if (expression == null)
-                { throw new SyntaxException($"Expected expression (setter) after \"for\" condition, got {CurrentToken}", tokenZarojel); }
+                { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
                 if (!ExpectOperator(")", out Token tokenZarojel2))
                 { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition()); }
@@ -1533,6 +1630,7 @@ namespace IngameCoding.BBCode
                 statement ??= ExpectKeywordCall("throw", true, true);
                 statement ??= ExpectKeywordCall("break");
                 statement ??= ExpectKeywordCall("delete", true, true);
+                statement ??= ExpectKeywordCall("clone", true, true);
                 statement ??= ExpectIfStatement();
                 statement ??= ExpectVariableDeclaration();
                 statement ??= ExpectSetter();
@@ -1692,7 +1790,7 @@ namespace IngameCoding.BBCode
                 {
                     StatementWithReturnValue valueToAssign = ExpectExpression();
                     if (valueToAssign == null)
-                    { throw new SyntaxException("Expected expression", o0); }
+                    { throw new SyntaxException("Expected expression after compound assignment operator", o0); }
 
                     Statement_Operator statementToAssign = new(new Token()
                     {
@@ -1767,7 +1865,7 @@ namespace IngameCoding.BBCode
                 {
                     StatementWithReturnValue valueToAssign = ExpectExpression();
                     if (valueToAssign == null)
-                    { throw new SyntaxException("Expected expression", op); }
+                    { throw new SyntaxException("Expected expression after assignment operator", op); }
 
                     return new Statement_Setter(op, leftStatement, valueToAssign);
                 }

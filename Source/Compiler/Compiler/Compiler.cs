@@ -10,7 +10,6 @@ namespace IngameCoding.BBCode.Compiler
     using Core;
 
     using DataUtilities.Serializer;
-    using BBCode.Compiler;
 
     using Errors;
 
@@ -82,12 +81,6 @@ namespace IngameCoding.BBCode.Compiler
                         Console.Write($"{instruction.Parameter.ValueFloat}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter.type == RuntimeType.BOOLEAN)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write($"{instruction.Parameter.ValueBoolean}");
-                        Console.Write($" ");
-                    }
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.White;
@@ -129,6 +122,7 @@ namespace IngameCoding.BBCode.Compiler
             public bool PrintInstructions;
             public bool DontOptimize;
             public bool GenerateDebugInstructions;
+            public bool BuiltinFunctionCache;
 
             public static CompilerSettings Default => new()
             {
@@ -137,6 +131,7 @@ namespace IngameCoding.BBCode.Compiler
                 PrintInstructions = false,
                 DontOptimize = false,
                 GenerateDebugInstructions = true,
+                BuiltinFunctionCache = true,
             };
         }
 
@@ -154,10 +149,12 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
+        CompiledFunction[] CompiledOperators;
         CompiledFunction[] CompiledFunctions;
         CompiledGeneralFunction[] CompiledGeneralFunctions;
         CompiledEnum[] CompiledEnums;
 
+        List<FunctionDefinition> Operators;
         List<FunctionDefinition> Functions;
         List<StructDefinition> Structs;
         List<ClassDefinition> Classes;
@@ -171,6 +168,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (CompiledStructs.ContainsKey(name)) return CompiledStructs.Get<string, ITypeDefinition>(name);
             if (CompiledClasses.ContainsKey(name)) return CompiledClasses.Get<string, ITypeDefinition>(name);
+            if (CompiledEnums.ContainsKey(name)) return CompiledEnums.Get<string, ITypeDefinition>(name);
 
             throw new InternalException($"Unknown type '{name}'");
         }
@@ -197,6 +195,16 @@ namespace IngameCoding.BBCode.Compiler
                     }
                 }
             }
+            foreach (var @enum in CompiledEnums)
+            {
+                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                {
+                    if (definedType == typeName)
+                    {
+                        return @enum.Identifier.Content;
+                    }
+                }
+            }
             return null;
         }
 
@@ -204,6 +212,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             public CompiledFunction[] Functions;
             public CompiledGeneralFunction[] GeneralFunctions;
+            public CompiledFunction[] Operators;
 
             public Dictionary<string, BuiltinFunction> BuiltinFunctions;
 
@@ -217,6 +226,41 @@ namespace IngameCoding.BBCode.Compiler
             public Statement[] TopLevelStatements;
         }
 
+        internal static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
+        {
+            Dictionary<string, AttributeValues> result = new();
+
+            for (int i = 0; i < attributes.Length; i++)
+            {
+                FunctionDefinition.Attribute attribute = attributes[i];
+
+                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
+
+                AttributeValues newAttribute = new()
+                {
+                    parameters = new(),
+                    Identifier = attribute.Identifier,
+                };
+
+                if (attribute.Parameters != null)
+                {
+                    for (int j = 0; j < attribute.Parameters.Length; j++)
+                    { newAttribute.parameters.Add(new Literal(attribute.Parameters[j])); }
+                }
+
+                result.Add(attribute.Identifier.Content, newAttribute);
+            }
+            return result;
+        }
+
+        internal static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, ITypeDefinition> unknownTypeCallback)
+        {
+            CompiledType[] result = new CompiledType[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            { result[i] = new CompiledType(parameters[i].Type, unknownTypeCallback); }
+            return result;
+        }
+
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
             if (CodeGeneratorBase.Keywords.Contains(@struct.Name.Content))
@@ -227,25 +271,7 @@ namespace IngameCoding.BBCode.Compiler
             if (CompiledStructs.ContainsKey(@struct.Name.Content))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
 
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in @struct.Attributes)
-            {
-                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
-
-                AttributeValues newAttribute = new()
-                { parameters = new() };
-
-                if (attribute.Parameters != null)
-                {
-                    foreach (object parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-
-                attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
+            Dictionary<string, AttributeValues> attributes = CompileAttributes(@struct.Attributes);
 
             return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct)
             {
@@ -263,9 +289,79 @@ namespace IngameCoding.BBCode.Compiler
             if (CompiledClasses.ContainsKey(@class.Name.Content))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
 
+            Dictionary<string, AttributeValues> attributes = CompileAttributes(@class.Attributes);
+
+            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class)
+            {
+                References = new List<DefinitionReference>(),
+            };
+        }
+
+        CompiledFunction CompileFunction(FunctionDefinition function)
+        {
+            Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
+
+            CompiledType type = new(function.Type, GetCustomType);
+
+            if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
+            {
+                if (BuiltinFunctions.TryGetValue(builtinFunctionName, out var builtinFunction))
+                {
+                    if (builtinFunction.ParameterCount != function.Parameters.Length)
+                    { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
+                    if (builtinFunction.ReturnSomething != (type != "void"))
+                    { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
+
+                    for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
+                    {
+                        if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
+                        {
+                            if (builtinFunction.ParameterTypes[i] != builtinType)
+                            { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        }
+                        else
+                        { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                    }
+
+                    return new CompiledFunction(type, function)
+                    {
+                        ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
+                        CompiledAttributes = attributes,
+                        References = new List<DefinitionReference>(),
+                    };
+                }
+
+                Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, function.FilePath));
+            }
+
+            return new CompiledFunction(
+                type,
+                CompileTypes(function.Parameters, GetCustomType),
+                function
+                )
+            {
+                CompiledAttributes = attributes,
+                References = new List<DefinitionReference>(),
+            };
+        }
+
+        CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, CompiledType baseType)
+        {
+            return new CompiledGeneralFunction(
+                baseType,
+                CompileTypes(function.Parameters, GetCustomType),
+                function
+                )
+            {
+                References = new List<DefinitionReference>(),
+            };
+        }
+
+        CompiledEnum CompileEnum(EnumDefinition @enum)
+        {
             Dictionary<string, AttributeValues> attributes = new();
 
-            foreach (var attribute in @class.Attributes)
+            foreach (var attribute in @enum.Attributes)
             {
                 attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
 
@@ -283,121 +379,10 @@ namespace IngameCoding.BBCode.Compiler
                 attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
-            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class)
-            {
-                References = new List<DefinitionReference>(),
-            };
-        }
-
-        CompiledFunction CompileFunction(FunctionDefinition function)
-        {
-            Dictionary<string, AttributeValues> attributes = new();
-
-            foreach (var attribute in function.Attributes)
-            {
-                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
-
-                AttributeValues newAttribute = new()
-                {
-                    parameters = new(),
-                    Identifier = attribute.Identifier,
-                };
-
-                if (attribute.Parameters != null)
-                {
-                    foreach (var parameter in attribute.Parameters)
-                    {
-                        newAttribute.parameters.Add(new Literal(parameter));
-                    }
-                }
-
-                attributes.Add(attribute.Identifier.Content, newAttribute);
-            }
-
-            CompiledType type = new(function.Type, GetCustomType);
-
-            if (attributes.TryGetValue("Builtin", out var attributeBuiltin))
-            {
-                if (attributeBuiltin.parameters.Count != 1)
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.FilePath); }
-                if (attributeBuiltin.TryGetValue(0, out string paramBuiltinName))
-                {
-                    foreach (var builtinFunction in BuiltinFunctions)
-                    {
-                        if (builtinFunction.Key.ToLower() == paramBuiltinName.ToLower())
-                        {
-                            if (builtinFunction.Value.ParameterCount != function.Parameters.Length)
-                            { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Key + "'", function.Identifier, function.FilePath); }
-                            if (builtinFunction.Value.ReturnSomething != (type != "void"))
-                            { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Key + "'", function.Type.Identifier, function.FilePath); }
-
-                            for (int i = 0; i < builtinFunction.Value.ParameterTypes.Length; i++)
-                            {
-                                if (builtinFunction.Value.ParameterTypes[i] == BuiltinType.ANY) continue;
-
-                                if (CodeGeneratorBase.BuiltinTypeMap1.TryGetValue(function.Parameters[i].Type.Identifier.Content, out BuiltinType builtinType))
-                                {
-                                    if (builtinFunction.Value.ParameterTypes[i] != builtinType)
-                                    { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
-                                }
-                                else
-                                { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Key + $"'. Parameter index: {i} Requied type: {builtinFunction.Value.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
-                            }
-
-                            return new CompiledFunction(function.ID(), type, function)
-                            {
-                                ParameterTypes = builtinFunction.Value.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
-                                CompiledAttributes = attributes,
-                                References = new List<DefinitionReference>(),
-                            };
-                        }
-                    }
-
-                    Errors.Add(new Error("Builtin function '" + paramBuiltinName.ToLower() + "' not found", attributeBuiltin.Identifier, function.FilePath));
-                    return new CompiledFunction(
-                        function.ID(),
-                        type,
-                        function.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
-                        function
-                        )
-                    {
-                        CompiledAttributes = attributes,
-                        References = new List<DefinitionReference>(),
-                    };
-                }
-                else
-                { throw new CompilerException("Attribute 'Builtin' requies 1 string parameter", attributeBuiltin.Identifier, function.FilePath); }
-            }
-
-            return new CompiledFunction(
-                function.ID(),
-                type,
-                function.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
-                function
-                )
-            {
-                CompiledAttributes = attributes,
-                References = new List<DefinitionReference>(),
-            };
-        }
-
-        CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, CompiledType baseType)
-        {
-            return new CompiledGeneralFunction(
-                baseType,
-                function.Parameters.Select(v => new CompiledType(v.Type, t => GetCustomType(t))).ToArray(),
-                function
-                )
-            {
-                References = new List<DefinitionReference>(),
-            };
-        }
-
-        CompiledEnum CompileEnum(EnumDefinition @enum)
-        {
-            CompiledEnum compiledEnum = new CompiledEnum()
+            CompiledEnum compiledEnum = new()
             {
                 Attributes = @enum.Attributes,
+                CompiledAttributes = attributes,
                 FilePath = @enum.FilePath,
                 Identifier = @enum.Identifier,
                 Members = new CompiledEnumMember[@enum.Members.Length],
@@ -419,7 +404,7 @@ namespace IngameCoding.BBCode.Compiler
                         compiledMember.Value = new DataItem(float.Parse(member.Value.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
                         break;
                     case LiteralType.BOOLEAN:
-                        compiledMember.Value = new DataItem(bool.Parse(member.Value.Value));
+                        compiledMember.Value = new DataItem(bool.Parse(member.Value.Value) ? 1 : 0);
                         break;
                     case LiteralType.CHAR:
                         if (member.Value.Value.Length != 1) throw new InternalException($"Literal char contains {member.Value.Value.Length} characters but only 1 allowed", @enum.FilePath);
@@ -441,15 +426,25 @@ namespace IngameCoding.BBCode.Compiler
             foreach (var func in collectedAST.ParserResult.Functions)
             {
                 if (Functions.ContainsSameDefinition(func))
-                { Errors.Add(new Error($"Function '{func.ReadableID()}' already exists", func.Identifier)); continue; }
+                { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier)); continue; }
 
                 Functions.Add(func);
             }
 
+            /*
+            foreach (var func in collectedAST.ParserResult.Operators)
+            {
+                if (Operators.ContainsSameDefinition(func))
+                { Errors.Add(new Error($"Operator '{func.ReadableID()}' already defined", func.Identifier)); continue; }
+
+                Operators.Add(func);
+            }
+            */
+
             foreach (var @struct in collectedAST.ParserResult.Structs)
             {
                 if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content) || Enums.ContainsKey(@struct.Name.Content))
-                { Errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name)); }
+                { Errors.Add(new Error($"Type \" {@struct.Name.Content} \" already defined", @struct.Name)); }
                 else
                 { Structs.Add(@struct); }
             }
@@ -457,15 +452,24 @@ namespace IngameCoding.BBCode.Compiler
             foreach (var @class in collectedAST.ParserResult.Classes)
             {
                 if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content) || Enums.ContainsKey(@class.Name.Content))
-                { Errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name)); }
+                { Errors.Add(new Error($"Type \"{@class.Name.Content}\" already defined", @class.Name)); }
                 else
                 { Classes.Add(@class); }
+
+
+                foreach (var func in @class.Operators)
+                {
+                    if (Operators.ContainsSameDefinition(func))
+                    { Errors.Add(new Error($"Operator {func.ReadableID()} already defined", func.Identifier)); continue; }
+
+                    Operators.Add(func);
+                }
             }
 
             foreach (var @enum in collectedAST.ParserResult.Enums)
             {
                 if (Classes.ContainsKey(@enum.Identifier.Content) || Structs.ContainsKey(@enum.Identifier.Content) || Enums.ContainsKey(@enum.Identifier.Content))
-                { Errors.Add(new Error($"Type '{@enum.Identifier.Content}' already exists", @enum.Identifier)); }
+                { Errors.Add(new Error($"Type \"{@enum.Identifier.Content}\" already defined", @enum.Identifier)); }
                 else
                 { Enums.Add(@enum); }
             }
@@ -511,34 +515,20 @@ namespace IngameCoding.BBCode.Compiler
                             for (int i = 1; i < hash.Parameters.Length; i++)
                             { bfParams[i - 1] = hash.Parameters[i].Value; }
 
-                            BuiltinType[] parameterTypes = new BuiltinType[bfParams.Length];
+                            Type[] parameterTypes = new Type[bfParams.Length];
                             for (int i = 0; i < bfParams.Length; i++)
                             {
-                                switch (bfParams[i])
+                                if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
                                 {
-                                    case "void":
-                                        if (i > 0)
-                                        { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
-                                        parameterTypes[i] = BuiltinType.VOID;
-                                        break;
-                                    case "int":
-                                        parameterTypes[i] = BuiltinType.INT;
-                                        break;
-                                    case "float":
-                                        parameterTypes[i] = BuiltinType.FLOAT;
-                                        break;
-                                    case "bool":
-                                        parameterTypes[i] = BuiltinType.BOOLEAN;
-                                        break;
-                                    case "byte":
-                                        parameterTypes[i] = BuiltinType.BYTE;
-                                        break;
-                                    case "char":
-                                        parameterTypes[i] = BuiltinType.CHAR;
-                                        break;
-                                    default:
-                                        Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
-                                        goto ExitBreak;
+                                    parameterTypes[i] = paramType;
+
+                                    if (paramType == Type.VOID && i > 0)
+                                    { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
+                                }
+                                else
+                                {
+                                    Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
+                                    goto ExitBreak;
                                 }
                             }
 
@@ -547,7 +537,7 @@ namespace IngameCoding.BBCode.Compiler
                             x.RemoveAt(0);
                             var pTypes = x.ToArray();
 
-                            if (parameterTypes[0] == BuiltinType.VOID)
+                            if (parameterTypes[0] == Type.VOID)
                             {
                                 builtinFunctions.AddBuiltinFunction(bfName, pTypes, (DataItem[] p) =>
                                 {
@@ -561,15 +551,14 @@ namespace IngameCoding.BBCode.Compiler
                                     Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
                                     DataItem returnValue = returnType switch
                                     {
-                                        BuiltinType.INT => new DataItem((int)0),
-                                        BuiltinType.BYTE => new DataItem((byte)0),
-                                        BuiltinType.FLOAT => new DataItem((float)0),
-                                        BuiltinType.BOOLEAN => new DataItem((bool)false),
-                                        BuiltinType.CHAR => new DataItem((char)'\0'),
+                                        Type.INT => new DataItem((int)0),
+                                        Type.BYTE => new DataItem((byte)0),
+                                        Type.FLOAT => new DataItem((float)0),
+                                        Type.CHAR => new DataItem((char)'\0'),
                                         _ => throw new RuntimeException($"Invalid return type \"{returnType}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\""),
                                     };
                                     returnValue.Tag = "return value";
-                                    return (returnValue);
+                                    return returnValue;
                                 });
                             }
                         }
@@ -679,11 +668,10 @@ namespace IngameCoding.BBCode.Compiler
                     @struct.FieldOffsets.Add(field.Identifier.Content, currentOffset);
                     switch (field.Type.BuiltinType)
                     {
-                        case CompiledType.CompiledTypeType.BYTE:
-                        case CompiledType.CompiledTypeType.INT:
-                        case CompiledType.CompiledTypeType.FLOAT:
-                        case CompiledType.CompiledTypeType.BOOL:
-                        case CompiledType.CompiledTypeType.CHAR:
+                        case Type.BYTE:
+                        case Type.INT:
+                        case Type.FLOAT:
+                        case Type.CHAR:
                             currentOffset++;
                             break;
                         default: throw new NotImplementedException();
@@ -698,16 +686,35 @@ namespace IngameCoding.BBCode.Compiler
                     @class.FieldOffsets.Add(field.Identifier.Content, currentOffset);
                     switch (field.Type.BuiltinType)
                     {
-                        case CompiledType.CompiledTypeType.BYTE:
-                        case CompiledType.CompiledTypeType.INT:
-                        case CompiledType.CompiledTypeType.FLOAT:
-                        case CompiledType.CompiledTypeType.BOOL:
-                        case CompiledType.CompiledTypeType.CHAR:
+                        case Type.BYTE:
+                        case Type.INT:
+                        case Type.FLOAT:
+                        case Type.CHAR:
                             currentOffset++;
                             break;
                         default: throw new NotImplementedException();
                     }
                 }
+            }
+
+            #endregion
+
+            #region Compile Operators
+
+            {
+                List<CompiledFunction> compiledOperators = new();
+
+                foreach (var function in Operators)
+                {
+                    CompiledFunction compiledFunction = CompileFunction(function);
+
+                    if (compiledOperators.ContainsSameDefinition(compiledFunction))
+                    { throw new CompilerException($"Operator '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
+
+                    compiledOperators.Add(compiledFunction);
+                }
+
+                this.CompiledOperators = compiledOperators.ToArray();
             }
 
             #endregion
@@ -794,6 +801,7 @@ namespace IngameCoding.BBCode.Compiler
             return new Result()
             {
                 Functions = this.CompiledFunctions,
+                Operators = this.CompiledOperators,
                 GeneralFunctions = this.CompiledGeneralFunctions,
                 BuiltinFunctions = builtinFunctions,
                 Classes = this.CompiledClasses,
@@ -845,12 +853,14 @@ namespace IngameCoding.BBCode.Compiler
             Compiler compiler = new()
             {
                 Functions = new List<FunctionDefinition>(),
+                Operators = new List<FunctionDefinition>(),
                 Structs = new List<StructDefinition>(),
                 Classes = new List<ClassDefinition>(),
                 Enums = new List<EnumDefinition>(),
                 Hashes = new List<Statement_HashInfo>(),
 
                 BuiltinFunctions = builtinFunctions,
+
                 Warnings = new List<Warning>(),
                 Errors = new List<Error>(),
                 // PrintCallback = printCallback,

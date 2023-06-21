@@ -6,5 +6,5 @@ void Start()
 	PrintD("Type something > ");
 	String input = Console.ReadLine();
 	PrintLine();
-	PrintLine(CombineD("Input: ", input));
+	PrintLine("Input: " + input);
 }

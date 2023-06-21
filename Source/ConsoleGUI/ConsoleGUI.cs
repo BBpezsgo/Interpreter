@@ -62,6 +62,7 @@ namespace ConsoleGUI
     {
         readonly Queue<T> EventQueue;
 
+        public int MaxCallbacksPerTick = int.MaxValue;
         public event MainThreadEventCallback<T> Callback;
 
         public MainThreadEvents()
@@ -69,9 +70,15 @@ namespace ConsoleGUI
             EventQueue = new Queue<T>();
         }
 
+        public MainThreadEvents(int maxCallbacksPerTick) : this()
+        {
+            MaxCallbacksPerTick = maxCallbacksPerTick;
+        }
+
         public void Tick(double _)
         {
-            while (EventQueue.Count > 0)
+            int limit = MaxCallbacksPerTick;
+            while (EventQueue.Count > 0 && limit-- > 0)
             {
                 T parameter = EventQueue.Dequeue();
                 Callback?.Invoke(parameter);
@@ -167,8 +174,8 @@ namespace ConsoleGUI
 
             this.LastTick = DateTime.UtcNow.TimeOfDay.TotalMilliseconds;
 
-            this.KeyEvents = new MainThreadEvents<KeyEvent>();
-            this.MouseEvents = new MainThreadEvents<MouseEvent>();
+            this.KeyEvents = new MainThreadEvents<KeyEvent>(32);
+            this.MouseEvents = new MainThreadEvents<MouseEvent>(8);
 
             this.KeyEvents.Callback += KeyEvent;
             this.MouseEvents.Callback += MouseEvent;

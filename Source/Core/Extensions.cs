@@ -10,6 +10,23 @@ namespace IngameCoding.Core
 {
     public static class Extensions
     {
+        public static Type Convert(this RuntimeType v) => v switch
+        {
+            RuntimeType.BYTE => Type.BYTE,
+            RuntimeType.INT => Type.INT,
+            RuntimeType.FLOAT => Type.FLOAT,
+            RuntimeType.CHAR => Type.CHAR,
+            _ => throw new System.NotImplementedException(),
+        };
+        public static RuntimeType Convert(this Type v) => v switch
+        {
+            Type.BYTE => RuntimeType.BYTE,
+            Type.INT => RuntimeType.INT,
+            Type.FLOAT => RuntimeType.FLOAT,
+            Type.CHAR => RuntimeType.CHAR,
+            _ => throw new System.NotImplementedException(),
+        };
+
         internal static bool TryGetAttribute<T0, T1, T2>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,
@@ -73,18 +90,8 @@ namespace IngameCoding.Core
         {
             RuntimeType.INT => item.ValueInt,
             RuntimeType.FLOAT => item.ValueFloat,
-            RuntimeType.BOOLEAN => item.ValueBoolean,
             RuntimeType.CHAR => item.ValueChar,
             _ => null,
-        };
-
-        public static bool EqualType(this DataItem item, BuiltinType type) => item.type switch
-        {
-            RuntimeType.INT => type == BuiltinType.INT,
-            RuntimeType.FLOAT => type == BuiltinType.FLOAT,
-            RuntimeType.BOOLEAN => type == BuiltinType.BOOLEAN,
-            RuntimeType.CHAR => type == BuiltinType.CHAR,
-            _ => false,
         };
 
         public static string Repeat(this string v, int count)

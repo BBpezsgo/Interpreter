@@ -123,6 +123,11 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
 
+    public interface IReadableID
+    {
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch);
+    }
+
     public abstract class Statement
     {
         public override string ToString()
@@ -219,7 +224,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_FunctionCall : StatementWithReturnValue
+    public class Statement_FunctionCall : StatementWithReturnValue, IReadableID
     {
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
@@ -281,9 +286,28 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
             return result;
         }
+
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = "";
+            if (this.PrevStatement != null)
+            {
+                result += TypeSearch.Invoke(this.PrevStatement);
+                result += ".";
+            }
+            result += this.FunctionName;
+            result += "(";
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result += ", "; }
+                result += TypeSearch.Invoke(this.Parameters[i]);
+            }
+            result += ")";
+            return result;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_KeywordCall : Statement
+    public class Statement_KeywordCall : StatementWithReturnValue, IReadableID
     {
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
@@ -328,15 +352,48 @@ namespace IngameCoding.BBCode.Parser.Statements
             { result.Extend(item.TotalPosition()); }
             return result;
         }
+
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = "";
+            result += this.Identifier.Content;
+            result += "(";
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result += ", "; }
+
+                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+            }
+            result += ")";
+
+            return result;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Operator : StatementWithReturnValue
+    public class Statement_Operator : StatementWithReturnValue, IReadableID
     {
         public readonly Token Operator;
         internal readonly StatementWithReturnValue Left;
         internal StatementWithReturnValue Right;
         internal bool InsideBracelet;
 
+        internal StatementWithReturnValue[] Parameters
+        {
+            get
+            {
+                StatementWithReturnValue left = this.Left;
+                StatementWithReturnValue right = this.Right;
+
+                if (left is null && right is not null)
+                { return new StatementWithReturnValue[] { right }; }
+                else if (left is not null && right is null)
+                { return new StatementWithReturnValue[] { left }; }
+                else if (left is not null && right is not null)
+                { return new StatementWithReturnValue[] { left, right }; }
+                else
+                { throw new Errors.InternalException(); }
+            }
+        }
         internal int ParameterCount
         {
             get
@@ -515,6 +572,21 @@ namespace IngameCoding.BBCode.Parser.Statements
             { result.Extend(Right.TotalPosition()); }
             return result;
         }
+
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = this.Operator.Content;
+            result += "(";
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result += ", "; }
+
+                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+            }
+            result += ")";
+
+            return result;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Setter : Statement
@@ -556,10 +628,15 @@ namespace IngameCoding.BBCode.Parser.Statements
         internal Position ImagineryPosition;
         public Token ValueToken;
 
-        public override string ToString()
+        public override string ToString() => Type switch
         {
-            return $"{Value}";
-        }
+            LiteralType.INT => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.FLOAT => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.BOOLEAN => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.STRING => $"\"{Value}\"",
+            LiteralType.CHAR => $"'{Value}'",
+            _ => null,
+        };
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -828,7 +905,7 @@ namespace IngameCoding.BBCode.Parser.Statements
         public override Position TotalPosition() => new(TypeName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_ConstructorCall : StatementWithReturnValue
+    public class Statement_ConstructorCall : StatementWithReturnValue, IReadableID
     {
         public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
         public Token Keyword;
@@ -867,9 +944,27 @@ namespace IngameCoding.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}new {TypeName}({(string.Join(", ", parameters))})";
         }
         public override Position TotalPosition() => new(TypeName);
+
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = "";
+            result += TypeName.Content;
+            result += ".";
+            result += this.Keyword.Content;
+            result += "(";
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result += ", "; }
+
+                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+            }
+            result += ")";
+
+            return result;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Index : StatementWithReturnValue
+    public class Statement_Index : StatementWithReturnValue, IReadableID
     {
         internal readonly StatementWithReturnValue Expression;
         internal StatementWithReturnValue PrevStatement;
@@ -894,6 +989,16 @@ namespace IngameCoding.BBCode.Parser.Statements
             Position result = Expression.TotalPosition();
             if (PrevStatement != null)
             { result.Extend(PrevStatement.TotalPosition()); }
+            return result;
+        }
+
+        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = TypeSearch.Invoke(this.PrevStatement).Name;
+            result += "[";
+            result += TypeSearch.Invoke(this.Expression).Name;
+            result += "]";
+
             return result;
         }
     }

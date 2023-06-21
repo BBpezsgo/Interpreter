@@ -248,13 +248,15 @@ namespace IngameCoding.BBCode.Parser
 
         public string Key => Name.Content;
 
-        public IReadOnlyCollection<FunctionDefinition> Methods => methods;
-        public IReadOnlyCollection<GeneralFunctionDefinition> GeneralMethods => generalMethods;
+        public IReadOnlyList<FunctionDefinition> Methods => methods;
+        public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
+        public IReadOnlyList<FunctionDefinition> Operators => operators;
 
         readonly FunctionDefinition[] methods;
         readonly GeneralFunctionDefinition[] generalMethods;
+        readonly FunctionDefinition[] operators;
 
-        public ClassDefinition(Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<FunctionDefinition> methods, IEnumerable<GeneralFunctionDefinition> generalMethods)
+        public ClassDefinition(Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<FunctionDefinition> methods, IEnumerable<GeneralFunctionDefinition> generalMethods, IEnumerable<FunctionDefinition> operators)
         {
             this.Name = name;
             this.Fields = fields.ToArray();
@@ -262,6 +264,7 @@ namespace IngameCoding.BBCode.Parser
             this.generalMethods = generalMethods.ToArray();
             this.Attributes = attributes.ToArray();
             this.Statements = new List<Statement>();
+            this.operators = operators.ToArray();
         }
 
         public override string ToString()
@@ -671,11 +674,11 @@ namespace IngameCoding.BBCode.Parser
                 this.Classes[i].FilePath = path;
                 for (int j = 0; j < this.Classes[i].Methods.Count; j++)
                 {
-                    this.Classes[i].Methods.ElementAt(j).FilePath = path;
+                    this.Classes[i].Methods[j].FilePath = path;
                 }
                 for (int j = 0; j < this.Classes[i].GeneralMethods.Count; j++)
                 {
-                    this.Classes[i].GeneralMethods.ElementAt(j).FilePath = path;
+                    this.Classes[i].GeneralMethods[j].FilePath = path;
                 }
             }
             for (int i = 0; i < this.Hashes.Length; i++)

@@ -179,9 +179,6 @@ namespace IngameCoding.Bytecode
                 case RuntimeType.FLOAT:
                     serializer.Serialize(dataItem.ValueFloat);
                     break;
-                case RuntimeType.BOOLEAN:
-                    serializer.Serialize(dataItem.ValueBoolean);
-                    break;
                 case RuntimeType.CHAR:
                     serializer.Serialize(dataItem.ValueChar);
                     break;
@@ -200,8 +197,6 @@ namespace IngameCoding.Bytecode
                     return new DataItem(deserializer.DeserializeInt32(), tag);
                 case RuntimeType.FLOAT:
                     return new DataItem(deserializer.DeserializeFloat(), tag);
-                case RuntimeType.BOOLEAN:
-                    return new DataItem(deserializer.DeserializeBoolean(), tag);
                 case RuntimeType.CHAR:
                     return new DataItem(deserializer.DeserializeChar(), tag);
                 default:
@@ -222,9 +217,6 @@ namespace IngameCoding.Bytecode
                 case RuntimeType.FLOAT:
                     result["Value"] = Value.Literal(dataItem.ValueFloat);
                     return result;
-                case RuntimeType.BOOLEAN:
-                    result["Value"] = Value.Literal(dataItem.ValueBoolean);
-                    return result;
                 case RuntimeType.CHAR:
                     result["Value"] = Value.Literal(dataItem.ValueChar);
                     return result;
@@ -243,8 +235,6 @@ namespace IngameCoding.Bytecode
                     return new DataItem((int)data["Value"].Int, tag);
                 case RuntimeType.FLOAT:
                     return new DataItem((float)data["Value"].Float, tag);
-                case RuntimeType.BOOLEAN:
-                    return new DataItem((bool)data["Value"].Bool, tag);
                 case RuntimeType.CHAR:
                     return new DataItem((char)data["Value"].Int, tag);
                 default:

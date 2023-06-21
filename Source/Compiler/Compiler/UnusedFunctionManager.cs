@@ -237,11 +237,11 @@ namespace IngameCoding.BBCode.Compiler
                         if (st8.PrevStatement != null)
                         { AnalyzeStatement(st8.PrevStatement); }
 
-                        if (!BuiltinFunctions.Contains(st8.FunctionName) && GetCompiledFunction(st8, out var cf))
+                        if (!KeywordFunctions.Contains(st8.FunctionName) && GetCompiledFunction(st8, out var cf))
                         {
                             if (currentFunction != null)
                             {
-                                if (cf.CheckID(currentFunction))
+                                if (cf.IsSame(currentFunction))
                                 {
                                     cf.TimesUsed++;
                                 }
@@ -258,15 +258,22 @@ namespace IngameCoding.BBCode.Compiler
                         foreach (var parameter in keywordCall.Parameters)
                         { AnalyzeStatement(parameter); }
 
-                        if (!BuiltinFunctions.Contains(keywordCall.FunctionName))
+                        if (!KeywordFunctions.Contains(keywordCall.FunctionName))
                         {
                             if (keywordCall.Parameters.Length > 0)
                             {
                                 CompiledClass @class = FindStatementType(keywordCall.Parameters[0]).Class ?? throw new NullReferenceException();
-                                if (GetDestructor(@class, out CompiledGeneralFunction function))
+
+                                if (GetDestructor(@class, out CompiledGeneralFunction destructor))
                                 {
-                                    function.TimesUsed++;
-                                    function.TimesUsedTotal++;
+                                    destructor.TimesUsed++;
+                                    destructor.TimesUsedTotal++;
+                                }
+
+                                if (GetCloner(@class, out CompiledGeneralFunction cloner))
+                                {
+                                    cloner.TimesUsed++;
+                                    cloner.TimesUsedTotal++;
                                 }
                             }
                         }
@@ -395,7 +402,11 @@ namespace IngameCoding.BBCode.Compiler
 
                 CompiledClasses = compilerResult.Classes,
                 CompiledStructs = compilerResult.Structs,
+
                 CompiledFunctions = compilerResult.Functions,
+                CompiledOperators = compilerResult.Operators,
+                CompiledGeneralFunctions = compilerResult.GeneralFunctions,
+
                 CompiledEnums = compilerResult.Enums,
 
                 Informations = new List<Information>(),

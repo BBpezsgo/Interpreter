@@ -1,6 +1,4 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.BBCode.Compiler;
-using IngameCoding.Bytecode;
+﻿using IngameCoding.Bytecode;
 using IngameCoding.Errors;
 
 using System;
@@ -8,10 +6,12 @@ using System.Collections.Generic;
 
 namespace IngameCoding.Core
 {
-    public class BuiltinFunction
+    public class BuiltinFunction : BBCode.Compiler.IElementWithKey<string>
     {
-        public readonly BuiltinType[] ParameterTypes;
+        public readonly BBCode.Compiler.Type[] ParameterTypes;
         public readonly string Name;
+
+        public string Key => Name;
 
         public int ParameterCount => ParameterTypes.Length;
         public readonly bool ReturnSomething;
@@ -20,7 +20,7 @@ namespace IngameCoding.Core
 
         protected Func<DataItem[], DataItem> callback;
 
-        protected BuiltinFunction(string name, BuiltinType[] parameters, bool returnSomething)
+        protected BuiltinFunction(string name, BBCode.Compiler.Type[] parameters, bool returnSomething)
         {
             this.Name = name;
             this.ParameterTypes = parameters;
@@ -28,7 +28,7 @@ namespace IngameCoding.Core
         }
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[]> callback, string name, BuiltinType[] parameters)
+        public BuiltinFunction(Action<DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters)
                  : this(name, parameters, false)
         {
             this.callback = new Func<DataItem[], DataItem>((p) =>
@@ -39,7 +39,7 @@ namespace IngameCoding.Core
         }
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Func<DataItem[], DataItem> callback, string name, BuiltinType[] parameters)
+        public BuiltinFunction(Func<DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters)
                  : this(name, parameters, true)
         {
             this.callback = callback;
@@ -77,7 +77,7 @@ namespace IngameCoding.Core
         public ReturnEvent OnReturn;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ManagedBuiltinFunction(Action<DataItem[], ManagedBuiltinFunction> callback, string name, BuiltinType[] parameters)
+        public ManagedBuiltinFunction(Action<DataItem[], ManagedBuiltinFunction> callback, string name, BBCode.Compiler.Type[] parameters)
                  : base(name, parameters, true)
         {
             base.callback = new Func<DataItem[], DataItem>((p) =>
@@ -104,22 +104,18 @@ namespace IngameCoding.Core
         public static BuiltinFunction AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, System.Reflection.MethodInfo method)
         {
             System.Reflection.ParameterInfo[] parameters = method.GetParameters();
-            BuiltinType[] parameterTypes = new BuiltinType[parameters.Length];
+            BBCode.Compiler.Type[] parameterTypes = new BBCode.Compiler.Type[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             {
                 System.Reflection.ParameterInfo parameter = parameters[i];
                 Type paramType = parameter.ParameterType;
                 if (paramType == typeof(int))
                 {
-                    parameterTypes[i] = BuiltinType.INT;
+                    parameterTypes[i] = BBCode.Compiler.Type.INT;
                 }
                 else if (paramType == typeof(float))
                 {
-                    parameterTypes[i] = BuiltinType.FLOAT;
-                }
-                else if (paramType == typeof(bool))
-                {
-                    parameterTypes[i] = BuiltinType.BOOLEAN;
+                    parameterTypes[i] = BBCode.Compiler.Type.FLOAT;
                 }
                 else
                 {
@@ -138,21 +134,11 @@ namespace IngameCoding.Core
                 for (int i = 0; i < ps.Length; i++)
                 {
                     var p = ps[i];
-                    if (p.type != RuntimeType.INT &&
-                        p.type != RuntimeType.FLOAT &&
-                        p.type != RuntimeType.BOOLEAN)
+                    if (p.type.Convert() != BBCode.Compiler.Type.INT &&
+                        p.type.Convert() != BBCode.Compiler.Type.FLOAT)
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
 
-                    RuntimeType convertedType = parameterTypes[i] switch
-                    {
-                        BuiltinType.INT => RuntimeType.INT,
-                        BuiltinType.BYTE => RuntimeType.BYTE,
-                        BuiltinType.FLOAT => RuntimeType.FLOAT,
-                        BuiltinType.BOOLEAN => RuntimeType.BOOLEAN,
-                        _ => throw new NotImplementedException(),
-                    };
-
-                    if (p.type != convertedType)
+                    if (p.type.Convert() != parameterTypes[i])
                     { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].ToString().ToLower()}"); }
 
                     objs[i] = p.Value();
@@ -174,7 +160,7 @@ namespace IngameCoding.Core
             return function;
         }
 
-        public static void AddManagedBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Action<DataItem[], ManagedBuiltinFunction> callback)
+        public static void AddManagedBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ManagedBuiltinFunction> callback)
         {
             ManagedBuiltinFunction function = new(callback, name, parameterTypes);
 
@@ -188,7 +174,7 @@ namespace IngameCoding.Core
                 Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Func<DataItem[], DataItem> callback)
+        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Func<DataItem[], DataItem> callback)
         {
             BuiltinFunction function = new(callback, name, parameterTypes);
 
@@ -207,7 +193,7 @@ namespace IngameCoding.Core
             BuiltinFunction function = new(p =>
             {
                 return callback.Invoke();
-            }, name, Array.Empty<BuiltinType>());
+            }, name, Array.Empty<BBCode.Compiler.Type>());
 
             if (!builtinFunctions.ContainsKey(name))
             {
@@ -219,7 +205,7 @@ namespace IngameCoding.Core
                 Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BuiltinType[] parameterTypes, Action<DataItem[]> callback)
+        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[]> callback)
         {
             BuiltinFunction function = new(callback, name, parameterTypes);
 
@@ -236,7 +222,7 @@ namespace IngameCoding.Core
 
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action callback)
         {
-            var types = Array.Empty<BuiltinType>();
+            var types = Array.Empty<BBCode.Compiler.Type>();
 
             builtinFunctions.AddBuiltinFunction(name, types, (args) =>
             {
@@ -369,7 +355,7 @@ namespace IngameCoding.Core
 
         public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<object> callback)
         {
-            var types = Array.Empty<BuiltinType>();
+            var types = Array.Empty<BBCode.Compiler.Type>();
 
             builtinFunctions.AddBuiltinFunction(name, types, (args) =>
             {
@@ -487,40 +473,40 @@ namespace IngameCoding.Core
         #endregion
 
         /// <exception cref="RuntimeException"/>
-        static void CheckParameters(string functionName, BuiltinType[] requied, DataItem[] passed)
+        static void CheckParameters(string functionName, BBCode.Compiler.Type[] requied, DataItem[] passed)
         {
             if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
-
-            return;
-
+            
+            /*
             for (int i = 0; i < requied.Length; i++)
             {
-                if (!passed[i].EqualType(requied[i])) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
+                if (passed[i].type != requied[i]) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
             }
+            */
         }
 
         #region GetTypes<>()
 
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0>() => new BuiltinType[1]
+        static BBCode.Compiler.Type[] GetTypes<T0>() => new BBCode.Compiler.Type[1]
         {
             GetType<T0>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0, T1>() => new BuiltinType[2]
+        static BBCode.Compiler.Type[] GetTypes<T0, T1>() => new BBCode.Compiler.Type[2]
         {
             GetType<T0>(),
             GetType<T1>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0, T1, T2>() => new BuiltinType[3]
+        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2>() => new BBCode.Compiler.Type[3]
         {
             GetType<T0>(),
             GetType<T1>(),
             GetType<T2>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0, T1, T2, T3>() => new BuiltinType[4]
+        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3>() => new BBCode.Compiler.Type[4]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -528,7 +514,7 @@ namespace IngameCoding.Core
             GetType<T3>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0, T1, T2, T3, T4>() => new BuiltinType[5]
+        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3, T4>() => new BBCode.Compiler.Type[5]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -537,7 +523,7 @@ namespace IngameCoding.Core
             GetType<T4>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType[] GetTypes<T0, T1, T2, T3, T4, T5>() => new BuiltinType[6]
+        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3, T4, T5>() => new BBCode.Compiler.Type[6]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -548,18 +534,18 @@ namespace IngameCoding.Core
         };
 
         /// <exception cref="NotImplementedException"/>
-        static BuiltinType GetType<T>()
+        static BBCode.Compiler.Type GetType<T>()
         {
             var type_ = typeof(T);
 
+            if (type_ == typeof(byte))
+            { return BBCode.Compiler.Type.BYTE; }
             if (type_ == typeof(int))
-            { return BuiltinType.INT; }
+            { return BBCode.Compiler.Type.INT; }
             if (type_ == typeof(float))
-            { return BuiltinType.FLOAT; }
-            if (type_ == typeof(bool))
-            { return BuiltinType.BOOLEAN; }
+            { return BBCode.Compiler.Type.FLOAT; }
             if (type_ == typeof(char))
-            { return BuiltinType.CHAR; }
+            { return BBCode.Compiler.Type.CHAR; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }

@@ -15,10 +15,11 @@ export void Set(char data, int x, int y);
 [Builtin("console-clear")]
 export void Clear();
 
-enum Bool
+[Define("boolean")]
+enum bool
 {
-    True = 1,
     False = 0,
+    True = 1,
 }
 
 export void Print(String message)
@@ -339,6 +340,40 @@ class String
         return result;
     }
 
+    export clone(String other)
+    {
+        String result = new String(other.Length());
+        for (int i; i < other.Length(); i++)
+        {
+            result.Set(i, other.At(i));
+        };
+        return result;
+    }
+
+    export String +(String a, String b)
+    {
+        int al = a.Length();
+        int bl = b.Length();
+
+        int lengthSum = al + bl;
+        String result = CreateString(lengthSum);
+  
+        for (int i; i < al; i++)
+        {
+            result.Set(i, a.At(i));
+        };
+  
+        for (int i; i < bl; i++)
+        {
+            result.Set(al + i, b.At(i));
+        };
+
+        delete a;
+        delete b;
+
+        return result;
+    }
+
     export char At(int index)
     {
         if (index < 0 || index >= this.length)
@@ -369,35 +404,6 @@ export String CreateString(int length)
     {
         *(result.pointer + i) = '\0';
     };
-    return result;
-}
-
-export String Combine(String a, String b)
-{
-    int al = a.Length();
-    int bl = b.Length();
-
-    int lengthSum = al + bl;
-    String result = CreateString(lengthSum);
-  
-    for (int i; i < al; i++)
-    {
-        result.Set(i, a.At(i));
-    };
-  
-    for (int i; i < bl; i++)
-    {
-        result.Set(al + i, b.At(i));
-    };
-
-    return result;
-}
-
-export String CombineD(String a, String b)
-{
-    String result = Combine(a, b);
-    delete a;
-    delete b;
     return result;
 }
 

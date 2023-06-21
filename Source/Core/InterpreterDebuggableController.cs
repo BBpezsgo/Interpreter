@@ -45,6 +45,11 @@ namespace IngameCoding.Core
     {
         int _breakpoint = int.MinValue;
 
+        bool _stackOperation = false;
+        bool _heapOperation = false;
+        bool _builtinFunctionOperation = false;
+        bool _aluOperation = false;
+
         public int Breakpoint
         {
             get => _breakpoint;
@@ -68,6 +73,11 @@ namespace IngameCoding.Core
             }
         }
 
+        public bool StackOperation => _stackOperation;
+        public bool HeapOperation => _heapOperation;
+        public bool BuiltinFunctionOperation => _builtinFunctionOperation;
+        public bool AluOperation => _aluOperation;
+
         public readonly Records<float> HeapUsage = new();
 
         public void Step()
@@ -77,16 +87,67 @@ namespace IngameCoding.Core
             Breakpoint = int.MinValue;
         }
 
+        internal void DoUpdate()
+        {
+            Instruction nextInstruction = this.details.NextInstruction;
+            if (nextInstruction != null)
+            {
+                _builtinFunctionOperation =
+                    nextInstruction.opcode == Opcode.CALL_BUILTIN;
+
+                _stackOperation =
+                    nextInstruction.opcode == Opcode.STORE_VALUE ||
+                    nextInstruction.opcode == Opcode.PUSH_VALUE ||
+                    nextInstruction.opcode == Opcode.POP_VALUE ||
+                    nextInstruction.opcode == Opcode.LOAD_VALUE;
+
+                _heapOperation =
+                    nextInstruction.opcode == Opcode.HEAP_ALLOC ||
+                    nextInstruction.opcode == Opcode.HEAP_DEALLOC ||
+                    nextInstruction.opcode == Opcode.HEAP_GET ||
+                    nextInstruction.opcode == Opcode.HEAP_SET;
+
+                _aluOperation =
+                    nextInstruction.opcode == Opcode.BITSHIFT_LEFT ||
+                    nextInstruction.opcode == Opcode.BITSHIFT_RIGHT ||
+
+                    nextInstruction.opcode == Opcode.LOGIC_AND ||
+                    nextInstruction.opcode == Opcode.LOGIC_EQ ||
+                    nextInstruction.opcode == Opcode.LOGIC_LT ||
+                    nextInstruction.opcode == Opcode.LOGIC_LTEQ ||
+                    nextInstruction.opcode == Opcode.LOGIC_MT ||
+                    nextInstruction.opcode == Opcode.LOGIC_MTEQ ||
+                    nextInstruction.opcode == Opcode.LOGIC_NEQ ||
+                    nextInstruction.opcode == Opcode.LOGIC_NOT ||
+                    nextInstruction.opcode == Opcode.LOGIC_OR ||
+                    nextInstruction.opcode == Opcode.LOGIC_XOR ||
+
+                    nextInstruction.opcode == Opcode.MATH_ADD ||
+                    nextInstruction.opcode == Opcode.MATH_DIV ||
+                    nextInstruction.opcode == Opcode.MATH_MOD ||
+                    nextInstruction.opcode == Opcode.MATH_MULT ||
+                    nextInstruction.opcode == Opcode.MATH_SUB;
+            }
+            else
+            {
+                _builtinFunctionOperation = false;
+                _stackOperation = false;
+                _heapOperation = false;
+            }
+            Update();
+            SampleHeap();
+        }
+
         public void StepInto()
         {
             Breakpoint = int.MinValue;
-            Update();
-            SampleHeap();
+            DoUpdate();
             Breakpoint = int.MinValue;
         }
 
         internal void SampleHeap()
         {
+            if (this.Details.Interpreter == null) return;
             if (this.Details.Interpreter.Heap == null) return;
             if (this.Details.Interpreter.Heap is HEAP heap)
             {
@@ -101,8 +162,7 @@ namespace IngameCoding.Core
             int endlessSafe = 1024;
             while (true)
             {
-                Update();
-                SampleHeap();
+                DoUpdate();
 
                 if (BytecodeInterpreter.CodePointer == Breakpoint) break;
 

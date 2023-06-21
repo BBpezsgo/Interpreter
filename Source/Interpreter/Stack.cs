@@ -15,7 +15,6 @@ namespace IngameCoding.Bytecode
                 {
                     RuntimeType.INT => 4,
                     RuntimeType.FLOAT => 4,
-                    RuntimeType.BOOLEAN => 1,
                     _ => throw new NotImplementedException(),
                 };
 

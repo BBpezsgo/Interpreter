@@ -138,7 +138,7 @@ namespace ConsoleGUI
             {
                 HasBorder = true,
                 Title = "State",
-                Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 3),
+                Layout = new InlineLayout(InlineLayoutSizeMode.Fixed, 4),
             };
             StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
 
@@ -233,8 +233,7 @@ namespace ConsoleGUI
                 if (this.CurrentlyJumping <= 0) return;
 
                 this.CurrentlyJumping--;
-                this.Interpreter.Update();
-                this.Interpreter.SampleHeap();
+                this.Interpreter.DoUpdate();
                 if (!this.Interpreter.IsExecutingCode)
                 {
                     ConsoleGUI.Instance.Destroy();
@@ -455,6 +454,76 @@ namespace ConsoleGUI
             b.BackgroundColor = CharColors.BgBlack;
             b.FinishLine(sender.Rect.Width);
             b.ForegroundColor = CharColors.FgDefault;
+
+            b.AddText("  ");
+
+
+            if (this.Interpreter.StackOperation)
+            {
+                b.BackgroundColor = CharColors.BgWhite;
+                b.ForegroundColor = CharColors.FgBlack;
+                b.AddText($"STACK");
+                b.BackgroundColor = CharColors.BgBlack;
+                b.ForegroundColor = CharColors.FgDefault;
+            }
+            else
+            {
+                b.AddText($"STACK");
+            }
+
+            b.AddText("  ");
+
+
+            if (this.Interpreter.HeapOperation)
+            {
+                b.BackgroundColor = CharColors.BgWhite;
+                b.ForegroundColor = CharColors.FgBlack;
+                b.AddText($"HEAP");
+                b.BackgroundColor = CharColors.BgBlack;
+                b.ForegroundColor = CharColors.FgDefault;
+            }
+            else
+            {
+                b.AddText($"HEAP");
+            }
+
+            b.AddText("  ");
+
+
+            if (this.Interpreter.AluOperation)
+            {
+                b.BackgroundColor = CharColors.BgWhite;
+                b.ForegroundColor = CharColors.FgBlack;
+                b.AddText($"ALU");
+                b.BackgroundColor = CharColors.BgBlack;
+                b.ForegroundColor = CharColors.FgDefault;
+            }
+            else
+            {
+                b.AddText($"ALU");
+            }
+
+            b.AddText("  ");
+
+
+            if (this.Interpreter.BuiltinFunctionOperation)
+            {
+                b.BackgroundColor = CharColors.BgWhite;
+                b.ForegroundColor = CharColors.FgBlack;
+                b.AddText($"BULTIN F.");
+                b.BackgroundColor = CharColors.BgBlack;
+                b.ForegroundColor = CharColors.FgDefault;
+            }
+            else
+            {
+                b.AddText($"BULTIN F.");
+            }
+
+            b.AddText("  ");
+
+            b.BackgroundColor = CharColors.BgBlack;
+            b.FinishLine(sender.Rect.Width);
+            b.ForegroundColor = CharColors.FgDefault;
         }
 
         private void HeapDiagnosticsElement_OnBeforeDraw(InlineElement sender)
@@ -630,10 +699,6 @@ namespace ConsoleGUI
                                 b.ForegroundColor = CharColors.FgYellow;
                                 b.AddText($"'{item.ValueChar.Escape()}'");
                                 break;
-                            case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
-                                b.ForegroundColor = CharColors.FgDarkBlue;
-                                b.AddText($"{item.ValueBoolean}");
-                                break;
                             default:
                                 b.ForegroundColor = CharColors.FgGray;
                                 b.AddText("?");
@@ -806,10 +871,6 @@ namespace ConsoleGUI
                         case IngameCoding.Bytecode.RuntimeType.CHAR:
                             b.ForegroundColor = CharColors.FgYellow;
                             b.AddText($"'{item.ValueChar.Escape()}'");
-                            break;
-                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
-                            b.ForegroundColor = CharColors.FgLightBlue;
-                            b.AddText($"{item.ValueBoolean}");
                             break;
                         default:
                             b.ForegroundColor = CharColors.FgGray;
@@ -988,11 +1049,6 @@ namespace ConsoleGUI
                         case IngameCoding.Bytecode.RuntimeType.FLOAT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{instruction.Parameter.ValueFloat}f");
-                            b.AddText($" ");
-                            break;
-                        case IngameCoding.Bytecode.RuntimeType.BOOLEAN:
-                            b.ForegroundColor = CharColors.FgDarkBlue;
-                            b.AddText($"{instruction.Parameter.ValueBoolean}");
                             b.AddText($" ");
                             break;
                         case IngameCoding.Bytecode.RuntimeType.CHAR:

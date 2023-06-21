@@ -34,7 +34,7 @@ namespace IngameCoding.BBCode.Compiler
                 Instruction instruction = self[instructionIndex];
                 if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
-                    if (instruction.Parameter.type ==   RuntimeType.INT)
+                    if (instruction.Parameter.type == RuntimeType.INT)
                     {
                         if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index) continue;
                         if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index) continue;
@@ -82,13 +82,13 @@ namespace IngameCoding.BBCode.Compiler
         public static bool ContainsSameDefinition(this IEnumerable<CompiledFunction> functions, CompiledFunction other)
         {
             foreach (var function in functions)
-            { if (function.CheckID(other.Identifier.Content, other.ParameterTypes)) return true; }
+            { if (function.IsSame(other)) return true; }
             return false;
         }
         public static bool ContainsSameDefinition(this IEnumerable<CompiledGeneralFunction> functions, CompiledGeneralFunction other)
         {
             foreach (CompiledGeneralFunction function in functions)
-            { if (function.CheckID(other.Identifier.Content, other.ParameterTypes)) return true; }
+            { if (function.IsSame(other)) return true; }
             return false;
         }
 
@@ -104,42 +104,6 @@ namespace IngameCoding.BBCode.Compiler
             return result;
         }
 
-        public static bool CheckID(this CompiledFunction function, CompiledFunction other)
-        {
-            if (function.Identifier.Content != other.Identifier.Content) return false;
-            if (function.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            { if (function.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
-            return true;
-        }
-
-        public static bool CheckID(this CompiledFunction function, FunctionDefinition other)
-        {
-            if (function.Identifier.Content != other.Identifier.Content) return false;
-            if (function.ParameterTypes.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            { if (function.ParameterTypes[i] != other.Parameters[i].Type) return false; }
-            return true;
-        }
-
-        public static bool CheckID(this CompiledFunction function, string name, CompiledType[] parameters)
-        {
-            if (function.Identifier.Content != name) return false;
-            if (function.ParameterTypes.Length != parameters.Length) return false;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            { if (function.ParameterTypes[i] != parameters[i]) return false; }
-            return true;
-        }
-
-        public static bool CheckID(this CompiledFunction function, string name, TypeInstance[] parameters)
-        {
-            if (function.Identifier.Content != name) return false;
-            if (function.ParameterTypes.Length != parameters.Length) return false;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            { if (function.ParameterTypes[i] != parameters[i]) return false; }
-            return true;
-        }
-
         public static string ID(this GeneralFunctionDefinition function)
         {
             string result = function.Identifier.Content;
@@ -150,15 +114,6 @@ namespace IngameCoding.BBCode.Compiler
                 result += "," + param.Type.ToString();
             }
             return result;
-        }
-
-        public static bool CheckID(this CompiledGeneralFunction function, string name, CompiledType[] parameters)
-        {
-            if (function.Identifier.Content == name) return false;
-            if (function.ParameterTypes.Length != parameters.Length) return false;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            { if (function.ParameterTypes[i] != parameters[i]) return false; }
-            return true;
         }
 
         public static bool TryGetValue<T>(this IEnumerable<IElementWithKey<T>> self, T key, out IElementWithKey<T> value)
@@ -424,6 +379,31 @@ namespace IngameCoding.BBCode.Compiler
 
     }
 
+    struct UndefinedOperatorFunctionOffset
+    {
+        public int CallInstructionIndex;
+
+        public Statement_Operator CallStatement;
+        public List<CompiledParameter> currentParameters;
+        public Dictionary<string, CompiledVariable> currentVariables;
+        internal string CurrentFile;
+
+        public UndefinedOperatorFunctionOffset(int callInstructionIndex, Statement_Operator functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        {
+            this.CallInstructionIndex = callInstructionIndex;
+            this.CallStatement = functionCallStatement;
+
+            this.currentParameters = new();
+            this.currentVariables = new();
+
+            foreach (var item in currentParameters)
+            { this.currentParameters.Add(item); }
+            foreach (var item in currentVariables)
+            { this.currentVariables.Add(item.Key, item.Value); }
+            this.CurrentFile = file;
+        }
+    }
+
     struct UndefinedFunctionOffset
     {
         public int CallInstructionIndex;
@@ -479,7 +459,8 @@ namespace IngameCoding.BBCode.Compiler
         public List<Literal> parameters;
         public Token Identifier;
 
-        static Literal.Type ConvertType(Type type)
+        /// <exception cref="NotImplementedException"/>
+        static Literal.Type ConvertType(System.Type type)
         {
             if (type == typeof(int))
             { return Literal.Type.Integer; }
@@ -492,7 +473,7 @@ namespace IngameCoding.BBCode.Compiler
             throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
         }
 
-        public bool TryGetValue<T>(int index, out T value)
+        public readonly bool TryGetValue<T>(int index, out T value)
         {
             value = default;
             if (parameters == null) return false;
@@ -518,7 +499,7 @@ namespace IngameCoding.BBCode.Compiler
             return true;
         }
 
-        public bool TryGetValue(int index, out string value)
+        public readonly bool TryGetValue(int index, out string value)
         {
             value = string.Empty;
             if (parameters == null) return false;
@@ -529,7 +510,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             return true;
         }
-        public bool TryGetValue(int index, out int value)
+        public readonly bool TryGetValue(int index, out int value)
         {
             value = 0;
             if (parameters == null) return false;
@@ -540,7 +521,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             return true;
         }
-        public bool TryGetValue(int index, out float value)
+        public readonly bool TryGetValue(int index, out float value)
         {
             value = 0;
             if (parameters == null) return false;
@@ -551,7 +532,7 @@ namespace IngameCoding.BBCode.Compiler
             }
             return true;
         }
-        public bool TryGetValue(int index, out bool value)
+        public readonly bool TryGetValue(int index, out bool value)
         {
             value = false;
             if (parameters == null) return false;
@@ -668,7 +649,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string, CompiledType[])>, IInContext<CompiledClass>
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>
     {
         public CompiledType[] ParameterTypes;
 
@@ -678,7 +659,7 @@ namespace IngameCoding.BBCode.Compiler
         public int InstructionOffset { get; set; } = -1;
 
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.Type.BuiltinType != CompiledType.CompiledTypeType.VOID;
+        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
@@ -703,8 +684,7 @@ namespace IngameCoding.BBCode.Compiler
             }
         }
 
-        public readonly string ID;
-        public string Key => ID;
+        public string Key => this.ID();
 
         CompiledClass context;
         public CompiledClass Context
@@ -713,9 +693,8 @@ namespace IngameCoding.BBCode.Compiler
             set => context = value;
         }
 
-        public CompiledFunction(string id, CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
         {
-            this.ID = id;
             this.Type = type;
 
             base.Attributes = functionDefinition.Attributes;
@@ -727,9 +706,8 @@ namespace IngameCoding.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
-        public CompiledFunction(string id, CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
         {
-            this.ID = id;
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
@@ -755,8 +733,14 @@ namespace IngameCoding.BBCode.Compiler
             return true;
         }
 
-        public bool IsSame((string, CompiledType[]) other)
-            => this.CheckID(other.Item1, other.Item2);
+        public bool IsSame((string name, CompiledType[] parameters) other)
+        {
+            if (this.Identifier.Content != other.name) return false;
+            if (this.ParameterTypes.Length != other.parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
+            return true;
+        }
 
         public bool IsSame(IFunctionThing other)
         {
@@ -765,7 +749,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string, CompiledType[])>, IInContext<CompiledClass>
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>
     {
         public CompiledType[] ParameterTypes;
 
@@ -775,7 +759,7 @@ namespace IngameCoding.BBCode.Compiler
         public int InstructionOffset { get; set; } = -1;
 
         public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.Type.BuiltinType != CompiledType.CompiledTypeType.VOID;
+        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
 
         public List<DefinitionReference> References = null;
 
@@ -823,8 +807,14 @@ namespace IngameCoding.BBCode.Compiler
             return true;
         }
 
-        public bool IsSame((string, CompiledType[]) other)
-            => this.CheckID(other.Item1, other.Item2);
+        public bool IsSame((string name, CompiledType[] parameters) other)
+        {
+            if (this.Identifier.Content == other.name) return false;
+            if (this.ParameterTypes.Length != other.parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
+            return true;
+        }
 
         public bool IsSame(IFunctionThing other)
         {
@@ -875,9 +865,10 @@ namespace IngameCoding.BBCode.Compiler
         public new DataItem Value;
     }
 
-    public class CompiledEnum : EnumDefinition, IElementWithKey<string>
+    public class CompiledEnum : EnumDefinition, ITypeDefinition, IElementWithKey<string>
     {
         public new CompiledEnumMember[] Members;
+        internal Dictionary<string, AttributeValues> CompiledAttributes;
     }
 
     public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
@@ -909,7 +900,7 @@ namespace IngameCoding.BBCode.Compiler
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
 
-        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.GeneralMethods)
+        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -986,34 +977,48 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
+    public enum Type
+    {
+        /// <summary>
+        /// Reserved for indicating that the <see cref="CompiledType"/> is not a built-in type
+        /// </summary>
+        NONE,
+
+        VOID,
+
+        BYTE,
+        INT,
+        FLOAT,
+        CHAR,
+
+        /// <summary>
+        /// Only used when get a value by it's memory address
+        /// </summary>
+        UNKNOWN,
+    }
+
     public class CompiledType : IEquatable<CompiledType>
     {
-        internal enum CompiledTypeType
-        {
-            NONE,
-            VOID,
-
-            BOOL,
-
-            BYTE,
-            INT,
-            FLOAT,
-
-            CHAR,
-
-            /// <summary>
-            /// Only used when get a value by it's memory address!
-            /// </summary>
-            UNKNOWN,
-        }
-
-        readonly CompiledTypeType builtinType;
+        readonly Type builtinType;
 
         CompiledStruct @struct;
         CompiledClass @class;
         CompiledEnum @enum;
 
-        internal CompiledTypeType BuiltinType => builtinType;
+        internal Type BuiltinType => builtinType;
+        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="NotImplementedException"/>
+        internal RuntimeType RuntimeType => builtinType switch
+        {
+            Type.BYTE => RuntimeType.BYTE,
+            Type.INT => RuntimeType.INT,
+            Type.FLOAT => RuntimeType.FLOAT,
+            Type.CHAR => RuntimeType.CHAR,
+
+            Type.NONE => throw new Errors.InternalException($"This ({this}) is not a built-in type"),
+
+            _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
+        };
 
         internal CompiledStruct Struct => @struct;
         internal CompiledClass Class => @class;
@@ -1021,20 +1026,23 @@ namespace IngameCoding.BBCode.Compiler
 
 
         /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="NotImplementedException"/>
         internal string Name
         {
             get
             {
-                if (builtinType != CompiledTypeType.NONE) return builtinType switch
+                if (builtinType != Type.NONE) return builtinType switch
                 {
-                    CompiledTypeType.VOID => "void",
-                    CompiledTypeType.BYTE => "byte",
-                    CompiledTypeType.INT => "int",
-                    CompiledTypeType.FLOAT => "float",
-                    CompiledTypeType.BOOL => "bool",
-                    CompiledTypeType.CHAR => "char",
-                    CompiledTypeType.UNKNOWN => "unknown",
-                    _ => throw new Errors.InternalException($"WTF???"),
+                    Type.VOID => "void",
+                    Type.BYTE => "byte",
+                    Type.INT => "int",
+                    Type.FLOAT => "float",
+                    Type.CHAR => "char",
+
+                    Type.UNKNOWN => throw new Errors.InternalException($"This ({this}) is an unknown type"),
+                    Type.NONE => throw new Errors.InternalException($"This should never occur"),
+
+                    _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
 
                 if (@struct != null) return @struct.Name.Content;
@@ -1050,7 +1058,7 @@ namespace IngameCoding.BBCode.Compiler
         internal bool IsEnum => @enum != null;
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         internal bool IsStruct => @struct != null;
-        internal bool IsBuiltin => builtinType != CompiledTypeType.NONE;
+        internal bool IsBuiltin => builtinType != Type.NONE;
         internal bool InHEAP => IsClass;
 
         public int Size
@@ -1084,7 +1092,7 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledType()
         {
-            this.builtinType = CompiledTypeType.NONE;
+            this.builtinType = Type.NONE;
             this.@struct = null;
             this.@class = null;
             this.@enum = null;
@@ -1108,22 +1116,20 @@ namespace IngameCoding.BBCode.Compiler
             this.@enum = @enum ?? throw new ArgumentNullException(nameof(@enum));
         }
 
-        internal CompiledType(CompiledTypeType type) : this()
+        internal CompiledType(Type type) : this()
         {
             this.builtinType = type;
         }
 
-        /// <exception cref="ArgumentException"/>
         /// <exception cref="Errors.InternalException"/>
         internal CompiledType(RuntimeType type) : this()
         {
             this.builtinType = type switch
             {
-                RuntimeType.BYTE => CompiledTypeType.BYTE,
-                RuntimeType.INT => CompiledTypeType.INT,
-                RuntimeType.FLOAT => CompiledTypeType.FLOAT,
-                RuntimeType.BOOLEAN => CompiledTypeType.BOOL,
-                RuntimeType.CHAR => CompiledTypeType.CHAR,
+                RuntimeType.BYTE => Type.BYTE,
+                RuntimeType.INT => Type.INT,
+                RuntimeType.FLOAT => Type.FLOAT,
+                RuntimeType.CHAR => Type.CHAR,
                 _ => throw new NotImplementedException(),
             };
         }
@@ -1134,84 +1140,30 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (string.IsNullOrEmpty(typeName)) throw new ArgumentException($"'{nameof(typeName)}' cannot be null or empty.", nameof(typeName));
 
-            switch (typeName)
-            {
-                case "void":
-                    this.builtinType = CompiledTypeType.VOID;
-                    return;
-                case "byte":
-                    this.builtinType = CompiledTypeType.BYTE;
-                    return;
-                case "int":
-                    this.builtinType = CompiledTypeType.INT;
-                    return;
-                case "float":
-                    this.builtinType = CompiledTypeType.FLOAT;
-                    return;
-                case "bool":
-                    this.builtinType = CompiledTypeType.BOOL;
-                    return;
-                case "char":
-                    this.builtinType = CompiledTypeType.CHAR;
-                    return;
-                default:
-                    break;
-            };
+            if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(typeName, out this.builtinType))
+            { return; }
 
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
 
             SetCustomType(typeName, UnknownTypeCallback);
         }
 
-        /// <exception cref="Errors.InternalException"/>
-        public CompiledType(BuiltinType type) : this()
-        {
-            this.builtinType = type switch
-            {
-                BBCode.BuiltinType.VOID => CompiledTypeType.VOID,
-                BBCode.BuiltinType.BYTE => CompiledTypeType.BYTE,
-                BBCode.BuiltinType.INT => CompiledTypeType.INT,
-                BBCode.BuiltinType.FLOAT => CompiledTypeType.FLOAT,
-                BBCode.BuiltinType.BOOLEAN => CompiledTypeType.BOOL,
-                BBCode.BuiltinType.CHAR => CompiledTypeType.CHAR,
-
-                _ => throw new Errors.InternalException($"Can't cast BuiltinType {type} to CompiledType"),
-            };
-        }
-
         /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="Errors.InternalException"/>
         public CompiledType(TypeInstance type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            switch (type.Identifier.Content)
-            {
-                case "void":
-                    this.builtinType = CompiledTypeType.VOID;
-                    return;
-                case "byte":
-                    this.builtinType = CompiledTypeType.BYTE;
-                    return;
-                case "int":
-                    this.builtinType = CompiledTypeType.INT;
-                    return;
-                case "float":
-                    this.builtinType = CompiledTypeType.FLOAT;
-                    return;
-                case "bool":
-                    this.builtinType = CompiledTypeType.BOOL;
-                    return;
-                case "char":
-                    this.builtinType = CompiledTypeType.CHAR;
-                    return;
-                default:
-                    break;
-            };
+            if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            { return; }
+
+            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
 
             SetCustomType(type.Identifier.Content, UnknownTypeCallback);
         }
 
         /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="Errors.InternalException"/>
         public CompiledType(ITypeDefinition type) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
@@ -1234,15 +1186,17 @@ namespace IngameCoding.BBCode.Compiler
                 return;
             }
 
-            throw new Errors.InternalException($"WTF???");
+            throw new Errors.InternalException($"Unknown type definition {type.GetType().FullName}");
         }
 
+        /// <exception cref="ArgumentNullException"/>
         /// <exception cref="Errors.InternalException"/>
         void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
         {
-            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
+            if (UnknownTypeCallback is null) throw new ArgumentNullException(nameof(UnknownTypeCallback));
 
             ITypeDefinition customType = UnknownTypeCallback.Invoke(typeName);
+
             if (customType is CompiledStruct @struct)
             {
                 this.@struct = @struct;
@@ -1259,7 +1213,7 @@ namespace IngameCoding.BBCode.Compiler
                 return;
             }
 
-            throw new Errors.InternalException($"WTF???");
+            throw new Errors.InternalException($"Unknown type definition {customType.GetType().FullName}");
         }
 
         public override string ToString() => Name;

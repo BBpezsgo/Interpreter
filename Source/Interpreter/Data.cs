@@ -39,8 +39,6 @@ namespace IngameCoding.Bytecode
         INT,
         FLOAT,
 
-        BOOLEAN,
-
         CHAR,
     }
 
@@ -56,7 +54,6 @@ namespace IngameCoding.Bytecode
         byte? valueByte;
         int? valueInt;
         float? valueFloat;
-        bool? valueBoolean;
         char? valueChar;
 
         #endregion
@@ -68,7 +65,6 @@ namespace IngameCoding.Bytecode
                 if (valueByte.HasValue) return false;
                 if (valueInt.HasValue) return false;
                 if (valueFloat.HasValue) return false;
-                if (valueBoolean.HasValue) return false;
                 if (valueChar.HasValue) return false;
                 return true;
             }
@@ -121,21 +117,6 @@ namespace IngameCoding.Bytecode
                 valueFloat = value;
             }
         }
-        public bool ValueBoolean
-        {
-            get
-            {
-                if (type == RuntimeType.BOOLEAN)
-                {
-                    return valueBoolean.Value;
-                }
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to boolean");
-            }
-            set
-            {
-                valueBoolean = value;
-            }
-        }
         public char ValueChar
         {
             get
@@ -167,7 +148,6 @@ namespace IngameCoding.Bytecode
             this.valueInt = null;
             this.valueByte = null;
             this.valueFloat = null;
-            this.valueBoolean = null;
             this.valueChar = null;
 
             this.Tag = tag;
@@ -179,7 +159,6 @@ namespace IngameCoding.Bytecode
             this.valueInt = null;
             this.valueByte = null;
             this.valueFloat = null;
-            this.valueBoolean = null;
             this.valueChar = null;
 
             this.Tag = null;
@@ -191,8 +170,6 @@ namespace IngameCoding.Bytecode
         { this.valueByte = value; }
         public DataItem(float value, string tag) : this(RuntimeType.FLOAT, tag)
         { this.valueFloat = value; }
-        public DataItem(bool value, string tag) : this(RuntimeType.BOOLEAN, tag)
-        { this.valueBoolean = value; }
         public DataItem(char value, string tag) : this(RuntimeType.CHAR, tag)
         { this.valueChar = value; }
 
@@ -202,8 +179,6 @@ namespace IngameCoding.Bytecode
         { this.valueByte = value; }
         public DataItem(float value) : this(RuntimeType.FLOAT)
         { this.valueFloat = value; }
-        public DataItem(bool value) : this(RuntimeType.BOOLEAN)
-        { this.valueBoolean = value; }
         public DataItem(char value) : this(RuntimeType.CHAR)
         { this.valueChar = value; }
 
@@ -225,11 +200,6 @@ namespace IngameCoding.Bytecode
                 this.type = RuntimeType.FLOAT;
                 this.valueFloat = b;
             }
-            else if (value is bool d)
-            {
-                this.type = RuntimeType.BOOLEAN;
-                this.valueBoolean = d;
-            }
             else if (value is byte g)
             {
                 this.type = RuntimeType.BYTE;
@@ -239,6 +209,11 @@ namespace IngameCoding.Bytecode
             {
                 this.type = RuntimeType.CHAR;
                 this.valueChar = h;
+            }
+            else if (value is bool @bool)
+            {
+                this.type = RuntimeType.INT;
+                this.valueInt = @bool ? 1 : 0;
             }
             else
             {
@@ -558,10 +533,20 @@ namespace IngameCoding.Bytecode
         /// <exception cref="RuntimeException"/>
         public static DataItem operator !(DataItem leftSide)
         {
-            if (leftSide.type == RuntimeType.BOOLEAN)
             {
-                return new DataItem(!leftSide.ValueBoolean, leftSide.Tag);
+                int? left = leftSide.Integer;
+
+                if (left.HasValue)
+                { return new DataItem((left.Value == 0) ? 1 : 0); }
             }
+
+            {
+                float? left = leftSide.Float;
+
+                if (left.HasValue)
+                { return new DataItem((left.Value == 0f) ? 1f : 0f); }
+            }
+
             throw new RuntimeException($"Can't do ! operation with type {leftSide.GetTypeText()}");
         }
         /// <exception cref="RuntimeException"/>
@@ -654,7 +639,6 @@ namespace IngameCoding.Bytecode
             RuntimeType.BYTE => this.valueByte == 0,
             RuntimeType.INT => this.valueInt.Value == 0,
             RuntimeType.FLOAT => this.valueFloat.Value == 0f,
-            RuntimeType.BOOLEAN => !this.valueBoolean.Value,
             RuntimeType.CHAR => (int)this.valueChar == 0,
             _ => false,
         };
@@ -665,7 +649,6 @@ namespace IngameCoding.Bytecode
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
-            RuntimeType.BOOLEAN => this.ValueBoolean ? 1 : 0,
             RuntimeType.CHAR => this.ValueChar,
             _ => null,
         };
@@ -684,7 +667,6 @@ namespace IngameCoding.Bytecode
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
             RuntimeType.FLOAT => this.ValueFloat,
-            RuntimeType.BOOLEAN => this.ValueBoolean ? 1f : 0f,
             RuntimeType.CHAR => this.ValueChar,
             _ => null,
         };
@@ -696,7 +678,6 @@ namespace IngameCoding.Bytecode
             RuntimeType.BYTE => ValueByte.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.FLOAT => ValueFloat.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.CHAR => ValueChar.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.BOOLEAN => ValueBoolean.ToString(System.Globalization.CultureInfo.InvariantCulture),
             _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
         };
 
@@ -710,7 +691,6 @@ namespace IngameCoding.Bytecode
                 RuntimeType.BYTE => ValueByte.ToString(),
                 RuntimeType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
                 RuntimeType.CHAR => $"'{ValueChar.Escape()}'",
-                RuntimeType.BOOLEAN => ValueBoolean.ToString(),
                 _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
             };
             if (!string.IsNullOrEmpty(this.Tag))
@@ -735,9 +715,6 @@ namespace IngameCoding.Bytecode
                 case RuntimeType.FLOAT:
                     hash.Add(valueFloat);
                     break;
-                case RuntimeType.BOOLEAN:
-                    hash.Add(valueBoolean);
-                    break;
                 case RuntimeType.CHAR:
                     hash.Add(valueChar);
                     break;
@@ -756,7 +733,6 @@ namespace IngameCoding.Bytecode
                 RuntimeType.BYTE => valueByte == value.valueByte,
                 RuntimeType.INT => valueInt == value.valueInt,
                 RuntimeType.FLOAT => valueFloat == value.valueFloat,
-                RuntimeType.BOOLEAN => valueBoolean == value.valueBoolean,
                 RuntimeType.CHAR => valueChar == value.valueChar,
                 _ => throw new NotImplementedException(),
             };
@@ -787,10 +763,6 @@ namespace IngameCoding.Bytecode
                     case RuntimeType.FLOAT:
                         Console.ForegroundColor = ConsoleColor.Green;
                         Console.Write(this.valueFloat?.ToString(ci));
-                        break;
-                    case RuntimeType.BOOLEAN:
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.Write(this.valueBoolean?.ToString(ci));
                         break;
                     case RuntimeType.CHAR:
                         Console.ForegroundColor = ConsoleColor.Yellow;

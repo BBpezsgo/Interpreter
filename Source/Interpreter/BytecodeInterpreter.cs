@@ -165,10 +165,10 @@ namespace IngameCoding.Bytecode
         void PrepareUserInvoke(UserInvoke userInvoke)
         {
             BytecodeProcessor.CodePointer = userInvoke.InstructionOffset;
-            BytecodeProcessor.Memory.Stack.Push(0, "return value");
+            BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "return value"));
             BytecodeProcessor.Memory.Stack.PushRange(userInvoke.Arguments, "arg");
 
-            BytecodeProcessor.Memory.Stack.Push(0, "saved base pointer");
+            BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "saved base pointer"));
             BytecodeProcessor.Memory.ReturnAddressStack.Push(BytecodeProcessor.End());
             BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }

@@ -25,9 +25,9 @@ namespace IngameCoding.Bytecode
             }
         }
 
-        internal BytecodeProcessor processor;
-
-        public DataStack(BytecodeProcessor processor) => this.processor = processor;
+        public DataStack() : base() {
+            
+        }
 
         public void Destroy() => base.Clear();
 
@@ -47,19 +47,6 @@ namespace IngameCoding.Bytecode
             var item = value;
             base.Push(item);
         }
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(DataItem value, string tag)
-        {
-            var item = value;
-            item.Tag = tag;
-            base.Push(item);
-        }
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(int value, string tag = null) => Push(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(float value, string tag = null) => Push(new DataItem(value, tag));
-        /// <returns>Adds a new item to the end</returns>
-        public void Push(bool value, string tag = null) => Push(new DataItem(value, tag));
         /// <summary>Adds a list to the end</summary>
         public override void PushRange(List<DataItem> list) => PushRange(list.ToArray());
         /// <summary>Adds an array to the end</summary>

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace IngameCoding.Core
@@ -43,16 +44,13 @@ namespace IngameCoding.Core
         }
 
         public virtual void Clear() => this.stack.Clear();
+
+        public IEnumerator<T> GetEnumerator() => this.stack.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => this.stack.GetEnumerator();
     }
 
-    public interface IReadOnlyStack<T>
+    public interface IReadOnlyStack<T> : IReadOnlyCollection<T>, IReadOnlyList<T>
     {
-        /// <returns>The number of items</returns>
-        public int Count { get; }
-
-        public T this[int i] { get; }
-
-        /// <returns>The last item</returns>
         public T Last();
 
         public T[] ToArray();

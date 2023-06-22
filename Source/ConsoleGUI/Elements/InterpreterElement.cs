@@ -1093,7 +1093,7 @@ namespace ConsoleGUI
 
         public override void OnKeyEvent(KeyEvent e)
         {
-            // Debug.Log(e.ToString());
+            Debug.Log(e.ToString());
 
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
@@ -1166,6 +1166,11 @@ namespace ConsoleGUI
                 }
                 return;
             }
+        }
+
+        public override void OnDestroy()
+        {
+            this.Interpreter?.Destroy();
         }
 
         public override void RefreshSize()

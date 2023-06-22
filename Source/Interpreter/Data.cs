@@ -1,44 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace IngameCoding.Bytecode
 {
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    internal class StepList<T>
-    {
-        int Position = 0;
-        readonly T[] Values = null;
-
-        internal StepList(T[] values, int startIndex)
-        {
-            this.Values = values;
-            this.Position = startIndex;
-        }
-        internal StepList(List<T> values, int startIndex) : this(values.ToArray(), startIndex) { }
-
-        internal StepList(T[] values) : this(values, 0) { }
-        internal StepList(List<T> values) : this(values.ToArray(), 0) { }
-
-        internal T Next() => Values[Position++];
-        internal T[] Next(int n)
-        {
-            T[] result = new T[n];
-            for (int i = 0; i < n; i++) result[i] = Next();
-            return result;
-        }
-        internal bool End() => Position >= Values.Length;
-        internal void Reset() => Position = 0;
-    }
-
     public enum RuntimeType : byte
     {
         BYTE,
         INT,
         FLOAT,
-
         CHAR,
     }
 
@@ -58,7 +29,7 @@ namespace IngameCoding.Bytecode
 
         #endregion
 
-        public bool IsNull
+        public readonly bool IsNull
         {
             get
             {
@@ -74,9 +45,10 @@ namespace IngameCoding.Bytecode
 
         #region Value Properties
 
+        /// <exception cref="RuntimeException"/>
         public byte ValueByte
         {
-            get
+            readonly get
             {
                 if (type == RuntimeType.BYTE)
                 { return valueByte ?? (byte)0; }
@@ -88,9 +60,10 @@ namespace IngameCoding.Bytecode
                 valueByte = value;
             }
         }
+        /// <exception cref="RuntimeException"/>
         public int ValueInt
         {
-            get
+            readonly get
             {
                 if (type == RuntimeType.INT)
                 { return valueInt.Value; }
@@ -102,9 +75,10 @@ namespace IngameCoding.Bytecode
                 valueInt = value;
             }
         }
+        /// <exception cref="RuntimeException"/>
         public float ValueFloat
         {
-            get
+            readonly get
             {
                 if (type == RuntimeType.FLOAT)
                 {
@@ -117,9 +91,10 @@ namespace IngameCoding.Bytecode
                 valueFloat = value;
             }
         }
+        /// <exception cref="RuntimeException"/>
         public char ValueChar
         {
-            get
+            readonly get
             {
                 if (type == RuntimeType.CHAR)
                 {
@@ -172,6 +147,8 @@ namespace IngameCoding.Bytecode
         { this.valueFloat = value; }
         public DataItem(char value, string tag) : this(RuntimeType.CHAR, tag)
         { this.valueChar = value; }
+        public DataItem(bool value, string tag) : this(value ? 1 : 0, tag)
+        { }
 
         public DataItem(int value) : this(RuntimeType.INT)
         { this.valueInt = value; }
@@ -181,45 +158,8 @@ namespace IngameCoding.Bytecode
         { this.valueFloat = value; }
         public DataItem(char value) : this(RuntimeType.CHAR)
         { this.valueChar = value; }
-
-        /// <exception cref="RuntimeException"/>
-        public DataItem(object value, string tag) : this(RuntimeType.BYTE, tag)
-        {
-            if (value == null)
-            {
-                throw new RuntimeException($"Unknown type null");
-            }
-
-            if (value is int a)
-            {
-                this.type = RuntimeType.INT;
-                this.valueInt = a;
-            }
-            else if (value is float b)
-            {
-                this.type = RuntimeType.FLOAT;
-                this.valueFloat = b;
-            }
-            else if (value is byte g)
-            {
-                this.type = RuntimeType.BYTE;
-                this.valueByte = g;
-            }
-            else if (value is char h)
-            {
-                this.type = RuntimeType.CHAR;
-                this.valueChar = h;
-            }
-            else if (value is bool @bool)
-            {
-                this.type = RuntimeType.INT;
-                this.valueInt = @bool ? 1 : 0;
-            }
-            else
-            {
-                throw new RuntimeException($"Unknown type {value.GetType().FullName}");
-            }
-        }
+        public DataItem(bool value) : this(value ? 1 : 0)
+        { }
 
         #endregion
 
@@ -537,14 +477,14 @@ namespace IngameCoding.Bytecode
                 int? left = leftSide.Integer;
 
                 if (left.HasValue)
-                { return new DataItem((left.Value == 0) ? 1 : 0); }
+                { return new DataItem((left.Value == 0) ? 1 : 0, leftSide.Tag); }
             }
 
             {
                 float? left = leftSide.Float;
 
                 if (left.HasValue)
-                { return new DataItem((left.Value == 0f) ? 1f : 0f); }
+                { return new DataItem((left.Value == 0f) ? 1f : 0f, leftSide.Tag); }
             }
 
             throw new RuntimeException($"Can't do ! operation with type {leftSide.GetTypeText()}");
@@ -634,25 +574,25 @@ namespace IngameCoding.Bytecode
             throw new RuntimeException($"Can't do ^ operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
 
-        public bool IsFalsy() => this.type switch
+        public readonly bool IsFalsy() => this.type switch
         {
             RuntimeType.BYTE => this.valueByte == 0,
             RuntimeType.INT => this.valueInt.Value == 0,
             RuntimeType.FLOAT => this.valueFloat.Value == 0f,
-            RuntimeType.CHAR => (int)this.valueChar == 0,
+            RuntimeType.CHAR => this.valueChar.Value == 0,
             _ => false,
         };
 
         #endregion
 
-        public int? Integer => type switch
+        public readonly int? Integer => type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
             RuntimeType.CHAR => this.ValueChar,
             _ => null,
         };
-        public byte? Byte
+        public readonly byte? Byte
         {
             get
             {
@@ -662,7 +602,7 @@ namespace IngameCoding.Bytecode
                     (byte)integer_.Value;
             }
         }
-        public float? Float => type switch
+        public readonly float? Float => type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
@@ -672,7 +612,7 @@ namespace IngameCoding.Bytecode
         };
 
         /// <exception cref="RuntimeException"/>
-        public override string ToString() => this.IsNull ? "null" : type switch
+        public readonly override string ToString() => this.IsNull ? "null" : type switch
         {
             RuntimeType.INT => ValueInt.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.BYTE => ValueByte.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -682,7 +622,7 @@ namespace IngameCoding.Bytecode
         };
 
         /// <exception cref="RuntimeException"/>
-        public string GetDebuggerDisplay()
+        public readonly string GetDebuggerDisplay()
         {
             if (IsNull) return null;
             string retStr = type switch
@@ -700,7 +640,7 @@ namespace IngameCoding.Bytecode
             return retStr;
         }
 
-        public override int GetHashCode()
+        public readonly override int GetHashCode()
         {
             HashCode hash = new();
             hash.Add(type);
@@ -725,7 +665,7 @@ namespace IngameCoding.Bytecode
         }
 
         /// <exception cref="NotImplementedException"/>
-        public override bool Equals(object obj)
+        public readonly override bool Equals(object obj)
             => obj is DataItem value &&
             this.type == value.type &&
             this.type switch
@@ -737,7 +677,7 @@ namespace IngameCoding.Bytecode
                 _ => throw new NotImplementedException(),
             };
 
-        public void DebugPrint()
+        public readonly void DebugPrint()
         {
             ConsoleColor savedFgColor = Console.ForegroundColor;
             ConsoleColor savedBgColor = Console.BackgroundColor;

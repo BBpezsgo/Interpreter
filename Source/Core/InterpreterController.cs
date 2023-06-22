@@ -586,6 +586,15 @@ namespace IngameCoding.Core
         {
             CurrentlyRunningCode = false;
 
+            if (Streams != null)
+            {
+                for (int i = 0; i < Streams.Count; i++)
+                {
+                    Streams[i].Dispose();
+                }
+                Streams.Clear();
+            }
+
             if (BytecodeInterpreter != null)
             {
                 BytecodeInterpreter.Destroy();

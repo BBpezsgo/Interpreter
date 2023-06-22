@@ -5,6 +5,8 @@ namespace IngameCoding.Bytecode
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
+    using System;
+
     internal class BytecodeProcessor
     {
         internal readonly Memory Memory;
@@ -23,11 +25,7 @@ namespace IngameCoding.Bytecode
             BasePointer = basePointer;
             CodePointer = code.Length;
 
-            Memory = new(
-                heapSize,
-                code,
-                this
-            );
+            Memory = new(heapSize, code);
         }
 
         /// <summary>
@@ -107,6 +105,9 @@ namespace IngameCoding.Bytecode
 
                 case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
 
+                case Opcode.TYPE_GET: return TYPE_GET();
+                case Opcode.TYPE_SET: return TYPE_SET();
+
                 #endregion
 
                 default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
@@ -117,22 +118,27 @@ namespace IngameCoding.Bytecode
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
+            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + CurrentInstruction.ParameterInt,
             AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
             AddressingMode.POP => Memory.Stack.Count - 1,
-            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+
             _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         /// <exception cref="System.Exception"/>
-        int GetHeapAddress() => CurrentInstruction.AddressingMode switch
+        int GetAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+
             _ => throw new System.Exception($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         #region Instruction Methods
+
+        #region HEAP Operations
 
         int HEAP_ALLOC()
         {
@@ -141,7 +147,7 @@ namespace IngameCoding.Bytecode
 
             int block = Memory.Heap.Allocate(size);
 
-            Memory.Stack.Push(block, CurrentInstruction.tag);
+            Memory.Stack.Push(new DataItem(block, CurrentInstruction.tag));
 
             Step();
             return 10;
@@ -158,64 +164,95 @@ namespace IngameCoding.Bytecode
             return 10;
         }
 
+        int HEAP_GET()
+        {
+            int address = GetAddress();
+            var value = Memory.Heap[address];
+            Memory.Stack.Push(value);
+            Step();
+
+            return 2;
+        }
+
+        int HEAP_SET()
+        {
+            int address = GetAddress();
+            var value = Memory.Stack.Pop();
+            Memory.Heap[address] = value;
+            Step();
+
+            return 2;
+        }
+
+        #endregion
+
+        #region Flow Control
+
         /// <exception cref="UserException"/>
         int THROW()
         {
             DataItem throwValue = Memory.Stack.Pop();
-            string v = null;
+            string value = null;
             try
-            { v = Memory.Heap.GetStringByPointer(throwValue.ValueInt); }
+            { value = Memory.Heap.GetStringByPointer(throwValue.ValueInt); }
             catch (System.Exception) { }
-            throw new UserException("User Exception Thrown", v);
+            throw new UserException("User Exception Thrown", value);
         }
 
-        /*
-        /// <exception cref="RuntimeException"/>
-        int FIND_HEAP_FREE_SPACE()
+        int RETURN()
         {
-            DataItem sizeNeededData = Memory.Stack.Pop();
+            int returnAddress = Memory.ReturnAddressStack.Pop();
+            BasePointer = Memory.Stack.Pop().ValueInt;
+            CodePointer = returnAddress;
 
-            if (sizeNeededData.type != RuntimeType.INT)
-            { throw new RuntimeException($"fuck you"); }
-
-            int sizeNeeded = sizeNeededData.ValueInt;
-
-            int currentFreeSize = 0;
-            int freeSizeStarted = 0;
-            bool found = false;
-            for (int i = 0; i < Memory.Heap.Size; i++)
-            {
-                if (Memory.Heap[i].IsNull)
-                {
-                    currentFreeSize++;
-                    if (currentFreeSize >= sizeNeeded)
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-                else
-                {
-                    currentFreeSize = 0;
-                    freeSizeStarted = i + 1;
-                }
-            }
-            if (!found) throw new RuntimeException("Out of HEAP memory");
-
-            Memory.Stack.Push(freeSizeStarted, CurrentInstruction.tag);
-
-            Step();
-
-            return 5;
+            return 3;
         }
-        */
 
-        int GET_BASEPOINTER()
+        int CALL()
         {
-            Memory.Stack.Push(BasePointer);
-            Step();
+            int relativeAddress = GetAddress();
+
+            Memory.Stack.Push(new DataItem(BasePointer, "saved base pointer"));
+            Memory.ReturnAddressStack.Push(CodePointer + 1);
+            BasePointer = Memory.Stack.Count;
+            Step(relativeAddress);
+
+            return 4;
+        }
+
+        int JUMP_BY()
+        {
+            int relativeAddress = GetAddress();
+
+            Step(relativeAddress);
+
             return 1;
         }
+
+        int JUMP_BY_IF_FALSE()
+        {
+            int relativeAddress = GetAddress();
+
+            var condition = Memory.Stack.Pop();
+
+            if (condition.IsFalsy())
+            { Step(relativeAddress); }
+            else
+            { Step(); }
+
+            return 3;
+        }
+
+        int EXIT()
+        {
+            CodePointer = Memory.Code.Length;
+
+            return 1;
+        }
+
+        #endregion
+
+        #region Debug Operations
 
         int CS_PUSH()
         {
@@ -235,268 +272,17 @@ namespace IngameCoding.Bytecode
 
         int DEBUG_SET_TAG()
         {
-            var last = Memory.Stack.Last();
-            last.Tag = CurrentInstruction.tag;
-            Memory.Stack.Set(Memory.Stack.Count - 1, last, true);
-            Step();
-
-            return 1;
-        }
-
-        int HEAP_GET()
-        {
-            int address = GetHeapAddress();
-            var v = Memory.Heap[address];
-            Memory.Stack.Push(v);
-            Step();
-
-            return 2;
-        }
-
-        int HEAP_SET()
-        {
-            int address = GetHeapAddress();
-            var v = Memory.Stack.Pop();
-            Memory.Heap[address] = v;
-            Step();
-
-            return 2;
-        }
-
-        int LOGIC_NOT()
-        {
-            var v = Memory.Stack.Pop();
-            Memory.Stack.Push(!v);
-            Step();
-
-            return 3;
-        }
-
-        void OnExternalReturnValue(DataItem returnValue)
-        {
-            Memory.Stack.Push(returnValue, "return v");
-        }
-
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
-        int CALL_BUILTIN()
-        {
-            DataItem functionNameDataItem = Memory.Stack.Pop();
-            if (functionNameDataItem.type != RuntimeType.INT)
-            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem}"); }
-
-            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
-
-            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
-
-            if (!BuiltinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
-            { throw new RuntimeException($"Undefined function \"{functionName}\""); }
-
-            List<DataItem> parameters = new();
-            for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
-            { parameters.Add(Memory.Stack.Pop()); }
-
-            if (builtinFunction is ManagedBuiltinFunction managedBuiltinFunction)
-            {
-                managedBuiltinFunction.OnReturn = OnExternalReturnValue;
-                managedBuiltinFunction.Callback(parameters.ToArray());
-            }
-            else
-            {
-                if (builtinFunction.ReturnSomething)
-                {
-                    var returnValue = builtinFunction.Callback(parameters.ToArray());
-                    Memory.Stack.Push(returnValue, "return v");
-                }
-                else
-                {
-                    builtinFunction.Callback(parameters.ToArray());
-                }
-            }
-
-            Step();
-
-            return 15;
-        }
-
-        int LOGIC_MT()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide > rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_EQ()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide == rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_NEQ()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide != rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_OR()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide | rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_XOR()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide ^ rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_LTEQ()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide <= rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_MTEQ()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide >= rightSide);
-
-            Step();
-
-            return 4;
-        }
-        int LOGIC_AND()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide & rightSide);
-
-            Step();
-
-            return 4;
-        }
-
-        int POP_VALUE()
-        {
-            if (Memory.Stack.Count > 0) Memory.Stack.RemoveAt(Memory.Stack.Count - 1);
-            Step();
-
-            return 2;
-        }
-
-        int RETURN()
-        {
-            int returnAddress = Memory.ReturnAddressStack.Pop();
-            BasePointer = Memory.Stack.Pop().ValueInt;
-            CodePointer = returnAddress;
-
-            return 3;
-        }
-        int CALL()
-        {
-            Memory.Stack.Push(BasePointer, "saved base pointer");
-            Memory.ReturnAddressStack.Push(CodePointer + 1);
-            BasePointer = Memory.Stack.Count;
-            Step(CurrentInstruction.ParameterInt);
-
-            return 4;
-        }
-
-        int JUMP_BY()
-        {
-            CodePointer += CurrentInstruction.ParameterInt;
-
-            return 1;
-        }
-        int JUMP_BY_IF_FALSE()
-        {
-            var condition = Memory.Stack.Pop();
-
-            if (condition.IsFalsy())
-            { CodePointer += CurrentInstruction.ParameterInt; }
-            else
-            { Step(); }
-
-            return 3;
-        }
-
-        int STORE_VALUE()
-        {
-            int address = GetStackAddress();
-            var value = Memory.Stack.Pop();
-
-            Memory.Stack.Set(address, value);
-
-            Step();
-
-            return 3;
-        }
-        int LOAD_VALUE()
-        {
-            int address = GetStackAddress();
-
-            Memory.Stack.Push(Memory.Stack[address], CurrentInstruction.tag);
-
-            Step();
-
-            return 3;
-        }
-
-        int LOGIC_LT()
-        {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
-
-            Memory.Stack.Push(leftSide < rightSide);
-
-            Step();
-
-            return 4;
-        }
-
-        int PUSH_VALUE()
-        {
-            DataItem value = CurrentInstruction.ParameterData;
+            DataItem value = Memory.Stack.Pop();
             value.Tag = CurrentInstruction.tag;
-
             Memory.Stack.Push(value);
-
             Step();
 
-            return 2;
+            return 1;
         }
+
+        #endregion
+
+        #region Logic Operations
 
         int BITSHIFT_LEFT()
         {
@@ -509,6 +295,7 @@ namespace IngameCoding.Bytecode
 
             return 4;
         }
+
         int BITSHIFT_RIGHT()
         {
             DataItem rightSide = Memory.Stack.Pop();
@@ -521,6 +308,127 @@ namespace IngameCoding.Bytecode
             return 4;
         }
 
+        int LOGIC_LT()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide < rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_NOT()
+        {
+            var v = Memory.Stack.Pop();
+            Memory.Stack.Push(!v);
+            Step();
+
+            return 3;
+        }
+
+        int LOGIC_MT()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide > rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_EQ()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide == rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_NEQ()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide != rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_OR()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(leftSide | rightSide);
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_XOR()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(leftSide ^ rightSide);
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_LTEQ()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide <= rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_MTEQ()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide >= rightSide, null));
+
+            Step();
+
+            return 4;
+        }
+
+        int LOGIC_AND()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(leftSide & rightSide);
+
+            Step();
+
+            return 4;
+        }
+
+        #endregion
+
+        #region Math Operations
+
         int MATH_ADD()
         {
             DataItem rightSide = Memory.Stack.Pop();
@@ -531,13 +439,6 @@ namespace IngameCoding.Bytecode
             Step();
 
             return 4;
-        }
-
-        int EXIT()
-        {
-            CodePointer = Memory.Code.Length;
-
-            return 1;
         }
 
         int MATH_DIV()
@@ -589,6 +490,185 @@ namespace IngameCoding.Bytecode
         }
 
         #endregion
+
+        #region Stack Operations
+
+        int PUSH_VALUE()
+        {
+            DataItem value = CurrentInstruction.ParameterData;
+            value.Tag = CurrentInstruction.tag;
+
+            Memory.Stack.Push(value);
+
+            Step();
+
+            return 2;
+        }
+
+        int POP_VALUE()
+        {
+            Memory.Stack.Pop();
+            Step();
+
+            return 2;
+        }
+
+        int STORE_VALUE()
+        {
+            int address = GetStackAddress();
+            var value = Memory.Stack.Pop();
+
+            Memory.Stack.Set(address, value);
+
+            Step();
+
+            return 3;
+        }
+
+        int LOAD_VALUE()
+        {
+            int address = GetStackAddress();
+
+            DataItem value = Memory.Stack[address];
+            value.Tag = CurrentInstruction.tag ?? value.Tag;
+
+            Memory.Stack.Push(value);
+
+            Step();
+
+            return 3;
+        }
+
+        #endregion
+
+        #region Utility Operations
+
+        int GET_BASEPOINTER()
+        {
+            Memory.Stack.Push(new DataItem(BasePointer, null));
+            Step();
+            return 1;
+        }
+
+        int TYPE_SET()
+        {
+            DataItem value = Memory.Stack.Pop();
+            RuntimeType targetType = (RuntimeType)(Memory.Stack.Pop().Byte ?? throw new RuntimeException($"Expected byte as target type"));
+
+            DataItem newValue;
+            unchecked
+            {
+                newValue = targetType switch
+                {
+                    RuntimeType.BYTE => value.type switch
+                    {
+                        RuntimeType.BYTE => new DataItem((byte)value.ValueByte, value.Tag),
+                        RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue), value.Tag),
+                        RuntimeType.FLOAT => new DataItem((byte)MathF.Round(value.ValueFloat), value.Tag),
+                        RuntimeType.CHAR => new DataItem((byte)value.ValueChar, value.Tag),
+                        _ => throw new NotImplementedException(),
+                    },
+                    RuntimeType.INT => value.type switch
+                    {
+                        RuntimeType.BYTE => new DataItem((int)value.ValueByte, value.Tag),
+                        RuntimeType.INT => new DataItem((int)value.ValueInt, value.Tag),
+                        RuntimeType.FLOAT => new DataItem((int)MathF.Round(value.ValueFloat), value.Tag),
+                        RuntimeType.CHAR => new DataItem((int)value.ValueChar, value.Tag),
+                        _ => throw new NotImplementedException(),
+                    },
+                    RuntimeType.FLOAT => value.type switch
+                    {
+                        RuntimeType.BYTE => new DataItem((float)value.ValueByte, value.Tag),
+                        RuntimeType.INT => new DataItem((float)value.ValueInt, value.Tag),
+                        RuntimeType.FLOAT => new DataItem((float)MathF.Round(value.ValueFloat), value.Tag),
+                        RuntimeType.CHAR => new DataItem((float)value.ValueChar, value.Tag),
+                        _ => throw new NotImplementedException(),
+                    },
+                    RuntimeType.CHAR => value.type switch
+                    {
+                        RuntimeType.BYTE => new DataItem((char)value.ValueByte, value.Tag),
+                        RuntimeType.INT => new DataItem((char)value.ValueInt, value.Tag),
+                        RuntimeType.FLOAT => new DataItem((char)MathF.Round(value.ValueFloat), value.Tag),
+                        RuntimeType.CHAR => new DataItem((char)value.ValueChar, value.Tag),
+                        _ => throw new NotImplementedException(),
+                    },
+                    _ => throw new NotImplementedException(),
+                };
+            }
+
+            Memory.Stack.Push(newValue);
+
+            Step();
+            return 1;
+        }
+
+        int TYPE_GET()
+        {
+            DataItem value = Memory.Stack.Pop();
+            byte type = (byte)value.type;
+
+            Memory.Stack.Push(new DataItem(type));
+
+            Step();
+            return 1;
+        }
+
+        #endregion
+
+        #region External Calls
+
+        void OnExternalReturnValue(DataItem returnValue)
+        {
+            returnValue.Tag ??= "return v";
+            Memory.Stack.Push(returnValue);
+        }
+
+        /// <exception cref="InternalException"/>
+        /// <exception cref="RuntimeException"/>
+        int CALL_BUILTIN()
+        {
+            DataItem functionNameDataItem = Memory.Stack.Pop();
+            if (functionNameDataItem.type != RuntimeType.INT)
+            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem}"); }
+
+            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
+
+            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
+
+            if (!BuiltinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            { throw new RuntimeException($"Undefined function \"{functionName}\""); }
+
+            List<DataItem> parameters = new();
+            for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
+            { parameters.Add(Memory.Stack.Pop()); }
+
+            if (builtinFunction is ManagedBuiltinFunction managedBuiltinFunction)
+            {
+                managedBuiltinFunction.OnReturn = OnExternalReturnValue;
+                managedBuiltinFunction.Callback(parameters.ToArray());
+            }
+            else
+            {
+                if (builtinFunction.ReturnSomething)
+                {
+                    var returnValue = builtinFunction.Callback(parameters.ToArray());
+                    returnValue.Tag ??= "return v";
+                    Memory.Stack.Push(returnValue);
+                }
+                else
+                {
+                    builtinFunction.Callback(parameters.ToArray());
+                }
+            }
+
+            Step();
+
+            return 15;
+        }
+
+        #endregion
+
+        #endregion
     }
 
     internal class Memory
@@ -599,11 +679,11 @@ namespace IngameCoding.Bytecode
         internal Instruction[] Code;
         internal Stack<string> CallStack;
 
-        public Memory(int heapSize, Instruction[] code, BytecodeProcessor processor)
+        public Memory(int heapSize, Instruction[] code)
         {
             Code = code;
 
-            Stack = new DataStack(processor);
+            Stack = new DataStack();
             Heap = new HEAP(heapSize);
 
             CallStack = new Stack<string>();

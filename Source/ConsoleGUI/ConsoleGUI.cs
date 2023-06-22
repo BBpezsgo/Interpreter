@@ -128,7 +128,7 @@ namespace ConsoleGUI
         internal static ConsoleGUI Instance = null;
 
         double LastTick;
-        bool Destroyed;
+        internal bool Destroyed { get; private set; }
 
         void Log(string message)
         {
@@ -214,13 +214,10 @@ namespace ConsoleGUI
         {
             if (Destroyed) return;
             Destroyed = true;
-            Clear();
             TimerAutoRefreshConsole?.Stop();
             TimerRefreshSizes?.Stop();
             TimerOnStart?.Stop();
-            Console.Clear();
 
-            Console.WriteLine("Destroy std handler ...");
             ConsoleListener.Stop();
         }
 
@@ -273,7 +270,6 @@ namespace ConsoleGUI
             this.LastTick = now;
 
             this.MainThreadThings.Tick(deltaTime);
-
 
             if (FilledElement != null)
             {
@@ -372,7 +368,19 @@ namespace ConsoleGUI
             {
                 if (e.AsciiChar == 27)
                 {
+                    for (int i = Elements.Length - 1; i >= 0; i--)
+                    {
+                        if (Elements[i] is not IElementWithEvents element) continue;
+                        element.OnDestroy();
+                    }
+
+                    if (FilledElement is IElementWithEvents elementWithEvents)
+                    {
+                        elementWithEvents.OnDestroy();
+                    }
+
                     ConsoleListener.Stop();
+                    this.Destroy();
                     return;
                 }
             }
@@ -432,19 +440,21 @@ namespace ConsoleGUI
 #endif
             }
 
-            for (int i = Elements.Length - 1; i >= 0; i--)
             {
-                if (Elements[i] is not IElementWithEvents element) continue;
-                if (!element.Contains(MousePosition.X, MousePosition.Y)) continue;
-                element.OnKeyEvent(e);
-                element.BeforeDraw();
-                DrawElement(element);
-            }
-            if (FilledElement is IElementWithEvents elementWithEvents)
-            {
-                elementWithEvents.OnKeyEvent(e);
-                elementWithEvents.BeforeDraw();
-                DrawElement(elementWithEvents);
+                for (int i = Elements.Length - 1; i >= 0; i--)
+                {
+                    if (Elements[i] is not IElementWithEvents element) continue;
+                    if (!element.Contains(MousePosition.X, MousePosition.Y)) continue;
+                    element.OnKeyEvent(e);
+                    element.BeforeDraw();
+                    DrawElement(element);
+                }
+                if (FilledElement is IElementWithEvents elementWithEvents)
+                {
+                    elementWithEvents.OnKeyEvent(e);
+                    elementWithEvents.BeforeDraw();
+                    DrawElement(elementWithEvents);
+                }
             }
         }
         void MouseEvent(MouseEvent e)

@@ -115,10 +115,8 @@ namespace TheProgram
                     {
                         FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
                     };
-                    while (true)
-                    {
-                        gui.Tick();
-                    }
+                    while (!gui.Destroyed)
+                    { gui.Tick(); }
                     return true;
                 case ArgumentParser.RunType.Debugger:
                     // unused = new Debugger(settings.Value);

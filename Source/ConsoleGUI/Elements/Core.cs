@@ -303,6 +303,7 @@ namespace ConsoleGUI
         void OnMouseEvent(MouseEvent mouse);
         void OnKeyEvent(KeyEvent e);
         void OnStart();
+        void OnDestroy();
     }
 
     public interface IElementWithTitle

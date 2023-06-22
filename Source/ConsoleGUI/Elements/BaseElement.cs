@@ -22,6 +22,7 @@ namespace ConsoleGUI
         }
         public virtual void OnKeyEvent(KeyEvent e) { }
         public virtual void OnStart() { }
+        public virtual void OnDestroy() { }
 
         public virtual void RefreshSize() => this.ClearBuffer();
 

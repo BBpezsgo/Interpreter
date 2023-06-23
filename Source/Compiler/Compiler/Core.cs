@@ -409,6 +409,7 @@ namespace IngameCoding.BBCode.Compiler
         public int CallInstructionIndex;
 
         public Statement_FunctionCall CallStatement;
+        public Statement_Variable VariableStatement;
         public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
         internal string CurrentFile;
@@ -417,6 +418,23 @@ namespace IngameCoding.BBCode.Compiler
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
+            this.VariableStatement = null;
+
+            this.currentParameters = new();
+            this.currentVariables = new();
+
+            foreach (var item in currentParameters)
+            { this.currentParameters.Add(item); }
+            foreach (var item in currentVariables)
+            { this.currentVariables.Add(item.Key, item.Value); }
+            this.CurrentFile = file;
+        }
+
+        public UndefinedFunctionOffset(int callInstructionIndex, Statement_Variable variable, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        {
+            this.CallInstructionIndex = callInstructionIndex;
+            this.CallStatement = null;
+            this.VariableStatement = variable;
 
             this.currentParameters = new();
             this.currentVariables = new();
@@ -649,7 +667,98 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>
+    public interface IReferenceable<T>
+    {
+        public void AddReference(T reference);
+        public void ClearReferences();
+    }
+
+    public class CompiledOperator : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledOperator>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_Operator>
+    {
+        public CompiledType[] ParameterTypes;
+
+        public int TimesUsed;
+        public int TimesUsedTotal;
+
+        public int InstructionOffset { get; set; } = -1;
+
+        public int ParameterCount => ParameterTypes.Length;
+
+        public Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public IReadOnlyList<Statement_Operator> ReferencesOperator => references;
+        readonly List<Statement_Operator> references = new();
+
+        public new CompiledType Type;
+        public TypeInstance TypeToken => base.Type;
+
+        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
+        public string BuiltinName => CompiledAttributes.TryGetAttribute("Builtin", out string builtinName) ? builtinName : string.Empty;
+
+        public string Key => this.ID();
+
+        public CompiledClass Context { get; set; }
+
+        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        {
+            this.Type = type;
+
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
+            base.ExportKeyword = functionDefinition.ExportKeyword;
+        }
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        {
+            this.Type = type;
+            this.ParameterTypes = parameterTypes;
+            this.CompiledAttributes = new();
+
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
+            base.ExportKeyword = functionDefinition.ExportKeyword;
+        }
+
+        public void AddReference(Statement_Operator statement) => references.Add(statement);
+        public void ClearReferences() => references.Clear();
+
+        public bool IsSame(CompiledOperator other)
+        {
+            if (this.Type != other.Type) return false;
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
+            for (int i = 0; i < this.ParameterTypes.Length; i++)
+            { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
+
+            return true;
+        }
+
+        public bool IsSame((string name, CompiledType[] parameters) other)
+        {
+            if (this.Identifier.Content != other.name) return false;
+            if (this.ParameterTypes.Length != other.parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
+            return true;
+        }
+
+        public bool IsSame(IFunctionThing other)
+        {
+            if (other is not CompiledOperator other2) return false;
+            return IsSame(other2);
+        }
+    }
+
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_FunctionCall>
     {
         public CompiledType[] ParameterTypes;
 
@@ -663,7 +772,8 @@ namespace IngameCoding.BBCode.Compiler
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
-        public List<DefinitionReference> References = null;
+        public IReadOnlyList<Statement_FunctionCall> ReferencesFunction => references;
+        readonly List<Statement_FunctionCall> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -722,6 +832,9 @@ namespace IngameCoding.BBCode.Compiler
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
+        public void AddReference(Statement_FunctionCall statement) => references.Add(statement);
+        public void ClearReferences() => references.Clear();
+
         public bool IsSame(CompiledFunction other)
         {
             if (this.Type != other.Type) return false;
@@ -749,7 +862,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_KeywordCall>, IReferenceable<Statement_ConstructorCall>
     {
         public CompiledType[] ParameterTypes;
 
@@ -761,7 +874,8 @@ namespace IngameCoding.BBCode.Compiler
         public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
 
-        public List<DefinitionReference> References = null;
+        public IReadOnlyList<Statement> References => references;
+        readonly List<Statement> references = new();
 
         public CompiledType Type;
 
@@ -795,6 +909,10 @@ namespace IngameCoding.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
+
+        public void AddReference(Statement_KeywordCall statement) => references.Add(statement);
+        public void AddReference(Statement_ConstructorCall statement) => references.Add(statement);
+        public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledGeneralFunction other)
         {
@@ -848,16 +966,6 @@ namespace IngameCoding.BBCode.Compiler
             base.InitialValue = declaration.InitialValue;
             base.VariableName = declaration.VariableName;
         }
-    }
-
-    public interface ITypeDefinition : IDefinition
-    {
-
-    }
-
-    public interface IDataStructure
-    {
-        public int Size { get; }
     }
 
     public class CompiledEnumMember : EnumMemberDefinition, IElementWithKey<string>
@@ -997,6 +1105,31 @@ namespace IngameCoding.BBCode.Compiler
         UNKNOWN,
     }
 
+    public class FunctionType : ITypeDefinition, IEquatable<FunctionType>
+    {
+        public readonly CompiledFunction Function;
+
+        public FunctionType(CompiledFunction function)
+        {
+            Function = function ?? throw new ArgumentNullException(nameof(function));
+        }
+
+        public string FilePath { get => Function.FilePath; set => Function.FilePath = value; }
+
+        public override bool Equals(object obj) => obj is FunctionType other && Equals(other);
+
+        public bool Equals(FunctionType other) =>
+            other is not null &&
+            EqualityComparer<CompiledFunction>.Default.Equals(Function, other.Function);
+
+        public override int GetHashCode() => HashCode.Combine(Function);
+
+        public static bool operator ==(FunctionType left, FunctionType right) =>
+            EqualityComparer<FunctionType>.Default.Equals(left, right);
+
+        public static bool operator !=(FunctionType left, FunctionType right) => !(left == right);
+    }
+
     public class CompiledType : IEquatable<CompiledType>
     {
         readonly Type builtinType;
@@ -1004,6 +1137,7 @@ namespace IngameCoding.BBCode.Compiler
         CompiledStruct @struct;
         CompiledClass @class;
         CompiledEnum @enum;
+        FunctionType function;
 
         internal Type BuiltinType => builtinType;
         /// <exception cref="Errors.InternalException"/>
@@ -1023,6 +1157,7 @@ namespace IngameCoding.BBCode.Compiler
         internal CompiledStruct Struct => @struct;
         internal CompiledClass Class => @class;
         internal CompiledEnum Enum => @enum;
+        internal FunctionType Function => function;
 
 
         /// <exception cref="Errors.InternalException"/>
@@ -1048,8 +1183,9 @@ namespace IngameCoding.BBCode.Compiler
                 if (@struct != null) return @struct.Name.Content;
                 if (@class != null) return @class.Name.Content;
                 if (@enum != null) return @enum.Identifier.Content;
+                if (function != null) return function.Function.Identifier.Content;
 
-                return null;
+                throw new NotImplementedException();
             }
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
@@ -1058,6 +1194,8 @@ namespace IngameCoding.BBCode.Compiler
         internal bool IsEnum => @enum != null;
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         internal bool IsStruct => @struct != null;
+        /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
+        internal bool IsFunction => function != null;
         internal bool IsBuiltin => builtinType != Type.NONE;
         internal bool InHEAP => IsClass;
 
@@ -1068,6 +1206,7 @@ namespace IngameCoding.BBCode.Compiler
                 if (IsStruct) return @struct.Size;
                 if (IsClass) return @class.Size;
                 if (IsEnum) return 1;
+                if (IsFunction) return 1;
                 return 1;
             }
         }
@@ -1084,8 +1223,6 @@ namespace IngameCoding.BBCode.Compiler
             get
             {
                 if (IsStruct) return @struct.Size;
-                if (IsClass) return 1;
-                if (IsEnum) return 1;
                 return 1;
             }
         }
@@ -1096,6 +1233,7 @@ namespace IngameCoding.BBCode.Compiler
             this.@struct = null;
             this.@class = null;
             this.@enum = null;
+            this.function = null;
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1114,6 +1252,12 @@ namespace IngameCoding.BBCode.Compiler
         internal CompiledType(CompiledEnum @enum) : this()
         {
             this.@enum = @enum ?? throw new ArgumentNullException(nameof(@enum));
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        internal CompiledType(CompiledFunction @function) : this()
+        {
+            this.function = new FunctionType(@function);
         }
 
         internal CompiledType(Type type) : this()
@@ -1140,7 +1284,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (string.IsNullOrEmpty(typeName)) throw new ArgumentException($"'{nameof(typeName)}' cannot be null or empty.", nameof(typeName));
 
-            if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(typeName, out this.builtinType))
+            if (Constants.BuiltinTypeMap3.TryGetValue(typeName, out this.builtinType))
             { return; }
 
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
@@ -1154,7 +1298,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
@@ -1186,6 +1330,12 @@ namespace IngameCoding.BBCode.Compiler
                 return;
             }
 
+            if (type is FunctionType function)
+            {
+                this.function = function;
+                return;
+            }
+
             throw new Errors.InternalException($"Unknown type definition {type.GetType().FullName}");
         }
 
@@ -1212,6 +1362,11 @@ namespace IngameCoding.BBCode.Compiler
                 this.@enum = @enum;
                 return;
             }
+            if (customType is FunctionType function)
+            {
+                this.function = function;
+                return;
+            }
 
             throw new Errors.InternalException($"Unknown type definition {customType.GetType().FullName}");
         }
@@ -1234,7 +1389,7 @@ namespace IngameCoding.BBCode.Compiler
             if (a is null) return false;
             if (b is null) return false;
 
-            if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(b.Identifier.Content, out var type3))
+            if (Constants.BuiltinTypeMap3.TryGetValue(b.Identifier.Content, out var type3))
             {
                 return type3 == a.builtinType;
             }
@@ -1265,10 +1420,12 @@ namespace IngameCoding.BBCode.Compiler
             if (this.IsBuiltin != b.IsBuiltin) return false;
             if (this.IsClass != b.IsClass) return false;
             if (this.IsStruct != b.IsStruct) return false;
+            if (this.IsFunction != b.IsFunction) return false;
 
             if (this.IsClass && b.IsClass) return this.@class.Name.Content == b.@class.Name.Content;
             if (this.IsStruct && b.IsStruct) return this.@struct.Name.Content == b.@struct.Name.Content;
             if (this.IsEnum && b.IsEnum) return this.@enum.Identifier.Content == b.@enum.Identifier.Content;
+            if (this.IsFunction && b.IsFunction) return this.@function == b.@function;
 
             if (this.IsBuiltin && b.IsBuiltin) return this.builtinType == b.builtinType;
 
@@ -1287,6 +1444,16 @@ namespace IngameCoding.BBCode.Compiler
         public static bool operator !=(CompiledType a, string b) => !(a == b);
         public static bool operator ==(string a, CompiledType b) => b == a;
         public static bool operator !=(string a, CompiledType b) => !(b == a);
+    }
+
+    public interface ITypeDefinition : IDefinition
+    {
+
+    }
+
+    public interface IDataStructure
+    {
+        public int Size { get; }
     }
 
     public interface IElementWithKey<T>

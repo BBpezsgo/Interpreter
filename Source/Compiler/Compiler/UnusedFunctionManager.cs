@@ -1,14 +1,8 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace IngameCoding.BBCode.Compiler
 {
-    using IngameCoding.BBCode.Analysis;
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Core;
     using IngameCoding.Errors;
 
     internal class UnusedFunctionManager : CodeGeneratorBase
@@ -23,374 +17,91 @@ namespace IngameCoding.BBCode.Compiler
 
         internal UnusedFunctionManager() : base() { }
 
-        #region GenerateCodeFor...
-
-        /// <returns>The variable's size</returns>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        int GenerateCodeForVariable(Statement_NewVariable newVariable, bool isGlobal)
-        {
-            if (newVariable.Type == "var")
-            {
-                if (newVariable.InitialValue != null)
-                {
-                    if (newVariable.InitialValue is Statement_Literal literal)
-                    {
-                        newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
-                    }
-                    else if (newVariable.InitialValue is Statement_NewInstance newInstance)
-                    {
-                        newVariable.Type = TypeInstance.CreateAnonymous(newInstance.TypeName.Content, TypeDefinitionReplacer);
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
-                    }
-                    else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
-                    {
-                        newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
-                    }
-                    else
-                    {
-                        CompiledType initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                        newVariable.Type = TypeInstance.CreateAnonymous(initialTypeRaw);
-
-                        newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
-
-                        GenerateCodeForVariable(newVariable, isGlobal);
-                        return 1;
-                    }
-                }
-                else
-                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type.Identifier); }
-
-                if (newVariable.Type == "var")
-                { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
-
-                GenerateCodeForVariable(newVariable, isGlobal);
-                return 1;
-            }
-
-            newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
-
-            compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(), isGlobal));
-
-            return 0;
-        }
-
-        int GetVariableSizesSum()
-        {
-            int sum = 0;
-            for (int i = 0; i < compiledVariables.Count; i++)
-            {
-                var key = compiledVariables.ElementAt(i).Key;
-                if (compiledVariables.Get(key).IsGlobal) continue;
-                if (compiledVariables.Get(key).Type.IsClass) sum++;
-                else sum += compiledVariables.Get(key).Type.Size;
-            }
-            return sum;
-        }
-
-        #endregion
-
-        CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int memoryOffset, bool isGlobal)
-        {
-            if (Keywords.Contains(newVariable.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
-
-            bool inHeap = GetCompiledClass(newVariable.Type.Identifier.Content, out _);
-            CompiledType type = new(newVariable.Type, GetCustomType);
-
-            return new CompiledVariable(
-                memoryOffset,
-                type,
-                isGlobal,
-                inHeap,
-                newVariable);
-        }
-
-        CompiledFunction[] AnalyzeFunctions(CompiledFunction[] functions, Statement[] topLevelStatements, Action<string, Output.LogType> printCallback = null)
+        int DoTheThing(Action<string, Output.LogType> printCallback = null)
         {
             printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
 
-            // Remove unused functions
-            {
-                FunctionDefinition currentFunction = null;
-
-                void AnalyzeNewVariable(Statement_NewVariable newVariable)
-                {
-                    if (newVariable.Type == "var")
-                    {
-                        if (newVariable.InitialValue != null)
-                        {
-                            if (newVariable.InitialValue is Statement_Literal literal)
-                            {
-                                newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
-                            }
-                            else if (newVariable.InitialValue is Statement_NewInstance newStruct)
-                            {
-                                newVariable.Type = TypeInstance.CreateAnonymous(newStruct.TypeName.Content, TypeDefinitionReplacer);
-                            }
-                            else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
-                            {
-                                newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
-                            }
-                            else
-                            {
-                                CompiledType initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                                newVariable.Type = TypeInstance.CreateAnonymous(initialTypeRaw);
-                            }
-                        }
-                        else
-                        { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type.Identifier); }
-
-                        if (newVariable.Type == "var")
-                        { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }
-                    }
-                    this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, -1, false));
-                }
-                void AnalyzeStatements(IEnumerable<Statement> statements)
-                {
-                    int variablesAdded = 0;
-                    foreach (var st in statements)
-                    {
-                        if (st is Statement_NewVariable newVar)
-                        {
-                            AnalyzeNewVariable(newVar);
-                            variablesAdded++;
-                        }
-                        else if (st is Statement_ForLoop forLoop)
-                        {
-                            AnalyzeNewVariable(forLoop.VariableDeclaration);
-                            variablesAdded++;
-                        }
-                    }
-
-                    foreach (var st in statements)
-                    {
-                        AnalyzeStatement(st);
-                        if (st is StatementParent pr)
-                        {
-                            AnalyzeStatements(pr.Statements);
-                        }
-                    }
-
-                    for (int i = 0; i < variablesAdded; i++)
-                    {
-                        this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key);
-                    }
-                }
-
-                void AnalyzeStatement(Statement st)
-                {
-                    if (st is Statement_ForLoop st0)
-                    {
-                        AnalyzeStatement(st0.VariableDeclaration);
-                        AnalyzeStatement(st0.Condition);
-                        AnalyzeStatement(st0.Expression);
-                    }
-                    else if (st is Statement_If st1)
-                    {
-                        foreach (var st2 in st1.Parts)
-                        { AnalyzeStatement(st2); }
-                    }
-                    else if (st is Statement_If_If st2)
-                    {
-                        AnalyzeStatement(st2.Condition);
-                        AnalyzeStatements(st2.Statements);
-                    }
-                    else if (st is Statement_If_ElseIf st3)
-                    {
-                        AnalyzeStatement(st3.Condition);
-                        AnalyzeStatements(st3.Statements);
-                    }
-                    else if (st is Statement_If_Else st3a)
-                    {
-                        AnalyzeStatements(st3a.Statements);
-                    }
-                    else if (st is Statement_Index st4)
-                    {
-                        AnalyzeStatement(st4.Expression);
-                    }
-                    else if (st is Statement_NewVariable st5)
-                    {
-                        if (st5.InitialValue != null) AnalyzeStatement(st5.InitialValue);
-                    }
-                    else if (st is Statement_Operator st6)
-                    {
-                        if (st6.Left != null) AnalyzeStatement(st6.Left);
-                        if (st6.Right != null) AnalyzeStatement(st6.Right);
-                    }
-                    else if (st is Statement_Setter setter)
-                    {
-                        AnalyzeStatement(setter.Left);
-                        AnalyzeStatement(setter.Right);
-                    }
-                    else if (st is Statement_WhileLoop st7)
-                    {
-                        AnalyzeStatement(st7.Condition);
-                    }
-                    else if (st is Statement_FunctionCall st8)
-                    {
-                        foreach (var st9 in st8.Parameters)
-                        { AnalyzeStatement(st9); }
-
-                        if (st8.PrevStatement != null)
-                        { AnalyzeStatement(st8.PrevStatement); }
-
-                        if (!KeywordFunctions.Contains(st8.FunctionName) && GetCompiledFunction(st8, out var cf))
-                        {
-                            if (currentFunction != null)
-                            {
-                                if (cf.IsSame(currentFunction))
-                                {
-                                    cf.TimesUsed++;
-                                }
-                            }
-                            else
-                            {
-                                cf.TimesUsed++;
-                            }
-                            cf.TimesUsedTotal++;
-                        }
-                    }
-                    else if (st is Statement_KeywordCall keywordCall)
-                    {
-                        foreach (var parameter in keywordCall.Parameters)
-                        { AnalyzeStatement(parameter); }
-
-                        if (!KeywordFunctions.Contains(keywordCall.FunctionName))
-                        {
-                            if (keywordCall.Parameters.Length > 0)
-                            {
-                                CompiledClass @class = FindStatementType(keywordCall.Parameters[0]).Class ?? throw new NullReferenceException();
-
-                                if (GetDestructor(@class, out CompiledGeneralFunction destructor))
-                                {
-                                    destructor.TimesUsed++;
-                                    destructor.TimesUsedTotal++;
-                                }
-
-                                if (GetCloner(@class, out CompiledGeneralFunction cloner))
-                                {
-                                    cloner.TimesUsed++;
-                                    cloner.TimesUsedTotal++;
-                                }
-                            }
-                        }
-                    }
-                    else if (st is Statement_Field st9)
-                    { AnalyzeStatement(st9.PrevStatement); }
-                    else if (st is Statement_Variable)
-                    { }
-                    else if (st is Statement_NewInstance)
-                    { }
-                    else if (st is Statement_ConstructorCall constructorCall)
-                    {
-                        foreach (StatementWithReturnValue parameter in constructorCall.Parameters)
-                        { AnalyzeStatement(parameter); }
-
-                        if (GetConstructor(constructorCall, out CompiledGeneralFunction function))
-                        {
-                            function.TimesUsed++;
-                            function.TimesUsedTotal++;
-                        }
-                    }
-                    else if (st is Statement_Literal)
-                    { }
-                    else if (st is Statement_As @as)
-                    { AnalyzeStatement(@as.PrevStatement); }
-                    else if (st is Statement_MemoryAddressGetter)
-                    { }
-                    else if (st is Statement_MemoryAddressFinder)
-                    { }
-                    else if (st is Statement_ListValue st10)
-                    { AnalyzeStatements(st10.Values); }
-                    else
-                    { throw new CompilerException($"Unknown statement {st.GetType().Name}", st, CurrentFile); }
-                }
-
-                foreach (var f in functions)
-                {
-                    if (CompiledFunctions.GetDefinition(f, out CompiledFunction compiledFunction))
-                    { compiledFunction.TimesUsed = 0; }
-                }
-
-                foreach (var f in functions)
-                {
-                    parameters.Clear();
-                    foreach (ParameterDefinition parameter in f.Parameters)
-                    { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
-                    CurrentFile = f.FilePath;
-
-                    currentFunction = f;
-                    AnalyzeStatements(f.Statements);
-
-                    currentFunction = null;
-                    CurrentFile = null;
-                    parameters.Clear();
-                }
-
-                AnalyzeStatements(topLevelStatements);
-            }
-
-            printCallback?.Invoke($"   Processing ...", Output.LogType.Debug);
-
             int functionsRemoved = 0;
 
-            List<CompiledFunction> newFunctions = new(functions);
-            for (int i = newFunctions.Count - 1; i >= 0; i--)
             {
-                var element = newFunctions.ElementAt(i);
+                List<CompiledFunction> newFunctions = new(this.CompiledFunctions);
 
-                if (!this.CompiledFunctions.GetDefinition(element, out CompiledFunction f)) continue;
-                if (f.TimesUsed > 0) continue;
-                if (f.TimesUsedTotal > 0) continue;
-                foreach (var attr in f.CompiledAttributes)
+                for (int i = newFunctions.Count - 1; i >= 0; i--)
                 {
-                    if (attr.Key == "CodeEntry") goto JumpOut;
-                    if (attr.Key == "Catch") goto JumpOut;
+                    CompiledFunction function = newFunctions[i];
+
+                    if (function.TimesUsed > 0) continue;
+
+                    if (function.CompiledAttributes.ContainsKey("CodeEntry")) continue;
+                    if (function.CompiledAttributes.ContainsKey("Catch")) continue;
+
+                    if (CompileLevel == Compiler.CompileLevel.All) continue;
+                    if (CompileLevel == Compiler.CompileLevel.Exported && function.IsExport) continue;
+
+                    string readableID = function.ReadableID();
+
+                    printCallback?.Invoke($"      Remove function {readableID}", Output.LogType.Debug);
+                    Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
+
+                    newFunctions.RemoveAt(i);
+                    functionsRemoved++;
                 }
 
-                if (CompileLevel == Compiler.CompileLevel.All) continue;
-                if (CompileLevel == Compiler.CompileLevel.Exported && f.IsExport) continue;
-
-                string readableID = element.ReadableID();
-
-                printCallback?.Invoke($"      Remove function '{readableID}' ...", Output.LogType.Debug);
-                Informations.Add(new Information($"Unused function '{readableID}' is not compiled", element.Identifier, element.FilePath));
-
-                bool _ = newFunctions.Remove(element.Key);
-                functionsRemoved++;
-
-            JumpOut:;
+                this.CompiledFunctions = newFunctions.ToArray();
             }
 
-            return newFunctions.ToArray();
-        }
-
-        CompiledFunction[] RemoveUnusedFunctions_(
-            Compiler.Result compilerResult,
-            int iterations,
-            Action<string, Output.LogType> printCallback)
-        {
-            for (int iteration = 0; iteration < iterations; iteration++)
             {
-                int totalFunctions = this.CompiledFunctions.Length;
-                this.CompiledFunctions = AnalyzeFunctions(this.CompiledFunctions, compilerResult.TopLevelStatements, printCallback);
-                int functionsRemoved = totalFunctions - this.CompiledFunctions.Length;
-                if (functionsRemoved == 0)
+                List<CompiledOperator> newOperators = new(this.CompiledOperators);
+
+                for (int i = newOperators.Count - 1; i >= 0; i--)
                 {
-                    printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
-                    break;
+                    CompiledOperator @operator = newOperators[i];
+
+                    if (@operator.TimesUsed > 0) continue;
+
+                    if (CompileLevel == Compiler.CompileLevel.All) continue;
+                    if (CompileLevel == Compiler.CompileLevel.Exported && @operator.IsExport) continue;
+
+                    string readableID = @operator.ReadableID();
+
+                    printCallback?.Invoke($"      Remove operator {readableID}", Output.LogType.Debug);
+                    Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
+
+                    newOperators.RemoveAt(i);
+                    functionsRemoved++;
                 }
 
-                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions (iteration {iteration})", Output.LogType.Debug);
+                this.CompiledOperators = newOperators.ToArray();
             }
 
-            return this.CompiledFunctions;
+            {
+                List<CompiledGeneralFunction> newGeneralFunctions = new(this.CompiledGeneralFunctions);
+
+                for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
+                {
+                    CompiledGeneralFunction generalFunction = newGeneralFunctions[i];
+
+                    if (generalFunction.TimesUsed > 0) continue;
+
+                    if (CompileLevel == Compiler.CompileLevel.All) continue;
+                    if (CompileLevel == Compiler.CompileLevel.Exported && generalFunction.IsExport) continue;
+
+                    string readableID = generalFunction.ReadableID();
+
+                    printCallback?.Invoke($"      Remove general function {readableID}", Output.LogType.Debug);
+                    Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
+
+                    newGeneralFunctions.RemoveAt(i);
+                    functionsRemoved++;
+                }
+
+                this.CompiledGeneralFunctions = newGeneralFunctions.ToArray();
+            }
+
+            return functionsRemoved;
         }
 
-        public static CompiledFunction[] RemoveUnusedFunctions(
+        public static (CompiledFunction[] functions, CompiledOperator[] operators, CompiledGeneralFunction[] generalFunctions) RemoveUnusedFunctions(
             Compiler.Result compilerResult,
             int iterations,
             Action<string, Output.LogType> printCallback = null,
@@ -412,11 +123,25 @@ namespace IngameCoding.BBCode.Compiler
                 Informations = new List<Information>(),
             };
 
-            return unusedFunctionManager.RemoveUnusedFunctions_(
-                compilerResult,
-                iterations,
-                printCallback
-                );
+            for (int iteration = 0; iteration < iterations; iteration++)
+            {
+                ReferenceCollector.CollectReferences(compilerResult, printCallback);
+
+                int functionsRemoved = unusedFunctionManager.DoTheThing(printCallback);
+                if (functionsRemoved == 0)
+                {
+                    printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
+                    break;
+                }
+
+                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", Output.LogType.Debug);
+
+                compilerResult.Functions = unusedFunctionManager.CompiledFunctions;
+                compilerResult.Operators = unusedFunctionManager.CompiledOperators;
+                compilerResult.GeneralFunctions = unusedFunctionManager.CompiledGeneralFunctions;
+            }
+
+            return (unusedFunctionManager.CompiledFunctions, unusedFunctionManager.CompiledOperators, unusedFunctionManager.CompiledGeneralFunctions);
         }
     }
 }

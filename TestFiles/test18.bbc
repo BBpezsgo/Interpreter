@@ -1,0 +1,17 @@
+[CodeEntry]
+void Start()
+{
+	var func = Yes;
+
+	func(4);
+}
+
+void Yes()
+{
+	*Alloc(1) = 3;
+}
+
+void Yes(int v)
+{
+	*Alloc(1) = v;
+}

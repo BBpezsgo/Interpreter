@@ -9,15 +9,8 @@ namespace IngameCoding.BBCode.Compiler
     using IngameCoding.Core;
     using IngameCoding.Errors;
 
-    public class CodeGeneratorBase
+    public static class Constants
     {
-        public static readonly string[] KeywordFunctions = new string[]
-        {
-            "return",
-            "break",
-            "type",
-            "delete",
-        };
         public static readonly string[] Keywords = new string[]
         {
             "struct",
@@ -52,7 +45,7 @@ namespace IngameCoding.BBCode.Compiler
             { "char", RuntimeType.CHAR },
         };
 
-        internal static readonly Dictionary<string, Type> BuiltinTypeMap3 = new()
+        public static readonly Dictionary<string, Type> BuiltinTypeMap3 = new()
         {
             { "byte", Type.BYTE },
             { "int", Type.INT },
@@ -61,10 +54,58 @@ namespace IngameCoding.BBCode.Compiler
             { "void", Type.VOID },
         };
 
+        public static class Operators
+        {
+            public static readonly Dictionary<string, Opcode> OpCodes = new()
+            {
+                { "!", Opcode.LOGIC_NOT },
+                { "+", Opcode.MATH_ADD },
+                { "<", Opcode.LOGIC_LT },
+                { ">", Opcode.LOGIC_MT },
+                { "-", Opcode.MATH_SUB },
+                { "*", Opcode.MATH_MULT },
+                { "/", Opcode.MATH_DIV },
+                { "%", Opcode.MATH_MOD },
+                { "==", Opcode.LOGIC_EQ },
+                { "!=", Opcode.LOGIC_NEQ },
+                { "&&", Opcode.LOGIC_AND },
+                { "||", Opcode.LOGIC_OR },
+                { "^", Opcode.LOGIC_XOR },
+                { "<=", Opcode.LOGIC_LTEQ },
+                { ">=", Opcode.LOGIC_MTEQ },
+                { "<<", Opcode.BITSHIFT_LEFT },
+                { ">>", Opcode.BITSHIFT_RIGHT },
+            };
+
+            public static readonly Dictionary<string, int> ParameterCounts = new()
+            {
+                { "!", 1 },
+                { "+", 2 },
+                { "<", 2 },
+                { ">", 2 },
+                { "-", 2 },
+                { "*", 2 },
+                { "/", 2 },
+                { "%", 2 },
+                { "==", 2 },
+                { "!=", 2 },
+                { "&&", 2 },
+                { "||", 2 },
+                { "^", 2 },
+                { "<=", 2 },
+                { ">=", 2 },
+                { "<<", 2 },
+                { ">>", 2 },
+            };
+        }
+    }
+
+    public class CodeGeneratorBase
+    {
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
-        protected CompiledFunction[] CompiledOperators;
+        protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
         protected List<KeyValuePair<string, CompiledVariable>> compiledVariables;
@@ -80,7 +121,7 @@ namespace IngameCoding.BBCode.Compiler
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledClasses = Array.Empty<CompiledClass>();
             CompiledFunctions = Array.Empty<CompiledFunction>();
-            CompiledOperators = Array.Empty<CompiledFunction>();
+            CompiledOperators = Array.Empty<CompiledOperator>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
@@ -94,6 +135,8 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         #region Helper Functions
+
+        #region Type Helpers
 
         public static bool SameType(CompiledEnum @enum, CompiledType type)
         {
@@ -120,16 +163,20 @@ namespace IngameCoding.BBCode.Compiler
         /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
         /// </list>
         /// </returns>
+        /// <param name="position">
+        /// Used for exceptions
+        /// </param>
         /// <exception cref="InternalException"></exception>
-        protected ITypeDefinition GetCustomType(string name, bool returnNull = false)
+        protected ITypeDefinition GetCustomType(string name, Position position)
         {
             if (CompiledStructs.ContainsKey(name)) return CompiledStructs.Get<string, ITypeDefinition>(name);
             if (CompiledClasses.ContainsKey(name)) return CompiledClasses.Get<string, ITypeDefinition>(name);
             if (CompiledEnums.ContainsKey(name)) return CompiledEnums.Get<string, ITypeDefinition>(name);
 
-            if (returnNull) return null;
+            if (GetFunction(name, out CompiledFunction function))
+            { return new FunctionType(function); }
 
-            throw new CompilerException($"Type \"{name}\" not found", Position.UnknownPosition, CurrentFile);
+            throw new CompilerException($"Type definition \"{name}\" not found", position, CurrentFile);
         }
 
         protected ITypeDefinition GetReplacedType(string builtinName)
@@ -137,9 +184,9 @@ namespace IngameCoding.BBCode.Compiler
             string replacedName = TypeDefinitionReplacer(builtinName);
 
             if (replacedName == null)
-            { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with the attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", Position.UnknownPosition, CurrentFile); }
+            { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with an attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", Position.UnknownPosition, CurrentFile); }
 
-            ITypeDefinition typeDefinition = GetCustomType(replacedName, false);
+            ITypeDefinition typeDefinition = GetCustomType(replacedName, Position.UnknownPosition);
 
             return typeDefinition;
         }
@@ -152,8 +199,8 @@ namespace IngameCoding.BBCode.Compiler
         /// </list>
         /// </returns>
         /// <exception cref="InternalException"></exception>
-        protected ITypeDefinition GetCustomType(TypeInstance name, bool returnNull = false)
-            => GetCustomType(name.Identifier.Content, returnNull);
+        protected ITypeDefinition GetCustomType(TypeInstance name)
+            => GetCustomType(name.Identifier.Content, name.Position);
 
         /// <returns>
         /// <list type="bullet">
@@ -164,7 +211,7 @@ namespace IngameCoding.BBCode.Compiler
         /// </returns>
         /// <exception cref="InternalException"></exception>
         protected ITypeDefinition GetCustomType(string name)
-            => GetCustomType(name, false);
+            => GetCustomType(name, Position.UnknownPosition);
 
         protected string TypeDefinitionReplacer(string typeName)
         {
@@ -201,16 +248,18 @@ namespace IngameCoding.BBCode.Compiler
             return null;
         }
 
+        #endregion
+
         protected bool GetEnum(string name, out CompiledEnum @enum)
             => CompiledEnums.TryGetValue(name, out @enum);
 
-        protected bool GetCompiledVariable(string variableName, out CompiledVariable compiledVariable)
+        protected bool GetVariable(string variableName, out CompiledVariable compiledVariable)
             => compiledVariables.TryGetValue(variableName, out compiledVariable);
 
         protected bool GetParameter(string parameterName, out CompiledParameter parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        protected bool GetCompiledFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
+        protected bool GetFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
             CompiledType[] parameters = new CompiledType[functionCallStatement.MethodParameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -219,7 +268,35 @@ namespace IngameCoding.BBCode.Compiler
             return CompiledFunctions.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledFunction);
         }
 
-        protected bool GetOperator(Statement_Operator @operator, out CompiledFunction operatorDefinition)
+        bool GetFunction(string name, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            CompiledFunction found = null;
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                var f = this.CompiledFunctions[i];
+                if (f.Identifier.Content != name) continue;
+
+                if (found != null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {found.ReadableID()} (at {found.Identifier.Position.ToMinString()}) ; {f.ReadableID()} (at {f.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
+
+                found = f;
+            }
+
+            if (found != null)
+            {
+                compiledFunction = found;
+                return true;
+            }
+
+            return false;
+        }
+
+        protected bool GetFunction(Statement_Variable variable, out CompiledFunction compiledFunction)
+            => GetFunction(variable.VariableName.Content, out compiledFunction);
+
+        protected bool GetOperator(Statement_Operator @operator, out CompiledOperator operatorDefinition)
         {
             StatementWithReturnValue[] parameters = @operator.Parameters;
             CompiledType[] parameterTypes = new CompiledType[parameters.Length];
@@ -234,8 +311,8 @@ namespace IngameCoding.BBCode.Compiler
 
         protected bool GetConstructor(Statement_ConstructorCall functionCallStatement, out CompiledGeneralFunction constructor)
         {
-            if (!GetCompiledClass(functionCallStatement, out var @class))
-            { throw new NotImplementedException(); }
+            if (!GetClass(functionCallStatement, out var @class))
+            { throw new CompilerException($"Class definition \"{functionCallStatement.TypeName}\" not found", functionCallStatement, CurrentFile); }
 
             for (int i = 0; i < CompiledGeneralFunctions.Length; i++)
             {
@@ -294,20 +371,36 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetCompiledStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
+        protected bool GetStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
             => CompiledStructs.TryGetValue(newStructStatement.TypeName.Content, out compiledStruct);
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetCompiledClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
+        protected bool GetClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
             => CompiledClasses.TryGetValue(newClassStatement.TypeName.Content, out compiledClass);
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetCompiledClass(Statement_ConstructorCall constructorCall, out CompiledClass compiledClass)
+        protected bool GetClass(Statement_ConstructorCall constructorCall, out CompiledClass compiledClass)
             => CompiledClasses.TryGetValue(constructorCall.TypeName.Content, out compiledClass);
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetCompiledClass(string className, out CompiledClass compiledClass)
+        protected bool GetClass(string className, out CompiledClass compiledClass)
             => CompiledClasses.TryGetValue(className, out compiledClass);
+
+        /// <exception cref="NotImplementedException"></exception>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        protected static DataItem GetInitialValue(Type type)
+        {
+            return type switch
+            {
+                Type.BYTE => new DataItem((byte)0),
+                Type.INT => new DataItem((int)0),
+                Type.FLOAT => new DataItem((float)0f),
+                Type.CHAR => new DataItem((char)'\0'),
+
+                _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
+            };
+        }
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -332,7 +425,7 @@ namespace IngameCoding.BBCode.Compiler
         protected static DataItem GetInitialValue(CompiledType type)
         {
             if (type.IsStruct)
-            { throw new NotImplementedException(); }
+            { throw new NotImplementedException($"Initial value for structs is not implemented"); }
 
             if (type.IsClass)
             { return new DataItem((int)Utils.NULL_POINTER); }
@@ -340,21 +433,12 @@ namespace IngameCoding.BBCode.Compiler
             if (type.IsEnum)
             {
                 if (type.Enum.Members.Length == 0)
-                {
-                    throw new CompilerException($"Can't get enum \"{type.Enum.Identifier.Content}\" initial value. Enum has no members", type.Enum.Identifier, type.Enum.FilePath);
-                }
+                { throw new CompilerException($"Could not get enum \"{type.Enum.Identifier.Content}\" initial value: enum has no members", type.Enum.Identifier, type.Enum.FilePath); }
+
                 return type.Enum.Members[0].Value;
             }
 
-            return type.BuiltinType switch
-            {
-                Type.BYTE => new DataItem((byte)0),
-                Type.INT => new DataItem((int)0),
-                Type.FLOAT => new DataItem((float)0f),
-                Type.CHAR => new DataItem((char)'\0'),
-
-                _ => throw new InternalException($"Initial value for type \"{type.Name}\" is unimplemented"),
-            };
+            return GetInitialValue(type.BuiltinType);
         }
 
         #endregion
@@ -375,12 +459,12 @@ namespace IngameCoding.BBCode.Compiler
             if (keywordCall.FunctionName == "clone")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException("Wrong number of parameters passed to 'clone'", keywordCall.TotalPosition(), CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to keyword-function \"clone\": requied {1}, passed {keywordCall.Parameters.Length}", keywordCall.TotalPosition(), CurrentFile); }
 
                 return FindStatementType(keywordCall.Parameters[0]);
             }
 
-            throw new CompilerException($"Unknown function (keyword) '{keywordCall.FunctionName}'", keywordCall.Identifier, CurrentFile);
+            throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
         protected CompiledType FindStatementType(Statement_FunctionCall functionCall)
         {
@@ -390,57 +474,16 @@ namespace IngameCoding.BBCode.Compiler
 
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
 
-            if (!GetCompiledFunction(functionCall, out var calledFunc))
-            { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found!", functionCall.Identifier, CurrentFile); }
+            if (!GetFunction(functionCall, out var calledFunc))
+            { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
             return calledFunc.Type;
         }
         protected CompiledType FindStatementType(Statement_Operator @operator)
         {
-            Dictionary<string, Opcode> operatorOpCodes = new()
+            if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
-                { "!", Opcode.LOGIC_NOT },
-                { "+", Opcode.MATH_ADD },
-                { "<", Opcode.LOGIC_LT },
-                { ">", Opcode.LOGIC_MT },
-                { "-", Opcode.MATH_SUB },
-                { "*", Opcode.MATH_MULT },
-                { "/", Opcode.MATH_DIV },
-                { "%", Opcode.MATH_MOD },
-                { "==", Opcode.LOGIC_EQ },
-                { "!=", Opcode.LOGIC_NEQ },
-                { "&&", Opcode.LOGIC_AND },
-                { "||", Opcode.LOGIC_OR },
-                { "^", Opcode.LOGIC_XOR },
-                { "<=", Opcode.LOGIC_LTEQ },
-                { ">=", Opcode.LOGIC_MTEQ },
-                { "<<", Opcode.BITSHIFT_LEFT },
-                { ">>", Opcode.BITSHIFT_RIGHT },
-            };
-            Dictionary<string, int> operatorParameterCounts = new()
-            {
-                { "!", 1 },
-                { "+", 2 },
-                { "<", 2 },
-                { ">", 2 },
-                { "-", 2 },
-                { "*", 2 },
-                { "/", 2 },
-                { "%", 2 },
-                { "==", 2 },
-                { "!=", 2 },
-                { "&&", 2 },
-                { "||", 2 },
-                { "^", 2 },
-                { "<=", 2 },
-                { ">=", 2 },
-                { "<<", 2 },
-                { ">>", 2 },
-            };
-
-            if (operatorOpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
-            {
-                if (operatorParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of passed ({@operator.ParameterCount}) to operator '{@operator.Operator.Content}', requied: {operatorParameterCounts[@operator.Operator.Content]}", @operator.Operator, CurrentFile); }
+                if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': requied {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
             }
             else
             {
@@ -449,7 +492,7 @@ namespace IngameCoding.BBCode.Compiler
 
             if (opcode != Opcode.UNKNOWN)
             {
-                if (GetOperator(@operator, out CompiledFunction operatorDefinition))
+                if (GetOperator(@operator, out CompiledOperator operatorDefinition))
                 { return operatorDefinition.Type; }
 
                 var leftType = FindStatementType(@operator.Left);
@@ -465,7 +508,7 @@ namespace IngameCoding.BBCode.Compiler
 
                     var predictedValue = PredictStatementValue(@operator.Operator.Content, leftValue, rightValue);
                     if (!predictedValue.HasValue)
-                    { throw new InternalException($"Failed to evaluate the operator"); }
+                    { throw new InternalException($"Failed to evaluate the operator {leftType} {@operator.Operator.Content} {rightType}"); }
 
                     return predictedValue.Value.type switch
                     {
@@ -473,7 +516,7 @@ namespace IngameCoding.BBCode.Compiler
                         RuntimeType.INT => new CompiledType(Type.INT),
                         RuntimeType.FLOAT => new CompiledType(Type.FLOAT),
                         RuntimeType.CHAR => new CompiledType(Type.CHAR),
-                        _ => throw new NotImplementedException(),
+                        _ => throw new NotImplementedException($"Unknown type {predictedValue.Value.type}"),
                     };
                 }
                 else
@@ -484,7 +527,7 @@ namespace IngameCoding.BBCode.Compiler
             else if (@operator.Operator.Content == "=")
             { throw new NotImplementedException(); }
             else
-            { throw new CompilerException($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, CurrentFile); }
+            { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
         }
         protected CompiledType FindStatementType(Statement_Literal literal) => literal.Type switch
         {
@@ -493,7 +536,7 @@ namespace IngameCoding.BBCode.Compiler
             LiteralType.STRING => new CompiledType(GetReplacedType("string")),
             LiteralType.BOOLEAN => new CompiledType(GetReplacedType("boolean")),
             LiteralType.CHAR => new CompiledType(Type.CHAR),
-            _ => throw new CompilerException($"Unknown literal type {literal.Type}", literal, CurrentFile),
+            _ => throw new NotImplementedException($"Unknown literal type {literal.Type}"),
         };
         protected CompiledType FindStatementType(Statement_Variable variable)
         {
@@ -501,38 +544,34 @@ namespace IngameCoding.BBCode.Compiler
             { return new CompiledType(Type.INT); }
 
             if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
-            {
-                if (variable.ListIndex != null)
-                { throw new NotImplementedException(); }
-                return param.Type;
-            }
-            else if (GetCompiledVariable(variable.VariableName.Content, out CompiledVariable val))
-            {
-                return val.Type;
-            }
-            else if (GetEnum(variable.VariableName.Content, out var @enum))
-            {
-                return new CompiledType(@enum);
-            }
-            else
-            {
-                throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
-            }
+            { return param.Type; }
+
+            if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
+            { return val.Type; }
+
+            if (GetEnum(variable.VariableName.Content, out var @enum))
+            { return new CompiledType(@enum); }
+
+            if (GetFunction(variable, out var function))
+            { return new CompiledType(function); }
+
+            throw new CompilerException($"Variable/parameter/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
         }
         protected CompiledType FindStatementType(Statement_MemoryAddressGetter _) => new(Type.INT);
         protected CompiledType FindStatementType(Statement_MemoryAddressFinder _) => new(Type.UNKNOWN);
         protected CompiledType FindStatementType(Statement_NewInstance newStruct)
         {
-            if (GetCompiledStruct(newStruct, out var structDefinition))
+            if (GetStruct(newStruct, out var structDefinition))
             { return new CompiledType(structDefinition); }
-            else if (GetCompiledClass(newStruct, out var classDefinition))
+
+            if (GetClass(newStruct, out var classDefinition))
             { return new CompiledType(classDefinition); }
 
-            throw new CompilerException($"Class or struct definition \"{newStruct.TypeName.Content}\" not found", newStruct.TypeName, CurrentFile);
+            throw new CompilerException($"Class/struct definition \"{newStruct.TypeName.Content}\" not found", newStruct.TypeName, CurrentFile);
         }
         protected CompiledType FindStatementType(Statement_ConstructorCall constructorCall)
         {
-            if (GetCompiledClass(constructorCall, out var classDefinition))
+            if (GetClass(constructorCall, out var classDefinition))
             { return new CompiledType(classDefinition); }
 
             throw new CompilerException($"Class definition \"{constructorCall.TypeName.Content}\" not found", constructorCall.TypeName, CurrentFile);
@@ -579,51 +618,53 @@ namespace IngameCoding.BBCode.Compiler
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{@enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
 
-            throw new CompilerException($"Class or struct definition \"{prevStatementType}\" not found", field.TotalPosition(), CurrentFile);
+            throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field.TotalPosition(), CurrentFile);
         }
         protected CompiledType FindStatementType(Statement_As @as)
         { return new CompiledType(@as.Type, GetCustomType); }
 
-        protected CompiledType FindStatementType(StatementWithReturnValue st)
+        protected CompiledType FindStatementType(StatementWithReturnValue statement)
         {
-            try
-            {
-                if (st is Statement_FunctionCall functionCall)
-                { return FindStatementType(functionCall); }
-                else if (st is Statement_Operator @operator)
-                { return FindStatementType(@operator); }
-                else if (st is Statement_Literal literal)
-                { return FindStatementType(literal); }
-                else if (st is Statement_Variable variable)
-                { return FindStatementType(variable); }
-                else if (st is Statement_MemoryAddressGetter memoryAddressGetter)
-                { return FindStatementType(memoryAddressGetter); }
-                else if (st is Statement_MemoryAddressFinder memoryAddressFinder)
-                { return FindStatementType(memoryAddressFinder); }
-                else if (st is Statement_NewInstance newStruct)
-                { return FindStatementType(newStruct); }
-                else if (st is Statement_ConstructorCall constructorCall)
-                { return FindStatementType(constructorCall); }
-                else if (st is Statement_Field field)
-                { return FindStatementType(field); }
-                else if (st is Statement_As @as)
-                { return FindStatementType(@as); }
-                else if (st is Statement_KeywordCall keywordCall)
-                { return FindStatementType(keywordCall); }
-                throw new CompilerException($"Statement without value type: {st.GetType().Name} {st}", st, CurrentFile);
-            }
-            catch (InternalException error)
-            {
-                Errors.Add(new Error(error.Message, st.TotalPosition()));
-                throw;
-            }
+            if (statement is Statement_FunctionCall functionCall)
+            { return FindStatementType(functionCall); }
+
+            if (statement is Statement_Operator @operator)
+            { return FindStatementType(@operator); }
+
+            if (statement is Statement_Literal literal)
+            { return FindStatementType(literal); }
+
+            if (statement is Statement_Variable variable)
+            { return FindStatementType(variable); }
+
+            if (statement is Statement_MemoryAddressGetter memoryAddressGetter)
+            { return FindStatementType(memoryAddressGetter); }
+
+            if (statement is Statement_MemoryAddressFinder memoryAddressFinder)
+            { return FindStatementType(memoryAddressFinder); }
+
+            if (statement is Statement_NewInstance newStruct)
+            { return FindStatementType(newStruct); }
+
+            if (statement is Statement_ConstructorCall constructorCall)
+            { return FindStatementType(constructorCall); }
+
+            if (statement is Statement_Field field)
+            { return FindStatementType(field); }
+
+            if (statement is Statement_As @as)
+            { return FindStatementType(@as); }
+
+            if (statement is Statement_KeywordCall keywordCall)
+            { return FindStatementType(keywordCall); }
+
+            throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
         }
         #endregion
 
         #region PredictStatementValue()
         protected DataItem? PredictStatementValue(string @operator, DataItem left, DataItem right)
-        {
-            return @operator switch
+            => @operator switch
             {
                 "!" => !left,
 
@@ -649,9 +690,8 @@ namespace IngameCoding.BBCode.Compiler
                 "!=" => new DataItem(left != right, null),
                 "<=" => new DataItem(left <= right, null),
                 ">=" => new DataItem(left >= right, null),
-                _ => null,
+                _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
             };
-        }
         protected DataItem? PredictStatementValue(Statement_Operator @operator)
         {
             if (GetOperator(@operator, out _))
@@ -672,22 +712,24 @@ namespace IngameCoding.BBCode.Compiler
 
                 return PredictStatementValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
             }
-            else
-            { return leftValue; }
+
+            return leftValue;
         }
-        protected DataItem? PredictStatementValue(Statement_Literal literal) => literal.Type switch
-        {
-            LiteralType.INT => new DataItem(int.Parse(literal.Value), null),
-            LiteralType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
-            LiteralType.STRING => null,
-            LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
-            _ => throw new NotImplementedException(),
-        };
+        protected DataItem? PredictStatementValue(Statement_Literal literal)
+            => literal.Type switch
+            {
+                LiteralType.INT => new DataItem(int.Parse(literal.Value), null),
+                LiteralType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
+                LiteralType.STRING => null,
+                LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
+                _ => throw new NotImplementedException($"This should never occur"),
+            };
         protected DataItem? PredictStatementValue(StatementWithReturnValue st)
         {
             if (st is Statement_Literal literal)
             { return PredictStatementValue(literal); }
-            else if (st is Statement_Operator @operator)
+
+            if (st is Statement_Operator @operator)
             { return PredictStatementValue(@operator); }
 
             return null;

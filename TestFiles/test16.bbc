@@ -3,9 +3,12 @@ using System;
 [CodeEntry]
 void Start()
 {
+	*Alloc(1) = 6;
+	/*
 	String message = new String(4);
 	delete message;
 	message = (clone "Hello") + " World";
 	PrintLine(message);
 	delete message;
+	*/
 }

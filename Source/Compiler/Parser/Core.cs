@@ -544,7 +544,7 @@ namespace IngameCoding.BBCode.Parser
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
-                if (!Compiler.CodeGeneratorBase.BuiltinTypes.Contains(item.Type.Identifier.Content))
+                if (!Compiler.Constants.BuiltinTypes.Contains(item.Type.Identifier.Content))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                 }
@@ -566,7 +566,7 @@ namespace IngameCoding.BBCode.Parser
                     Console.ForegroundColor = ConsoleColor.Blue;
                     if (param.withThisKeyword)
                     { Console.Write("this "); }
-                    if (!Compiler.CodeGeneratorBase.BuiltinTypes.Contains(param.Type.Identifier.Content))
+                    if (!Compiler.Constants.BuiltinTypes.Contains(param.Type.Identifier.Content))
                     { Console.ForegroundColor = ConsoleColor.Green; }
                     Console.Write($"{param.Type} ");
                     Console.ForegroundColor = ConsoleColor.White;

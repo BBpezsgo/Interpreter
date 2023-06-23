@@ -127,7 +127,7 @@ namespace IngameCoding.BBCode.Compiler
             public static CompilerSettings Default => new()
             {
                 GenerateComments = true,
-                RemoveUnusedFunctionsMaxIterations = 4,
+                RemoveUnusedFunctionsMaxIterations = 10,
                 PrintInstructions = false,
                 DontOptimize = false,
                 GenerateDebugInstructions = true,
@@ -149,7 +149,7 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
-        CompiledFunction[] CompiledOperators;
+        CompiledOperator[] CompiledOperators;
         CompiledFunction[] CompiledFunctions;
         CompiledGeneralFunction[] CompiledGeneralFunctions;
         CompiledEnum[] CompiledEnums;
@@ -212,7 +212,7 @@ namespace IngameCoding.BBCode.Compiler
         {
             public CompiledFunction[] Functions;
             public CompiledGeneralFunction[] GeneralFunctions;
-            public CompiledFunction[] Operators;
+            public CompiledOperator[] Operators;
 
             public Dictionary<string, BuiltinFunction> BuiltinFunctions;
 
@@ -263,7 +263,7 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
-            if (CodeGeneratorBase.Keywords.Contains(@struct.Name.Content))
+            if (Constants.Keywords.Contains(@struct.Name.Content))
             { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
 
             @struct.Name.AnalysedType = TokenAnalysedType.Struct;
@@ -281,7 +281,7 @@ namespace IngameCoding.BBCode.Compiler
 
         CompiledClass CompileClass(ClassDefinition @class)
         {
-            if (CodeGeneratorBase.Keywords.Contains(@class.Name.Content))
+            if (Constants.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
             @class.Name.AnalysedType = TokenAnalysedType.Struct;
@@ -314,7 +314,7 @@ namespace IngameCoding.BBCode.Compiler
 
                     for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
                     {
-                        if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
+                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
                         {
                             if (builtinFunction.ParameterTypes[i] != builtinType)
                             { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
@@ -327,7 +327,6 @@ namespace IngameCoding.BBCode.Compiler
                     {
                         ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                         CompiledAttributes = attributes,
-                        References = new List<DefinitionReference>(),
                     };
                 }
 
@@ -341,7 +340,52 @@ namespace IngameCoding.BBCode.Compiler
                 )
             {
                 CompiledAttributes = attributes,
-                References = new List<DefinitionReference>(),
+            };
+        }
+
+        CompiledOperator CompileOperator(FunctionDefinition function)
+        {
+            Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
+
+            CompiledType type = new(function.Type, GetCustomType);
+
+            if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
+            {
+                if (BuiltinFunctions.TryGetValue(builtinFunctionName, out var builtinFunction))
+                {
+                    if (builtinFunction.ParameterCount != function.Parameters.Length)
+                    { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
+                    if (builtinFunction.ReturnSomething != (type != "void"))
+                    { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
+
+                    for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
+                    {
+                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
+                        {
+                            if (builtinFunction.ParameterTypes[i] != builtinType)
+                            { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        }
+                        else
+                        { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                    }
+
+                    return new CompiledOperator(type, function)
+                    {
+                        ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
+                        CompiledAttributes = attributes,
+                    };
+                }
+
+                Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, function.FilePath));
+            }
+
+            return new CompiledOperator(
+                type,
+                CompileTypes(function.Parameters, GetCustomType),
+                function
+                )
+            {
+                CompiledAttributes = attributes,
             };
         }
 
@@ -351,10 +395,7 @@ namespace IngameCoding.BBCode.Compiler
                 baseType,
                 CompileTypes(function.Parameters, GetCustomType),
                 function
-                )
-            {
-                References = new List<DefinitionReference>(),
-            };
+                );
         }
 
         CompiledEnum CompileEnum(EnumDefinition @enum)
@@ -518,7 +559,7 @@ namespace IngameCoding.BBCode.Compiler
                             Type[] parameterTypes = new Type[bfParams.Length];
                             for (int i = 0; i < bfParams.Length; i++)
                             {
-                                if (CodeGeneratorBase.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
+                                if (Constants.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
                                 {
                                     parameterTypes[i] = paramType;
 
@@ -702,11 +743,11 @@ namespace IngameCoding.BBCode.Compiler
             #region Compile Operators
 
             {
-                List<CompiledFunction> compiledOperators = new();
+                List<CompiledOperator> compiledOperators = new();
 
                 foreach (var function in Operators)
                 {
-                    CompiledFunction compiledFunction = CompileFunction(function);
+                    CompiledOperator compiledFunction = CompileOperator(function);
 
                     if (compiledOperators.ContainsSameDefinition(compiledFunction))
                     { throw new CompilerException($"Operator '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }

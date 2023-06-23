@@ -12,11 +12,25 @@ namespace IngameCoding.BBCode
     public class TypeInstance : IEquatable<TypeInstance>
     {
         public Token Identifier;
+        public List<TypeInstance> GenericTypes;
 
         public TypeInstance(Token identifier) : base()
         {
             this.Identifier = identifier;
+            this.GenericTypes = new List<TypeInstance>();
         }
+
+        public Position Position
+        {
+            get
+            {
+                Position result = Identifier.GetPosition();
+                for (int i = 0; i < GenericTypes.Count; i++)
+                { result.Extend(GenericTypes[i].Position); }
+                return result;
+            }
+        }
+
         public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string> typeDefinitionReplacer)
             => TypeInstance.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
         public static TypeInstance CreateAnonymous(string name, Func<string, string> typeDefinitionReplacer)
@@ -2145,94 +2159,71 @@ namespace IngameCoding.BBCode
 
                 possibleType.AnalysedType = TokenAnalysedType.Keyword;
 
-                TypeInstance newType = null;
-
-                if (!types.Contains(possibleType.Content))
+                if (possibleType.Content == "any")
                 {
-                    if (newType == null && possibleType.Content == "any")
+                    if (!allowAnyKeyword)
                     {
-                        if (allowAnyKeyword)
-                        {
-                            newType = new TypeInstance(possibleType);
-                        }
-                        else
-                        {
-                            Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
-                        }
+                        Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
+                        return null;
                     }
 
-                    if (newType == null && possibleType.Content == "var")
+                    return new TypeInstance(possibleType);
+                }
+
+                if (possibleType.Content == "var")
+                {
+                    if (!allowVarKeyword)
                     {
-                        if (allowVarKeyword)
-                        {
-                            newType = new TypeInstance(possibleType);
-                        }
-                        else
-                        {
-                            Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
-                        }
+                        Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
+                        return null;
                     }
 
-                    if (newType == null)
-                    {
-                        if (TryGetStruct(possibleType.Content, out var s))
-                        {
-                            newType = new TypeInstance(possibleType);
-                            newType.Identifier.AnalysedType = TokenAnalysedType.Struct;
-                        }
-                        else if (TryGetClass(possibleType.Content, out var c))
-                        {
-                            newType = new TypeInstance(possibleType);
-                            newType.Identifier.AnalysedType = TokenAnalysedType.Class;
-                        }
-                        else
-                        {
-                            newType = new TypeInstance(possibleType);
-                            // warning = new Warning($"Type '{possibleType.Content}' not found", possibleType);
-                        }
-                    }
+                    return new TypeInstance(possibleType);
+                }
 
-                    if (newType == null)
-                    { return null; }
+                TypeInstance newType = new(possibleType);
+
+                if (types.Contains(possibleType.Content))
+                {
+
+                    newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType;
                 }
                 else
                 {
-                    newType = new TypeInstance(possibleType);
-                    newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType;
+                    if (TryGetStruct(possibleType.Content, out _))
+                    { newType.Identifier.AnalysedType = TokenAnalysedType.Struct; }
+                    else if (TryGetClass(possibleType.Content, out _))
+                    { newType.Identifier.AnalysedType = TokenAnalysedType.Class; }
                 }
 
-                while (ExpectOperator("[", out var listToken0))
+                if (ExpectOperator("<"))
                 {
-                    if (ExpectOperator("]", out var listToken1))
+                    while (true)
                     {
-                        // newType = new TypeToken(newType.Content, newType, newType);
-                        Errors.Add(new Error($"Lists aren't supported as built-in feature", new Position(listToken0, listToken1)));
+                        var type = ExpectType(false, false);
+                        if (type == null)
+                        { throw new SyntaxException($"Expected type as generic parameter", CurrentToken); }
+
+                        newType.GenericTypes.Add(type);
+
+                        if (ExpectOperator(">"))
+                        { break; }
+
+                        if (ExpectOperator(","))
+                        { continue; }
                     }
-                    else
-                    { currentTokenIndex = parseStart; return null; }
                 }
 
-                // tokens[currentTokenIndex - 1] = newType;
+                if (ExpectOperator("[", out var listToken0))
+                { Errors.Add(new Error($"Lists aren't supported as built-in feature", new Position(listToken0))); }
 
                 return newType;
             }
 
             bool TryGetStruct(string name, out StructDefinition @struct)
-            {
-                if (Structs.TryGetValue(name, out @struct))
-                {
-                    return true;
-                }
-                return false;
-            }
+                => Structs.TryGetValue(name, out @struct);
             bool TryGetClass(string name, out ClassDefinition @class)
-            {
-                if (Classes.TryGetValue(name, out @class))
-                {
-                    return true;
-                }
-                return false;
-            }
+                => Classes.TryGetValue(name, out @class);
 
             #endregion
         }

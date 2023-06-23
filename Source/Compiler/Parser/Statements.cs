@@ -50,8 +50,8 @@ namespace IngameCoding.BBCode.Parser.Statements
             }
             else if (st is Statement_Literal)
             { }
-            else if (st is Statement_Variable variable)
-            { if (variable.ListIndex != null) return GetAllStatement(variable.ListIndex, callback); }
+            else if (st is Statement_Variable)
+            { }
             else if (st is Statement_WhileLoop whileLoop)
             { return GetAllStatement(whileLoop.Condition, callback); }
             else if (st is Statement_ForLoop forLoop)
@@ -657,32 +657,20 @@ namespace IngameCoding.BBCode.Parser.Statements
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_Variable : StatementWithReturnValue
     {
-        /// <summary> Used for: Only for lists! This is the value between "[]" </summary>
-        public Statement ListIndex;
         public Token VariableName;
 
         public override string ToString()
-        {
-            return $"{VariableName.Content}{((ListIndex != null) ? "[...]" : "")}";
-        }
+            => $"{VariableName.Content}";
 
         public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{VariableName.Content}{((ListIndex != null) ? $"[{ListIndex.PrettyPrint()}]" : "")}";
-        }
+            => $"{" ".Repeat(ident)}{VariableName.Content}";
 
         public Statement_Variable()
         {
-            this.ListIndex = null;
+
         }
 
-        public override Position TotalPosition()
-        {
-            Position result = new(VariableName);
-            if (ListIndex != null)
-            { result.Extend(ListIndex.TotalPosition()); }
-            return result;
-        }
+        public override Position TotalPosition() => new Position(VariableName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Statement_MemoryAddressGetter : StatementWithReturnValue

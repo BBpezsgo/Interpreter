@@ -422,3 +422,24 @@ export void CopyString(String from, String to)
         to.Set(i, from.At(i));
     };
 }
+
+export int Random(int state)
+{
+	// Precomputed parameters for Schrage's method
+	int M = 0x7fffffff;
+	int A = 48271;
+	int Q = M / A;    // 44488
+	int R = M % A;    //  3399
+
+	int div = state / Q;	// max: M / Q = A = 48,271
+	int rem = state % Q;	// max: Q - 1     = 44,487
+
+	int s = rem * A;	// max: 44,487 * 48,271 = 2,147,431,977 = 0x7fff3629
+	int t = div * R;	// max: 48,271 *  3,399 =   164,073,129
+	int result = s - t;
+
+	if (result < 0)
+    { result += M; };
+    
+	return result;
+}

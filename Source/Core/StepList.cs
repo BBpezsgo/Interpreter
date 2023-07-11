@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     internal class StepList<T>
     {

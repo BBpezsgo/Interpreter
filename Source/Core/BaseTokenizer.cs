@@ -1,8 +1,8 @@
-﻿namespace IngameCoding.Tokenizer
+﻿namespace ProgrammingLanguage.Tokenizer
 {
     using Core;
 
-    public class BaseToken
+    public class BaseToken : IThingWithPosition
     {
         public Range<SinglePosition> Position;
         public Range<int> AbsolutePosition;

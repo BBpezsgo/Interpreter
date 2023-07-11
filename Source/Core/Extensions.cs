@@ -1,12 +1,12 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.BBCode.Compiler;
-using IngameCoding.Bytecode;
-using IngameCoding.Tokenizer;
+﻿using ProgrammingLanguage.BBCode;
+using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Tokenizer;
 
 using System.Collections.Generic;
 using System.Text;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     public static class Extensions
     {

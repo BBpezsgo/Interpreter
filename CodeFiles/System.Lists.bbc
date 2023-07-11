@@ -6,13 +6,6 @@ class Array
     private int capacity;
     int length;
 
-    export int ElementAt(int index)
-    {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; };
-        return *(this.pointer + index);
-    }
-
     export void Push(int value)
     {
         if (this.length >= this.capacity)
@@ -40,17 +33,10 @@ class Array
   
         for (int i = this.length - 1; i >= index; i--)
         {
-            *(this.pointer + i + 1) = this.ElementAt(i);
+            *(this.pointer + i + 1) = this[i];
         };
         *(this.pointer + index) = element;
         this.length++;
-    }
-
-    export void Set(int index, int element)
-    {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; };
-        *(this.pointer + index) = element;
     }
 
     export void RemoveAt(int index)
@@ -60,7 +46,7 @@ class Array
   
         for (int i = index; i < this.length - 1; i++)
         {
-            *(this.pointer + i) = this.ElementAt(i + 1);
+            *(this.pointer + i) = this[i + 1];
         };
         this.length--;
         *(this.pointer + this.length) = 0;
@@ -75,37 +61,51 @@ class Array
             if (i > 0) {
                 result = result + ", ";
             };
-            int element = this.ElementAt(i);
+            int element = this[i];
             result = result + element.ToString();
         };
         return "{ " + result + " }";
     }
+    
+    export int indexer_get(int index)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        return *(this.pointer + index);
+    }
+
+    export void indexer_set(int index, int value)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        *(this.pointer + index) = value;
+    }
+    
+    export constructor(int length, int capacity)
+    {
+        Array result = new Array;
+        result.pointer = Alloc(capacity);
+        result.capacity = capacity;
+        result.length = length;
+        for (int i = 0; i < length; i++)
+        {
+            *(result.pointer + i) = i;
+        };
+        if (length < capacity)
+        {
+            for (int i = length; i < capacity; i++)
+            {
+                *(result.pointer + i) = 0;
+            };
+        };
+        return result;
+    }
 
     export destructor()
     {
-        Dealloc(this.pointer, this.capacity);
-        Dealloc(&this, sizeof(this));
+        delete this.pointer;
+        delete &this;
     }
-}
-
-export Array CreateArray(int length, int capacity)
-{
-  Array result = new Array;
-  result.pointer = Alloc(capacity);
-  result.capacity = capacity;
-  result.length = length;
-  for (int i = 0; i < length; i++)
-  {
-    *(result.pointer + i) = i;
-  };
-  if (length < capacity)
-  {
-    for (int i = length; i < capacity; i++)
-    {
-      *(result.pointer + i) = 0;
-    };
-  };
-  return result;
 }
 
 class Map
@@ -152,28 +152,28 @@ class Map
         return "{ " + result + " }";
     }
 
+    export constructor(int width, int height)
+    {
+        int length = height * width;
+        Map result = new Map;
+        result.pointer = Alloc(length);
+        result.length = length;
+        result.width = width;
+        for (int i = 0; i < length; i++)
+        {
+            *(result.pointer + i) = 0;
+        };
+        return result;
+    }
+
     export destructor()
     {
-        Dealloc(this.pointer, this.length);
-        Dealloc(&this, sizeof(this));
+        delete this.pointer;
+        delete &this;
     }
 
     export bool OutOf(int x, int y)
     {
-      return (x < 0 || y < 0 || x > this.width || y > (this.length / this.width));
+        return (x < 0 || y < 0 || x > this.width || y > (this.length / this.width));
     }
-}
-
-export Map CreateMap(int width, int height)
-{
-  int length = height * width;
-  Map result = new Map;
-  result.pointer = Alloc(length);
-  result.length = length;
-  result.width = width;
-  for (int i = 0; i < length; i++)
-  {
-    *(result.pointer + i) = 0;
-  };
-  return result;
 }

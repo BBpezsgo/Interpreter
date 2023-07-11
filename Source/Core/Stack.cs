@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     internal class Stack<T> : IReadOnlyStack<T>
     {

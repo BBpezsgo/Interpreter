@@ -1,15 +1,15 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.BBCode.Compiler;
-using IngameCoding.Bytecode;
-using IngameCoding.Core;
-using IngameCoding.Errors;
+﻿using ProgrammingLanguage.BBCode;
+using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Core;
+using ProgrammingLanguage.Errors;
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace IngameCoding.Tester
+namespace ProgrammingLanguage.Tester
 {
     class Tester
     {

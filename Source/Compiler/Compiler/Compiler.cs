@@ -3,20 +3,20 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using Bytecode;
+    using ProgrammingLanguage.Bytecode;
 
-    using Core;
+    using ProgrammingLanguage.Core;
 
     using DataUtilities.Serializer;
 
-    using Errors;
+    using ProgrammingLanguage.Errors;
 
-    using IngameCoding.BBCode.Analysis;
+    using ProgrammingLanguage.BBCode.Analysis;
 
-    using Parser;
-    using Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
 
     public class Compiler
     {

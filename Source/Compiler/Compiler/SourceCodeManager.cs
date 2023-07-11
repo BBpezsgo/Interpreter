@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     internal class SourceCodeManager
     {

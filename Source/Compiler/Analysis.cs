@@ -1,11 +1,11 @@
 ﻿
-namespace IngameCoding.BBCode.Analysis
+namespace ProgrammingLanguage.BBCode.Analysis
 {
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     using System.Collections.Generic;
     using System.IO;

@@ -1,11 +1,11 @@
-﻿using IngameCoding.BBCode.Compiler;
-using IngameCoding.Bytecode;
-using IngameCoding.Errors;
+﻿using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Errors;
 
 using System;
 using System.IO;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     /// <summary>
     /// A simpler form of <see cref="Interpreter"/><br/>

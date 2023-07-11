@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.Bytecode
+namespace ProgrammingLanguage.Bytecode
 {
-    using IngameCoding.Core;
+    using ProgrammingLanguage.Core;
 
     internal class DataStack : Stack<DataItem>
     {

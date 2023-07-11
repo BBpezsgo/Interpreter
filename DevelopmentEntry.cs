@@ -17,18 +17,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test18.bbc";
-
-            if (false)
-            {
-                ConsoleGUI.ConsoleGUI consoleGUI = new()
-                {
-                    FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}")
-                };
-                consoleGUI.Start();
-
-                return true;
-            }
+            var file = "donught.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -46,7 +35,7 @@ namespace TheProgram
                 // "-decompile",
                 // "-compile",
                 // "-debug",
-                 "-console-gui",
+                // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
                 "-heap 64",
@@ -65,49 +54,6 @@ namespace TheProgram
             var settings = ArgumentParser.Parse(args);
             if (!settings.HasValue) return true;
 
-            /*
-            IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
-            {
-                "-throw-errors",
-                "-basepath \"../CodeFiles/\"",
-                "-dont-optimize",
-                "-compile",
-                "\".\\output.txt\"",
-                "-compiler-type", "readable",
-                $"\"{TestConstants.TestFilesPath}{file}\""
-            }).Value);
-            IngameCoding.Core.EasyInterpreter.RunCompiledFile(ArgumentParser.Parse(new string[]
-            {
-                "-throw-errors",
-                "-basepath \"../CodeFiles/\"",
-                "-dont-optimize",
-                "-decompile",
-                "-compiler-type", "readable",
-                "\".\\output.txt\"",
-            }).Value);
-            IngameCoding.CompileIntoFile.Compile(ArgumentParser.Parse(new string[]
-            {
-                "-throw-errors",
-                "-basepath \"../CodeFiles/\"",
-                "-dont-optimize",
-                "-compile",
-                "\".\\output.bin\"",
-                "-compression", "no",
-                "-compiler-type", "binary",
-                $"\"{TestConstants.TestFilesPath}{file}\""
-            }).Value);
-            IngameCoding.Core.EasyInterpreter.RunCompiledFile(ArgumentParser.Parse(new string[]
-            {
-                "-throw-errors",
-                "-basepath \"../CodeFiles/\"",
-                "-dont-optimize",
-                "-decompile",
-                "-compiler-type", "binary",
-                "\".\\output.bin\"",
-            }).Value);
-            return true;
-            */
-
             switch (settings.Value.RunType)
             {
                 case ArgumentParser.RunType.ConsoleGUI:
@@ -119,20 +65,16 @@ namespace TheProgram
                     { gui.Tick(); }
                     return true;
                 case ArgumentParser.RunType.Debugger:
-                    // unused = new Debugger(settings.Value);
                     throw new NotImplementedException();
-                    // return true;
                 case ArgumentParser.RunType.Tester:
-                    IngameCoding.Tester.Tester.RunTestFile(settings.Value);
+                    ProgrammingLanguage.Tester.Tester.RunTestFile(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    IngameCoding.Core.EasyInterpreter.Run(settings.Value);
+                    ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    // IngameCoding.CompileIntoFile.Compile(settings.Value);
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Decompile:
-                    // IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
                     throw new NotImplementedException();
             }
 

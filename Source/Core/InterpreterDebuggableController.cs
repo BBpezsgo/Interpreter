@@ -1,10 +1,10 @@
-﻿using IngameCoding.Bytecode;
+﻿using ProgrammingLanguage.Bytecode;
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     public readonly struct Record<T>
     {

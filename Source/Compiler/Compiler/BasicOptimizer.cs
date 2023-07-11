@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using IngameCoding.Bytecode;
+    using ProgrammingLanguage.Bytecode;
 
     internal class BasicOptimizer
     {

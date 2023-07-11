@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.Bytecode
+namespace ProgrammingLanguage.Bytecode
 {
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     public readonly struct CallStackFrame
     {

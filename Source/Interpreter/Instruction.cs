@@ -3,7 +3,7 @@ using DataUtilities.Serializer;
 
 using System;
 
-namespace IngameCoding.Bytecode
+namespace ProgrammingLanguage.Bytecode
 {
     public enum AddressingMode : byte
     {

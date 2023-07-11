@@ -1,4 +1,4 @@
-﻿namespace IngameCoding.Core
+﻿namespace ProgrammingLanguage.Core
 {
     public struct FileExtensions
     {

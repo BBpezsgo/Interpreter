@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.BBCode
+namespace ProgrammingLanguage.BBCode
 {
-    using IngameCoding.BBCode.Analysis;
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
-    using IngameCoding.Tokenizer;
+    using ProgrammingLanguage.BBCode.Analysis;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
+    using ProgrammingLanguage.Tokenizer;
 
     public enum TokenType
     {

@@ -1,4 +1,4 @@
-﻿namespace IngameCoding.Bytecode
+﻿namespace ProgrammingLanguage.Bytecode
 {
     public enum Opcode : byte
     {

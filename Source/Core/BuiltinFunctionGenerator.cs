@@ -1,10 +1,10 @@
-﻿using IngameCoding.Bytecode;
-using IngameCoding.Errors;
+﻿using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Errors;
 
 using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     public class BuiltinFunction : BBCode.Compiler.IElementWithKey<string>
     {

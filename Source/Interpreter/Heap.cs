@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Linq;
 
-namespace IngameCoding.Bytecode
+namespace ProgrammingLanguage.Bytecode
 {
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.Errors;
 
     using System.Collections.Generic;
 

@@ -5,8 +5,8 @@ using System.IO;
 
 namespace ConsoleGUI
 {
-    using IngameCoding.Core;
-    using IngameCoding.Output.Debug;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Output.Debug;
 
     internal sealed class InterpreterElement : WindowElement
     {
@@ -44,7 +44,7 @@ namespace ConsoleGUI
             HasBorder = false;
         }
 
-        public InterpreterElement(string file, IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : this()
+        public InterpreterElement(string file, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.BBCode.Parser.ParserSettings parserSettings, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : this()
         {
             this.File = file;
             SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors);
@@ -224,8 +224,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpreter() => SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings.Default, IngameCoding.BBCode.Parser.ParserSettings.Default, IngameCoding.Bytecode.BytecodeInterpreterSettings.Default, false);
-        void SetupInterpreter(IngameCoding.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, IngameCoding.BBCode.Parser.ParserSettings parserSettings, IngameCoding.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
+        void SetupInterpreter() => SetupInterpreter(ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings.Default, ProgrammingLanguage.BBCode.Parser.ParserSettings.Default, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings.Default, false);
+        void SetupInterpreter(ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.BBCode.Parser.ParserSettings parserSettings, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
             this.InterpreterTimer = new MainThreadTimer(200);
             this.InterpreterTimer.Elapsed += () =>
@@ -249,11 +249,11 @@ namespace ConsoleGUI
 
             Interpreter.OnOutput += (sender, message, logType) => ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
             {
-                IngameCoding.Output.LogType.System => CharColors.FgDefault,
-                IngameCoding.Output.LogType.Normal => CharColors.FgDefault,
-                IngameCoding.Output.LogType.Warning => CharColors.FgYellow,
-                IngameCoding.Output.LogType.Error => CharColors.FgRed,
-                IngameCoding.Output.LogType.Debug => CharColors.FgGray,
+                ProgrammingLanguage.Output.LogType.System => CharColors.FgDefault,
+                ProgrammingLanguage.Output.LogType.Normal => CharColors.FgDefault,
+                ProgrammingLanguage.Output.LogType.Warning => CharColors.FgYellow,
+                ProgrammingLanguage.Output.LogType.Error => CharColors.FgRed,
+                ProgrammingLanguage.Output.LogType.Debug => CharColors.FgGray,
                 _ => CharColors.FgDefault,
             }));
 
@@ -272,7 +272,7 @@ namespace ConsoleGUI
 
                 if (compiledCode != null)
                 {
-                    Interpreter.ExecuteProgram(compiledCode, new IngameCoding.Bytecode.BytecodeInterpreterSettings()
+                    Interpreter.ExecuteProgram(compiledCode, new ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings()
                     {
                         ClockCyclesPerUpdate = 1,
                         InstructionLimit = interpreterSettings.InstructionLimit,
@@ -292,19 +292,19 @@ namespace ConsoleGUI
 
             sender.DrawBuffer.ResetColor();
 
-            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
             List<int> loadIndicators = new();
             List<int> storeIndicators = new();
 
             if (instruction != null)
             {
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.CS_POP)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.CS_POP)
                 {
                     loadIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length - 1);
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.CS_PUSH)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.CS_PUSH)
                 {
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length);
                 }
@@ -313,7 +313,7 @@ namespace ConsoleGUI
             int i;
             for (i = 0; i < this.Interpreter.Details.Interpreter.CallStack.Length; i++)
             {
-                IngameCoding.Bytecode.CallStackFrame frame = new(this.Interpreter.Details.Interpreter.CallStack[i]);
+                ProgrammingLanguage.Bytecode.CallStackFrame frame = new(this.Interpreter.Details.Interpreter.CallStack[i]);
 
                 sender.DrawBuffer.ForegroundColor = CharColors.FgGray;
                 sender.DrawBuffer.AddText(" ");
@@ -582,26 +582,26 @@ namespace ConsoleGUI
 
             b.ResetColor();
 
-            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
             List<int> loadIndicators = new();
             List<int> storeIndicators = new();
 
             if (instruction != null)
             {
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
                     { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
                     else
                     { storeIndicators.Add(instruction.ParameterInt); }
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET)
                 {
-                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
                     {
-                        if (this.Interpreter.Details.Interpreter.Stack[^1].type == IngameCoding.Bytecode.RuntimeType.INT)
+                        if (this.Interpreter.Details.Interpreter.Stack[^1].type == ProgrammingLanguage.Bytecode.RuntimeType.INT)
                         { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
                     }
                     else
@@ -613,13 +613,13 @@ namespace ConsoleGUI
             for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Size; i++)
             {
                 var item = this.Interpreter.Details.Interpreter.Heap[i];
-                bool isHeader = ((nextHeader == i) && (!this.Interpreter.Details.Interpreter.Heap[i].IsNull) && (this.Interpreter.Details.Interpreter.Heap is IngameCoding.Bytecode.HEAP));
+                bool isHeader = ((nextHeader == i) && (!this.Interpreter.Details.Interpreter.Heap[i].IsNull) && (this.Interpreter.Details.Interpreter.Heap is ProgrammingLanguage.Bytecode.HEAP));
                 (int, bool) header = (default, default);
 
                 if (isHeader)
                 {
-                    header = IngameCoding.Bytecode.HEAP.GetHeader(item);
-                    nextHeader += header.Item1 + IngameCoding.Bytecode.HEAP.BLOCK_HEADER_SIZE;
+                    header = ProgrammingLanguage.Bytecode.HEAP.GetHeader(item);
+                    nextHeader += header.Item1 + ProgrammingLanguage.Bytecode.HEAP.BLOCK_HEADER_SIZE;
                 }
 
                 bool addLoadIndicator = false;
@@ -683,19 +683,19 @@ namespace ConsoleGUI
                     {
                         switch (item.type)
                         {
-                            case IngameCoding.Bytecode.RuntimeType.BYTE:
+                            case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
                                 b.ForegroundColor = CharColors.FgCyan;
                                 b.AddText($"{item.ValueByte}");
                                 break;
-                            case IngameCoding.Bytecode.RuntimeType.INT:
+                            case ProgrammingLanguage.Bytecode.RuntimeType.INT:
                                 b.ForegroundColor = CharColors.FgCyan;
                                 b.AddText($"{item.ValueInt}");
                                 break;
-                            case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                            case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
                                 b.ForegroundColor = CharColors.FgCyan;
                                 b.AddText($"{item.ValueFloat}f");
                                 break;
-                            case IngameCoding.Bytecode.RuntimeType.CHAR:
+                            case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
                                 b.ForegroundColor = CharColors.FgYellow;
                                 b.AddText($"'{item.ValueChar.Escape()}'");
                                 break;
@@ -730,14 +730,14 @@ namespace ConsoleGUI
 
             b.ResetColor();
 
-            IngameCoding.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
 
             List<int> savedBasePointers = new();
 
             for (int j = 0; j < this.Interpreter.Details.Interpreter.Stack.Count; j++)
             {
                 var item = this.Interpreter.Details.Interpreter.Stack[j];
-                if (item.type != IngameCoding.Bytecode.RuntimeType.INT) continue;
+                if (item.type != ProgrammingLanguage.Bytecode.RuntimeType.INT) continue;
                 if (item.Tag != "saved base pointer") continue;
                 savedBasePointers.Add(item.ValueInt);
             }
@@ -749,41 +749,41 @@ namespace ConsoleGUI
 
             if (instruction != null)
             {
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE)
                 {
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == IngameCoding.Bytecode.AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
                     { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 2); }
                     else
                     { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1); }
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOAD_VALUE)
                 {
                     loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count);
                 }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.PUSH_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.GET_BASEPOINTER ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.PUSH_VALUE ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.GET_BASEPOINTER ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET)
                 { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count); }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.POP_VALUE)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.POP_VALUE)
                 { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1); }
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_ADD ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_DIV ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_MOD ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_MULT ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.MATH_SUB ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_AND ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.LOGIC_OR)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_ADD ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_DIV ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_MOD ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_MULT ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_SUB ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOGIC_AND ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOGIC_OR)
                 {
                     loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 1);
                     storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack.Count - 2);
@@ -856,19 +856,19 @@ namespace ConsoleGUI
                 {
                     switch (item.type)
                     {
-                        case IngameCoding.Bytecode.RuntimeType.BYTE:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{item.ValueByte}");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.INT:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.INT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{item.ValueInt}");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{item.ValueFloat}f");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.CHAR:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
                             b.ForegroundColor = CharColors.FgYellow;
                             b.AddText($"'{item.ValueChar.Escape()}'");
                             break;
@@ -975,7 +975,7 @@ namespace ConsoleGUI
             for (int i = 0; i < this.Interpreter.Details.Interpreter.CodePointer - 5; i++)
             {
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     { indent--; }
@@ -992,7 +992,7 @@ namespace ConsoleGUI
                 if (Interpreter.Details.Interpreter != null) if (Interpreter.Details.Interpreter.CodePointer == i) IsNextInstruction = true;
 
                 var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.COMMENT)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     {
@@ -1025,10 +1025,10 @@ namespace ConsoleGUI
                 b.AddText($"{instruction.opcode}");
                 b.AddText($" ");
 
-                if (instruction.opcode == IngameCoding.Bytecode.Opcode.LOAD_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_GET ||
-                    instruction.opcode == IngameCoding.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOAD_VALUE ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET ||
+                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
                 {
                     b.AddText($"{instruction.AddressingMode}");
                     b.AddText($" ");
@@ -1036,22 +1036,22 @@ namespace ConsoleGUI
 
                 if (!instruction.Parameter.IsNull) switch (instruction.Parameter.type)
                     {
-                        case IngameCoding.Bytecode.RuntimeType.BYTE:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{instruction.Parameter.ValueByte}");
                             b.AddText($" ");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.INT:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.INT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{instruction.Parameter.ValueInt}");
                             b.AddText($" ");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.FLOAT:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
                             b.ForegroundColor = CharColors.FgCyan;
                             b.AddText($"{instruction.Parameter.ValueFloat}f");
                             b.AddText($" ");
                             break;
-                        case IngameCoding.Bytecode.RuntimeType.CHAR:
+                        case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
                             b.ForegroundColor = CharColors.FgYellow;
                             b.AddText($"'{instruction.Parameter.ValueChar.Escape()}'");
                             b.AddText($" ");

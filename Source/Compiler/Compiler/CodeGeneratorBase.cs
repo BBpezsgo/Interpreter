@@ -1,13 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Bytecode;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.Bytecode;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     public static class Constants
     {
@@ -268,6 +268,64 @@ namespace IngameCoding.BBCode.Compiler
             return CompiledFunctions.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledFunction);
         }
 
+        protected bool GetIndexGetter(CompiledClass @class, out CompiledFunction compiledFunction)
+        {
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                var function = CompiledFunctions[i];
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != "indexer_get") continue;
+
+                compiledFunction = function;
+
+                if (function.ParameterTypes.Length != 2)
+                { throw new CompilerException($"Method \"{"indexer_get"}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{"indexer_get"}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (!function.ReturnSomething)
+                { throw new CompilerException($"Method \"{"indexer_get"}\" should return something", function.TypeToken, function.FilePath); }
+
+                return true;
+            }
+
+            compiledFunction = null;
+            return false;
+        }
+
+        protected bool GetIndexSetter(CompiledClass @class, CompiledType elementType, out CompiledFunction compiledFunction)
+        {
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                var function = CompiledFunctions[i];
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != "indexer_set") continue;
+
+                if (function.ParameterTypes.Length < 3)
+                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[2] != elementType)
+                { continue; }
+
+                if (function.ParameterTypes.Length > 3)
+                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                compiledFunction = function;
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ReturnSomething)
+                { throw new CompilerException($"Method \"{"indexer_set"}\" should not return anything", function.TypeToken, function.FilePath); }
+
+                return true;
+            }
+
+            compiledFunction = null;
+            return false;
+        }
+
         bool GetFunction(string name, out CompiledFunction compiledFunction)
         {
             compiledFunction = null;
@@ -466,6 +524,18 @@ namespace IngameCoding.BBCode.Compiler
 
             throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
+        protected CompiledType FindStatementType(Statement_Index index)
+        {
+            CompiledType prevType = FindStatementType(index.PrevStatement);
+
+            if (!prevType.IsClass)
+            { throw new CompilerException($"Index getter for type \"{prevType.Name}\" not found", index, CurrentFile); }
+
+            if (!GetIndexGetter(prevType.Class, out CompiledFunction indexer))
+            { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
+            
+            return indexer.Type;
+        }
         protected CompiledType FindStatementType(Statement_FunctionCall functionCall)
         {
             if (functionCall.FunctionName == "Dealloc") return new CompiledType(Type.VOID);
@@ -658,6 +728,9 @@ namespace IngameCoding.BBCode.Compiler
             if (statement is Statement_KeywordCall keywordCall)
             { return FindStatementType(keywordCall); }
 
+            if (statement is Statement_Index index)
+            { return FindStatementType(index); }
+
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
         }
         #endregion
@@ -715,6 +788,7 @@ namespace IngameCoding.BBCode.Compiler
 
             return leftValue;
         }
+
         protected DataItem? PredictStatementValue(Statement_Literal literal)
             => literal.Type switch
             {
@@ -724,6 +798,23 @@ namespace IngameCoding.BBCode.Compiler
                 LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
                 _ => throw new NotImplementedException($"This should never occur"),
             };
+
+        protected DataItem? PredictStatementValue(Statement_KeywordCall keywordCall)
+        {
+            if (keywordCall.FunctionName == "sizeof")
+            {
+                if (keywordCall.Parameters.Length != 1)
+                { return null; }
+
+                StatementWithReturnValue param0 = keywordCall.Parameters[0];
+                CompiledType param0Type = FindStatementType(param0);
+
+                return new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
+            }
+
+            return null;
+        }
+
         protected DataItem? PredictStatementValue(StatementWithReturnValue st)
         {
             if (st is Statement_Literal literal)
@@ -731,6 +822,9 @@ namespace IngameCoding.BBCode.Compiler
 
             if (st is Statement_Operator @operator)
             { return PredictStatementValue(@operator); }
+
+            if (st is Statement_KeywordCall keywordCall)
+            { return PredictStatementValue(keywordCall); }
 
             return null;
         }

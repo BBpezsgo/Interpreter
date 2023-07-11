@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.BBCode.Parser
+namespace ProgrammingLanguage.BBCode.Parser
 {
-    using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Core;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.Core;
 
     public enum LiteralType
     {

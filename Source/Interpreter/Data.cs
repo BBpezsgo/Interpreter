@@ -1,9 +1,9 @@
 ﻿using System;
 
-namespace IngameCoding.Bytecode
+namespace ProgrammingLanguage.Bytecode
 {
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     public enum RuntimeType : byte
     {

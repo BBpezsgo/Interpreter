@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.Errors;
 
     internal class UnusedFunctionManager : CodeGeneratorBase
     {

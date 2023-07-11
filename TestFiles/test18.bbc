@@ -1,9 +1,11 @@
+
+
 [CodeEntry]
 void Start()
 {
 	var func = Yes;
 
-	func(4);
+	func();
 }
 
 void Yes()
@@ -11,7 +13,7 @@ void Yes()
 	*Alloc(1) = 3;
 }
 
-void Yes(int v)
+void Yes2(int v)
 {
 	*Alloc(1) = v;
 }

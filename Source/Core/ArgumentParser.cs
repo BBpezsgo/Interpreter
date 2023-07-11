@@ -3,10 +3,10 @@ using System.Linq;
 
 namespace TheProgram
 {
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.Bytecode;
-    using IngameCoding.Output;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.Bytecode;
+    using ProgrammingLanguage.Output;
 
     using System.Collections.Generic;
     using System.IO.Compression;

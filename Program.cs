@@ -17,20 +17,16 @@
                     System.Console.ResetColor();
                     return;
                 case ArgumentParser.RunType.Debugger:
-                    // unused = new Debugger(settings.Value);
                     throw new System.NotImplementedException();
-                    // return;
                 case ArgumentParser.RunType.Tester:
-                    IngameCoding.Tester.Tester.RunTestFile(settings.Value);
+                    ProgrammingLanguage.Tester.Tester.RunTestFile(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    IngameCoding.Core.EasyInterpreter.Run(settings.Value);
+                    ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    // IngameCoding.CompileIntoFile.Compile(settings.Value);
                     throw new System.NotImplementedException();
                 case ArgumentParser.RunType.Decompile:
-                    // IngameCoding.Core.EasyInterpreter.RunCompiledFile(settings.Value);
                     throw new System.NotImplementedException();
             }
 

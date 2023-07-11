@@ -1,7 +1,7 @@
-﻿namespace IngameCoding.BBCode.Analysis
+﻿namespace ProgrammingLanguage.BBCode.Analysis
 {
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
 
     public static class Extensions
     {

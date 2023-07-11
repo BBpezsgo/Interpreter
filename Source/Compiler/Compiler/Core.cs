@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace IngameCoding.BBCode
+namespace ProgrammingLanguage.BBCode
 {
     public static class Utils
     {
@@ -9,12 +9,12 @@ namespace IngameCoding.BBCode
     }
 }
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
     using Bytecode;
 
-    using IngameCoding.Core;
-    using IngameCoding.Tokenizer;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Tokenizer;
 
     using Parser;
     using Parser.Statements;
@@ -410,6 +410,9 @@ namespace IngameCoding.BBCode.Compiler
 
         public Statement_FunctionCall CallStatement;
         public Statement_Variable VariableStatement;
+        public Statement_Index IndexStatement;
+        public bool IsSetter;
+
         public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
         internal string CurrentFile;
@@ -419,6 +422,8 @@ namespace IngameCoding.BBCode.Compiler
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
             this.VariableStatement = null;
+            this.IndexStatement = null;
+            this.IsSetter = false;
 
             this.currentParameters = new();
             this.currentVariables = new();
@@ -435,6 +440,26 @@ namespace IngameCoding.BBCode.Compiler
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
             this.VariableStatement = variable;
+            this.IndexStatement = null;
+            this.IsSetter = false;
+
+            this.currentParameters = new();
+            this.currentVariables = new();
+
+            foreach (var item in currentParameters)
+            { this.currentParameters.Add(item); }
+            foreach (var item in currentVariables)
+            { this.currentVariables.Add(item.Key, item.Value); }
+            this.CurrentFile = file;
+        }
+
+        public UndefinedFunctionOffset(int callInstructionIndex, Statement_Index index, bool isSetter, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        {
+            this.CallInstructionIndex = callInstructionIndex;
+            this.CallStatement = null;
+            this.VariableStatement = null;
+            this.IndexStatement = index;
+            this.IsSetter = isSetter;
 
             this.currentParameters = new();
             this.currentVariables = new();
@@ -758,7 +783,7 @@ namespace IngameCoding.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_FunctionCall>
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_FunctionCall>, IReferenceable<Statement_Index>
     {
         public CompiledType[] ParameterTypes;
 
@@ -772,8 +797,8 @@ namespace IngameCoding.BBCode.Compiler
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
-        public IReadOnlyList<Statement_FunctionCall> ReferencesFunction => references;
-        readonly List<Statement_FunctionCall> references = new();
+        public IReadOnlyList<Statement> ReferencesFunction => references;
+        readonly List<Statement> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -833,6 +858,7 @@ namespace IngameCoding.BBCode.Compiler
         }
 
         public void AddReference(Statement_FunctionCall statement) => references.Add(statement);
+        public void AddReference(Statement_Index statement) => references.Add(statement);
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledFunction other)
@@ -1382,6 +1408,14 @@ namespace IngameCoding.BBCode.Compiler
             return a.Equals(b);
         }
         public static bool operator !=(CompiledType a, CompiledType b) => !(a == b);
+
+        public static bool operator ==(CompiledType a, Type b)
+        {
+            if (a is null) return false;
+            if (!a.IsBuiltin) return false;
+            return a.BuiltinType == b;
+        }
+        public static bool operator !=(CompiledType a, Type b) => !(a == b);
 
         public static bool operator ==(CompiledType a, TypeInstance b)
         {

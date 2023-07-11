@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.BBCode
+namespace ProgrammingLanguage.BBCode
 {
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
-    public class TypeInstance : IEquatable<TypeInstance>
+    public class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
     {
         public Token Identifier;
         public List<TypeInstance> GenericTypes;
@@ -25,11 +25,11 @@ namespace IngameCoding.BBCode
             get
             {
                 Position result = Identifier.GetPosition();
-                for (int i = 0; i < GenericTypes.Count; i++)
-                { result.Extend(GenericTypes[i].Position); }
+                result.Extend(GenericTypes);
                 return result;
             }
         }
+        public Position GetPosition() => Position;
 
         public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string> typeDefinitionReplacer)
             => TypeInstance.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
@@ -163,7 +163,7 @@ namespace IngameCoding.BBCode
             /// </summary>
             /// <param name="_tokens">
             /// The list of tokens<br/>
-            /// This should be generated using <see cref="IngameCoding.BBCode.Tokenizer"/>
+            /// This should be generated using <see cref="ProgrammingLanguage.BBCode.Tokenizer"/>
             /// </param>
             /// <param name="warnings">
             /// A list that the parser can fill with warnings
@@ -1051,21 +1051,19 @@ namespace IngameCoding.BBCode
 
             bool ExpectIndex(out Statement_Index statement)
             {
-                if (ExpectOperator("[", out var token0))
+                if (!ExpectOperator("[", out Token bracketLeft))
                 {
-                    var st = ExpectOneValue();
-                    if (ExpectOperator("]", out _))
-                    {
-                        statement = new Statement_Index(st);
-                        return true;
-                    }
-                    else
-                    {
-                        throw new SyntaxException("Unbalanced [", token0);
-                    }
+                    statement = null;
+                    return false;
                 }
-                statement = null;
-                return false;
+
+                StatementWithReturnValue expression = ExpectExpression();
+
+                if (!ExpectOperator("]", out Token bracketRight))
+                { throw new SyntaxException("Unbalanced [", bracketLeft); }
+
+                statement = new Statement_Index(expression);
+                return true;
             }
 
             /// <returns>
@@ -1129,19 +1127,21 @@ namespace IngameCoding.BBCode
                     if (instanceTypeName == null)
                     { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
 
-                    if (ExpectOperator("("))
+                    if (ExpectOperator("(", out Token bracketLeft))
                     {
                         Statement_ConstructorCall newStructStatement = new()
                         {
                             TypeName = instanceTypeName,
                             Keyword = newIdentifier,
+                            BracketLeft = bracketLeft,
                         };
 
                         bool expectParameter = false;
                         List<StatementWithReturnValue> parameters = new();
 
                         int endlessSafe = 0;
-                        while (!ExpectOperator(")") || expectParameter)
+                        Token bracketRight = null;
+                        while (!ExpectOperator(")", out bracketRight) || expectParameter)
                         {
                             StatementWithReturnValue parameter = ExpectExpression();
                             if (parameter == null)
@@ -1162,6 +1162,7 @@ namespace IngameCoding.BBCode
                             { throw new EndlessLoopException(); }
                         }
                         newStructStatement.Parameters = parameters.ToArray();
+                        newStructStatement.BracketRight = bracketRight;
 
                         returnStatement = newStructStatement;
                     }
@@ -1666,7 +1667,7 @@ namespace IngameCoding.BBCode
                 if (!ExpectIdentifier(out var possibleFunctionName))
                 { currentTokenIndex = startTokenIndex; return false; }
 
-                if (!ExpectOperator("("))
+                if (!ExpectOperator("(", out Token bracketLeft))
                 { currentTokenIndex = startTokenIndex; return false; }
 
                 possibleFunctionName.AnalysedType = TokenAnalysedType.FunctionName;
@@ -1674,13 +1675,15 @@ namespace IngameCoding.BBCode
                 methodCall = new()
                 {
                     Identifier = possibleFunctionName,
+                    BracketLeft = bracketLeft,
                 };
 
                 bool expectParameter = false;
 
                 List<StatementWithReturnValue> parameters = new();
                 int endlessSafe = 0;
-                while (!ExpectOperator(")") || expectParameter)
+                Token bracketRight = null;
+                while (!ExpectOperator(")", out bracketRight) || expectParameter)
                 {
                     StatementWithReturnValue parameter = ExpectExpression();
                     if (parameter == null)
@@ -1701,6 +1704,7 @@ namespace IngameCoding.BBCode
                     { throw new EndlessLoopException(); }
                 }
                 methodCall.Parameters = parameters.ToArray();
+                methodCall.BracketRight = bracketRight;
 
                 return true;
             }
@@ -1755,7 +1759,6 @@ namespace IngameCoding.BBCode
 
                 while (true)
                 {
-                    int parseStart = currentTokenIndex;
                     if (!ExpectOperator(new string[] {
                         "<<", ">>",
                         "+", "-", "*", "/", "%", "&", "|",
@@ -1766,7 +1769,7 @@ namespace IngameCoding.BBCode
 
                     if (rightStatement == null)
                     { throw new SyntaxException($"Expected OneValue after operator ('{op}'), got {CurrentToken}", CurrentToken); }
-
+                    
                     int rightSidePrecedence = OperatorPrecedence(op.Content);
 
                     Statement_Operator rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
@@ -1924,7 +1927,7 @@ namespace IngameCoding.BBCode
                 if (possibleFunctionName == null)
                 { currentTokenIndex = startTokenIndex; return null; }
 
-                if (!ExpectOperator("("))
+                if (!ExpectOperator("(", out Token bracketLeft))
                 { currentTokenIndex = startTokenIndex; return null; }
 
                 possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
@@ -1932,13 +1935,15 @@ namespace IngameCoding.BBCode
                 Statement_FunctionCall functionCall = new()
                 {
                     Identifier = possibleFunctionName,
+                    BracketLeft = bracketLeft,
                 };
 
                 bool expectParameter = false;
                 List<StatementWithReturnValue> parameters = new();
 
                 int endlessSafe = 0;
-                while (!ExpectOperator(")") || expectParameter)
+                Token bracketRight = null;
+                while (!ExpectOperator(")", out bracketRight) || expectParameter)
                 {
                     StatementWithReturnValue parameter = ExpectExpression();
                     if (parameter == null)
@@ -1959,6 +1964,7 @@ namespace IngameCoding.BBCode
                     { throw new EndlessLoopException(); }
                 }
                 functionCall.Parameters = parameters.ToArray();
+                functionCall.BracketRight = bracketRight;
 
                 return functionCall;
             }

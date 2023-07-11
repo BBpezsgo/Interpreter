@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
     /// <summary>
     /// <see href="https://stackoverflow.com/questions/6944056/compare-string-similarity/6944095#6944095"/>

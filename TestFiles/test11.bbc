@@ -4,10 +4,12 @@ using System.Lists;
 [CodeEntry]
 void Start()
 {
-  Array list = CreateArray(5, 10);
+  Array list = new Array(3, 5);
 
   PrintLineD(list.ToString());
-  list.Push(420);
+  // list.Push(420);
+
+  /*
   PrintLineD(list.ToString());
   list.Insert(1, 69);
   PrintLineD(list.ToString());
@@ -15,12 +17,15 @@ void Start()
   PrintLineD(list.ToString());
   list.RemoveAt(0);
   PrintLineD(list.ToString());
+  */
   
-  list.Deallocate();
+  delete list;
 
-  Map map = CreateMap(10, 10);
+  /*
+  Map map = new Map(10, 10);
   PrintLine(map.Get(5, 5));
   map.Set(4, 8, 333);
   PrintLine(map.Get(4, 8));
-  map.Deallocate();
+  delete map;
+  */
 }

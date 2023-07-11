@@ -1,13 +1,13 @@
-﻿using IngameCoding.BBCode.Compiler;
-using IngameCoding.BBCode.Parser;
-using IngameCoding.Core;
-using IngameCoding.Errors;
+﻿using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.BBCode.Parser;
+using ProgrammingLanguage.Core;
+using ProgrammingLanguage.Errors;
 
 using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace IngameCoding.BBCode
+namespace ProgrammingLanguage.BBCode
 {
     public class EasyCompiler
     {

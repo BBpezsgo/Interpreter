@@ -3,16 +3,16 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
-    using BBCode;
+    using ProgrammingLanguage.BBCode;
 
-    using Bytecode;
+    using ProgrammingLanguage.Bytecode;
 
-    using Errors;
+    using ProgrammingLanguage.Errors;
 
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.Output;
+    using ProgrammingLanguage.BBCode.Compiler;
+    using ProgrammingLanguage.Output;
 
     /// <summary>
     /// This compiles and runs the code
@@ -246,7 +246,7 @@ namespace IngameCoding.Core
             }
 
             public override string ToString() => $"Code executed in {ElapsedTime}";
-            public string ElapsedTime => IngameCoding.Utils.GetEllapsedTime(ElapsedMilliseconds);
+            public string ElapsedTime => ProgrammingLanguage.Utils.GetEllapsedTime(ElapsedMilliseconds);
         }
 
         protected readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
@@ -559,7 +559,7 @@ namespace IngameCoding.Core
         void PrintException(Exception error)
         {
             OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, LogType.Error);
-            IngameCoding.Output.Debug.Debug.LogError(error);
+            ProgrammingLanguage.Output.Debug.Debug.LogError(error);
 
             StackTrace stackTrace = new(error);
             var stackFrames = stackTrace.GetFrames();

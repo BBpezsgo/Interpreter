@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace IngameCoding.Tester.Parser.Statements
+namespace ProgrammingLanguage.Tester.Parser.Statements
 {
     using Core;
 

@@ -1,11 +1,17 @@
-﻿using IngameCoding.BBCode;
+﻿using ProgrammingLanguage.BBCode;
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 
-namespace IngameCoding.Core
+namespace ProgrammingLanguage.Core
 {
+    public interface IThingWithPosition
+    {
+        public Position GetPosition();
+    }
+
     public struct Position
     {
         public static Position UnknownPosition => new(-1);
@@ -45,20 +51,19 @@ namespace IngameCoding.Core
             AbsolutePosition = absolutePosition;
         }
 
-        public Position(params Token[] tokens)
+        public Position(params IThingWithPosition[] elements)
         {
-            if (tokens.Length == 0) throw new ArgumentException($"Array 'tokens' length is 0");
-            Start = tokens[0].Position.Start;
-            End = tokens[0].Position.End;
-            AbsolutePosition = tokens[0].AbsolutePosition;
+            if (elements.Length == 0) throw new ArgumentException($"Array {nameof(elements)} length is 0");
+            Start = elements[0].GetPosition().Start;
+            End = elements[0].GetPosition().End;
+            AbsolutePosition = elements[0].GetPosition().AbsolutePosition;
 
-            for (int i = 1; i < tokens.Length; i++)
-            {
-                Token token = tokens[i];
-                if (token == null) continue;
-                Extend(new Position(token.Position, token.AbsolutePosition));
-            }
+            for (int i = 1; i < elements.Length; i++)
+            { Extend(elements[i]); }
         }
+        public Position(IEnumerable<IThingWithPosition> elements)
+            : this((elements ?? throw new ArgumentNullException(nameof(elements))).ToArray())
+        { }
         internal void Extend(Position other)
         {
             if (Start.Line > other.Start.Line)
@@ -94,8 +99,26 @@ namespace IngameCoding.Core
 
         internal void Extend(Range<int> absolutePosition) => AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
         internal void Extend(int start, int end) => AbsolutePosition.Extend(start, end);
-        internal void Extend(Tokenizer.BaseToken token) => AbsolutePosition.Extend(token.AbsolutePosition);
-        internal void Extend(BBCode.Parser.Statements.Statement statement) => AbsolutePosition.Extend(statement.TotalPosition().AbsolutePosition);
+        internal void Extend(IThingWithPosition other)
+        {
+            if (other == null) return;
+            Extend(other.GetPosition());
+        }
+        internal void Extend(params IThingWithPosition[] elements)
+        {
+            if (elements == null) return;
+            if (elements.Length == 0) return;
+
+            for (int i = 0; i < elements.Length; i++)
+            { Extend(elements[i]); }
+        }
+        internal void Extend(IEnumerable<IThingWithPosition> elements)
+        {
+            if (elements == null) return;
+
+            foreach (IThingWithPosition element in elements)
+            { Extend(element); }
+        }
 
         public readonly string ToMinString()
         {

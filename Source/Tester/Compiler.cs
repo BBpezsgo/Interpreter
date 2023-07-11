@@ -1,11 +1,11 @@
-﻿using IngameCoding.BBCode;
-using IngameCoding.Core;
-using IngameCoding.Errors;
+﻿using ProgrammingLanguage.BBCode;
+using ProgrammingLanguage.Core;
+using ProgrammingLanguage.Errors;
 
 using System.Collections.Generic;
 using System.IO;
 
-namespace IngameCoding.Tester
+namespace ProgrammingLanguage.Tester
 {
     using Parser;
 

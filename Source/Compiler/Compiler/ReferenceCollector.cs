@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace IngameCoding.BBCode.Compiler
+namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using IngameCoding.BBCode.Parser;
-    using IngameCoding.BBCode.Parser.Statements;
-    using IngameCoding.Core;
-    using IngameCoding.Errors;
+    using ProgrammingLanguage.BBCode.Parser;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     internal class ReferenceCollector : CodeGeneratorBase
     {
@@ -126,6 +126,20 @@ namespace IngameCoding.BBCode.Compiler
             {
                 AnalyzeStatement(index.PrevStatement);
                 AnalyzeStatement(index.Expression);
+
+                CompiledType prevType = FindStatementType(index.PrevStatement);
+
+                if (!prevType.IsClass)
+                { return; }
+
+                if (!GetIndexGetter(prevType.Class, out CompiledFunction indexer))
+                { return; }
+
+                indexer.AddReference(index);
+
+                if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                { indexer.TimesUsed++; }
+                indexer.TimesUsedTotal++;
             }
             else if (statement is Statement_NewVariable newVariable)
             {
@@ -147,7 +161,28 @@ namespace IngameCoding.BBCode.Compiler
             }
             else if (statement is Statement_Setter setter)
             {
-                AnalyzeStatement(setter.Left);
+                if (setter.Left is Statement_Index indexSetter)
+                {
+                    AnalyzeStatement(indexSetter.PrevStatement);
+                    AnalyzeStatement(indexSetter.Expression);
+
+                    CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
+                    CompiledType valueType = FindStatementType(setter.Right);
+
+                    if (!prevType.IsClass)
+                    { return; }
+
+                    if (!GetIndexSetter(prevType.Class, valueType, out CompiledFunction indexer))
+                    { return; }
+
+                    indexer.AddReference(indexSetter);
+
+                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                    { indexer.TimesUsed++; }
+                    indexer.TimesUsedTotal++;
+                }
+                else
+                { AnalyzeStatement(setter.Left); }
                 AnalyzeStatement(setter.Right);
             }
             else if (statement is Statement_WhileLoop whileLoop)

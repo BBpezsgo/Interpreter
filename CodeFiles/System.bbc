@@ -397,8 +397,8 @@ class String
 
     export destructor()
     {
-        Dealloc(this.pointer, this.length);
-        Dealloc(&this, sizeof(this));
+        delete this.pointer;
+        delete &this;
     }
 }
 

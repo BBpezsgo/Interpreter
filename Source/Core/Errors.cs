@@ -3,11 +3,11 @@ using System.Runtime.Serialization;
 
 #pragma warning disable CS0618 // Type or member is obsolete
 
-namespace IngameCoding.Errors
+namespace ProgrammingLanguage.Errors
 {
     using Core;
 
-    using IngameCoding.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statements;
 
     using System.Collections.Generic;
 
@@ -41,30 +41,30 @@ namespace IngameCoding.Errors
 
         readonly Position position;
 
-        [Obsolete("Don't use this", true)]
-        public Exception() { }
-
-        [Obsolete("Don't use this", false)]
-        public Exception(string message, Position pos) : base(message)
+        protected Exception(string message, IThingWithPosition something) : this(message, something.GetPosition())
+        { }
+        protected Exception(string message, IThingWithPosition something, string file) : this(message, something.GetPosition(), file)
+        { }
+        protected Exception(string message, Position pos) : base(message)
         {
             this.position = pos;
         }
-        [Obsolete("Don't use this", false)]
-        public Exception(string message, BaseToken token) : this(message, token.GetPosition()) { }
-        [Obsolete("Don't use this", false)]
-        public Exception(string message, Position pos, string file) : base(message)
+        protected Exception(string message, BaseToken token) : this(message, token.GetPosition()) { }
+        protected Exception(string message, Position pos, string file) : base(message)
         {
             this.position = pos;
             this.File = file;
         }
-        [Obsolete("Don't use this", false)]
-        public Exception(string message, BaseToken token, string file) : this(message, token.GetPosition(), file) { }
+        protected Exception(string message, BaseToken token, string file) : this(message, token.GetPosition(), file) { }
 
-        public Exception(string message, Statement statement, string file) : base(message)
+        protected Exception(string message, Statement statement, string file) : base(message)
         {
             this.File = file;
             this.position = statement.TotalPosition();
         }
+
+        public Exception(Error error) : this(error.Message, error.Position, error.File)
+        { }
 
         public Exception(string message, System.Exception inner) : base(message, inner) { }
         protected Exception(
@@ -72,12 +72,13 @@ namespace IngameCoding.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="IngameCoding.BBCode.Compiler.CodeGenerator"/> and <see cref="IngameCoding.Core.Interpreter"/> </summary>
+    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Compiler.CodeGenerator"/> and <see cref="ProgrammingLanguage.Core.Interpreter"/> </summary>
     [Serializable]
     public class CompilerException : Exception
     {
         public CompilerException(string message, Position pos) : base(message, pos) { }
         public CompilerException(string message, BaseToken token) : base(message, token) { }
+        public CompilerException(string message, IThingWithPosition something, string file) : base(message, something, file) { }
         public CompilerException(string message, Position pos, string file) : base(message, pos, file) { }
         public CompilerException(string message, BaseToken token, string file) : base(message, token, file) { }
         public CompilerException(string message, Statement statement, string file) : base(message, statement, file) { }
@@ -87,7 +88,7 @@ namespace IngameCoding.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="IngameCoding.BBCode.Tokenizer"/> </summary>
+    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Tokenizer"/> </summary>
     [Serializable]
     public class TokenizerException : Exception
     {
@@ -101,7 +102,7 @@ namespace IngameCoding.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="IngameCoding.BBCode.Parser.Parser"/> </summary>
+    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Parser.Parser"/> </summary>
     [Serializable]
     public class SyntaxException : Exception
     {
@@ -115,7 +116,7 @@ namespace IngameCoding.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="IngameCoding.Bytecode.BytecodeInterpreter"/> </summary>
+    /// <summary> Thrown by the <see cref="ProgrammingLanguage.Bytecode.BytecodeInterpreter"/> </summary>
     [Serializable]
     public class RuntimeException : Exception
     {
@@ -302,7 +303,7 @@ namespace IngameCoding.Errors
 
         public override string ToString() => MessageAll;
 
-        public Exception ToException() => new Exception(Message, base.Position, File);
+        public Exception ToException() => new Exception(this);
     }
 
     public class Hint : NotExceptionBut

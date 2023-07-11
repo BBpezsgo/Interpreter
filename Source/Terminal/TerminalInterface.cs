@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace IngameCoding.Output
+namespace ProgrammingLanguage.Output
 {
     namespace Debug
     {
@@ -170,7 +170,7 @@ namespace IngameCoding.Output
     }
 }
 
-namespace IngameCoding.TerminalInterface
+namespace ProgrammingLanguage.TerminalInterface
 {
     internal class TerminalInterface
     {

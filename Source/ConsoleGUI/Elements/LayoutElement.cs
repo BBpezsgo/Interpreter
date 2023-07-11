@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ConsoleDrawer;
+
+using System;
 using System.Drawing;
 
 namespace ConsoleGUI

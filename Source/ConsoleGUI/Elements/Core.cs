@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ConsoleDrawer;
+
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 
@@ -11,8 +13,8 @@ namespace ConsoleGUI
         int currentIndex;
         readonly int Width;
         readonly int Height;
-        CharColors currentBgColor;
-        CharColors currentFgColor;
+        BackgroundColor currentBgColor;
+        ForegroundColor currentFgColor;
 
         public DrawBuffer()
         {
@@ -100,7 +102,7 @@ namespace ConsoleGUI
             return newPoints.ToArray();
         }
 
-        public void DrawLine((int x, int y)[] points, CharColors color)
+        public void DrawLine((int x, int y)[] points, BackgroundColor color)
         {
             if (points.Length == 0) return;
 
@@ -108,7 +110,7 @@ namespace ConsoleGUI
 
             if (points.Length == 1)
             {
-                this[points[0].x, points[0].y] = new Character(' ', color);
+                this[points[0].x, points[0].y] = Character.Solid(color);
                 return;
             }
 
@@ -137,14 +139,14 @@ namespace ConsoleGUI
                         }
                         */
 
-                        this[x, y] = new Character(c, color);
+                        this[x, y] = Character.Solid(color);
                     }
                 }
             }
         }
-        public void DrawLine((int, int) p1, (int, int) p2, CharColors color)
+        public void DrawLine((int, int) p1, (int, int) p2, BackgroundColor color)
             => DrawLine(p1.Item1, p1.Item2, p2.Item1, p2.Item2, color);
-        public void DrawLine(int x1, int y1, int x2, int y2, CharColors color)
+        public void DrawLine(int x1, int y1, int x2, int y2, BackgroundColor color)
         {
             (int, int)? prev = (x1, y1);
             for (int x = x1; x <= x2; x++)
@@ -172,7 +174,7 @@ namespace ConsoleGUI
                         }
                     }
 
-                    this[x, y] = new Character(c, color);
+                    this[x, y] = new Character(c, color.ToForeground(), color);
 
                     prev = (x, y);
                 }
@@ -189,12 +191,12 @@ namespace ConsoleGUI
 
         public int CurrentIndex => currentIndex;
 
-        public CharColors ForegroundColor
+        public ForegroundColor ForegroundColor
         {
             get => currentFgColor;
             set => currentFgColor = value;
         }
-        public CharColors BackgroundColor
+        public BackgroundColor BackgroundColor
         {
             get => currentBgColor;
             set => currentBgColor = value;
@@ -202,13 +204,13 @@ namespace ConsoleGUI
 
         public void ResetColor()
         {
-            this.ForegroundColor = CharColors.FgDefault;
-            this.BackgroundColor = CharColors.BgBlack;
+            this.ForegroundColor = ForegroundColor.Default;
+            this.BackgroundColor = BackgroundColor.Black;
         }
 
-        CharColors CurrentColor
+        short CurrentColor
         {
-            get => currentFgColor | currentBgColor;
+            get => (short)((short)currentFgColor | (short)currentBgColor);
         }
 
         public bool AddChar(char v)
@@ -216,7 +218,8 @@ namespace ConsoleGUI
             if (currentIndex >= this.v.Length) return false;
             if (currentIndex < 0) return false;
 
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Color = CurrentColor;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].ForegroundColor = currentFgColor;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].BackgroundColor = currentBgColor;
             this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
 
             currentIndex++;
@@ -230,7 +233,8 @@ namespace ConsoleGUI
             if (i >= this.v.Length) return false;
             if (i < 0) return false;
 
-            this.v[i].Color = CurrentColor;
+            this.v[i].ForegroundColor = currentFgColor;
+            this.v[i].BackgroundColor = currentBgColor;
             this.v[i].Char = v;
 
             return true;
@@ -241,11 +245,12 @@ namespace ConsoleGUI
             { if (!this.SetChar(v[i], i + from)) break; }
         }
 
-        public bool AddChar(char v, CharColors color)
+        public bool AddChar(char v, ForegroundColor fg, BackgroundColor bg)
         {
             if (currentIndex >= this.v.Length) return false;
 
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Color = color;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].ForegroundColor = fg;
+            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].BackgroundColor = bg;
             this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
 
             currentIndex++;
@@ -273,12 +278,13 @@ namespace ConsoleGUI
             this.AddChar(' ');
         }
 
-        public void Fill(CharColors color)
+        public void Fill(BackgroundColor color)
         {
             for (int i = 0; i < this.v.Length; i++)
             {
                 this.v[i].Char = ' ';
-                this.v[i].Color = color;
+                this.v[i].ForegroundColor = color.ToForeground();
+                this.v[i].BackgroundColor = color;
             }
             this.currentIndex = this.v.Length;
         }
@@ -405,7 +411,7 @@ namespace ConsoleGUI
             element.Rect.Contains(x - 1, y) ||
             element.Rect.Contains(x, y - 1) ||
             element.Rect.Contains(x - 1, y - 1);
-        public static bool Contains(this IElement element, Position position)
+        public static bool Contains(this IElement element, Coord position)
             => element.Contains(position.X, position.Y);
 
         public static void OnMouseEvent(this IElement[] elements, MouseEvent e)
@@ -516,13 +522,14 @@ namespace ConsoleGUI
         internal static Character Details(this char v) => new()
         {
             Char = v,
-            Color = CharColors.FgDefault,
+            ForegroundColor = ForegroundColor.Default,
+            BackgroundColor = BackgroundColor.Black,
         };
     }
 
     internal static class Utils
     {
         public static int GetIndex(int x, int y, int width) => x + (y * width);
-        public static int GetIndex(Position position, int width) => position.X + (position.Y * width);
+        public static int GetIndex(Coord position, int width) => position.X + (position.Y * width);
     }
 }

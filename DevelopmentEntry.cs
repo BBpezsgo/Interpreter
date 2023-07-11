@@ -38,7 +38,7 @@ namespace TheProgram
                 // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                "-heap 64",
+                "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{TestConstants.TestFilesPath}{file}\""
                 // $"\"{TestConstants.TestFilesPath}tester.bbct\""

@@ -1,14 +1,12 @@
-﻿using Microsoft.Win32.SafeHandles;
+﻿using ConsoleDrawer;
+
+using Microsoft.Win32.SafeHandles;
 
 using System;
 using System.Collections.Generic;
 
 namespace ConsoleGUI
 {
-    using ConsoleLib;
-
-    using static Core;
-
     internal delegate void MainThreadTimerCallback();
     internal delegate void MainThreadEventCallback<T>(T e);
 
@@ -98,7 +96,8 @@ namespace ConsoleGUI
         internal static Character NullCharacter => new()
         {
             Char = ' ',
-            Color = CharColors.BgBlack
+            ForegroundColor = ForegroundColor.Black,
+            BackgroundColor = BackgroundColor.Black,
         };
 
         internal IElement[] Elements = Array.Empty<IElement>();
@@ -120,7 +119,7 @@ namespace ConsoleGUI
         short Height;
         CharInfo[] ConsoleBuffer;
         SmallRect ConsoleRect;
-        Position MousePosition;
+        Coord MousePosition;
 
         bool ResizeElements;
         internal bool NextRefreshConsole;
@@ -191,7 +190,7 @@ namespace ConsoleGUI
             };
 
             Log("Setup console");
-            SetupConsole();
+            ConsoleHandler.SetupConsole();
 
             ConsoleListener.MouseEvent += MouseEventThread;
             ConsoleListener.KeyEvent += KeyEventThread;
@@ -201,7 +200,7 @@ namespace ConsoleGUI
             ConsoleListener.Start();
 
             Log("Setup console handler");
-            ConsoleHandle = CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, System.IO.FileMode.Open, 0, IntPtr.Zero);
+            ConsoleHandle = Kernel32.CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, System.IO.FileMode.Open, 0, IntPtr.Zero);
 
             Width = (short)Console.WindowWidth;
             Height = (short)Console.WindowHeight;
@@ -294,7 +293,7 @@ namespace ConsoleGUI
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 ConsoleBuffer[i].Char.UnicodeChar = ' ';
-                ConsoleBuffer[i].Attributes = (short)CharColors.BgMagenta;
+                ConsoleBuffer[i].Attributes = (short)BackgroundColor.Magenta;
             }
 
             try
@@ -334,7 +333,7 @@ namespace ConsoleGUI
                     if (ConsoleBuffer.IsOutside(i)) continue;
 
                     Character chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
-                    ConsoleBuffer[i].Attributes = (short)chr.Color;
+                    ConsoleBuffer[i].Attributes = (short)((short)chr.ForegroundColor | (short)chr.BackgroundColor);
                     ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
                 }
             }
@@ -352,7 +351,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
+            Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
                 new Coord((short)Console.WindowWidth, (short)Console.WindowHeight),
                 new Coord(0, 0),
                 ref rect);

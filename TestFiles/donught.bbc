@@ -19,7 +19,7 @@ void Start()
 	float K2 = 5f;
     float K1 = screen_width.ToFloat() * K2 * 3f / (20f * (R1 + R2));
 
-    Map zbuffer = CreateMap(screen_width, screen_height);
+    Map zbuffer = new Map(screen_width, screen_height);
 
     while (0 == yes)
     {

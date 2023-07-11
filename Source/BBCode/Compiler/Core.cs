@@ -36,9 +36,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (instruction.Parameter.type == RuntimeType.INT)
                     {
-                        if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index) continue;
-                        if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index) continue;
-                        if (instruction.Parameter.ValueInt + instructionIndex == index) throw new Exception($"Can't remove instruction at {index} becouse instruction {instruction} is referencing to this position");
+                        if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index)
+                        { continue; }
+                        
+                        if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index)
+                        { continue; }
+                        
+                        // TODO: Think about that safe to remove instructions in this case:
+                        if (instruction.Parameter.ValueInt + instructionIndex == index)
+                        { continue; }
+                        // { throw new Exception($"Can't remove instruction at {index} because instruction {instruction} is referencing to this position"); }
 
                         if (instructionIndex < index)
                         { instruction.Parameter = new DataItem(instruction.Parameter.ValueInt - 1); changedInstructions++; }

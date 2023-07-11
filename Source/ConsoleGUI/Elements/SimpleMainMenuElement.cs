@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace ConsoleGUI
 {
-    using ConsoleLib;
+    using ConsoleDrawer;
 
     using System.Timers;
 
@@ -43,8 +43,8 @@ namespace ConsoleGUI
         {
             base.BeforeDraw();
 
-            CharColors ForegroundColor;
-            CharColors BackgroundColor;
+            ForegroundColor ForegroundColor;
+            BackgroundColor BackgroundColor;
 
             int BufferIndex = 0;
 
@@ -54,7 +54,8 @@ namespace ConsoleGUI
 
                 DrawBuffer[BufferIndex] = new Character()
                 {
-                    Color = ForegroundColor | BackgroundColor,
+                    ForegroundColor = ForegroundColor,
+                    BackgroundColor = BackgroundColor,
                     Char = data,
                 };
 
@@ -84,8 +85,8 @@ namespace ConsoleGUI
                 AddChar(' ');
             }
 
-            ForegroundColor = CharColors.FgDefault;
-            BackgroundColor = CharColors.BgBlack;
+            ForegroundColor = ForegroundColor.Default;
+            BackgroundColor = BackgroundColor.Black;
 
             AddText(" Current Version: ");
             AddText(TheProgram.Version.Current);

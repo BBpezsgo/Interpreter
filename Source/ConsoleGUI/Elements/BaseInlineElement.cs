@@ -1,4 +1,6 @@
-﻿namespace ConsoleGUI
+﻿using ConsoleDrawer;
+
+namespace ConsoleGUI
 {
     internal class InlineElement : Element, IBorderedElement, IElementWithTitle, IInlineLayoutElement
     {

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ConsoleDrawer;
+
+using System;
 using System.Diagnostics;
 
 namespace ConsoleGUI
@@ -20,7 +22,7 @@ namespace ConsoleGUI
         {
             if (buf.Length == 0) ClearBuffer();
 
-            CharColors Color;
+            ForegroundColor Color;
 
             int BufferIndex = 0;
 
@@ -28,7 +30,7 @@ namespace ConsoleGUI
             {
                 if (BufferIndex >= buf.Length) return false;
 
-                buf[BufferIndex].Color = Color;
+                buf[BufferIndex].ForegroundColor = Color;
                 buf[BufferIndex].Char = data;
 
                 BufferIndex++;
@@ -51,14 +53,14 @@ namespace ConsoleGUI
                 }
             }
 
-            Color = CharColors.FgDefault;
+            Color = ForegroundColor.Default;
 
             void Line(string lineNumber, string lineText)
             {
                 AddText(new string(' ', 4 - lineNumber.Length));
-                Color = CharColors.FgGray;
+                Color = ForegroundColor.Gray;
                 AddText(lineNumber);
-                Color = CharColors.FgDefault;
+                Color = ForegroundColor.Default;
                 AddSpace(5);
                 AddText(lineText);
             }

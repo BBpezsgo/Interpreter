@@ -82,7 +82,7 @@ namespace ProgrammingLanguage.BBCode
 
     namespace Parser
     {
-        using Statements;
+        using ProgrammingLanguage.BBCode.Parser.Statement;
 
         /// <summary>
         /// The parser for the BBCode language
@@ -111,12 +111,13 @@ namespace ProgrammingLanguage.BBCode
 
             // === Result ===
             readonly List<FunctionDefinition> Functions = new();
+            readonly List<MacroDefinition> Macros = new();
             readonly List<EnumDefinition> Enums = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly Dictionary<string, ClassDefinition> Classes = new();
             readonly List<UsingDefinition> Usings = new();
-            readonly List<Statement_HashInfo> Hashes = new();
-            readonly List<Statement> TopLevelStatements = new();
+            readonly List<CompileTag> Hashes = new();
+            readonly List<Statement.Statement> TopLevelStatements = new();
             // === ===
 
             public Parser()
@@ -193,7 +194,7 @@ namespace ProgrammingLanguage.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
+                return new ParserResult(this.Functions, this.Macros, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -211,7 +212,7 @@ namespace ProgrammingLanguage.BBCode
 
             #region Parse top level
 
-            bool ExpectHash(out Statement_HashInfo hashStatement)
+            bool ExpectHash(out CompileTag hashStatement)
             {
                 hashStatement = null;
 
@@ -225,7 +226,7 @@ namespace ProgrammingLanguage.BBCode
 
                 hashName.AnalysedType = TokenAnalysedType.Hash;
 
-                List<Statement_Literal> parameters = new();
+                List<Literal> parameters = new();
                 int endlessSafe = 50;
                 while (!ExpectOperator(";"))
                 {
@@ -243,7 +244,7 @@ namespace ProgrammingLanguage.BBCode
                     { throw new EndlessLoopException(); }
                 }
 
-                hashStatement = new Statement_HashInfo
+                hashStatement = new CompileTag
                 {
                     HashToken = hashT,
                     HashName = hashName,
@@ -319,15 +320,17 @@ namespace ProgrammingLanguage.BBCode
             {
                 if (ExpectStructDefinition()) { }
                 else if (ExpectClassDefinition()) { }
+                else if (ExpectMacroDefinition(out var macroDefinition))
+                { Macros.Add(macroDefinition); }
                 else if (ExpectFunctionDefinition(out var functionDefinition))
                 { Functions.Add(functionDefinition); }
                 else if (ExpectEnumDefinition(out var enumDefinition))
                 { Enums.Add(enumDefinition); }
                 else
                 {
-                    Statement statement = ExpectStatement();
+                    Statement.Statement statement = ExpectStatement();
                     if (statement == null)
-                    { throw new SyntaxException($"Expected top-level statement, type or function definition. Got a token {CurrentToken}", CurrentToken); }
+                    { throw new SyntaxException($"Expected top-level statement, type, macro or function definition. Got a token {CurrentToken}", CurrentToken); }
 
                     SetStatementThings(statement);
 
@@ -390,7 +393,7 @@ namespace ProgrammingLanguage.BBCode
 
                     if (ExpectOperator("=", out Token assignOperator))
                     {
-                        if (!ExpectLiteral(out Statement_Literal value))
+                        if (!ExpectLiteral(out Literal value))
                         { throw new SyntaxException($"Expected literal after enum member assignment", assignOperator.After()); }
 
                         newMember.Value = value;
@@ -507,7 +510,7 @@ namespace ProgrammingLanguage.BBCode
                     Parameters = parameters.ToArray(),
                 };
 
-                List<Statement> statements = new();
+                List<Statement.Statement> statements = new();
 
                 if (!ExpectOperator(";"))
                 {
@@ -517,6 +520,108 @@ namespace ProgrammingLanguage.BBCode
                 }
 
                 function.Statements = statements.ToArray();
+
+                return true;
+            }
+
+            bool ExpectMacroDefinition(out MacroDefinition macro)
+            {
+                int parseStart = currentTokenIndex;
+                macro = null;
+
+                List<FunctionDefinition.Attribute> attributes = new();
+                while (ExpectAttribute(out var attr))
+                {
+                    bool alreadyHave = false;
+                    foreach (var attribute in attributes)
+                    {
+                        if (attribute.Identifier == attr.Identifier)
+                        {
+                            alreadyHave = true;
+                            break;
+                        }
+                    }
+                    if (!alreadyHave)
+                    {
+                        attributes.Add(attr);
+                    }
+                    else
+                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
+                }
+
+                ExpectIdentifier("export", out Token ExportKeyword);
+
+                if (!ExpectIdentifier("macro", out Token keyword))
+                { currentTokenIndex = parseStart; return false; }
+
+                TypeInstance possibleType = ExpectType(false);
+                if (possibleType == null)
+                { currentTokenIndex = parseStart; return false; }
+
+                if (!ExpectIdentifier(out Token possibleNameT))
+                { currentTokenIndex = parseStart; return false; }
+
+                if (!ExpectOperator("("))
+                { currentTokenIndex = parseStart; return false; }
+
+                possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
+
+                List<ParameterDefinition> parameters = new();
+
+                var expectParameter = false;
+                while (!ExpectOperator(")") || expectParameter)
+                {
+                    if (ExpectIdentifier("this", out Token thisKeywordT))
+                    {
+                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
+                        if (parameters.Count > 0)
+                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
+                    }
+
+                    TypeInstance possibleParameterType = ExpectType(false, true);
+                    if (possibleParameterType == null)
+                    { throw new SyntaxException("Expected parameter type", CurrentToken); }
+
+                    if (!ExpectIdentifier(out Token possibleParameterNameT))
+                    { throw new SyntaxException("Expected a parameter name", CurrentToken); }
+
+                    possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
+
+                    ParameterDefinition parameterDefinition = new()
+                    {
+                        Type = possibleParameterType,
+                        Identifier = possibleParameterNameT,
+                        withThisKeyword = thisKeywordT != null,
+                    };
+                    parameters.Add(parameterDefinition);
+
+                    if (ExpectOperator(")"))
+                    { break; }
+
+                    if (!ExpectOperator(","))
+                    { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                    else
+                    { expectParameter = true; }
+                }
+
+                macro = new(possibleNameT, keyword)
+                {
+                    Type = possibleType,
+                    Attributes = attributes.ToArray(),
+                    ExportKeyword = ExportKeyword,
+                    Parameters = parameters.ToArray(),
+                };
+
+                List<Statement.Statement> statements = new();
+
+                if (!ExpectOperator(";"))
+                {
+                    statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                    macro.BracketStart = braceletStart;
+                    macro.BracketEnd = braceletEnd;
+                }
+
+                macro.Statements = statements.ToArray();
 
                 return true;
             }
@@ -606,7 +711,7 @@ namespace ProgrammingLanguage.BBCode
                     Parameters = parameters.ToArray(),
                 };
 
-                List<Statement> statements = new();
+                List<Statement.Statement> statements = new();
 
                 if (!ExpectOperator(";"))
                 {
@@ -678,7 +783,7 @@ namespace ProgrammingLanguage.BBCode
                 if (ExpectOperator(";", out var tIdk))
                 { throw new SyntaxException($"Body is requied for general function definition", tIdk); }
 
-                List<Statement> statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                List<Statement.Statement> statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
                 function.BracketStart = braceletStart;
                 function.BracketEnd = braceletEnd;
 
@@ -853,17 +958,17 @@ namespace ProgrammingLanguage.BBCode
 
             #region Parse low level
 
-            bool ExpectListValue(out Statement_ListValue listValue)
+            bool ExpectListValue(out LiteralList listValue)
             {
                 listValue = null;
 
                 if (!ExpectOperator("[", out var o0))
                 { return false; }
 
-                List<StatementWithReturnValue> values = new();
-                listValue = new Statement_ListValue()
+                List<StatementWithValue> values = new();
+                listValue = new LiteralList()
                 {
-                    Values = Array.Empty<StatementWithReturnValue>(),
+                    Values = Array.Empty<StatementWithValue>(),
                     BracketLeft = o0,
                 };
 
@@ -899,13 +1004,13 @@ namespace ProgrammingLanguage.BBCode
                 return true;
             }
 
-            bool ExpectLiteral(out Statement_Literal statement)
+            bool ExpectLiteral(out Literal statement)
             {
                 int savedToken = currentTokenIndex;
 
                 if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = CurrentToken.Content.Replace("_", ""),
                         Type = LiteralType.FLOAT,
@@ -919,7 +1024,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = CurrentToken.Content.Replace("_", ""),
                         Type = LiteralType.INT,
@@ -933,7 +1038,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = Convert.ToInt32(CurrentToken.Content, 16).ToString(),
                         Type = LiteralType.INT,
@@ -947,7 +1052,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(),
                         Type = LiteralType.INT,
@@ -961,7 +1066,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = CurrentToken.Content,
                         Type = LiteralType.STRING,
@@ -975,7 +1080,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = CurrentToken.Content,
                         Type = LiteralType.CHAR,
@@ -989,7 +1094,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (ExpectIdentifier("true", out var tTrue))
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = "true",
                         Type = LiteralType.BOOLEAN,
@@ -1003,7 +1108,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (ExpectIdentifier("false", out var tFalse))
                 {
-                    Statement_Literal literal = new()
+                    Literal literal = new()
                     {
                         Value = "false",
                         Type = LiteralType.BOOLEAN,
@@ -1022,12 +1127,12 @@ namespace ProgrammingLanguage.BBCode
                 return false;
             }
 
-            bool ExpectAs(out Statement_As statement)
+            bool ExpectAs(out TypeCast statement)
             {
                 int parseStart = currentTokenIndex;
                 statement = null;
 
-                StatementWithReturnValue prevStatement = ExpectOneValue();
+                StatementWithValue prevStatement = ExpectOneValue();
                 if (prevStatement == null)
                 {
                     currentTokenIndex = parseStart;
@@ -1045,11 +1150,11 @@ namespace ProgrammingLanguage.BBCode
                 if (type == null)
                 { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
 
-                statement = new Statement_As(prevStatement, keyword, type);
+                statement = new TypeCast(prevStatement, keyword, type);
                 return true;
             }
 
-            bool ExpectIndex(out Statement_Index statement)
+            bool ExpectIndex(out IndexCall statement)
             {
                 if (!ExpectOperator("[", out Token bracketLeft))
                 {
@@ -1057,39 +1162,39 @@ namespace ProgrammingLanguage.BBCode
                     return false;
                 }
 
-                StatementWithReturnValue expression = ExpectExpression();
+                StatementWithValue expression = ExpectExpression();
 
                 if (!ExpectOperator("]", out Token bracketRight))
                 { throw new SyntaxException("Unbalanced [", bracketLeft); }
 
-                statement = new Statement_Index(expression);
+                statement = new IndexCall(expression);
                 return true;
             }
 
             /// <returns>
             /// <list type="bullet">
             /// <item>
-            ///  <seealso cref="Statement_FunctionCall"></seealso>
+            ///  <seealso cref="FunctionCall"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Literal"></seealso>
+            ///  <seealso cref="Literal"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_NewInstance"></seealso>
+            ///  <seealso cref="NewInstance"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Field"></seealso>
+            ///  <seealso cref="Field"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Variable"></seealso>
+            ///  <seealso cref="Identifier"></seealso>
             /// </item>
             /// </list>
             /// </returns>
-            StatementWithReturnValue ExpectOneValue()
+            StatementWithValue ExpectOneValue()
             {
                 int savedToken = currentTokenIndex;
 
-                StatementWithReturnValue returnStatement = null;
+                StatementWithValue returnStatement = null;
 
                 returnStatement ??= ExpectKeywordCall("clone", true, true);
 
@@ -1109,7 +1214,7 @@ namespace ProgrammingLanguage.BBCode
                     if (expression == null)
                     { throw new SyntaxException("Expected expression after '('", braceletT); }
 
-                    if (expression is Statement_Operator operation)
+                    if (expression is OperatorCall operation)
                     { operation.InsideBracelet = true; }
 
                     if (!ExpectOperator(")"))
@@ -1129,7 +1234,7 @@ namespace ProgrammingLanguage.BBCode
 
                     if (ExpectOperator("(", out Token bracketLeft))
                     {
-                        Statement_ConstructorCall newStructStatement = new()
+                        ConstructorCall newStructStatement = new()
                         {
                             TypeName = instanceTypeName,
                             Keyword = newIdentifier,
@@ -1137,13 +1242,13 @@ namespace ProgrammingLanguage.BBCode
                         };
 
                         bool expectParameter = false;
-                        List<StatementWithReturnValue> parameters = new();
+                        List<StatementWithValue> parameters = new();
 
                         int endlessSafe = 0;
                         Token bracketRight = null;
                         while (!ExpectOperator(")", out bracketRight) || expectParameter)
                         {
-                            StatementWithReturnValue parameter = ExpectExpression();
+                            StatementWithValue parameter = ExpectExpression();
                             if (parameter == null)
                             { throw new SyntaxException("Expected expression as parameter", newStructStatement.TotalPosition()); }
 
@@ -1168,7 +1273,7 @@ namespace ProgrammingLanguage.BBCode
                     }
                     else
                     {
-                        Statement_NewInstance newStructStatement = new()
+                        NewInstance newStructStatement = new()
                         {
                             TypeName = instanceTypeName,
                             Keyword = newIdentifier,
@@ -1189,7 +1294,7 @@ namespace ProgrammingLanguage.BBCode
                     }
                     else
                     {
-                        Statement_Variable variableNameStatement = new()
+                        Identifier variableNameStatement = new()
                         {
                             VariableName = variableName,
                         };
@@ -1202,11 +1307,11 @@ namespace ProgrammingLanguage.BBCode
                         returnStatement = variableNameStatement;
                     }
                 }
-                else if (ExpectVariableAddressGetter(out Statement_MemoryAddressGetter memoryAddressGetter))
+                else if (ExpectVariableAddressGetter(out AddressGetter memoryAddressGetter))
                 {
                     returnStatement = memoryAddressGetter;
                 }
-                else if (ExpectVariableAddressFinder(out Statement_MemoryAddressFinder memoryAddressFinder))
+                else if (ExpectVariableAddressFinder(out Pointer memoryAddressFinder))
                 {
                     returnStatement = memoryAddressFinder;
                 }
@@ -1225,7 +1330,7 @@ namespace ProgrammingLanguage.BBCode
                             if (!ExpectIdentifier(out Token fieldName))
                             { throw new SyntaxException("Expected field or method", tokenDot); }
 
-                            var fieldStatement = new Statement_Field()
+                            var fieldStatement = new Field()
                             {
                                 FieldName = fieldName,
                                 PrevStatement = returnStatement
@@ -1255,14 +1360,14 @@ namespace ProgrammingLanguage.BBCode
                         if (type == null)
                         { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
 
-                        returnStatement = new Statement_As(returnStatement, keyword, type);
+                        returnStatement = new TypeCast(returnStatement, keyword, type);
                     }
                 }
 
                 return returnStatement;
             }
 
-            bool ExpectVariableAddressGetter(out Statement_MemoryAddressGetter statement)
+            bool ExpectVariableAddressGetter(out AddressGetter statement)
             {
                 var parseStart = currentTokenIndex;
                 if (!ExpectOperator("&", out var refToken))
@@ -1274,7 +1379,7 @@ namespace ProgrammingLanguage.BBCode
 
                 var prevStatement = ExpectOneValue();
 
-                statement = new Statement_MemoryAddressGetter()
+                statement = new AddressGetter()
                 {
                     OperatorToken = refToken,
                     PrevStatement = prevStatement,
@@ -1282,7 +1387,7 @@ namespace ProgrammingLanguage.BBCode
                 return true;
             }
 
-            bool ExpectVariableAddressFinder(out Statement_MemoryAddressFinder statement)
+            bool ExpectVariableAddressFinder(out Pointer statement)
             {
                 var parseStart = currentTokenIndex;
                 if (!ExpectOperator("*", out var refToken))
@@ -1294,7 +1399,7 @@ namespace ProgrammingLanguage.BBCode
 
                 var prevStatement = ExpectOneValue();
 
-                statement = new Statement_MemoryAddressFinder()
+                statement = new Pointer()
                 {
                     OperatorToken = refToken,
                     PrevStatement = prevStatement,
@@ -1302,7 +1407,7 @@ namespace ProgrammingLanguage.BBCode
                 return true;
             }
 
-            void SetStatementThings(Statement statement)
+            void SetStatementThings(Statement.Statement statement)
             {
                 if (statement == null)
                 {
@@ -1312,34 +1417,69 @@ namespace ProgrammingLanguage.BBCode
                     { throw new SyntaxException($"Unknown statement null", Position.UnknownPosition); }
                 }
 
-                if (statement is Statement_Literal)
+                if (statement is Literal)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
 
-                if (statement is Statement_Variable)
+                if (statement is Identifier)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
 
-                if (statement is Statement_NewInstance)
+                if (statement is NewInstance)
                 { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
 
-                if (statement is StatementWithReturnValue statementWithReturnValue)
+                if (statement is StatementWithValue statementWithReturnValue)
                 {
                     statementWithReturnValue.SaveValue = false;
                 }
             }
 
-            List<Statement> ParseFunctionBody(out Token braceletStart, out Token braceletEnd)
+            bool ExpectBlock(out Block block)
+            {
+                if (!ExpectOperator("{", out var braceletStart))
+                {
+                    block = null;
+                    return false;
+                }
+
+                List<Statement.Statement> statements = new();
+
+                int endlessSafe = 0;
+                Token braceletEnd = null;
+                while (!ExpectOperator("}", out braceletEnd))
+                {
+                    Statement.Statement statement = ExpectStatement();
+                    SetStatementThings(statement);
+
+                    statements.Add(statement);
+
+                    if (!ExpectOperator(";"))
+                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
+
+
+                    endlessSafe++;
+                    if (endlessSafe > 500) throw new EndlessLoopException();
+                }
+
+                block = new Block(statements)
+                {
+                    BracketStart = braceletStart,
+                    BracketEnd = braceletEnd,
+                };
+                return true;
+            }
+
+            List<Statement.Statement> ParseFunctionBody(out Token braceletStart, out Token braceletEnd)
             {
                 braceletEnd = null;
 
                 if (!ExpectOperator("{", out braceletStart))
                 { return null; }
 
-                List<Statement> statements = new();
+                List<Statement.Statement> statements = new();
 
                 int endlessSafe = 0;
                 while (!ExpectOperator("}", out braceletEnd))
                 {
-                    Statement statement = ExpectStatement();
+                    Statement.Statement statement = ExpectStatement();
                     SetStatementThings(statement);
 
                     statements.Add(statement);
@@ -1355,7 +1495,7 @@ namespace ProgrammingLanguage.BBCode
                 return statements;
             }
 
-            Statement_NewVariable ExpectVariableDeclaration()
+            VariableDeclaretion ExpectVariableDeclaration()
             {
                 int startTokenIndex = currentTokenIndex;
                 TypeInstance possibleType = ExpectType();
@@ -1367,7 +1507,7 @@ namespace ProgrammingLanguage.BBCode
 
                 possibleVariableName.AnalysedType = TokenAnalysedType.VariableName;
 
-                Statement_NewVariable statement = new()
+                VariableDeclaretion statement = new()
                 {
                     VariableName = possibleVariableName,
                     Type = possibleType,
@@ -1386,7 +1526,7 @@ namespace ProgrammingLanguage.BBCode
                 return statement;
             }
 
-            Statement_ForLoop ExpectForStatement()
+            ForLoop ExpectForStatement()
             {
                 if (!ExpectIdentifier("for", out Token tokenFor))
                 { return null; }
@@ -1403,56 +1543,36 @@ namespace ProgrammingLanguage.BBCode
                 if (!ExpectOperator(";"))
                 { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition().After()); }
 
-                StatementWithReturnValue condition = ExpectExpression();
+                StatementWithValue condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
                 if (!ExpectOperator(";"))
                 { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition().After()); }
 
-                Statement_Setter expression = ExpectSetter();
+                Assignment expression = ExpectSetter();
                 if (expression == null)
                 { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
                 if (!ExpectOperator(")", out Token tokenZarojel2))
                 { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition().After()); }
 
-                if (!ExpectOperator("{", out var braceletStart))
-                { throw new SyntaxException($"Expected '{{' after \"for\" condition, got {CurrentToken}", tokenZarojel2.After()); }
+                if (!ExpectBlock(out Block block))
+                { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenZarojel2.After()); }
 
-                Statement_ForLoop forStatement = new()
+                ForLoop forStatement = new()
                 {
                     Keyword = tokenFor,
                     VariableDeclaration = variableDeclaration,
                     Condition = condition,
                     Expression = expression,
-                    BracketStart = braceletStart,
+                    Block = block,
                 };
-
-                int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && !ExpectOperator("}", out forStatement.BracketEnd))
-                {
-                    var statement = ExpectStatement();
-                    if (statement == null) break;
-
-                    SetStatementThings(statement);
-
-                    if (!ExpectOperator(";"))
-                    { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition())); }
-
-                    forStatement.Statements.Add(statement);
-
-                    endlessSafe++;
-                    if (endlessSafe > 500)
-                    {
-                        throw new EndlessLoopException();
-                    }
-                }
 
                 return forStatement;
             }
 
-            Statement_WhileLoop ExpectWhileStatement()
+            WhileLoop ExpectWhileStatement()
             {
                 if (!ExpectIdentifier("while", out Token tokenWhile))
                 { return null; }
@@ -1462,56 +1582,38 @@ namespace ProgrammingLanguage.BBCode
                 if (!ExpectOperator("(", out Token tokenZarojel))
                 { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
 
-                StatementWithReturnValue condition = ExpectExpression();
+                StatementWithValue condition = ExpectExpression();
                 if (condition == null)
                 { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
 
                 if (!ExpectOperator(")", out Token tokenZarojel2))
                 { throw new SyntaxException("Expected ')' after \"while\" condition", condition.TotalPosition()); }
 
-                if (!ExpectOperator("{", out Token braceletStart))
-                { throw new SyntaxException("Expected '{' after \"while\" condition", tokenZarojel2); }
+                if (!ExpectBlock(out Block block))
+                { throw new SyntaxException("Expected block", tokenZarojel2.After()); }
 
-                Statement_WhileLoop whileStatement = new()
+                WhileLoop whileStatement = new()
                 {
                     Keyword = tokenWhile,
                     Condition = condition,
-                    BracketStart = braceletStart,
+                    Block = block,
                 };
-
-                int endlessSafe = 0;
-                while (CurrentToken != null && CurrentToken != null && !ExpectOperator("}", out whileStatement.BracketEnd))
-                {
-                    var statement = ExpectStatement();
-                    if (statement == null) break;
-
-                    SetStatementThings(statement);
-
-                    if (!ExpectOperator(";"))
-                    { Errors.Add(new Error($"Expected ';' at end of statement  (after {statement.GetType().Name})", statement.TotalPosition().After())); }
-
-                    whileStatement.Statements.Add(statement);
-
-                    endlessSafe++;
-                    if (endlessSafe > 500)
-                    { throw new EndlessLoopException(); }
-                }
 
                 return whileStatement;
             }
 
-            Statement_If ExpectIfStatement()
+            IfContainer ExpectIfStatement()
             {
-                Statement_If_Part ifStatement = ExpectIfSegmentStatement();
+                BaseBranch ifStatement = ExpectIfSegmentStatement();
                 if (ifStatement == null) return null;
 
-                Statement_If statement = new();
+                IfContainer statement = new();
                 statement.Parts.Add(ifStatement);
 
                 int endlessSafe = 0;
                 while (true)
                 {
-                    Statement_If_Part elseifStatement = ExpectIfSegmentStatement("elseif", Statement_If_Part.IfPart.ElseIf);
+                    BaseBranch elseifStatement = ExpectIfSegmentStatement("elseif", BaseBranch.IfPart.ElseIf);
                     if (elseifStatement == null) break;
                     statement.Parts.Add(elseifStatement);
 
@@ -1520,7 +1622,7 @@ namespace ProgrammingLanguage.BBCode
                     { throw new EndlessLoopException(); }
                 }
 
-                Statement_If_Part elseStatement = ExpectIfSegmentStatement("else", Statement_If_Part.IfPart.Else, false);
+                BaseBranch elseStatement = ExpectIfSegmentStatement("else", BaseBranch.IfPart.Else, false);
                 if (elseStatement != null)
                 {
                     statement.Parts.Add(elseStatement);
@@ -1529,14 +1631,14 @@ namespace ProgrammingLanguage.BBCode
                 return statement;
             }
 
-            Statement_If_Part ExpectIfSegmentStatement(string ifSegmentName = "if", Statement_If_Part.IfPart ifSegmentType = Statement_If_Part.IfPart.If, bool needParameters = true)
+            BaseBranch ExpectIfSegmentStatement(string ifSegmentName = "if", BaseBranch.IfPart ifSegmentType = BaseBranch.IfPart.If, bool needParameters = true)
             {
                 if (!ExpectIdentifier(ifSegmentName, out Token tokenIf))
                 { return null; }
 
                 tokenIf.AnalysedType = TokenAnalysedType.Statement;
 
-                StatementWithReturnValue condition = null;
+                StatementWithValue condition = null;
                 if (needParameters)
                 {
                     if (!ExpectOperator("(", out Token tokenZarojel))
@@ -1548,97 +1650,63 @@ namespace ProgrammingLanguage.BBCode
                     if (!ExpectOperator(")"))
                     { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.TotalPosition()); }
                 }
-                if (!ExpectOperator("{", out Token braceletStart))
-                { throw new SyntaxException("Expected '{' after \"" + ifSegmentName + "\" condition", tokenIf); }
+                if (!ExpectBlock(out Block block))
+                { throw new SyntaxException("Expected block", tokenIf.After()); }
 
-                Statement_If_Part ifStatement = null;
-
-                switch (ifSegmentType)
+                return ifSegmentType switch
                 {
-                    case Statement_If_Part.IfPart.If:
-                        ifStatement = new Statement_If_If()
-                        {
-                            Keyword = tokenIf,
-                            Condition = condition,
-                            BracketStart = braceletStart,
-                        };
-                        break;
-                    case Statement_If_Part.IfPart.ElseIf:
-                        ifStatement = new Statement_If_ElseIf()
-                        {
-                            Keyword = tokenIf,
-                            Condition = condition,
-                            BracketStart = braceletStart,
-                        };
-                        break;
-                    case Statement_If_Part.IfPart.Else:
-                        ifStatement = new Statement_If_Else()
-                        {
-                            Keyword = tokenIf,
-                            BracketStart = braceletStart,
-                        };
-                        break;
-                }
-
-                if (ifStatement == null)
-                { throw new InternalException(); }
-
-                int endlessSafe = 0;
-                while (CurrentToken != null && !ExpectOperator("}", out ifStatement.BracketEnd))
-                {
-                    var statement = ExpectStatement();
-
-                    SetStatementThings(statement);
-
-                    if (!ExpectOperator(";"))
+                    BaseBranch.IfPart.If => new IfBranch()
                     {
-                        if (statement == null)
-                        { throw new SyntaxException("Expected a statement", CurrentToken); }
-                        else
-                        { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
-                    }
-
-                    ifStatement.Statements.Add(statement);
-
-                    endlessSafe++;
-                    if (endlessSafe > 500)
-                    { throw new EndlessLoopException(); }
-                }
-
-                return ifStatement;
+                        Keyword = tokenIf,
+                        Condition = condition,
+                        Block = block,
+                    },
+                    BaseBranch.IfPart.ElseIf => new ElseIfBranch()
+                    {
+                        Keyword = tokenIf,
+                        Condition = condition,
+                        Block = block,
+                    },
+                    BaseBranch.IfPart.Else => new ElseBranch()
+                    {
+                        Keyword = tokenIf,
+                        Block = block,
+                    },
+                    _ => throw new InternalException(),
+                };
             }
 
             /// <returns>
             /// <list type="bullet">
             /// <item>
-            ///  <seealso cref="Statement_WhileLoop"></seealso>
+            ///  <seealso cref="WhileLoop"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_ForLoop"></seealso>
+            ///  <seealso cref="ForLoop"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_FunctionCall"></seealso>
+            ///  <seealso cref="FunctionCall"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_KeywordCall"></seealso>
+            ///  <seealso cref="KeywordCall"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_If"></seealso>
+            ///  <seealso cref="IfContainer"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_NewVariable"></seealso>
+            ///  <seealso cref="VariableDeclaretion"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Setter"></seealso>
+            ///  <seealso cref="Assignment"></seealso>
             /// </item>
             /// <item>
             ///  <seealso cref="ExpectExpression"></seealso>
             /// </item>
             /// </list>
             /// </returns>
-            Statement ExpectStatement()
+            Statement.Statement ExpectStatement()
             {
-                Statement statement = ExpectWhileStatement();
+                Statement.Statement statement = ExpectWhileStatement();
                 statement ??= ExpectForStatement();
                 statement ??= ExpectKeywordCall("return", true);
                 statement ??= ExpectKeywordCall("throw", true, true);
@@ -1652,7 +1720,7 @@ namespace ProgrammingLanguage.BBCode
                 return statement;
             }
 
-            bool ExpectMethodCall(bool expectDot, out Statement_FunctionCall methodCall)
+            bool ExpectMethodCall(bool expectDot, out FunctionCall methodCall)
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -1680,12 +1748,12 @@ namespace ProgrammingLanguage.BBCode
 
                 bool expectParameter = false;
 
-                List<StatementWithReturnValue> parameters = new();
+                List<StatementWithValue> parameters = new();
                 int endlessSafe = 0;
                 Token bracketRight = null;
                 while (!ExpectOperator(")", out bracketRight) || expectParameter)
                 {
-                    StatementWithReturnValue parameter = ExpectExpression();
+                    StatementWithValue parameter = ExpectExpression();
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", methodCall.TotalPosition()); }
 
@@ -1712,35 +1780,35 @@ namespace ProgrammingLanguage.BBCode
             /// <returns>
             /// <list type="bullet">
             /// <item>
-            ///  <seealso cref="Statement_FunctionCall"></seealso>
+            ///  <seealso cref="FunctionCall"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Literal"></seealso>
+            ///  <seealso cref="Literal"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_NewInstance"></seealso>
+            ///  <seealso cref="NewInstance"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Field"></seealso>
+            ///  <seealso cref="Field"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Variable"></seealso>
+            ///  <seealso cref="Identifier"></seealso>
             /// </item>
             /// <item>
-            ///  <seealso cref="Statement_Operator"></seealso>
+            ///  <seealso cref="OperatorCall"></seealso>
             /// </item>
             /// </list>
             /// </returns>
             /// <exception cref="SyntaxException"></exception>
-            StatementWithReturnValue ExpectExpression()
+            StatementWithValue ExpectExpression()
             {
                 if (ExpectOperator("!", out var tNotOperator))
                 {
-                    StatementWithReturnValue statement = ExpectOneValue();
+                    StatementWithValue statement = ExpectOneValue();
                     if (statement == null)
                     { throw new SyntaxException($"Expected OneValue after operator ('{tNotOperator}'), got {CurrentToken}", CurrentToken); }
 
-                    return new Statement_Operator(tNotOperator, statement);
+                    return new OperatorCall(tNotOperator, statement);
                 }
 
                 /*
@@ -1754,7 +1822,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 */
 
-                StatementWithReturnValue leftStatement = ExpectOneValue();
+                StatementWithValue leftStatement = ExpectOneValue();
                 if (leftStatement == null) return null;
 
                 while (true)
@@ -1765,22 +1833,22 @@ namespace ProgrammingLanguage.BBCode
                         "<", ">", ">=", "<=", "!=", "==", "&&", "||", "^"
                     }, out Token op)) break;
 
-                    StatementWithReturnValue rightStatement = ExpectOneValue();
+                    StatementWithValue rightStatement = ExpectOneValue();
 
                     if (rightStatement == null)
                     { throw new SyntaxException($"Expected OneValue after operator ('{op}'), got {CurrentToken}", CurrentToken); }
                     
                     int rightSidePrecedence = OperatorPrecedence(op.Content);
 
-                    Statement_Operator rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
+                    OperatorCall rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
                     if (rightmostStatement != null)
                     {
-                        Statement_Operator operatorCall = new(op, rightmostStatement.Right, rightStatement);
+                        OperatorCall operatorCall = new(op, rightmostStatement.Right, rightStatement);
                         rightmostStatement.Right = operatorCall;
                     }
                     else
                     {
-                        Statement_Operator operatorCall = new(op, leftStatement, rightStatement);
+                        OperatorCall operatorCall = new(op, leftStatement, rightStatement);
                         leftStatement = operatorCall;
                     }
                 }
@@ -1789,10 +1857,10 @@ namespace ProgrammingLanguage.BBCode
             }
 
             /// <exception cref="SyntaxException"></exception>
-            Statement_Setter ExpectSetter()
+            Assignment ExpectSetter()
             {
                 int parseStart = currentTokenIndex;
-                StatementWithReturnValue leftStatement = ExpectExpression();
+                StatementWithValue leftStatement = ExpectExpression();
                 if (leftStatement == null)
                 {
                     currentTokenIndex = parseStart;
@@ -1804,11 +1872,11 @@ namespace ProgrammingLanguage.BBCode
                     "&=", "|=", "^=",
                 }, out var o0))
                 {
-                    StatementWithReturnValue valueToAssign = ExpectExpression();
+                    StatementWithValue valueToAssign = ExpectExpression();
                     if (valueToAssign == null)
                     { throw new SyntaxException("Expected expression after compound assignment operator", o0); }
 
-                    Statement_Operator statementToAssign = new(new Token()
+                    OperatorCall statementToAssign = new(new Token()
                     {
                         AbsolutePosition = o0.AbsolutePosition,
                         Content = o0.Content.Replace("=", ""),
@@ -1816,7 +1884,7 @@ namespace ProgrammingLanguage.BBCode
                         TokenType = o0.TokenType,
                     }, leftStatement, valueToAssign);
 
-                    return new Statement_Setter(new Token()
+                    return new Assignment(new Token()
                     {
                         AbsolutePosition = o0.AbsolutePosition,
                         Content = "=",
@@ -1827,14 +1895,14 @@ namespace ProgrammingLanguage.BBCode
 
                 if (ExpectOperator("++", out var t0))
                 {
-                    Statement_Literal literalOne = new()
+                    Literal literalOne = new()
                     {
                         Value = "1",
                         Type = LiteralType.INT,
                         ImagineryPosition = t0.GetPosition(),
                     };
 
-                    Statement_Operator statementToAssign = new(new Token()
+                    OperatorCall statementToAssign = new(new Token()
                     {
                         AbsolutePosition = t0.AbsolutePosition,
                         Content = "+",
@@ -1842,7 +1910,7 @@ namespace ProgrammingLanguage.BBCode
                         TokenType = t0.TokenType,
                     }, leftStatement, literalOne);
 
-                    return new Statement_Setter(new Token()
+                    return new Assignment(new Token()
                     {
                         AbsolutePosition = t0.AbsolutePosition,
                         Content = "=",
@@ -1853,14 +1921,14 @@ namespace ProgrammingLanguage.BBCode
 
                 if (ExpectOperator("--", out var t1))
                 {
-                    Statement_Literal literalOne = new()
+                    Literal literalOne = new()
                     {
                         Value = "1",
                         Type = LiteralType.INT,
                         ImagineryPosition = t1.GetPosition(),
                     };
 
-                    Statement_Operator statementToAssign = new(new Token()
+                    OperatorCall statementToAssign = new(new Token()
                     {
                         AbsolutePosition = t1.AbsolutePosition,
                         Content = "-",
@@ -1868,7 +1936,7 @@ namespace ProgrammingLanguage.BBCode
                         TokenType = t1.TokenType,
                     }, leftStatement, literalOne);
 
-                    return new Statement_Setter(new Token()
+                    return new Assignment(new Token()
                     {
                         AbsolutePosition = t1.AbsolutePosition,
                         Content = "=",
@@ -1879,11 +1947,11 @@ namespace ProgrammingLanguage.BBCode
 
                 if (ExpectOperator("=", out Token op))
                 {
-                    StatementWithReturnValue valueToAssign = ExpectExpression();
+                    StatementWithValue valueToAssign = ExpectExpression();
                     if (valueToAssign == null)
                     { throw new SyntaxException("Expected expression after assignment operator", op); }
 
-                    return new Statement_Setter(op, leftStatement, valueToAssign);
+                    return new Assignment(op, leftStatement, valueToAssign);
                 }
 
                 currentTokenIndex = parseStart;
@@ -1896,15 +1964,15 @@ namespace ProgrammingLanguage.BBCode
             /// <param name="statement"></param>
             /// <param name="rightSidePrecedence"></param>
             /// <returns>
-            /// <see langword="null"/> or <see cref="Statement_Operator"/>
+            /// <see langword="null"/> or <see cref="OperatorCall"/>
             /// </returns>
-            Statement_Operator FindRightmostStatement(Statement statement, int rightSidePrecedence)
+            OperatorCall FindRightmostStatement(Statement.Statement statement, int rightSidePrecedence)
             {
-                if (statement is not Statement_Operator leftSide) return null;
+                if (statement is not OperatorCall leftSide) return null;
                 if (OperatorPrecedence(leftSide.Operator.Content) >= rightSidePrecedence) return null;
                 if (leftSide.InsideBracelet) return null;
 
-                Statement_Operator right = FindRightmostStatement(leftSide.Right, rightSidePrecedence);
+                OperatorCall right = FindRightmostStatement(leftSide.Right, rightSidePrecedence);
 
                 if (right == null) return leftSide;
                 return right;
@@ -1917,7 +1985,7 @@ namespace ProgrammingLanguage.BBCode
                 else throw new InternalException($"Precedence for operator {str} not found");
             }
 
-            Statement_FunctionCall ExpectFunctionCall()
+            FunctionCall ExpectFunctionCall()
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -1932,20 +2000,20 @@ namespace ProgrammingLanguage.BBCode
 
                 possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
 
-                Statement_FunctionCall functionCall = new()
+                FunctionCall functionCall = new()
                 {
                     Identifier = possibleFunctionName,
                     BracketLeft = bracketLeft,
                 };
 
                 bool expectParameter = false;
-                List<StatementWithReturnValue> parameters = new();
+                List<StatementWithValue> parameters = new();
 
                 int endlessSafe = 0;
                 Token bracketRight = null;
                 while (!ExpectOperator(")", out bracketRight) || expectParameter)
                 {
-                    StatementWithReturnValue parameter = ExpectExpression();
+                    StatementWithValue parameter = ExpectExpression();
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
@@ -1970,7 +2038,7 @@ namespace ProgrammingLanguage.BBCode
             }
 
             /// <summary> return, break, continue, etc. </summary>
-            Statement_KeywordCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
+            KeywordCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -1982,15 +2050,15 @@ namespace ProgrammingLanguage.BBCode
 
                 possibleFunctionName.AnalysedType = TokenAnalysedType.Statement;
 
-                Statement_KeywordCall functionCall = new()
+                KeywordCall functionCall = new()
                 {
                     Identifier = possibleFunctionName,
                 };
-                List<StatementWithReturnValue> parameters = new();
+                List<StatementWithValue> parameters = new();
 
                 if (canHaveParameters)
                 {
-                    StatementWithReturnValue parameter = ExpectExpression();
+                    StatementWithValue parameter = ExpectExpression();
                     if (parameter == null && needParameters)
                     { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 

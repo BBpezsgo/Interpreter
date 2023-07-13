@@ -7,7 +7,7 @@ namespace ProgrammingLanguage.Errors
 {
     using Core;
 
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
 
     using System.Collections.Generic;
 

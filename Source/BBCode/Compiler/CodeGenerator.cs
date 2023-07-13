@@ -6,7 +6,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 {
     using ProgrammingLanguage.BBCode.Analysis;
     using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
     using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
@@ -222,7 +222,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
         #endregion
 
-        bool GetCompiledField(Statement_Field field, out CompiledField compiledField)
+        bool GetCompiledField(Field field, out CompiledField compiledField)
         {
             compiledField = null;
 
@@ -242,7 +242,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #region GenerateCodeForStatement
 
-        void GenerateCodeForStatement(Statement_NewVariable newVariable)
+        void GenerateCodeForStatement(VariableDeclaretion newVariable)
         {
             newVariable.VariableName.AnalysedType = TokenAnalysedType.VariableName;
 
@@ -257,7 +257,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_KeywordCall keywordCall)
+        void GenerateCodeForStatement(KeywordCall keywordCall)
         {
             AddComment($"Call Keyword {keywordCall.FunctionName} {{");
 
@@ -270,7 +270,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     AddComment(" Param 0:");
 
-                    StatementWithReturnValue returnValue = keywordCall.Parameters[0];
+                    StatementWithValue returnValue = keywordCall.Parameters[0];
                     CompiledType returnValueType = FindStatementType(returnValue);
 
                     GenerateCodeForStatement(returnValue);
@@ -299,7 +299,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddComment(" Param 0:");
 
-                StatementWithReturnValue throwValue = keywordCall.Parameters[0];
+                StatementWithValue throwValue = keywordCall.Parameters[0];
                 // CompiledType throwValueType = FindStatementType(throwValue);
 
                 GenerateCodeForStatement(throwValue);
@@ -328,7 +328,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (keywordCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": requied {1} passed {keywordCall.Parameters.Length}", keywordCall.TotalPosition(), CurrentFile); }
 
-                StatementWithReturnValue param0 = keywordCall.Parameters[0];
+                StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
                 AddInstruction(Opcode.PUSH_VALUE, param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
@@ -456,14 +456,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
-        void GenerateCodeForStatement(Statement_FunctionCall functionCall)
+        void GenerateCodeForStatement(FunctionCall functionCall)
         {
             if (functionCall.FunctionName == "sizeof")
             {
                 if (functionCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": requied {1} passed {functionCall.Parameters.Length}", functionCall.TotalPosition(), CurrentFile); }
 
-                StatementWithReturnValue param0 = functionCall.Parameters[0];
+                StatementWithValue param0 = functionCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
                 AddInstruction(Opcode.PUSH_VALUE, param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
@@ -505,7 +505,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
 
-        void GenerateCodeForFunctionCall_Function(Statement_FunctionCall functionCall, CompiledFunction compiledFunction)
+        void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
             AddComment($"Call {compiledFunction.ReadableID()} {{");
 
@@ -703,7 +703,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForFunctionCall_Variable(Statement_FunctionCall functionCall, CompiledVariable compiledVariable)
+        void GenerateCodeForFunctionCall_Variable(FunctionCall functionCall, CompiledVariable compiledVariable)
         {
             AddComment($"Call {compiledVariable.Type.Function.Function.ReadableID()} {{");
 
@@ -911,7 +911,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddComment("}");
         }
 
-        void GenerateCodeForStatement(Statement_Operator @operator)
+        void GenerateCodeForStatement(OperatorCall @operator)
         {
             if (OptimizeCode)
             {
@@ -1092,11 +1092,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
         }
-        void GenerateCodeForStatement(Statement_Setter setter)
+        void GenerateCodeForStatement(Assignment setter)
         {
             GenerateCodeForValueSetter(setter.Left, setter.Right);
         }
-        void GenerateCodeForStatement(Statement_Literal literal)
+        void GenerateCodeForStatement(BBCode.Parser.Statement.Literal literal)
         {
             switch (literal.Type)
             {
@@ -1120,7 +1120,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        void GenerateCodeForLiteralString(Statement_Literal literal)
+        void GenerateCodeForLiteralString(BBCode.Parser.Statement.Literal literal)
             => GenerateCodeForLiteralString(literal.Value);
         void GenerateCodeForLiteralString(string literal)
         {
@@ -1210,7 +1210,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddComment("}");
         }
 
-        void GenerateCodeForStatement(Statement_Variable variable)
+        void GenerateCodeForStatement(Identifier variable)
         {
             if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
@@ -1247,9 +1247,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
             }
         }
-        void GenerateCodeForStatement(Statement_MemoryAddressGetter memoryAddressGetter)
+        void GenerateCodeForStatement(AddressGetter memoryAddressGetter)
         {
-            void GetVariableAddress(Statement_Variable variable)
+            void GetVariableAddress(Identifier variable)
             {
                 if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
                 {
@@ -1294,7 +1294,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
             }
 
-            void GetFieldAddress(Statement_Field field)
+            void GetFieldAddress(Field field)
             {
                 var prevType = FindStatementType(field.PrevStatement);
 
@@ -1325,13 +1325,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             void GetAddress(Statement statement)
             {
-                if (statement is Statement_Variable variable)
+                if (statement is Identifier variable)
                 {
                     GetVariableAddress(variable);
                     return;
                 }
 
-                if (statement is Statement_Field field)
+                if (statement is Field field)
                 {
                     GetFieldAddress(field);
                     return;
@@ -1342,19 +1342,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             GetAddress(memoryAddressGetter.PrevStatement);
         }
-        void GenerateCodeForStatement(Statement_MemoryAddressFinder memoryAddressFinder)
+        void GenerateCodeForStatement(Pointer memoryAddressFinder)
         {
             GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
             // TODO: stack getter
             AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
         }
-        void GenerateCodeForStatement(Statement_WhileLoop whileLoop)
+        void GenerateCodeForStatement(WhileLoop whileLoop)
         {
             var conditionValue = PredictStatementValue(whileLoop.Condition);
             if (conditionValue.HasValue && !conditionValue.Value.IsFalsy() && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
-                Informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.BracketStart, whileLoop.BracketEnd), CurrentFile));
+                Informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.Block), CurrentFile));
                 return;
             }
 
@@ -1369,9 +1369,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             BreakInstructions.Add(new List<int>());
 
             AddComment("Statements {");
-            for (int i = 0; i < whileLoop.Statements.Count; i++)
+            for (int i = 0; i < whileLoop.Block.Statements.Count; i++)
             {
-                GenerateCodeForStatement(whileLoop.Statements[i]);
+                GenerateCodeForStatement(whileLoop.Block.Statements[i]);
             }
 
             AddComment("}");
@@ -1401,7 +1401,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             BreakInstructions.RemoveAt(BreakInstructions.Count - 1);
         }
-        void GenerateCodeForStatement(Statement_ForLoop forLoop)
+        void GenerateCodeForStatement(ForLoop forLoop)
         {
             AddComment("for (...) {");
 
@@ -1421,9 +1421,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             BreakInstructions.Add(new List<int>());
 
             AddComment("Statements {");
-            for (int i = 0; i < forLoop.Statements.Count; i++)
+            for (int i = 0; i < forLoop.Block.Statements.Count; i++)
             {
-                Statement currStatement = forLoop.Statements[i];
+                Statement currStatement = forLoop.Block.Statements[i];
                 GenerateCodeForStatement(currStatement);
             }
 
@@ -1447,13 +1447,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_If @if)
+        void GenerateCodeForStatement(IfContainer @if)
         {
             List<int> jumpOutInstructions = new();
 
             foreach (var ifSegment in @if.Parts)
             {
-                if (ifSegment is Statement_If_If partIf)
+                if (ifSegment is IfBranch partIf)
                 {
                     AddComment("if (...) {");
 
@@ -1463,12 +1463,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     int jumpNextInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
-                    CleanupStack.Push(CompileVariables(partIf, false));
+                    CleanupStack.Push(CompileVariables(partIf.Block, false));
 
                     AddComment("IF Statements");
-                    for (int i = 0; i < partIf.Statements.Count; i++)
+                    for (int i = 0; i < partIf.Block.Statements.Count; i++)
                     {
-                        GenerateCodeForStatement(partIf.Statements[i]);
+                        GenerateCodeForStatement(partIf.Block.Statements[i]);
                     }
 
                     CleanupVariables(CleanupStack.Pop());
@@ -1481,7 +1481,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
                 }
-                else if (ifSegment is Statement_If_ElseIf partElseif)
+                else if (ifSegment is ElseIfBranch partElseif)
                 {
                     AddComment("elseif (...) {");
 
@@ -1491,12 +1491,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     int jumpNextInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
 
-                    CleanupStack.Push(CompileVariables(partElseif, false));
+                    CleanupStack.Push(CompileVariables(partElseif.Block, false));
 
                     AddComment("ELSEIF Statements");
-                    for (int i = 0; i < partElseif.Statements.Count; i++)
+                    for (int i = 0; i < partElseif.Block.Statements.Count; i++)
                     {
-                        GenerateCodeForStatement(partElseif.Statements[i]);
+                        GenerateCodeForStatement(partElseif.Block.Statements[i]);
                     }
 
                     CleanupVariables(CleanupStack.Pop());
@@ -1509,17 +1509,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
                 }
-                else if (ifSegment is Statement_If_Else partElse)
+                else if (ifSegment is ElseBranch partElse)
                 {
                     AddComment("else {");
 
                     AddComment("ELSE Statements");
 
-                    CleanupStack.Push(CompileVariables(partElse, false));
+                    CleanupStack.Push(CompileVariables(partElse.Block, false));
 
-                    for (int i = 0; i < partElse.Statements.Count; i++)
+                    for (int i = 0; i < partElse.Block.Statements.Count; i++)
                     {
-                        GenerateCodeForStatement(partElse.Statements[i]);
+                        GenerateCodeForStatement(partElse.Block.Statements[i]);
                     }
 
                     CleanupVariables(CleanupStack.Pop());
@@ -1533,7 +1533,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 GeneratedCode[item].Parameter = new DataItem(GeneratedCode.Count - item);
             }
         }
-        void GenerateCodeForStatement(Statement_NewInstance newObject)
+        void GenerateCodeForStatement(NewInstance newObject)
         {
             AddComment($"new {newObject.TypeName} {{");
 
@@ -1574,7 +1574,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newObject.TypeName, CurrentFile); }
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_ConstructorCall constructorCall)
+        void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
             AddComment($"new {constructorCall.TypeName}(...): {{");
 
@@ -1662,7 +1662,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_Field field)
+        void GenerateCodeForStatement(Field field)
         {
             field.FieldName.AnalysedType = TokenAnalysedType.FieldName;
 
@@ -1725,7 +1725,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 GenerateCodeForValueGetter(offset, addressingMode);
             }
         }
-        void GenerateCodeForStatement(Statement_Index index)
+        void GenerateCodeForStatement(IndexCall index)
         {
             CompiledType prevType = FindStatementType(index.PrevStatement);
 
@@ -1789,9 +1789,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForStatement(Statement_ListValue listValue)
+        void GenerateCodeForStatement(LiteralList listValue)
         { throw new NotImplementedException(); }
-        void GenerateCodeForStatement(Statement_As @as)
+        void GenerateCodeForStatement(TypeCast @as)
         {
             GenerateCodeForStatement(@as.PrevStatement);
 
@@ -1815,51 +1815,51 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 InstructionStart = GeneratedCode.Count,
                 InstructionEnd = GeneratedCode.Count,
             };
-            if (st is StatementParent statementParent)
-            { CleanupStack.Push(CompileVariables(statementParent, false)); }
+            if (st is StatementWithBlock statementParent)
+            { CleanupStack.Push(CompileVariables(statementParent.Block, false)); }
 
-            if (st is Statement_ListValue listValue)
+            if (st is LiteralList listValue)
             { GenerateCodeForStatement(listValue); }
-            else if (st is Statement_NewVariable newVariable)
+            else if (st is VariableDeclaretion newVariable)
             { GenerateCodeForStatement(newVariable); }
-            else if (st is Statement_FunctionCall functionCall)
+            else if (st is FunctionCall functionCall)
             { GenerateCodeForStatement(functionCall); }
-            else if (st is Statement_KeywordCall keywordCall)
+            else if (st is KeywordCall keywordCall)
             { GenerateCodeForStatement(keywordCall); }
-            else if (st is Statement_Operator @operator)
+            else if (st is OperatorCall @operator)
             { GenerateCodeForStatement(@operator); }
-            else if (st is Statement_Setter setter)
+            else if (st is Assignment setter)
             { GenerateCodeForStatement(setter); }
-            else if (st is Statement_Literal literal)
+            else if (st is BBCode.Parser.Statement.Literal literal)
             { GenerateCodeForStatement(literal); }
-            else if (st is Statement_Variable variable)
+            else if (st is Identifier variable)
             { GenerateCodeForStatement(variable); }
-            else if (st is Statement_MemoryAddressGetter memoryAddressGetter)
+            else if (st is AddressGetter memoryAddressGetter)
             { GenerateCodeForStatement(memoryAddressGetter); }
-            else if (st is Statement_MemoryAddressFinder memoryAddressFinder)
+            else if (st is Pointer memoryAddressFinder)
             { GenerateCodeForStatement(memoryAddressFinder); }
-            else if (st is Statement_WhileLoop whileLoop)
+            else if (st is WhileLoop whileLoop)
             { GenerateCodeForStatement(whileLoop); }
-            else if (st is Statement_ForLoop forLoop)
+            else if (st is ForLoop forLoop)
             { GenerateCodeForStatement(forLoop); }
-            else if (st is Statement_If @if)
+            else if (st is IfContainer @if)
             { GenerateCodeForStatement(@if); }
-            else if (st is Statement_NewInstance newStruct)
+            else if (st is NewInstance newStruct)
             { GenerateCodeForStatement(newStruct); }
-            else if (st is Statement_ConstructorCall constructorCall)
+            else if (st is ConstructorCall constructorCall)
             { GenerateCodeForStatement(constructorCall); }
-            else if (st is Statement_Index indexStatement)
+            else if (st is IndexCall indexStatement)
             { GenerateCodeForStatement(indexStatement); }
-            else if (st is Statement_Field field)
+            else if (st is Field field)
             { GenerateCodeForStatement(field); }
-            else if (st is Statement_As @as)
+            else if (st is TypeCast @as)
             { GenerateCodeForStatement(@as); }
             else
             {
                 Output.Debug.Debug.Log("[Compiler]: Unimplemented statement " + st.GetType().Name);
             }
 
-            if (st is StatementParent)
+            if (st is StatementWithBlock)
             { CleanupVariables(CleanupStack.Pop()); }
 
             debugInfo.InstructionEnd = GeneratedCode.Count - 1;
@@ -1927,12 +1927,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
 
-        CleanupItem CompileVariables(StatementParent statement, bool isGlobal, bool addComments = true)
+        CleanupItem CompileVariables(Block block, bool isGlobal, bool addComments = true)
         {
             if (addComments) AddComment("Variables");
             int count = 0;
             int variableSizeSum = 0;
-            foreach (var s in statement.Statements)
+            foreach (var s in block.Statements)
             {
                 var v = GenerateCodeForVariable(s, isGlobal);
                 variableSizeSum += v.Size;
@@ -1959,20 +1959,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             PopVariable(cleanupItem.Count);
         }
 
-        void GenerateCodeForValueSetter(Statement statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
         {
-            if (statementToSet is Statement_Variable variable)
+            if (statementToSet is Identifier variable)
             { GenerateCodeForValueSetter(variable, value); }
-            else if (statementToSet is Statement_Field field)
+            else if (statementToSet is Field field)
             { GenerateCodeForValueSetter(field, value); }
-            else if (statementToSet is Statement_Index index)
+            else if (statementToSet is IndexCall index)
             { GenerateCodeForValueSetter(index, value); }
-            else if (statementToSet is Statement_MemoryAddressFinder memoryAddressGetter)
+            else if (statementToSet is Pointer memoryAddressGetter)
             { GenerateCodeForValueSetter(memoryAddressGetter, value); }
             else
             { throw new CompilerException($"The left side of the assignment operator should be a variable, field or memory address. Passed {statementToSet.GetType().Name}", statementToSet, CurrentFile); }
         }
-        void GenerateCodeForValueSetter(Statement_Variable statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
         {
             CompiledType valueType = FindStatementType(value);
 
@@ -2001,7 +2001,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 throw new CompilerException($"Variable \"{statementToSet.VariableName.Content}\" not found", statementToSet.VariableName, CurrentFile);
             }
         }
-        void GenerateCodeForValueSetter(Statement_Field statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
         {
             statementToSet.FieldName.AnalysedType = TokenAnalysedType.FieldName;
 
@@ -2042,7 +2042,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new NotImplementedException();
         }
-        void GenerateCodeForValueSetter(Statement_Index statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(IndexCall statementToSet, StatementWithValue value)
         {
             CompiledType prevType = FindStatementType(statementToSet.PrevStatement);
             CompiledType valueType = FindStatementType(value);
@@ -2107,7 +2107,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
         }
-        void GenerateCodeForValueSetter(Statement_MemoryAddressFinder statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(Pointer statementToSet, StatementWithValue value)
         {
             CompiledType targetType = FindStatementType(statementToSet);
 
@@ -2119,9 +2119,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             // TODO: set value by stack address
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
-        void GenerateCodeForValueSetter(Statement_NewVariable statementToSet, StatementWithReturnValue value)
+        void GenerateCodeForValueSetter(VariableDeclaretion statementToSet, StatementWithValue value)
         {
-            if (value is Statement_ListValue)
+            if (value is LiteralList)
             { throw new NotImplementedException(); }
 
             if (!GetVariable(statementToSet.VariableName.Content, out var variable))
@@ -2147,7 +2147,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithReturnValue value)
+        void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithValue value)
         {
             if (destination == valueType)
             { return; }
@@ -2391,7 +2391,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="CompilerException"/>
-        int GetDataAddress(Statement_Variable variable, out AddressingMode addressingMode)
+        int GetDataAddress(Identifier variable, out AddressingMode addressingMode)
         {
             if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
@@ -2419,7 +2419,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Can be:<br/><see cref="AddressingMode.BASEPOINTER_RELATIVE"/><br/> or <br/><see cref="AddressingMode.ABSOLUTE"/>
         /// </param>
         /// <exception cref="NotImplementedException"/>
-        int GetDataAddress(Statement_Field field, out AddressingMode addressingMode)
+        int GetDataAddress(Field field, out AddressingMode addressingMode)
         {
             var prevType = FindStatementType(field.PrevStatement);
             if (prevType.IsStruct)
@@ -2427,7 +2427,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 var @struct = prevType.Struct;
                 if (@struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
-                    if (field.PrevStatement is Statement_Variable _prevVar)
+                    if (field.PrevStatement is Identifier _prevVar)
                     {
                         if (GetParameter(_prevVar.VariableName.Content, out CompiledParameter param))
                         {
@@ -2437,7 +2437,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         }
                         return fieldOffset + GetDataAddress(_prevVar, out addressingMode);
                     }
-                    if (field.PrevStatement is Statement_Field _prevField) return fieldOffset + GetDataAddress(_prevField, out addressingMode);
+                    if (field.PrevStatement is Field _prevField) return fieldOffset + GetDataAddress(_prevField, out addressingMode);
                 }
             }
             else if (prevType.IsClass)
@@ -2445,7 +2445,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 var @class = prevType.Class;
                 if (@class.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
-                    if (field.PrevStatement is Statement_Variable _prevVar)
+                    if (field.PrevStatement is Identifier _prevVar)
                     {
                         if (GetParameter(_prevVar.VariableName.Content, out CompiledParameter param))
                         {
@@ -2455,7 +2455,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         }
                         return fieldOffset + GetDataAddress(_prevVar, out addressingMode);
                     }
-                    if (field.PrevStatement is Statement_Field prevField) return fieldOffset + GetDataAddress(prevField, out addressingMode);
+                    if (field.PrevStatement is Field prevField) return fieldOffset + GetDataAddress(prevField, out addressingMode);
                 }
             }
 
@@ -2466,7 +2466,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Returns the <paramref name="field"/>'s offset relative to the base object/field
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        int GetFieldOffset(Statement_Field field)
+        int GetFieldOffset(Field field)
         {
             var prevType = FindStatementType(field.PrevStatement);
             if (prevType.IsStruct)
@@ -2474,8 +2474,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 var @struct = prevType.Struct;
                 if (@struct.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
-                    if (field.PrevStatement is Statement_Variable) return fieldOffset;
-                    if (field.PrevStatement is Statement_Field prevField) return fieldOffset + GetFieldOffset(prevField);
+                    if (field.PrevStatement is Identifier) return fieldOffset;
+                    if (field.PrevStatement is Field prevField) return fieldOffset + GetFieldOffset(prevField);
                 }
             }
             else if (prevType.IsClass)
@@ -2483,8 +2483,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 var @class = prevType.Class;
                 if (@class.FieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
                 {
-                    if (field.PrevStatement is Statement_Variable) return fieldOffset;
-                    if (field.PrevStatement is Statement_Field prevField) return fieldOffset + GetFieldOffset(prevField);
+                    if (field.PrevStatement is Identifier) return fieldOffset;
+                    if (field.PrevStatement is Field prevField) return fieldOffset + GetFieldOffset(prevField);
                 }
             }
 
@@ -2506,7 +2506,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Can be:<br/><see cref="AddressingMode.BASEPOINTER_RELATIVE"/><br/> or <br/><see cref="AddressingMode.ABSOLUTE"/>
         /// </param>
         /// <exception cref="CompilerException"/>
-        int GetBaseAddress(Statement_Variable variable, out AddressingMode addressingMode)
+        int GetBaseAddress(Identifier variable, out AddressingMode addressingMode)
         {
             if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
             {
@@ -2535,14 +2535,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Returns the <paramref name="field"/>'s base memory address. In the most cases the memory address is at the pointer that points to the <paramref name="field"/>'s object on the heap.
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        int GetBaseAddress(Statement_Field field, out AddressingMode addressingMode)
+        int GetBaseAddress(Field field, out AddressingMode addressingMode)
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
             if (prevType.IsStruct || prevType.IsClass)
             {
-                if (field.PrevStatement is Statement_Variable prevVariable) return GetBaseAddress(prevVariable, out addressingMode);
-                if (field.PrevStatement is Statement_Field prevField) return GetBaseAddress(prevField, out addressingMode);
+                if (field.PrevStatement is Identifier prevVariable) return GetBaseAddress(prevVariable, out addressingMode);
+                if (field.PrevStatement is Field prevField) return GetBaseAddress(prevField, out addressingMode);
             }
 
             throw new NotImplementedException();
@@ -2553,7 +2553,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// </summary>
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="CompilerException"/>
-        bool IsItInHeap(Statement_Variable variable)
+        bool IsItInHeap(Identifier variable)
         {
             if (GetParameter(variable.VariableName.Content, out var parameter))
             {
@@ -2572,18 +2572,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Checks if the <paramref name="field"/> is stored on the heap or not
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        bool IsItInHeap(Statement_Field field)
+        bool IsItInHeap(Field field)
         {
             var prevType = FindStatementType(field.PrevStatement);
             if (prevType.IsStruct)
             {
-                if (field.PrevStatement is Statement_Variable _prevVar) return IsItInHeap(_prevVar);
-                if (field.PrevStatement is Statement_Field _prevField) return IsItInHeap(_prevField);
+                if (field.PrevStatement is Identifier _prevVar) return IsItInHeap(_prevVar);
+                if (field.PrevStatement is Field _prevField) return IsItInHeap(_prevField);
             }
             else if (prevType.IsClass)
             {
-                if (field.PrevStatement is Statement_Variable _prevVar) return IsItInHeap(_prevVar);
-                if (field.PrevStatement is Statement_Field _prevField) return IsItInHeap(_prevField);
+                if (field.PrevStatement is Identifier _prevVar) return IsItInHeap(_prevVar);
+                if (field.PrevStatement is Field _prevField) return IsItInHeap(_prevField);
             }
 
             throw new NotImplementedException();
@@ -2596,23 +2596,23 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <returns>The variable's size</returns>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        int GenerateCodeForVariable(Statement_NewVariable newVariable, bool isGlobal)
+        int GenerateCodeForVariable(VariableDeclaretion newVariable, bool isGlobal)
         {
             if (newVariable.Type.Identifier == "var")
             {
                 if (newVariable.InitialValue != null)
                 {
-                    if (newVariable.InitialValue is Statement_Literal literal)
+                    if (newVariable.InitialValue is BBCode.Parser.Statement.Literal literal)
                     {
                         newVariable.Type = TypeInstance.CreateAnonymous(literal.Type, TypeDefinitionReplacer);
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
-                    else if (newVariable.InitialValue is Statement_NewInstance newInstance)
+                    else if (newVariable.InitialValue is NewInstance newInstance)
                     {
                         newVariable.Type.Identifier.Content = newInstance.TypeName.Content;
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
                     }
-                    else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
+                    else if (newVariable.InitialValue is ConstructorCall constructorCall)
                     {
                         newVariable.Type.Identifier.Content = constructorCall.TypeName.Content;
                         newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
@@ -2652,7 +2652,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
         {
-            if (st is Statement_NewVariable newVariable)
+            if (st is VariableDeclaretion newVariable)
             {
                 int size = GenerateCodeForVariable(newVariable, isGlobal);
                 return new CleanupItem(size, 1);
@@ -2932,7 +2932,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
-        CompiledVariable GetVariableInfo(Statement_NewVariable newVariable, int memoryOffset, bool isGlobal)
+        CompiledVariable GetVariableInfo(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
         {
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
@@ -3227,7 +3227,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (var pair in item.currentVariables)
                 { compiledVariables.Add(pair.Key, pair.Value); }
 
-                if (item.CallStatement is Statement_ConstructorCall constructorCall)
+                if (item.CallStatement is ConstructorCall constructorCall)
                 {
                     if (!GetConstructor(constructorCall, out var function))
                     { throw new CompilerException($"Constructor for type \"{constructorCall.TypeName}\" not found", constructorCall.TypeName, CurrentFile); }
@@ -3237,7 +3237,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
                 }
-                else if (item.CallStatement is Statement_KeywordCall functionCall)
+                else if (item.CallStatement is KeywordCall functionCall)
                 {
                     if (functionCall.Identifier.Content == "delete")
                     {

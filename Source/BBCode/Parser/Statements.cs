@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace ProgrammingLanguage.BBCode.Parser.Statements
+namespace ProgrammingLanguage.BBCode.Parser.Statement
 {
     using Core;
 
@@ -17,72 +17,19 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
             if (callback?.Invoke(st) == true) return true;
 
-            if (st is StatementParent statementParent)
-            { if (GetAllStatement(statementParent.Statements, callback)) return true; }
+            var statements = st.GetStatements();
+            return GetAllStatement(statements, callback);
+        }
+        static bool GetAllStatement(IEnumerable<Statement> statements, Func<Statement, bool> callback)
+        {
+            if (statements is null) throw new ArgumentNullException(nameof(statements));
 
-            if (st is Statement_ListValue listValue)
-            { return GetAllStatement(listValue.Values, callback); }
-            else if (st is Statement_NewVariable newVariable)
-            { if (newVariable.InitialValue != null) return GetAllStatement(newVariable.InitialValue, callback); }
-            else if (st is Statement_FunctionCall functionCall)
-            {
-                if (GetAllStatement(functionCall.PrevStatement, callback)) return true;
+            if (callback == null) return false;
 
-                return GetAllStatement(functionCall.Parameters, callback);
-            }
-            else if (st is Statement_ConstructorCall constructorCall)
+            foreach (var statement in statements)
             {
-                return GetAllStatement(constructorCall.Parameters, callback);
+                if (GetAllStatement(statement, callback)) return true;
             }
-            else if (st is Statement_KeywordCall keywordCall)
-            {
-                return GetAllStatement(keywordCall.Parameters, callback);
-            }
-            else if (st is Statement_Operator @operator)
-            {
-                if (@operator.Right != null) if (GetAllStatement(@operator.Right, callback)) return true;
-                if (@operator.Left != null) return GetAllStatement(@operator.Left, callback);
-            }
-            else if (st is Statement_Setter setter)
-            {
-                if (GetAllStatement(setter.Right, callback)) return true;
-                return GetAllStatement(setter.Left, callback);
-            }
-            else if (st is Statement_Literal)
-            { }
-            else if (st is Statement_Variable)
-            { }
-            else if (st is Statement_WhileLoop whileLoop)
-            { return GetAllStatement(whileLoop.Condition, callback); }
-            else if (st is Statement_ForLoop forLoop)
-            {
-                if (GetAllStatement(forLoop.Condition, callback)) return true;
-                if (GetAllStatement(forLoop.Expression, callback)) return true;
-                if (GetAllStatement(forLoop.VariableDeclaration, callback)) return true;
-            }
-            else if (st is Statement_If @if)
-            { return GetAllStatement(@if.Parts.ToArray(), callback); }
-            else if (st is Statement_If_If ifIf)
-            { return GetAllStatement(ifIf.Condition, callback); }
-            else if (st is Statement_If_ElseIf ifElseif)
-            { return GetAllStatement(ifElseif.Condition, callback); }
-            else if (st is Statement_If_Else)
-            { }
-            else if (st is Statement_NewInstance)
-            { }
-            else if (st is Statement_Index)
-            { }
-            else if (st is Statement_Field field)
-            { return GetAllStatement(field.PrevStatement, callback); }
-            else if (st is Statement_As @as)
-            { return GetAllStatement(@as.PrevStatement, callback); }
-            else if (st is Statement_MemoryAddressGetter memoryAddressGetter)
-            { return GetAllStatement(memoryAddressGetter.PrevStatement, callback); }
-            else if (st is Statement_MemoryAddressFinder memoryAddressFinder)
-            { return GetAllStatement(memoryAddressFinder.PrevStatement, callback); }
-            else
-            { throw new NotImplementedException($"{st.GetType().FullName}"); }
-
             return false;
         }
         static bool GetAllStatement(Statement[] statements, Func<Statement, bool> callback)
@@ -116,11 +63,6 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
                 GetAllStatement(parserResult.Functions[i].Statements, callback);
             }
         }
-        public static bool GetAllStatement(List<Statement> statements, Func<Statement, bool> callback)
-        {
-            if (statements is null) throw new ArgumentNullException(nameof(statements));
-            return GetAllStatement(statements.ToArray(), callback);
-        }
         public static void GetAllStatement(IEnumerable<FunctionDefinition> functions, Func<Statement, bool> callback)
         {
             if (callback == null) return;
@@ -141,23 +83,72 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
     public interface IReadableID
     {
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch);
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch);
     }
 
     public abstract class Statement : IThingWithPosition
     {
         public override string ToString()
-        { return this.GetType().Name; }
+            => this.GetType().Name;
 
         public abstract string PrettyPrint(int ident = 0);
         public abstract Position TotalPosition();
         public Position GetPosition() => TotalPosition();
+
+        public virtual IEnumerable<Statement> GetStatements()
+        { yield break; }
     }
-    public class Statement_HashInfo : Statement, IDefinition
+
+    public abstract class StatementWithValue : Statement
+    {
+        public bool SaveValue = true;
+        public virtual object TryGetValue() => null;
+    }
+
+    public class Block : Statement
+    {
+        public List<Statement> Statements;
+
+        public Token BracketStart;
+        public Token BracketEnd;
+
+        public Block()
+        { this.Statements = new(); }
+
+        public Block(IEnumerable<Statement> statements)
+        { this.Statements = new(statements); }
+
+        public override Position TotalPosition()
+            => new(BracketStart, BracketEnd);
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            string result = "{\n";
+
+            foreach (Statement statement in Statements)
+            { result += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n"; }
+
+            result += $"{" ".Repeat(ident)}}}";
+            return result;
+        }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            for (int i = 0; i < Statements.Count; i++)
+            { yield return Statements[i]; }
+        }
+    }
+
+    public abstract class StatementWithBlock : Statement
+    {
+        internal Block Block;
+    }
+
+    public class CompileTag : Statement, IDefinition
     {
         public Token HashToken;
         public Token HashName;
-        public Statement_Literal[] Parameters;
+        public Literal[] Parameters;
 
         public string FilePath { get; set; }
 
@@ -177,33 +168,12 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         }
     }
 
-    public abstract class StatementWithReturnValue : Statement
-    {
-        public bool SaveValue = true;
-        public virtual object TryGetValue() => null;
-    }
-
-    public abstract class StatementParent : Statement
-    {
-        public List<Statement> Statements;
-        public StatementParent()
-        { this.Statements = new(); }
-
-        public Token BracketStart;
-        public Token BracketEnd;
-
-        public override Position TotalPosition()
-            => new(BracketStart, BracketEnd);
-
-        public abstract override string PrettyPrint(int ident = 0);
-    }
-
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_ListValue : StatementWithReturnValue
+    public class LiteralList : StatementWithValue
     {
         public Token BracketLeft;
         public Token BracketRight;
-        public StatementWithReturnValue[] Values;
+        public StatementWithValue[] Values;
         public int Size => Values.Length;
 
         public override string PrettyPrint(int ident = 0)
@@ -213,14 +183,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override Position TotalPosition()
             => new(BracketLeft, BracketRight);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            for (int i = 0; i < Values.Length; i++)
+            { yield return Values[i]; }
+        }
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_NewVariable : Statement, IDefinition
+    public class VariableDeclaretion : Statement, IDefinition
     {
         public TypeInstance Type;
         public Token VariableName;
-        internal StatementWithReturnValue InitialValue;
+        internal StatementWithValue InitialValue;
 
         public string FilePath { get; set; }
 
@@ -239,26 +215,31 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             Position result = new(Type, VariableName, InitialValue);
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return InitialValue;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_FunctionCall : StatementWithReturnValue, IReadableID
+    public class FunctionCall : StatementWithValue, IReadableID
     {
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
-        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
+        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
         internal bool IsMethodCall => PrevStatement != null;
-        public StatementWithReturnValue PrevStatement;
+        public StatementWithValue PrevStatement;
 
         public Token BracketLeft;
         public Token BracketRight;
 
-        internal StatementWithReturnValue[] MethodParameters
+        internal StatementWithValue[] MethodParameters
         {
             get
             {
                 if (PrevStatement == null)
                 { return Parameters.ToArray(); }
-                var newList = new List<StatementWithReturnValue>(Parameters.ToArray());
+                var newList = new List<StatementWithValue>(Parameters.ToArray());
                 newList.Insert(0, PrevStatement);
                 return newList.ToArray();
             }
@@ -304,7 +285,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             return result;
         }
 
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = "";
             if (this.PrevStatement != null)
@@ -322,13 +303,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             result += ")";
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+            for (int i = 0; i < Parameters.Length; i++)
+            { yield return Parameters[i]; }
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_KeywordCall : StatementWithReturnValue, IReadableID
+    public class KeywordCall : StatementWithValue, IReadableID
     {
         public Token Identifier;
         internal string FunctionName => Identifier.Content;
-        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
+        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
 
         public override string ToString()
         {
@@ -369,7 +357,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             return result;
         }
 
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = "";
             result += this.Identifier.Content;
@@ -384,28 +372,34 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            for (int i = 0; i < Parameters.Length; i++)
+            { yield return Parameters[i]; }
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Operator : StatementWithReturnValue, IReadableID
+    public class OperatorCall : StatementWithValue, IReadableID
     {
         public readonly Token Operator;
-        internal readonly StatementWithReturnValue Left;
-        internal StatementWithReturnValue Right;
+        internal readonly StatementWithValue Left;
+        internal StatementWithValue Right;
         internal bool InsideBracelet;
 
-        internal StatementWithReturnValue[] Parameters
+        internal StatementWithValue[] Parameters
         {
             get
             {
-                StatementWithReturnValue left = this.Left;
-                StatementWithReturnValue right = this.Right;
+                StatementWithValue left = this.Left;
+                StatementWithValue right = this.Right;
 
                 if (left is null && right is not null)
-                { return new StatementWithReturnValue[] { right }; }
+                { return new StatementWithValue[] { right }; }
                 else if (left is not null && right is null)
-                { return new StatementWithReturnValue[] { left }; }
+                { return new StatementWithValue[] { left }; }
                 else if (left is not null && right is not null)
-                { return new StatementWithReturnValue[] { left, right }; }
+                { return new StatementWithValue[] { left, right }; }
                 else
                 { throw new Errors.InternalException(); }
             }
@@ -421,13 +415,13 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             }
         }
 
-        public Statement_Operator(Token op, StatementWithReturnValue left)
+        public OperatorCall(Token op, StatementWithValue left)
         {
             this.Operator = op;
             this.Left = left;
             this.Right = null;
         }
-        public Statement_Operator(Token op, StatementWithReturnValue left, StatementWithReturnValue right)
+        public OperatorCall(Token op, StatementWithValue left, StatementWithValue right)
         {
             this.Operator = op;
             this.Left = left;
@@ -580,7 +574,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         }
 
         public override Position TotalPosition() => new(Operator, Left, Right);
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = this.Operator.Content;
             result += "(";
@@ -594,15 +588,21 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Left;
+            yield return Right;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Setter : Statement
+    public class Assignment : Statement
     {
         public readonly Token Operator;
-        internal readonly StatementWithReturnValue Left;
-        internal readonly StatementWithReturnValue Right;
+        internal readonly StatementWithValue Left;
+        internal readonly StatementWithValue Right;
 
-        public Statement_Setter(Token @operator, StatementWithReturnValue left, StatementWithReturnValue right)
+        public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
         {
             this.Operator = @operator;
             this.Left = left;
@@ -614,9 +614,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
 
         public override Position TotalPosition() => new(Operator, Left, Right);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Left;
+            yield return Right;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Literal : StatementWithReturnValue
+    public class Literal : StatementWithValue
     {
         public LiteralType Type;
         internal string Value;
@@ -654,7 +660,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         public override Position TotalPosition() => ValueToken == null ? ImagineryPosition : new Position(ValueToken);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Variable : StatementWithReturnValue
+    public class Identifier : StatementWithValue
     {
         public Token VariableName;
 
@@ -664,7 +670,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         public override string PrettyPrint(int ident = 0)
             => $"{" ".Repeat(ident)}{VariableName.Content}";
 
-        public Statement_Variable()
+        public Identifier()
         {
 
         }
@@ -672,10 +678,10 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         public override Position TotalPosition() => new Position(VariableName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_MemoryAddressGetter : StatementWithReturnValue
+    public class AddressGetter : StatementWithValue
     {
         public Token OperatorToken;
-        internal StatementWithReturnValue PrevStatement;
+        internal StatementWithValue PrevStatement;
 
         public override string ToString()
         {
@@ -687,19 +693,24 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
-        public Statement_MemoryAddressGetter()
+        public AddressGetter()
         {
 
         }
 
         public override Position TotalPosition()
             => new(OperatorToken, PrevStatement);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_MemoryAddressFinder : StatementWithReturnValue
+    public class Pointer : StatementWithValue
     {
         public Token OperatorToken;
-        internal StatementWithReturnValue PrevStatement;
+        internal StatementWithValue PrevStatement;
 
         public override string ToString()
         {
@@ -711,19 +722,24 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
-        public Statement_MemoryAddressFinder()
+        public Pointer()
         {
 
         }
 
         public override Position TotalPosition()
             => new(OperatorToken, PrevStatement);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_WhileLoop : StatementParent
+    public class WhileLoop : StatementWithBlock
     {
         internal Token Keyword;
-        internal StatementWithReturnValue Condition;
+        internal StatementWithValue Condition;
 
         public override string ToString()
         {
@@ -732,26 +748,26 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}while ({Condition.PrettyPrint()}) {{\n";
-
-            foreach (var statement in Statements)
-            {
-                x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
-            }
-
-            x += $"{" ".Repeat(ident)}}}";
+            var x = $"{" ".Repeat(ident)}while ({Condition.PrettyPrint()})";
+            x += Block.PrettyPrint();
             return x;
         }
 
         public override Position TotalPosition()
-            => new(Keyword, BracketStart, BracketEnd);
+            => new(Keyword, Block);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Condition;
+            yield return Block;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_ForLoop : StatementParent
+    public class ForLoop : StatementWithBlock
     {
         internal Token Keyword;
-        internal Statement_NewVariable VariableDeclaration;
-        internal StatementWithReturnValue Condition;
+        internal VariableDeclaretion VariableDeclaration;
+        internal StatementWithValue Condition;
         internal Statement Expression;
 
         public override string ToString()
@@ -761,23 +777,25 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}for ({VariableDeclaration.PrettyPrint()}; {Condition.PrettyPrint()}; {Expression.PrettyPrint()}) {{\n";
-
-            foreach (var statement in Statements)
-            {
-                x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
-            }
-
-            x += $"{" ".Repeat(ident)}}}";
+            var x = $"{" ".Repeat(ident)}for ({VariableDeclaration.PrettyPrint()}; {Condition.PrettyPrint()}; {Expression.PrettyPrint()})";
+            x += Block.PrettyPrint();
             return x;
         }
 
         public override Position TotalPosition()
-            => new(Keyword, BracketStart, BracketEnd);
+            => new(Keyword, Block);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return VariableDeclaration;
+            yield return Condition;
+            yield return Expression;
+            yield return Block;
+        }
     }
-    public class Statement_If : Statement
+    public class IfContainer : Statement
     {
-        public List<Statement_If_Part> Parts = new();
+        public List<BaseBranch> Parts = new();
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -795,9 +813,17 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override Position TotalPosition()
             => new(Parts);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            for (int i = 0; i < Parts.Count; i++)
+            {
+                yield return Parts[i];
+            }
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public abstract class Statement_If_Part : StatementParent
+    public abstract class BaseBranch : StatementWithBlock
     {
         internal Token Keyword;
         public IfPart Type;
@@ -815,70 +841,74 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         }
 
         public override Position TotalPosition()
-            => new(Keyword, BracketStart, BracketEnd);
+            => new(Keyword, Block);
 
         public abstract override string PrettyPrint(int ident = 0);
-    }
-    public class Statement_If_If : Statement_If_Part
-    {
-        internal StatementWithReturnValue Condition;
 
-        public Statement_If_If()
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Block;
+        }
+    }
+    public class IfBranch : BaseBranch
+    {
+        internal StatementWithValue Condition;
+
+        public IfBranch()
         { Type = IfPart.If; }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}if ({Condition.PrettyPrint()}) {{\n";
-
-            foreach (var statement in Statements)
-            {
-                x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
-            }
-
-            x += $"{" ".Repeat(ident)}}}";
+            var x = $"{" ".Repeat(ident)}if ({Condition.PrettyPrint()})";
+            x += Block.PrettyPrint();
             return x;
         }
-    }
-    public class Statement_If_ElseIf : Statement_If_Part
-    {
-        internal StatementWithReturnValue Condition;
 
-        public Statement_If_ElseIf()
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Condition;
+            yield return Block;
+        }
+    }
+    public class ElseIfBranch : BaseBranch
+    {
+        internal StatementWithValue Condition;
+
+        public ElseIfBranch()
         { Type = IfPart.ElseIf; }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}elseif ({Condition.PrettyPrint()}) {{\n";
-
-            foreach (var statement in Statements)
-            {
-                x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
-            }
-
-            x += $"{" ".Repeat(ident)}}}";
+            var x = $"{" ".Repeat(ident)}elseif ({Condition.PrettyPrint()})";
+            x += Block.PrettyPrint();
             return x;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Condition;
+            yield return Block;
+        }
     }
-    public class Statement_If_Else : Statement_If_Part
+    public class ElseBranch : BaseBranch
     {
-        public Statement_If_Else()
+        public ElseBranch()
         { Type = IfPart.Else; }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}else {{\n";
-
-            foreach (var statement in Statements)
-            {
-                x += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n";
-            }
-
-            x += $"{" ".Repeat(ident)}}}";
+            var x = $"{" ".Repeat(ident)}else";
+            x += Block.PrettyPrint();
             return x;
+        }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Block;
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_NewInstance : StatementWithReturnValue
+    public class NewInstance : StatementWithValue
     {
         public Token Keyword;
         public Token TypeName;
@@ -889,9 +919,9 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             => new(Keyword, TypeName);
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_ConstructorCall : StatementWithReturnValue, IReadableID
+    public class ConstructorCall : StatementWithValue, IReadableID
     {
-        public StatementWithReturnValue[] Parameters = Array.Empty<StatementWithReturnValue>();
+        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
         public Token Keyword;
         public Token TypeName;
 
@@ -937,7 +967,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
             return result;
         }
 
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = "";
             result += TypeName.Content;
@@ -954,14 +984,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            for (int i = 0; i < Parameters.Length; i++)
+            { yield return Parameters[i]; }
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Index : StatementWithReturnValue, IReadableID
+    public class IndexCall : StatementWithValue, IReadableID
     {
-        internal readonly StatementWithReturnValue Expression;
-        internal StatementWithReturnValue PrevStatement;
+        internal readonly StatementWithValue Expression;
+        internal StatementWithValue PrevStatement;
 
-        public Statement_Index(StatementWithReturnValue indexStatement)
+        public IndexCall(StatementWithValue indexStatement)
         {
             this.Expression = indexStatement;
         }
@@ -979,7 +1015,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
         public override Position TotalPosition()
             => new(PrevStatement, Expression);
 
-        public string ReadableID(Func<StatementWithReturnValue, Compiler.CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = TypeSearch.Invoke(this.PrevStatement).Name;
             result += "[";
@@ -988,12 +1024,18 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
             return result;
         }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+            yield return Expression;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_Field : StatementWithReturnValue
+    public class Field : StatementWithValue
     {
         public Token FieldName;
-        internal StatementWithReturnValue PrevStatement;
+        internal StatementWithValue PrevStatement;
 
         public override string ToString()
         {
@@ -1007,15 +1049,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override Position TotalPosition()
             => new(PrevStatement, FieldName);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+        }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Statement_As : StatementWithReturnValue
+    public class TypeCast : StatementWithValue
     {
-        internal StatementWithReturnValue PrevStatement;
+        internal StatementWithValue PrevStatement;
         internal Token Keyword;
         internal TypeInstance Type;
 
-        public Statement_As(StatementWithReturnValue prevStatement, Token keyword, TypeInstance type)
+        public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
         {
             this.PrevStatement = prevStatement;
             this.Keyword = keyword;
@@ -1027,5 +1074,10 @@ namespace ProgrammingLanguage.BBCode.Parser.Statements
 
         public override Position TotalPosition()
             => new(PrevStatement, Keyword, Type);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return PrevStatement;
+        }
     }
 }

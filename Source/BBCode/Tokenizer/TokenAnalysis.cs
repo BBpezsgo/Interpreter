@@ -1,7 +1,7 @@
 ﻿namespace ProgrammingLanguage.BBCode.Analysis
 {
     using ProgrammingLanguage.BBCode.Compiler;
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
 
     public static class Extensions
     {
@@ -66,14 +66,14 @@
             FilePath = @class.FilePath,
             Kind = ComplexTypeKind.Class,
         };
-        internal static AnalysedToken_Field Field(this Token token, CompiledStruct @struct, Statement_Field field, CompiledType type) => new(token)
+        internal static AnalysedToken_Field Field(this Token token, CompiledStruct @struct, Field field, CompiledType type) => new(token)
         {
             Name = @struct.Name.Content,
             FilePath = @struct.FilePath,
             Type = type.Name,
             Kind = ComplexTypeKind.Struct,
         };
-        internal static AnalysedToken_Field Field(this Token token, CompiledClass @class, Statement_Field field, CompiledType type) => new(token)
+        internal static AnalysedToken_Field Field(this Token token, CompiledClass @class, Field field, CompiledType type) => new(token)
         {
             Name = @class.Name.Content,
             FilePath = @class.FilePath,

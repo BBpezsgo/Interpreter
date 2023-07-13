@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Parser
 {
-    using ProgrammingLanguage.BBCode.Parser.Statements;
     using ProgrammingLanguage.Core;
 
     public enum LiteralType
@@ -76,7 +75,7 @@ namespace ProgrammingLanguage.BBCode.Parser
     public class EnumMemberDefinition : Compiler.IElementWithKey<string>
     {
         public Token Identifier;
-        public Statement_Literal Value;
+        public Statement.Literal Value;
 
         public string Key => Identifier.Content;
     }
@@ -92,7 +91,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition.Attribute[] Attributes;
     }
 
-    public class FunctionDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<FunctionDefinition>
+    public class FunctionDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<MacroDefinition>, Compiler.IDefinitionComparer<FunctionDefinition>
     {
         public class Attribute : Compiler.IElementWithKey<string>
         {
@@ -108,7 +107,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public Attribute[] Attributes;
         public readonly Token Identifier;
         public ParameterDefinition[] Parameters;
-        public Statement[] Statements;
+        public Statement.Statement[] Statements;
         public TypeInstance Type;
 
         public string FilePath { get; set; }
@@ -121,7 +120,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition(Token name)
         {
             Parameters = Array.Empty<ParameterDefinition>();
-            Statements = Array.Empty<Statement>();
+            Statements = Array.Empty<Statement.Statement>();
             Attributes = Array.Empty<Attribute>();
             this.Identifier = name;
         }
@@ -173,6 +172,107 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             return true;
         }
+
+        public bool IsSame(MacroDefinition other)
+        {
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
+            }
+            return true;
+        }
+    }
+
+    public class MacroDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<MacroDefinition>, Compiler.IDefinitionComparer<FunctionDefinition>
+    {
+        public Token BracketStart;
+        public Token BracketEnd;
+
+        public FunctionDefinition.Attribute[] Attributes;
+        public readonly Token Identifier;
+        public ParameterDefinition[] Parameters;
+        public Statement.Statement[] Statements;
+        public TypeInstance Type;
+        public readonly Token Keyword;
+
+        public string FilePath { get; set; }
+
+        /// <summary>
+        /// The first parameter is labeled as 'this'
+        /// </summary>
+        public bool IsMethod => ((Parameters.Length > 0) && (Parameters[0].withThisKeyword));
+
+        public MacroDefinition(Token name, Token keyword)
+        {
+            Parameters = Array.Empty<ParameterDefinition>();
+            Statements = Array.Empty<Statement.Statement>();
+            Attributes = Array.Empty<FunctionDefinition.Attribute>();
+            this.Identifier = name;
+            this.Keyword = keyword;
+        }
+
+        public override string ToString()
+        {
+            return $"{(IsExport ? "export " : "")}{Keyword}{this.Type.Identifier.Content} {this.Identifier}" + (this.Parameters.Length > 0 ? "(...)" : "()") + " " + (this.Statements.Length > 0 ? "{...}" : "{}");
+        }
+
+        public string PrettyPrint(int ident = 0)
+        {
+            List<string> parameters = new();
+            foreach (var parameter in this.Parameters)
+            {
+                parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
+            }
+
+            List<string> statements = new();
+            foreach (var statement in this.Statements)
+            {
+                statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
+            }
+
+            return $"{" ".Repeat(ident)}{this.Type.Identifier.Content} {this.Identifier}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+        }
+
+        public string ReadableID()
+        {
+            string result = "";
+            result += $"{Keyword} ";
+            result += this.Identifier.ToString();
+            result += "(";
+            for (int j = 0; j < this.Parameters.Length; j++)
+            {
+                if (j > 0) { result += ", "; }
+                result += this.Parameters[j].Type.ToString();
+            }
+            result += ")";
+            return result;
+        }
+
+        public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+
+        public bool IsSame(MacroDefinition other)
+        {
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
+            }
+            return true;
+        }
+
+        public bool IsSame(FunctionDefinition other)
+        {
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
+            }
+            return true;
+        }
     }
 
     public class GeneralFunctionDefinition : Exportable, IDefinition
@@ -182,7 +282,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         public readonly Token Identifier;
         public ParameterDefinition[] Parameters;
-        public Statement[] Statements;
+        public Statement.Statement[] Statements;
 
         public string FilePath { get; set; }
 
@@ -194,7 +294,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public GeneralFunctionDefinition(Token name)
         {
             Parameters = Array.Empty<ParameterDefinition>();
-            Statements = Array.Empty<Statement>();
+            Statements = Array.Empty<Statement.Statement>();
             this.Identifier = name;
         }
 
@@ -242,7 +342,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly Token Name;
         public Token BracketStart;
         public Token BracketEnd;
-        public List<Statement> Statements;
+        public List<Statement.Statement> Statements;
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
 
@@ -263,7 +363,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             this.methods = methods.ToArray();
             this.generalMethods = generalMethods.ToArray();
             this.Attributes = attributes.ToArray();
-            this.Statements = new List<Statement>();
+            this.Statements = new List<Statement.Statement>();
             this.operators = operators.ToArray();
         }
 
@@ -304,7 +404,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly Token Name;
         public Token BracketStart;
         public Token BracketEnd;
-        public List<Statement> Statements;
+        public List<Statement.Statement> Statements;
 
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
@@ -320,7 +420,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             this.Fields = fields.ToArray();
             this.methods = new Dictionary<string, FunctionDefinition>(methods);
             this.Attributes = attributes.ToArray();
-            this.Statements = new List<Statement>();
+            this.Statements = new List<Statement.Statement>();
         }
 
         public override string ToString()
@@ -358,17 +458,19 @@ namespace ProgrammingLanguage.BBCode.Parser
     public readonly struct ParserResult
     {
         public readonly FunctionDefinition[] Functions;
+        public readonly MacroDefinition[] Macros;
         public readonly StructDefinition[] Structs;
         public readonly ClassDefinition[] Classes;
         public readonly UsingDefinition[] Usings;
-        public readonly Statement_HashInfo[] Hashes;
+        public readonly Statement.CompileTag[] Hashes;
         public readonly List<UsingAnalysis> UsingsAnalytics;
-        public readonly Statement[] TopLevelStatements;
+        public readonly Statement.Statement[] TopLevelStatements;
         public readonly EnumDefinition[] Enums;
 
-        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement_HashInfo> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
+        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
         {
             Functions = functions.ToArray();
+            Macros = macros.ToArray();
             Structs = structs.ToArray();
             Usings = usings.ToArray();
             UsingsAnalytics = new();
@@ -578,56 +680,56 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (item.Statements.Length > 0)
                 {
                     int statementCount = 0;
-                    void AddStatement(Statement st)
+                    void AddStatement(Statement.Statement st)
                     {
                         statementCount++;
-                        if (st is Statement_ForLoop st0)
+                        if (st is Statement.ForLoop st0)
                         {
                             AddStatement(st0.Condition);
                             AddStatement(st0.VariableDeclaration);
                             AddStatement(st0.Expression);
                         }
-                        else if (st is Statement_WhileLoop st1)
+                        else if (st is Statement.WhileLoop st1)
                         {
                             AddStatement(st1.Condition);
                         }
-                        else if (st is Statement_FunctionCall st2)
+                        else if (st is Statement.FunctionCall st2)
                         {
                             if (st2.PrevStatement != null) AddStatement(st2.PrevStatement);
                             foreach (var st3 in st2.Parameters)
                             { AddStatement(st3); }
                         }
-                        else if (st is Statement_KeywordCall keywordCall)
+                        else if (st is Statement.KeywordCall keywordCall)
                         {
                             foreach (var st_ in keywordCall.Parameters)
                             { AddStatement(st_); }
                         }
-                        else if (st is Statement_If_If st3)
+                        else if (st is Statement.IfBranch st3)
                         {
                             AddStatement(st3.Condition);
                         }
-                        else if (st is Statement_If_ElseIf st4)
+                        else if (st is Statement.ElseIfBranch st4)
                         {
                             AddStatement(st4.Condition);
                         }
-                        else if (st is Statement_Index st5)
+                        else if (st is Statement.IndexCall st5)
                         {
                             AddStatement(st5.Expression);
                             statementCount++;
                         }
-                        else if (st is Statement_NewVariable st6)
+                        else if (st is Statement.VariableDeclaretion st6)
                         {
                             if (st6.InitialValue != null) AddStatement(st6.InitialValue);
                         }
-                        else if (st is Statement_Operator st7)
+                        else if (st is Statement.OperatorCall st7)
                         {
                             if (st7.Left != null) AddStatement(st7.Left);
                             if (st7.Right != null) AddStatement(st7.Right);
                         }
 
-                        if (st is StatementParent st8)
+                        if (st is Statement.StatementWithBlock st8)
                         {
-                            foreach (var item in st8.Statements)
+                            foreach (var item in st8.Block.Statements)
                             {
                                 AddStatement(st);
                             }
@@ -683,7 +785,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             for (int i = 0; i < this.Hashes.Length; i++)
             { this.Hashes[i].FilePath = path; }
-            StatementFinder.GetAllStatement(this, statement =>
+            Statement.StatementFinder.GetAllStatement(this, statement =>
             {
                 if (statement is not IDefinition def) return false;
                 def.FilePath = path;
@@ -714,7 +816,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 else
                 { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
             }
-            StatementFinder.GetAllStatement(this, statement =>
+            Statement.StatementFinder.GetAllStatement(this, statement =>
             {
                 if (statement is not IDefinition def) return false;
                 if (string.IsNullOrEmpty(def.FilePath))
@@ -729,10 +831,10 @@ namespace ProgrammingLanguage.BBCode.Parser
     public readonly struct ParserResultHeader
     {
         public readonly List<UsingDefinition> Usings;
-        public readonly Statement_HashInfo[] Hashes;
+        public readonly Statement.CompileTag[] Hashes;
         public readonly List<UsingAnalysis> UsingsAnalytics;
 
-        public ParserResultHeader(List<UsingDefinition> usings, List<Statement_HashInfo> hashes)
+        public ParserResultHeader(List<UsingDefinition> usings, List<Statement.CompileTag> hashes)
         {
             Usings = usings;
             UsingsAnalytics = new();

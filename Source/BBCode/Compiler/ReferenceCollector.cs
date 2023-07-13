@@ -5,7 +5,7 @@ using System.Linq;
 namespace ProgrammingLanguage.BBCode.Compiler
 {
     using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
 
@@ -19,7 +19,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         internal ReferenceCollector() : base() { }
 
-        CompiledVariable GetVariableInfo(Statement_NewVariable newVariable)
+        CompiledVariable GetVariableInfo(VariableDeclaretion newVariable)
         {
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
@@ -35,22 +35,22 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 newVariable);
         }
 
-        void AnalyzeNewVariable(Statement_NewVariable newVariable)
+        void AnalyzeNewVariable(VariableDeclaretion newVariable)
         {
             if (newVariable.Type == "var")
             {
                 if (newVariable.InitialValue == null)
                 { throw new CompilerException($"Initial value for \"var\" variable declaration is requied", newVariable.Type.Identifier); }
 
-                if (newVariable.InitialValue is Statement_Literal literal)
+                if (newVariable.InitialValue is BBCode.Parser.Statement.Literal literal)
                 {
                     newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
                 }
-                else if (newVariable.InitialValue is Statement_NewInstance newStruct)
+                else if (newVariable.InitialValue is NewInstance newStruct)
                 {
                     newVariable.Type = TypeInstance.CreateAnonymous(newStruct.TypeName.Content, TypeDefinitionReplacer);
                 }
-                else if (newVariable.InitialValue is Statement_ConstructorCall constructorCall)
+                else if (newVariable.InitialValue is ConstructorCall constructorCall)
                 {
                     newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
                 }
@@ -71,12 +71,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int variablesAdded = 0;
             foreach (var st in statements)
             {
-                if (st is Statement_NewVariable newVar)
+                if (st is VariableDeclaretion newVar)
                 {
                     AnalyzeNewVariable(newVar);
                     variablesAdded++;
                 }
-                else if (st is Statement_ForLoop forLoop)
+                else if (st is ForLoop forLoop)
                 {
                     AnalyzeNewVariable(forLoop.VariableDeclaration);
                     variablesAdded++;
@@ -86,9 +86,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (var st in statements)
             {
                 AnalyzeStatement(st);
-                if (st is StatementParent pr)
+                if (st is StatementWithBlock pr)
                 {
-                    AnalyzeStatements(pr.Statements);
+                    AnalyzeStatements(pr.Block.Statements);
                 }
             }
 
@@ -100,29 +100,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void AnalyzeStatement(Statement statement)
         {
-            if (statement is Statement_ForLoop forLoop)
+            if (statement is ForLoop forLoop)
             {
                 AnalyzeStatement(forLoop.VariableDeclaration);
                 AnalyzeStatement(forLoop.Condition);
                 AnalyzeStatement(forLoop.Expression);
             }
-            else if (statement is Statement_If @if)
+            else if (statement is IfContainer @if)
             {
                 AnalyzeStatements(@if.Parts);
             }
-            else if (statement is Statement_If_If ifIf)
+            else if (statement is IfBranch ifIf)
             {
                 AnalyzeStatement(ifIf.Condition);
             }
-            else if (statement is Statement_If_ElseIf ifElseIf)
+            else if (statement is ElseIfBranch ifElseIf)
             {
                 AnalyzeStatement(ifElseIf.Condition);
             }
-            else if (statement is Statement_If_Else)
+            else if (statement is ElseBranch)
             {
 
             }
-            else if (statement is Statement_Index index)
+            else if (statement is IndexCall index)
             {
                 AnalyzeStatement(index.PrevStatement);
                 AnalyzeStatement(index.Expression);
@@ -141,11 +141,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 { indexer.TimesUsed++; }
                 indexer.TimesUsedTotal++;
             }
-            else if (statement is Statement_NewVariable newVariable)
+            else if (statement is VariableDeclaretion newVariable)
             {
                 if (newVariable.InitialValue != null) AnalyzeStatement(newVariable.InitialValue);
             }
-            else if (statement is Statement_Operator @operator)
+            else if (statement is OperatorCall @operator)
             {
                 if (@operator.Left != null) AnalyzeStatement(@operator.Left);
                 if (@operator.Right != null) AnalyzeStatement(@operator.Right);
@@ -159,9 +159,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     operatorDefinition.TimesUsedTotal++;
                 }
             }
-            else if (statement is Statement_Setter setter)
+            else if (statement is Assignment setter)
             {
-                if (setter.Left is Statement_Index indexSetter)
+                if (setter.Left is IndexCall indexSetter)
                 {
                     AnalyzeStatement(indexSetter.PrevStatement);
                     AnalyzeStatement(indexSetter.Expression);
@@ -185,11 +185,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 { AnalyzeStatement(setter.Left); }
                 AnalyzeStatement(setter.Right);
             }
-            else if (statement is Statement_WhileLoop whileLoop)
+            else if (statement is WhileLoop whileLoop)
             {
                 AnalyzeStatement(whileLoop.Condition);
             }
-            else if (statement is Statement_FunctionCall functionCall)
+            else if (statement is FunctionCall functionCall)
             {
                 AnalyzeStatements(functionCall.Parameters);
 
@@ -205,7 +205,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     function.TimesUsedTotal++;
                 }
             }
-            else if (statement is Statement_KeywordCall keywordCall)
+            else if (statement is KeywordCall keywordCall)
             {
                 AnalyzeStatements(keywordCall.Parameters);
 
@@ -271,9 +271,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     return;
                 }
             }
-            else if (statement is Statement_Field field)
+            else if (statement is Field field)
             { AnalyzeStatement(field.PrevStatement); }
-            else if (statement is Statement_Variable variable)
+            else if (statement is Identifier variable)
             {
                 if (GetFunction(variable, out var function))
                 {
@@ -284,9 +284,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     function.TimesUsedTotal++;
                 }
             }
-            else if (statement is Statement_NewInstance)
+            else if (statement is NewInstance)
             { }
-            else if (statement is Statement_ConstructorCall constructorCall)
+            else if (statement is ConstructorCall constructorCall)
             {
                 AnalyzeStatements(constructorCall.Parameters);
 
@@ -299,15 +299,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     function.TimesUsedTotal++;
                 }
             }
-            else if (statement is Statement_Literal)
+            else if (statement is BBCode.Parser.Statement.Literal)
             { }
-            else if (statement is Statement_As @as)
+            else if (statement is TypeCast @as)
             { AnalyzeStatement(@as.PrevStatement); }
-            else if (statement is Statement_MemoryAddressGetter memoryAddressGetter)
+            else if (statement is AddressGetter memoryAddressGetter)
             { AnalyzeStatement(memoryAddressGetter.PrevStatement); }
-            else if (statement is Statement_MemoryAddressFinder memoryAddressFinder)
+            else if (statement is Pointer memoryAddressFinder)
             { AnalyzeStatement(memoryAddressFinder.PrevStatement); }
-            else if (statement is Statement_ListValue listValue)
+            else if (statement is LiteralList listValue)
             { AnalyzeStatements(listValue.Values); }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
@@ -375,7 +375,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             for (int i = 0; i < this.CompiledFunctions.Length; i++)
             {
-                ((IReferenceable<Statement_FunctionCall>)this.CompiledFunctions[i]).ClearReferences();
+                ((IReferenceable<FunctionCall>)this.CompiledFunctions[i]).ClearReferences();
                 this.CompiledFunctions[i].TimesUsed = 0;
                 this.CompiledFunctions[i].TimesUsedTotal = 0;
             }
@@ -389,7 +389,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < this.CompiledOperators.Length; i++)
             {
-                ((IReferenceable<Statement_Operator>)this.CompiledOperators[i]).ClearReferences();
+                ((IReferenceable<OperatorCall>)this.CompiledOperators[i]).ClearReferences();
                 this.CompiledOperators[i].TimesUsed = 0;
                 this.CompiledOperators[i].TimesUsedTotal = 0;
             }

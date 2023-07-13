@@ -17,7 +17,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
     using ProgrammingLanguage.Tokenizer;
 
     using Parser;
-    using Parser.Statements;
+    using Parser.Statement;
 
     public static class Extensions
     {
@@ -97,6 +97,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (CompiledGeneralFunction function in functions)
             { if (function.IsSame(other)) return true; }
             return false;
+        }
+
+        public static string ID(this MacroDefinition function)
+        {
+            string result = "macro " + function.Identifier.Content;
+            for (int i = 0; i < function.Parameters.Length; i++)
+            {
+                var param = function.Parameters[i];
+                // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
+                result += "," + param.Type.ToString();
+            }
+            return result;
         }
 
         public static string ID(this FunctionDefinition function)
@@ -390,12 +402,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         public int CallInstructionIndex;
 
-        public Statement_Operator CallStatement;
+        public OperatorCall CallStatement;
         public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
         internal string CurrentFile;
 
-        public UndefinedOperatorFunctionOffset(int callInstructionIndex, Statement_Operator functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
@@ -415,16 +427,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         public int CallInstructionIndex;
 
-        public Statement_FunctionCall CallStatement;
-        public Statement_Variable VariableStatement;
-        public Statement_Index IndexStatement;
+        public FunctionCall CallStatement;
+        public Identifier VariableStatement;
+        public IndexCall IndexStatement;
         public bool IsSetter;
 
         public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
         internal string CurrentFile;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_FunctionCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
@@ -442,7 +454,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_Variable variable, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
@@ -460,7 +472,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Statement_Index index, bool isSetter, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, IndexCall index, bool isSetter, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
@@ -705,7 +717,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public void ClearReferences();
     }
 
-    public class CompiledOperator : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledOperator>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_Operator>
+    public class CompiledOperator : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledOperator>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<OperatorCall>
     {
         public CompiledType[] ParameterTypes;
 
@@ -718,8 +730,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
-        public IReadOnlyList<Statement_Operator> ReferencesOperator => references;
-        readonly List<Statement_Operator> references = new();
+        public IReadOnlyList<OperatorCall> ReferencesOperator => references;
+        readonly List<OperatorCall> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -760,7 +772,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
-        public void AddReference(Statement_Operator statement) => references.Add(statement);
+        public void AddReference(OperatorCall statement) => references.Add(statement);
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledOperator other)
@@ -790,7 +802,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_FunctionCall>, IReferenceable<Statement_Index>
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>
     {
         public CompiledType[] ParameterTypes;
 
@@ -864,8 +876,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
-        public void AddReference(Statement_FunctionCall statement) => references.Add(statement);
-        public void AddReference(Statement_Index statement) => references.Add(statement);
+        public void AddReference(FunctionCall statement) => references.Add(statement);
+        public void AddReference(IndexCall statement) => references.Add(statement);
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledFunction other)
@@ -895,7 +907,112 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<Statement_KeywordCall>, IReferenceable<Statement_ConstructorCall>
+    public class CompiledMacro : MacroDefinition, IFunctionThing, IDefinitionComparer<CompiledMacro>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>
+    {
+        public CompiledType[] ParameterTypes;
+
+        public int TimesUsed;
+        public int TimesUsedTotal;
+
+        public int InstructionOffset { get; set; } = -1;
+
+        public int ParameterCount => ParameterTypes.Length;
+        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
+
+        public Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public IReadOnlyList<Statement> ReferencesFunction => references;
+        readonly List<Statement> references = new();
+
+        public new CompiledType Type;
+        public TypeInstance TypeToken => base.Type;
+
+        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
+        public string BuiltinName
+        {
+            get
+            {
+                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
+                {
+                    if (attributeValues.TryGetValue(0, out string builtinName))
+                    {
+                        return builtinName;
+                    }
+                }
+                return string.Empty;
+            }
+        }
+
+        public string Key => this.ID();
+
+        CompiledClass context;
+        public CompiledClass Context
+        {
+            get => context;
+            set => context = value;
+        }
+
+        public CompiledMacro(CompiledType type, MacroDefinition macroDefinition) : base(macroDefinition.Identifier, macroDefinition.Keyword)
+        {
+            this.Type = type;
+
+            base.Attributes = macroDefinition.Attributes;
+            base.BracketEnd = macroDefinition.BracketEnd;
+            base.BracketStart = macroDefinition.BracketStart;
+            base.Parameters = macroDefinition.Parameters;
+            base.Statements = macroDefinition.Statements;
+            base.Type = macroDefinition.Type;
+            base.FilePath = macroDefinition.FilePath;
+            base.ExportKeyword = macroDefinition.ExportKeyword;
+        }
+        public CompiledMacro(CompiledType type, CompiledType[] parameterTypes, MacroDefinition macroDefinition) : base(macroDefinition.Identifier, macroDefinition.Keyword)
+        {
+            this.Type = type;
+            this.ParameterTypes = parameterTypes;
+            this.CompiledAttributes = new();
+
+            base.Attributes = macroDefinition.Attributes;
+            base.BracketEnd = macroDefinition.BracketEnd;
+            base.BracketStart = macroDefinition.BracketStart;
+            base.Parameters = macroDefinition.Parameters;
+            base.Statements = macroDefinition.Statements;
+            base.Type = macroDefinition.Type;
+            base.FilePath = macroDefinition.FilePath;
+            base.ExportKeyword = macroDefinition.ExportKeyword;
+        }
+
+        public void AddReference(FunctionCall statement) => references.Add(statement);
+        public void AddReference(IndexCall statement) => references.Add(statement);
+        public void ClearReferences() => references.Clear();
+
+        public bool IsSame(CompiledMacro other)
+        {
+            if (this.Type != other.Type) return false;
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
+            for (int i = 0; i < this.ParameterTypes.Length; i++)
+            { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
+
+            return true;
+        }
+
+        public bool IsSame((string name, CompiledType[] parameters) other)
+        {
+            if (this.Identifier.Content != other.name) return false;
+            if (this.ParameterTypes.Length != other.parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
+            return true;
+        }
+
+        public bool IsSame(IFunctionThing other)
+        {
+            if (other is not CompiledFunction other2) return false;
+            return IsSame(other2);
+        }
+    }
+
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>
     {
         public CompiledType[] ParameterTypes;
 
@@ -943,8 +1060,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
-        public void AddReference(Statement_KeywordCall statement) => references.Add(statement);
-        public void AddReference(Statement_ConstructorCall statement) => references.Add(statement);
+        public void AddReference(KeywordCall statement) => references.Add(statement);
+        public void AddReference(ConstructorCall statement) => references.Add(statement);
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledGeneralFunction other)
@@ -979,7 +1096,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal int InstructionOffset { get; set; }
     }
 
-    public class CompiledVariable : Statement_NewVariable
+    public class CompiledVariable : VariableDeclaretion
     {
         public readonly new CompiledType Type;
 
@@ -987,7 +1104,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public readonly bool IsGlobal;
         public readonly bool IsStoredInHEAP;
 
-        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, Statement_NewVariable declaration)
+        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, VariableDeclaretion declaration)
         {
             this.Type = type;
 

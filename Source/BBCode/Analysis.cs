@@ -3,7 +3,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
 {
     using ProgrammingLanguage.BBCode.Compiler;
     using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
 
@@ -196,7 +196,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
             Dictionary<string, FunctionDefinition> Functions = new();
             Dictionary<string, StructDefinition> Structs = new();
             Dictionary<string, ClassDefinition> Classes = new();
-            List<Statement_HashInfo> Hashes = new(parserResult.Hashes);
+            List<CompileTag> Hashes = new(parserResult.Hashes);
 
             parserResult.UsingsAnalytics.Clear();
 

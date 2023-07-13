@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace ProgrammingLanguage.BBCode.Compiler
 {
     using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statements;
+    using ProgrammingLanguage.BBCode.Parser.Statement;
     using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
@@ -16,6 +16,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             "struct",
             "class",
             "enum",
+            "macro",
 
             "void",
             "namespace",
@@ -105,6 +106,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
+        protected CompiledMacro[] CompiledMacros;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
@@ -121,6 +123,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledClasses = Array.Empty<CompiledClass>();
             CompiledFunctions = Array.Empty<CompiledFunction>();
+            CompiledMacros = Array.Empty<CompiledMacro>();
             CompiledOperators = Array.Empty<CompiledOperator>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
@@ -259,13 +262,22 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected bool GetParameter(string parameterName, out CompiledParameter parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        protected bool GetFunction(Statement_FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
+        protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
             CompiledType[] parameters = new CompiledType[functionCallStatement.MethodParameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             { parameters[i] = FindStatementType(functionCallStatement.MethodParameters[i]); }
 
             return CompiledFunctions.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledFunction);
+        }
+
+        protected bool GetMacro(FunctionCall functionCallStatement, out CompiledMacro compiledMacro)
+        {
+            CompiledType[] parameters = new CompiledType[functionCallStatement.MethodParameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            { parameters[i] = FindStatementType(functionCallStatement.MethodParameters[i]); }
+
+            return CompiledMacros.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledMacro);
         }
 
         protected bool GetIndexGetter(CompiledClass @class, out CompiledFunction compiledFunction)
@@ -351,12 +363,40 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool GetFunction(Statement_Variable variable, out CompiledFunction compiledFunction)
+        bool GetMacro(string name, out CompiledMacro compiledMacro)
+        {
+            compiledMacro = null;
+
+            CompiledMacro found = null;
+            for (int i = 0; i < this.CompiledMacros.Length; i++)
+            {
+                var f = this.CompiledMacros[i];
+                if (f.Identifier.Content != name) continue;
+
+                if (found != null)
+                { throw new CompilerException($"Macro type could not be inferred. Definition conflicts: {found.ReadableID()} (at {found.Identifier.Position.ToMinString()}) ; {f.ReadableID()} (at {f.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
+
+                found = f;
+            }
+
+            if (found != null)
+            {
+                compiledMacro = found;
+                return true;
+            }
+
+            return false;
+        }
+
+        protected bool GetFunction(Identifier variable, out CompiledFunction compiledFunction)
             => GetFunction(variable.VariableName.Content, out compiledFunction);
 
-        protected bool GetOperator(Statement_Operator @operator, out CompiledOperator operatorDefinition)
+        protected bool GetMacro(Identifier variable, out CompiledMacro compiledMacro)
+            => GetMacro(variable.VariableName.Content, out compiledMacro);
+
+        protected bool GetOperator(OperatorCall @operator, out CompiledOperator operatorDefinition)
         {
-            StatementWithReturnValue[] parameters = @operator.Parameters;
+            StatementWithValue[] parameters = @operator.Parameters;
             CompiledType[] parameterTypes = new CompiledType[parameters.Length];
 
             for (int i = 0; i < parameters.Length; i++)
@@ -367,7 +407,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return CompiledOperators.GetDefinition((@operator.Operator.Content, parameterTypes), out operatorDefinition);
         }
 
-        protected bool GetConstructor(Statement_ConstructorCall functionCallStatement, out CompiledGeneralFunction constructor)
+        protected bool GetConstructor(ConstructorCall functionCallStatement, out CompiledGeneralFunction constructor)
         {
             if (!GetClass(functionCallStatement, out var @class))
             { throw new CompilerException($"Class definition \"{functionCallStatement.TypeName}\" not found", functionCallStatement, CurrentFile); }
@@ -429,15 +469,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetStruct(Statement_NewInstance newStructStatement, out CompiledStruct compiledStruct)
+        protected bool GetStruct(NewInstance newStructStatement, out CompiledStruct compiledStruct)
             => CompiledStructs.TryGetValue(newStructStatement.TypeName.Content, out compiledStruct);
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetClass(Statement_NewInstance newClassStatement, out CompiledClass compiledClass)
+        protected bool GetClass(NewInstance newClassStatement, out CompiledClass compiledClass)
             => CompiledClasses.TryGetValue(newClassStatement.TypeName.Content, out compiledClass);
 
         /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetClass(Statement_ConstructorCall constructorCall, out CompiledClass compiledClass)
+        protected bool GetClass(ConstructorCall constructorCall, out CompiledClass compiledClass)
             => CompiledClasses.TryGetValue(constructorCall.TypeName.Content, out compiledClass);
 
         /// <exception cref="ArgumentNullException"></exception>
@@ -502,7 +542,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         #endregion
 
         #region FindStatementType()
-        protected CompiledType FindStatementType(Statement_KeywordCall keywordCall)
+        protected CompiledType FindStatementType(KeywordCall keywordCall)
         {
             if (keywordCall.FunctionName == "return") return new CompiledType(Type.VOID);
 
@@ -524,7 +564,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
-        protected CompiledType FindStatementType(Statement_Index index)
+        protected CompiledType FindStatementType(IndexCall index)
         {
             CompiledType prevType = FindStatementType(index.PrevStatement);
 
@@ -536,7 +576,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             
             return indexer.Type;
         }
-        protected CompiledType FindStatementType(Statement_FunctionCall functionCall)
+        protected CompiledType FindStatementType(FunctionCall functionCall)
         {
             if (functionCall.FunctionName == "Dealloc") return new CompiledType(Type.VOID);
 
@@ -548,7 +588,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
             return calledFunc.Type;
         }
-        protected CompiledType FindStatementType(Statement_Operator @operator)
+        protected CompiledType FindStatementType(OperatorCall @operator)
         {
             if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
@@ -599,7 +639,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
         }
-        protected CompiledType FindStatementType(Statement_Literal literal) => literal.Type switch
+        protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal) => literal.Type switch
         {
             LiteralType.INT => new CompiledType(Type.INT),
             LiteralType.FLOAT => new CompiledType(Type.FLOAT),
@@ -608,7 +648,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             LiteralType.CHAR => new CompiledType(Type.CHAR),
             _ => throw new NotImplementedException($"Unknown literal type {literal.Type}"),
         };
-        protected CompiledType FindStatementType(Statement_Variable variable)
+        protected CompiledType FindStatementType(Identifier variable)
         {
             if (variable.VariableName.Content == "nullptr")
             { return new CompiledType(Type.INT); }
@@ -627,9 +667,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Variable/parameter/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
         }
-        protected CompiledType FindStatementType(Statement_MemoryAddressGetter _) => new(Type.INT);
-        protected CompiledType FindStatementType(Statement_MemoryAddressFinder _) => new(Type.UNKNOWN);
-        protected CompiledType FindStatementType(Statement_NewInstance newStruct)
+        protected CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
+        protected CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
+        protected CompiledType FindStatementType(NewInstance newStruct)
         {
             if (GetStruct(newStruct, out var structDefinition))
             { return new CompiledType(structDefinition); }
@@ -639,14 +679,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Class/struct definition \"{newStruct.TypeName.Content}\" not found", newStruct.TypeName, CurrentFile);
         }
-        protected CompiledType FindStatementType(Statement_ConstructorCall constructorCall)
+        protected CompiledType FindStatementType(ConstructorCall constructorCall)
         {
             if (GetClass(constructorCall, out var classDefinition))
             { return new CompiledType(classDefinition); }
 
             throw new CompilerException($"Class definition \"{constructorCall.TypeName.Content}\" not found", constructorCall.TypeName, CurrentFile);
         }
-        protected CompiledType FindStatementType(Statement_Field field)
+        protected CompiledType FindStatementType(Field field)
         {
             var prevStatementType = FindStatementType(field.PrevStatement);
 
@@ -690,45 +730,45 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field.TotalPosition(), CurrentFile);
         }
-        protected CompiledType FindStatementType(Statement_As @as)
+        protected CompiledType FindStatementType(TypeCast @as)
         { return new CompiledType(@as.Type, GetCustomType); }
 
-        protected CompiledType FindStatementType(StatementWithReturnValue statement)
+        protected CompiledType FindStatementType(StatementWithValue statement)
         {
-            if (statement is Statement_FunctionCall functionCall)
+            if (statement is FunctionCall functionCall)
             { return FindStatementType(functionCall); }
 
-            if (statement is Statement_Operator @operator)
+            if (statement is OperatorCall @operator)
             { return FindStatementType(@operator); }
 
-            if (statement is Statement_Literal literal)
+            if (statement is BBCode.Parser.Statement.Literal literal)
             { return FindStatementType(literal); }
 
-            if (statement is Statement_Variable variable)
+            if (statement is Identifier variable)
             { return FindStatementType(variable); }
 
-            if (statement is Statement_MemoryAddressGetter memoryAddressGetter)
+            if (statement is AddressGetter memoryAddressGetter)
             { return FindStatementType(memoryAddressGetter); }
 
-            if (statement is Statement_MemoryAddressFinder memoryAddressFinder)
+            if (statement is Pointer memoryAddressFinder)
             { return FindStatementType(memoryAddressFinder); }
 
-            if (statement is Statement_NewInstance newStruct)
+            if (statement is NewInstance newStruct)
             { return FindStatementType(newStruct); }
 
-            if (statement is Statement_ConstructorCall constructorCall)
+            if (statement is ConstructorCall constructorCall)
             { return FindStatementType(constructorCall); }
 
-            if (statement is Statement_Field field)
+            if (statement is Field field)
             { return FindStatementType(field); }
 
-            if (statement is Statement_As @as)
+            if (statement is TypeCast @as)
             { return FindStatementType(@as); }
 
-            if (statement is Statement_KeywordCall keywordCall)
+            if (statement is KeywordCall keywordCall)
             { return FindStatementType(keywordCall); }
 
-            if (statement is Statement_Index index)
+            if (statement is IndexCall index)
             { return FindStatementType(index); }
 
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
@@ -765,7 +805,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 ">=" => new DataItem(left >= right, null),
                 _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
             };
-        protected DataItem? PredictStatementValue(Statement_Operator @operator)
+        protected DataItem? PredictStatementValue(OperatorCall @operator)
         {
             if (GetOperator(@operator, out _))
             { return null; }
@@ -789,7 +829,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return leftValue;
         }
 
-        protected DataItem? PredictStatementValue(Statement_Literal literal)
+        protected DataItem? PredictStatementValue(BBCode.Parser.Statement.Literal literal)
             => literal.Type switch
             {
                 LiteralType.INT => new DataItem(int.Parse(literal.Value), null),
@@ -799,14 +839,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 _ => throw new NotImplementedException($"This should never occur"),
             };
 
-        protected DataItem? PredictStatementValue(Statement_KeywordCall keywordCall)
+        protected DataItem? PredictStatementValue(KeywordCall keywordCall)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
                 if (keywordCall.Parameters.Length != 1)
                 { return null; }
 
-                StatementWithReturnValue param0 = keywordCall.Parameters[0];
+                StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
                 return new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
@@ -815,15 +855,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return null;
         }
 
-        protected DataItem? PredictStatementValue(StatementWithReturnValue st)
+        protected DataItem? PredictStatementValue(StatementWithValue st)
         {
-            if (st is Statement_Literal literal)
+            if (st is BBCode.Parser.Statement.Literal literal)
             { return PredictStatementValue(literal); }
 
-            if (st is Statement_Operator @operator)
+            if (st is OperatorCall @operator)
             { return PredictStatementValue(@operator); }
 
-            if (st is Statement_KeywordCall keywordCall)
+            if (st is KeywordCall keywordCall)
             { return PredictStatementValue(keywordCall); }
 
             return null;

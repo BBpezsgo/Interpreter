@@ -28,6 +28,8 @@
                     throw new System.NotImplementedException();
                 case ArgumentParser.RunType.Decompile:
                     throw new System.NotImplementedException();
+                case ArgumentParser.RunType.Brainfuck:
+                    throw new System.NotImplementedException();
             }
 
         ExitProgram:

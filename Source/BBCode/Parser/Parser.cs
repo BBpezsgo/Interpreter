@@ -1713,6 +1713,7 @@ namespace ProgrammingLanguage.BBCode
                 statement ??= ExpectKeywordCall("break");
                 statement ??= ExpectKeywordCall("delete", true, true);
                 statement ??= ExpectKeywordCall("clone", true, true);
+                statement ??= ExpectKeywordCall("out", true, true);
                 statement ??= ExpectIfStatement();
                 statement ??= ExpectVariableDeclaration();
                 statement ??= ExpectSetter();

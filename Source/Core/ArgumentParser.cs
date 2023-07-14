@@ -21,6 +21,7 @@ namespace TheProgram
             Compile,
             Decompile,
             ConsoleGUI,
+            Brainfuck,
         }
 
         public enum FileType
@@ -130,6 +131,14 @@ namespace TheProgram
                         if (result.RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
                         result.compilerSettings.BuiltinFunctionCache = false;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-brainfuck")
+                    {
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}");
+                        result.RunType = RunType.Brainfuck;
                         goto ArgParseDone;
                     }
 

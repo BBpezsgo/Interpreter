@@ -951,6 +951,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             get => context;
             set => context = value;
         }
+        public Block Block => new(Statements)
+        {
+            BracketStart = BracketStart,
+            BracketEnd = BracketEnd,
+        };
 
         public CompiledMacro(CompiledType type, MacroDefinition macroDefinition) : base(macroDefinition.Identifier, macroDefinition.Keyword)
         {

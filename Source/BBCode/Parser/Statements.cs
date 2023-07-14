@@ -1080,4 +1080,27 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return PrevStatement;
         }
     }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class ModifiedStatement : StatementWithValue
+    {
+        internal StatementWithValue Statement;
+        internal Token Keyword;
+
+        public ModifiedStatement(StatementWithValue statement, Token keyword)
+        {
+            this.Statement = statement;
+            this.Keyword = keyword;
+        }
+
+        public override string ToString() => $"{Keyword} {Statement}";
+        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{Keyword} {Statement}";
+
+        public override Position TotalPosition()
+            => new(Keyword, Statement);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Statement;
+        }
+    }
 }

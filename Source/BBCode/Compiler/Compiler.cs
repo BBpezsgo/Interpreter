@@ -151,13 +151,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
         CompiledStruct[] CompiledStructs;
         CompiledOperator[] CompiledOperators;
         CompiledFunction[] CompiledFunctions;
-        CompiledMacro[] CompiledMacros;
         CompiledGeneralFunction[] CompiledGeneralFunctions;
         CompiledEnum[] CompiledEnums;
 
         List<FunctionDefinition> Operators;
         List<FunctionDefinition> Functions;
-        List<MacroDefinition> Macros;
         List<StructDefinition> Structs;
         List<ClassDefinition> Classes;
         List<EnumDefinition> Enums;
@@ -213,7 +211,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public struct Result
         {
             public CompiledFunction[] Functions;
-            public CompiledMacro[] Macros;
             public CompiledGeneralFunction[] GeneralFunctions;
             public CompiledOperator[] Operators;
 
@@ -346,52 +343,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
         }
 
-        CompiledMacro CompileMacro(MacroDefinition macro)
-        {
-            Dictionary<string, AttributeValues> attributes = CompileAttributes(macro.Attributes);
-
-            CompiledType type = new(macro.Type, GetCustomType);
-
-            if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
-            {
-                if (BuiltinFunctions.TryGetValue(builtinFunctionName, out var builtinFunction))
-                {
-                    if (builtinFunction.ParameterCount != macro.Parameters.Length)
-                    { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", macro.Identifier, macro.FilePath); }
-                    if (builtinFunction.ReturnSomething != (type != "void"))
-                    { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", macro.Type.Identifier, macro.FilePath); }
-
-                    for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
-                    {
-                        if (Constants.BuiltinTypeMap3.TryGetValue(macro.Parameters[i].Type.Identifier.Content, out Type builtinType))
-                        {
-                            if (builtinFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {macro.Parameters[i].Type}", macro.Parameters[i].Type.Identifier, macro.FilePath); }
-                        }
-                        else
-                        { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {macro.Parameters[i].Type}", macro.Parameters[i].Type.Identifier, macro.FilePath); }
-                    }
-
-                    return new CompiledMacro(type, macro)
-                    {
-                        ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
-                        CompiledAttributes = attributes,
-                    };
-                }
-
-                Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, macro.FilePath));
-            }
-
-            return new CompiledMacro(
-                type,
-                CompileTypes(macro.Parameters, GetCustomType),
-                macro
-                )
-            {
-                CompiledAttributes = attributes,
-            };
-        }
-
         CompiledOperator CompileOperator(FunctionDefinition function)
         {
             Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
@@ -513,22 +464,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void CompileFile(SourceCodeManager.CollectedAST collectedAST)
         {
-            // TODO: macro and function check
-
             foreach (var func in collectedAST.ParserResult.Functions)
             {
                 if (Functions.ContainsSameDefinition(func))
                 { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier)); continue; }
 
                 Functions.Add(func);
-            }
-
-            foreach (var func in collectedAST.ParserResult.Macros)
-            {
-                if (Macros.ContainsSameDefinition(func))
-                { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier)); continue; }
-
-                Macros.Add(func);
             }
 
             /*
@@ -588,7 +529,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
             Functions.AddRange(parserResult.Functions);
-            Macros.AddRange(parserResult.Macros);
 
             SourceCodeManager.Result collectorResult = SourceCodeManager.Collect(parserResult, file, parserSettings, printCallback, basePath);
 
@@ -832,7 +772,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     {
                         foreach (var parameter in method.Parameters)
                         {
-                            if (parameter.withThisKeyword)
+                            if (parameter.Modifiers.Contains("this"))
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
                         }
 
@@ -843,7 +783,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                             {
                                 Identifier = Token.CreateAnonymous("this"),
                                 Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
-                                withThisKeyword = true,
+                                Modifiers = new Token[1] { Token.CreateAnonymous("this") }
                             });
                             method.Parameters = parameters.ToArray();
                         }
@@ -861,7 +801,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     {
                         foreach (var parameter in method.Parameters)
                         {
-                            if (parameter.withThisKeyword)
+                            if (parameter.Modifiers.Contains("this"))
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
                         }
                         List<ParameterDefinition> parameters = method.Parameters.ToList();
@@ -869,7 +809,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         {
                             Identifier = Token.CreateAnonymous("this"),
                             Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
-                            withThisKeyword = true,
+                            Modifiers = new Token[1] { Token.CreateAnonymous("this") },
                         });
                         method.Parameters = parameters.ToArray();
 
@@ -899,30 +839,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             #endregion
 
-            #region Compile Macros
-
-            {
-                List<CompiledMacro> compiledMacros = new();
-
-                foreach (var function in Macros)
-                {
-                    var compiledMacro = CompileMacro(function);
-
-                    if (compiledMacros.ContainsSameDefinition(compiledMacro))
-                    { throw new CompilerException($"Macro with name '{compiledMacro.ReadableID()}' already defined", function.Identifier, function.FilePath); }
-
-                    compiledMacros.Add(compiledMacro);
-                }
-
-                this.CompiledMacros = compiledMacros.ToArray();
-            }
-
-            #endregion
-
             return new Result()
             {
                 Functions = this.CompiledFunctions,
-                Macros = this.CompiledMacros,
                 Operators = this.CompiledOperators,
                 GeneralFunctions = this.CompiledGeneralFunctions,
                 BuiltinFunctions = builtinFunctions,
@@ -975,7 +894,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Compiler compiler = new()
             {
                 Functions = new List<FunctionDefinition>(),
-                Macros = new List<MacroDefinition>(),
                 Operators = new List<FunctionDefinition>(),
                 Structs = new List<StructDefinition>(),
                 Classes = new List<ClassDefinition>(),

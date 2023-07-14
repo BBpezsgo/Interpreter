@@ -99,18 +99,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        public static string ID(this MacroDefinition function)
-        {
-            string result = "macro " + function.Identifier.Content;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            {
-                var param = function.Parameters[i];
-                // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
-                result += "," + param.Type.ToString();
-            }
-            return result;
-        }
-
         public static string ID(this FunctionDefinition function)
         {
             string result = function.Identifier.Content;
@@ -743,7 +731,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public CompiledClass Context { get; set; }
 
-        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
 
@@ -754,9 +742,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Statements = functionDefinition.Statements;
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
-        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
@@ -769,7 +756,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Statements = functionDefinition.Statements;
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
         public void AddReference(OperatorCall statement) => references.Add(statement);
@@ -847,150 +833,45 @@ namespace ProgrammingLanguage.BBCode.Compiler
             set => context = value;
         }
 
-        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
-        {
-            this.Type = type;
-
-            base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
-            base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
-        }
-        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
-        {
-            this.Type = type;
-            this.ParameterTypes = parameterTypes;
-            this.CompiledAttributes = new();
-
-            base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
-            base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
-        }
-
-        public void AddReference(FunctionCall statement) => references.Add(statement);
-        public void AddReference(IndexCall statement) => references.Add(statement);
-        public void ClearReferences() => references.Clear();
-
-        public bool IsSame(CompiledFunction other)
-        {
-            if (this.Type != other.Type) return false;
-            if (this.Identifier.Content != other.Identifier.Content) return false;
-            if (this.ParameterTypes.Length != other.ParameterTypes.Length) return false;
-            for (int i = 0; i < this.ParameterTypes.Length; i++)
-            { if (this.ParameterTypes[i] != other.ParameterTypes[i]) return false; }
-
-            return true;
-        }
-
-        public bool IsSame((string name, CompiledType[] parameters) other)
-        {
-            if (this.Identifier.Content != other.name) return false;
-            if (this.ParameterTypes.Length != other.parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
-            return true;
-        }
-
-        public bool IsSame(IFunctionThing other)
-        {
-            if (other is not CompiledFunction other2) return false;
-            return IsSame(other2);
-        }
-    }
-
-    public class CompiledMacro : MacroDefinition, IFunctionThing, IDefinitionComparer<CompiledMacro>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>
-    {
-        public CompiledType[] ParameterTypes;
-
-        public int TimesUsed;
-        public int TimesUsedTotal;
-
-        public int InstructionOffset { get; set; } = -1;
-
-        public int ParameterCount => ParameterTypes.Length;
-        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
-
-        public Dictionary<string, AttributeValues> CompiledAttributes;
-
-        public IReadOnlyList<Statement> ReferencesFunction => references;
-        readonly List<Statement> references = new();
-
-        public new CompiledType Type;
-        public TypeInstance TypeToken => base.Type;
-
-        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
-        public string BuiltinName
-        {
-            get
-            {
-                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
-                {
-                    if (attributeValues.TryGetValue(0, out string builtinName))
-                    {
-                        return builtinName;
-                    }
-                }
-                return string.Empty;
-            }
-        }
-
-        public string Key => this.ID();
-
-        CompiledClass context;
-        public CompiledClass Context
-        {
-            get => context;
-            set => context = value;
-        }
         public Block Block => new(Statements)
         {
             BracketStart = BracketStart,
             BracketEnd = BracketEnd,
         };
 
-        public CompiledMacro(CompiledType type, MacroDefinition macroDefinition) : base(macroDefinition.Identifier, macroDefinition.Keyword)
+        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
 
-            base.Attributes = macroDefinition.Attributes;
-            base.BracketEnd = macroDefinition.BracketEnd;
-            base.BracketStart = macroDefinition.BracketStart;
-            base.Parameters = macroDefinition.Parameters;
-            base.Statements = macroDefinition.Statements;
-            base.Type = macroDefinition.Type;
-            base.FilePath = macroDefinition.FilePath;
-            base.ExportKeyword = macroDefinition.ExportKeyword;
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
         }
-        public CompiledMacro(CompiledType type, CompiledType[] parameterTypes, MacroDefinition macroDefinition) : base(macroDefinition.Identifier, macroDefinition.Keyword)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
 
-            base.Attributes = macroDefinition.Attributes;
-            base.BracketEnd = macroDefinition.BracketEnd;
-            base.BracketStart = macroDefinition.BracketStart;
-            base.Parameters = macroDefinition.Parameters;
-            base.Statements = macroDefinition.Statements;
-            base.Type = macroDefinition.Type;
-            base.FilePath = macroDefinition.FilePath;
-            base.ExportKeyword = macroDefinition.ExportKeyword;
+            base.Attributes = functionDefinition.Attributes;
+            base.BracketEnd = functionDefinition.BracketEnd;
+            base.BracketStart = functionDefinition.BracketStart;
+            base.Parameters = functionDefinition.Parameters;
+            base.Statements = functionDefinition.Statements;
+            base.Type = functionDefinition.Type;
+            base.FilePath = functionDefinition.FilePath;
         }
 
         public void AddReference(FunctionCall statement) => references.Add(statement);
+        public void AddReference(KeywordCall statement) => references.Add(statement);
         public void AddReference(IndexCall statement) => references.Add(statement);
         public void ClearReferences() => references.Clear();
 
-        public bool IsSame(CompiledMacro other)
+        public bool IsSame(CompiledFunction other)
         {
             if (this.Type != other.Type) return false;
             if (this.Identifier.Content != other.Identifier.Content) return false;
@@ -1041,7 +922,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             set => context = value;
         }
 
-        public CompiledGeneralFunction(CompiledType type, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledGeneralFunction(CompiledType type, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
 
@@ -1050,9 +931,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
             base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
-        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier)
+        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
@@ -1062,7 +942,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Parameters = functionDefinition.Parameters;
             base.Statements = functionDefinition.Statements;
             base.FilePath = functionDefinition.FilePath;
-            base.ExportKeyword = functionDefinition.ExportKeyword;
         }
 
         public void AddReference(KeywordCall statement) => references.Add(statement);
@@ -1142,7 +1021,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
 
-        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods)
+        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -1151,7 +1030,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.BracketEnd = definition.BracketEnd;
             base.BracketStart = definition.BracketStart;
             base.Statements = definition.Statements;
-            base.ExportKeyword = definition.ExportKeyword;
         }
     }
 
@@ -1163,7 +1041,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal Dictionary<string, int> FieldOffsets = new();
         public int Size { get; set; }
 
-        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
+        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -1172,7 +1050,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.BracketEnd = definition.BracketEnd;
             base.BracketStart = definition.BracketStart;
             base.Statements = definition.Statements;
-            base.ExportKeyword = definition.ExportKeyword;
         }
     }
 
@@ -1202,7 +1079,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.Type = type;
 
             base.Identifier = definition.Identifier;
-            base.withThisKeyword = definition.withThisKeyword;
+            base.Modifiers = definition.Modifiers;
         }
 
         public override string ToString() => $"{index} {Identifier}";
@@ -1329,7 +1206,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     Type.FLOAT => "float",
                     Type.CHAR => "char",
 
-                    Type.UNKNOWN => throw new Errors.InternalException($"This ({this}) is an unknown type"),
+                    Type.UNKNOWN => "unknown",
                     Type.NONE => throw new Errors.InternalException($"This should never occur"),
 
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),

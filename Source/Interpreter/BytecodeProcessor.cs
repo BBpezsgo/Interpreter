@@ -552,8 +552,8 @@ namespace ProgrammingLanguage.Bytecode
 
         int TYPE_SET()
         {
-            DataItem value = Memory.Stack.Pop();
             RuntimeType targetType = (RuntimeType)(Memory.Stack.Pop().Byte ?? throw new RuntimeException($"Expected byte as target type"));
+            DataItem value = Memory.Stack.Pop();
 
             DataItem newValue;
             unchecked

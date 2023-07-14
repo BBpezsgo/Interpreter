@@ -95,6 +95,31 @@ namespace ProgrammingLanguage.BBCode
 
             Token CurrentToken => (currentTokenIndex >= 0 && currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
 
+            static readonly string[] Modifiers = new string[]
+            {
+                "export",
+                "macro",
+                "adaptive",
+            };
+
+            static readonly string[] VariableModifiers = new string[]
+            {
+                "const",
+            };
+
+            static readonly string[] ParameterModifiers = new string[]
+            {
+                "this",
+                "ref",
+                "const",
+            };
+
+            static readonly string[] PassedParameterModifiers = new string[]
+            {
+                "ref",
+                "const",
+            };
+
             static readonly string[] types = new string[]
             {
                 "int",
@@ -111,7 +136,6 @@ namespace ProgrammingLanguage.BBCode
 
             // === Result ===
             readonly List<FunctionDefinition> Functions = new();
-            readonly List<MacroDefinition> Macros = new();
             readonly List<EnumDefinition> Enums = new();
             readonly Dictionary<string, StructDefinition> Structs = new();
             readonly Dictionary<string, ClassDefinition> Classes = new();
@@ -194,7 +218,7 @@ namespace ProgrammingLanguage.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.Macros, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
+                return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -320,8 +344,6 @@ namespace ProgrammingLanguage.BBCode
             {
                 if (ExpectStructDefinition()) { }
                 else if (ExpectClassDefinition()) { }
-                else if (ExpectMacroDefinition(out var macroDefinition))
-                { Macros.Add(macroDefinition); }
                 else if (ExpectFunctionDefinition(out var functionDefinition))
                 { Functions.Add(functionDefinition); }
                 else if (ExpectEnumDefinition(out var enumDefinition))
@@ -445,7 +467,7 @@ namespace ProgrammingLanguage.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
                 }
 
-                ExpectIdentifier("export", out Token ExportKeyword);
+                Token[] modifiers = ParseModifiers();
 
                 TypeInstance possibleType = ExpectType(false);
                 if (possibleType == null)
@@ -469,12 +491,8 @@ namespace ProgrammingLanguage.BBCode
                 var expectParameter = false;
                 while (!ExpectOperator(")") || expectParameter)
                 {
-                    if (ExpectIdentifier("this", out Token thisKeywordT))
-                    {
-                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
-                        if (parameters.Count > 0)
-                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
-                    }
+                    Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
+                    CheckModifiers(parameterModifiers, "this");
 
                     TypeInstance possibleParameterType = ExpectType(false, true);
                     if (possibleParameterType == null)
@@ -489,7 +507,7 @@ namespace ProgrammingLanguage.BBCode
                     {
                         Type = possibleParameterType,
                         Identifier = possibleParameterNameT,
-                        withThisKeyword = thisKeywordT != null,
+                        Modifiers = parameterModifiers,
                     };
                     parameters.Add(parameterDefinition);
 
@@ -502,11 +520,12 @@ namespace ProgrammingLanguage.BBCode
                     { expectParameter = true; }
                 }
 
-                function = new(possibleName)
+                CheckModifiers(modifiers, "export");
+
+                function = new(possibleName, modifiers)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
-                    ExportKeyword = ExportKeyword,
                     Parameters = parameters.ToArray(),
                 };
 
@@ -520,108 +539,6 @@ namespace ProgrammingLanguage.BBCode
                 }
 
                 function.Statements = statements.ToArray();
-
-                return true;
-            }
-
-            bool ExpectMacroDefinition(out MacroDefinition macro)
-            {
-                int parseStart = currentTokenIndex;
-                macro = null;
-
-                List<FunctionDefinition.Attribute> attributes = new();
-                while (ExpectAttribute(out var attr))
-                {
-                    bool alreadyHave = false;
-                    foreach (var attribute in attributes)
-                    {
-                        if (attribute.Identifier == attr.Identifier)
-                        {
-                            alreadyHave = true;
-                            break;
-                        }
-                    }
-                    if (!alreadyHave)
-                    {
-                        attributes.Add(attr);
-                    }
-                    else
-                    { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
-                }
-
-                ExpectIdentifier("export", out Token ExportKeyword);
-
-                if (!ExpectIdentifier("macro", out Token keyword))
-                { currentTokenIndex = parseStart; return false; }
-
-                TypeInstance possibleType = ExpectType(false);
-                if (possibleType == null)
-                { currentTokenIndex = parseStart; return false; }
-
-                if (!ExpectIdentifier(out Token possibleNameT))
-                { currentTokenIndex = parseStart; return false; }
-
-                if (!ExpectOperator("("))
-                { currentTokenIndex = parseStart; return false; }
-
-                possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
-
-                List<ParameterDefinition> parameters = new();
-
-                var expectParameter = false;
-                while (!ExpectOperator(")") || expectParameter)
-                {
-                    if (ExpectIdentifier("this", out Token thisKeywordT))
-                    {
-                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
-                        if (parameters.Count > 0)
-                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
-                    }
-
-                    TypeInstance possibleParameterType = ExpectType(false, true);
-                    if (possibleParameterType == null)
-                    { throw new SyntaxException("Expected parameter type", CurrentToken); }
-
-                    if (!ExpectIdentifier(out Token possibleParameterNameT))
-                    { throw new SyntaxException("Expected a parameter name", CurrentToken); }
-
-                    possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
-
-                    ParameterDefinition parameterDefinition = new()
-                    {
-                        Type = possibleParameterType,
-                        Identifier = possibleParameterNameT,
-                        withThisKeyword = thisKeywordT != null,
-                    };
-                    parameters.Add(parameterDefinition);
-
-                    if (ExpectOperator(")"))
-                    { break; }
-
-                    if (!ExpectOperator(","))
-                    { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
-                    else
-                    { expectParameter = true; }
-                }
-
-                macro = new(possibleNameT, keyword)
-                {
-                    Type = possibleType,
-                    Attributes = attributes.ToArray(),
-                    ExportKeyword = ExportKeyword,
-                    Parameters = parameters.ToArray(),
-                };
-
-                List<Statement.Statement> statements = new();
-
-                if (!ExpectOperator(";"))
-                {
-                    statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
-                    macro.BracketStart = braceletStart;
-                    macro.BracketEnd = braceletEnd;
-                }
-
-                macro.Statements = statements.ToArray();
 
                 return true;
             }
@@ -651,7 +568,7 @@ namespace ProgrammingLanguage.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
                 }
 
-                ExpectIdentifier("export", out Token ExportKeyword);
+                Token[] modifiers = ParseModifiers();
 
                 TypeInstance possibleType = ExpectType(false);
                 if (possibleType == null)
@@ -670,12 +587,8 @@ namespace ProgrammingLanguage.BBCode
                 var expectParameter = false;
                 while (!ExpectOperator(")") || expectParameter)
                 {
-                    if (ExpectIdentifier("this", out Token thisKeywordT))
-                    {
-                        thisKeywordT.AnalysedType = TokenAnalysedType.Keyword;
-                        if (parameters.Count > 0)
-                        { Errors.Add(new Error("Keyword 'this' is only valid at the first parameter", thisKeywordT)); }
-                    }
+                    Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
+                    CheckModifiers(parameterModifiers, "this", "ref");
 
                     TypeInstance possibleParameterType = ExpectType(false, true);
                     if (possibleParameterType == null)
@@ -690,7 +603,7 @@ namespace ProgrammingLanguage.BBCode
                     {
                         Type = possibleParameterType,
                         Identifier = possibleParameterNameT,
-                        withThisKeyword = thisKeywordT != null,
+                        Modifiers = parameterModifiers,
                     };
                     parameters.Add(parameterDefinition);
 
@@ -703,11 +616,12 @@ namespace ProgrammingLanguage.BBCode
                     { expectParameter = true; }
                 }
 
-                function = new(possibleNameT)
+                CheckModifiers(modifiers, "export", "macro", "adaptive");
+
+                function = new(possibleNameT, modifiers)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
-                    ExportKeyword = ExportKeyword,
                     Parameters = parameters.ToArray(),
                 };
 
@@ -730,7 +644,7 @@ namespace ProgrammingLanguage.BBCode
                 int parseStart = currentTokenIndex;
                 function = null;
 
-                ExpectIdentifier("export", out Token ExportKeyword);
+                Token[] modifiers = ParseModifiers();
 
                 if (!ExpectIdentifier(out Token possibleNameT))
                 { currentTokenIndex = parseStart; return false; }
@@ -745,8 +659,8 @@ namespace ProgrammingLanguage.BBCode
                 var expectParameter = false;
                 while (!ExpectOperator(")") || expectParameter)
                 {
-                    if (ExpectIdentifier("this", out Token thisKeywordT))
-                    { throw new SyntaxException($"Keyword 'this' is not valid in general function definitions", thisKeywordT); }
+                    Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
+                    CheckModifiers(parameterModifiers);
 
                     TypeInstance possibleParameterType = ExpectType(false, true);
                     if (possibleParameterType == null)
@@ -761,7 +675,7 @@ namespace ProgrammingLanguage.BBCode
                     {
                         Type = possibleParameterType,
                         Identifier = possibleParameterNameT,
-                        withThisKeyword = thisKeywordT != null,
+                        Modifiers = parameterModifiers,
                     };
                     parameters.Add(parameterDefinition);
 
@@ -774,9 +688,10 @@ namespace ProgrammingLanguage.BBCode
                     { expectParameter = true; }
                 }
 
-                function = new(possibleNameT)
+                CheckModifiers(modifiers, "export");
+
+                function = new(possibleNameT, modifiers)
                 {
-                    ExportKeyword = ExportKeyword,
                     Parameters = parameters.ToArray(),
                 };
 
@@ -816,7 +731,7 @@ namespace ProgrammingLanguage.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Identifier)); }
                 }
 
-                ExpectIdentifier("export", out Token ExportKeyword);
+                Token[] modifiers = ParseModifiers();
 
                 if (!ExpectIdentifier("class", out Token keyword))
                 { currentTokenIndex = startTokenIndex; return false; }
@@ -869,11 +784,12 @@ namespace ProgrammingLanguage.BBCode
                     }
                 }
 
-                ClassDefinition classDefinition = new(possibleClassName, attributes, fields, methods, generalMethods, operators)
+                CheckModifiers(modifiers, "export");
+
+                ClassDefinition classDefinition = new(possibleClassName, attributes, modifiers, fields, methods, generalMethods, operators)
                 {
                     BracketStart = braceletStart,
                     BracketEnd = braceletEnd,
-                    ExportKeyword = ExportKeyword,
                 };
 
                 Classes.Add(classDefinition.Name.Content, classDefinition);
@@ -907,7 +823,7 @@ namespace ProgrammingLanguage.BBCode
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Identifier)); }
                 }
 
-                ExpectIdentifier("export", out Token ExportKeyword);
+                Token[] modifiers = ParseModifiers();
 
                 if (!ExpectIdentifier("struct", out Token keyword))
                 { currentTokenIndex = startTokenIndex; return false; }
@@ -942,11 +858,12 @@ namespace ProgrammingLanguage.BBCode
                     }
                 }
 
-                StructDefinition structDefinition = new(possibleStructName, attributes, fields, methods)
+                CheckModifiers(modifiers, "export");
+
+                StructDefinition structDefinition = new(possibleStructName, attributes, fields, methods, modifiers)
                 {
                     BracketStart = braceletStart,
                     BracketEnd = braceletEnd,
-                    ExportKeyword = ExportKeyword,
                 };
 
                 Structs.Add(structDefinition.Name.Content, structDefinition);
@@ -1311,9 +1228,9 @@ namespace ProgrammingLanguage.BBCode
                 {
                     returnStatement = memoryAddressGetter;
                 }
-                else if (ExpectVariableAddressFinder(out Pointer memoryAddressFinder))
+                else if (ExpectVariableAddressFinder(out Pointer pointer))
                 {
-                    returnStatement = memoryAddressFinder;
+                    returnStatement = pointer;
                 }
 
                 while (true)
@@ -1498,6 +1415,9 @@ namespace ProgrammingLanguage.BBCode
             VariableDeclaretion ExpectVariableDeclaration()
             {
                 int startTokenIndex = currentTokenIndex;
+
+                ExpectIdentifier("const", out Token constModifier);
+
                 TypeInstance possibleType = ExpectType();
                 if (possibleType == null)
                 { currentTokenIndex = startTokenIndex; return null; }
@@ -1511,6 +1431,7 @@ namespace ProgrammingLanguage.BBCode
                 {
                     VariableName = possibleVariableName,
                     Type = possibleType,
+                    Modifiers = constModifier == null ? Array.Empty<Token>() : new Token[1] { constModifier },
                 };
 
                 if (ExpectOperator("=", out var eqT))
@@ -1604,7 +1525,7 @@ namespace ProgrammingLanguage.BBCode
 
             IfContainer ExpectIfStatement()
             {
-                BaseBranch ifStatement = ExpectIfSegmentStatement();
+                BaseBranch ifStatement = ExpectIfSegmentStatement("if", BaseBranch.IfPart.If, true);
                 if (ifStatement == null) return null;
 
                 IfContainer statement = new();
@@ -1613,7 +1534,7 @@ namespace ProgrammingLanguage.BBCode
                 int endlessSafe = 0;
                 while (true)
                 {
-                    BaseBranch elseifStatement = ExpectIfSegmentStatement("elseif", BaseBranch.IfPart.ElseIf);
+                    BaseBranch elseifStatement = ExpectIfSegmentStatement("elseif", BaseBranch.IfPart.ElseIf, true);
                     if (elseifStatement == null) break;
                     statement.Parts.Add(elseifStatement);
 
@@ -1631,7 +1552,7 @@ namespace ProgrammingLanguage.BBCode
                 return statement;
             }
 
-            BaseBranch ExpectIfSegmentStatement(string ifSegmentName = "if", BaseBranch.IfPart ifSegmentType = BaseBranch.IfPart.If, bool needParameters = true)
+            BaseBranch ExpectIfSegmentStatement(string ifSegmentName, BaseBranch.IfPart ifSegmentType, bool needParameters)
             {
                 if (!ExpectIdentifier(ifSegmentName, out Token tokenIf))
                 { return null; }
@@ -1838,7 +1759,7 @@ namespace ProgrammingLanguage.BBCode
 
                     if (rightStatement == null)
                     { throw new SyntaxException($"Expected OneValue after operator ('{op}'), got {CurrentToken}", CurrentToken); }
-                    
+
                     int rightSidePrecedence = OperatorPrecedence(op.Content);
 
                     OperatorCall rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
@@ -1959,6 +1880,26 @@ namespace ProgrammingLanguage.BBCode
                 return null;
             }
 
+            /// <exception cref="SyntaxException"></exception>
+            bool ExpectModifiedValue(out ModifiedStatement modifiedStatement, params string[] validModifiers)
+            {
+                if (!ExpectIdentifier(out Token modifier, validModifiers))
+                {
+                    modifiedStatement = null;
+                    return false;
+                }
+
+                modifier.AnalysedType = TokenAnalysedType.Keyword;
+
+                var value = ExpectOneValue();
+
+                if (value == null)
+                { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
+
+                modifiedStatement = new ModifiedStatement(value, modifier);
+                return true;
+            }
+
             /// <summary>
             /// 
             /// </summary>
@@ -2014,7 +1955,18 @@ namespace ProgrammingLanguage.BBCode
                 Token bracketRight = null;
                 while (!ExpectOperator(")", out bracketRight) || expectParameter)
                 {
-                    StatementWithValue parameter = ExpectExpression();
+
+                    StatementWithValue parameter = null;
+
+                    if (ExpectModifiedValue(out ModifiedStatement modifiedStatement, PassedParameterModifiers))
+                    {
+                        parameter = modifiedStatement;
+                    }
+                    else
+                    {
+                        parameter = ExpectExpression();
+                    }
+
                     if (parameter == null)
                     { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
@@ -2186,6 +2138,59 @@ namespace ProgrammingLanguage.BBCode
 
             #region Basic parsing
 
+            Token[] ParseParameterModifiers(int parameterIndex)
+            {
+                List<Token> modifiers = new();
+                int endlessSafe = 16;
+                while (true)
+                {
+                    if (ExpectIdentifier(out Token modifier, ParameterModifiers))
+                    {
+                        modifier.AnalysedType = TokenAnalysedType.Keyword;
+                        modifiers.Add(modifier);
+
+                        if (modifier == "this" && parameterIndex != 0)
+                        {
+                            Errors.Add(new Error($"Modifier \"{modifier}\" only valid on the first parameter", modifier));
+                        }
+                    }
+                    else
+                    { break; }
+
+                    if (endlessSafe-- <= 0)
+                    { throw new EndlessLoopException(); }
+                }
+                return modifiers.ToArray();
+            }
+
+            Token[] ParseModifiers()
+            {
+                List<Token> modifiers = new();
+                int endlessSafe = 16;
+                while (true)
+                {
+                    if (ExpectIdentifier(out Token modifier, Modifiers))
+                    {
+                        modifier.AnalysedType = TokenAnalysedType.Keyword;
+                        modifiers.Add(modifier);
+                    }
+                    else
+                    { break; }
+
+                    if (endlessSafe-- <= 0)
+                    { throw new EndlessLoopException(); }
+                }
+                return modifiers.ToArray();
+            }
+            void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
+            {
+                foreach (var modifier in modifiers)
+                {
+                    if (!validModifiers.Contains(modifier.Content))
+                    { throw new SyntaxException($"Modifier \"{modifier}\" not valid in the current context", modifier); }
+                }
+            }
+
             bool ExpectIdentifier(out Token result) => ExpectIdentifier("", out result);
             bool ExpectIdentifier(string name, out Token result)
             {
@@ -2198,6 +2203,16 @@ namespace ProgrammingLanguage.BBCode
                 currentTokenIndex++;
 
                 return true;
+            }
+            bool ExpectIdentifier(out Token result, params string[] names)
+            {
+                foreach (string name in names)
+                {
+                    if (ExpectIdentifier(name, out result))
+                    { return true; }
+                }
+                result = null;
+                return false;
             }
 
             bool ExpectOperator(string name) => ExpectOperator(name, out _);

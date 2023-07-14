@@ -10,7 +10,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
     public static class StatementFinder
     {
-        static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
+        public static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
         {
             if (st == null) return false;
             if (callback == null) return false;
@@ -20,7 +20,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             var statements = st.GetStatements();
             return GetAllStatement(statements, callback);
         }
-        static bool GetAllStatement(IEnumerable<Statement> statements, Func<Statement, bool> callback)
+        public static bool GetAllStatement(IEnumerable<Statement> statements, Func<Statement, bool> callback)
         {
             if (statements is null) throw new ArgumentNullException(nameof(statements));
 
@@ -32,7 +32,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             }
             return false;
         }
-        static bool GetAllStatement(Statement[] statements, Func<Statement, bool> callback)
+        public static bool GetAllStatement(Statement[] statements, Func<Statement, bool> callback)
         {
             if (statements is null) throw new ArgumentNullException(nameof(statements));
 
@@ -197,17 +197,18 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         public TypeInstance Type;
         public Token VariableName;
         internal StatementWithValue InitialValue;
+        public Token[] Modifiers;
 
         public string FilePath { get; set; }
 
         public override string ToString()
         {
-            return $"{Type} {VariableName}{((InitialValue != null) ? " = ..." : "")}";
+            return $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : "")}".Trim();
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"{" ".Repeat(ident)}{Type} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
+            return $"{" ".Repeat(ident)}{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
         }
 
         public override Position TotalPosition()

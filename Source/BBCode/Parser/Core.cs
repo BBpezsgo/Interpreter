@@ -47,13 +47,12 @@ namespace ProgrammingLanguage.BBCode.Parser
     {
         public Token Identifier;
         public TypeInstance Type;
-
-        public bool withThisKeyword;
+        public Token[] Modifiers;
 
         public string Key => Identifier.Content;
 
-        public override string ToString() => $"{(withThisKeyword ? "this " : "")}{Type} {Identifier}";
-        internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{Type} {Identifier}";
+        public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
+        internal string PrettyPrint() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
     }
 
     public class FieldDefinition
@@ -66,10 +65,9 @@ namespace ProgrammingLanguage.BBCode.Parser
         internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
     }
 
-    public class Exportable
+    public interface IExportable
     {
-        public Token ExportKeyword;
-        public bool IsExport => ExportKeyword != null;
+        public bool IsExport { get; }
     }
 
     public class EnumMemberDefinition : Compiler.IElementWithKey<string>
@@ -91,7 +89,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition.Attribute[] Attributes;
     }
 
-    public class FunctionDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<MacroDefinition>, Compiler.IDefinitionComparer<FunctionDefinition>
+    public class FunctionDefinition : IExportable, IDefinition, Compiler.IDefinitionComparer<FunctionDefinition>
     {
         public class Attribute : Compiler.IElementWithKey<string>
         {
@@ -109,20 +107,26 @@ namespace ProgrammingLanguage.BBCode.Parser
         public ParameterDefinition[] Parameters;
         public Statement.Statement[] Statements;
         public TypeInstance Type;
+        public Token[] Modifiers;
 
         public string FilePath { get; set; }
 
         /// <summary>
         /// The first parameter is labeled as 'this'
         /// </summary>
-        public bool IsMethod => ((Parameters.Length > 0) && (Parameters[0].withThisKeyword));
+        public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
 
-        public FunctionDefinition(Token name)
+        public bool IsExport => Modifiers.Contains("export");
+
+        public FunctionDefinition(
+            Token name,
+            IEnumerable<Token> modifiers)
         {
             Parameters = Array.Empty<ParameterDefinition>();
             Statements = Array.Empty<Statement.Statement>();
             Attributes = Array.Empty<Attribute>();
-            this.Identifier = name;
+            Identifier = name;
+            Modifiers = modifiers.ToArray();
         }
 
         public override string ToString()
@@ -135,7 +139,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             List<string> parameters = new();
             foreach (var parameter in this.Parameters)
             {
-                parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
+                parameters.Add(parameter.PrettyPrint());
             }
 
             List<string> statements = new();
@@ -172,110 +176,9 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             return true;
         }
-
-        public bool IsSame(MacroDefinition other)
-        {
-            if (this.Identifier.Content != other.Identifier.Content) return false;
-            if (this.Parameters.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            {
-                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
-            }
-            return true;
-        }
     }
 
-    public class MacroDefinition : Exportable, IDefinition, Compiler.IDefinitionComparer<MacroDefinition>, Compiler.IDefinitionComparer<FunctionDefinition>
-    {
-        public Token BracketStart;
-        public Token BracketEnd;
-
-        public FunctionDefinition.Attribute[] Attributes;
-        public readonly Token Identifier;
-        public ParameterDefinition[] Parameters;
-        public Statement.Statement[] Statements;
-        public TypeInstance Type;
-        public readonly Token Keyword;
-
-        public string FilePath { get; set; }
-
-        /// <summary>
-        /// The first parameter is labeled as 'this'
-        /// </summary>
-        public bool IsMethod => ((Parameters.Length > 0) && (Parameters[0].withThisKeyword));
-
-        public MacroDefinition(Token name, Token keyword)
-        {
-            Parameters = Array.Empty<ParameterDefinition>();
-            Statements = Array.Empty<Statement.Statement>();
-            Attributes = Array.Empty<FunctionDefinition.Attribute>();
-            this.Identifier = name;
-            this.Keyword = keyword;
-        }
-
-        public override string ToString()
-        {
-            return $"{(IsExport ? "export " : "")}{Keyword}{this.Type.Identifier.Content} {this.Identifier}" + (this.Parameters.Length > 0 ? "(...)" : "()") + " " + (this.Statements.Length > 0 ? "{...}" : "{}");
-        }
-
-        public string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var parameter in this.Parameters)
-            {
-                parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
-            }
-
-            List<string> statements = new();
-            foreach (var statement in this.Statements)
-            {
-                statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            return $"{" ".Repeat(ident)}{this.Type.Identifier.Content} {this.Identifier}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
-        }
-
-        public string ReadableID()
-        {
-            string result = "";
-            result += $"{Keyword} ";
-            result += this.Identifier.ToString();
-            result += "(";
-            for (int j = 0; j < this.Parameters.Length; j++)
-            {
-                if (j > 0) { result += ", "; }
-                result += this.Parameters[j].Type.ToString();
-            }
-            result += ")";
-            return result;
-        }
-
-        public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-
-        public bool IsSame(MacroDefinition other)
-        {
-            if (this.Identifier.Content != other.Identifier.Content) return false;
-            if (this.Parameters.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            {
-                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
-            }
-            return true;
-        }
-
-        public bool IsSame(FunctionDefinition other)
-        {
-            if (this.Identifier.Content != other.Identifier.Content) return false;
-            if (this.Parameters.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            {
-                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
-            }
-            return true;
-        }
-    }
-
-    public class GeneralFunctionDefinition : Exportable, IDefinition
+    public class GeneralFunctionDefinition : IExportable, IDefinition
     {
         public Token BracketStart;
         public Token BracketEnd;
@@ -283,19 +186,25 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly Token Identifier;
         public ParameterDefinition[] Parameters;
         public Statement.Statement[] Statements;
+        public Token[] Modifiers;
 
         public string FilePath { get; set; }
 
         /// <summary>
         /// The first parameter is labeled as 'this'
         /// </summary>
-        public bool IsMethod => ((Parameters.Length > 0) && (Parameters[0].withThisKeyword));
+        public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
 
-        public GeneralFunctionDefinition(Token name)
+        public bool IsExport => Modifiers.Contains("export");
+
+        public GeneralFunctionDefinition(
+            Token name,
+            IEnumerable<Token> modifiers)
         {
             Parameters = Array.Empty<ParameterDefinition>();
             Statements = Array.Empty<Statement.Statement>();
-            this.Identifier = name;
+            Identifier = name;
+            Modifiers = modifiers.ToArray();
         }
 
         public override string ToString()
@@ -308,7 +217,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             List<string> parameters = new();
             foreach (var parameter in this.Parameters)
             {
-                parameters.Add(parameter.PrettyPrint((ident == 0) ? 2 : ident));
+                parameters.Add(parameter.PrettyPrint());
             }
 
             List<string> statements = new();
@@ -336,7 +245,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }
 
-    public class ClassDefinition : Exportable, IDefinition, Compiler.IElementWithKey<string>
+    public class ClassDefinition : IExportable, IDefinition, Compiler.IElementWithKey<string>
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
@@ -345,6 +254,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public List<Statement.Statement> Statements;
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
+        public Token[] Modifiers;
 
         public string Key => Name.Content;
 
@@ -352,11 +262,20 @@ namespace ProgrammingLanguage.BBCode.Parser
         public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
         public IReadOnlyList<FunctionDefinition> Operators => operators;
 
+        public bool IsExport => Modifiers.Contains("export");
+
         readonly FunctionDefinition[] methods;
         readonly GeneralFunctionDefinition[] generalMethods;
         readonly FunctionDefinition[] operators;
 
-        public ClassDefinition(Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<FunctionDefinition> methods, IEnumerable<GeneralFunctionDefinition> generalMethods, IEnumerable<FunctionDefinition> operators)
+        public ClassDefinition(
+            Token name,
+            IEnumerable<FunctionDefinition.Attribute> attributes,
+            IEnumerable<Token> modifiers,
+            IEnumerable<FieldDefinition> fields,
+            IEnumerable<FunctionDefinition> methods,
+            IEnumerable<GeneralFunctionDefinition> generalMethods,
+            IEnumerable<FunctionDefinition> operators)
         {
             this.Name = name;
             this.Fields = fields.ToArray();
@@ -365,6 +284,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             this.Attributes = attributes.ToArray();
             this.Statements = new List<Statement.Statement>();
             this.operators = operators.ToArray();
+            this.Modifiers = modifiers.ToArray();
         }
 
         public override string ToString()
@@ -398,29 +318,38 @@ namespace ProgrammingLanguage.BBCode.Parser
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
     }
 
-    public class StructDefinition : Exportable, IDefinition, Compiler.IElementWithKey<string>
+    public class StructDefinition : IExportable, IDefinition, Compiler.IElementWithKey<string>
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
         public Token BracketStart;
         public Token BracketEnd;
         public List<Statement.Statement> Statements;
+        public Token[] Modifiers;
 
         public string FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
 
         public string Key => Name.Content;
 
+        public bool IsExport => Modifiers.Contains("export");
+
         public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
         readonly Dictionary<string, FunctionDefinition> methods;
 
-        public StructDefinition(Token name, IEnumerable<FunctionDefinition.Attribute> attributes, IEnumerable<FieldDefinition> fields, IEnumerable<KeyValuePair<string, FunctionDefinition>> methods)
+        public StructDefinition(
+            Token name,
+            IEnumerable<FunctionDefinition.Attribute> attributes,
+            IEnumerable<FieldDefinition> fields,
+            IEnumerable<KeyValuePair<string, FunctionDefinition>> methods,
+            IEnumerable<Token> modifiers)
         {
             this.Name = name;
             this.Fields = fields.ToArray();
             this.methods = new Dictionary<string, FunctionDefinition>(methods);
             this.Attributes = attributes.ToArray();
             this.Statements = new List<Statement.Statement>();
+            this.Modifiers = modifiers.ToArray();
         }
 
         public override string ToString()
@@ -458,7 +387,6 @@ namespace ProgrammingLanguage.BBCode.Parser
     public readonly struct ParserResult
     {
         public readonly FunctionDefinition[] Functions;
-        public readonly MacroDefinition[] Macros;
         public readonly StructDefinition[] Structs;
         public readonly ClassDefinition[] Classes;
         public readonly UsingDefinition[] Usings;
@@ -467,10 +395,9 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly Statement.Statement[] TopLevelStatements;
         public readonly EnumDefinition[] Enums;
 
-        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
+        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
         {
             Functions = functions.ToArray();
-            Macros = macros.ToArray();
             Structs = structs.ToArray();
             Usings = usings.ToArray();
             UsingsAnalytics = new();
@@ -666,8 +593,8 @@ namespace ProgrammingLanguage.BBCode.Parser
 
                     ParameterDefinition param = item.Parameters[i];
                     Console.ForegroundColor = ConsoleColor.Blue;
-                    if (param.withThisKeyword)
-                    { Console.Write("this "); }
+                    foreach (var modifier in param.Modifiers)
+                    { Console.Write($"{modifier.Content} "); }
                     if (!Compiler.Constants.BuiltinTypes.Contains(param.Type.Identifier.Content))
                     { Console.ForegroundColor = ConsoleColor.Green; }
                     Console.Write($"{param.Type} ");

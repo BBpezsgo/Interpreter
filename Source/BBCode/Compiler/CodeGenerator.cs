@@ -454,6 +454,142 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return;
             }
 
+            if (keywordCall.FunctionName == "out")
+            {
+                if (keywordCall.Parameters.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to \"out\": requied {1} passed {0}", keywordCall.TotalPosition(), CurrentFile); }
+
+                var outType = FindStatementType(keywordCall.Parameters[0]);
+
+                if (!GetOutputWriter(outType, out var function))
+                { throw new CompilerException($"No function found with attribute \"{"StandardOutput"}\" that satisfies keyword-call {keywordCall.ReadableID(FindStatementType)}", keywordCall, CurrentFile); }
+
+                if (function.IsBuiltin)
+                {
+                    if (!BuiltinFunctions.TryGetValue(function.BuiltinName, out var builtinFunction))
+                    {
+                        Errors.Add(new Error($"Builtin function \"{function.BuiltinName}\" not found", keywordCall.Identifier, CurrentFile));
+                        AddComment("}");
+                        return;
+                    }
+
+                    AddComment(" Function Name:");
+                    if (BuiltinFunctionCache.TryGetValue(function.BuiltinName, out int cacheAddress))
+                    {
+                        if (function.BuiltinName.Length == 0)
+                        { throw new CompilerException($"Builtin function with length of zero", Position.UnknownPosition); }
+
+                        AddComment($" Param {0}:");
+                        GenerateCodeForStatement(keywordCall.Parameters[0]);
+                        AddInstruction(Opcode.PUSH_VALUE, function.BuiltinName.Length, "ID Length");
+
+                        AddComment($" Load Function Name String Pointer (Cache):");
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
+
+                        AddComment(" .:");
+                        AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+
+                        if (function.ReturnSomething)
+                        {
+                            if (!keywordCall.SaveValue)
+                            {
+                                AddComment($" Clear Return Value:");
+                                AddInstruction(Opcode.POP_VALUE);
+                            }
+                            else
+                            {
+                                AddInstruction(Opcode.DEBUG_SET_TAG, "Return value");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        GenerateCodeForLiteralString(function.BuiltinName);
+
+                        int offset = -1;
+
+                        AddComment($" Param {0}:");
+                        GenerateCodeForStatement(keywordCall.Parameters[0]);
+                        offset--;
+
+                        AddInstruction(Opcode.PUSH_VALUE, 0, "ID Length");
+                        offset--;
+
+                        AddComment($" Load Function Name String Pointer:");
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
+
+                        AddComment(" .:");
+                        AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+
+                        bool thereIsReturnValue = false;
+                        if (function.ReturnSomething)
+                        {
+                            if (!keywordCall.SaveValue)
+                            {
+                                AddComment($" Clear Return Value:");
+                                AddInstruction(Opcode.POP_VALUE);
+                            }
+                            else
+                            { thereIsReturnValue = true; }
+                        }
+
+                        AddComment(" Deallocate Function Name String:");
+
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
+                        AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+                        AddInstruction(Opcode.HEAP_DEALLOC);
+
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
+                        AddInstruction(Opcode.HEAP_DEALLOC);
+
+                        if (thereIsReturnValue)
+                        {
+                            AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, -2);
+                            AddInstruction(Opcode.DEBUG_SET_TAG, "Return value");
+                        }
+                        else
+                        {
+                            AddInstruction(Opcode.POP_VALUE);
+                        }
+                    }
+
+                    AddComment("}");
+                    return;
+                }
+
+                int returnValueSize = 0;
+                if (function.ReturnSomething)
+                {
+                    returnValueSize = GenerateInitialValue(function.Type, "returnvalue");
+                }
+
+                AddComment($" Param {0}:");
+                GenerateCodeForStatement(keywordCall.Parameters[0]);
+                AddInstruction(Opcode.DEBUG_SET_TAG, $"param.{function.Parameters[0].Identifier}");
+
+                AddComment(" .:");
+
+                if (function.InstructionOffset == -1)
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, keywordCall, this.parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+
+                AddInstruction(Opcode.CALL, function.InstructionOffset - GeneratedCode.Count);
+
+                AddComment(" Clear Params:");
+
+                AddInstruction(Opcode.POP_VALUE);
+
+                if (function.ReturnSomething && !keywordCall.SaveValue)
+                {
+                    AddComment(" Clear Return Value:");
+                    for (int i = 0; i < returnValueSize; i++)
+                    { AddInstruction(Opcode.POP_VALUE); }
+                }
+
+                AddComment("}");
+
+                return;
+            }
+
             throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
         void GenerateCodeForStatement(FunctionCall functionCall)
@@ -1805,7 +1941,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
 
             if (type.IsBuiltin && targetType.IsBuiltin)
-            { AddInstruction(Opcode.TYPE_SET, (byte)targetType.BuiltinType.Convert()); }
+            {
+                AddInstruction(Opcode.PUSH_VALUE, (byte)targetType.BuiltinType.Convert(), $"typecast target type");
+                AddInstruction(Opcode.TYPE_SET);
+            }
         }
 
         void GenerateCodeForStatement(Statement st)
@@ -2640,7 +2779,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             newVariable.VariableName = newVariable.VariableName.Variable(newVariable.VariableName.Content, newVariable.Type.ToString(), false);
 
-            compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(), isGlobal));
+            if (isGlobal)
+            { compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(true) + BuiltinFunctionCache.Count, isGlobal)); }
+            else
+            { compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(false), isGlobal)); }
 
             AddComment($"Initial value {{");
 
@@ -2672,13 +2814,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return new CleanupItem(size, count);
         }
 
-        int GetVariableSizesSum()
+        int GetVariableSizesSum(bool alsoGlobals)
         {
             int sum = 0;
             for (int i = 0; i < compiledVariables.Count; i++)
             {
                 var key = compiledVariables.ElementAt(i).Key;
-                if (compiledVariables.Get(key).IsGlobal) continue;
+                if (compiledVariables.Get(key).IsGlobal && !alsoGlobals) continue;
                 if (compiledVariables.Get(key).Type.IsClass) sum++;
                 else sum += compiledVariables.Get(key).Type.Size;
             }
@@ -3258,6 +3400,21 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                         if (function.InstructionOffset == -1)
                         { throw new InternalException($"Cloner for type \"{@class}\" does not have instruction offset", item.CurrentFile); }
+
+                        GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
+                    }
+                    else if (functionCall.Identifier.Content == "out")
+                    {
+                        if (functionCall.Parameters.Length != 1)
+                        { throw new CompilerException($"Wrong number of parameters passed to \"out\": requied {1} passed {0}", functionCall.TotalPosition(), CurrentFile); }
+
+                        var outType = FindStatementType(functionCall.Parameters[0]);
+
+                        if (!GetOutputWriter(outType, out var function))
+                        { throw new CompilerException($"No function found with attribute \"{"StandardOutput"}\" that satisfies keyword-call {functionCall.ReadableID(FindStatementType)}", functionCall, CurrentFile); }
+
+                        if (function.InstructionOffset == -1)
+                        { throw new InternalException($"Function {function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
                         GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
                     }

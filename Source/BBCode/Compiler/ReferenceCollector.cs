@@ -270,6 +270,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     return;
                 }
+
+                if (keywordCall.FunctionName == "out")
+                {
+                    AnalyzeStatements(keywordCall.Parameters);
+
+                    if (keywordCall.Parameters.Length != 1)
+                    { return; }
+
+                    if (!GetOutputWriter(FindStatementType(keywordCall.Parameters[0]), out var function))
+                    { return; }
+
+                    function.AddReference(keywordCall);
+
+                    if (CurrentFunction == null || !function.IsSame(CurrentFunction))
+                    { function.TimesUsed++; }
+                    function.TimesUsedTotal++;
+                }
+
             }
             else if (statement is Field field)
             { AnalyzeStatement(field.PrevStatement); }

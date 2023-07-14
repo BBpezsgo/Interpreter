@@ -10,6 +10,16 @@ namespace ProgrammingLanguage.Core
 {
     public static class Extensions
     {
+        public static bool Contains(this Token[] tokens, string value)
+        {
+            for (int i = 0; i < tokens.Length; i++)
+            {
+                if (tokens[i].Content == value)
+                { return true; }
+            }
+            return false;
+        }
+
         public static Type Convert(this RuntimeType v) => v switch
         {
             RuntimeType.BYTE => Type.BYTE,

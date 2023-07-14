@@ -17,6 +17,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             "class",
             "enum",
             "macro",
+            "adaptive",
 
             "void",
             "namespace",
@@ -106,7 +107,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
-        protected CompiledMacro[] CompiledMacros;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
@@ -123,7 +123,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledClasses = Array.Empty<CompiledClass>();
             CompiledFunctions = Array.Empty<CompiledFunction>();
-            CompiledMacros = Array.Empty<CompiledMacro>();
             CompiledOperators = Array.Empty<CompiledOperator>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
@@ -271,15 +270,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return CompiledFunctions.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledFunction);
         }
 
-        protected bool GetMacro(FunctionCall functionCallStatement, out CompiledMacro compiledMacro)
-        {
-            CompiledType[] parameters = new CompiledType[functionCallStatement.MethodParameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            { parameters[i] = FindStatementType(functionCallStatement.MethodParameters[i]); }
-
-            return CompiledMacros.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledMacro);
-        }
-
         protected bool GetIndexGetter(CompiledClass @class, out CompiledFunction compiledFunction)
         {
             for (int i = 0; i < CompiledFunctions.Length; i++)
@@ -363,36 +353,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        bool GetMacro(string name, out CompiledMacro compiledMacro)
-        {
-            compiledMacro = null;
-
-            CompiledMacro found = null;
-            for (int i = 0; i < this.CompiledMacros.Length; i++)
-            {
-                var f = this.CompiledMacros[i];
-                if (f.Identifier.Content != name) continue;
-
-                if (found != null)
-                { throw new CompilerException($"Macro type could not be inferred. Definition conflicts: {found.ReadableID()} (at {found.Identifier.Position.ToMinString()}) ; {f.ReadableID()} (at {f.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
-
-                found = f;
-            }
-
-            if (found != null)
-            {
-                compiledMacro = found;
-                return true;
-            }
-
-            return false;
-        }
-
         protected bool GetFunction(Identifier variable, out CompiledFunction compiledFunction)
             => GetFunction(variable.VariableName.Content, out compiledFunction);
-
-        protected bool GetMacro(Identifier variable, out CompiledMacro compiledMacro)
-            => GetMacro(variable.VariableName.Content, out compiledMacro);
 
         protected bool GetOperator(OperatorCall @operator, out CompiledOperator operatorDefinition)
         {
@@ -500,6 +462,30 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
         }
 
+        protected bool GetOutputWriter(CompiledType type, out CompiledFunction function)
+        {
+            foreach (var _function in CompiledFunctions)
+            {
+                if (!_function.CompiledAttributes.TryGetAttribute("StandardOutput"))
+                { continue; }
+
+                if (!_function.CanUse(CurrentFile))
+                { continue; }
+
+                if (_function.Parameters.Length != 1)
+                { continue; }
+
+                if (type != _function.ParameterTypes[0])
+                { continue; }
+
+                function = _function;
+                return true;
+            }
+
+            function = null;
+            return false;
+        }
+
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
@@ -573,7 +559,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (!GetIndexGetter(prevType.Class, out CompiledFunction indexer))
             { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
-            
+
             return indexer.Type;
         }
         protected CompiledType FindStatementType(FunctionCall functionCall)

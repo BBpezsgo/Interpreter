@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test11.bfpp";
+            var file = "test20.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -29,7 +29,7 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 "-hide-debug",
                 "-hide-system",
-                "-c-generate-comments false",
+                // "-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
                 // "-test",

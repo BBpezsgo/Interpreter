@@ -48,7 +48,7 @@ namespace ProgrammingLanguage.Bytecode
             {
                 if (this[i].type != RuntimeType.CHAR)
                 {
-                    throw new InternalException($"Unexpected data type {this[i].type}, expected {nameof(RuntimeType.CHAR)}");
+                    throw new InternalException($"Unexpected data type {this[i].type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
                 }
                 result += this[i].ValueChar;
             }

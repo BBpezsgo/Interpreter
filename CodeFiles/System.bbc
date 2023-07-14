@@ -11,8 +11,9 @@
 #bf "float-to-int" "int" "float";
 
 [Builtin("stdout")]
+[StandardOutput]
 export void Print(char data);
-  
+
 [Builtin("stderr")]
 export void PrintError(char data);
   
@@ -29,6 +30,14 @@ enum bool
     True = 1,
 }
 
+[StandardOutput]
+export void Print(int message)
+{
+    String _message = message.ToString();
+    Print(_message);
+    delete _message;
+}
+
 export void Print(String message)
 {
     int length = message.Length();
@@ -43,34 +52,34 @@ export void PrintD(String message)
     Print(message);
     delete message;
 }
-  
+
 export void PrintLine()
 {
     PrintD("\r\n");
 }
-  
+
 export void PrintLine(String message)
 {
     Print(message);
     PrintD("\r\n");
 }
-  
+
 export void PrintLineD(String message)
 {
     PrintD(message);
     PrintD("\r\n");
 }
-  
+
 export void PrintLine(int message)
 {
     PrintLineD(message.ToString());
 }
-  
+
 export void PrintLine(byte message)
 {
     PrintLineD(message.ToString());
 }
-  
+
 [Builtin("stdin")]
 export char ReadKey();
 

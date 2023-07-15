@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test24.bbc";
+            var file = "test27.bbc";
 
             if (args.Length == 0) args = new string[]
             {

@@ -1,0 +1,17 @@
+int i = 0;
+while (1) {
+	i++;
+	out i;
+	out '\n';
+
+	if (i == 50) {
+		out "Break!";
+		break;
+		out "What?";
+	};
+	
+	out i;
+	out " Late\n";
+};
+
+out "Huhu";

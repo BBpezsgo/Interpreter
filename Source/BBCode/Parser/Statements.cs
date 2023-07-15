@@ -149,6 +149,47 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         internal Block Block;
     }
 
+    public class LinkedIf : StatementWithBlock
+    {
+        public Token Keyword;
+        public StatementWithValue Condition;
+        /// <summary>
+        /// Can be:
+        /// <list type="bullet">
+        /// <item><see cref="LinkedIf"/> (else if)</item>
+        /// <item><see cref="LinkedElse"/></item>
+        /// <item><see langword="null"/></item>
+        /// </list>
+        /// </summary>
+        public Statement NextLink;
+
+        public LinkedIf(Token keyword, StatementWithValue condition)
+        {
+            Keyword = keyword;
+            Condition = condition;
+        }
+
+        public override Position TotalPosition() => new(Keyword, Condition, Block);
+
+        public override string PrettyPrint(int ident = 0)
+        { throw new NotImplementedException(); }
+    }
+
+    public class LinkedElse : StatementWithBlock
+    {
+        public Token Keyword;
+
+        public LinkedElse(Token keyword)
+        {
+            Keyword = keyword;
+        }
+
+        public override Position TotalPosition() => new(Keyword, Block);
+
+        public override string PrettyPrint(int ident = 0)
+        { throw new NotImplementedException(); }
+    }
+
     public class CompileTag : Statement, IDefinition
     {
         public Token HashToken;
@@ -1004,6 +1045,41 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             {
                 yield return Parts[i];
             }
+        }
+
+        Statement ToLinks(int i)
+        {
+            if (i >= Parts.Count)
+            { return null; }
+
+            if (Parts[i] is ElseIfBranch elseIfBranch)
+            {
+                return new LinkedIf(elseIfBranch.Keyword, elseIfBranch.Condition)
+                {
+                    Block = elseIfBranch.Block,
+                    NextLink = ToLinks(i + 1),
+                };
+            }
+
+            if (Parts[i] is ElseBranch elseBranch)
+            {
+                return new LinkedElse(elseBranch.Keyword)
+                {
+                    Block = elseBranch.Block,
+                };
+            }
+
+            throw new Exception();
+        }
+        public LinkedIf ToLinks()
+        {
+            if (Parts.Count == 0) throw new Exception();
+            if (Parts[0] is not IfBranch ifBranch) throw new Exception();
+            return new LinkedIf(ifBranch.Keyword, ifBranch.Condition)
+            {
+                Block = ifBranch.Block,
+                NextLink = ToLinks(1),
+            };
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

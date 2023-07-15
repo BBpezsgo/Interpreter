@@ -13,11 +13,38 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         #region Fields
 
+        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
+        List<CompiledParameter> parameters;
+
         IFunctionThing CurrentFunction;
 
         #endregion
 
         internal ReferenceCollector() : base() { }
+
+        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        {
+            if (GetVariable(symbolName, out CompiledVariable variable))
+            {
+                type = variable.Type;
+                return true;
+            }
+
+            if (GetParameter(symbolName, out CompiledParameter parameter))
+            {
+                type = parameter.Type;
+                return true;
+            }
+
+            type = null;
+            return false;
+        }
+
+        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+            => compiledVariables.TryGetValue(variableName, out compiledVariable);
+
+        bool GetParameter(string parameterName, out CompiledParameter parameter)
+            => parameters.TryGetValue(parameterName, out parameter);
 
         CompiledVariable GetVariableInfo(VariableDeclaretion newVariable)
         {
@@ -100,7 +127,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void AnalyzeStatement(Statement statement)
         {
-            if (statement is ForLoop forLoop)
+            if (statement is ShortOperatorCall shortOperatorCall)
+            {
+                AnalyzeStatement(shortOperatorCall.ToAssignment());
+            }
+            else if (statement is ForLoop forLoop)
             {
                 AnalyzeStatement(forLoop.VariableDeclaration);
                 AnalyzeStatement(forLoop.Condition);

@@ -1471,7 +1471,7 @@ namespace ProgrammingLanguage.BBCode
                 if (!ExpectOperator(";"))
                 { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition().After()); }
 
-                Assignment expression = ExpectSetter();
+                AnyAssignment expression = ExpectAnySetter();
                 if (expression == null)
                 { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
@@ -1637,6 +1637,8 @@ namespace ProgrammingLanguage.BBCode
                 statement ??= ExpectKeywordCall("out", true, true);
                 statement ??= ExpectIfStatement();
                 statement ??= ExpectVariableDeclaration();
+                statement ??= ExpectShortOperator();
+                statement ??= ExpectCompoundSetter();
                 statement ??= ExpectSetter();
                 statement ??= ExpectExpression();
                 return statement;
@@ -1779,6 +1781,16 @@ namespace ProgrammingLanguage.BBCode
             }
 
             /// <exception cref="SyntaxException"></exception>
+            AnyAssignment ExpectAnySetter()
+            {
+                AnyAssignment statement = null;
+                statement ??= ExpectShortOperator();
+                statement ??= ExpectCompoundSetter();
+                statement ??= ExpectSetter();
+                return statement;
+            }
+
+            /// <exception cref="SyntaxException"></exception>
             Assignment ExpectSetter()
             {
                 int parseStart = currentTokenIndex;
@@ -1789,91 +1801,66 @@ namespace ProgrammingLanguage.BBCode
                     return null;
                 }
 
-                if (ExpectOperator(new string[] {
+                if (!ExpectOperator("=", out Token @operator))
+                {
+                    currentTokenIndex = parseStart;
+                    return null;
+                }
+
+                StatementWithValue valueToAssign = ExpectExpression();
+                if (valueToAssign == null)
+                { throw new SyntaxException("Expected expression after assignment operator", @operator); }
+
+                return new Assignment(@operator, leftStatement, valueToAssign);
+            }
+
+            /// <exception cref="SyntaxException"></exception>
+            CompoundAssignment ExpectCompoundSetter()
+            {
+                int parseStart = currentTokenIndex;
+                StatementWithValue leftStatement = ExpectExpression();
+                if (leftStatement == null)
+                {
+                    currentTokenIndex = parseStart;
+                    return null;
+                }
+
+                if (!ExpectOperator(new string[] {
                     "+=", "-=", "*=", "/=", "%=",
                     "&=", "|=", "^=",
-                }, out var o0))
+                }, out var @operator))
                 {
-                    StatementWithValue valueToAssign = ExpectExpression();
-                    if (valueToAssign == null)
-                    { throw new SyntaxException("Expected expression after compound assignment operator", o0); }
+                    currentTokenIndex = parseStart;
+                    return null;
+                }
 
-                    OperatorCall statementToAssign = new(new Token()
-                    {
-                        AbsolutePosition = o0.AbsolutePosition,
-                        Content = o0.Content.Replace("=", ""),
-                        Position = o0.Position,
-                        TokenType = o0.TokenType,
-                    }, leftStatement, valueToAssign);
+                StatementWithValue valueToAssign = ExpectExpression();
+                if (valueToAssign == null)
+                { throw new SyntaxException("Expected expression after compound assignment operator", @operator); }
 
-                    return new Assignment(new Token()
-                    {
-                        AbsolutePosition = o0.AbsolutePosition,
-                        Content = "=",
-                        Position = o0.Position,
-                        TokenType = o0.TokenType,
-                    }, leftStatement, statementToAssign);
+                return new CompoundAssignment(@operator, leftStatement, valueToAssign);
+            }
+
+            /// <exception cref="SyntaxException"></exception>
+            ShortOperatorCall ExpectShortOperator()
+            {
+                int parseStart = currentTokenIndex;
+                StatementWithValue leftStatement = ExpectExpression();
+
+                if (leftStatement == null)
+                {
+                    currentTokenIndex = parseStart;
+                    return null;
                 }
 
                 if (ExpectOperator("++", out var t0))
                 {
-                    Literal literalOne = new()
-                    {
-                        Value = "1",
-                        Type = LiteralType.INT,
-                        ImagineryPosition = t0.GetPosition(),
-                    };
-
-                    OperatorCall statementToAssign = new(new Token()
-                    {
-                        AbsolutePosition = t0.AbsolutePosition,
-                        Content = "+",
-                        Position = t0.Position,
-                        TokenType = t0.TokenType,
-                    }, leftStatement, literalOne);
-
-                    return new Assignment(new Token()
-                    {
-                        AbsolutePosition = t0.AbsolutePosition,
-                        Content = "=",
-                        Position = t0.Position,
-                        TokenType = t0.TokenType,
-                    }, leftStatement, statementToAssign);
+                    return new ShortOperatorCall(t0, leftStatement);
                 }
 
                 if (ExpectOperator("--", out var t1))
                 {
-                    Literal literalOne = new()
-                    {
-                        Value = "1",
-                        Type = LiteralType.INT,
-                        ImagineryPosition = t1.GetPosition(),
-                    };
-
-                    OperatorCall statementToAssign = new(new Token()
-                    {
-                        AbsolutePosition = t1.AbsolutePosition,
-                        Content = "-",
-                        Position = t1.Position,
-                        TokenType = t1.TokenType,
-                    }, leftStatement, literalOne);
-
-                    return new Assignment(new Token()
-                    {
-                        AbsolutePosition = t1.AbsolutePosition,
-                        Content = "=",
-                        Position = t1.Position,
-                        TokenType = t1.TokenType,
-                    }, leftStatement, statementToAssign);
-                }
-
-                if (ExpectOperator("=", out Token op))
-                {
-                    StatementWithValue valueToAssign = ExpectExpression();
-                    if (valueToAssign == null)
-                    { throw new SyntaxException("Expected expression after assignment operator", op); }
-
-                    return new Assignment(op, leftStatement, valueToAssign);
+                    return new ShortOperatorCall(t1, leftStatement);
                 }
 
                 currentTokenIndex = parseStart;

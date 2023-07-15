@@ -1,0 +1,92 @@
+macro void IsPrime(int n, ref int divisors) {
+	int _macro_prime_iterator = 0;
+
+	while (_macro_prime_iterator - n) {
+		_macro_prime_iterator++;
+
+		if (n % _macro_prime_iterator == 0) {
+			divisors++;
+		
+			if (divisors == 3) {
+				_macro_prime_iterator = n;
+			};
+		};
+	};
+
+	divisors = divisors == 2;
+}
+
+const int True = 1;
+const int False = 0;
+
+int i = 0;
+
+while (i - 100) {
+	i++;
+	int j = i;
+	int either = True;
+	int isPrime;
+
+	IsPrime(i, ref isPrime);
+	
+	if (isPrime) {
+		while (j - 100) {
+			j++;
+
+			if (j % 7 == 0) {
+				j = 100;
+			} elseif (j % 11 == 0) {
+				j = 100;
+			} else {
+				int isPrime2 = False;
+				IsPrime(j, ref isPrime2);
+				if (isPrime2) {
+					j = 100;
+					isPrime = False;
+				};
+			};
+		};
+	};
+
+	if (i % 3 == 0) {
+		either = False;
+	
+		out "Fizz";
+	};
+	
+	if (i % 5 == 0) {
+		either = False;
+	
+		out "Buzz";
+	};
+
+	if (i % 7 == 0) {
+		either = False;
+	
+		out "Rizz";
+	};
+
+	if (i % 11 == 0) {
+		either = False;
+	
+		out "Jazz";
+	};
+
+	if (120 % i == 0) {
+		either = False;
+	
+		out "Dizz";
+	};
+
+	if (isPrime) {
+		either = False;
+	
+		out "Prizz";
+	};
+
+	if (either) {
+		out i;
+	};
+	
+	out '\n';
+};

@@ -68,7 +68,7 @@ namespace ProgrammingLanguage.Core
 
             interpreter.OnNeedInput += (sender) =>
             {
-                var input = Console.ReadKey();
+                var input = Console.ReadKey(true);
                 sender.OnInput(input.KeyChar);
             };
 

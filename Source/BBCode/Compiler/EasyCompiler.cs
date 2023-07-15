@@ -106,6 +106,12 @@ namespace ProgrammingLanguage.BBCode
                 foreach (Warning warning in codeGeneratorResult.Warnings)
                 { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
 
+                foreach (var info in codeGeneratorResult.Informations)
+                { printCallback?.Invoke(info.MessageAll, Output.LogType.Normal); }
+
+                foreach (var hint in codeGeneratorResult.Hints)
+                { printCallback?.Invoke(hint.MessageAll, Output.LogType.Normal); }
+
                 if (codeGeneratorResult.Errors.Length > 0)
                 { throw new Errors.Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
 

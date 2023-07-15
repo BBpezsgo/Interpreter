@@ -9,6 +9,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         #region Fields
 
+        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
+        List<CompiledParameter> parameters;
+
         Compiler.CompileLevel CompileLevel;
 
         List<Information> Informations;
@@ -16,6 +19,30 @@ namespace ProgrammingLanguage.BBCode.Compiler
         #endregion
 
         internal UnusedFunctionManager() : base() { }
+
+        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        {
+            if (GetVariable(symbolName, out CompiledVariable variable))
+            {
+                type = variable.Type;
+                return true;
+            }
+
+            if (GetParameter(symbolName, out CompiledParameter parameter))
+            {
+                type = parameter.Type;
+                return true;
+            }
+
+            type = null;
+            return false;
+        }
+
+        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+            => compiledVariables.TryGetValue(variableName, out compiledVariable);
+
+        bool GetParameter(string parameterName, out CompiledParameter parameter)
+            => parameters.TryGetValue(parameterName, out parameter);
 
         int DoTheThing(Action<string, Output.LogType> printCallback = null)
         {

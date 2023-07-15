@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test20.bbc";
+            var file = "test24.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -86,7 +86,7 @@ namespace TheProgram
 
                         ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code);
 
-                        int runMode = 2;
+                        int runMode = 3;
 
                         if (runMode == 0)
                         {

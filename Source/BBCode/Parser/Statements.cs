@@ -99,6 +99,11 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         { yield break; }
     }
 
+    public abstract class AnyAssignment : Statement
+    {
+        public abstract Assignment ToAssignment();
+    }
+
     public abstract class StatementWithValue : Statement
     {
         public bool SaveValue = true;
@@ -307,7 +312,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override IEnumerable<Statement> GetStatements()
         {
-            yield return PrevStatement;
+            if (PrevStatement != null) yield return PrevStatement;
             for (int i = 0; i < Parameters.Length; i++)
             { yield return Parameters[i]; }
         }
@@ -597,8 +602,138 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class Assignment : Statement
+    public class ShortOperatorCall : AnyAssignment, IReadableID
     {
+        public readonly Token Operator;
+        internal readonly StatementWithValue Left;
+
+        internal StatementWithValue[] Parameters => new StatementWithValue[] { this.Left };
+        internal int ParameterCount => 1;
+
+        public ShortOperatorCall(Token op, StatementWithValue left)
+        {
+            this.Operator = op;
+            this.Left = left;
+        }
+
+        public override string ToString()
+        {
+            string result = "";
+            if (Left != null)
+            {
+                if (Left.ToString().Length <= 50)
+                { result += Left.ToString(); }
+                else
+                { result += "..."; }
+
+                result += $" {Operator}";
+            }
+            else
+            { result = $"{Operator}"; }
+
+            return result;
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            string v;
+            if (Left != null)
+            {
+                v = $"{Left.PrettyPrint()} {Operator}";
+            }
+            else
+            {
+                v = $"{Operator}";
+            }
+
+            return $"{" ".Repeat(ident)}({v})";
+        }
+
+        public override Position TotalPosition() => new(Operator, Left);
+        public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
+        {
+            string result = this.Operator.Content;
+            result += "(";
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result += ", "; }
+
+                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+            }
+            result += ")";
+
+            return result;
+        }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Left;
+        }
+
+        public override Assignment ToAssignment()
+        {
+            switch (Operator.Content)
+            {
+                case "++":
+                    {
+                        Literal one = new()
+                        {
+                            ImagineryPosition = Operator.GetPosition(),
+                            SaveValue = true,
+                            Type = LiteralType.INT,
+                            Value = "1",
+                            ValueToken = Token.CreateAnonymous("1", TokenType.LITERAL_NUMBER),
+                        };
+
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.OPERATOR), Left, one);
+
+                        Token assignmentToken = new()
+                        {
+                            AbsolutePosition = Operator.AbsolutePosition,
+                            Position = Operator.Position,
+                            Content = "=",
+                            TokenType = Operator.TokenType,
+                            AnalysedType = Operator.AnalysedType,
+                        };
+
+                        return new Assignment(assignmentToken, Left, operatorCall);
+                    }
+
+                case "--":
+                    {
+                        Literal one = new()
+                        {
+                            ImagineryPosition = Operator.GetPosition(),
+                            SaveValue = true,
+                            Type = LiteralType.INT,
+                            Value = "1",
+                            ValueToken = Token.CreateAnonymous("1", TokenType.LITERAL_NUMBER),
+                        };
+
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.OPERATOR), Left, one);
+
+                        Token assignmentToken = new()
+                        {
+                            AbsolutePosition = Operator.AbsolutePosition,
+                            Position = Operator.Position,
+                            Content = "=",
+                            TokenType = Operator.TokenType,
+                            AnalysedType = Operator.AnalysedType,
+                        };
+
+                        return new Assignment(assignmentToken, Left, operatorCall);
+                    }
+
+                default: throw new NotImplementedException();
+            }
+        }
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class Assignment : AnyAssignment
+    {
+        /// <summary>
+        /// This should always be "="
+        /// </summary>
         public readonly Token Operator;
         internal readonly StatementWithValue Left;
         internal readonly StatementWithValue Right;
@@ -620,6 +755,54 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         {
             yield return Left;
             yield return Right;
+        }
+
+        public override Assignment ToAssignment() => this;
+    }
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class CompoundAssignment : AnyAssignment
+    {
+        /// This should always starts with "="
+        public readonly Token Operator;
+        internal readonly StatementWithValue Left;
+        internal readonly StatementWithValue Right;
+
+        public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
+        {
+            this.Operator = @operator;
+            this.Left = left;
+            this.Right = right;
+        }
+
+        public override string ToString() => $"... {Operator} ...";
+
+        public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
+
+        public override Position TotalPosition() => new(Operator, Left, Right);
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            yield return Left;
+            yield return Right;
+        }
+
+        public override Assignment ToAssignment()
+        {
+            OperatorCall statementToAssign = new(new Token()
+            {
+                AbsolutePosition = Operator.AbsolutePosition,
+                Content = Operator.Content.Replace("=", ""),
+                Position = Operator.Position,
+                TokenType = Operator.TokenType,
+            }, Left, Right);
+
+            return new Assignment(new Token()
+            {
+                AbsolutePosition = Operator.AbsolutePosition,
+                Content = "=",
+                Position = Operator.Position,
+                TokenType = Operator.TokenType,
+            }, Left, statementToAssign);
         }
     }
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
@@ -769,7 +952,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         internal Token Keyword;
         internal VariableDeclaretion VariableDeclaration;
         internal StatementWithValue Condition;
-        internal Statement Expression;
+        internal AnyAssignment Expression;
 
         public override string ToString()
         {

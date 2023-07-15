@@ -64,11 +64,38 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public List<Hint> Hints;
         readonly List<DebugInfo> GeneratedDebugInfo = new();
 
+        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
+        List<CompiledParameter> parameters;
+
         #endregion
 
         public CodeGenerator() : base() { }
 
         #region Helper Functions
+
+        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        {
+            if (GetVariable(symbolName, out CompiledVariable variable))
+            {
+                type = variable.Type;
+                return true;
+            }
+
+            if (GetParameter(symbolName, out CompiledParameter parameter))
+            {
+                type = parameter.Type;
+                return true;
+            }
+
+            type = null;
+            return false;
+        }
+
+        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+            => compiledVariables.TryGetValue(variableName, out compiledVariable);
+
+        bool GetParameter(string parameterName, out CompiledParameter parameter)
+            => parameters.TryGetValue(parameterName, out parameter);
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -1487,7 +1514,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
             var conditionValue = PredictStatementValue(whileLoop.Condition);
-            if (conditionValue.HasValue && !conditionValue.Value.IsFalsy() && TrimUnreachableCode)
+            if (conditionValue.HasValue && conditionValue.Value.IsFalsy() && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
                 Informations.Add(new Information($"Unreachable code not compiled", new Position(whileLoop.Block), CurrentFile));
@@ -1967,8 +1994,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { GenerateCodeForStatement(keywordCall); }
             else if (st is OperatorCall @operator)
             { GenerateCodeForStatement(@operator); }
-            else if (st is Assignment setter)
-            { GenerateCodeForStatement(setter); }
+            else if (st is AnyAssignment setter)
+            { GenerateCodeForStatement(setter.ToAssignment()); }
             else if (st is BBCode.Parser.Statement.Literal literal)
             { GenerateCodeForStatement(literal); }
             else if (st is Identifier variable)
@@ -3150,19 +3177,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
-            base.compiledVariables = new();
             this.GeneratedCode = new();
             this.BuiltinFunctions = compilerResult.BuiltinFunctions;
             this.BuiltinFunctionCache = new();
             this.OptimizeCode = !settings.DontOptimize;
             this.GeneratedDebugInfo.Clear();
             this.CleanupStack = new();
-            base.parameters = new();
             this.ReturnInstructions = new();
             this.BreakInstructions = new();
             this.UndefinedFunctionOffsets = new();
             this.UndefinedOperatorFunctionOffsets = new();
             this.UndefinedGeneralFunctionOffsets = new();
+
+            this.compiledVariables = new();
+            this.parameters = new();
 
             this.Informations = new();
             this.Hints = new();

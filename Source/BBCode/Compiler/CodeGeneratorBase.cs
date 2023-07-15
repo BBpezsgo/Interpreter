@@ -102,7 +102,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CodeGeneratorBase
+    public abstract class CodeGeneratorBase
     {
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
@@ -110,8 +110,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
-        protected List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        protected List<CompiledParameter> parameters;
 
         protected List<Error> Errors;
         protected List<Warning> Warnings;
@@ -126,9 +124,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledOperators = Array.Empty<CompiledOperator>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
-
-            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
-            parameters = new List<CompiledParameter>();
 
             Errors = new List<Error>();
             Warnings = new List<Warning>();
@@ -255,11 +250,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected bool GetEnum(string name, out CompiledEnum @enum)
             => CompiledEnums.TryGetValue(name, out @enum);
 
-        protected bool GetVariable(string variableName, out CompiledVariable compiledVariable)
-            => compiledVariables.TryGetValue(variableName, out compiledVariable);
-
-        protected bool GetParameter(string parameterName, out CompiledParameter parameter)
-            => parameters.TryGetValue(parameterName, out parameter);
+        protected abstract bool GetLocalSymbolType(string symbolName, out CompiledType type);
 
         protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
@@ -639,11 +630,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (variable.VariableName.Content == "nullptr")
             { return new CompiledType(Type.INT); }
 
-            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
-            { return param.Type; }
-
-            if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
-            { return val.Type; }
+            if (GetLocalSymbolType(variable.VariableName.Content, out CompiledType type))
+            { return type; }
 
             if (GetEnum(variable.VariableName.Content, out var @enum))
             { return new CompiledType(@enum); }
@@ -651,7 +639,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (GetFunction(variable, out var function))
             { return new CompiledType(function); }
 
-            throw new CompilerException($"Variable/parameter/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+            throw new CompilerException($"Local symbol/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
         }
         protected CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
         protected CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);

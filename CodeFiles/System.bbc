@@ -81,7 +81,14 @@ export void PrintLine(byte message)
 }
 
 [Builtin("stdin")]
-export char ReadKey();
+char StdIn();
+
+export char ReadKey()
+{
+    char in = StdIn();
+    Print(in);
+    return in;
+}
 
 export String ReadLine() {
     String result = new String(0);

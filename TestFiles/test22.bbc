@@ -1,0 +1,11 @@
+set a 0
+set b 255
+
+while (b) {
+
+	out '\t' a '\t' b '\t'
+	out a || b
+	out '\n'
+
+	sub b 1
+}

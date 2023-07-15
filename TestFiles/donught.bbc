@@ -43,7 +43,7 @@ void Start()
     };
 }
 
-void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Map zbuffer)
+adaptive void RenderFrame(float A, float B, float R1, float R2, float K1, float K2, Map zbuffer)
 {
     float PI = 3.1415f;
 

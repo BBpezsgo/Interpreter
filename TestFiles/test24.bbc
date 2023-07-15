@@ -1,0 +1,59 @@
+macro void IsPrime(byte n, ref byte divisors) {
+	var i = 0;
+
+	while (i - n) {
+		i ++;
+
+		if (n % i == 0) {
+			divisors ++;
+		
+			if (divisors == 3) {
+				i = n;
+			};
+		};
+	};
+
+	divisors = divisors == 2;
+}
+
+macro byte IsPrime(byte n) {
+	byte divisors = 0;
+	var i = 0;
+
+	while (i - n) {
+		i ++;
+
+		if (n % i == 0) {
+			divisors ++;
+		
+			if (divisors == 3) {
+				i = n;
+			};
+		};
+	};
+
+	return divisors == 2;
+}
+
+const byte True = 1;
+const byte False = 0;
+
+byte i;
+
+while (i - 100) {
+	i ++;
+	var either = True;
+	var isPrime = IsPrime(i);
+
+	// IsPrime(i, ref isPrime);
+
+	if (isPrime) {
+		either = False;
+
+		out i;
+		out " is prime\n";
+	} else {
+		out i;
+		out '\n';
+	};
+};

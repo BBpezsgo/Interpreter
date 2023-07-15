@@ -1,0 +1,19 @@
+macro Hey(message bruh) {
+	out message
+	out '\n'
+	outstr bruh
+}
+
+set a "01abc"
+set b "66"
+set c a
+set a "01abb"
+
+out b
+out '\n'
+out a
+out '\n'
+out c
+out '\n'
+
+Hey(c 55)

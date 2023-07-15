@@ -1,0 +1,27 @@
+macro InputChar(input) {
+	set input IN
+	out input
+}
+
+macro InputByte(input) {
+	set char IN
+	out char
+
+	set result 0
+
+	while (char - '\r') {
+		set result result * 10
+		add result char - 48
+		
+		set char IN
+		if (char - '\r')
+		{
+			out char
+		}
+	}
+
+	set input result
+}
+
+set input 0
+InputByte(ref input)

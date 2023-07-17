@@ -125,9 +125,9 @@ namespace ConsoleGUI
                 for (int x = prevPoint.x; x <= point.x; x++)
                 {
                     for (int y = prevPoint.y; y <= point.y; y++)
-                    {
-                        char c = '█';
+                    {;
                         /*
+                        char c = '█'
                         if (i + 1 < points.Length)
                         {
                             // (int x, int y) nextPoint = (points[i + 1].x, points[i + 1].y);

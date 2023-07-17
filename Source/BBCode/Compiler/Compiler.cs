@@ -224,6 +224,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public Error[] Errors;
             public Warning[] Warnings;
             public Statement[] TopLevelStatements;
+            public Token[] Tokens;
         }
 
         internal static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
@@ -467,7 +468,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (var func in collectedAST.ParserResult.Functions)
             {
                 if (Functions.ContainsSameDefinition(func))
-                { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier)); continue; }
+                { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier, func.FilePath)); continue; }
 
                 Functions.Add(func);
             }
@@ -485,7 +486,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (var @struct in collectedAST.ParserResult.Structs)
             {
                 if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content) || Enums.ContainsKey(@struct.Name.Content))
-                { Errors.Add(new Error($"Type \" {@struct.Name.Content} \" already defined", @struct.Name)); }
+                { Errors.Add(new Error($"Type \" {@struct.Name.Content} \" already defined", @struct.Name, @struct.FilePath)); }
                 else
                 { Structs.Add(@struct); }
             }
@@ -493,7 +494,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (var @class in collectedAST.ParserResult.Classes)
             {
                 if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content) || Enums.ContainsKey(@class.Name.Content))
-                { Errors.Add(new Error($"Type \"{@class.Name.Content}\" already defined", @class.Name)); }
+                { Errors.Add(new Error($"Type \"{@class.Name.Content}\" already defined", @class.Name, @class.FilePath)); }
                 else
                 { Classes.Add(@class); }
 
@@ -501,7 +502,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (var func in @class.Operators)
                 {
                     if (Operators.ContainsSameDefinition(func))
-                    { Errors.Add(new Error($"Operator {func.ReadableID()} already defined", func.Identifier)); continue; }
+                    { Errors.Add(new Error($"Operator {func.ReadableID()} already defined", func.Identifier, func.FilePath)); continue; }
 
                     Operators.Add(func);
                 }
@@ -510,7 +511,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (var @enum in collectedAST.ParserResult.Enums)
             {
                 if (Classes.ContainsKey(@enum.Identifier.Content) || Structs.ContainsKey(@enum.Identifier.Content) || Enums.ContainsKey(@enum.Identifier.Content))
-                { Errors.Add(new Error($"Type \"{@enum.Identifier.Content}\" already defined", @enum.Identifier)); }
+                { Errors.Add(new Error($"Type \"{@enum.Identifier.Content}\" already defined", @enum.Identifier, @enum.FilePath)); }
                 else
                 { Enums.Add(@enum); }
             }
@@ -850,6 +851,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Enums = this.CompiledEnums,
                 Hashes = this.Hashes.ToArray(),
                 TopLevelStatements = parserResult.TopLevelStatements,
+                Tokens = parserResult.Tokens,
 
                 Errors = this.Errors.ToArray(),
                 Warnings = this.Warnings.ToArray(),

@@ -1,9 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace ProgrammingLanguage.Core
 {
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     internal class Stack<T> : IReadOnlyStack<T>
     {
         readonly List<T> stack;
@@ -47,6 +49,30 @@ namespace ProgrammingLanguage.Core
 
         public IEnumerator<T> GetEnumerator() => this.stack.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => this.stack.GetEnumerator();
+
+        private string GetDebuggerDisplay()
+        {
+            if (stack is null)
+            { return "null"; }
+
+            string result = "";
+
+            for (int i = 0; i < stack.Count; i++)
+            {
+                if (i > 0)
+                { result += ", "; }
+
+                if (result.Length > 30)
+                {
+                    result += "...";
+                    break;
+                }
+
+                result += stack[i].ToString();
+            }
+
+            return $"[ {result.Trim()} ]";
+        }
     }
 
     public interface IReadOnlyStack<T> : IReadOnlyCollection<T>, IReadOnlyList<T>

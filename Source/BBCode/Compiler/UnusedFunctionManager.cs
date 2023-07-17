@@ -9,16 +9,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         #region Fields
 
-        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        List<CompiledParameter> parameters;
+        readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
+        readonly List<CompiledParameter> parameters;
 
-        Compiler.CompileLevel CompileLevel;
+        readonly Compiler.CompileLevel CompileLevel;
 
-        List<Information> Informations;
+        readonly List<Information> Informations;
 
         #endregion
 
-        internal UnusedFunctionManager() : base() { }
+        internal UnusedFunctionManager(Compiler.CompileLevel compileLevel) : base()
+        {
+            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
+            parameters = new List<CompiledParameter>();
+
+            CompileLevel = compileLevel;
+
+            Informations = new List<Information>();
+        }
 
         protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
         {
@@ -134,10 +142,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Action<string, Output.LogType> printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
-            UnusedFunctionManager unusedFunctionManager = new()
+            UnusedFunctionManager unusedFunctionManager = new(level)
             {
-                CompileLevel = level,
-
                 CompiledClasses = compilerResult.Classes,
                 CompiledStructs = compilerResult.Structs,
 
@@ -146,8 +152,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CompiledGeneralFunctions = compilerResult.GeneralFunctions,
 
                 CompiledEnums = compilerResult.Enums,
-
-                Informations = new List<Information>(),
             };
 
             for (int iteration = 0; iteration < iterations; iteration++)

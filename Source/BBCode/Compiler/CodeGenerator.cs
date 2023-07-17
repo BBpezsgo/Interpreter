@@ -11,6 +11,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
 
+    using System.ComponentModel.DataAnnotations;
+
     readonly struct CleanupItem
     {
         /// <summary>
@@ -504,7 +506,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (BuiltinFunctionCache.TryGetValue(function.BuiltinName, out int cacheAddress))
                     {
                         if (function.BuiltinName.Length == 0)
-                        { throw new CompilerException($"Builtin function with length of zero", Position.UnknownPosition); }
+                        { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)function.Attributes.Get("Builtin"), function.FilePath); }
 
                         AddComment($" Param {0}:");
                         GenerateCodeForStatement(keywordCall.Parameters[0]);
@@ -700,7 +702,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (BuiltinFunctionCache.TryGetValue(compiledFunction.BuiltinName, out int cacheAddress))
                 {
                     if (compiledFunction.BuiltinName.Length == 0)
-                    { throw new CompilerException($"Builtin function with length of zero", Position.UnknownPosition); }
+                    { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Builtin"), compiledFunction.FilePath); }
 
                     if (functionCall.PrevStatement != null)
                     {
@@ -901,7 +903,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (BuiltinFunctionCache.TryGetValue(compiledFunction.BuiltinName, out int cacheAddress))
                 {
                     if (compiledFunction.BuiltinName.Length == 0)
-                    { throw new CompilerException($"Builtin function with length of zero", Position.UnknownPosition); }
+                    { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Builtin"), compiledFunction.FilePath); }
 
                     if (functionCall.PrevStatement != null)
                     {
@@ -2795,7 +2797,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     }
                 }
                 else
-                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable.Type.Identifier); }
+                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable, newVariable.FilePath); }
 
                 if (newVariable.Type.Identifier == "var")
                 { throw new InternalException("Invalid or unimplemented initial value", newVariable.FilePath); }

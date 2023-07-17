@@ -13,14 +13,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         #region Fields
 
-        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        List<CompiledParameter> parameters;
+        readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
+        readonly List<CompiledParameter> parameters;
 
         IFunctionThing CurrentFunction;
 
         #endregion
 
-        internal ReferenceCollector() : base() { }
+        internal ReferenceCollector() : base()
+        {
+            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
+            parameters = new List<CompiledParameter>();
+            CurrentFunction = null;
+        }
 
         protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
         {
@@ -67,7 +72,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (newVariable.Type == "var")
             {
                 if (newVariable.InitialValue == null)
-                { throw new CompilerException($"Initial value for \"var\" variable declaration is requied", newVariable.Type.Identifier); }
+                { throw new CompilerException($"Initial value for \"var\" variable declaration is requied", newVariable, CurrentFile); }
 
                 if (newVariable.InitialValue is BBCode.Parser.Statement.Literal literal)
                 {

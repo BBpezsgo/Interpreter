@@ -91,12 +91,15 @@ namespace ProgrammingLanguage.BBCode.Parser
 
     public class FunctionDefinition : IExportable, IDefinition, Compiler.IDefinitionComparer<FunctionDefinition>
     {
-        public class Attribute : Compiler.IElementWithKey<string>
+        public class Attribute : Compiler.IElementWithKey<string>, IThingWithPosition
         {
             public Token Identifier;
             public object[] Parameters;
 
             public string Key => Identifier.Content;
+
+            public Position GetPosition()
+            { return new Position(Identifier); }
         }
 
         public Token BracketStart;
@@ -394,8 +397,9 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly List<UsingAnalysis> UsingsAnalytics;
         public readonly Statement.Statement[] TopLevelStatements;
         public readonly EnumDefinition[] Enums;
+        public readonly Token[] Tokens;
 
-        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
+        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, Token[] tokens)
         {
             Functions = functions.ToArray();
             Structs = structs.ToArray();
@@ -405,6 +409,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             Classes = classes.ToArray();
             TopLevelStatements = topLevelStatements.ToArray();
             Enums = enums.ToArray();
+            Tokens = tokens;
         }
 
         /// <summary>Converts the parsed AST into text</summary>

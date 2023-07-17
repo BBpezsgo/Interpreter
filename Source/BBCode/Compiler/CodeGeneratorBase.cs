@@ -489,8 +489,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 "float" => new DataItem((float)0f),
                 "char" => new DataItem((char)'\0'),
 
-                "var" => throw new CompilerException("Undefined type", type.Identifier),
-                "void" => throw new CompilerException("Invalid type", type.Identifier),
+                "var" => throw new CompilerException("Undefined type", type.Identifier, null),
+                "void" => throw new CompilerException("Invalid type", type.Identifier, null),
                 _ => throw new InternalException($"Initial value for type \"{type.Identifier.Content}\" is unimplemented"),
             };
         }

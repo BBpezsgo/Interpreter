@@ -51,7 +51,7 @@ namespace ProgrammingLanguage.Tester
                     { throw new CompilerException($"Attribute 'File' requies 1 string parameter, passed {attrFile.Parameters[0].TokenType}", attrFile.Name, path); }
 
                     if (!File.Exists(Path.Combine(directory.FullName, attrFile.Parameters[0].Content)))
-                    { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].Content)} does not exists'", attrFile.Parameters[0]); }
+                    { throw new CompilerException($"File '{Path.Combine(directory.FullName, attrFile.Parameters[0].Content)} does not exists'", attrFile.Parameters[0], path); }
 
                     compiledTestDefinitions.Add(new CompiledTestDefinition()
                     {

@@ -13,6 +13,7 @@ namespace ProgrammingLanguage.Core
 
     using ProgrammingLanguage.BBCode.Compiler;
     using ProgrammingLanguage.Output;
+    using ProgrammingLanguage.BBCode.Parser;
 
     /// <summary>
     /// This compiles and runs the code
@@ -442,7 +443,7 @@ namespace ProgrammingLanguage.Core
                             instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
                         }
                         else
-                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier); }
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
                     }
                     else if (value == "end")
                     {
@@ -451,10 +452,10 @@ namespace ProgrammingLanguage.Core
                             instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
                         }
                         else
-                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier); }
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
                     }
                     else
-                    { throw new CompilerException("Unknown event '" + value + "'", Position.UnknownPosition); }
+                    { throw new CompilerException("Unknown event '" + value + "'", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Catch"), compiledFunction.FilePath); }
                 }
             }
 

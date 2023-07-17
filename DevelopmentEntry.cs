@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test27.bbc";
+            var file = "test24.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -80,13 +80,18 @@ namespace TheProgram
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
                     {
-                        string code = Brainfuck.ProgramUtils.CompilePlus(settings.Value.File, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
-                        if (string.IsNullOrEmpty(code))
+                        ProgrammingLanguage.Brainfuck.Compiler.CodeGenerator.Result? _code = Brainfuck.ProgramUtils.CompilePlus(settings.Value.File, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
+                        if (!_code.HasValue)
                         { break; }
+                        var code = _code.Value;
 
-                        ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code);
+                        ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code.Code)
+                        {
+                            DebugInfo = code.DebugInfo.ToArray(),
+                            OriginalCode = code.Tokens,
+                        };
 
-                        int runMode = 3;
+                        int runMode = 2;
 
                         if (runMode == 0)
                         {
@@ -94,7 +99,7 @@ namespace TheProgram
                             Console.Write("Press any key to start the interpreter");
                             Console.ReadKey();
 
-                            interpreter.RunWithUI(true, 10);
+                            interpreter.RunWithUI(false, 50);
                         }
                         else if (runMode == 1)
                         {
@@ -102,7 +107,7 @@ namespace TheProgram
                             Console.WriteLine($" === RESULT ===");
                             Console.WriteLine();
 
-                            Brainfuck.ProgramUtils.SpeedTest(code, 3);
+                            Brainfuck.ProgramUtils.SpeedTest(code.Code, 3);
                         }
                         else
                         {

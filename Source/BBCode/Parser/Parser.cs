@@ -218,7 +218,7 @@ namespace ProgrammingLanguage.BBCode
                     if (endlessSafe > 500) { throw new EndlessLoopException(); }
                 }
 
-                return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums);
+                return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.tokens.ToArray());
             }
 
             public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
@@ -794,7 +794,7 @@ namespace ProgrammingLanguage.BBCode
 
                 Classes.Add(classDefinition.Name.Content, classDefinition);
 
-                Warnings.Add(new Warning($"Class is experimental feature!", keyword));
+                Warnings.Add(new Warning($"Class is experimental feature!", keyword, classDefinition.FilePath));
 
                 return true;
             }

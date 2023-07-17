@@ -1,13 +1,9 @@
 ﻿using System;
 using System.Runtime.Serialization;
 
-#pragma warning disable CS0618 // Type or member is obsolete
-
 namespace ProgrammingLanguage.Errors
 {
     using Core;
-
-    using ProgrammingLanguage.BBCode.Parser.Statement;
 
     using System.Collections.Generic;
 
@@ -41,28 +37,13 @@ namespace ProgrammingLanguage.Errors
 
         readonly Position position;
 
-        protected Exception(string message, IThingWithPosition something) : this(message, something.GetPosition())
+        protected Exception(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file)
         { }
-        protected Exception(string message, IThingWithPosition something, string file) : this(message, something.GetPosition(), file)
-        { }
-        protected Exception(string message, Position pos) : base(message)
+        protected Exception(string message, Position position, string file) : base(message)
         {
-            this.position = pos;
-        }
-        protected Exception(string message, BaseToken token) : this(message, token.GetPosition()) { }
-        protected Exception(string message, Position pos, string file) : base(message)
-        {
-            this.position = pos;
+            this.position = position;
             this.File = file;
         }
-        protected Exception(string message, BaseToken token, string file) : this(message, token.GetPosition(), file) { }
-
-        protected Exception(string message, Statement statement, string file) : base(message)
-        {
-            this.File = file;
-            this.position = statement.TotalPosition();
-        }
-
         public Exception(Error error) : this(error.Message, error.Position, error.File)
         { }
 
@@ -72,51 +53,47 @@ namespace ProgrammingLanguage.Errors
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Compiler.CodeGenerator"/> and <see cref="ProgrammingLanguage.Core.Interpreter"/> </summary>
     [Serializable]
     public class CompilerException : Exception
     {
-        public CompilerException(string message, Position pos) : base(message, pos) { }
-        public CompilerException(string message, BaseToken token) : base(message, token) { }
-        public CompilerException(string message, IThingWithPosition something, string file) : base(message, something, file) { }
-        public CompilerException(string message, Position pos, string file) : base(message, pos, file) { }
-        public CompilerException(string message, BaseToken token, string file) : base(message, token, file) { }
-        public CompilerException(string message, Statement statement, string file) : base(message, statement, file) { }
+        public CompilerException(string message, Position position, string file) : base(message, position, file) { }
+        public CompilerException(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file) { }
 
         protected CompilerException(
           SerializationInfo info,
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Tokenizer"/> </summary>
+    /// <summary> Thrown by the <see cref="BBCode.Tokenizer"/> </summary>
     [Serializable]
     public class TokenizerException : Exception
     {
-        public TokenizerException(string message, Position pos) : base(message, pos) { }
-        public TokenizerException(string message, BaseToken token) : base(message, token) { }
-        public TokenizerException(string message, Position pos, string file) : base(message, pos, file) { }
-        public TokenizerException(string message, BaseToken token, string file) : base(message, token, file) { }
+        public TokenizerException(string message, Position position) : base(message, position, null) { }
+        public TokenizerException(string message, Position position, string file) : base(message, position, file) { }
+
+        public TokenizerException(string message, IThingWithPosition position) : this(message, position.GetPosition()) { }
+        public TokenizerException(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file) { }
 
         protected TokenizerException(
           SerializationInfo info,
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="ProgrammingLanguage.BBCode.Parser.Parser"/> </summary>
+    /// <summary> Thrown by the <see cref="BBCode.Parser.Parser"/> </summary>
     [Serializable]
     public class SyntaxException : Exception
     {
-        public SyntaxException(string message, Position pos) : base(message, pos) { }
-        public SyntaxException(string message, BaseToken token) : base(message, token) { }
-        public SyntaxException(string message, Position pos, string file) : base(message, pos, file) { }
-        public SyntaxException(string message, BaseToken token, string file) : base(message, token, file) { }
+        public SyntaxException(string message, Position position) : base(message, position, null) { }
+        public SyntaxException(string message, Position position, string file) : base(message, position, file) { }
+        public SyntaxException(string message, IThingWithPosition position) : this(message, position.GetPosition()) { }
+        public SyntaxException(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file) { }
 
         protected SyntaxException(
           SerializationInfo info,
           StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="ProgrammingLanguage.Bytecode.BytecodeInterpreter"/> </summary>
+    /// <summary> Thrown by the <see cref="Bytecode.BytecodeInterpreter"/> </summary>
     [Serializable]
     public class RuntimeException : Exception
     {
@@ -137,8 +114,8 @@ namespace ProgrammingLanguage.Errors
             ContextDebugInfo = contextDebugInfo.ToArray();
         }
 
-        internal RuntimeException(string message) : base(message, Position.UnknownPosition) { }
-        internal RuntimeException(string message, Bytecode.Context context) : base(message, Position.UnknownPosition)
+        internal RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
+        internal RuntimeException(string message, Bytecode.Context context) : base(message, Position.UnknownPosition, null)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
@@ -187,7 +164,7 @@ namespace ProgrammingLanguage.Errors
                     result += $"\n Code:";
                     for (int i = 0; i < Context.Value.Code.Length; i++)
                     {
-                        result += $"\n{(i + Context.Value.CodePointer)}\t {Context.Value.Code[i].ToString()}";
+                        result += $"\n{(i + Context.Value.CodePointer)}\t {Context.Value.Code[i]}";
                     }
                 }
 
@@ -254,17 +231,13 @@ namespace ProgrammingLanguage.Errors
 
         readonly Position position;
 
+        public NotExceptionBut(string message, Position position) : this(message, position, null)
+        { }
         public NotExceptionBut(string message, Position position, string file)
         {
             this.Message = message;
             this.position = position;
             this.File = file;
-        }
-        public NotExceptionBut(string message, Position position)
-        {
-            this.Message = message;
-            this.position = position;
-            this.File = null;
         }
 
         public virtual string MessageAll
@@ -283,33 +256,31 @@ namespace ProgrammingLanguage.Errors
 
     public class Warning : NotExceptionBut
     {
-        public Warning(string message, BaseToken token, string file) : base(message, token.GetPosition(), file)
+        public Warning(string message, Position position) : base(message, position)
         { }
         public Warning(string message, Position position, string file) : base(message, position, file)
         { }
-        public Warning(string message, BaseToken token) : base(message, token.GetPosition())
-        { }
-        public Warning(string message, Position position) : base(message, position)
+        public Warning(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file)
         { }
     }
 
     /// <summary> It's an exception, but not. </summary>
     public class Error : NotExceptionBut
     {
-        public Error(string message, BaseToken token, string file) : base(message, token.GetPosition(), file) { }
-        public Error(string message, Position position, string file) : base(message, position, file) { }
-        public Error(string message, BaseToken token) : base(message, token.GetPosition()) { }
         public Error(string message, Position position) : base(message, position) { }
+        public Error(string message, Position position, string file) : base(message, position, file) { }
+        public Error(string message, IThingWithPosition position) : this(message, position.GetPosition()) { }
+        public Error(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file) { }
 
         public override string ToString() => MessageAll;
 
-        public Exception ToException() => new Exception(this);
+        public Exception ToException() => new(this);
     }
 
     public class Hint : NotExceptionBut
     {
-        public Hint(string message, BaseToken token, string file) : base(message, token.GetPosition(), file) { }
         public Hint(string message, Position position, string file) : base(message, position, file) { }
+        public Hint(string message, IThingWithPosition token, string file) : this(message, token.GetPosition(), file) { }
 
         public override string ToString() => MessageAll;
 
@@ -318,8 +289,8 @@ namespace ProgrammingLanguage.Errors
 
     public class Information : NotExceptionBut
     {
-        public Information(string message, BaseToken token, string file) : base(message, token.GetPosition(), file) { }
         public Information(string message, Position position, string file) : base(message, position, file) { }
+        public Information(string message, IThingWithPosition token, string file) : this(message, token.GetPosition(), file) { }
 
         public override string ToString() => MessageAll;
 

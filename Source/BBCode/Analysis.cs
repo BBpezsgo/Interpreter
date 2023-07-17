@@ -26,7 +26,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
         public readonly ParserResult ParserResult => parserResult ?? throw new System.NullReferenceException();
         public ParserResult? parserResult;
-        public Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
+        public readonly Compiler.CompilerResult CompilerResult => compilerResult ?? throw new System.NullReferenceException();
         public Compiler.CompilerResult compilerResult;
         public Warning[] Warnings;
         public Hint[] Hints;
@@ -303,7 +303,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     {
                         if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content))
                         {
-                            errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name));
+                            errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name, @struct.FilePath));
                         }
                         else
                         {
@@ -315,7 +315,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     {
                         if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content))
                         {
-                            errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name));
+                            errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name, @class.FilePath));
                         }
                         else
                         {
@@ -380,7 +380,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
             {
                 if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content))
                 {
-                    errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name));
+                    errors.Add(new Error($"Type '{@struct.Name.Content}' already exists", @struct.Name, @struct.FilePath));
                 }
                 else
                 {
@@ -391,7 +391,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
             {
                 if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content))
                 {
-                    errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name));
+                    errors.Add(new Error($"Type '{@class.Name.Content}' already exists", @class.Name, @class.FilePath));
                 }
                 else
                 {

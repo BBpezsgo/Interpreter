@@ -1,59 +1,22 @@
-macro void IsPrime(byte n, ref byte divisors) {
-	var i = 0;
+macro void Half() {
+	int i = 0;
 
-	while (i - n) {
-		i ++;
-
-		if (n % i == 0) {
-			divisors ++;
-		
-			if (divisors == 3) {
-				i = n;
-			};
-		};
-	};
-
-	divisors = divisors == 2;
-}
-
-macro byte IsPrime(byte n) {
-	byte divisors = 0;
-	var i = 0;
-
-	while (i - n) {
-		i ++;
-
-		if (n % i == 0) {
-			divisors ++;
-		
-			if (divisors == 3) {
-				i = n;
-			};
-		};
-	};
-
-	return divisors == 2;
-}
-
-const byte True = 1;
-const byte False = 0;
-
-byte i;
-
-while (i - 100) {
-	i ++;
-	var either = True;
-	var isPrime = IsPrime(i);
-
-	// IsPrime(i, ref isPrime);
-
-	if (isPrime) {
-		either = False;
-
-		out i;
-		out " is prime\n";
-	} else {
+	while (1) {
+		i++;
 		out i;
 		out '\n';
+
+		if (i == 50) {
+			out "a\n";
+			return;
+			out "nope\n";
+		};
+		out 'b';
 	};
-};
+
+	out "BRUH\n";
+Half();
+}
+
+Half();
+out "hello\n";

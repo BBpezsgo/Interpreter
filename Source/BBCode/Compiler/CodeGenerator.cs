@@ -11,8 +11,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
 
-    using System.ComponentModel.DataAnnotations;
-
     readonly struct CleanupItem
     {
         /// <summary>
@@ -275,8 +273,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             newVariable.VariableName.AnalysedType = TokenAnalysedType.VariableName;
 
-            if (!GetVariable(newVariable.VariableName.Content, out _))
+            if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
             { throw new CompilerException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.VariableName, CurrentFile); }
+
+            if (compiledVariable.Type.IsClass)
+            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Class; }
+            else if (compiledVariable.Type.IsStruct)
+            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Struct; }
+            else if (compiledVariable.Type.IsEnum)
+            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Enum; }
 
             if (newVariable.InitialValue == null) return;
 

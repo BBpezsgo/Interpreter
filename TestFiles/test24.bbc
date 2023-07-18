@@ -1,3 +1,5 @@
+using System;
+
 macro void Half() {
 	int i = 0;
 
@@ -15,7 +17,7 @@ macro void Half() {
 	};
 
 	out "BRUH\n";
-Half();
+	Half();
 }
 
 Half();

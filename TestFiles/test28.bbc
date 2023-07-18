@@ -1,0 +1,27 @@
+struct Point {
+	int x;
+	int y;
+}
+
+macro Point NewPoint(int x, int y) {
+	Point result = new Point;
+	result.x = x;
+	result.y = y;
+	return result;
+}
+
+Point p0 = NewPoint(55, 48);
+Point p1 = new Point;
+
+p1.x = 5;
+p1.y = 4;
+
+out p0.x '\n';
+
+out p0.y '\n';
+
+p0 = p1;
+
+out p0.x '\n';
+
+out p0.y '\n';

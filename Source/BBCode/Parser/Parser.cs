@@ -1113,7 +1113,7 @@ namespace ProgrammingLanguage.BBCode
 
                 StatementWithValue returnStatement = null;
 
-                returnStatement ??= ExpectKeywordCall("clone", true, true);
+                returnStatement ??= ExpectKeywordCall("clone", 1);
 
                 if (returnStatement != null)
                 { }
@@ -1629,12 +1629,12 @@ namespace ProgrammingLanguage.BBCode
             {
                 Statement.Statement statement = ExpectWhileStatement();
                 statement ??= ExpectForStatement();
-                statement ??= ExpectKeywordCall("return", true);
-                statement ??= ExpectKeywordCall("throw", true, true);
-                statement ??= ExpectKeywordCall("break");
-                statement ??= ExpectKeywordCall("delete", true, true);
-                statement ??= ExpectKeywordCall("clone", true, true);
-                statement ??= ExpectKeywordCall("out", true, true);
+                statement ??= ExpectKeywordCall("return", 0, 1);
+                statement ??= ExpectKeywordCall("throw", 1);
+                statement ??= ExpectKeywordCall("break", 0);
+                statement ??= ExpectKeywordCall("delete", 1);
+                statement ??= ExpectKeywordCall("clone", 1);
+                statement ??= ExpectKeywordCall("out", 1, 64);
                 statement ??= ExpectIfStatement();
                 statement ??= ExpectVariableDeclaration();
                 statement ??= ExpectShortOperator();
@@ -1977,8 +1977,9 @@ namespace ProgrammingLanguage.BBCode
                 return functionCall;
             }
 
-            /// <summary> return, break, continue, etc. </summary>
-            KeywordCall ExpectKeywordCall(string name, bool canHaveParameters = false, bool needParameters = false)
+            KeywordCall ExpectKeywordCall(string name, int parameterCount)
+                => ExpectKeywordCall(name, parameterCount, parameterCount);
+            KeywordCall ExpectKeywordCall(string name, int minParameterCount, int maxParameterCount)
             {
                 int startTokenIndex = currentTokenIndex;
 
@@ -1996,16 +1997,27 @@ namespace ProgrammingLanguage.BBCode
                 };
                 List<StatementWithValue> parameters = new();
 
-                if (canHaveParameters)
+                int endlessSafe = 16;
+                while (true)
                 {
+                    if (endlessSafe-- < 0) throw new EndlessLoopException();
+
                     StatementWithValue parameter = ExpectExpression();
-                    if (parameter == null && needParameters)
-                    { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
 
                     if (parameter != null)
                     { parameters.Add(parameter); }
+                    else
+                    { break; }
                 }
+
                 functionCall.Parameters = parameters.ToArray();
+
+                if (functionCall.Parameters.Length < minParameterCount)
+                { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requies minimum {minParameterCount} parameters but you passed {parameters.Count}", functionCall); }
+
+                if (functionCall.Parameters.Length > maxParameterCount)
+                { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requies maximum {maxParameterCount} parameters but you passed {parameters.Count}", functionCall); }
+
                 return functionCall;
             }
 

@@ -9,7 +9,7 @@ void Start()
 	float B = 20f;
 
 	int screen_width = 50;
-	int screen_height = 20;
+    int screen_height = 20;
 
     int yes = 0;
 

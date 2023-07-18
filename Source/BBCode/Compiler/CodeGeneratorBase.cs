@@ -453,6 +453,22 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
         }
 
+        /// <exception cref="NotImplementedException"></exception>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        protected static DataItem[] GetInitialValue(CompiledStruct @struct)
+        {
+            List<DataItem> result = new();
+
+            foreach (CompiledField field in @struct.Fields)
+            { result.Add(GetInitialValue(field.Type)); }
+
+            if (result.Count != @struct.Size)
+            { throw new NotImplementedException(); }
+
+            return result.ToArray();
+        }
+
         protected bool GetOutputWriter(CompiledType type, out CompiledFunction function)
         {
             foreach (var _function in CompiledFunctions)

@@ -1,3 +1,6 @@
+#bf "cos" "float" "float";
+#bf "sin" "float" "float";
+
 [Builtin("cos")]
 export float Cos(float v);
 

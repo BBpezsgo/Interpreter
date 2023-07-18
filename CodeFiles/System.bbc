@@ -38,6 +38,7 @@ export void Print(int message)
     delete _message;
 }
 
+[StandardOutput]
 export void Print(String message)
 {
     int length = message.Length();

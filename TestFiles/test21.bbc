@@ -1,27 +1,27 @@
-macro InputChar(input) {
-	set input IN
-	out input
+macro void InputChar(ref char input) {
+	input = IN;
+	out input;
 }
 
-macro InputByte(input) {
-	set char IN
-	out char
+macro void InputByte(ref byte input) {
+	char _char = IN;
+	out _char;
 
-	set result 0
+	int result = 0;
 
-	while (char - '\r') {
-		set result result * 10
-		add result char - 48
+	while (_char - '\r') {
+		result = result * 10;
+		result += _char - 48;
 		
-		set char IN
-		if (char - '\r')
+		_char = IN;
+		if (_char - '\r')
 		{
-			out char
-		}
-	}
+			out _char;
+		};
+	};
 
-	set input result
+	input = result;
 }
 
-set input 0
-InputByte(ref input)
+int input = 0;
+InputByte(ref input);

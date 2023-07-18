@@ -195,6 +195,32 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     operatorDefinition.TimesUsedTotal++;
                 }
             }
+            else if (statement is CompoundAssignment compoundAssignment)
+            {
+                if (compoundAssignment.Left is IndexCall indexSetter)
+                {
+                    AnalyzeStatement(indexSetter.PrevStatement);
+                    AnalyzeStatement(indexSetter.Expression);
+
+                    CompiledType prevType = FindStatementType(indexSetter.PrevStatement);
+                    CompiledType valueType = FindStatementType(compoundAssignment.Right);
+
+                    if (!prevType.IsClass)
+                    { return; }
+
+                    if (!GetIndexSetter(prevType.Class, valueType, out CompiledFunction indexer))
+                    { return; }
+
+                    indexer.AddReference(indexSetter);
+
+                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                    { indexer.TimesUsed++; }
+                    indexer.TimesUsedTotal++;
+                }
+                else
+                { AnalyzeStatement(compoundAssignment.Left); }
+                AnalyzeStatement(compoundAssignment.Right);
+            }
             else if (statement is Assignment setter)
             {
                 if (setter.Left is IndexCall indexSetter)

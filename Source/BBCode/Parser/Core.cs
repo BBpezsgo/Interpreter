@@ -89,6 +89,22 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition.Attribute[] Attributes;
     }
 
+    public class TemplateInfo
+    {
+        public Token Keyword;
+        public Token LeftP;
+        public Token[] TypeParameters;
+        public Token RightP;
+
+        public TemplateInfo(Token keyword, Token leftP, IEnumerable<Token> typeParameters, Token rightP)
+        {
+            Keyword = keyword;
+            LeftP = leftP;
+            TypeParameters = typeParameters.ToArray();
+            RightP = rightP;
+        }
+    }
+
     public class FunctionDefinition : IExportable, IDefinition, Compiler.IDefinitionComparer<FunctionDefinition>
     {
         public class Attribute : Compiler.IElementWithKey<string>, IThingWithPosition
@@ -111,6 +127,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public Statement.Statement[] Statements;
         public TypeInstance Type;
         public Token[] Modifiers;
+        public readonly TemplateInfo TemplateInfo;
 
         public string FilePath { get; set; }
 
@@ -123,13 +140,15 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         public FunctionDefinition(
             Token name,
-            IEnumerable<Token> modifiers)
+            IEnumerable<Token> modifiers,
+            TemplateInfo templateInfo)
         {
             Parameters = Array.Empty<ParameterDefinition>();
             Statements = Array.Empty<Statement.Statement>();
             Attributes = Array.Empty<Attribute>();
             Identifier = name;
             Modifiers = modifiers.ToArray();
+            TemplateInfo = templateInfo;
         }
 
         public override string ToString()

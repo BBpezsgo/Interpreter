@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test28.bbc";
+            var file = "test29.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -99,7 +99,7 @@ namespace TheProgram
                             Console.Write("Press any key to start the interpreter");
                             Console.ReadKey();
 
-                            interpreter.RunWithUI(false, 50);
+                            interpreter.RunWithUI(true, 5);
                         }
                         else if (runMode == 1)
                         {

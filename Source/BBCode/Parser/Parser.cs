@@ -522,7 +522,7 @@ namespace ProgrammingLanguage.BBCode
 
                 CheckModifiers(modifiers, "export");
 
-                function = new(possibleName, modifiers)
+                function = new(possibleName, modifiers, null)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),
@@ -539,6 +539,43 @@ namespace ProgrammingLanguage.BBCode
                 }
 
                 function.Statements = statements.ToArray();
+
+                return true;
+            }
+
+            bool ExpectTemplateInfo(out TemplateInfo templateInfo)
+            {
+                if (!ExpectIdentifier("template", out Token keyword))
+                {
+                    templateInfo = null;
+                    return false;
+                }
+
+                if (!ExpectOperator("<", out Token leftP))
+                { throw new SyntaxException($"Expected '<' after keyword \"{keyword}\"", keyword.After()); }
+
+                List<Token> parameters = new();
+
+                Token rightP;
+
+                var expectParameter = false;
+                while (!ExpectOperator(">", out rightP) || expectParameter)
+                {
+                    if (!ExpectIdentifier(out Token parameter))
+                    { throw new SyntaxException("Expected identifier or '>'", CurrentToken); }
+
+                    parameters.Add(parameter);
+
+                    if (ExpectOperator(">", out rightP))
+                    { break; }
+
+                    if (!ExpectOperator(","))
+                    { throw new SyntaxException("Expected ',' or '>'", CurrentToken); }
+                    else
+                    { expectParameter = true; }
+                }
+
+                templateInfo = new(keyword, leftP, parameters, rightP);;
 
                 return true;
             }
@@ -567,6 +604,8 @@ namespace ProgrammingLanguage.BBCode
                     else
                     { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
                 }
+
+                ExpectTemplateInfo(out TemplateInfo templateInfo);
 
                 Token[] modifiers = ParseModifiers();
 
@@ -618,7 +657,7 @@ namespace ProgrammingLanguage.BBCode
 
                 CheckModifiers(modifiers, "export", "macro", "adaptive");
 
-                function = new(possibleNameT, modifiers)
+                function = new(possibleNameT, modifiers, templateInfo)
                 {
                     Type = possibleType,
                     Attributes = attributes.ToArray(),

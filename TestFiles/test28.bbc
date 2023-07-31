@@ -1,3 +1,7 @@
+class Player {
+	int x;
+}
+
 struct Point {
 	int x;
 	int y;
@@ -10,18 +14,50 @@ macro Point NewPoint(int x, int y) {
 	return result;
 }
 
-Point p0 = NewPoint(55, 48);
-Point p1 = new Point;
+macro void TestPoint() {
+	Point p0 = NewPoint(55, 48);
+	Point p1 = new Point;
 
-p1.x = 5;
-p1.y = 4;
+	p1.x = 5;
+	p1.y = 4;
 
-out p0.x '\n';
+	out p0.x '\n';
 
-out p0.y '\n';
+	out p0.y '\n';
 
-p0 = p1;
+	p0 = p1;
 
-out p0.x '\n';
+	out p0.x '\n';
 
-out p0.y '\n';
+	out p0.y '\n';
+}
+
+macro void TestClass() {
+	Player player = new Player;
+	
+	// player.x = 69;
+	// player.y = 80;
+
+	// out player.x '\n';
+
+	// delete player;
+}
+
+macro int Test(int size) {
+	int result = Alloc();
+	int i = size;
+	while (i) {
+		i--;
+
+		int result2 = AllocFrom(result);
+		if (result2 - 1 != result) {
+			delete result;
+			delete result2;
+			result = result2;
+			i = size;
+		};
+	};
+	return result;
+}
+
+Test(3);

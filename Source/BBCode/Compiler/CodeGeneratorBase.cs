@@ -575,6 +575,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (functionCall.FunctionName == "Alloc") return new CompiledType(Type.INT);
 
+            if (functionCall.FunctionName == "AllocFrom") return new CompiledType(Type.INT);
+
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
 
             if (!GetFunction(functionCall, out var calledFunc))

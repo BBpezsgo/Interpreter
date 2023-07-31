@@ -13,11 +13,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 {
     using Bytecode;
 
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Tokenizer;
-
     using Parser;
     using Parser.Statement;
+
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Tokenizer;
 
     public static class Extensions
     {
@@ -38,10 +38,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     {
                         if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index)
                         { continue; }
-                        
+
                         if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index)
                         { continue; }
-                        
+
                         // TODO: Think about that safe to remove instructions in this case:
                         if (instruction.Parameter.ValueInt + instructionIndex == index)
                         { continue; }
@@ -359,17 +359,31 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public static bool GetDefinition<T, TResult>(this IDefinitionComparer<T>[] self, T other, out TResult value) where TResult : IDefinitionComparer<T>
         {
+            bool found = false;
+            value = default;
+
             foreach (IDefinitionComparer<T> element in self)
             {
                 if (element == null) continue;
                 if (element.IsSame(other))
                 {
+                    if (found)
+                    {
+                        if (element is IThingWithPosition position)
+                        {
+                            if (element is IDefinition definition)
+                            { throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", position, definition.FilePath); }
+                            throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", position, null);
+                        }
+                        throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", Position.UnknownPosition, null);
+                    }
+
                     value = (TResult)element;
-                    return true;
+                    found = true;
                 }
             }
-            value = default;
-            return false;
+
+            return found;
         }
         public static TResult GetDefinition<T, TResult>(this IDefinitionComparer<T>[] self, T other) where TResult : IDefinitionComparer<T>
         {
@@ -731,7 +745,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public CompiledClass Context { get; set; }
 
-        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
+        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
         {
             this.Type = type;
 
@@ -743,7 +757,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
         }
-        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
@@ -839,7 +853,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             BracketEnd = BracketEnd,
         };
 
-        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
+        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
         {
             this.Type = type;
 
@@ -851,7 +865,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.Type = functionDefinition.Type;
             base.FilePath = functionDefinition.FilePath;
         }
-        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
@@ -887,7 +901,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (this.Identifier.Content != other.name) return false;
             if (this.ParameterTypes.Length != other.parameters.Length) return false;
             for (int i = 0; i < this.Parameters.Length; i++)
-            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
+            {
+                if (this.ParameterTypes[i] != other.parameters[i])
+                {
+                    if (this.ParameterTypes[i].IsGeneric)
+                    { continue; }
+                    return false;
+                }
+            }
             return true;
         }
 
@@ -1164,7 +1185,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
     public class CompiledType : IEquatable<CompiledType>
     {
-        readonly Type builtinType;
+        Type builtinType;
 
         CompiledStruct @struct;
         CompiledClass @class;
@@ -1191,6 +1212,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal CompiledEnum Enum => @enum;
         internal FunctionType Function => function;
 
+        string genericName;
+
 
         /// <exception cref="Errors.InternalException"/>
         /// <exception cref="NotImplementedException"/>
@@ -1198,6 +1221,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             get
             {
+                if (IsGeneric)
+                {
+                    return genericName;
+                }
+
                 if (builtinType != Type.NONE) return builtinType switch
                 {
                     Type.VOID => "void",
@@ -1230,11 +1258,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal bool IsFunction => function != null;
         internal bool IsBuiltin => builtinType != Type.NONE;
         internal bool InHEAP => IsClass;
+        internal bool IsGeneric => !string.IsNullOrEmpty(genericName);
 
         public int Size
         {
             get
             {
+                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
                 if (IsClass) return @class.Size;
                 if (IsEnum) return 1;
@@ -1242,18 +1272,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return 1;
             }
         }
+        /// <summary>
+        /// Returns the class's size or 0 if it is not a class
+        /// </summary>
         public int SizeOnHeap
         {
             get
             {
+                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
                 if (IsClass) return @class.Size;
                 return 0;
             }
         }
+        /// <summary>
+        /// Returns the struct's size or 1 if it is not a class
+        /// </summary>
         public int SizeOnStack
         {
             get
             {
+                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
                 return 1;
             }
@@ -1266,6 +1304,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.@class = null;
             this.@enum = null;
             this.function = null;
+            this.genericName = null;
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1310,20 +1349,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
         }
 
-        /// <exception cref="ArgumentException"/>
-        /// <exception cref="Errors.InternalException"/>
-        internal CompiledType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
-        {
-            if (string.IsNullOrEmpty(typeName)) throw new ArgumentException($"'{nameof(typeName)}' cannot be null or empty.", nameof(typeName));
-
-            if (Constants.BuiltinTypeMap3.TryGetValue(typeName, out this.builtinType))
-            { return; }
-
-            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {typeName} to CompiledType");
-
-            SetCustomType(typeName, UnknownTypeCallback);
-        }
-
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="Errors.InternalException"/>
         public CompiledType(TypeInstance type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
@@ -1336,6 +1361,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
 
             SetCustomType(type.Identifier.Content, UnknownTypeCallback);
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="Errors.InternalException"/>
+        public CompiledType(TypeInstance type, Func<string, CompiledType> UnknownTypeCallback) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            { return; }
+
+            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
+
+            Set(UnknownTypeCallback.Invoke(type.Identifier.Content));
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1403,6 +1442,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             throw new Errors.InternalException($"Unknown type definition {customType.GetType().FullName}");
         }
 
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="Errors.InternalException"/>
+        void Set(CompiledType other)
+        {
+            if (other is null) throw new ArgumentNullException(nameof(other));
+
+            this.builtinType = other.builtinType;
+            this.@class = other.@class;
+            this.@enum = other.@enum;
+            this.function = other.function;
+            this.genericName = other.genericName;
+            this.@struct = other.@struct;
+        }
+
         public override string ToString() => Name;
 
         public static bool operator ==(CompiledType a, CompiledType b)
@@ -1457,6 +1510,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             if (b is null) return false;
 
+            if (this.genericName != b.genericName) return false;
+
             if (this.IsBuiltin != b.IsBuiltin) return false;
             if (this.IsClass != b.IsClass) return false;
             if (this.IsStruct != b.IsStruct) return false;
@@ -1473,6 +1528,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         public override int GetHashCode() => HashCode.Combine(builtinType, @struct, @class);
+
+        public static CompiledType CreateGeneric(string content)
+            => new()
+            { genericName = content, };
 
         public static bool operator ==(CompiledType a, string b)
         {

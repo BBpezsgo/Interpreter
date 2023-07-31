@@ -5,18 +5,14 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using ProgrammingLanguage.Bytecode;
-
-    using ProgrammingLanguage.Core;
-
     using DataUtilities.Serializer;
 
-    using ProgrammingLanguage.Errors;
-
     using ProgrammingLanguage.BBCode.Analysis;
-
     using ProgrammingLanguage.BBCode.Parser;
     using ProgrammingLanguage.BBCode.Parser.Statement;
+    using ProgrammingLanguage.Bytecode;
+    using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
 
     public class Compiler
     {
@@ -160,15 +156,28 @@ namespace ProgrammingLanguage.BBCode.Compiler
         List<ClassDefinition> Classes;
         List<EnumDefinition> Enums;
 
+        Stack<Token[]> GenericParameters;
+
         List<CompileTag> Hashes;
 
         Dictionary<string, BuiltinFunction> BuiltinFunctions;
 
-        ITypeDefinition GetCustomType(string name)
+        CompiledType GetCustomType(string name)
         {
-            if (CompiledStructs.ContainsKey(name)) return CompiledStructs.Get<string, ITypeDefinition>(name);
-            if (CompiledClasses.ContainsKey(name)) return CompiledClasses.Get<string, ITypeDefinition>(name);
-            if (CompiledEnums.ContainsKey(name)) return CompiledEnums.Get<string, ITypeDefinition>(name);
+            for (int i = 0; i < GenericParameters.Count; i++)
+            {
+                for (int j = 0; j < GenericParameters[i].Length; j++)
+                {
+                    if (GenericParameters[i][j].Content == name)
+                    {
+                        return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
+                    }
+                }
+            }
+
+            if (CompiledStructs.ContainsKey(name)) return new CompiledType(CompiledStructs.Get<string, ITypeDefinition>(name));
+            if (CompiledClasses.ContainsKey(name)) return new CompiledType(CompiledClasses.Get<string, ITypeDefinition>(name));
+            if (CompiledEnums.ContainsKey(name)) return new CompiledType(CompiledEnums.Get<string, ITypeDefinition>(name));
 
             throw new InternalException($"Unknown type '{name}'");
         }
@@ -262,6 +271,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
+        internal static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, CompiledType> unknownTypeCallback)
+        {
+            CompiledType[] result = new CompiledType[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            { result[i] = new CompiledType(parameters[i].Type, unknownTypeCallback); }
+            return result;
+        }
+
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
             if (Constants.Keywords.Contains(@struct.Name.Content))
@@ -302,6 +319,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
 
+            if (function.TemplateInfo != null)
+            { GenericParameters.Push(function.TemplateInfo.TypeParameters); }
+
             CompiledType type = new(function.Type, GetCustomType);
 
             if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
@@ -324,6 +344,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                     }
 
+                    if (function.TemplateInfo != null)
+                    { GenericParameters.Pop(); }
+
                     return new CompiledFunction(type, function)
                     {
                         ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
@@ -334,7 +357,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, function.FilePath));
             }
 
-            return new CompiledFunction(
+            CompiledFunction result = new(
                 type,
                 CompileTypes(function.Parameters, GetCustomType),
                 function
@@ -342,6 +365,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledAttributes = attributes,
             };
+
+            if (function.TemplateInfo != null)
+            { GenericParameters.Pop(); }
+
+            return result;
         }
 
         CompiledOperator CompileOperator(FunctionDefinition function)
@@ -531,7 +559,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Classes.AddRange(parserResult.Classes);
             Functions.AddRange(parserResult.Functions);
 
-            SourceCodeManager.Result collectorResult = SourceCodeManager.Collect(parserResult, file, parserSettings, printCallback, basePath);
+            SourceCodeManager.Result collectorResult;
+            if (file != null)
+            {
+                collectorResult = SourceCodeManager.Collect(parserResult, file, parserSettings, printCallback, basePath);
+            }
+            else
+            {
+                collectorResult = new SourceCodeManager.Result()
+                {
+                    CollectedASTs = Array.Empty<SourceCodeManager.CollectedAST>(),
+                    Errors = Array.Empty<Error>(),
+                    Warnings = Array.Empty<Warning>(),
+                };
+            }
 
             this.Warnings.AddRange(collectorResult.Warnings);
             this.Errors.AddRange(collectorResult.Errors);
@@ -726,16 +767,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (var field in @class.Fields)
                 {
                     @class.FieldOffsets.Add(field.Identifier.Content, currentOffset);
-                    switch (field.Type.BuiltinType)
-                    {
-                        case Type.BYTE:
-                        case Type.INT:
-                        case Type.FLOAT:
-                        case Type.CHAR:
-                            currentOffset++;
-                            break;
-                        default: throw new NotImplementedException();
-                    }
+                    currentOffset += field.Type.SizeOnStack;
                 }
             }
 
@@ -901,6 +933,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Classes = new List<ClassDefinition>(),
                 Enums = new List<EnumDefinition>(),
                 Hashes = new List<CompileTag>(),
+                GenericParameters = new Stack<Token[]>(),
 
                 BuiltinFunctions = builtinFunctions,
 

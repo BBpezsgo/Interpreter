@@ -111,7 +111,7 @@ namespace ProgrammingLanguage.Tester
                     Console.ForegroundColor = ConsoleColor.DarkMagenta;
 
                     Console.Write(" (");
-                    Console.Write(item.Files[i].Split('\\').Last());
+                    Console.Write(item.Files[i].Split('\\')[^1]);
                     Console.Write(") ");
 
                     Console.Write(" === \n");

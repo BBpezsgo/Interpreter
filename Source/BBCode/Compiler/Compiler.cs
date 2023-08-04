@@ -263,14 +263,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
-        internal static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, ITypeDefinition> unknownTypeCallback)
-        {
-            CompiledType[] result = new CompiledType[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            { result[i] = new CompiledType(parameters[i].Type, unknownTypeCallback); }
-            return result;
-        }
-
         internal static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, CompiledType> unknownTypeCallback)
         {
             CompiledType[] result = new CompiledType[parameters.Length];
@@ -330,7 +322,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (builtinFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
-                    if (builtinFunction.ReturnSomething != (type != "void"))
+                    if (builtinFunction.ReturnSomething != (type != Type.VOID))
                     { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
 
                     for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
@@ -384,7 +376,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (builtinFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
-                    if (builtinFunction.ReturnSomething != (type != "void"))
+                    if (builtinFunction.ReturnSomething != (type != Type.VOID))
                     { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
 
                     for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
@@ -708,6 +700,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             for (int i = 0; i < CompiledClasses.Length; i++)
             {
+                if (CompiledClasses[i].TemplateInfo != null)
+                { GenericParameters.Push(CompiledClasses[i].TemplateInfo.TypeParameters); }
+
                 for (int j = 0; j < CompiledClasses[i].Fields.Length; j++)
                 {
                     CompiledClasses[i].Fields[j] = new CompiledField(((ClassDefinition)CompiledClasses[i]).Fields[j])
@@ -716,62 +711,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         Class = CompiledClasses[i],
                     };
                 }
+
+                if (CompiledClasses[i].TemplateInfo != null)
+                { GenericParameters.Pop(); }
             }
-
-            #region Set DataStructure Sizes
-
-            foreach (var @struct in CompiledStructs)
-            {
-                int size = 0;
-                foreach (var field in @struct.Fields)
-                {
-                    size++;
-                }
-                @struct.Size = size;
-            }
-            foreach (var @class in CompiledClasses)
-            {
-                int size = 0;
-                foreach (var field in @class.Fields)
-                {
-                    size += field.Type.SizeOnStack;
-                }
-                @class.Size = size;
-            }
-
-            #endregion
-
-            #region Set Field Offsets
-
-            foreach (var @struct in CompiledStructs)
-            {
-                int currentOffset = 0;
-                foreach (var field in @struct.Fields)
-                {
-                    @struct.FieldOffsets.Add(field.Identifier.Content, currentOffset);
-                    switch (field.Type.BuiltinType)
-                    {
-                        case Type.BYTE:
-                        case Type.INT:
-                        case Type.FLOAT:
-                        case Type.CHAR:
-                            currentOffset++;
-                            break;
-                        default: throw new NotImplementedException();
-                    }
-                }
-            }
-            foreach (var @class in CompiledClasses)
-            {
-                int currentOffset = 0;
-                foreach (var field in @class.Fields)
-                {
-                    @class.FieldOffsets.Add(field.Identifier.Content, currentOffset);
-                    currentOffset += field.Type.SizeOnStack;
-                }
-            }
-
-            #endregion
 
             #region Compile Operators
 
@@ -801,6 +744,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 foreach (CompiledClass compiledClass in CompiledClasses)
                 {
+                    if (compiledClass.TemplateInfo != null)
+                    { GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters); }
+
                     foreach (var method in compiledClass.GeneralMethods)
                     {
                         foreach (var parameter in method.Parameters)
@@ -854,6 +800,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         methodInfo.Context = compiledClass;
                         compiledFunctions.Add(methodInfo);
                     }
+
+                    if (compiledClass.TemplateInfo != null)
+                    { GenericParameters.Pop(); }
                 }
 
                 foreach (var function in Functions)

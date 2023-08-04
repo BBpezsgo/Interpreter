@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace ProgrammingLanguage.Bytecode
 {
-    using ProgrammingLanguage.Core;
+    using Core;
 
     internal class DataStack : Stack<DataItem>
     {
@@ -25,9 +25,7 @@ namespace ProgrammingLanguage.Bytecode
             }
         }
 
-        public DataStack() : base() {
-            
-        }
+        public DataStack() : base() { }
 
         public void Destroy() => base.Clear();
 
@@ -73,6 +71,24 @@ namespace ProgrammingLanguage.Bytecode
                 item.Tag = this[index].Tag;
             }
             this[index] = item;
+        }
+
+        public void DebugPrint()
+        {
+#if DEBUG
+            for (int i = 0; i < Count; i++)
+            {
+                this[i].DebugPrint();
+                if (this[i].Tag != null)
+                {
+                    Console.Write(' ');
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.Write(this[i].Tag);
+                    Console.ResetColor();
+                }
+                Console.WriteLine();
+            }
+#endif
         }
     }
 }

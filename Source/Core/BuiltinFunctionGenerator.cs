@@ -1,12 +1,12 @@
-﻿using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Errors;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace ProgrammingLanguage.Core
 {
-    public class BuiltinFunction : BBCode.Compiler.IElementWithKey<string>
+    using ProgrammingLanguage.Bytecode;
+    using ProgrammingLanguage.Errors;
+
+    public class BuiltinFunction : BBCode.Compiler.IHaveKey<string>
     {
         public readonly BBCode.Compiler.Type[] ParameterTypes;
         public readonly string Name;

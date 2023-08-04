@@ -3,11 +3,14 @@ using System.Collections.Generic;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statement;
-    using ProgrammingLanguage.Bytecode;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using Bytecode;
+
+    using Core;
+
+    using Errors;
+
+    using Parser;
+    using Parser.Statement;
 
     public static class Constants
     {
@@ -102,14 +105,163 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
+    public readonly struct FunctionNames
+    {
+        public const string Destructor = "destructor";
+        public const string Cloner = "clone";
+        public const string Constructor = "constructor";
+        public const string IndexerGet = "indexer_get";
+        public const string IndexerSet = "indexer_set";
+    }
+
     public abstract class CodeGeneratorBase
     {
+        protected readonly struct CompileableTemplate<T> where T : IDuplicateable<T>
+        {
+            internal readonly T OriginalFunction;
+            internal readonly T Function;
+            internal readonly Dictionary<string, CompiledType> TypeArguments;
+
+            public CompileableTemplate(T function, Dictionary<string, CompiledType> typeArguments)
+            {
+                OriginalFunction = function;
+                Function = function.Duplicate();
+                TypeArguments = typeArguments;
+
+                FinishInitialization();
+            }
+
+            void FinishInitialization()
+            {
+                foreach (KeyValuePair<string, CompiledType> pair in TypeArguments)
+                {
+                    if (pair.Value.IsGeneric)
+                    { throw new InternalException(); }
+                }
+
+                if (Function is CompiledFunction compiledFunction)
+                {
+                    for (int i = 0; i < compiledFunction.ParameterTypes.Length; i++)
+                    {
+                        if (compiledFunction.ParameterTypes[i].IsGeneric)
+                        {
+                            if (!TypeArguments.TryGetValue(compiledFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                            { throw new InternalException(); }
+
+                            compiledFunction.ParameterTypes[i] = bruh;
+                            continue;
+                        }
+
+                        if (compiledFunction.ParameterTypes[i].IsClass && compiledFunction.ParameterTypes[i].Class.TemplateInfo != null)
+                        {
+                            Token[] classTypeParameters = compiledFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+
+                            CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
+
+                            foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
+                            {
+                                if (compiledFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                                { classTypeParameterValues[j] = item.Value; }
+                            }
+
+                            for (int j = 0; j < classTypeParameterValues.Length; j++)
+                            {
+                                if (classTypeParameterValues[j] is null ||
+                                    classTypeParameterValues[j].IsGeneric)
+                                { throw new InternalException(); }
+                            }
+
+                            compiledFunction.ParameterTypes[i] = new CompiledType(compiledFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                            continue;
+                        }
+                    }
+
+                    if (compiledFunction.Type.IsGeneric)
+                    {
+                        if (!TypeArguments.TryGetValue(compiledFunction.Type.Name, out CompiledType bruh))
+                        { throw new InternalException(); }
+
+                        compiledFunction.Type = bruh;
+                    }
+
+                    if (compiledFunction.Context != null && compiledFunction.Context.TemplateInfo != null)
+                    {
+                        compiledFunction.Context = compiledFunction.Context.Duplicate();
+                        compiledFunction.Context.AddTypeArguments(TypeArguments);
+                    }
+                }
+                else if (Function is CompiledGeneralFunction compiledGeneralFunction)
+                {
+                    for (int i = 0; i < compiledGeneralFunction.ParameterTypes.Length; i++)
+                    {
+                        if (compiledGeneralFunction.ParameterTypes[i].IsGeneric)
+                        {
+                            if (!TypeArguments.TryGetValue(compiledGeneralFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                            { throw new InternalException(); }
+
+                            compiledGeneralFunction.ParameterTypes[i] = bruh;
+                            continue;
+                        }
+
+                        if (compiledGeneralFunction.Type.IsGeneric)
+                        {
+                            if (!TypeArguments.TryGetValue(compiledGeneralFunction.Type.Name, out CompiledType bruh))
+                            { throw new InternalException(); }
+
+                            compiledGeneralFunction.Type = bruh;
+                        }
+
+                        if (compiledGeneralFunction.ParameterTypes[i].IsClass && compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo != null)
+                        {
+                            Token[] classTypeParameters = compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+
+                            CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
+
+                            foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
+                            {
+                                if (compiledGeneralFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                                { classTypeParameterValues[j] = item.Value; }
+                            }
+
+                            for (int j = 0; j < classTypeParameterValues.Length; j++)
+                            {
+                                if (classTypeParameterValues[j] is null ||
+                                    classTypeParameterValues[j].IsGeneric)
+                                { throw new InternalException(); }
+                            }
+
+                            compiledGeneralFunction.ParameterTypes[i] = new CompiledType(compiledGeneralFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                            continue;
+                        }
+                    }
+
+                    if (compiledGeneralFunction.Context != null && compiledGeneralFunction.Context.TemplateInfo != null)
+                    {
+                        compiledGeneralFunction.Context = compiledGeneralFunction.Context.Duplicate();
+                        compiledGeneralFunction.Context.AddTypeArguments(TypeArguments);
+                    }
+                }
+            }
+
+            public override string ToString() => Function == null ? "null" : Function.ToString();
+        }
+
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
+
+        protected IReadOnlyList<CompileableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
+        protected IReadOnlyList<CompileableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
+        protected IReadOnlyList<CompileableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
+
+        readonly List<CompileableTemplate<CompiledFunction>> compilableFunctions = new();
+        readonly List<CompileableTemplate<CompiledOperator>> compilableOperators = new();
+        readonly List<CompileableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
+
+        protected readonly Dictionary<string, CompiledType> TypeArguments;
 
         protected List<Error> Errors;
         protected List<Warning> Warnings;
@@ -129,11 +281,55 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Warnings = new List<Warning>();
 
             CurrentFile = null;
+
+            TypeArguments = new Dictionary<string, CompiledType>();
+
+            compilableFunctions = new List<CompileableTemplate<CompiledFunction>>();
+            compilableOperators = new List<CompileableTemplate<CompiledOperator>>();
+            compilableGeneralFunctions = new List<CompileableTemplate<CompiledGeneralFunction>>();
         }
 
         #region Helper Functions
 
-        #region Type Helpers
+        protected CompileableTemplate<CompiledFunction> AddCompilable(CompileableTemplate<CompiledFunction> compilable)
+        {
+            for (int i = 0; i < compilableFunctions.Count; i++)
+            {
+                if (compilableFunctions[i].Function.IsSame(compilable.Function))
+                { return compilableFunctions[i]; }
+            }
+            compilableFunctions.Add(compilable);
+            return compilable;
+        }
+
+        protected CompileableTemplate<CompiledOperator> AddCompilable(CompileableTemplate<CompiledOperator> compilable)
+        {
+            for (int i = 0; i < compilableOperators.Count; i++)
+            {
+                if (compilableOperators[i].Function.IsSame(compilable.Function))
+                { return compilableOperators[i]; }
+            }
+            compilableOperators.Add(compilable);
+            return compilable;
+        }
+
+        protected CompileableTemplate<CompiledGeneralFunction> AddCompilable(CompileableTemplate<CompiledGeneralFunction> compilable)
+        {
+            for (int i = 0; i < compilableGeneralFunctions.Count; i++)
+            {
+                if (compilableGeneralFunctions[i].Function.IsSame(compilable.Function))
+                { return compilableGeneralFunctions[i]; }
+            }
+            compilableGeneralFunctions.Add(compilable);
+            return compilable;
+        }
+
+        protected void AddTypeArguments(Dictionary<string, CompiledType> typeArguments)
+        {
+            TypeArguments.Clear();
+            foreach (KeyValuePair<string, CompiledType> typeArgument in typeArguments)
+            { TypeArguments.Add(typeArgument.Key, typeArgument.Value); }
+        }
 
         public static bool SameType(CompiledEnum @enum, CompiledType type)
         {
@@ -153,66 +349,23 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return true;
         }
 
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
         /// <param name="position">
         /// Used for exceptions
         /// </param>
-        /// <exception cref="InternalException"></exception>
-        protected ITypeDefinition GetCustomType(string name, Position position)
-        {
-            if (CompiledStructs.ContainsKey(name)) return CompiledStructs.Get<string, ITypeDefinition>(name);
-            if (CompiledClasses.ContainsKey(name)) return CompiledClasses.Get<string, ITypeDefinition>(name);
-            if (CompiledEnums.ContainsKey(name)) return CompiledEnums.Get<string, ITypeDefinition>(name);
-
-            if (GetFunction(name, out CompiledFunction function))
-            { return new FunctionType(function); }
-
-            throw new CompilerException($"Type definition \"{name}\" not found", position, CurrentFile);
-        }
-
-        protected ITypeDefinition GetReplacedType(string builtinName)
+        /// <exception cref="CompilerException"/>
+        protected CompiledType FindReplacedType(string builtinName, IThingWithPosition position)
         {
             string replacedName = TypeDefinitionReplacer(builtinName);
 
             if (replacedName == null)
-            { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with an attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", Position.UnknownPosition, CurrentFile); }
+            { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with an attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", position, CurrentFile); }
 
-            ITypeDefinition typeDefinition = GetCustomType(replacedName, Position.UnknownPosition);
-
-            return typeDefinition;
+            return FindType(replacedName, position);
         }
-
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="InternalException"></exception>
-        protected ITypeDefinition GetCustomType(TypeInstance name)
-            => GetCustomType(name.Identifier.Content, name.Position);
-
-        /// <returns>
-        /// <list type="bullet">
-        /// <item><see cref="CompiledStruct"/></item>
-        /// <item><see cref="CompiledClass"/></item>
-        /// <item><see langword="null"/> if <paramref name="returnNull"/> is set to <see langword="true"/></item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="InternalException"></exception>
-        protected ITypeDefinition GetCustomType(string name)
-            => GetCustomType(name, Position.UnknownPosition);
 
         protected string TypeDefinitionReplacer(string typeName)
         {
-            foreach (var @struct in CompiledStructs)
+            foreach (CompiledStruct @struct in CompiledStructs)
             {
                 if (@struct.CompiledAttributes.TryGetAttribute("Define", out string definedType))
                 {
@@ -222,7 +375,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     }
                 }
             }
-            foreach (var @class in CompiledClasses)
+            foreach (CompiledClass @class in CompiledClasses)
             {
                 if (@class.CompiledAttributes.TryGetAttribute("Define", out string definedType))
                 {
@@ -232,7 +385,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     }
                 }
             }
-            foreach (var @enum in CompiledEnums)
+            foreach (CompiledEnum @enum in CompiledEnums)
             {
                 if (@enum.CompiledAttributes.TryGetAttribute("Define", out string definedType))
                 {
@@ -245,41 +398,162 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return null;
         }
 
-        #endregion
-
         protected bool GetEnum(string name, out CompiledEnum @enum)
             => CompiledEnums.TryGetValue(name, out @enum);
 
         protected abstract bool GetLocalSymbolType(string symbolName, out CompiledType type);
 
         protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
-        {
-            CompiledType[] parameters = new CompiledType[functionCallStatement.MethodParameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            { parameters[i] = FindStatementType(functionCallStatement.MethodParameters[i]); }
+            => GetFunction(functionCallStatement.FunctionName, FindStatementTypes(functionCallStatement.MethodParameters), out compiledFunction);
 
-            return CompiledFunctions.GetDefinition((functionCallStatement.FunctionName, parameters), out compiledFunction);
-        }
-
-        protected bool GetIndexGetter(CompiledClass @class, out CompiledFunction compiledFunction)
+        protected bool GetFunction(string name, CompiledType[] parameters, out CompiledFunction compiledFunction)
         {
-            for (int i = 0; i < CompiledFunctions.Length; i++)
+            bool found = false;
+            compiledFunction = null;
+
+            foreach (CompiledFunction function in CompiledFunctions)
             {
-                var function = CompiledFunctions[i];
-                if (function.Context != @class) continue;
-                if (function.Identifier.Content != "indexer_get") continue;
+                if (function == null) continue;
+
+                if (function.IsTemplate) continue;
+
+                if (function.Identifier.Content != name) continue;
+
+                if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
 
                 compiledFunction = function;
+                found = true;
+            }
+
+            foreach (CompileableTemplate<CompiledFunction> function in compilableFunctions)
+            {
+                if (function.Function == null) continue;
+
+                if (function.Function.Identifier.Content != name) continue;
+
+                if (!CompiledType.Equals(function.Function.ParameterTypes, parameters)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
+
+                compiledFunction = function.Function;
+                found = true;
+            }
+
+            return found;
+        }
+
+        protected bool GetFunctionTemplate(FunctionCall functionCallStatement, out CompileableTemplate<CompiledFunction> compiledFunction)
+        {
+            CompiledType[] parameters = FindStatementTypes(functionCallStatement.MethodParameters);
+
+            bool found = false;
+            compiledFunction = default;
+
+            foreach (CompiledFunction element in CompiledFunctions)
+            {
+                if (element == null) continue;
+
+                if (!element.IsTemplate) continue;
+
+                if (element.Identifier != functionCallStatement.FunctionName) continue;
+
+                if (!CompiledType.Equals(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+
+                if (element.Context != null && element.Context.TemplateInfo != null)
+                { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
+
+                compiledFunction = new CompileableTemplate<CompiledFunction>(element, typeParameters);
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {element} are the same", element.Identifier, element.FilePath); }
+
+                found = true;
+            }
+
+            return found;
+        }
+
+        protected bool GetConstructorTemplate(CompiledClass @class, ConstructorCall constructorCall, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
+        {
+            bool found = false;
+            compiledGeneralFunction = default;
+
+            CompiledType[] parameters = FindStatementTypes(constructorCall.Parameters);
+
+            foreach (CompiledGeneralFunction function in CompiledGeneralFunctions)
+            {
+                if (!function.IsTemplate) continue;
+
+                if (function.Identifier.Content != FunctionNames.Constructor) continue;
+                if (function.Type.Class != @class) continue;
+                if (function.ParameterCount != parameters.Length) continue;
+
+                if (!CompiledType.Equals(function.ParameterTypes, parameters, out var typeParameters)) continue;
+
+                CollectTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
+
+                compiledGeneralFunction = new CompileableTemplate<CompiledGeneralFunction>(function, typeParameters);
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
+
+                found = true;
+            }
+
+            return found;
+        }
+
+        protected bool GetIndexGetter(CompiledType prevType, out CompiledFunction compiledFunction)
+        {
+            if (!prevType.IsClass)
+            {
+                compiledFunction = null;
+                return false;
+            }
+            CompiledClass @class = prevType.Class;
+
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = CompiledFunctions[i];
+
+                if (function.IsTemplate) continue;
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
-                { throw new CompilerException($"Method \"{"indexer_get"}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.INT)
-                { throw new CompilerException($"Method \"{"indexer_get"}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
-                { throw new CompilerException($"Method \"{"indexer_get"}\" should return something", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
+                compiledFunction = function;
+                return true;
+            }
+
+            for (int i = 0; i < compilableFunctions.Count; i++)
+            {
+                CompiledFunction function = compilableFunctions[i].Function;
+
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
+
+                if (function.ParameterTypes.Length != 2)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (!function.ReturnSomething)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
+
+                compiledFunction = function;
                 return true;
             }
 
@@ -287,35 +561,151 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool GetIndexSetter(CompiledClass @class, CompiledType elementType, out CompiledFunction compiledFunction)
+        protected bool GetIndexSetter(CompiledType prevType, CompiledType elementType, out CompiledFunction compiledFunction)
         {
+            if (!prevType.IsClass)
+            {
+                compiledFunction = null;
+                return false;
+            }
+            CompiledClass @class = prevType.Class;
+
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
-                var function = CompiledFunctions[i];
+                CompiledFunction function = CompiledFunctions[i];
+
+                if (function.IsTemplate) continue;
                 if (function.Context != @class) continue;
-                if (function.Identifier.Content != "indexer_set") continue;
+                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
-                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[2] != elementType)
                 { continue; }
 
                 if (function.ParameterTypes.Length > 3)
-                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
-
-                compiledFunction = function;
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.INT)
-                { throw new CompilerException($"Method \"{"indexer_set"}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
-                { throw new CompilerException($"Method \"{"indexer_set"}\" should not return anything", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
+                compiledFunction = function;
+                return true;
+            }
+
+            for (int i = 0; i < compilableFunctions.Count; i++)
+            {
+                CompiledFunction function = compilableFunctions[i].Function;
+
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
+
+                if (function.ParameterTypes.Length < 3)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[2] != elementType)
+                { continue; }
+
+                if (function.ParameterTypes.Length > 3)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ReturnSomething)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
+
+                compiledFunction = function;
                 return true;
             }
 
             compiledFunction = null;
+            return false;
+        }
+
+        protected bool GetIndexGetterTemplate(CompiledType prevType, out CompileableTemplate<CompiledFunction> compiledFunction)
+        {
+            if (!prevType.IsClass)
+            {
+                compiledFunction = default;
+                return false;
+            }
+            CompiledClass @class = prevType.Class;
+
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = CompiledFunctions[i];
+
+                if (!function.IsTemplate) continue;
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
+
+                if (function.ParameterTypes.Length != 2)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+
+                if (!function.ReturnSomething)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
+
+                Dictionary<string, CompiledType> typeParameters = new();
+
+                CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
+
+                compiledFunction = new CompileableTemplate<CompiledFunction>(function, typeParameters);
+                return true;
+            }
+
+            compiledFunction = default;
+            return false;
+        }
+
+        protected bool GetIndexSetterTemplate(CompiledType prevType, CompiledType elementType, out CompileableTemplate<CompiledFunction> compiledFunction)
+        {
+            if (!prevType.IsClass)
+            {
+                compiledFunction = default;
+                return false;
+            }
+            CompiledClass @class = prevType.Class;
+
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = CompiledFunctions[i];
+
+                if (!function.IsTemplate) continue;
+                if (function.Context != @class) continue;
+                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
+
+                if (function.ParameterTypes.Length < 3)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (!function.ParameterTypes[2].IsGeneric && function.ParameterTypes[2] != elementType)
+                { continue; }
+
+                if (function.ParameterTypes.Length > 3)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ParameterTypes[1] != Type.INT)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+
+                if (function.ReturnSomething)
+                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
+
+                Dictionary<string, CompiledType> typeParameters = new();
+
+                CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
+
+                compiledFunction = new CompileableTemplate<CompiledFunction>(function, typeParameters);
+                return true;
+            }
+
+            compiledFunction = default;
             return false;
         }
 
@@ -323,59 +713,100 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             compiledFunction = null;
 
-            CompiledFunction found = null;
             for (int i = 0; i < this.CompiledFunctions.Length; i++)
             {
-                var f = this.CompiledFunctions[i];
-                if (f.Identifier.Content != name) continue;
+                CompiledFunction function = this.CompiledFunctions[i];
 
-                if (found != null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {found.ReadableID()} (at {found.Identifier.Position.ToMinString()}) ; {f.ReadableID()} (at {f.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
+                if (function.Identifier != name) continue;
 
-                found = f;
+                if (compiledFunction != null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
+
+                compiledFunction = function;
             }
 
-            if (found != null)
-            {
-                compiledFunction = found;
-                return true;
-            }
-
-            return false;
+            return compiledFunction != null;
         }
 
         protected bool GetFunction(Identifier variable, out CompiledFunction compiledFunction)
             => GetFunction(variable.VariableName.Content, out compiledFunction);
 
-        protected bool GetOperator(OperatorCall @operator, out CompiledOperator operatorDefinition)
+        protected bool GetOperator(OperatorCall @operator, out CompiledOperator compiledOperator)
         {
-            StatementWithValue[] parameters = @operator.Parameters;
-            CompiledType[] parameterTypes = new CompiledType[parameters.Length];
+            CompiledType[] parameters = FindStatementTypes(@operator.Parameters);
 
-            for (int i = 0; i < parameters.Length; i++)
+            bool found = false;
+            compiledOperator = null;
+
+            foreach (CompiledOperator function in CompiledOperators)
             {
-                parameterTypes[i] = FindStatementType(parameters[i]);
+                if (function.IsTemplate) continue;
+                if (function.Identifier.Content != @operator.Operator.Content) continue;
+                if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated operator definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
+
+                compiledOperator = function;
+                found = true;
             }
 
-            return CompiledOperators.GetDefinition((@operator.Operator.Content, parameterTypes), out operatorDefinition);
+            return found;
         }
 
-        protected bool GetConstructor(ConstructorCall functionCallStatement, out CompiledGeneralFunction constructor)
+        protected bool GetOperatorTemplate(OperatorCall @operator, out CompileableTemplate<CompiledOperator> compiledOperator)
         {
-            if (!GetClass(functionCallStatement, out var @class))
-            { throw new CompilerException($"Class definition \"{functionCallStatement.TypeName}\" not found", functionCallStatement, CurrentFile); }
+            CompiledType[] parameters = FindStatementTypes(@operator.Parameters);
 
+            bool found = false;
+            compiledOperator = default;
+
+            foreach (CompiledOperator function in CompiledOperators)
+            {
+                if (!function.IsTemplate) continue;
+                if (function.Identifier.Content != @operator.Operator.Content) continue;
+                if (!CompiledType.Equals(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
+
+                compiledOperator = new CompileableTemplate<CompiledOperator>(function, typeParameters);
+
+                found = true;
+            }
+
+            return found;
+        }
+
+        protected bool GetGeneralFunction(CompiledClass @class, string name, out CompiledGeneralFunction generalFunction)
+            => GetGeneralFunction(@class, Array.Empty<CompiledType>(), name, out generalFunction);
+        protected bool GetGeneralFunction(CompiledClass @class, CompiledType[] parameters, string name, out CompiledGeneralFunction generalFunction)
+        {
             for (int i = 0; i < CompiledGeneralFunctions.Length; i++)
             {
-                var function = CompiledGeneralFunctions[i];
-                if (function.Identifier.Content != "constructor") continue;
+                CompiledGeneralFunction function = CompiledGeneralFunctions[i];
+
+                if (function.IsTemplate) continue;
+                if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (function.ParameterCount != functionCallStatement.Parameters.Length) continue;
+                if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
+
+                generalFunction = function;
+                return true;
+            }
+
+            for (int i = 0; i < compilableGeneralFunctions.Count; i++)
+            {
+                CompiledGeneralFunction function = compilableGeneralFunctions[i].Function;
+
+                if (function.Identifier.Content != name) continue;
+                if (function.Type.Class != @class) continue;
+                if (function.ParameterCount != parameters.Length) continue;
 
                 bool not = false;
                 for (int j = 0; j < function.ParameterTypes.Length; j++)
                 {
-                    if (FindStatementType(functionCallStatement.Parameters[j]) != function.ParameterTypes[j])
+                    if (parameters[j] != function.ParameterTypes[j])
                     {
                         not = true;
                         break;
@@ -383,95 +814,41 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 if (not) continue;
 
-                constructor = function;
+                generalFunction = function;
                 return true;
             }
 
-            constructor = null;
+            generalFunction = null;
             return false;
         }
-        protected bool GetCloner(CompiledClass @class, out CompiledGeneralFunction cloner)
+
+        protected bool GetGeneralFunctionTemplate(CompiledClass @class, string name, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
+            => GetGeneralFunctionTemplate(@class, Array.Empty<CompiledType>(), name, out compiledGeneralFunction);
+        protected bool GetGeneralFunctionTemplate(CompiledClass @class, CompiledType[] parameters, string name, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
         {
-            for (int i = 0; i < CompiledGeneralFunctions.Length; i++)
+            bool found = false;
+            compiledGeneralFunction = default;
+
+            foreach (CompiledGeneralFunction function in CompiledGeneralFunctions)
             {
-                var function = CompiledGeneralFunctions[i];
-                if (function.Identifier.Content != "clone") continue;
+                if (!function.IsTemplate) continue;
+                if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
+                if (!CompiledType.Equals(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
-                cloner = function;
-                return true;
+                compiledGeneralFunction = new CompileableTemplate<CompiledGeneralFunction>(function, typeParameters);
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {compiledGeneralFunction.OriginalFunction} and {function} are the same", function.Identifier, function.FilePath); }
+                found = true;
             }
 
-            cloner = null;
-            return false;
-        }
-        protected bool GetDestructor(CompiledClass @class, out CompiledGeneralFunction destructor)
-        {
-            for (int i = 0; i < CompiledGeneralFunctions.Length; i++)
-            {
-                var function = CompiledGeneralFunctions[i];
-                if (function.Identifier.Content != "destructor") continue;
-                if (function.Type.Class != @class) continue;
-
-                destructor = function;
-                return true;
-            }
-
-            destructor = null;
-            return false;
-        }
-
-        /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetStruct(NewInstance newStructStatement, out CompiledStruct compiledStruct)
-            => CompiledStructs.TryGetValue(newStructStatement.TypeName.Content, out compiledStruct);
-
-        /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetClass(NewInstance newClassStatement, out CompiledClass compiledClass)
-            => CompiledClasses.TryGetValue(newClassStatement.TypeName.Content, out compiledClass);
-
-        /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetClass(ConstructorCall constructorCall, out CompiledClass compiledClass)
-            => CompiledClasses.TryGetValue(constructorCall.TypeName.Content, out compiledClass);
-
-        /// <exception cref="ArgumentNullException"></exception>
-        protected bool GetClass(string className, out CompiledClass compiledClass)
-            => CompiledClasses.TryGetValue(className, out compiledClass);
-
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        protected static DataItem GetInitialValue(Type type)
-        {
-            return type switch
-            {
-                Type.BYTE => new DataItem((byte)0),
-                Type.INT => new DataItem((int)0),
-                Type.FLOAT => new DataItem((float)0f),
-                Type.CHAR => new DataItem((char)'\0'),
-
-                _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
-            };
-        }
-
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        protected static DataItem[] GetInitialValue(CompiledStruct @struct)
-        {
-            List<DataItem> result = new();
-
-            foreach (CompiledField field in @struct.Fields)
-            { result.Add(GetInitialValue(field.Type)); }
-
-            if (result.Count != @struct.Size)
-            { throw new NotImplementedException(); }
-
-            return result.ToArray();
+            return found;
         }
 
         protected bool GetOutputWriter(CompiledType type, out CompiledFunction function)
         {
-            foreach (var _function in CompiledFunctions)
+            foreach (CompiledFunction _function in CompiledFunctions)
             {
                 if (!_function.CompiledAttributes.TryGetAttribute("StandardOutput"))
                 { continue; }
@@ -493,12 +870,160 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
+        #endregion
+
+        #region GetStruct()
+
+        protected bool GetStruct(NewInstance newStructStatement, out CompiledStruct compiledStruct)
+            => GetStruct(newStructStatement.TypeName, out compiledStruct);
+
+        protected bool GetStruct(TypeInstance type, out CompiledStruct compiledStruct)
+            => GetStruct(type.Identifier.Content, out compiledStruct);
+
+        protected bool GetStruct(string structName, out CompiledStruct compiledStruct)
+        {
+            for (int i = 0; i < CompiledStructs.Length; i++)
+            {
+                var @struct = CompiledStructs[i];
+
+                if (@struct.Name != structName) continue;
+
+                compiledStruct = @struct;
+                return true;
+            }
+
+            compiledStruct = null;
+            return false;
+        }
+
+        #endregion
+
+        #region GetClass()
+
+        protected bool GetClass(NewInstance newClassStatement, out CompiledClass compiledClass)
+            => GetClass(newClassStatement.TypeName, out compiledClass);
+
+        protected bool GetClass(ConstructorCall constructorCall, out CompiledClass compiledClass)
+            => GetClass(constructorCall.TypeName, out compiledClass);
+
+        protected bool GetClass(TypeInstance type, out CompiledClass compiledClass)
+            => GetClass(type.Identifier.Content, type.GenericTypes.Count, out compiledClass);
+
+        protected bool GetClass(string className, out CompiledClass compiledClass)
+            => GetClass(className, 0, out compiledClass);
+        protected bool GetClass(string className, int typeParameterCount, out CompiledClass compiledClass)
+        {
+            for (int i = 0; i < CompiledClasses.Length; i++)
+            {
+                var @class = CompiledClasses[i];
+
+                if (@class.Name != className) continue;
+                if (typeParameterCount > 0 && @class.TemplateInfo != null)
+                { if (@class.TemplateInfo.TypeParameters.Length != typeParameterCount) continue; }
+
+                compiledClass = @class;
+                return true;
+            }
+
+            compiledClass = null;
+            return false;
+        }
+
+        #endregion
+
+        #region FindType()
+
+        /// <exception cref="InternalException"></exception>
+        protected CompiledType FindType(Token name) => FindType(name.Content, name);
+
+        /// <exception cref="InternalException"></exception>
+        protected CompiledType FindType(string name, IThingWithPosition position) => FindType(name, position.GetPosition());
+
+        /// <exception cref="InternalException"></exception>
+        protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
+
+        /// <param name="position">
+        /// Used for exceptions
+        /// </param>
+        /// <exception cref="InternalException"></exception>
+        CompiledType FindType(string name, Position position)
+        {
+            if (CompiledStructs.TryGetValue(name, out CompiledStruct @struct)) return new CompiledType(@struct);
+            if (CompiledClasses.TryGetValue(name, out CompiledClass @class)) return new CompiledType(@class);
+            if (CompiledEnums.TryGetValue(name, out CompiledEnum @enum)) return new CompiledType(@enum);
+
+            if (TypeArguments.TryGetValue(name, out CompiledType typeArgument))
+            { return typeArgument; }
+
+            if (GetFunction(name, out CompiledFunction function))
+            { return new CompiledType(new FunctionType(function)); }
+
+            throw new CompilerException($"Type \"{name}\" not found", position, CurrentFile);
+        }
+
+        /// <exception cref="InternalException"/>
+        protected CompiledType FindType(TypeInstance name)
+            => new(name, FindType);
+
+        #endregion
+
+        /// <summary>
+        /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
+        /// </summary>
+        /// <exception cref="NotImplementedException"/>
+        void CollectTypeParameters(TypeInstance type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+            => CollectTypeParameters(new CompiledType(type, FindType), typeParameterNames, typeParameters);
+
+        /// <summary>
+        /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
+        /// </summary>
+        /// <exception cref="NotImplementedException"/>
+        static void CollectTypeParameters(CompiledType type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+        {
+            if (type.TypeParameters.Length != typeParameterNames.Length)
+            { throw new NotImplementedException(); }
+
+            for (int i = 0; i < typeParameterNames.Length; i++)
+            { typeParameters[typeParameterNames[i].Content] = type.TypeParameters[i]; }
+        }
+
+        #region GetInitialValue()
+
+        /// <exception cref="NotImplementedException"></exception>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        protected static DataItem GetInitialValue(Type type)
+            => type switch
+            {
+                Type.BYTE => new DataItem((byte)0),
+                Type.INT => new DataItem((int)0),
+                Type.FLOAT => new DataItem((float)0f),
+                Type.CHAR => new DataItem((char)'\0'),
+
+                _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
+            };
+
+        /// <exception cref="NotImplementedException"></exception>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        protected static DataItem[] GetInitialValue(CompiledStruct @struct)
+        {
+            List<DataItem> result = new();
+
+            foreach (CompiledField field in @struct.Fields)
+            { result.Add(GetInitialValue(field.Type)); }
+
+            if (result.Count != @struct.Size)
+            { throw new NotImplementedException(); }
+
+            return result.ToArray();
+        }
+
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
         protected static DataItem GetInitialValue(TypeInstance type)
-        {
-            return type.Identifier.Content switch
+            => type.Identifier.Content switch
             {
                 "int" => new DataItem((int)0),
                 "byte" => new DataItem((byte)0),
@@ -509,12 +1034,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 "void" => throw new CompilerException("Invalid type", type.Identifier, null),
                 _ => throw new InternalException($"Initial value for type \"{type.Identifier.Content}\" is unimplemented"),
             };
-        }
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="InternalException"></exception>
         protected static DataItem GetInitialValue(CompiledType type)
         {
+            if (type.IsGeneric)
+            { throw new NotImplementedException($"Initial value for type arguments is bruh moment"); }
+
             if (type.IsStruct)
             { throw new NotImplementedException($"Initial value for structs is not implemented"); }
 
@@ -535,6 +1062,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         #endregion
 
         #region FindStatementType()
+
         protected CompiledType FindStatementType(KeywordCall keywordCall)
         {
             if (keywordCall.FunctionName == "return") return new CompiledType(Type.VOID);
@@ -564,8 +1092,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (!prevType.IsClass)
             { throw new CompilerException($"Index getter for type \"{prevType.Name}\" not found", index, CurrentFile); }
 
-            if (!GetIndexGetter(prevType.Class, out CompiledFunction indexer))
-            { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
+            if (!GetIndexGetter(prevType, out CompiledFunction indexer))
+            {
+                if (!GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
+
+                indexer = indexerTemplate.Function;
+            }
 
             return indexer.Type;
         }
@@ -579,9 +1112,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
 
-            if (!GetFunction(functionCall, out var calledFunc))
-            { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
-            return calledFunc.Type;
+            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            {
+                if (!GetFunctionTemplate(functionCall, out var compiledFunctionTemplate))
+                { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
+
+                compiledFunction = compiledFunctionTemplate.Function;
+            }
+
+            return compiledFunction.Type;
         }
         protected CompiledType FindStatementType(OperatorCall @operator)
         {
@@ -591,55 +1130,39 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': requied {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
             }
             else
-            {
-                opcode = Opcode.UNKNOWN;
-            }
+            { opcode = Opcode.UNKNOWN; }
 
-            if (opcode != Opcode.UNKNOWN)
-            {
-                if (GetOperator(@operator, out CompiledOperator operatorDefinition))
-                { return operatorDefinition.Type; }
-
-                var leftType = FindStatementType(@operator.Left);
-                if (@operator.Right != null)
-                {
-                    var rightType = FindStatementType(@operator.Right);
-
-                    if (!leftType.IsBuiltin || !rightType.IsBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
-                    { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
-
-                    var leftValue = GetInitialValue(leftType);
-                    var rightValue = GetInitialValue(rightType);
-
-                    var predictedValue = PredictStatementValue(@operator.Operator.Content, leftValue, rightValue);
-                    if (!predictedValue.HasValue)
-                    { throw new InternalException($"Failed to evaluate the operator {leftType} {@operator.Operator.Content} {rightType}"); }
-
-                    return predictedValue.Value.type switch
-                    {
-                        RuntimeType.BYTE => new CompiledType(Type.BYTE),
-                        RuntimeType.INT => new CompiledType(Type.INT),
-                        RuntimeType.FLOAT => new CompiledType(Type.FLOAT),
-                        RuntimeType.CHAR => new CompiledType(Type.CHAR),
-                        _ => throw new NotImplementedException($"Unknown type {predictedValue.Value.type}"),
-                    };
-                }
-                else
-                {
-                    return leftType;
-                }
-            }
-            else if (@operator.Operator.Content == "=")
-            { throw new NotImplementedException(); }
-            else
+            if (opcode == Opcode.UNKNOWN)
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
+
+            if (GetOperator(@operator, out CompiledOperator operatorDefinition))
+            { return operatorDefinition.Type; }
+
+            CompiledType leftType = FindStatementType(@operator.Left);
+            if (@operator.Right == null)
+            { return leftType; }
+
+            CompiledType rightType = FindStatementType(@operator.Right);
+
+            if (!leftType.IsBuiltin || !rightType.IsBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
+            { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
+
+            DataItem leftValue = GetInitialValue(leftType);
+            DataItem rightValue = GetInitialValue(rightType);
+
+            DataItem? predictedValue = ComputeValue(@operator.Operator.Content, leftValue, rightValue);
+
+            if (!predictedValue.HasValue)
+            { throw new InternalException($"Failed to compute {leftType} {@operator.Operator.Content} {rightType}"); }
+
+            return new CompiledType(predictedValue.Value.type);
         }
         protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal) => literal.Type switch
         {
             LiteralType.INT => new CompiledType(Type.INT),
             LiteralType.FLOAT => new CompiledType(Type.FLOAT),
-            LiteralType.STRING => new CompiledType(GetReplacedType("string")),
-            LiteralType.BOOLEAN => new CompiledType(GetReplacedType("boolean")),
+            LiteralType.STRING => FindReplacedType("string", literal),
+            LiteralType.BOOLEAN => FindReplacedType("boolean", literal),
             LiteralType.CHAR => new CompiledType(Type.CHAR),
             _ => throw new NotImplementedException($"Unknown literal type {literal.Type}"),
         };
@@ -657,73 +1180,77 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (GetFunction(variable, out var function))
             { return new CompiledType(function); }
 
+            try
+            { return FindType(variable.VariableName); }
+            catch (Exception)
+            { }
+
             throw new CompilerException($"Local symbol/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
         }
-        protected CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
-        protected CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
-        protected CompiledType FindStatementType(NewInstance newStruct)
-        {
-            if (GetStruct(newStruct, out var structDefinition))
-            { return new CompiledType(structDefinition); }
-
-            if (GetClass(newStruct, out var classDefinition))
-            { return new CompiledType(classDefinition); }
-
-            throw new CompilerException($"Class/struct definition \"{newStruct.TypeName.Content}\" not found", newStruct.TypeName, CurrentFile);
-        }
-        protected CompiledType FindStatementType(ConstructorCall constructorCall)
-        {
-            if (GetClass(constructorCall, out var classDefinition))
-            { return new CompiledType(classDefinition); }
-
-            throw new CompilerException($"Class definition \"{constructorCall.TypeName.Content}\" not found", constructorCall.TypeName, CurrentFile);
-        }
+        protected static CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
+        protected static CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
+        protected CompiledType FindStatementType(NewInstance newInstance) => new(newInstance.TypeName, FindType);
+        protected CompiledType FindStatementType(ConstructorCall constructorCall) => new(constructorCall.TypeName, FindType);
         protected CompiledType FindStatementType(Field field)
         {
-            var prevStatementType = FindStatementType(field.PrevStatement);
+            CompiledType prevStatementType = FindStatementType(field.PrevStatement);
 
-            foreach (var @struct in CompiledStructs)
+            if (prevStatementType.IsStruct)
             {
-                if (@struct.Key != prevStatementType.Name) continue;
-
-                foreach (var sField in @struct.Fields)
+                for (int i = 0; i < prevStatementType.Struct.Fields.Length; i++)
                 {
-                    if (sField.Identifier.Content != field.FieldName.Content) continue;
-                    return sField.Type;
+                    CompiledField definedField = prevStatementType.Struct.Fields[i];
+
+                    if (definedField.Identifier.Content != field.FieldName.Content) continue;
+
+                    if (definedField.Type.IsGeneric)
+                    { throw new CompilerException($"Struct templates not supported :(", definedField, prevStatementType.Struct.FilePath); }
+
+                    return definedField.Type;
                 }
 
-                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in struct \"{@struct.Name.Content}\"", field.FieldName, CurrentFile);
+                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in struct \"{prevStatementType.Struct.Name.Content}\"", field.FieldName, CurrentFile);
             }
 
-            foreach (var @class in CompiledClasses)
+            if (prevStatementType.IsClass)
             {
-                if (@class.Key != prevStatementType.Name) continue;
-
-                foreach (var sField in @class.Fields)
+                for (int i = 0; i < prevStatementType.Class.Fields.Length; i++)
                 {
-                    if (sField.Identifier.Content != field.FieldName.Content) continue;
-                    return sField.Type;
+                    CompiledField definedField = prevStatementType.Class.Fields[i];
+
+                    if (definedField.Identifier.Content != field.FieldName.Content) continue;
+
+                    if (definedField.Type.IsGeneric)
+                    {
+                        if (this.TypeArguments.TryGetValue(definedField.Type.Name, out CompiledType typeParameter))
+                        { return typeParameter; }
+
+                        if (!prevStatementType.Class.TryGetTypeArgumentIndex(definedField.Type.Name, out int j))
+                        { throw new CompilerException($"Type argument \"{definedField.Type.Name}\" not found", definedField, prevStatementType.Class.FilePath); }
+
+                        if (prevStatementType.TypeParameters.Length <= j)
+                        { throw new NotImplementedException(); }
+
+                        return prevStatementType.TypeParameters[j];
+                    }
+
+                    return definedField.Type;
                 }
 
-                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in class \"{@class.Name.Content}\"", field.FieldName, CurrentFile);
+                throw new CompilerException($"Field definition \"{prevStatementType}\" not found in class \"{prevStatementType.Class.Name.Content}\"", field.FieldName, CurrentFile);
             }
 
-            foreach (var @enum in CompiledEnums)
+            if (prevStatementType.IsEnum)
             {
-                if (@enum.Key != prevStatementType.Name) continue;
+                if (prevStatementType.Enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember enumMember))
+                { return new CompiledType(enumMember.Value.type); }
 
-                if (@enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember enumMember))
-                {
-                    return new CompiledType(enumMember.Value.type);
-                }
-
-                throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{@enum.Identifier.Content}\"", field.FieldName, CurrentFile);
+                throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
 
             throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field.TotalPosition(), CurrentFile);
         }
-        protected CompiledType FindStatementType(TypeCast @as)
-        { return new CompiledType(@as.Type, GetCustomType); }
+        protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
 
         protected CompiledType FindStatementType(StatementWithValue statement)
         {
@@ -765,10 +1292,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
         }
+
+        protected CompiledType[] FindStatementTypes(StatementWithValue[] statements)
+        {
+            CompiledType[] result = new CompiledType[statements.Length];
+            for (int i = 0; i < statements.Length; i++)
+            { result[i] = FindStatementType(statements[i]); }
+            return result;
+        }
+
         #endregion
 
-        #region PredictStatementValue()
-        protected DataItem? PredictStatementValue(string @operator, DataItem left, DataItem right)
+        #region ComputeValue()
+        protected static DataItem? ComputeValue(string @operator, DataItem left, DataItem right)
             => @operator switch
             {
                 "!" => !left,
@@ -797,12 +1333,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 ">=" => new DataItem(left >= right, null),
                 _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
             };
-        protected DataItem? PredictStatementValue(OperatorCall @operator)
+
+        protected DataItem? ComputeValue(OperatorCall @operator)
         {
             if (GetOperator(@operator, out _))
             { return null; }
 
-            var leftValue = PredictStatementValue(@operator.Left);
+            var leftValue = ComputeValue(@operator.Left);
             if (!leftValue.HasValue) return null;
 
             if (@operator.Operator.Content == "!")
@@ -812,16 +1349,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (@operator.Right != null)
             {
-                var rightValue = PredictStatementValue(@operator.Right);
+                var rightValue = ComputeValue(@operator.Right);
                 if (!rightValue.HasValue) return null;
 
-                return PredictStatementValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
+                return ComputeValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
             }
 
             return leftValue;
         }
-
-        protected DataItem? PredictStatementValue(BBCode.Parser.Statement.Literal literal)
+        protected static DataItem? ComputeValue(BBCode.Parser.Statement.Literal literal)
             => literal.Type switch
             {
                 LiteralType.INT => new DataItem(int.Parse(literal.Value), null),
@@ -830,8 +1366,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
                 _ => throw new NotImplementedException($"This should never occur"),
             };
-
-        protected DataItem? PredictStatementValue(KeywordCall keywordCall)
+        protected DataItem? ComputeValue(KeywordCall keywordCall)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
@@ -841,22 +1376,25 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
+                if (!param0Type.IsClass)
+                { throw new CompilerException($"{param0Type} is not a reference type", param0, CurrentFile); }
+
                 return new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
             }
 
             return null;
         }
 
-        protected DataItem? PredictStatementValue(StatementWithValue st)
+        protected DataItem? ComputeValue(StatementWithValue st)
         {
             if (st is BBCode.Parser.Statement.Literal literal)
-            { return PredictStatementValue(literal); }
+            { return ComputeValue(literal); }
 
             if (st is OperatorCall @operator)
-            { return PredictStatementValue(@operator); }
+            { return ComputeValue(@operator); }
 
             if (st is KeywordCall keywordCall)
-            { return PredictStatementValue(keywordCall); }
+            { return ComputeValue(keywordCall); }
 
             return null;
         }

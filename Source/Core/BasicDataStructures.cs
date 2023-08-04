@@ -54,9 +54,20 @@ namespace ProgrammingLanguage.Core
         public Position(params IThingWithPosition[] elements)
         {
             if (elements.Length == 0) throw new ArgumentException($"Array {nameof(elements)} length is 0");
-            Start = elements[0].GetPosition().Start;
-            End = elements[0].GetPosition().End;
-            AbsolutePosition = elements[0].GetPosition().AbsolutePosition;
+
+            Start = Position.UnknownPosition.Start;
+            End = Position.UnknownPosition.End;
+            AbsolutePosition = Position.UnknownPosition.AbsolutePosition;
+
+            for (int i = 0; i < elements.Length; i++)
+            {
+                if (elements[i] == null) continue;
+                if (elements[i] is Token token && token.IsAnonymous) continue;
+                Start = elements[0].GetPosition().Start;
+                End = elements[0].GetPosition().End;
+                AbsolutePosition = elements[0].GetPosition().AbsolutePosition;
+                break;
+            }
 
             for (int i = 1; i < elements.Length; i++)
             { Extend(elements[i]); }
@@ -66,6 +77,8 @@ namespace ProgrammingLanguage.Core
         { }
         internal void Extend(Position other)
         {
+            if (other.AbsolutePosition == Position.UnknownPosition.AbsolutePosition) return;
+
             if (Start.Line > other.Start.Line)
             {
                 Start.Line = other.Start.Line;
@@ -102,6 +115,7 @@ namespace ProgrammingLanguage.Core
         internal void Extend(IThingWithPosition other)
         {
             if (other == null) return;
+            if (other is Token token && token.IsAnonymous) return;
             Extend(other.GetPosition());
         }
         internal void Extend(params IThingWithPosition[] elements)

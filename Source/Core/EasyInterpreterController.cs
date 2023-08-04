@@ -82,7 +82,16 @@ namespace ProgrammingLanguage.Core
                 Console.WriteLine($"");
 
                 sender.Details.Interpreter.Heap.DebugPrint();
-                // PrintHeap(sender.Details.Interpreter.Heap);
+
+                if (sender.Details.Interpreter.Stack.Count > 0 &&
+                    sender.Details.Interpreter.Stack is DataStack dataStack)
+                {
+                    Console.WriteLine($"");
+                    Console.WriteLine($" ===== STACK ===== ");
+                    Console.WriteLine($"");
+
+                    dataStack.DebugPrint();
+                }
             };
 #endif
 

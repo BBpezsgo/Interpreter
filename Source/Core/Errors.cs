@@ -162,9 +162,9 @@ namespace ProgrammingLanguage.Errors
                     }
 
                     result += $"\n Code:";
-                    for (int i = 0; i < Context.Value.Code.Length; i++)
+                    for (int offset = 0; offset < Context.Value.Code.Length; offset++)
                     {
-                        result += $"\n{(i + Context.Value.CodePointer)}\t {Context.Value.Code[i]}";
+                        result += $"\n{offset + Context.Value.CodeSampleStart}\t {Context.Value.Code[offset]}";
                     }
                 }
 

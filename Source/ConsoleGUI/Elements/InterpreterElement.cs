@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 
 namespace ConsoleGUI
 {
@@ -353,7 +354,60 @@ namespace ConsoleGUI
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
                 sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;
 
-                sender.DrawBuffer.AddText($"{frame.Function}");
+                if (frame.Function.Contains('('))
+                {
+                    string functionName = frame.Function[..frame.Function.IndexOf('(')];
+
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Yellow;
+                    sender.DrawBuffer.AddText($"{functionName}");
+
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                    sender.DrawBuffer.AddChar('(');
+
+                    string parameters = frame.Function[(frame.Function.IndexOf('(') + 1)..frame.Function.IndexOf(')')];
+
+                    List<string> parameters2;
+                    if (!parameters.Contains(','))
+                    {
+                        parameters2 = new List<string>() { parameters };
+                    }
+                    else
+                    {
+                        parameters2 = new List<string>();
+                        string[] splitted = parameters.Split(',');
+                        for (int j = 0; j < splitted.Length; j++)
+                        { parameters2.Add(splitted[j].Trim()); }
+                    }
+
+                    for (int j = 0; j < parameters2.Count; j++)
+                    {
+                        if (j > 0)
+                        {
+                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                            sender.DrawBuffer.AddText($", ");
+                        }
+
+                        string param = parameters2[j];
+                        if (ProgrammingLanguage.BBCode.Compiler.Constants.BuiltinTypes.Contains(param))
+                        {
+                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
+                        }
+                        else
+                        {
+                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                        }
+                        sender.DrawBuffer.AddText($"{param}");
+                    }
+
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                    sender.DrawBuffer.AddChar(')');
+
+                    sender.DrawBuffer.ResetColor();
+                }
+                else
+                {
+                    sender.DrawBuffer.AddText($"{frame.Function}");
+                }
 
                 sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;
                 sender.DrawBuffer.FinishLine(sender.Rect.Width);

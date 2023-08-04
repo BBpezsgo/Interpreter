@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ProgrammingLanguage.BBCode
 {
@@ -17,7 +18,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
     using Parser.Statement;
 
     using ProgrammingLanguage.Core;
+    using ProgrammingLanguage.Errors;
     using ProgrammingLanguage.Tokenizer;
+
+    public interface IDuplicateable<T>
+    {
+        public T Duplicate();
+    }
 
     public static class Extensions
     {
@@ -80,12 +87,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { v.Add(keys.Invoke(value), value); }
         }
 
-        public static bool ContainsSameDefinition<T>(this IEnumerable<IDefinitionComparer<T>> functions, T other)
+        public static bool ContainsSameDefinition(this IEnumerable<FunctionDefinition> functions, FunctionDefinition other)
         {
             foreach (var function in functions)
             { if (function.IsSame(other)) return true; }
             return false;
         }
+
         public static bool ContainsSameDefinition(this IEnumerable<CompiledFunction> functions, CompiledFunction other)
         {
             foreach (var function in functions)
@@ -123,9 +131,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
-        public static bool TryGetValue<T>(this IEnumerable<IElementWithKey<T>> self, T key, out IElementWithKey<T> value)
+        public static bool TryGetValue<T>(this IEnumerable<IHaveKey<T>> self, T key, out IHaveKey<T> value)
         {
-            foreach (IElementWithKey<T> element in self)
+            foreach (IHaveKey<T> element in self)
             {
                 if (element == null) continue;
                 if (element.Key.Equals(key))
@@ -137,15 +145,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
             value = null;
             return false;
         }
-        public static bool TryGetValue<T, TResult>(this IEnumerable<IElementWithKey<T>> self, T key, out TResult value) where TResult : IElementWithKey<T>
+        public static bool TryGetValue<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key, out TResult value) where TResult : IHaveKey<T>
         {
-            bool result = self.TryGetValue<T>(key, out IElementWithKey<T> _value);
+            bool result = self.TryGetValue<T>(key, out IHaveKey<T> _value);
             value = (_value == null) ? default : (TResult)_value;
             return result;
         }
-        public static bool ContainsKey<T>(this IEnumerable<IElementWithKey<T>> self, T key)
+        public static bool ContainsKey<T>(this IEnumerable<IHaveKey<T>> self, T key)
         {
-            foreach (IElementWithKey<T> element in self)
+            foreach (IHaveKey<T> element in self)
             {
                 if (element == null) continue;
                 if (element.Key.Equals(key))
@@ -156,9 +164,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
         /// <exception cref="KeyNotFoundException"></exception>
-        public static IElementWithKey<T> Get<T>(this IEnumerable<IElementWithKey<T>> self, T key)
+        public static IHaveKey<T> Get<T>(this IEnumerable<IHaveKey<T>> self, T key)
         {
-            foreach (IElementWithKey<T> element in self)
+            foreach (IHaveKey<T> element in self)
             {
                 if (element == null) continue;
                 if (element.Key.Equals(key))
@@ -169,13 +177,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             throw new KeyNotFoundException($"Key {key} not found in list {self}");
         }
         /// <exception cref="KeyNotFoundException"></exception>
-        public static TResult Get<T, TResult>(this IEnumerable<IElementWithKey<T>> self, T key)
+        public static TResult Get<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key)
             => (TResult)self.Get<T>(key);
-        public static bool Remove<TKey>(this IList<IElementWithKey<TKey>> self, TKey key)
+        public static bool Remove<TKey>(this IList<IHaveKey<TKey>> self, TKey key)
         {
             for (int i = self.Count - 1; i >= 0; i--)
             {
-                IElementWithKey<TKey> element = self[i];
+                IHaveKey<TKey> element = self[i];
                 if (element.Key.Equals(key))
                 {
                     self.RemoveAt(i);
@@ -198,17 +206,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        public static Dictionary<TKey, IElementWithKey<TKey>> ToDictionary<TKey>(this IEnumerable<IElementWithKey<TKey>> self)
+        public static Dictionary<TKey, IHaveKey<TKey>> ToDictionary<TKey>(this IEnumerable<IHaveKey<TKey>> self)
         {
-            Dictionary<TKey, IElementWithKey<TKey>> result = new();
-            foreach (IElementWithKey<TKey> element in self)
+            Dictionary<TKey, IHaveKey<TKey>> result = new();
+            foreach (IHaveKey<TKey> element in self)
             { result.Add(element.Key, element); }
             return result;
         }
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IElementWithKey<TKey>> self)
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IHaveKey<TKey>> self)
         {
             Dictionary<TKey, TValue> result = new();
-            foreach (IElementWithKey<TKey> element in self)
+            foreach (IHaveKey<TKey> element in self)
             { result.Add(element.Key, (TValue)element); }
             return result;
         }
@@ -275,129 +283,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         #endregion
-
-        public static bool GetDefinition<T>(this IEnumerable<IDefinitionComparer<T>> self, T other, out IDefinitionComparer<T> value)
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    value = element;
-                    return true;
-                }
-            }
-            value = null;
-            return false;
-        }
-        public static IDefinitionComparer<T> GetDefinition<T>(this IEnumerable<IDefinitionComparer<T>> self, T other)
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    return element;
-                }
-            }
-            throw new KeyNotFoundException($"Key {other} not found in list {self}");
-        }
-
-        public static bool GetDefinition<T>(this IDefinitionComparer<T>[] self, T other, out IDefinitionComparer<T> value)
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    value = element;
-                    return true;
-                }
-            }
-            value = null;
-            return false;
-        }
-        public static IDefinitionComparer<T> GetDefinition<T>(this IDefinitionComparer<T>[] self, T other)
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    return element;
-                }
-            }
-            throw new KeyNotFoundException($"Key {other} not found in list {self}");
-        }
-
-        public static bool GetDefinition<T, TResult>(this IEnumerable<IDefinitionComparer<T>> self, T other, out TResult value) where TResult : IDefinitionComparer<T>
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    value = (TResult)element;
-                    return true;
-                }
-            }
-            value = default;
-            return false;
-        }
-        public static TResult GetDefinition<T, TResult>(this IEnumerable<IDefinitionComparer<T>> self, T other) where TResult : IDefinitionComparer<T>
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    return (TResult)element;
-                }
-            }
-            throw new KeyNotFoundException($"Key {other} not found in list {self}");
-        }
-
-        public static bool GetDefinition<T, TResult>(this IDefinitionComparer<T>[] self, T other, out TResult value) where TResult : IDefinitionComparer<T>
-        {
-            bool found = false;
-            value = default;
-
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    if (found)
-                    {
-                        if (element is IThingWithPosition position)
-                        {
-                            if (element is IDefinition definition)
-                            { throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", position, definition.FilePath); }
-                            throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", position, null);
-                        }
-                        throw new Errors.CompilerException($"Duplicated definitions ({typeof(T).Name}, {typeof(TResult).Name}): {found} and {element} are the same", Position.UnknownPosition, null);
-                    }
-
-                    value = (TResult)element;
-                    found = true;
-                }
-            }
-
-            return found;
-        }
-        public static TResult GetDefinition<T, TResult>(this IDefinitionComparer<T>[] self, T other) where TResult : IDefinitionComparer<T>
-        {
-            foreach (IDefinitionComparer<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.IsSame(other))
-                {
-                    return (TResult)element;
-                }
-            }
-            throw new KeyNotFoundException($"Key {other} not found in list {self}");
-        }
-
     }
 
     struct UndefinedOperatorFunctionOffset
@@ -419,8 +304,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             foreach (var item in currentParameters)
             { this.currentParameters.Add(item); }
+
             foreach (var item in currentVariables)
             { this.currentVariables.Add(item.Key, item.Value); }
+
             this.CurrentFile = file;
         }
     }
@@ -433,6 +320,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public Identifier VariableStatement;
         public IndexCall IndexStatement;
         public bool IsSetter;
+        public StatementWithValue ValueToAssign;
 
         public List<CompiledParameter> currentParameters;
         public Dictionary<string, CompiledVariable> currentVariables;
@@ -445,14 +333,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.VariableStatement = null;
             this.IndexStatement = null;
             this.IsSetter = false;
+            this.ValueToAssign = null;
 
             this.currentParameters = new();
             this.currentVariables = new();
 
             foreach (var item in currentParameters)
             { this.currentParameters.Add(item); }
+            
             foreach (var item in currentVariables)
             { this.currentVariables.Add(item.Key, item.Value); }
+            
             this.CurrentFile = file;
         }
 
@@ -463,6 +354,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.VariableStatement = variable;
             this.IndexStatement = null;
             this.IsSetter = false;
+            this.ValueToAssign = null;
 
             this.currentParameters = new();
             this.currentVariables = new();
@@ -474,13 +366,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, IndexCall index, bool isSetter, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, IndexCall index, StatementWithValue valueToAssign, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
             this.VariableStatement = null;
             this.IndexStatement = index;
-            this.IsSetter = isSetter;
+            this.IsSetter = valueToAssign != null;
+            this.ValueToAssign = valueToAssign;
 
             this.currentParameters = new();
             this.currentVariables = new();
@@ -719,7 +612,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public void ClearReferences();
     }
 
-    public class CompiledOperator : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledOperator>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<OperatorCall>
+    public class CompiledOperator : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicateable<CompiledOperator>
     {
         public CompiledType[] ParameterTypes;
 
@@ -728,8 +621,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public int InstructionOffset { get; set; } = -1;
 
-        public int ParameterCount => ParameterTypes.Length;
-
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
         public IReadOnlyList<OperatorCall> ReferencesOperator => references;
@@ -737,6 +628,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
+
+        public override bool IsTemplate
+        {
+            get
+            {
+                if (TemplateInfo != null) return true;
+                if (Context != null && Context.TemplateInfo != null) return true;
+                return false;
+            }
+        }
 
         public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
         public string BuiltinName => CompiledAttributes.TryGetAttribute("Builtin", out string builtinName) ? builtinName : string.Empty;
@@ -800,9 +701,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (other is not CompiledOperator other2) return false;
             return IsSame(other2);
         }
+
+        CompiledOperator IDuplicateable<CompiledOperator>.Duplicate() => new(this.Type, this)
+        {
+            CompiledAttributes = this.CompiledAttributes,
+            Modifiers = this.Modifiers,
+            ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
+            TimesUsed = TimesUsed,
+            TimesUsedTotal = TimesUsedTotal,
+        };
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicateable<CompiledFunction>
     {
         public CompiledType[] ParameterTypes;
 
@@ -811,7 +721,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public int InstructionOffset { get; set; } = -1;
 
-        public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
@@ -821,6 +730,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
+
+        public override bool IsTemplate
+        {
+            get
+            {
+                if (TemplateInfo != null) return true;
+                if (Context != null && Context.TemplateInfo != null) return true;
+                return false;
+            }
+        }
 
         public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
         public string BuiltinName
@@ -840,18 +759,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public string Key => this.ID();
 
-        CompiledClass context;
-        public CompiledClass Context
-        {
-            get => context;
-            set => context = value;
-        }
-
-        public Block Block => new(Statements)
-        {
-            BracketStart = BracketStart,
-            BracketEnd = BracketEnd,
-        };
+        public CompiledClass Context { get; set; }
 
         public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
         {
@@ -896,30 +804,57 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return true;
         }
 
-        public bool IsSame((string name, CompiledType[] parameters) other)
-        {
-            if (this.Identifier.Content != other.name) return false;
-            if (this.ParameterTypes.Length != other.parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            {
-                if (this.ParameterTypes[i] != other.parameters[i])
-                {
-                    if (this.ParameterTypes[i].IsGeneric)
-                    { continue; }
-                    return false;
-                }
-            }
-            return true;
-        }
-
         public bool IsSame(IFunctionThing other)
         {
             if (other is not CompiledFunction other2) return false;
             return IsSame(other2);
         }
+
+        public CompiledFunction Duplicate() => new(this.Type, this)
+        {
+            CompiledAttributes = this.CompiledAttributes,
+            Context = this.Context,
+            Modifiers = this.Modifiers,
+            ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
+            TimesUsed = TimesUsed,
+            TimesUsedTotal = TimesUsedTotal,
+        };
+
+        public override string ToString()
+        {
+            string result = "";
+            if (IsExport)
+            {
+                result += "export ";
+            }
+            result += this.Type.ToString();
+            result += ' ';
+
+            result += this.Identifier.Content;
+
+            result += '(';
+            if (this.ParameterTypes.Length > 0)
+            {
+                for (int i = 0; i < ParameterTypes.Length; i++)
+                {
+                    if (i > 0) result += ", ";
+                    result += ParameterTypes[i].ToString();
+                }
+            }
+            result += ')';
+
+            result += ' ';
+
+            result += '{';
+            if (this.Statements.Length > 0)
+            { result += "..."; }
+            result += '}';
+
+            return result;
+        }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IDefinitionComparer<CompiledGeneralFunction>, IDefinitionComparer<(string name, CompiledType[] parameters)>, IInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicateable<CompiledGeneralFunction>
     {
         public CompiledType[] ParameterTypes;
 
@@ -928,11 +863,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public int InstructionOffset { get; set; } = -1;
 
-        public int ParameterCount => ParameterTypes.Length;
         public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
 
         public IReadOnlyList<Statement> References => references;
         readonly List<Statement> references = new();
+
+        public override bool IsTemplate
+        {
+            get
+            {
+                if (TemplateInfo != null) return true;
+                if (context != null && context.TemplateInfo != null) return true;
+                return false;
+            }
+        }
 
         public CompiledType Type;
 
@@ -994,11 +938,50 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (other is not CompiledGeneralFunction other2) return false;
             return IsSame(other2);
         }
+
+        public CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
+        {
+            context = this.context,
+            Modifiers = this.Modifiers,
+            TimesUsed = this.TimesUsed,
+            TimesUsedTotal = this.TimesUsedTotal,
+        };
+
+        public override string ToString()
+        {
+            string result = "";
+            if (IsExport)
+            {
+                result += "export ";
+            }
+            result += this.Identifier.Content;
+
+            result += '(';
+            if (this.ParameterTypes.Length > 0)
+            {
+                for (int i = 0; i < ParameterTypes.Length; i++)
+                {
+                    if (i > 0) result += ", ";
+                    result += ParameterTypes[i].ToString();
+                }
+            }
+            result += ')';
+
+            result += ' ';
+
+            result += '{';
+            if (this.Statements.Length > 0)
+            { result += "..."; }
+            result += '}';
+
+            return result;
+        }
     }
 
-    public interface IFunctionThing : IDefinitionComparer<IFunctionThing>
+    public interface IFunctionThing
     {
         internal int InstructionOffset { get; set; }
+        internal bool IsSame(IFunctionThing other);
     }
 
     public class CompiledVariable : VariableDeclaretion
@@ -1023,24 +1006,58 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CompiledEnumMember : EnumMemberDefinition, IElementWithKey<string>
+    public class CompiledEnumMember : EnumMemberDefinition, IHaveKey<string>
     {
         public new DataItem Value;
     }
 
-    public class CompiledEnum : EnumDefinition, ITypeDefinition, IElementWithKey<string>
+    public class CompiledEnum : EnumDefinition, ITypeDefinition, IHaveKey<string>
     {
         public new CompiledEnumMember[] Members;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
     }
 
-    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
+    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>
     {
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
-        internal Dictionary<string, int> FieldOffsets = new();
-        public int Size { get; set; }
+        internal IReadOnlyDictionary<string, int> FieldOffsets
+        {
+            get
+            {
+                Dictionary<string, int> result = new();
+                int currentOffset = 0;
+                foreach (var field in Fields)
+                {
+                    result.Add(field.Identifier.Content, currentOffset);
+                    switch (field.Type.BuiltinType)
+                    {
+                        case Type.BYTE:
+                        case Type.INT:
+                        case Type.FLOAT:
+                        case Type.CHAR:
+                            currentOffset++;
+                            break;
+                        default: throw new NotImplementedException();
+                    }
+                }
+                return result;
+            }
+        }
+        public int Size
+        {
+            get
+            {
+                int size = 0;
+                for (int i = 0; i < Fields.Length; i++)
+                {
+                    CompiledField field = Fields[i];
+                    size += field.Type.SizeOnStack;
+                }
+                return size;
+            }
+        }
 
         public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
         {
@@ -1054,23 +1071,157 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IElementWithKey<string>
+    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>, IDuplicateable<CompiledClass>
     {
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public List<DefinitionReference> References = null;
-        internal Dictionary<string, int> FieldOffsets = new();
-        public int Size { get; set; }
+        readonly Dictionary<string, CompiledType> currentTypeArguments;
+        public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
+
+        public IReadOnlyDictionary<string, int> FieldOffsets
+        {
+            get
+            {
+                Dictionary<string, int> result = new();
+                int currentOffset = 0;
+                foreach (CompiledField field in Fields)
+                {
+                    result.Add(field.Identifier.Content, currentOffset);
+                    currentOffset += GetType(field.Type, field).SizeOnStack;
+                }
+                return result;
+            }
+        }
+        public int Size
+        {
+            get
+            {
+                int size = 0;
+                foreach (CompiledField field in Fields)
+                { size += GetType(field.Type, field).SizeOnStack; }
+                return size;
+            }
+        }
+
+        public void AddTypeArguments(IEnumerable<CompiledType> typeArguments)
+             => AddTypeArguments(typeArguments.ToArray());
+        public void AddTypeArguments(CompiledType[] typeArguments)
+        {
+            if (TemplateInfo == null)
+            { return; }
+
+            if (typeArguments == null || typeArguments.Length == 0)
+            { return; }
+
+            string[] typeParameters = TemplateInfo.ToDictionary().Keys.ToArray();
+
+            if (typeArguments.Length != typeParameters.Length)
+            { throw new CompilerException($"Ah", Position.UnknownPosition, null); }
+
+            for (int i = 0; i < typeArguments.Length; i++)
+            {
+                if (TemplateInfo == null)
+                { throw new CompilerException($"Ah", Position.UnknownPosition, null); }
+
+                CompiledType value = typeArguments[i];
+                string key = typeParameters[i];
+
+                currentTypeArguments[key] = value;
+            }
+        }
+        internal void AddTypeArguments(Dictionary<string, CompiledType> typeArguments)
+        {
+            if (TemplateInfo == null)
+            { return; }
+
+            string[] typeParameters = TemplateInfo.ToDictionary().Keys.ToArray();
+
+            for (int i = 0; i < typeParameters.Length; i++)
+            {
+                if (!typeArguments.TryGetValue(typeParameters[i], out var ehhh))
+                { continue; }
+                currentTypeArguments[typeParameters[i]] = ehhh;
+            }
+        }
+
+        public void ClearTypeArguments() => currentTypeArguments.Clear();
+
+        CompiledType GetType(CompiledType type, IThingWithPosition position)
+        {
+            if (!type.IsGeneric) return type;
+            if (!currentTypeArguments.TryGetValue(type.Name, out CompiledType result))
+            { throw new CompilerException($"Type argument \"{type.Name}\" not found", position, FilePath); }
+            return result;
+        }
+
+        public CompiledClass Duplicate() => new(CompiledAttributes, Fields, this)
+        {
+
+        };
 
         public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
+            this.TemplateInfo = definition.TemplateInfo;
+            this.currentTypeArguments = new Dictionary<string, CompiledType>();
 
             base.FilePath = definition.FilePath;
             base.BracketEnd = definition.BracketEnd;
             base.BracketStart = definition.BracketStart;
             base.Statements = definition.Statements;
+        }
+
+        public bool TryGetTypeArgumentIndex(string typeArgumentName, out int index)
+        {
+            index = 0;
+            if (TemplateInfo == null) return false;
+            for (int i = 0; i < TemplateInfo.TypeParameters.Length; i++)
+            {
+                if (TemplateInfo.TypeParameters[i].Content == typeArgumentName)
+                {
+                    index = i;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public override string ToString()
+        {
+            string result = $"class";
+            result += ' ';
+            result += $"{this.Name.Content}";
+            if (this.TemplateInfo != null)
+            {
+                result += '<';
+                if (this.currentTypeArguments.Count > 0)
+                {
+                    for (int i = 0; i < this.TemplateInfo.TypeParameters.Length; i++)
+                    {
+                        if (i > 0) result += ", ";
+
+                        string typeParameterName = this.TemplateInfo.TypeParameters[i].Content;
+                        if (this.currentTypeArguments.TryGetValue(typeParameterName, out var typeParameterValue))
+                        {
+                            result += typeParameterValue.ToString();
+                        }
+                        else
+                        {
+                            result += "?";
+                        }
+                    }
+                }
+                else
+                {
+                    result += string.Join<Token>(", ", this.TemplateInfo.TypeParameters);
+                }
+                result += '>';
+            }
+            result += ' ';
+            result += "{...}";
+            return result;
         }
     }
 
@@ -1079,29 +1230,23 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public new CompiledType Type;
 
         readonly int index;
-        readonly int allParamCount;
         readonly int currentParamsSize;
 
         public int Index => index;
-        public int RealIndex
-        {
-            get
-            {
-                var v = -1 - (currentParamsSize + 1 - index);
-                return v;
-            }
-        }
+        public int RealIndex => (-1) - (currentParamsSize + 1 - index);
 
-        public CompiledParameter(int index, int currentParamsSize, int allParamCount, CompiledType type, ParameterDefinition definition)
+        public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition)
         {
             this.index = index;
-            this.allParamCount = allParamCount;
             this.currentParamsSize = currentParamsSize;
             this.Type = type;
 
             base.Identifier = definition.Identifier;
             base.Modifiers = definition.Modifiers;
         }
+
+        public CompiledParameter(CompiledType type, ParameterDefinition definition)
+            : this(-1, -1, type, definition) { }
 
         public override string ToString() => $"{index} {Identifier}";
     }
@@ -1167,23 +1312,41 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Function = function ?? throw new ArgumentNullException(nameof(function));
         }
 
-        public string FilePath { get => Function.FilePath; set => Function.FilePath = value; }
+        public string FilePath
+        {
+            get => Function.FilePath;
+            set => Function.FilePath = value;
+        }
 
-        public override bool Equals(object obj) => obj is FunctionType other && Equals(other);
+        public override bool Equals(object obj)
+        {
+            if (obj is null) return false;
+            if (obj is not FunctionType other) return false;
 
-        public bool Equals(FunctionType other) =>
-            other is not null &&
-            EqualityComparer<CompiledFunction>.Default.Equals(Function, other.Function);
+            return Equals(other);
+        }
+
+        public bool Equals(FunctionType other)
+        {
+            if (other is null) return false;
+
+            return Function.IsSame(other.Function);
+        }
 
         public override int GetHashCode() => HashCode.Combine(Function);
 
-        public static bool operator ==(FunctionType left, FunctionType right) =>
-            EqualityComparer<FunctionType>.Default.Equals(left, right);
+        public static bool operator ==(FunctionType a, FunctionType b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
 
-        public static bool operator !=(FunctionType left, FunctionType right) => !(left == right);
+            return a.Equals(b);
+        }
+
+        public static bool operator !=(FunctionType a, FunctionType b) => !(a == b);
     }
 
-    public class CompiledType : IEquatable<CompiledType>
+    public class CompiledType : IEquatable<CompiledType>, IEquatable<TypeInstance>, IEquatable<Type>, IEquatable<RuntimeType>
     {
         Type builtinType;
 
@@ -1191,9 +1354,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
         CompiledClass @class;
         CompiledEnum @enum;
         FunctionType function;
+        CompiledType[] typeParameters;
 
         internal Type BuiltinType => builtinType;
-        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
         internal RuntimeType RuntimeType => builtinType switch
         {
@@ -1202,7 +1366,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Type.FLOAT => RuntimeType.FLOAT,
             Type.CHAR => RuntimeType.CHAR,
 
-            Type.NONE => throw new Errors.InternalException($"This ({this}) is not a built-in type"),
+            Type.NONE => throw new InternalException($"{this} is not a built-in type"),
 
             _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
         };
@@ -1211,20 +1375,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal CompiledClass Class => @class;
         internal CompiledEnum Enum => @enum;
         internal FunctionType Function => function;
+        internal CompiledType[] TypeParameters => typeParameters;
 
         string genericName;
 
 
-        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
         internal string Name
         {
             get
             {
-                if (IsGeneric)
-                {
-                    return genericName;
-                }
+                if (IsGeneric) return genericName;
 
                 if (builtinType != Type.NONE) return builtinType switch
                 {
@@ -1235,7 +1397,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     Type.CHAR => "char",
 
                     Type.UNKNOWN => "unknown",
-                    Type.NONE => throw new Errors.InternalException($"This should never occur"),
+                    Type.NONE => throw new InternalException("This should never occur"),
 
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
@@ -1264,7 +1426,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             get
             {
-                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
+                if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
                 if (IsClass) return @class.Size;
                 if (IsEnum) return 1;
@@ -1279,7 +1441,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             get
             {
-                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
+                if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
                 if (IsClass) return @class.Size;
                 return 0;
             }
@@ -1291,7 +1453,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             get
             {
-                if (IsGeneric) throw new Errors.InternalException($"Can not get the size of a generic type");
+                if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
                 return 1;
             }
@@ -1305,6 +1467,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.@enum = null;
             this.function = null;
             this.genericName = null;
+            this.typeParameters = Array.Empty<CompiledType>();
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1317,6 +1480,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
         internal CompiledType(CompiledClass @class) : this()
         {
             this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        internal CompiledType(CompiledClass @class, params CompiledType[][] typeParameters) : this()
+        {
+            this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
+            List<CompiledType> typeParameters1 = new();
+            for (int i = 0; i < typeParameters.Length; i++)
+            { typeParameters1.AddRange(typeParameters[i]); }
+            this.typeParameters = typeParameters1.ToArray();
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1336,7 +1509,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.builtinType = type;
         }
 
-        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="InternalException"/>
         internal CompiledType(RuntimeType type) : this()
         {
             this.builtinType = type switch
@@ -1345,40 +1518,28 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 RuntimeType.INT => Type.INT,
                 RuntimeType.FLOAT => Type.FLOAT,
                 RuntimeType.CHAR => Type.CHAR,
-                _ => throw new NotImplementedException(),
+                _ => throw new NotImplementedException("This should never occur"),
             };
         }
 
         /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="Errors.InternalException"/>
-        public CompiledType(TypeInstance type, Func<string, ITypeDefinition> UnknownTypeCallback) : this()
+        /// <exception cref="InternalException"/>
+        public CompiledType(TypeInstance type, Func<string, CompiledType> typeFinder) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
             if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
-            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
+            if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
 
-            SetCustomType(type.Identifier.Content, UnknownTypeCallback);
+            Set(typeFinder.Invoke(type.Identifier.Content));
+
+            typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
         }
 
         /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="Errors.InternalException"/>
-        public CompiledType(TypeInstance type, Func<string, CompiledType> UnknownTypeCallback) : this()
-        {
-            if (type is null) throw new ArgumentNullException(nameof(type));
-
-            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
-            { return; }
-
-            if (UnknownTypeCallback == null) throw new Errors.InternalException($"Can't parse {type} to CompiledType");
-
-            Set(UnknownTypeCallback.Invoke(type.Identifier.Content));
-        }
-
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="InternalException"/>
         public CompiledType(ITypeDefinition type) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
@@ -1407,43 +1568,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return;
             }
 
-            throw new Errors.InternalException($"Unknown type definition {type.GetType().FullName}");
+            throw new InternalException($"Unknown type definition {type.GetType().FullName}");
         }
 
         /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="Errors.InternalException"/>
-        void SetCustomType(string typeName, Func<string, ITypeDefinition> UnknownTypeCallback)
-        {
-            if (UnknownTypeCallback is null) throw new ArgumentNullException(nameof(UnknownTypeCallback));
-
-            ITypeDefinition customType = UnknownTypeCallback.Invoke(typeName);
-
-            if (customType is CompiledStruct @struct)
-            {
-                this.@struct = @struct;
-                return;
-            }
-            if (customType is CompiledClass @class)
-            {
-                this.@class = @class;
-                return;
-            }
-            if (customType is CompiledEnum @enum)
-            {
-                this.@enum = @enum;
-                return;
-            }
-            if (customType is FunctionType function)
-            {
-                this.function = function;
-                return;
-            }
-
-            throw new Errors.InternalException($"Unknown type definition {customType.GetType().FullName}");
-        }
-
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="Errors.InternalException"/>
+        /// <exception cref="InternalException"/>
         void Set(CompiledType other)
         {
             if (other is null) throw new ArgumentNullException(nameof(other));
@@ -1454,9 +1583,34 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.function = other.function;
             this.genericName = other.genericName;
             this.@struct = other.@struct;
+            this.typeParameters = new List<CompiledType>(other.typeParameters).ToArray();
         }
 
-        public override string ToString() => Name;
+        public override string ToString()
+        {
+            string result = Name;
+
+            if (TypeParameters.Length > 0)
+            {
+                result += '<';
+                result += string.Join<CompiledType>(", ", TypeParameters);
+                result += '>';
+            }
+            else
+            {
+                if (@class != null)
+                {
+                    if (@class.TemplateInfo != null)
+                    {
+                        result += '<';
+                        result += string.Join<Token>(", ", @class.TemplateInfo.TypeParameters);
+                        result += '>';
+                    }
+                }
+            }
+
+            return result;
+        }
 
         public static bool operator ==(CompiledType a, CompiledType b)
         {
@@ -1468,62 +1622,160 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         public static bool operator !=(CompiledType a, CompiledType b) => !(a == b);
 
+        public static bool operator ==(CompiledType a, RuntimeType b)
+        {
+            if (a is null) return false;
+
+            return a.Equals(b);
+        }
+        public static bool operator !=(CompiledType a, RuntimeType b) => !(a == b);
+
         public static bool operator ==(CompiledType a, Type b)
         {
             if (a is null) return false;
-            if (!a.IsBuiltin) return false;
-            return a.BuiltinType == b;
+
+            return a.Equals(b);
         }
         public static bool operator !=(CompiledType a, Type b) => !(a == b);
 
         public static bool operator ==(CompiledType a, TypeInstance b)
         {
             if (a is null && b is null) return true;
-            if (a is null) return false;
-            if (b is null) return false;
+            if (a is null || b is null) return false;
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(b.Identifier.Content, out var type3))
-            {
-                return type3 == a.builtinType;
-            }
-
-            if (a.@struct != null && a.@struct.Name.Content == b.Identifier.Content)
-            { return true; }
-
-            if (a.@class != null && a.@class.Name.Content == b.Identifier.Content)
-            { return true; }
-
-            if (a.@enum != null && a.@enum.Identifier.Content == b.Identifier.Content)
-            { return true; }
-
-            return false;
+            return a.Equals(b);
         }
         public static bool operator !=(CompiledType a, TypeInstance b) => !(a == b);
 
         public override bool Equals(object obj)
         {
             if (obj is null) return false;
-            if (obj is not CompiledType _obj) return false;
-            return this.Equals(_obj);
+            if (obj is not CompiledType other) return false;
+            return this.Equals(other);
         }
-        public bool Equals(CompiledType b)
+
+        public bool Equals(CompiledType other)
         {
-            if (b is null) return false;
+            if (other is null) return false;
 
-            if (this.genericName != b.genericName) return false;
+            if (this.genericName != other.genericName) return false;
 
-            if (this.IsBuiltin != b.IsBuiltin) return false;
-            if (this.IsClass != b.IsClass) return false;
-            if (this.IsStruct != b.IsStruct) return false;
-            if (this.IsFunction != b.IsFunction) return false;
+            if (this.IsBuiltin != other.IsBuiltin) return false;
+            if (this.IsClass != other.IsClass) return false;
+            if (this.IsStruct != other.IsStruct) return false;
+            if (this.IsFunction != other.IsFunction) return false;
 
-            if (this.IsClass && b.IsClass) return this.@class.Name.Content == b.@class.Name.Content;
-            if (this.IsStruct && b.IsStruct) return this.@struct.Name.Content == b.@struct.Name.Content;
-            if (this.IsEnum && b.IsEnum) return this.@enum.Identifier.Content == b.@enum.Identifier.Content;
-            if (this.IsFunction && b.IsFunction) return this.@function == b.@function;
+            if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
 
-            if (this.IsBuiltin && b.IsBuiltin) return this.builtinType == b.builtinType;
+            if (this.IsClass && other.IsClass) return this.@class.Name.Content == other.@class.Name.Content;
+            if (this.IsStruct && other.IsStruct) return this.@struct.Name.Content == other.@struct.Name.Content;
+            if (this.IsEnum && other.IsEnum) return this.@enum.Identifier.Content == other.@enum.Identifier.Content;
+            if (this.IsFunction && other.IsFunction) return this.@function == other.@function;
 
+            if (this.IsBuiltin && other.IsBuiltin) return this.builtinType == other.builtinType;
+
+            return true;
+        }
+
+        public bool Equals(TypeInstance other)
+        {
+            if (other is null) return false;
+
+            if (!CompiledType.Equals(this.typeParameters, other.GenericTypes)) return false;
+
+            if (Constants.BuiltinTypeMap3.TryGetValue(other.Identifier.Content, out var type))
+            { return type == this.builtinType; }
+
+            if (this.@struct != null && this.@struct.Name.Content == other.Identifier.Content)
+            { return true; }
+
+            if (this.@class != null && this.@class.Name.Content == other.Identifier.Content)
+            { return true; }
+
+            if (this.@enum != null && this.@enum.Identifier.Content == other.Identifier.Content)
+            { return true; }
+
+            return false;
+        }
+
+        public bool Equals(Type other)
+        {
+            if (!this.IsBuiltin) return false;
+            return this.BuiltinType == other;
+        }
+
+        public bool Equals(RuntimeType other)
+        {
+            if (!this.IsBuiltin) return false;
+            return this.RuntimeType == other;
+        }
+
+        public static bool Equals(CompiledType[] a, CompiledType[] b, out Dictionary<string, CompiledType> typeParameters)
+        {
+            typeParameters = new Dictionary<string, CompiledType>();
+
+            if (a is null || b is null) return false;
+
+            if (a.Length != b.Length) return false;
+
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (b[i].IsGeneric)
+                { throw new NotImplementedException(); }
+
+                if (a[i].IsGeneric)
+                {
+                    if (typeParameters.TryGetValue(a[i].Name, out CompiledType addedGenericType))
+                    { if (addedGenericType != b[i]) return false; }
+                    else
+                    { typeParameters.Add(a[i].Name, b[i]); }
+
+                    continue;
+                }
+
+                if (a[i].IsClass && a[i].Class.TemplateInfo != null)
+                {
+                    Token[] classTypeParameters = a[i].Class.TemplateInfo.TypeParameters;
+                    if (classTypeParameters.Length != b[i].TypeParameters.Length)
+                    { throw new NotImplementedException("Bruh"); }
+
+                    for (int j = 0; j < classTypeParameters.Length; j++)
+                    {
+                        string typeParameterName = classTypeParameters[j].Content;
+                        CompiledType typeParameterValue = b[i].TypeParameters[j];
+
+                        if (typeParameters.TryGetValue(typeParameterName, out CompiledType addedGenericType))
+                        { if (addedGenericType != typeParameterValue) return false; }
+                        else
+                        { typeParameters.Add(typeParameterName, typeParameterValue); }
+                    }
+
+                    continue;
+                }
+
+                if (a[i] != b[i]) return false;
+            }
+
+            return true;
+        }
+
+        public static bool Equals(CompiledType[] a, CompiledType[] b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+            { if (!a[i].Equals(b[i])) return false; }
+            return true;
+        }
+
+        public static bool Equals(CompiledType[] a, TypeInstance[] b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+            { if (a[i] != b[i]) return false; }
             return true;
         }
 
@@ -1533,16 +1785,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
             => new()
             { genericName = content, };
 
-        public static bool operator ==(CompiledType a, string b)
+        public static CompiledType[] FromArray(List<TypeInstance> types, Func<string, CompiledType> typeFinder)
+            => CompiledType.FromArray(types.ToArray(), typeFinder);
+        public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<string, CompiledType> typeFinder)
+            => CompiledType.FromArray(types.ToArray(), typeFinder);
+        public static CompiledType[] FromArray(TypeInstance[] types, Func<string, CompiledType> typeFinder)
         {
-            if (a is null && b is null) return true;
-            if (a is not null && b is null) return false;
-            if (a is null && b is not null) return false;
-            return a.Name == b;
+            if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+            CompiledType[] result = new CompiledType[types.Length];
+            for (int i = 0; i < types.Length; i++)
+            { result[i] = new CompiledType(types[i], typeFinder); }
+            return result;
         }
-        public static bool operator !=(CompiledType a, string b) => !(a == b);
-        public static bool operator ==(string a, CompiledType b) => b == a;
-        public static bool operator !=(string a, CompiledType b) => !(b == a);
     }
 
     public interface ITypeDefinition : IDefinition
@@ -1555,17 +1809,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public int Size { get; }
     }
 
-    public interface IElementWithKey<T>
+    public interface IHaveKey<T>
     {
         public T Key { get; }
     }
 
-    public interface IDefinitionComparer<T>
-    {
-        public bool IsSame(T other);
-    }
-
-    public interface IInContext<T>
+    public interface IAmInContext<T>
     {
         public T Context { get; set; }
     }

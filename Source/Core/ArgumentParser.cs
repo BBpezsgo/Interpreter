@@ -368,12 +368,12 @@ namespace TheProgram
                 }
             }
 
-            if (!System.IO.File.Exists(args.Last()))
+            if (!System.IO.File.Exists(args[^1]))
             {
-                throw new ArgumentException($"File '{args.Last()}' not found!");
+                throw new ArgumentException($"File '{args[^1]}' not found!");
             }
 
-            result.File = new System.IO.FileInfo(args.Last());
+            result.File = new System.IO.FileInfo(args[^1]);
 
             return result;
         }

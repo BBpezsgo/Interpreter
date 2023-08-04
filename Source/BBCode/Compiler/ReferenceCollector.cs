@@ -57,7 +57,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
 
             bool inHeap = GetClass(newVariable.Type.Identifier.Content, out _);
-            CompiledType type = new(newVariable.Type, GetCustomType);
+            CompiledType type = new(newVariable.Type, FindType);
 
             return new CompiledVariable(
                 -1,
@@ -78,13 +78,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
                 }
-                else if (newVariable.InitialValue is NewInstance newStruct)
+                else if (newVariable.InitialValue is NewInstance newInstance)
                 {
-                    newVariable.Type = TypeInstance.CreateAnonymous(newStruct.TypeName.Content, TypeDefinitionReplacer);
+                    newVariable.Type = newInstance.TypeName; // TypeInstance.CreateAnonymous(newInstance.TypeName.Identifier.Content, TypeDefinitionReplacer);
                 }
                 else if (newVariable.InitialValue is ConstructorCall constructorCall)
                 {
-                    newVariable.Type = TypeInstance.CreateAnonymous(constructorCall.TypeName.Content, TypeDefinitionReplacer);
+                    newVariable.Type = constructorCall.TypeName; //TypeInstance.CreateAnonymous(constructorCall.TypeName.Identifier.Content, TypeDefinitionReplacer);
                 }
                 else
                 {
@@ -168,14 +168,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!prevType.IsClass)
                 { return; }
 
-                if (!GetIndexGetter(prevType.Class, out CompiledFunction indexer))
-                { return; }
+                if (GetIndexGetter(prevType, out CompiledFunction indexer))
+                {
+                    indexer.AddReference(index);
 
-                indexer.AddReference(index);
+                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                    { indexer.TimesUsed++; }
+                    indexer.TimesUsedTotal++;
+                }
+                else if (GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                {
+                    indexerTemplate = AddCompilable(indexerTemplate);
 
-                if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                { indexer.TimesUsed++; }
-                indexer.TimesUsedTotal++;
+                    indexerTemplate.OriginalFunction.AddReference(index);
+                    indexerTemplate.Function.AddReference(index);
+
+                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                    {
+                        indexerTemplate.OriginalFunction.TimesUsed++;
+                        indexerTemplate.Function.TimesUsed++;
+                    }
+                    indexerTemplate.OriginalFunction.TimesUsedTotal++;
+                    indexerTemplate.Function.TimesUsedTotal++;
+                }
             }
             else if (statement is VariableDeclaretion newVariable)
             {
@@ -194,6 +209,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { operatorDefinition.TimesUsed++; }
                     operatorDefinition.TimesUsedTotal++;
                 }
+                else if (GetOperatorTemplate(@operator, out var compilableOperator))
+                {
+                    compilableOperator.Function.AddReference(@operator);
+
+                    if (CurrentFunction == null || !compilableOperator.Function.IsSame(CurrentFunction))
+                    { compilableOperator.Function.TimesUsed++; }
+                    compilableOperator.Function.TimesUsedTotal++;
+
+                    compilableOperator = AddCompilable(compilableOperator);
+                }
             }
             else if (statement is CompoundAssignment compoundAssignment)
             {
@@ -208,14 +233,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (!prevType.IsClass)
                     { return; }
 
-                    if (!GetIndexSetter(prevType.Class, valueType, out CompiledFunction indexer))
-                    { return; }
+                    if (GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
+                    {
+                        indexer.AddReference(indexSetter);
 
-                    indexer.AddReference(indexSetter);
+                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        { indexer.TimesUsed++; }
+                        indexer.TimesUsedTotal++;
+                    }
+                    else if (GetIndexSetterTemplate(prevType, valueType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                    {
+                        indexerTemplate = AddCompilable(indexerTemplate);
 
-                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                    { indexer.TimesUsed++; }
-                    indexer.TimesUsedTotal++;
+                        indexerTemplate.OriginalFunction.AddReference(indexSetter);
+                        indexerTemplate.Function.AddReference(indexSetter);
+
+                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        {
+                            indexerTemplate.OriginalFunction.TimesUsed++;
+                            indexerTemplate.Function.TimesUsed++;
+                        }
+                        indexerTemplate.OriginalFunction.TimesUsedTotal++;
+                        indexerTemplate.Function.TimesUsedTotal++;
+                    }
                 }
                 else
                 { AnalyzeStatement(compoundAssignment.Left); }
@@ -234,14 +274,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (!prevType.IsClass)
                     { return; }
 
-                    if (!GetIndexSetter(prevType.Class, valueType, out CompiledFunction indexer))
-                    { return; }
+                    if (GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
+                    {
+                        indexer.AddReference(indexSetter);
 
-                    indexer.AddReference(indexSetter);
+                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        { indexer.TimesUsed++; }
+                        indexer.TimesUsedTotal++;
+                    }
+                    else if (GetIndexSetterTemplate(prevType, valueType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                    {
+                        indexerTemplate = AddCompilable(indexerTemplate);
 
-                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
-                    { indexer.TimesUsed++; }
-                    indexer.TimesUsedTotal++;
+                        indexerTemplate.OriginalFunction.AddReference(indexSetter);
+                        indexerTemplate.Function.AddReference(indexSetter);
+
+                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        {
+                            indexerTemplate.OriginalFunction.TimesUsed++;
+                            indexerTemplate.Function.TimesUsed++;
+                        }
+                        indexerTemplate.OriginalFunction.TimesUsedTotal++;
+                        indexerTemplate.Function.TimesUsedTotal++;
+                    }
                 }
                 else
                 { AnalyzeStatement(setter.Left); }
@@ -258,13 +313,33 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (functionCall.PrevStatement != null)
                 { AnalyzeStatement(functionCall.PrevStatement); }
 
-                if (GetFunction(functionCall, out var function))
+                if (functionCall.FunctionName == "sizeof")
+                { return; }
+
+                if (functionCall.FunctionName == "Alloc")
+                { return; }
+
+                if (GetFunction(functionCall, out CompiledFunction function))
                 {
                     function.AddReference(functionCall);
 
                     if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                     { function.TimesUsed++; }
                     function.TimesUsedTotal++;
+                }
+                else if (GetFunctionTemplate(functionCall, out var compilableFunction))
+                {
+                    compilableFunction.OriginalFunction.AddReference(functionCall);
+
+                    if (CurrentFunction == null || !compilableFunction.OriginalFunction.IsSame(CurrentFunction))
+                    {
+                        compilableFunction.OriginalFunction.TimesUsed++;
+                        compilableFunction.Function.TimesUsed++;
+                    }
+                    compilableFunction.OriginalFunction.TimesUsedTotal++;
+                    compilableFunction.Function.TimesUsedTotal++;
+
+                    compilableFunction = AddCompilable(compilableFunction);
                 }
             }
             else if (statement is KeywordCall keywordCall)
@@ -293,19 +368,36 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (!GetDestructor(paramType.Class, out var destructor))
-                    { return; }
+                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructor))
+                    {
+                        if (!destructor.CanUse(CurrentFile))
+                        { return; }
 
-                    if (!destructor.CanUse(CurrentFile))
-                    { return; }
+                        destructor.AddReference(keywordCall);
 
-                    destructor.AddReference(keywordCall);
+                        if (CurrentFunction == null || !destructor.IsSame(CurrentFunction))
+                        { destructor.TimesUsed++; }
+                        destructor.TimesUsedTotal++;
 
-                    if (CurrentFunction == null || !destructor.IsSame(CurrentFunction))
-                    { destructor.TimesUsed++; }
-                    destructor.TimesUsedTotal++;
+                        return;
+                    }
+                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var compilableGeneralFunction))
+                    {
+                        if (!compilableGeneralFunction.OriginalFunction.CanUse(CurrentFile))
+                        { return; }
 
-                    return;
+                        compilableGeneralFunction.OriginalFunction.AddReference(keywordCall);
+
+                        if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
+                        {
+                            compilableGeneralFunction.OriginalFunction.TimesUsed++;
+                            compilableGeneralFunction.Function.TimesUsed++;
+                        }
+                        compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
+                        compilableGeneralFunction.Function.TimesUsedTotal++;
+
+                        compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
+                    }
                 }
 
                 if (keywordCall.FunctionName == "clone")
@@ -318,7 +410,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (!GetCloner(paramType.Class, out var cloner))
+                    if (!GetGeneralFunction(paramType.Class, FunctionNames.Cloner, out var cloner))
                     { return; }
 
                     if (!cloner.CanUse(CurrentFile))
@@ -370,13 +462,30 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 AnalyzeStatements(constructorCall.Parameters);
 
-                if (GetConstructor(constructorCall, out CompiledGeneralFunction function))
-                {
-                    function.AddReference(constructorCall);
+                if (!GetClass(constructorCall, out var @class))
+                { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-                    if (CurrentFunction == null || !function.IsSame(CurrentFunction))
-                    { function.TimesUsed++; }
-                    function.TimesUsedTotal++;
+                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+                {
+                    constructor.AddReference(constructorCall);
+
+                    if (CurrentFunction == null || !constructor.IsSame(CurrentFunction))
+                    { constructor.TimesUsed++; }
+                    constructor.TimesUsedTotal++;
+                }
+                else if (GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                {
+                    compilableGeneralFunction.OriginalFunction.AddReference(constructorCall);
+
+                    if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
+                    {
+                        compilableGeneralFunction.OriginalFunction.TimesUsed++;
+                        compilableGeneralFunction.Function.TimesUsed++;
+                    }
+                    compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
+                    compilableGeneralFunction.Function.TimesUsedTotal++;
+
+                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
                 }
             }
             else if (statement is BBCode.Parser.Statement.Literal)
@@ -401,9 +510,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
+                if (function.IsTemplate)
+                { continue; }
+
                 parameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -418,9 +530,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledOperator function = this.CompiledOperators[i];
 
+                if (function.IsTemplate)
+                { continue; }
+
                 parameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -435,9 +550,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledGeneralFunction function = this.CompiledGeneralFunctions[i];
 
+                if (function.IsTemplate)
+                { continue; }
+
                 parameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(-1, -1, -1, new CompiledType(parameter.Type, v => GetCustomType(v)), parameter)); }
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -449,6 +567,66 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
 
             AnalyzeStatements(topLevelStatements);
+
+            for (int i = 0; i < this.CompilableFunctions.Count; i++)
+            {
+                CompileableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
+
+                AddTypeArguments(function.TypeArguments);
+
+                parameters.Clear();
+                foreach (ParameterDefinition parameter in function.Function.Parameters)
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                CurrentFile = function.Function.FilePath;
+                CurrentFunction = function.Function;
+
+                AnalyzeStatements(function.Function.Statements);
+
+                CurrentFunction = null;
+                CurrentFile = null;
+                parameters.Clear();
+                TypeArguments.Clear();
+            }
+
+            for (int i = 0; i < this.CompilableOperators.Count; i++)
+            {
+                CompileableTemplate<CompiledOperator> function = this.CompilableOperators[i];
+
+                AddTypeArguments(function.TypeArguments);
+
+                parameters.Clear();
+                foreach (ParameterDefinition parameter in function.Function.Parameters)
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                CurrentFile = function.Function.FilePath;
+                CurrentFunction = function.Function;
+
+                AnalyzeStatements(function.Function.Statements);
+
+                CurrentFunction = null;
+                CurrentFile = null;
+                parameters.Clear();
+                TypeArguments.Clear();
+            }
+
+            for (int i = 0; i < this.CompilableGeneralFunctions.Count; i++)
+            {
+                CompileableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
+
+                AddTypeArguments(function.TypeArguments);
+
+                parameters.Clear();
+                foreach (ParameterDefinition parameter in function.Function.Parameters)
+                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                CurrentFile = function.Function.FilePath;
+                CurrentFunction = function.Function;
+
+                AnalyzeStatements(function.Function.Statements);
+
+                CurrentFunction = null;
+                CurrentFile = null;
+                parameters.Clear();
+                TypeArguments.Clear();
+            }
         }
 
         void ResetReferences()

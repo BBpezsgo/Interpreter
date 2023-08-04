@@ -42,6 +42,7 @@ namespace ProgrammingLanguage.Bytecode
         public int ExecutedInstructionCount;
         public Instruction[] Code;
         internal DataStack Stack;
+        internal int CodeSampleStart;
     }
 
     public class BytecodeInterpreter
@@ -137,7 +138,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="RuntimeException"></exception>
         internal void Tick()
         {
-            if (!CanExecuteCode || IsDestroyed) return;
+            if (IsDestroyed) return;
             RemainingClockCycles = Math.Min(RemainingClockCycles + Settings.ClockCyclesPerUpdate, Settings.ClockCyclesPerUpdate);
             while (ExecuteNext())
             {
@@ -156,8 +157,9 @@ namespace ProgrammingLanguage.Bytecode
             RawCallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
             ExecutedInstructionCount = this.EndlessSafe,
             CodePointer = this.BytecodeProcessor.CodePointer,
-            Code = this.BytecodeProcessor.Memory.Code[Math.Clamp(this.BytecodeProcessor.CodePointer - 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)..Math.Clamp(this.BytecodeProcessor.CodePointer + 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)],
+            Code = this.BytecodeProcessor.Memory.Code[Math.Max(this.BytecodeProcessor.CodePointer - 20, 0)..Math.Clamp(this.BytecodeProcessor.CodePointer + 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)],
             Stack = this.BytecodeProcessor.Memory.Stack,
+            CodeSampleStart = Math.Max(this.BytecodeProcessor.CodePointer - 20, 0),
         };
 
         #endregion
@@ -239,7 +241,7 @@ namespace ProgrammingLanguage.Bytecode
 
             if (LastInstructionPointer == BytecodeProcessor.CodePointer)
             {
-                Output.Debug.Debug.LogWarning($"Possible endless loop! Instruction: " + BytecodeProcessor.CurrentInstruction.ToString());
+                throw new RuntimeException($"Possible endless loop!", GetContext());
             }
 
             LastInstructionPointer = BytecodeProcessor.CodePointer;
@@ -286,7 +288,7 @@ namespace ProgrammingLanguage.Bytecode
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
             AddressingMode.RELATIVE => BytecodeProcessor.Memory.Stack.Count + offset,
             AddressingMode.POP => BytecodeProcessor.Memory.Stack.Count - 1,
-            AddressingMode.RUNTIME => BytecodeProcessor.Memory.Stack.Last().ValueInt,
+            AddressingMode.RUNTIME => BytecodeProcessor.Memory.Stack.Last.ValueInt,
             _ => offset,
         };
     }

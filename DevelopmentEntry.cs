@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "test29.bbc";
+            var file = "test30.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -27,7 +27,7 @@ namespace TheProgram
                 // "-c-print-instructions true",
                 // "-c-remove-unused-functions 5",
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
-                "-hide-debug",
+                // "-hide-debug",
                 "-hide-system",
                 // "-c-generate-comments false",
                 // "-no-debug-info",
@@ -39,7 +39,7 @@ namespace TheProgram
                 // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                "-brainfuck",
+                // "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{TestConstants.TestFilesPath}{file}\""

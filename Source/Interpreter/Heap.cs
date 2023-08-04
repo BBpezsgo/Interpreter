@@ -5,8 +5,6 @@ namespace ProgrammingLanguage.Bytecode
 {
     using ProgrammingLanguage.Errors;
 
-    using System.Collections.Generic;
-
     internal class HEAP : IHeap
     {
         readonly DataItem[] heap;
@@ -56,9 +54,8 @@ namespace ProgrammingLanguage.Bytecode
         }
         internal string GetStringByPointer(int pointer)
         {
-            int subpointer = this[pointer].ValueInt;
-            int length = this[pointer + 1].ValueInt;
-            return GetString(subpointer, length);
+            int length = this[pointer].ValueInt;
+            return GetString(pointer, length);
         }
 
         const int BLOCK_SIZE_MASK = 0b_0000_0000_0000_0000_1111_1111_1111_1111;

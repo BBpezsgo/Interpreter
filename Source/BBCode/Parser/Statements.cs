@@ -327,7 +327,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override Position TotalPosition()
         {
-            Position result = new(Identifier, BracketLeft, BracketRight);
+            Position result = new(BracketLeft, BracketRight);
+            result.Extend(Identifier);
             result.Extend(MethodParameters);
             return result;
         }
@@ -337,7 +338,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             string result = "";
             if (this.PrevStatement != null)
             {
-                result += TypeSearch.Invoke(this.PrevStatement);
+                result += TypeSearch.Invoke(this.PrevStatement).ToString();
                 result += ".";
             }
             result += this.FunctionName;
@@ -345,7 +346,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             for (int i = 0; i < this.Parameters.Length; i++)
             {
                 if (i > 0) { result += ", "; }
-                result += TypeSearch.Invoke(this.Parameters[i]);
+                result += TypeSearch.Invoke(this.Parameters[i]).ToString();
             }
             result += ")";
             return result;
@@ -1171,7 +1172,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
     public class NewInstance : StatementWithValue
     {
         public Token Keyword;
-        public Token TypeName;
+        public TypeInstance TypeName;
 
         public override string ToString() => $"new {TypeName}";
         public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TypeName}";
@@ -1183,7 +1184,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
     {
         public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
         public Token Keyword;
-        public Token TypeName;
+        public TypeInstance TypeName;
 
         public Token BracketLeft;
         public Token BracketRight;
@@ -1191,7 +1192,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         public override string ToString()
         {
             string result = "new ";
-            result += TypeName.Content;
+            result += TypeName.ToString();
             result += "(";
 
             string paramsString = "";
@@ -1230,7 +1231,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = "";
-            result += TypeName.Content;
+            result += TypeName.ToString();
             result += ".";
             result += this.Keyword.Content;
             result += "(";
@@ -1257,19 +1258,24 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         internal readonly StatementWithValue Expression;
         internal StatementWithValue PrevStatement;
 
-        public IndexCall(StatementWithValue indexStatement)
+        internal readonly Token BracketLeft;
+        internal readonly Token BracketRight;
+
+        public IndexCall(StatementWithValue indexStatement, Token bracketLeft, Token bracketRight)
         {
             this.Expression = indexStatement;
+            this.BracketLeft = bracketLeft;
+            this.BracketRight = bracketRight;
         }
 
         public override string ToString()
         {
-            return $"[{Expression}]";
+            return $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}";
         }
 
         public override string PrettyPrint(int ident = 0)
         {
-            return $"[{Expression.PrettyPrint()}]";
+            return $"{PrevStatement}[{Expression.PrettyPrint()}]";
         }
 
         public override Position TotalPosition()

@@ -41,10 +41,17 @@ export void Print(int message)
 [StandardOutput]
 export void Print(String message)
 {
-    int length = message.Length();
-    for (int i; i < length; i++)
+    if (&message < 0)
     {
-        Print(message.At(i));
+        PrintD("null");
+    }
+    else
+    {
+        int length = message.length;
+        for (int i; i < length; i++)
+        {
+            Print(message[i]);
+        };
     };
 }
 
@@ -71,6 +78,13 @@ export void PrintLineD(String message)
     PrintD("\r\n");
 }
 
+export void PrintLine(char message)
+{
+    Print(message);
+    Print('\r');
+    Print('\n');
+}
+
 export void PrintLine(int message)
 {
     PrintLineD(message.ToString());
@@ -79,6 +93,18 @@ export void PrintLine(int message)
 export void PrintLine(byte message)
 {
     PrintLineD(message.ToString());
+}
+
+export void PrintLine(bool message)
+{
+    if (message)
+    {
+        PrintLineD("true");
+    }
+    else
+    {
+        PrintLineD("false");
+    };
 }
 
 [Builtin("stdin")]
@@ -99,14 +125,14 @@ export String ReadLine() {
         if (inpChar == '\n') { break; };
         if (inpChar == '\r') { break; };
 
-        String newResult = new String(result.Length() + 1);
+        String newResult = new String(result.length + 1);
 
-        for (int i = 0; i < result.Length(); i++)
+        for (int i = 0; i < result.length; i++)
         {
-            newResult.Set(i, result.At(i));
+            newResult[i] = result[i];
         };
 
-        newResult.Set(result.Length(), inpChar);
+        newResult[result.length] = inpChar;
       
         delete result;
 
@@ -143,9 +169,15 @@ char DigitToChar(byte digit)
       elseif (digit == 9) { return '9'; };  
 }
 
+export String ToString(this bool v)
+{
+    if (v) { return "true"; }
+    else { return "false"; };
+}
+
 export String ToString(this byte number)
 {
-	String result = CreateString(0);
+	String result = new String(0);
 
 	if (number == 0) {
 	      delete result;
@@ -159,9 +191,9 @@ export String ToString(this byte number)
 	{
         byte rem = v % 10;
 		
-		String newResult = CreateString(result.Length() + 1);
+		String newResult = new String(result.length + 1);
 		CopyString(result, newResult);
-		newResult.Set(result.Length(), DigitToChar(rem));
+		newResult[result.length] = DigitToChar(rem);
 		delete result;
 		result = newResult;
 
@@ -177,44 +209,39 @@ export String ToString(this byte number)
 
 export String ToString(this int number)
 {
-	String result = CreateString(0);
-
 	if (number == 0) {
-	      delete result;
-	      result = "0";
-	      return result;
+	    return "0";
 	};
+    
+	String result = new String(0);
 
 	int v = number;
 
-	bool isNegative = false;
-	if (v < 0)
-	{
-		isNegative = true;
-		v = 0 - v;
-	};
+	bool isNegative = v < 0;
+	if (isNegative)
+	{ v = 0 - v; };
 
 	while (v > 0)
 	{
         int rem = v % 10;
 		
-		String newResult = CreateString(result.Length() + 1);
+		String newResult = new String(result.length + 1);
 		CopyString(result, newResult);
-		newResult.Set(result.Length(), DigitToChar(rem));
+		newResult[result.length] = DigitToChar(rem);
 		delete result;
 		result = newResult;
 
 		v = v / 10;
 	};
 
-	if (isNegative)
-	{
-	      String newResult = CreateString(result.Length() + 1);
-	      CopyString(result, newResult);
-	      newResult.Set(result.Length(), '-');
-	      delete result;
-	      result = newResult;
-	};
+    if (isNegative)
+    {
+        String newResult = new String(result.length + 1);
+		CopyString(result, newResult);
+        newResult[result.length] = '-';
+        delete result;
+        result = newResult;
+    };
 
 	String reversed = result.Reverse();
 	delete result;
@@ -258,48 +285,48 @@ export int Max(int a, int b)
 export String Substring(this String v, int start)
 {
     int newLength = 0;
-    for (int i = start; i < v.Length(); i++)
+    for (int i = start; i < v.length; i++)
     {
         newLength++;
     };
-    String newV = CreateString(newLength);
-    for (int i = start; i < v.Length(); i++)
+    String newV = new String(newLength);
+    for (int i = start; i < v.length; i++)
     {
-        newV.Set(i - start, v.At(i));
+        newV[i - start] = v[i];
     };
     return newV;
 }
 
 export String Reverse(this String v)
 {
-    String newV = CreateString(v.Length());
-    for (int i = 0; i < v.Length(); i++)
+    String newV = new String(v.length);
+    for (int i = 0; i < v.length; i++)
     {
-        newV.Set(i, v.At(v.Length() - 1 - i));
+        newV[i] = v[v.length - 1 - i];
     };
     return newV;
 }
 
 export String Substring(this String v, int start, int length)
 {
-    String newV = CreateString(Min(v.Length(), start + length));
-    for (int i = start; i < Min(v.Length(), start + length); i++)
+    String newV = new String(Min(v.length, start + length));
+    for (int i = start; i < Min(v.length, start + length); i++)
     {
-        newV.Set(i - start, v.At(i));
+        newV[i - start] = v[i];
     };
     return newV;
 }
 
 export int ParseInt(String v)
 {
-    bool IsNegative = (v.At(0) == '-');
+    bool IsNegative = (v[0] == '-');
     String parsing = v;
     if (IsNegative) { parsing = parsing.Substring(1); };
     parsing = parsing.Reverse();
     int result = 0;
-    for (int i = 0; i < parsing.Length(); i++)
+    for (int i = 0; i < parsing.length; i++)
     {
-        char digit = parsing.At(i);
+        char digit = parsing[i];
         result += (Pow(10, i) * ParseDigit(digit));
     };
     if (IsNegative)
@@ -309,14 +336,14 @@ export int ParseInt(String v)
 
 export byte ParseByte(String v)
 {
-    bool IsNegative = (v.At(0) == '-');
+    bool IsNegative = (v[0] == '-');
     String parsing = v;
     if (IsNegative) { parsing = parsing.Substring(1); };
     parsing = parsing.Reverse();
     int result = 0;
-    for (int i = 0; i < parsing.Length(); i++)
+    for (int i = 0; i < parsing.length; i++)
     {
-        char digit = parsing.At(i);
+        char digit = parsing[i];
         result += (Pow(10, i) * ParseDigit(digit));
     };
     if (IsNegative)
@@ -347,49 +374,49 @@ export int ToInt(this float v);
 [Define("string")]
 class String
 {
-    private int pointer;
-    private int length;
-
-    export int Length() { return this.length; }
+    int length;
 
     export constructor(int length)
     {
-        String result = new String;
-        result.pointer = Alloc(length);
-        result.length = length;
-        for (int i = 0; i < length; i++)
+        int pointer = Alloc(sizeof(String) + length);
+
+        *pointer = length;
+
+        for (int offset; offset < length; offset++)
         {
-            *(result.pointer + i) = '\0';
+            *(pointer + sizeof(String) + offset) = '\0';
         };
-        return result;
+
+        return pointer as String;
     }
 
     export clone(String other)
     {
-        String result = new String(other.Length());
-        for (int i; i < other.Length(); i++)
+        String result = new String(other.length);
+        for (int i; i < other.length; i++)
         {
-            result.Set(i, other.At(i));
+            result[i] = other[i];
         };
         return result;
     }
 
     export String +(String a, String b)
     {
-        int al = a.Length();
-        int bl = b.Length();
+        int al = a.length;
+        int bl = b.length;
 
         int lengthSum = al + bl;
-        String result = CreateString(lengthSum);
+
+        String result = new String(lengthSum);
   
         for (int i; i < al; i++)
         {
-            result.Set(i, a.At(i));
+            result[i] = a[i];
         };
   
         for (int i; i < bl; i++)
         {
-            result.Set(al + i, b.At(i));
+            result[al + i] = b[i];
         };
 
         delete a;
@@ -397,46 +424,63 @@ class String
 
         return result;
     }
-
-    export char At(int index)
+    
+    export String +(String a, int b)
     {
-        if (index < 0 || index >= this.length)
-        { throw "Index out of range exception"; };
-        return *(this.pointer + index);
+        return a + b.ToString();
     }
+    
+    export String +(int a, String b)
+    {
+        return a.ToString() + b;
+    }
+    
+    export bool ==(String a, String b)
+    {
+        int length = a.length;
 
-    export void Set(int index, char element)
+        if (length != b.length) { return false; };
+
+        for (int i = 0; i < length; i++)
+        {
+            char _a = a[i];
+            char _b = b[i];
+            
+            if (_a != _b)
+            {
+                return false;
+            };
+        };
+
+        return true;
+    }
+    
+    export char indexer_get(int index)
     {
         if (index < 0 || index >= this.length)
         { throw "Index out of range exception"; };
-        *(this.pointer + index) = element;
+        return *((&this) + sizeof(String) + index);
+    }
+    
+    export void indexer_set(int index, char element)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        *((&this) + sizeof(String) + index) = element;
     }
 
     export destructor()
     {
-        delete this.pointer;
         delete &this;
     }
 }
 
-export String CreateString(int length)
-{
-    String result = new String;
-    result.pointer = Alloc(length);
-    result.length = length;
-    for (int i = 0; i < length; i++)
-    {
-        *(result.pointer + i) = '\0';
-    };
-    return result;
-}
-
 export void CopyString(String from, String to)
 {
-    int newLength = Min(from.Length(), to.Length());
+    int newLength = Min(from.length, to.length);
     for (int i; i < newLength; i++)
     {
-        to.Set(i, from.At(i));
+        to[i] = from[i];
     };
 }
 

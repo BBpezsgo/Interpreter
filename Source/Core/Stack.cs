@@ -35,11 +35,17 @@ namespace ProgrammingLanguage.Core
         { foreach (T item in list) Push(item); }
 
         /// <returns>The last item</returns>
-        public virtual T Last() => this.stack.Last();
+        public virtual T Last => this.stack[^1];
 
         public virtual T[] ToArray() => this.stack.ToArray();
 
         public virtual T this[int i]
+        {
+            get => this.stack[i];
+            set => this.stack[i] = value;
+        }
+
+        public virtual T this[System.Index i]
         {
             get => this.stack[i];
             set => this.stack[i] = value;
@@ -77,7 +83,7 @@ namespace ProgrammingLanguage.Core
 
     public interface IReadOnlyStack<T> : IReadOnlyCollection<T>, IReadOnlyList<T>
     {
-        public T Last();
+        public T Last { get; }
 
         public T[] ToArray();
     }

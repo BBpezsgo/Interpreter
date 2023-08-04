@@ -22,7 +22,21 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int removed = GeneratedCode.RemoveInstruction(index, indexes);
 
             for (int j = 0; j < this.FunctionThings.Length; j++)
-            { this.FunctionThings.GetDefinition<IFunctionThing, IFunctionThing>(this.FunctionThings.ElementAt(j)).InstructionOffset = indexes[j]; }
+            {
+                bool found = false;
+                foreach (IFunctionThing element in this.FunctionThings)
+                {
+                    if (element == null) continue;
+                    if (element.IsSame(this.FunctionThings.ElementAt(j)))
+                    {
+                        element.InstructionOffset = indexes[j];
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                { throw new KeyNotFoundException($"Key {this.FunctionThings.ElementAt(j)} not found in list {this.FunctionThings}"); }
+            }
 
             return removed;
         }

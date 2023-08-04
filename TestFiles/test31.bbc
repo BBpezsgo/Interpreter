@@ -1,0 +1,24 @@
+int Heh(int a, int b)
+{
+	int v0 = 55;
+	int v1 = 45;
+	int i = a;
+	if (a >= b)
+	{
+		return 69;
+	};
+
+	for (int i = a; i <= b; i++)
+	{
+		if (i == b)
+		{
+			return i;
+		};
+	};
+
+	int v2 = 43;
+	return 69;
+}
+
+int res = Heh(5, 7);
+*Alloc(1) = res;

@@ -4,8 +4,6 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode
 {
-    using ProgrammingLanguage.BBCode.Analysis;
-    using ProgrammingLanguage.BBCode.Compiler;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
     using ProgrammingLanguage.Tokenizer;
@@ -85,11 +83,16 @@ namespace ProgrammingLanguage.BBCode
 
         public string Content;
 
+        bool isAnonymous;
+
+        public bool IsAnonymous => isAnonymous;
+
         public Token()
         {
             TokenType = TokenType.WHITESPACE;
             AnalysedType = TokenAnalysedType.None;
             Content = "";
+            isAnonymous = false;
         }
 
         public Token Clone() => new()
@@ -101,6 +104,8 @@ namespace ProgrammingLanguage.BBCode
             AnalysedType = AnalysedType,
 
             Content = Content,
+
+            isAnonymous = isAnonymous,
         };
         public override string ToString() => Content;
 
@@ -111,10 +116,11 @@ namespace ProgrammingLanguage.BBCode
 
         public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new()
         {
-            AbsolutePosition = new Range<int>(0, 0),
-            Position = new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)),
+            AbsolutePosition = Core.Position.UnknownPosition.AbsolutePosition,
+            Position = Core.Position.UnknownPosition.Range,
             TokenType = type,
             Content = content,
+            isAnonymous = true,
         };
 
         public override bool Equals(object obj) => obj is Token other && Equals(other);
@@ -124,7 +130,8 @@ namespace ProgrammingLanguage.BBCode
             Position.Equals(other.Position) &&
             AbsolutePosition.Equals(other.AbsolutePosition) &&
             TokenType == other.TokenType &&
-            Content == other.Content;
+            Content == other.Content &&
+            isAnonymous == other.isAnonymous;
 
         public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
 
@@ -826,7 +833,7 @@ namespace ProgrammingLanguage.BBCode
                     continue;
                 }
 
-                var lastToken = result.Last();
+                var lastToken = result[^1];
 
                 if (token.TokenType == TokenType.WHITESPACE && lastToken.TokenType == TokenType.WHITESPACE)
                 {

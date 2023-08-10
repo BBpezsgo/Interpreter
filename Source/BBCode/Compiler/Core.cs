@@ -39,7 +39,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             for (int instructionIndex = 0; instructionIndex < self.Count; instructionIndex++)
             {
                 Instruction instruction = self[instructionIndex];
-                if (instruction.opcode == Opcode.CALL || instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
+                if (instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
                     if (instruction.Parameter.type == RuntimeType.INT)
                     {
@@ -1233,7 +1233,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         readonly int currentParamsSize;
 
         public int Index => index;
-        public int RealIndex => (-1) - (currentParamsSize + 1 - index);
+        public int RealIndex => (-2) - (currentParamsSize + 1 - index);
 
         public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition)
         {

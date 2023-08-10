@@ -35,7 +35,11 @@ namespace ProgrammingLanguage.Core
         { foreach (T item in list) Push(item); }
 
         /// <returns>The last item</returns>
-        public virtual T Last => this.stack[^1];
+        public virtual T Last
+        {
+            get => this.stack[^1];
+            set => this.stack[^1] = value;
+        }
 
         public virtual T[] ToArray() => this.stack.ToArray();
 

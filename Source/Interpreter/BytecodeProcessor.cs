@@ -2,10 +2,9 @@
 
 namespace ProgrammingLanguage.Bytecode
 {
+    using System;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
-
-    using System;
 
     internal class BytecodeProcessor
     {
@@ -28,20 +27,13 @@ namespace ProgrammingLanguage.Bytecode
             Memory = new(heapSize, code);
         }
 
-        /// <summary>
-        /// Returns the program size
-        /// </summary>
-        public int End() => Memory.Code.Length;
-
         public void Step() => Step(1);
         public void Step(int num) => CodePointer += num;
 
         public void Destroy()
         {
             Memory.Stack.Destroy();
-            Memory.ReturnAddressStack.Clear();
             Memory.Stack = null;
-            Memory.ReturnAddressStack = null;
             this.BuiltinFunctions = null;
         }
 
@@ -67,8 +59,6 @@ namespace ProgrammingLanguage.Bytecode
 
                 case Opcode.JUMP_BY_IF_FALSE: return JUMP_BY_IF_FALSE();
                 case Opcode.JUMP_BY: return JUMP_BY();
-                case Opcode.CALL: return CALL();
-                case Opcode.RETURN: return RETURN();
                 case Opcode.THROW: return THROW();
 
                 case Opcode.CALL_BUILTIN: return CALL_BUILTIN();
@@ -104,6 +94,9 @@ namespace ProgrammingLanguage.Bytecode
                 case Opcode.CS_POP: return CS_POP();
 
                 case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
+                case Opcode.SET_BASEPOINTER: return SET_BASEPOINTER();
+
+                case Opcode.SET_CODEPOINTER: return SET_CODEPOINTER();
 
                 case Opcode.TYPE_GET: return TYPE_GET();
                 case Opcode.TYPE_SET: return TYPE_SET();
@@ -197,27 +190,6 @@ namespace ProgrammingLanguage.Bytecode
             { value = Memory.Heap.GetStringByPointer(throwValue.ValueInt); }
             catch (System.Exception) { }
             throw new UserException("User Exception Thrown", value);
-        }
-
-        int RETURN()
-        {
-            int returnAddress = Memory.ReturnAddressStack.Pop();
-            BasePointer = Memory.Stack.Pop().ValueInt;
-            CodePointer = returnAddress;
-
-            return 3;
-        }
-
-        int CALL()
-        {
-            int relativeAddress = GetAddress();
-
-            Memory.Stack.Push(new DataItem(BasePointer, "saved base pointer"));
-            Memory.ReturnAddressStack.Push(CodePointer + 1);
-            BasePointer = Memory.Stack.Count;
-            Step(relativeAddress);
-
-            return 4;
         }
 
         int JUMP_BY()
@@ -550,6 +522,32 @@ namespace ProgrammingLanguage.Bytecode
             return 1;
         }
 
+        int SET_BASEPOINTER()
+        {
+            BasePointer = CurrentInstruction.AddressingMode switch
+            {
+                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+                AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
+                AddressingMode.RELATIVE => Memory.Stack.Count,
+                _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_BASEPOINTER}"),
+            };
+
+            Step();
+            return 1;
+        }
+
+        int SET_CODEPOINTER()
+        {
+            CodePointer = CurrentInstruction.AddressingMode switch
+            {
+                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+                AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
+                _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_CODEPOINTER}"),
+            };
+
+            return 1;
+        }
+
         int TYPE_SET()
         {
             RuntimeType targetType = (RuntimeType)(Memory.Stack.Pop().Byte ?? throw new RuntimeException($"Expected byte as target type"));
@@ -675,7 +673,6 @@ namespace ProgrammingLanguage.Bytecode
     {
         internal DataStack Stack;
         internal HEAP Heap;
-        internal Stack<int> ReturnAddressStack;
         internal Instruction[] Code;
         internal Stack<string> CallStack;
 
@@ -687,7 +684,6 @@ namespace ProgrammingLanguage.Bytecode
             Heap = new HEAP(heapSize);
 
             CallStack = new Stack<string>();
-            ReturnAddressStack = new Stack<int>();
         }
     }
 }

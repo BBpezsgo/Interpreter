@@ -286,7 +286,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             {
                 if (PrevStatement == null)
                 { return Parameters.ToArray(); }
-                var newList = new List<StatementWithValue>(Parameters.ToArray());
+                List<StatementWithValue> newList = new(Parameters);
                 newList.Insert(0, PrevStatement);
                 return newList.ToArray();
             }

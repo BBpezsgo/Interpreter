@@ -111,34 +111,6 @@
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
-        ///     <c><see cref="int"/> relative address</c> (optional)<br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     <c>"saved base pointer"</c>
-        /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
-        /// </para>
-        /// </summary>
-        CALL,
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        ///     <c><see cref="int"/> saved base address</c><br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
-        /// </para>
-        /// </summary>
-        RETURN,
-
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
         ///     <c>parameters</c> (as much as needed)<br/>
         ///     <c><see cref="int"/> function name length</c><br/>
         ///     <c><see cref="int"/> function name address</c><br/>
@@ -161,6 +133,74 @@
         /// </para>
         /// </summary>
         GET_BASEPOINTER,
+
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c><see cref="int"/> value</c> (optional)<br/>
+        /// </para><br/><br/>
+        /// <para><br/><br/>
+        ///     <see cref="AddressingMode"/>s:
+        ///     <list type="table">
+        ///         <item>
+        ///             <term>
+        ///                 <see cref="AddressingMode.RUNTIME"/>
+        ///             </term>
+        ///             <description>
+        ///                 Pops an element from the stack and uses it as a new value
+        ///             </description>
+        ///         </item>
+        ///         <item>
+        ///             <term>
+        ///                 <see cref="AddressingMode.ABSOLUTE"/>
+        ///             </term>
+        ///             <description>
+        ///                 Uses the instruction's parameter as a new value
+        ///             </description>
+        ///         </item>
+        ///         <item>
+        ///             <term>
+        ///                 <see cref="AddressingMode.RELATIVE"/>
+        ///             </term>
+        ///             <description>
+        ///                 Uses the stack's size as a new value
+        ///             </description>
+        ///         </item>
+        ///     </list>
+        /// </para>
+        /// </summary>
+        SET_BASEPOINTER,
+
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c><see cref="int"/> value</c> (optional)<br/>
+        /// </para><br/><br/>
+        /// <para><br/><br/>
+        ///     <see cref="AddressingMode"/>s:
+        ///     <list type="table">
+        ///         <item>
+        ///             <term>
+        ///                 <see cref="AddressingMode.RUNTIME"/>
+        ///             </term>
+        ///             <description>
+        ///                 Pops an element from the stack and uses it as a new value
+        ///             </description>
+        ///         </item>
+        ///         <item>
+        ///             <term>
+        ///                 <see cref="AddressingMode.ABSOLUTE"/>
+        ///             </term>
+        ///             <description>
+        ///                 Uses the instruction's parameter as a new value
+        ///             </description>
+        ///         </item>
+        ///     </list>
+        /// </para>
+        /// </summary>
+        SET_CODEPOINTER,
 
         /// <summary>
         /// <para>

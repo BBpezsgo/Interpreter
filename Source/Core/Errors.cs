@@ -3,11 +3,8 @@ using System.Runtime.Serialization;
 
 namespace ProgrammingLanguage.Errors
 {
-    using Core;
-
     using System.Collections.Generic;
-
-    using Tokenizer;
+    using Core;
 
     #region Exception
 
@@ -24,21 +21,18 @@ namespace ProgrammingLanguage.Errors
                 {
                     return Message;
                 }
-                else if (Position.Start.Character == -1)
+
+                if (Position.Start.Character == -1)
                 {
-                    return $"{Message} at line {Position.Start.Character} {InnerException}";
+                    return $"{Message} (at line {Position.Start.Character}) {InnerException}";
                 }
-                else
-                {
-                    return $"{Message} at line {Position.Start.Line} at col {Position.Start.Character} {InnerException}";
-                }
+
+                return $"{Message} (at line {Position.Start.Line} and column {Position.Start.Character}) {InnerException}";
             }
         }
 
         readonly Position position;
 
-        protected Exception(string message, IThingWithPosition position, string file) : this(message, position.GetPosition(), file)
-        { }
         protected Exception(string message, Position position, string file) : base(message)
         {
             this.position = position;

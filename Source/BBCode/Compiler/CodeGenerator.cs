@@ -45,6 +45,34 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
     public class CodeGenerator : CodeGeneratorBase
     {
+        /*
+         *      
+         *      === Stack Structure ===
+         *      
+         *        -- ENTRY --
+         *      
+         *        ? ... pointers ... (builtin function cache) > BuiltinFunctionCache.Count
+         *      
+         *        ? ... variables ... (global variables)
+         *        
+         *        -- CALL --
+         *      
+         *   -5    return value
+         *      
+         *   -4    ? parameter "this"    \ ParametersSize()
+         *   -3    ? ... parameters ...  /
+         *      
+         *   -2    saved code pointer
+         *   -1    saved base pointer
+         *   
+         *   >> 
+         *   
+         *   0    return flag
+         *   
+         *   1    ? ... variables ... (locals)
+         *   
+         */
+
         #region Fields
 
         Stack<CleanupItem> CleanupStack;
@@ -66,7 +94,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         bool AddCommentsToCode = true;
         readonly bool TrimUnreachableCode = true;
         bool GenerateDebugInstructions = true;
-        int ReturnFlagOffset = -1;
+        bool CanReturn;
 
         List<Information> Informations;
         public List<Hint> Hints;
@@ -75,11 +103,101 @@ namespace ProgrammingLanguage.BBCode.Compiler
         List<KeyValuePair<string, CompiledVariable>> compiledVariables;
         List<CompiledParameter> parameters;
 
+        /// <summary>
+        /// Used for keep track of local (after base pointer) tag count that are not variables.
+        /// <br/>
+        /// ie.:
+        /// <br/>
+        /// <c>Return Flag</c>
+        /// </summary>
+        Stack<int> TagCount;
+
         #endregion
 
         public CodeGenerator() : base() { }
 
         #region Helper Functions
+
+        int CallRuntime(CompiledVariable address)
+        {
+            if (address.Type != Type.INT)
+            { throw new CompilerException($"This should be an integer", Position.UnknownPosition, CurrentFile); }
+
+            int returnToValueInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(0, "saved code pointer"));
+
+            AddInstruction(Opcode.GET_BASEPOINTER);
+            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
+
+            if (address.IsStoredInHEAP)
+            { AddInstruction(Opcode.HEAP_GET, AddressingMode.ABSOLUTE, address.MemoryAddress); }
+            else
+            { LoadFromStack(address.MemoryAddress, address.Type.Size, !address.IsGlobal); }
+
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
+
+            AddInstruction(Opcode.MATH_SUB);
+
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE);
+
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
+
+            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count, "saved code pointer");
+
+            return jumpInstruction;
+        }
+
+        int CallRuntime(StatementWithValue address)
+        {
+            if (FindStatementType(address) != Type.INT)
+            { throw new CompilerException($"This should be an integer", address, CurrentFile); }
+
+            int returnToValueInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(0, "saved code pointer"));
+
+            AddInstruction(Opcode.GET_BASEPOINTER);
+            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
+
+            GenerateCodeForStatement(address);
+
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
+
+            AddInstruction(Opcode.MATH_SUB);
+
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE);
+
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
+
+            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count, "saved code pointer");
+
+            return jumpInstruction;
+        }
+
+        int Call(int absoluteAddress)
+        {
+            int returnToValueInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(0, "saved code pointer"));
+
+            AddInstruction(Opcode.GET_BASEPOINTER);
+            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
+
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE);
+
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.ABSOLUTE, absoluteAddress - GeneratedCode.Count);
+
+            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count, "saved code pointer");
+
+            return jumpInstruction;
+        }
+
+        void Return()
+        {
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.RUNTIME);
+        }
 
         protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
         {
@@ -206,25 +324,28 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return 1;
         }
 
-        int ParameterSizeSum()
+        int ParametersSize()
         {
             int sum = 0;
+
             for (int i = 0; i < parameters.Count; i++)
             {
-                if (parameters[i].Type.IsClass) sum++;
-                else sum += parameters[i].Type.Size;
+                sum += parameters[i].Type.SizeOnStack;
             }
+
             return sum;
         }
-        int ParameterSizeSum(int beforeThis)
+        int ParametersSize(int beforeThis)
         {
             int sum = 0;
+
             for (int i = 0; i < parameters.Count; i++)
             {
                 if (parameters[i].Index < beforeThis) continue;
-                if (parameters[i].Type.IsClass) sum++;
-                else sum += parameters[i].Type.Size;
+
+                sum += parameters[i].Type.SizeOnStack;
             }
+
             return sum;
         }
 
@@ -316,7 +437,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     CompiledType returnValueType = FindStatementType(returnValue);
 
                     GenerateCodeForStatement(returnValue);
-                    int offset = GetReturnValueAddress();
+                    int offset = ReturnValueOffset;
 
                     for (int i = 0; i < returnValueType.SizeOnStack; i++)
                     { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset - i); }
@@ -326,7 +447,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddComment(" .:");
 
-                if (ReturnFlagOffset != -1)
+                if (CanReturn)
                 {
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(true, "RETURN_FLAG"), "RETURN_FLAG");
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, ReturnFlagOffset);
@@ -435,10 +556,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     AddComment(" .:");
 
-                    if (destructor.InstructionOffset == -1)
-                    { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                    int jumpInstruction = Call(destructor.InstructionOffset);
 
-                    AddInstruction(Opcode.CALL, destructor.InstructionOffset - GeneratedCode.Count);
+                    if (destructor.InstructionOffset == -1)
+                    { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
                     AddComment(" Clear Param:");
 
@@ -490,11 +611,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddComment(" .:");
 
+                int jumpInstruction = Call(cloner.InstructionOffset);
+
                 if (cloner.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
-
-                AddInstruction(Opcode.CALL, cloner.InstructionOffset - GeneratedCode.Count);
-
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
 
@@ -627,10 +747,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddComment(" .:");
 
-                if (function.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, keywordCall, this.parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                int jumpInstruction = Call(function.InstructionOffset);
 
-                AddInstruction(Opcode.CALL, function.InstructionOffset - GeneratedCode.Count);
+                if (function.InstructionOffset == -1)
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, this.parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
 
@@ -707,14 +827,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
-            AddComment($"Call {compiledFunction.ReadableID()} {{");
-
             functionCall.Identifier = functionCall.Identifier.Function(compiledFunction);
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
                 Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
-                AddComment("}");
                 return;
             }
 
@@ -723,6 +840,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+
+            if (compiledFunction.IsMacro)
+            {
+                Warnings.Add(new Warning($"I can not inline macros becouse of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile));
+                // InlineMacro(compiledFunction, functionCall.MethodParameters, functionCall.SaveValue);
+                // return;
+            }
+
+            AddComment($"Call {compiledFunction.ReadableID()} {{");
 
             if (compiledFunction.IsBuiltin)
             {
@@ -863,10 +989,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment(" .:");
 
-            if (compiledFunction.InstructionOffset == -1)
-            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+            int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
-            AddInstruction(Opcode.CALL, compiledFunction.InstructionOffset - GeneratedCode.Count);
+            if (compiledFunction.InstructionOffset == -1)
+            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -1064,16 +1190,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment(" .:");
 
-            if (compiledVariable.IsStoredInHEAP)
-            { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, compiledVariable.MemoryAddress); }
-            else
-            { LoadFromStack(compiledVariable.MemoryAddress, compiledVariable.Type.Size, !compiledVariable.IsGlobal); }
-
-            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
-
-            AddInstruction(Opcode.MATH_SUB);
-
-            AddInstruction(Opcode.CALL, AddressingMode.RUNTIME);
+            CallRuntime(compiledVariable);
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -1239,10 +1356,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddComment(" .:");
 
-                if (operatorDefinition.InstructionOffset == -1)
-                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(GeneratedCode.Count, @operator, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
-                AddInstruction(Opcode.CALL, operatorDefinition.InstructionOffset - GeneratedCode.Count);
+                if (operatorDefinition.InstructionOffset == -1)
+                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(jumpInstruction, @operator, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
                 for (int i = 0; i < paramsSize; i++)
@@ -1694,10 +1811,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment(" .:");
 
-            if (constructor.InstructionOffset == -1)
-            { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(GeneratedCode.Count, constructorCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+            int jumpInstruction = Call(constructor.InstructionOffset);
 
-            AddInstruction(Opcode.CALL, constructor.InstructionOffset - GeneratedCode.Count);
+            if (constructor.InstructionOffset == -1)
+            { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, constructorCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -2187,6 +2304,107 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
+        #region Macro Things
+
+        void InlineMacro(CompiledFunction macro, StatementWithValue[] parameters, bool saveValue)
+        {
+            if (Constants.Keywords.Contains(macro.Identifier.Content))
+            { throw new CompilerException($"The identifier \"{macro.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", macro.Identifier, macro.FilePath); }
+
+            AddComment($"Inline {macro.ReadableID()} {{");
+
+            int returnValueSize = 0;
+            if (macro.ReturnSomething)
+            { returnValueSize = GenerateInitialValue(macro.Type, "returnvalue"); }
+
+            int paramsSize = 0;
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                StatementWithValue param = parameters[i];
+                string paramName = macro.Parameters[i].Identifier.Content;
+                CompiledType paramType = macro.ParameterTypes[i];
+
+                AddComment($" Param {i}:");
+                GenerateCodeForStatement(param);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + paramName);
+
+                paramsSize += paramType.SizeOnStack;
+            }
+
+            AddComment(" .:");
+
+            macro.Identifier.AnalysedType = TokenAnalysedType.FunctionName;
+
+            (
+                CompiledParameter[] Parameters,
+                KeyValuePair<string, CompiledVariable>[] Locals,
+                int[] ReturnInstructions,
+                string CurrentFile
+            ) savedThings =
+            (
+                this.parameters.ToArray(),
+                compiledVariables.ToArray(),
+                ReturnInstructions.ToArray(),
+                CurrentFile
+            );
+
+            this.parameters.Clear();
+            RemoveLocalVariables();
+            ReturnInstructions.Clear();
+
+            CompileParameters(macro.Parameters);
+
+            CurrentFile = macro.FilePath;
+
+            AddInstruction(Opcode.CS_PUSH, $"macro_{macro.ReadableID()};{CurrentFile};{GeneratedCode.Count};{macro.Identifier.Position.Start.Line}");
+
+            CanReturn = true;
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(false, "RETURN_FLAG"), "RETURN_FLAG");
+
+            OnScopeEnter(macro.Block);
+
+            AddComment("Statements {");
+            for (int i = 0; i < macro.Statements.Length; i++)
+            { GenerateCodeForStatement(macro.Statements[i]); }
+            AddComment("}");
+
+            CurrentFile = null;
+
+            CanReturn = false;
+
+            OnScopeExit();
+
+            AddInstruction(Opcode.POP_VALUE, "Pop RETURN_TAG");
+
+            AddComment("Return");
+            AddInstruction(Opcode.CS_POP);
+
+            this.parameters.Clear();
+            RemoveLocalVariables();
+            ReturnInstructions.Clear();
+
+            this.parameters = new List<CompiledParameter>(savedThings.Parameters);
+            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>(savedThings.Locals);
+            ReturnInstructions = new List<int>(savedThings.ReturnInstructions);
+            CurrentFile = savedThings.CurrentFile;
+
+            AddComment($" Clear Params (size: {paramsSize}):");
+            for (int i = 0; i < paramsSize; i++)
+            { AddInstruction(Opcode.POP_VALUE); }
+
+            if (macro.ReturnSomething && !saveValue)
+            {
+                AddComment($" Clear Return Value (size: {returnValueSize}):");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.POP_VALUE); }
+            }
+
+            AddComment($"}}");
+        }
+
+        #endregion
+
         void OnScopeEnter(Block block)
         {
             AddComment("Scope enter");
@@ -2203,7 +2421,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CleanupVariables(CleanupStack.Pop());
 
-            if (ReturnFlagOffset != -1)
+            if (CanReturn)
             {
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, ReturnFlagOffset);
                 AddInstruction(Opcode.LOGIC_NOT);
@@ -2428,9 +2646,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
-        #region Adressing Helpers
+        #region Addressing Helpers
 
-        int GetReturnValueAddress() => 0 - (ParameterSizeSum() + 2);
+        const int TagsBeforeBasePointer = 2;
+
+        int ReturnValueOffset => -(ParametersSize() + 1 + TagsBeforeBasePointer);
+        const int ReturnFlagOffset = 0;
+        const int SavedBasePointerOffset = -1;
+        const int SavedCodePointerOffset = -2;
 
         /// <summary>
         /// Returns the variable's <b>memory address on the stack</b>
@@ -2549,11 +2772,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <summary>
         /// Returns the <paramref name="parameter"/>'s <b>memory address on the stack</b>
         /// </summary>
-        int GetDataAddress(CompiledParameter parameter) => 0 - (ParameterSizeSum(parameter.Index) + 1);
+        int GetDataAddress(CompiledParameter parameter) => -(ParametersSize(parameter.Index) + TagsBeforeBasePointer);
         /// <summary>
         /// Returns the <paramref name="parameter"/>'s offsetted <b>memory address on the stack</b>
         /// </summary>
-        int GetDataAddress(CompiledParameter parameter, int offset) => 0 - ((ParameterSizeSum(parameter.Index) - offset) + 1);
+        int GetDataAddress(CompiledParameter parameter, int offset) => -(ParametersSize(parameter.Index) - offset + TagsBeforeBasePointer);
         /// <summary>
         /// Returns the <paramref name="variable"/>'s <b>memory address on the stack</b>
         /// </summary>
@@ -2703,10 +2926,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
             }
 
+            int offset = TagCount.Last;
             if (isGlobal)
-            { compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(true) + BuiltinFunctionCache.Count, isGlobal)); }
+            { offset += VariablesSize + BuiltinFunctionCache.Count; }
             else
-            { compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, GetVariableSizesSum(false), isGlobal)); }
+            { offset += LocalVariablesSize; }
+
+            compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable, offset, isGlobal));
 
             AddComment($"Initial value {{");
 
@@ -2737,28 +2963,47 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return new CleanupItem(size, count);
         }
 
-        int GetVariableSizesSum(bool alsoGlobals)
+        int VariablesSize
         {
-            int sum = 0;
-            for (int i = 0; i < compiledVariables.Count; i++)
+            get
             {
-                var key = compiledVariables.ElementAt(i).Key;
-                if (compiledVariables.Get(key).IsGlobal && !alsoGlobals) continue;
-                if (compiledVariables.Get(key).Type.IsClass) sum++;
-                else sum += compiledVariables.Get(key).Type.Size;
+                int sum = 0;
+
+                for (int i = 0; i < compiledVariables.Count; i++)
+                {
+                    CompiledVariable variable = compiledVariables[i].Value;
+                    sum += variable.Type.SizeOnStack;
+                }
+
+                return sum;
             }
-            if (ReturnFlagOffset != -1)
-            { sum++; }
-            return sum;
+        }
+
+        int LocalVariablesSize
+        {
+            get
+            {
+                int sum = 0;
+
+                for (int i = 0; i < compiledVariables.Count; i++)
+                {
+                    CompiledVariable variable = compiledVariables[i].Value;
+
+                    if (variable.IsGlobal) continue;
+
+                    sum += variable.Type.SizeOnStack;
+                }
+
+                return sum;
+            }
         }
 
         void RemoveLocalVariables()
         {
             for (int i = compiledVariables.Count - 1; i >= 0; i--)
             {
-                var key = compiledVariables.ElementAt(i).Key;
-                if (compiledVariables.Get(key).IsGlobal) continue;
-                compiledVariables.Remove(key);
+                if (compiledVariables[i].Value.IsGlobal) continue;
+                compiledVariables.RemoveAt(i);
             }
         }
 
@@ -2788,6 +3033,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
             }
 
+            TagCount.Push(0);
+
             parameters.Clear();
             RemoveLocalVariables();
             ReturnInstructions.Clear();
@@ -2798,8 +3045,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
 
-            ReturnFlagOffset = GetVariableSizesSum(false);
+            CanReturn = true;
             AddInstruction(Opcode.PUSH_VALUE, new DataItem(false, "RETURN_FLAG"), "RETURN_FLAG");
+            TagCount.Last++;
 
             OnScopeEnter(function.Block);
 
@@ -2810,24 +3058,28 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CurrentFile = null;
 
-            ReturnFlagOffset = -1;
+            CanReturn = false;
 
             OnScopeExit();
 
             AddInstruction(Opcode.POP_VALUE, "Pop RETURN_TAG");
+            TagCount.Last--;
 
             AddComment("Return");
             AddInstruction(Opcode.CS_POP);
-            AddInstruction(Opcode.RETURN);
+            Return();
 
             parameters.Clear();
             RemoveLocalVariables();
             ReturnInstructions.Clear();
+
+            TagCount.Pop();
         }
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
             CurrentFile = null;
+            TagCount.Push(0);
 
             AddComment("Variables");
             CleanupStack.Push(GenerateCodeForVariable(statements, true));
@@ -2841,6 +3093,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             ReturnInstructions.Clear();
 
             CleanupVariables(CleanupStack.Pop());
+
+            TagCount.Pop();
         }
 
         void CompileParameters(ParameterDefinition[] parameters)
@@ -2904,6 +3158,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
+        CompiledFunction GetCodeEntry()
+        {
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                for (int j = 0; j < function.Attributes.Length; j++)
+                {
+                    if (function.Attributes[j].Identifier.Content != "CodeEntry") continue;
+
+                    if (function.IsTemplate)
+                    { throw new CompilerException($"Code entry can not be a template function", function.TemplateInfo, function.FilePath); }
+
+                    return function;
+                }
+            }
+
+            return null;
+        }
+
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
@@ -2923,6 +3197,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.UndefinedFunctionOffsets = new();
             this.UndefinedOperatorFunctionOffsets = new();
             this.UndefinedGeneralFunctionOffsets = new();
+
+            this.TagCount = new();
 
             this.compiledVariables = new();
             this.parameters = new();
@@ -2947,6 +3223,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     printCallback,
                     level
                     );
+
+            var codeEntry = GetCodeEntry();
 
             List<string> UsedBuiltinFunctions = new();
 
@@ -2995,8 +3273,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
-            int entryCallInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.CALL, -1);
+            int entryCallInstruction = -1;
+            if (codeEntry != null)
+            { entryCallInstruction = Call(-1); }
 
             if (BuiltinFunctionCache.Count > 0)
             {
@@ -3029,6 +3308,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.Statements.Length > 0) AddComment("}");
                 CurrentContext = null;
             }
+
+            if (codeEntry != null && GeneratedCode[entryCallInstruction].ParameterInt == -1)
+            { throw new InternalException($"Failed to set code entry call instruction's parameter", CurrentFile); }
 
             foreach (var function in this.CompiledOperators)
             {
@@ -3117,9 +3399,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CurrentContext = null;
                 TypeArguments.Clear();
             }
-
-            if (GeneratedCode[entryCallInstruction].ParameterInt == -1)
-            { GeneratedCode[entryCallInstruction] = new Instruction(Opcode.COMMENT); }
 
             foreach (UndefinedFunctionOffset item in UndefinedFunctionOffsets)
             {

@@ -147,7 +147,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition.Attribute[] Attributes;
     }
 
-    public class TemplateInfo
+    public class TemplateInfo : IThingWithPosition
     {
         public Token Keyword;
         public Token LeftP;
@@ -161,6 +161,13 @@ namespace ProgrammingLanguage.BBCode.Parser
             Dictionary<string, Token> result = new();
             for (int i = 0; i < TypeParameters.Length; i++)
             { result.Add(TypeParameters[i].Content, TypeParameters[i]); }
+            return result;
+        }
+
+        public Position GetPosition()
+        {
+            Position result = new(TypeParameters);
+            result.Extend(Keyword, LeftP, RightP);
             return result;
         }
 
@@ -196,6 +203,8 @@ namespace ProgrammingLanguage.BBCode.Parser
         public int ParameterCount => Parameters.Length;
 
         public bool IsExport => Modifiers.Contains("export");
+
+        public bool IsMacro => Modifiers.Contains("macro");
 
         public string FilePath { get; set; }
 

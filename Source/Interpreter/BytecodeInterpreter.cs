@@ -28,7 +28,7 @@ namespace ProgrammingLanguage.Bytecode
     public struct Context
     {
         public string[] RawCallStack;
-        public CallStackFrame[] CallStack
+        public readonly CallStackFrame[] CallStack
         {
             get
             {
@@ -171,7 +171,8 @@ namespace ProgrammingLanguage.Bytecode
             BytecodeProcessor.Memory.Stack.PushRange(userInvoke.Arguments, "arg");
 
             BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "saved base pointer"));
-            BytecodeProcessor.Memory.ReturnAddressStack.Push(BytecodeProcessor.End());
+            BytecodeProcessor.Memory.Stack.Push(new DataItem(BytecodeProcessor.Memory.Code.Length, "saved code pointer"));
+
             BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
         }
 

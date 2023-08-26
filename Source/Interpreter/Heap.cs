@@ -44,9 +44,9 @@ namespace ProgrammingLanguage.Bytecode
             string result = "";
             for (int i = start; i < end; i++)
             {
-                if (this[i].type != RuntimeType.CHAR)
+                if (this[i].Type != RuntimeType.CHAR)
                 {
-                    throw new InternalException($"Unexpected data type {this[i].type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
+                    throw new InternalException($"Unexpected data type {this[i].Type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
                 }
                 result += this[i].ValueChar;
             }

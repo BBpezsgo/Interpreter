@@ -18,7 +18,7 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            var file = "donught.bbc";
+            string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -36,13 +36,13 @@ namespace TheProgram
                 // "-decompile",
                 // "-compile",
                 // "-debug",
-                // "-console-gui",
+                "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
                 // "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
-                $"\"{TestConstants.TestFilesPath}{file}\""
+                $"\"{path}\""
                 // $"\"{TestConstants.TestFilesPath}tester.bbct\""
             };
 #endif
@@ -61,7 +61,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.ConsoleGUI:
                     ConsoleGUI.ConsoleGUI gui = new()
                     {
-                        FilledElement = new ConsoleGUI.InterpreterElement($"{TestConstants.TestFilesPath}{file}", settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors)
+                        FilledElement = new ConsoleGUI.InterpreterElement(path, settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors, settings.Value.BasePath)
                     };
                     while (!gui.Destroyed)
                     { gui.Tick(); }

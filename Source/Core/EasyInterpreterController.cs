@@ -179,7 +179,7 @@ namespace ProgrammingLanguage.Core
                 else
                 {
                     string v;
-                    switch (heap[i].type)
+                    switch (heap[i].Type)
                     {
                         case RuntimeType.BYTE:
                             Console.ForegroundColor = ConsoleColor.Cyan;

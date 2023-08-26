@@ -51,7 +51,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
          *      
          *        -- ENTRY --
          *      
-         *        ? ... pointers ... (builtin function cache) > BuiltinFunctionCache.Count
+         *        ? ... pointers ... (external function cache) > ExternalFunctionsCache.Count
          *      
          *        ? ... variables ... (global variables)
          *        
@@ -77,8 +77,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         Stack<CleanupItem> CleanupStack;
 
-        Dictionary<string, BuiltinFunction> BuiltinFunctions;
-        Dictionary<string, int> BuiltinFunctionCache;
+        Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        Dictionary<string, int> ExternalFunctionsCache;
         IAmInContext<CompiledClass> CurrentContext;
 
         List<int> ReturnInstructions;
@@ -642,30 +642,30 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!GetOutputWriter(outType, out var function))
                 { throw new CompilerException($"No function found with attribute \"{"StandardOutput"}\" that satisfies keyword-call {keywordCall.ReadableID(FindStatementType)}", keywordCall, CurrentFile); }
 
-                if (function.IsBuiltin)
+                if (function.IsExternal)
                 {
-                    if (!BuiltinFunctions.TryGetValue(function.BuiltinName, out var builtinFunction))
+                    if (!ExternalFunctions.TryGetValue(function.ExternalFunctionName, out ExternalFunctionBase externalFunction))
                     {
-                        Errors.Add(new Error($"Builtin function \"{function.BuiltinName}\" not found", keywordCall.Identifier, CurrentFile));
+                        Errors.Add(new Error($"External function \"{function.ExternalFunctionName}\" not found", keywordCall.Identifier, CurrentFile));
                         AddComment("}");
                         return;
                     }
 
                     AddComment(" Function Name:");
-                    if (BuiltinFunctionCache.TryGetValue(function.BuiltinName, out int cacheAddress))
+                    if (ExternalFunctionsCache.TryGetValue(function.ExternalFunctionName, out int cacheAddress))
                     {
-                        if (function.BuiltinName.Length == 0)
-                        { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)function.Attributes.Get("Builtin"), function.FilePath); }
+                        if (function.ExternalFunctionName.Length == 0)
+                        { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)function.Attributes.Get("External"), function.FilePath); }
 
                         AddComment($" Param {0}:");
                         GenerateCodeForStatement(keywordCall.Parameters[0]);
-                        AddInstruction(Opcode.PUSH_VALUE, function.BuiltinName.Length, "ID Length");
+                        AddInstruction(Opcode.PUSH_VALUE, function.ExternalFunctionName.Length, "ID Length");
 
                         AddComment($" Load Function Name String Pointer (Cache):");
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
 
                         AddComment(" .:");
-                        AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                        AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                         if (function.ReturnSomething)
                         {
@@ -682,7 +682,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     }
                     else
                     {
-                        GenerateCodeForLiteralString(function.BuiltinName);
+                        GenerateCodeForLiteralString(function.ExternalFunctionName);
 
                         int offset = -1;
 
@@ -697,7 +697,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
 
                         AddComment(" .:");
-                        AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                        AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                         bool thereIsReturnValue = false;
                         if (function.ReturnSomething)
@@ -850,20 +850,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment($"Call {compiledFunction.ReadableID()} {{");
 
-            if (compiledFunction.IsBuiltin)
+            if (compiledFunction.IsExternal)
             {
-                if (!BuiltinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
+                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out var externalFunction))
                 {
-                    Errors.Add(new Error($"Builtin function \"{compiledFunction.BuiltinName}\" not found", functionCall.Identifier, CurrentFile));
+                    Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
                 AddComment(" Function Name:");
-                if (BuiltinFunctionCache.TryGetValue(compiledFunction.BuiltinName, out int cacheAddress))
+                if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
                 {
-                    if (compiledFunction.BuiltinName.Length == 0)
-                    { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Builtin"), compiledFunction.FilePath); }
+                    if (compiledFunction.ExternalFunctionName.Length == 0)
+                    { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
 
                     if (functionCall.PrevStatement != null)
                     {
@@ -875,13 +875,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         AddComment($" Param {i}:");
                         GenerateCodeForStatement(functionCall.Parameters[i]);
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName.Length, "ID Length");
+                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.ExternalFunctionName.Length, "ID Length");
 
                     AddComment($" Load Function Name String Pointer (Cache):");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
+                    AddInstruction(Opcode.PUSH_VALUE, cacheAddress + 1, "(pointer)");
 
                     AddComment(" .:");
-                    AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                     if (compiledFunction.ReturnSomething)
                     {
@@ -898,7 +898,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 else
                 {
-                    GenerateCodeForLiteralString(compiledFunction.BuiltinName);
+                    GenerateCodeForLiteralString(compiledFunction.ExternalFunctionName);
 
                     int offset = -1;
                     if (functionCall.PrevStatement != null)
@@ -920,7 +920,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
 
                     AddComment(" .:");
-                    AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                     bool thereIsReturnValue = false;
                     if (compiledFunction.ReturnSomething)
@@ -1037,20 +1037,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall.TotalPosition(), CurrentFile); }
 
-            if (compiledFunction.IsBuiltin)
+            if (compiledFunction.IsExternal)
             {
-                if (!BuiltinFunctions.TryGetValue(compiledFunction.BuiltinName, out var builtinFunction))
+                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out var externalFunction))
                 {
-                    Errors.Add(new Error($"Builtin function '{compiledFunction.BuiltinName}' not found", functionCall.Identifier, CurrentFile));
+                    Errors.Add(new Error($"External function '{compiledFunction.ExternalFunctionName}' not found", functionCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
                 AddComment(" Function Name:");
-                if (BuiltinFunctionCache.TryGetValue(compiledFunction.BuiltinName, out int cacheAddress))
+                if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
                 {
-                    if (compiledFunction.BuiltinName.Length == 0)
-                    { throw new CompilerException($"Builtin function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Builtin"), compiledFunction.FilePath); }
+                    if (compiledFunction.ExternalFunctionName.Length == 0)
+                    { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
 
                     if (functionCall.PrevStatement != null)
                     {
@@ -1062,13 +1062,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         AddComment($" Param {i}:");
                         GenerateCodeForStatement(functionCall.Parameters[i]);
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.BuiltinName.Length, "ID Length");
+                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.ExternalFunctionName.Length, "ID Length");
 
                     AddComment($" Load Function Name String Pointer (Cache):");
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
 
                     AddComment(" .:");
-                    AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                     if (compiledFunction.ReturnSomething)
                     {
@@ -1085,7 +1085,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 else
                 {
-                    GenerateCodeForLiteralString(compiledFunction.BuiltinName);
+                    GenerateCodeForLiteralString(compiledFunction.ExternalFunctionName);
 
                     int offset = -1;
                     if (functionCall.PrevStatement != null)
@@ -1107,7 +1107,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
 
                     AddComment(" .:");
-                    AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                     bool thereIsReturnValue = false;
                     if (compiledFunction.ReturnSomething)
@@ -1223,7 +1223,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     var predictedValue = predictedValueN.Value;
 
-                    switch (predictedValue.type)
+                    switch (predictedValue.Type)
                     {
                         case RuntimeType.BYTE:
                             {
@@ -1262,20 +1262,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (@operator.ParameterCount != operatorDefinition.ParameterCount)
                 { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ReadableID()}: requied {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator.TotalPosition(), CurrentFile); }
 
-                if (operatorDefinition.IsBuiltin)
+                if (operatorDefinition.IsExternal)
                 {
-                    if (!BuiltinFunctions.TryGetValue(operatorDefinition.BuiltinName, out var builtinFunction))
+                    if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase externalFunction))
                     {
-                        Errors.Add(new Error($"Builtin function \"{operatorDefinition.BuiltinName}\" not found", @operator.Operator, CurrentFile));
+                        Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
                         AddComment("}");
                         return;
                     }
 
                     AddComment(" Function Name:");
-                    if (BuiltinFunctionCache.TryGetValue(operatorDefinition.BuiltinName, out int cacheAddress))
+                    if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
                     { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress); }
                     else
-                    { GenerateCodeForLiteralString(operatorDefinition.BuiltinName); }
+                    { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
 
                     int offset = -1;
                     for (int i = 0; i < @operator.Parameters.Length; i++)
@@ -1289,7 +1289,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
 
                     AddComment(" .:");
-                    AddInstruction(Opcode.CALL_BUILTIN, builtinFunction.ParameterCount);
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
 
                     bool thereIsReturnValue = false;
                     if (!@operator.SaveValue)
@@ -2928,7 +2928,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             int offset = TagCount.Last;
             if (isGlobal)
-            { offset += VariablesSize + BuiltinFunctionCache.Count; }
+            { offset += VariablesSize + ExternalFunctionsCache.Count; }
             else
             { offset += LocalVariablesSize; }
 
@@ -3028,7 +3028,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 for (int i = 0; i < functionDefinition.Attributes.Length; i++)
                 {
-                    if (functionDefinition.Attributes[i].Identifier == "Builtin")
+                    if (functionDefinition.Attributes[i].Identifier == "External")
                     { return; }
                 }
             }
@@ -3187,8 +3187,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
             this.GeneratedCode = new();
-            this.BuiltinFunctions = compilerResult.BuiltinFunctions;
-            this.BuiltinFunctionCache = new();
+            this.ExternalFunctions = compilerResult.ExternalFunctions;
+            this.ExternalFunctionsCache = new();
             this.OptimizeCode = !settings.DontOptimize;
             this.GeneratedDebugInfo.Clear();
             this.CleanupStack = new();
@@ -3226,36 +3226,36 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             var codeEntry = GetCodeEntry();
 
-            List<string> UsedBuiltinFunctions = new();
+            List<string> UsedExternalFunctions = new();
 
             foreach (CompiledFunction function in this.CompiledFunctions)
             {
-                if (function.IsBuiltin)
-                { UsedBuiltinFunctions.Add(function.BuiltinName); }
+                if (function.IsExternal)
+                { UsedExternalFunctions.Add(function.ExternalFunctionName); }
             }
 
             foreach (CompiledOperator @operator in this.CompiledOperators)
             {
-                if (@operator.IsBuiltin)
-                { UsedBuiltinFunctions.Add(@operator.BuiltinName); }
+                if (@operator.IsExternal)
+                { UsedExternalFunctions.Add(@operator.ExternalFunctionName); }
             }
 
-            if (settings.BuiltinFunctionCache)
+            if (settings.ExternalFunctionsCache)
             {
-                AddComment($"Create builtin function cache {{");
-                foreach (string builtinFunction in UsedBuiltinFunctions)
+                AddComment($"Create external functions cache {{");
+                foreach (string function in UsedExternalFunctions)
                 {
-                    AddComment($"Create string \"{builtinFunction}\" {{");
+                    AddComment($"Create string \"{function}\" {{");
 
-                    AddInstruction(Opcode.PUSH_VALUE, builtinFunction.Length, $"\"{builtinFunction}\".Length");
+                    AddInstruction(Opcode.PUSH_VALUE, function.Length, $"\"{function}\".Length");
                     AddInstruction(Opcode.HEAP_ALLOC, $"(String pointer)");
 
-                    BuiltinFunctionCache.Add(builtinFunction, BuiltinFunctionCache.Count);
+                    ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count);
 
-                    for (int i = 0; i < builtinFunction.Length; i++)
+                    for (int i = 0; i < function.Length; i++)
                     {
                         // Prepare value
-                        AddInstruction(Opcode.PUSH_VALUE, builtinFunction[i]);
+                        AddInstruction(Opcode.PUSH_VALUE, function[i]);
 
                         // Calculate pointer
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
@@ -3277,10 +3277,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (codeEntry != null)
             { entryCallInstruction = Call(-1); }
 
-            if (BuiltinFunctionCache.Count > 0)
+            if (ExternalFunctionsCache.Count > 0)
             {
-                AddComment("Clear builtin function cache {");
-                for (int i = 0; i < BuiltinFunctionCache.Count; i++)
+                AddComment("Clear external functions cache {");
+                for (int i = 0; i < ExternalFunctionsCache.Count; i++)
                 {
                     AddInstruction(Opcode.HEAP_DEALLOC);
                 }

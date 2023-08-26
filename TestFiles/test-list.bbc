@@ -1,6 +1,6 @@
 ﻿using System;
 
-[Builtin("test")]
+[External("test")]
 void test();
 
 [CodeEntry]

@@ -208,9 +208,9 @@ namespace ProgrammingLanguage.Core
 
             public Dictionary<Kind, int> Offsets;
 
-            public int Get(Kind kind) => Offsets[kind];
-            public bool TryGet(Kind kind) => TryGet(kind, out _);
-            public bool TryGet(Kind kind, out int offset)
+            public readonly int Get(Kind kind) => Offsets[kind];
+            public readonly bool TryGet(Kind kind) => TryGet(kind, out _);
+            public readonly bool TryGet(Kind kind, out int offset)
             {
                 offset = -1;
                 if (Offsets.TryGetValue(kind, out int offset_))
@@ -246,11 +246,11 @@ namespace ProgrammingLanguage.Core
                 ElapsedMilliseconds = elapsedMilliseconds;
             }
 
-            public override string ToString() => $"Code executed in {ElapsedTime}";
-            public string ElapsedTime => ProgrammingLanguage.Utils.GetEllapsedTime(ElapsedMilliseconds);
+            public override readonly string ToString() => $"Code executed in {ElapsedTime}";
+            public readonly string ElapsedTime => ProgrammingLanguage.Utils.GetEllapsedTime(ElapsedMilliseconds);
         }
 
-        protected readonly Dictionary<string, BuiltinFunction> builtinFunctions = new();
+        protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
 
         protected InterpreterDetails details;
         public InterpreterDetails Details => details;
@@ -296,8 +296,8 @@ namespace ProgrammingLanguage.Core
         public virtual void ExecuteProgram(Instruction[] program, BytecodeInterpreterSettings settings)
         {
             CodeStartedTimespan = DateTime.Now.TimeOfDay;
-            BytecodeInterpreter = new BytecodeInterpreter(program, builtinFunctions, settings);
-            builtinFunctions.SetInterpreter(BytecodeInterpreter);
+            BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions, settings);
+            externalFunctions.SetInterpreter(BytecodeInterpreter);
 
             state = State.Initialized;
 
@@ -393,13 +393,13 @@ namespace ProgrammingLanguage.Core
         public Instruction[] CompileCode(
             FileInfo file,
             Compiler.CompilerSettings compilerSettings,
-            BBCode.Parser.ParserSettings parserSettings)
+            ParserSettings parserSettings)
         {
             OnOutput?.Invoke(this, $"Parse code: The main source code ...", LogType.Debug);
 
             CodeGenerator.Result codeGeneratorResult = EasyCompiler.Compile(
                 file,
-                builtinFunctions,
+                externalFunctions,
                 TokenizerSettings.Default,
                 parserSettings,
                 compilerSettings,
@@ -466,7 +466,7 @@ namespace ProgrammingLanguage.Core
         /// Initializes the compiler
         /// <list type="bullet">
         /// <item>It checks if any code is running</item>
-        /// <item>Adds built-in functions</item>
+        /// <item>Adds external functions</item>
         /// </list>
         /// </summary>
         /// <returns>
@@ -490,7 +490,7 @@ namespace ProgrammingLanguage.Core
                 Streams.Clear();
             }
 
-            AddBuiltins();
+            AddExternalFunctions();
 
             details = new InterpreterDetails(this);
 
@@ -635,7 +635,7 @@ namespace ProgrammingLanguage.Core
                 var methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
                 foreach (var method in methods)
                 {
-                    var newFunction = builtinFunctions.AddBuiltinFunction(method);
+                    var newFunction = externalFunctions.AddExternalFunction(method);
                     OnOutput?.Invoke(this, $" Added function {newFunction.ID}", LogType.Debug);
                     functionsAdded++;
                 }
@@ -644,11 +644,11 @@ namespace ProgrammingLanguage.Core
             OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", LogType.Debug);
         }
 
-        void AddBuiltins()
+        void AddExternalFunctions()
         {
             #region Console
 
-            builtinFunctions.AddManagedBuiltinFunction("stdin", Array.Empty<Type>(), (DataItem[] parameters, ManagedBuiltinFunction function) =>
+            externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<Type>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
             {
                 this.PauseCode = true;
                 this.ReturnValueConsumer = function;
@@ -663,13 +663,13 @@ namespace ProgrammingLanguage.Core
                 }
             });
 
-            builtinFunctions.AddBuiltinFunction("stdout",
+            externalFunctions.AddExternalFunction("stdout",
                 (char @char) =>
                 {
                     OnStdOut?.Invoke(this, @char.ToString());
                 });
 
-            builtinFunctions.AddBuiltinFunction("console-set",
+            externalFunctions.AddExternalFunction("console-set",
                 (char @char, int x, int y) =>
                 {
                     if (x < 0 || y < 0) return;
@@ -679,18 +679,18 @@ namespace ProgrammingLanguage.Core
                     Console.SetCursorPosition(lx, ly);
                 });
 
-            builtinFunctions.AddBuiltinFunction("console-clear", () =>
+            externalFunctions.AddExternalFunction("console-clear", () =>
             {
                 Console.Clear();
             });
 
-            builtinFunctions.AddBuiltinFunction("stderr",
+            externalFunctions.AddExternalFunction("stderr",
                 (char @char) =>
                 {
                     OnStdError?.Invoke(this, @char.ToString());
                 });
 
-            builtinFunctions.AddBuiltinFunction("sleep",
+            externalFunctions.AddExternalFunction("sleep",
                 (int t) =>
                 {
                     PauseCodeTime = t;
@@ -700,11 +700,11 @@ namespace ProgrammingLanguage.Core
 
             #region Math
 
-            builtinFunctions.AddBuiltinFunction("cos",
+            externalFunctions.AddExternalFunction("cos",
                 (float v) =>
                 { return MathF.Cos(v); });
 
-            builtinFunctions.AddBuiltinFunction("sin",
+            externalFunctions.AddExternalFunction("sin",
                 (float v) =>
                 { return MathF.Sin(v); });
 
@@ -712,7 +712,7 @@ namespace ProgrammingLanguage.Core
 
             #region Enviroment
 
-            builtinFunctions.AddBuiltinFunction("time", () =>
+            externalFunctions.AddExternalFunction("time", () =>
             {
                 throw new NotImplementedException();
             });
@@ -721,10 +721,10 @@ namespace ProgrammingLanguage.Core
 
             #region Casts
 
-            builtinFunctions.AddBuiltinFunction("float-to-int",
+            externalFunctions.AddExternalFunction("float-to-int",
                 (float @float) =>
                 { return (int)@float; });
-            builtinFunctions.AddBuiltinFunction("int-to-float",
+            externalFunctions.AddExternalFunction("int-to-float",
                 (int @int) =>
                 { return (float)@int; });
 
@@ -732,7 +732,7 @@ namespace ProgrammingLanguage.Core
 
             #region Streams
 
-            builtinFunctions.AddBuiltinFunction("stream-c",
+            externalFunctions.AddExternalFunction("stream-c",
                 (int bufferSize, int bufferMemoryAddress) =>
                 {
                     int newID = 1;
@@ -757,7 +757,7 @@ namespace ProgrammingLanguage.Core
 
                     return newID;
                 });
-            builtinFunctions.AddBuiltinFunction("stream-d",
+            externalFunctions.AddExternalFunction("stream-d",
                 (int id) =>
                 {
                     for (int i = Streams.Count - 1; i >= 0; i--)
@@ -773,7 +773,7 @@ namespace ProgrammingLanguage.Core
 
                     throw new RuntimeException($"Stream {id} not found");
                 });
-            builtinFunctions.AddBuiltinFunction("stream-f",
+            externalFunctions.AddExternalFunction("stream-f",
                 (int id, int count) =>
                 {
                     for (int i = 0; i < Streams.Count; i++)
@@ -796,7 +796,7 @@ namespace ProgrammingLanguage.Core
 
                     throw new RuntimeException($"Stream {id} not found");
                 });
-            builtinFunctions.AddBuiltinFunction("stream-l",
+            externalFunctions.AddExternalFunction("stream-l",
                 (int id) =>
                 {
                     for (int i = 0; i < Streams.Count; i++)
@@ -811,7 +811,7 @@ namespace ProgrammingLanguage.Core
 
                     throw new RuntimeException($"Stream {id} not found");
                 });
-            builtinFunctions.AddBuiltinFunction("stream-r",
+            externalFunctions.AddExternalFunction("stream-r",
                 (int id) =>
                 {
                     for (int i = 0; i < Streams.Count; i++)

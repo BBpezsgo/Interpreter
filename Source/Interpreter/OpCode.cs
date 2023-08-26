@@ -120,7 +120,7 @@
         ///     Inherits from external or <c>"return v"</c>
         /// </para>
         /// </summary>
-        CALL_BUILTIN,
+        CALL_EXTERNAL,
 
         /// <summary>
         /// <para>

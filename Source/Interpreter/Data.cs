@@ -2,6 +2,8 @@
 
 namespace ProgrammingLanguage.Bytecode
 {
+    using DataUtilities.ReadableFileFormat;
+    using DataUtilities.Serializer;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
 
@@ -14,11 +16,13 @@ namespace ProgrammingLanguage.Bytecode
     }
 
     [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
-    public struct DataItem
+    public struct DataItem : ISerializable<DataItem>, IFullySerializableText
     {
         public static DataItem Null => new() { };
 
-        public readonly RuntimeType type;
+        public readonly RuntimeType Type => type;
+
+        RuntimeType type;
 
         #region Value Fields
 
@@ -50,10 +54,10 @@ namespace ProgrammingLanguage.Bytecode
         {
             readonly get
             {
-                if (type == RuntimeType.BYTE)
+                if (Type == RuntimeType.BYTE)
                 { return valueByte ?? (byte)0; }
 
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to byte");
+                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to byte");
             }
             set
             {
@@ -65,10 +69,10 @@ namespace ProgrammingLanguage.Bytecode
         {
             readonly get
             {
-                if (type == RuntimeType.INT)
+                if (Type == RuntimeType.INT)
                 { return valueInt.Value; }
 
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to integer");
+                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to integer");
             }
             set
             {
@@ -80,11 +84,11 @@ namespace ProgrammingLanguage.Bytecode
         {
             readonly get
             {
-                if (type == RuntimeType.FLOAT)
+                if (Type == RuntimeType.FLOAT)
                 {
                     return valueFloat.Value;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to float");
+                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to float");
             }
             set
             {
@@ -96,15 +100,15 @@ namespace ProgrammingLanguage.Bytecode
         {
             readonly get
             {
-                if (type == RuntimeType.CHAR)
+                if (Type == RuntimeType.CHAR)
                 {
                     return valueChar.Value;
                 }
-                if (type == RuntimeType.INT)
+                if (Type == RuntimeType.INT)
                 {
                     return (char)valueInt.Value;
                 }
-                throw new RuntimeException("Can't cast " + type.ToString().ToLower() + " to char");
+                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to char");
             }
             set
             {
@@ -139,6 +143,49 @@ namespace ProgrammingLanguage.Bytecode
             this.Tag = null;
         }
 
+        public DataItem(object value, string tag)
+        {
+            if (value is null)
+            { throw new ArgumentNullException(nameof(value)); }
+
+            Tag = tag;
+
+            valueByte = null;
+            valueChar = null;
+            valueFloat = null;
+            valueInt = null;
+
+            if (value is int @int)
+            {
+                valueInt = @int;
+                type = RuntimeType.INT;
+                return;
+            }
+
+            if (value is byte @byte)
+            {
+                valueByte = @byte;
+                type = RuntimeType.BYTE;
+                return;
+            }
+
+            if (value is float @float)
+            {
+                valueFloat = @float;
+                type = RuntimeType.FLOAT;
+                return;
+            }
+
+            if (value is char @char)
+            {
+                valueChar = @char;
+                type = RuntimeType.CHAR;
+                return;
+            }
+
+            throw new System.Exception($"Unknown type {value.GetType().FullName}");
+        }
+
         public DataItem(int value, string tag) : this(RuntimeType.INT, tag)
         { this.valueInt = value; }
         public DataItem(byte value, string tag) : this(RuntimeType.BYTE, tag)
@@ -168,7 +215,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -199,12 +246,12 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value + right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do + operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do + operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -235,13 +282,13 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value - right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do - operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do - operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
 
         /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftLeft(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -264,12 +311,12 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value << right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do << operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do << operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftRight(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -292,13 +339,13 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value >> right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do >> operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do >> operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
 
         /// <exception cref="RuntimeException"/>
         public static DataItem operator *(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -329,12 +376,12 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value * right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do * operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do * operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator /(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -365,12 +412,12 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value / right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do / operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do / operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator %(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -401,7 +448,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value % right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException("Can't do % operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do % operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
 
         /// <exception cref="RuntimeException"/>
@@ -415,7 +462,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return left.Value < right.Value; }
             }
 
-            throw new RuntimeException("Can't do < operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do < operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static bool operator >(DataItem leftSide, DataItem rightSide)
@@ -428,7 +475,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return left.Value > right.Value; }
             }
 
-            throw new RuntimeException("Can't do > operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do > operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
 
         /// <exception cref="RuntimeException"/>
@@ -437,7 +484,7 @@ namespace ProgrammingLanguage.Bytecode
             try
             { return (leftSide < rightSide) || (leftSide == rightSide); }
             catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do <= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
+            { throw new RuntimeException("Can't do <= operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
         }
         /// <exception cref="RuntimeException"/>
         public static bool operator >=(DataItem leftSide, DataItem rightSide)
@@ -445,7 +492,7 @@ namespace ProgrammingLanguage.Bytecode
             try
             { return (leftSide > rightSide) || (leftSide == rightSide); }
             catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do >= operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
+            { throw new RuntimeException("Can't do >= operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
         }
 
         /// <exception cref="RuntimeException"/>
@@ -459,7 +506,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return left.Value == right.Value; }
             }
 
-            throw new RuntimeException("Can't do == operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString());
+            throw new RuntimeException("Can't do == operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
         }
         /// <exception cref="RuntimeException"/>
         public static bool operator !=(DataItem leftSide, DataItem rightSide)
@@ -467,7 +514,7 @@ namespace ProgrammingLanguage.Bytecode
             try
             { return !(leftSide == rightSide); }
             catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do != operation with type " + leftSide.type.ToString() + " and " + rightSide.type.ToString(), ex); }
+            { throw new RuntimeException("Can't do != operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
         }
 
         /// <exception cref="RuntimeException"/>
@@ -492,7 +539,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -520,7 +567,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="RuntimeException"/>
         public static DataItem operator &(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -548,7 +595,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="RuntimeException"/>
         public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.type == RuntimeType.BYTE && rightSide.type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -574,7 +621,7 @@ namespace ProgrammingLanguage.Bytecode
             throw new RuntimeException($"Can't do ^ operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
         }
 
-        public readonly bool IsFalsy() => this.type switch
+        public readonly bool IsFalsy() => this.Type switch
         {
             RuntimeType.BYTE => this.valueByte == 0,
             RuntimeType.INT => this.valueInt.Value == 0,
@@ -585,7 +632,7 @@ namespace ProgrammingLanguage.Bytecode
 
         #endregion
 
-        public readonly int? Integer => type switch
+        public readonly int? Integer => Type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
@@ -602,7 +649,7 @@ namespace ProgrammingLanguage.Bytecode
                     (byte)integer_.Value;
             }
         }
-        public readonly float? Float => type switch
+        public readonly float? Float => Type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
@@ -612,26 +659,26 @@ namespace ProgrammingLanguage.Bytecode
         };
 
         /// <exception cref="RuntimeException"/>
-        public readonly override string ToString() => this.IsNull ? "null" : type switch
+        public readonly override string ToString() => this.IsNull ? "null" : Type switch
         {
             RuntimeType.INT => ValueInt.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.BYTE => ValueByte.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.FLOAT => ValueFloat.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.CHAR => ValueChar.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
+            _ => throw new RuntimeException("Can't parse " + Type.ToString() + " to STRING"),
         };
 
         /// <exception cref="RuntimeException"/>
         public readonly string GetDebuggerDisplay()
         {
             if (IsNull) return null;
-            string retStr = type switch
+            string retStr = Type switch
             {
                 RuntimeType.INT => ValueInt.ToString(),
                 RuntimeType.BYTE => ValueByte.ToString(),
                 RuntimeType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
                 RuntimeType.CHAR => $"'{ValueChar.Escape()}'",
-                _ => throw new RuntimeException("Can't parse " + type.ToString() + " to STRING"),
+                _ => throw new RuntimeException("Can't parse " + Type.ToString() + " to STRING"),
             };
             if (!string.IsNullOrEmpty(this.Tag))
             {
@@ -643,8 +690,8 @@ namespace ProgrammingLanguage.Bytecode
         public readonly override int GetHashCode()
         {
             HashCode hash = new();
-            hash.Add(type);
-            switch (type)
+            hash.Add(Type);
+            switch (Type)
             {
                 case RuntimeType.BYTE:
                     hash.Add(valueByte);
@@ -667,8 +714,8 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="NotImplementedException"/>
         public readonly override bool Equals(object obj)
             => obj is DataItem value &&
-            this.type == value.type &&
-            this.type switch
+            this.Type == value.Type &&
+            this.Type switch
             {
                 RuntimeType.BYTE => valueByte == value.valueByte,
                 RuntimeType.INT => valueInt == value.valueInt,
@@ -690,7 +737,7 @@ namespace ProgrammingLanguage.Bytecode
             }
             else
             {
-                switch (type)
+                switch (Type)
                 {
                     case RuntimeType.BYTE:
                         Console.ForegroundColor = ConsoleColor.Green;
@@ -717,5 +764,96 @@ namespace ProgrammingLanguage.Bytecode
             Console.ForegroundColor = savedFgColor;
             Console.BackgroundColor = savedBgColor;
         }
+
+        #region Serialize
+        public readonly void Serialize(Serializer serializer)
+        {
+            serializer.Serialize((byte)type);
+            switch (type)
+            {
+                case RuntimeType.BYTE:
+                    serializer.Serialize(valueByte.Value);
+                    break;
+                case RuntimeType.INT:
+                    serializer.Serialize(valueInt.Value);
+                    break;
+                case RuntimeType.FLOAT:
+                    serializer.Serialize(valueFloat.Value);
+                    break;
+                case RuntimeType.CHAR:
+                    serializer.Serialize(valueChar.Value);
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            serializer.Serialize(Tag);
+        }
+
+        public void Deserialize(Deserializer deserializer)
+        {
+            type = (RuntimeType)deserializer.DeserializeByte();
+            switch (type)
+            {
+                case RuntimeType.BYTE:
+                    valueByte = deserializer.DeserializeByte();
+                    break;
+                case RuntimeType.INT:
+                    valueInt = deserializer.DeserializeInt32();
+                    break;
+                case RuntimeType.FLOAT:
+                    valueFloat = deserializer.DeserializeFloat();
+                    break;
+                case RuntimeType.CHAR:
+                    valueChar = deserializer.DeserializeChar();
+                    break;
+                default:
+                    throw new NotImplementedException();
+            }
+            Tag = deserializer.DeserializeString();
+        }
+
+        public readonly Value SerializeText()
+        {
+            Value result = Value.Object();
+
+            result["Type"] = Value.Literal(type.ToString());
+            result["Value"] = type switch
+            {
+                RuntimeType.BYTE => Value.Literal(valueByte.Value),
+                RuntimeType.INT => Value.Literal(valueInt.Value),
+                RuntimeType.FLOAT => Value.Literal(valueFloat.Value),
+                RuntimeType.CHAR => Value.Literal(valueChar.Value),
+                _ => throw new NotImplementedException(),
+            };
+            result["Tag"] = Value.Literal(Tag);
+
+            return result;
+        }
+
+        public void DeserializeText(Value data)
+        {
+            if (!Enum.TryParse(data["Type"].String ?? "", out type))
+            { return; }
+
+            switch (type)
+            {
+                case RuntimeType.BYTE:
+                    valueByte = (byte)(data["Value"].Int ?? 0);
+                    break;
+                case RuntimeType.INT:
+                    valueInt = data["Value"].Int ?? 0;
+                    break;
+                case RuntimeType.FLOAT:
+                    valueFloat = data["Value"].Float ?? 0f;
+                    break;
+                case RuntimeType.CHAR:
+                    valueChar = (char)(data["Value"].Int ?? 0);
+                    break;
+                default:
+                    break;
+            }
+            Tag = data["Tag"].String;
+        }
+        #endregion
     }
 }

@@ -11,7 +11,7 @@ namespace ProgrammingLanguage.BBCode
 {
     public class EasyCompiler
     {
-        Dictionary<string, BuiltinFunction> builtinFunctions;
+        Dictionary<string, ExternalFunctionBase> externalFunctions;
         string BasePath;
         TokenizerSettings tokenizerSettings;
         Parser.ParserSettings parserSettings;
@@ -78,7 +78,7 @@ namespace ProgrammingLanguage.BBCode
             {
                 compilerResult = Compiler.Compiler.Compile(
                     parserResult,
-                    this.builtinFunctions,
+                    this.externalFunctions,
                     file,
                     Parser.ParserSettings.Default,
                     printCallback,
@@ -129,7 +129,7 @@ namespace ProgrammingLanguage.BBCode
 
         public static Result Compile(
             FileInfo file,
-            Dictionary<string, BuiltinFunction> builtinFunctions,
+            Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
             Parser.ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
@@ -139,7 +139,7 @@ namespace ProgrammingLanguage.BBCode
         {
             EasyCompiler easyCompiler = new()
             {
-                builtinFunctions = builtinFunctions,
+                externalFunctions = externalFunctions,
                 BasePath = basePath,
                 tokenizerSettings = tokenizerSettings,
                 parserSettings = parserSettings,

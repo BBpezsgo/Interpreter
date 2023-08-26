@@ -130,7 +130,7 @@ namespace TheProgram
                     {
                         if (result.RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
-                        result.compilerSettings.BuiltinFunctionCache = false;
+                        result.compilerSettings.ExternalFunctionsCache = false;
                         goto ArgParseDone;
                     }
 

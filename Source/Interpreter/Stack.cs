@@ -11,7 +11,7 @@ namespace ProgrammingLanguage.Bytecode
         {
             get
             {
-                static int CalculateItemSize(DataItem item) => item.type switch
+                static int CalculateItemSize(DataItem item) => item.Type switch
                 {
                     RuntimeType.INT => 4,
                     RuntimeType.FLOAT => 4,

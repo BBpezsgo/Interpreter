@@ -151,7 +151,7 @@ namespace ProgrammingLanguage.Errors
                         }
                         else
                         {
-                            result += $"\n{i}\t {Context.Value.Stack[i].type} {Context.Value.Stack[i].Value()} # {Context.Value.Stack[i].Tag}";
+                            result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].Value()} # {Context.Value.Stack[i].Tag}";
                         }
                     }
 

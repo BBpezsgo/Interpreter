@@ -2,6 +2,6 @@
 
 namespace Http
 {
-  [Builtin("http_get")]
+  [External("http_get")]
   export string Get(string url);
 }

@@ -3,10 +3,18 @@ using System.Collections.Generic;
 
 namespace ProgrammingLanguage.Core
 {
+    using System.Linq;
     using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Errors;
 
-    public class BuiltinFunction : BBCode.Compiler.IHaveKey<string>
+    [Flags]
+    public enum ExternalFunctionFlags : byte
+    {
+        CheckParamLength    = 1,
+        CheckParamType      = 2,
+    }
+
+    public abstract class ExternalFunctionBase : BBCode.Compiler.IHaveKey<string>
     {
         public readonly BBCode.Compiler.Type[] ParameterTypes;
         public readonly string Name;
@@ -18,40 +26,19 @@ namespace ProgrammingLanguage.Core
 
         internal BytecodeInterpreter BytecodeInterpreter;
 
-        protected Func<DataItem[], DataItem> callback;
+        public readonly ExternalFunctionFlags Flags;
 
-        protected BuiltinFunction(string name, BBCode.Compiler.Type[] parameters, bool returnSomething)
+        public bool CheckParameterLength => ((byte)Flags & (byte)ExternalFunctionFlags.CheckParamLength) != 0;
+        public bool CheckParameterType => ((byte)Flags & (byte)ExternalFunctionFlags.CheckParamType) != 0;
+
+        public const ExternalFunctionFlags DefaultFlags = ExternalFunctionFlags.CheckParamLength | ExternalFunctionFlags.CheckParamType;
+
+        protected ExternalFunctionBase(string name, BBCode.Compiler.Type[] parameters, bool returnSomething, ExternalFunctionFlags flags)
         {
             this.Name = name;
             this.ParameterTypes = parameters;
             this.ReturnSomething = returnSomething;
-        }
-
-        /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Action<DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters)
-                 : this(name, parameters, false)
-        {
-            this.callback = new Func<DataItem[], DataItem>((p) =>
-            {
-                callback?.Invoke(p);
-                return DataItem.Null;
-            });
-        }
-
-        /// <param name="callback">Callback when the interpreter process this function</param>
-        public BuiltinFunction(Func<DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters)
-                 : this(name, parameters, true)
-        {
-            this.callback = callback;
-        }
-
-        /// <exception cref="InternalException"></exception>
-        public DataItem Callback(DataItem[] parameters)
-        {
-            if (callback == null)
-            { throw new InternalException("Callback is null"); }
-
-            return callback.Invoke(parameters);
+            this.Flags = flags;
         }
 
         internal object ID
@@ -69,22 +56,78 @@ namespace ProgrammingLanguage.Core
                 return result;
             }
         }
+
+        protected void BeforeCallback(DataItem[] parameters)
+        {
+            if (CheckParameterLength && parameters.Length != ParameterTypes.Length)
+            { throw new RuntimeException($"Wrong number of parameters passed to external function {Name} ({parameters.Length}): expected {ParameterTypes.Length}"); }
+
+            if (CheckParameterType)
+            { ExternalFunctionGenerator.CheckTypes(parameters, ParameterTypes.Select(v => v.Convert()).ToArray()); }
+        }
     }
 
-    public class ManagedBuiltinFunction : BuiltinFunction, IReturnValueConsumer
+    public class ExternalFunctionSimple : ExternalFunctionBase
     {
-        public delegate void ReturnEvent(DataItem returnValue);
-        public ReturnEvent OnReturn;
+        protected Func<DataItem[], DataItem> callback;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ManagedBuiltinFunction(Action<DataItem[], ManagedBuiltinFunction> callback, string name, BBCode.Compiler.Type[] parameters)
-                 : base(name, parameters, true)
+        public ExternalFunctionSimple(Action<DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+                 : base(name, parameters, false, flags)
         {
-            base.callback = new Func<DataItem[], DataItem>((p) =>
+            this.callback = (v) =>
+            {
+                callback?.Invoke(v);
+                return DataItem.Null;
+            };
+        }
+
+        /// <param name="callback">Callback when the interpreter process this function</param>
+        public ExternalFunctionSimple(Func<DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+                 : base(name, parameters, true, flags)
+        {
+            this.callback = callback;
+        }
+
+        /// <exception cref="InternalException"></exception>
+        public DataItem Callback(DataItem[] parameters)
+        {
+            base.BeforeCallback(parameters);
+
+            if (callback == null)
+            { throw new InternalException("Callback is null"); }
+
+            return callback.Invoke(parameters);
+        }
+    }
+
+    public class ExternalFunctionManaged : ExternalFunctionBase, IReturnValueConsumer
+    {
+        public delegate void ReturnEvent(DataItem returnValue);
+
+        public ReturnEvent OnReturn;
+        readonly Func<DataItem[], DataItem> callback;
+
+        /// <param name="callback">Callback when the interpreter process this function</param>
+        public ExternalFunctionManaged(Action<DataItem[], ExternalFunctionManaged> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+                 : base(name, parameters, true, flags)
+        {
+            this.callback = new Func<DataItem[], DataItem>((p) =>
             {
                 callback?.Invoke(p, this);
                 return DataItem.Null;
             });
+        }
+
+        /// <exception cref="InternalException"></exception>
+        public void Callback(DataItem[] parameters)
+        {
+            base.BeforeCallback(parameters);
+
+            if (callback == null)
+            { throw new InternalException("Callback is null"); }
+
+            callback.Invoke(parameters);
         }
 
         public void Return(DataItem returnValue) => OnReturn?.Invoke(returnValue);
@@ -95,136 +138,143 @@ namespace ProgrammingLanguage.Core
         public void Return(DataItem returnValue);
     }
 
-    public static class BuiltinFunctionGenerator
+    public static class ExternalFunctionGenerator
     {
-        #region AddBuiltinFunction()
+        #region AddExternalFunction()
 
         /// <exception cref="InternalException"></exception>
         /// <exception cref="RuntimeException"></exception>
-        public static BuiltinFunction AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, System.Reflection.MethodInfo method)
+        public static ExternalFunctionSimple AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
         {
-            System.Reflection.ParameterInfo[] parameters = method.GetParameters();
-            BBCode.Compiler.Type[] parameterTypes = new BBCode.Compiler.Type[parameters.Length];
-            for (int i = 0; i < parameters.Length; i++)
-            {
-                System.Reflection.ParameterInfo parameter = parameters[i];
-                Type paramType = parameter.ParameterType;
-                if (paramType == typeof(int))
-                {
-                    parameterTypes[i] = BBCode.Compiler.Type.INT;
-                }
-                else if (paramType == typeof(float))
-                {
-                    parameterTypes[i] = BBCode.Compiler.Type.FLOAT;
-                }
-                else
-                {
-                    throw new InternalException($"Unknown type {paramType.FullName}");
-                }
-            }
+            BBCode.Compiler.Type[] parameterTypes = GetTypes(method.GetParameters());
 
             bool returnSomething = method.ReturnType != typeof(void);
 
-            BuiltinFunction function = new((ps) =>
+            ExternalFunctionSimple function;
+            if (returnSomething)
             {
-                if (ps.Length != parameters.Length)
-                { throw new RuntimeException($"Wrong number of parameters passed to built-in function {method.Name} ({ps.Length}): expected {parameters.Length}"); }
-
-                var objs = new object[ps.Length];
-                for (int i = 0; i < ps.Length; i++)
+                function = new((parameters) =>
                 {
-                    var p = ps[i];
-                    if (p.type.Convert() != BBCode.Compiler.Type.INT &&
-                        p.type.Convert() != BBCode.Compiler.Type.FLOAT)
-                    { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}"); }
-
-                    if (p.type.Convert() != parameterTypes[i])
-                    { throw new RuntimeException($"Invalid parameter type {p.type.ToString().ToLower()}: expected {parameterTypes[i].ToString().ToLower()}"); }
-
-                    objs[i] = p.Value();
-                }
-
-                method.Invoke(null, objs);
-            }, method.Name, parameterTypes);
-
-            if (!builtinFunctions.ContainsKey(method.Name))
-            {
-                builtinFunctions.Add(method.Name, function);
+                    object[] parameterValues = GetValues(parameters);
+                    object returnValue = method.Invoke(null, parameterValues);
+                    if (returnValue is null)
+                    {
+                        return DataItem.Null;
+                    }
+                    else
+                    {
+                        return GetValue(returnValue, $"{method.Name}() result");
+                    }
+                }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
             }
             else
             {
-                builtinFunctions[method.Name] = function;
-                Output.Output.Warning($"The built-in function '{method.Name}' is already defined, so I'll override it");
+                function = new((parameters) =>
+                {
+                    object[] parameterValues = GetValues(parameters);
+                    method.Invoke(null, parameterValues);
+                }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
+            }
+
+            if (!functions.ContainsKey(method.Name))
+            {
+                functions.Add(method.Name, function);
+            }
+            else
+            {
+                functions[method.Name] = function;
+                Output.Output.Warning($"External function '{method.Name}' is already defined, so I'll override it");
             }
 
             return function;
         }
 
-        public static void AddManagedBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ManagedBuiltinFunction> callback)
+        /// <exception cref="RuntimeException"/>
+        internal static void CheckTypes(DataItem[] values, RuntimeType[] types)
         {
-            ManagedBuiltinFunction function = new(callback, name, parameterTypes);
-
-            if (!builtinFunctions.ContainsKey(name))
+            int n = Math.Min(values.Length, types.Length);
+            for (int i = 0; i < n; i++)
             {
-                builtinFunctions.Add(name, function);
+                if (values[i].Type != types[i])
+                {
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLower()}: expected {types[i].ToString().ToLower()}");
+                }
+            }
+        }
+
+        internal static object[] GetValues(DataItem[] values)
+        {
+            object[] result = new object[values.Length];
+            for (int i = 0; i < values.Length; i++)
+            { result[i] = values[i].Value(); }
+            return result;
+        }
+
+        public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        {
+            ExternalFunctionManaged function = new(callback, name, parameterTypes, flags);
+
+            if (!functions.ContainsKey(name))
+            {
+                functions.Add(name, function);
             }
             else
             {
-                builtinFunctions[name] = function;
-                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+                functions[name] = function;
+                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Func<DataItem[], DataItem> callback)
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
         {
-            BuiltinFunction function = new(callback, name, parameterTypes);
+            ExternalFunctionSimple function = new(callback, name, parameterTypes, flags);
 
-            if (!builtinFunctions.ContainsKey(name))
+            if (!functions.ContainsKey(name))
             {
-                builtinFunctions.Add(name, function);
+                functions.Add(name, function);
             }
             else
             {
-                builtinFunctions[name] = function;
-                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+                functions[name] = function;
+                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<DataItem> callback)
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
         {
-            BuiltinFunction function = new(p =>
+            ExternalFunctionSimple function = new(p =>
             {
                 return callback.Invoke();
-            }, name, Array.Empty<BBCode.Compiler.Type>());
+            }, name, Array.Empty<BBCode.Compiler.Type>(), flags);
 
-            if (!builtinFunctions.ContainsKey(name))
+            if (!functions.ContainsKey(name))
             {
-                builtinFunctions.Add(name, function);
+                functions.Add(name, function);
             }
             else
             {
-                builtinFunctions[name] = function;
-                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+                functions[name] = function;
+                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
             }
         }
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[]> callback)
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[]> callback, ExternalFunctionFlags checkParameterLength = ExternalFunctionBase.DefaultFlags)
         {
-            BuiltinFunction function = new(callback, name, parameterTypes);
+            ExternalFunctionSimple function = new(callback, name, parameterTypes, checkParameterLength);
 
-            if (!builtinFunctions.ContainsKey(name))
+            if (!functions.ContainsKey(name))
             {
-                builtinFunctions.Add(name, function);
+                functions.Add(name, function);
             }
             else
             {
-                builtinFunctions[name] = function;
-                Output.Output.Warning($"The built-in function '{name}' is already defined, so I'll override it");
+                functions[name] = function;
+                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
             }
         }
 
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action callback)
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
         {
             var types = Array.Empty<BBCode.Compiler.Type>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -232,11 +282,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0> callback)
+        public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0> callback)
         {
             var types = GetTypes<T0>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -245,11 +295,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1> callback)
+        public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1> callback)
         {
             var types = GetTypes<T0, T1>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -259,11 +309,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2> callback)
+        public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2> callback)
         {
             var types = GetTypes<T0, T1, T2>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -274,11 +324,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3> callback)
         {
             var types = GetTypes<T0, T1, T2, T3>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -290,11 +340,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3, T4>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3, T4> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4> callback)
         {
             var types = GetTypes<T0, T1, T2, T3, T4>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -307,11 +357,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
         {
             var types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -369,11 +419,11 @@ namespace ProgrammingLanguage.Core
             throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
         }
 
-        public static void AddBuiltinFunction(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<object> callback)
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<object> callback)
         {
             var types = Array.Empty<BBCode.Compiler.Type>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -383,11 +433,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, object> callback)
+        public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, object> callback)
         {
             var types = GetTypes<T0>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -400,11 +450,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, object> callback)
+        public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, object> callback)
         {
             var types = GetTypes<T0, T1>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -418,11 +468,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, object> callback)
+        public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, object> callback)
         {
             var types = GetTypes<T0, T1, T2>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -437,11 +487,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, object> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, object> callback)
         {
             var types = GetTypes<T0, T1, T2, T3>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -457,11 +507,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3, T4>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, T4, object> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, object> callback)
         {
             var types = GetTypes<T0, T1, T2, T3, T4>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -478,11 +528,11 @@ namespace ProgrammingLanguage.Core
             });
         }
         /// <exception cref="NotImplementedException"/>
-        public static void AddBuiltinFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, BuiltinFunction> builtinFunctions, string name, Func<T0, T1, T2, T3, T4, T5, object> callback)
+        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, T5, object> callback)
         {
             var types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-            builtinFunctions.AddBuiltinFunction(name, types, (args) =>
+            functions.AddExternalFunction(name, types, (args) =>
             {
                 Array.Reverse(args);
                 CheckParameters(name, types, args);
@@ -500,9 +550,9 @@ namespace ProgrammingLanguage.Core
             });
         }
 
-        public static void SetInterpreter(this Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreter interpreter)
+        public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeInterpreter interpreter)
         {
-            foreach (KeyValuePair<string, BuiltinFunction> item in builtinFunctions)
+            foreach (KeyValuePair<string, ExternalFunctionBase> item in functions)
             { item.Value.BytecodeInterpreter = interpreter; }
         }
 
@@ -511,14 +561,7 @@ namespace ProgrammingLanguage.Core
         /// <exception cref="RuntimeException"/>
         static void CheckParameters(string functionName, BBCode.Compiler.Type[] requied, DataItem[] passed)
         {
-            if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to builtin function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
-
-            /*
-            for (int i = 0; i < requied.Length; i++)
-            {
-                if (passed[i].type != requied[i]) throw new RuntimeException($"Wrong type of parameter passed to builtin function '{functionName}'. Parameter index: {i} Requied type: {requied[i].ToString().ToLower()} Passed type: {passed[i].type.ToString().ToLower()}");
-            }
-            */
+            if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to external function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
         }
 
         #region GetTypes<>()
@@ -584,6 +627,42 @@ namespace ProgrammingLanguage.Core
             { return BBCode.Compiler.Type.CHAR; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
+        }
+
+        static BBCode.Compiler.Type[] GetTypes(params System.Reflection.ParameterInfo[] parameters)
+        {
+            BBCode.Compiler.Type[] result = new BBCode.Compiler.Type[parameters.Length];
+            for (int i = 0; i < parameters.Length; i++)
+            { result[i] = GetType(parameters[i].ParameterType); }
+            return result;
+        }
+
+        static BBCode.Compiler.Type[] GetTypes(params Type[] types)
+        {
+            BBCode.Compiler.Type[] result = new BBCode.Compiler.Type[types.Length];
+            for (int i = 0; i < types.Length; i++)
+            { result[i] = GetType(types[i]); }
+            return result;
+        }
+
+        static BBCode.Compiler.Type GetType(Type type)
+        {
+            if (type == typeof(byte))
+            { return BBCode.Compiler.Type.BYTE; }
+
+            if (type == typeof(int))
+            { return BBCode.Compiler.Type.INT; }
+
+            if (type == typeof(float))
+            { return BBCode.Compiler.Type.FLOAT; }
+
+            if (type == typeof(float))
+            { return BBCode.Compiler.Type.FLOAT; }
+
+            if (type == typeof(void))
+            { return BBCode.Compiler.Type.VOID; }
+
+            throw new InternalException($"Unknown type {type.FullName}");
         }
 
         #endregion

@@ -10,16 +10,16 @@ namespace ProgrammingLanguage.Bytecode
     {
         internal readonly Memory Memory;
 
-        internal Dictionary<string, BuiltinFunction> BuiltinFunctions;
+        internal Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
         internal int CodePointer;
         internal int BasePointer;
 
         internal Instruction CurrentInstruction => Memory.Code[CodePointer];
 
-        public BytecodeProcessor(Instruction[] code, int basePointer, int heapSize, Dictionary<string, BuiltinFunction> builtinFunctions)
+        public BytecodeProcessor(Instruction[] code, int basePointer, int heapSize, Dictionary<string, ExternalFunctionBase> externalFunctions)
         {
-            this.BuiltinFunctions = builtinFunctions;
+            ExternalFunctions = externalFunctions;
 
             BasePointer = basePointer;
             CodePointer = code.Length;
@@ -34,7 +34,7 @@ namespace ProgrammingLanguage.Bytecode
         {
             Memory.Stack.Destroy();
             Memory.Stack = null;
-            this.BuiltinFunctions = null;
+            ExternalFunctions = null;
         }
 
         /// <exception cref="RuntimeException"></exception>
@@ -61,7 +61,7 @@ namespace ProgrammingLanguage.Bytecode
                 case Opcode.JUMP_BY: return JUMP_BY();
                 case Opcode.THROW: return THROW();
 
-                case Opcode.CALL_BUILTIN: return CALL_BUILTIN();
+                case Opcode.CALL_EXTERNAL: return CALL_EXTERNAL();
 
                 case Opcode.MATH_ADD: return MATH_ADD();
                 case Opcode.MATH_SUB: return MATH_SUB();
@@ -136,7 +136,7 @@ namespace ProgrammingLanguage.Bytecode
         int HEAP_ALLOC()
         {
             DataItem sizeData = Memory.Stack.Pop();
-            int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.type}");
+            int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.Type}");
 
             int block = Memory.Heap.Allocate(size);
 
@@ -149,7 +149,7 @@ namespace ProgrammingLanguage.Bytecode
         int HEAP_DEALLOC()
         {
             DataItem pointerData = Memory.Stack.Pop();
-            int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.type}");
+            int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.Type}");
 
             Memory.Heap.Deallocate(pointer);
 
@@ -558,7 +558,7 @@ namespace ProgrammingLanguage.Bytecode
             {
                 newValue = targetType switch
                 {
-                    RuntimeType.BYTE => value.type switch
+                    RuntimeType.BYTE => value.Type switch
                     {
                         RuntimeType.BYTE => new DataItem((byte)value.ValueByte, value.Tag),
                         RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue), value.Tag),
@@ -566,7 +566,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.CHAR => new DataItem((byte)value.ValueChar, value.Tag),
                         _ => throw new NotImplementedException(),
                     },
-                    RuntimeType.INT => value.type switch
+                    RuntimeType.INT => value.Type switch
                     {
                         RuntimeType.BYTE => new DataItem((int)value.ValueByte, value.Tag),
                         RuntimeType.INT => new DataItem((int)value.ValueInt, value.Tag),
@@ -574,7 +574,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.CHAR => new DataItem((int)value.ValueChar, value.Tag),
                         _ => throw new NotImplementedException(),
                     },
-                    RuntimeType.FLOAT => value.type switch
+                    RuntimeType.FLOAT => value.Type switch
                     {
                         RuntimeType.BYTE => new DataItem((float)value.ValueByte, value.Tag),
                         RuntimeType.INT => new DataItem((float)value.ValueInt, value.Tag),
@@ -582,7 +582,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.CHAR => new DataItem((float)value.ValueChar, value.Tag),
                         _ => throw new NotImplementedException(),
                     },
-                    RuntimeType.CHAR => value.type switch
+                    RuntimeType.CHAR => value.Type switch
                     {
                         RuntimeType.BYTE => new DataItem((char)value.ValueByte, value.Tag),
                         RuntimeType.INT => new DataItem((char)value.ValueInt, value.Tag),
@@ -603,7 +603,7 @@ namespace ProgrammingLanguage.Bytecode
         int TYPE_GET()
         {
             DataItem value = Memory.Stack.Pop();
-            byte type = (byte)value.type;
+            byte type = (byte)value.Type;
 
             Memory.Stack.Push(new DataItem(type));
 
@@ -623,39 +623,39 @@ namespace ProgrammingLanguage.Bytecode
 
         /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
-        int CALL_BUILTIN()
+        int CALL_EXTERNAL()
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
-            if (functionNameDataItem.type != RuntimeType.INT)
-            { throw new InternalException($"Instruction CALL_BUILTIN need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.type} {functionNameDataItem}"); }
+            if (functionNameDataItem.Type != RuntimeType.INT)
+            { throw new InternalException($"Instruction CALL_EXTERNAL need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.Type} {functionNameDataItem}"); }
 
             int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
 
             string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
 
-            if (!BuiltinFunctions.TryGetValue(functionName, out BuiltinFunction builtinFunction))
+            if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }
 
             List<DataItem> parameters = new();
             for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
             { parameters.Add(Memory.Stack.Pop()); }
 
-            if (builtinFunction is ManagedBuiltinFunction managedBuiltinFunction)
+            if (function is ExternalFunctionManaged managedFunction)
             {
-                managedBuiltinFunction.OnReturn = OnExternalReturnValue;
-                managedBuiltinFunction.Callback(parameters.ToArray());
+                managedFunction.OnReturn = OnExternalReturnValue;
+                managedFunction.Callback(parameters.ToArray());
             }
-            else
+            else if (function is ExternalFunctionSimple simpleFunction)
             {
-                if (builtinFunction.ReturnSomething)
+                if (function.ReturnSomething)
                 {
-                    var returnValue = builtinFunction.Callback(parameters.ToArray());
-                    returnValue.Tag ??= "return v";
+                    DataItem returnValue = simpleFunction.Callback(parameters.ToArray());
+                    returnValue.Tag ??= $"{function.Name}() result";
                     Memory.Stack.Push(returnValue);
                 }
                 else
                 {
-                    builtinFunction.Callback(parameters.ToArray());
+                    simpleFunction.Callback(parameters.ToArray());
                 }
             }
 

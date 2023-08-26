@@ -79,17 +79,17 @@ class Stream
 	}
 }
 
-[Builtin("stream-d")]
+[External("stream-d")]
 void DisposeStream(int id);
 
-[Builtin("stream-f")]
+[External("stream-f")]
 void FlushStream(int id, int count);
 
-[Builtin("stream-c")]
+[External("stream-c")]
 int CreateStream(int bufferSize, int bufferMemoryAddress);
 
-[Builtin("stream-l")]
+[External("stream-l")]
 int GetStreamLength(int id);
 
-[Builtin("stream-r")]
+[External("stream-r")]
 void ClearStreamBuffer(int id);

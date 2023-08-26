@@ -92,11 +92,11 @@ namespace ProgrammingLanguage.Bytecode
 
         #endregion
 
-        internal BytecodeInterpreter(Instruction[] code, Dictionary<string, BuiltinFunction> builtinFunctions, BytecodeInterpreterSettings settings)
+        internal BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
         {
             this.Settings = settings;
 
-            this.BytecodeProcessor = new BytecodeProcessor(code, 0, settings.HeapSize, builtinFunctions);
+            this.BytecodeProcessor = new BytecodeProcessor(code, 0, settings.HeapSize, externalFunctions);
 
             this.isExecuting = false;
             this.IsDestroyed = false;

@@ -10,17 +10,17 @@
 #bf "int-to-float" "float" "int";
 #bf "float-to-int" "int" "float";
 
-[Builtin("stdout")]
+[External("stdout")]
 [StandardOutput]
 export void Print(char data);
 
-[Builtin("stderr")]
+[External("stderr")]
 export void PrintError(char data);
   
-[Builtin("console-set")]
+[External("console-set")]
 export void Set(char data, int x, int y);
 
-[Builtin("console-clear")]
+[External("console-clear")]
 export void Clear();
 
 [Define("boolean")]
@@ -107,7 +107,7 @@ export void PrintLine(bool message)
     };
 }
 
-[Builtin("stdin")]
+[External("stdin")]
 char StdIn();
 
 export char ReadKey()
@@ -250,7 +250,7 @@ export String ToString(this int number)
 	return result;
 }
 
-[Builtin("sleep")]
+[External("sleep")]
 export void Sleep(int ms);
 
 export int Pow(int a, int b)
@@ -365,10 +365,10 @@ int ParseDigit(char digit)
     elseif (digit == '9') { return 9; };
 }
 
-[Builtin("int-to-float")]
+[External("int-to-float")]
 export float ToFloat(this int v);
 
-[Builtin("float-to-int")]
+[External("float-to-int")]
 export int ToInt(this float v);
 
 [Define("string")]
@@ -503,4 +503,12 @@ export int Random(int state)
     { result += M; };
     
 	return result;
+}
+
+void memcp(int source, int destination, int size)
+{
+    for (int offset; offset < size; offset++)
+    {
+        (*(destination + offset)) = *(source + offset);
+    };
 }

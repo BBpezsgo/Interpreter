@@ -47,7 +47,7 @@ namespace ProgrammingLanguage.Core
 
         bool _stackOperation = false;
         bool _heapOperation = false;
-        bool _builtinFunctionOperation = false;
+        bool _externalFunctionOperation = false;
         bool _aluOperation = false;
 
         public int Breakpoint
@@ -75,7 +75,7 @@ namespace ProgrammingLanguage.Core
 
         public bool StackOperation => _stackOperation;
         public bool HeapOperation => _heapOperation;
-        public bool BuiltinFunctionOperation => _builtinFunctionOperation;
+        public bool ExternalFunctionOperation => _externalFunctionOperation;
         public bool AluOperation => _aluOperation;
 
         public readonly Records<float> HeapUsage = new();
@@ -92,8 +92,8 @@ namespace ProgrammingLanguage.Core
             Instruction nextInstruction = this.details.NextInstruction;
             if (nextInstruction != null)
             {
-                _builtinFunctionOperation =
-                    nextInstruction.opcode == Opcode.CALL_BUILTIN;
+                _externalFunctionOperation =
+                    nextInstruction.opcode == Opcode.CALL_EXTERNAL;
 
                 _stackOperation =
                     nextInstruction.opcode == Opcode.STORE_VALUE ||
@@ -130,7 +130,7 @@ namespace ProgrammingLanguage.Core
             }
             else
             {
-                _builtinFunctionOperation = false;
+                _externalFunctionOperation = false;
                 _stackOperation = false;
                 _heapOperation = false;
             }

@@ -342,7 +342,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < @enum.Members.Length; i++)
             {
-                if (@enum.Members[i].Value.type != runtimeType)
+                if (@enum.Members[i].Value.Type != runtimeType)
                 { return false; }
             }
 
@@ -1155,7 +1155,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (!predictedValue.HasValue)
             { throw new InternalException($"Failed to compute {leftType} {@operator.Operator.Content} {rightType}"); }
 
-            return new CompiledType(predictedValue.Value.type);
+            return new CompiledType(predictedValue.Value.Type);
         }
         protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal) => literal.Type switch
         {
@@ -1243,7 +1243,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (prevStatementType.IsEnum)
             {
                 if (prevStatementType.Enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember enumMember))
-                { return new CompiledType(enumMember.Value.type); }
+                { return new CompiledType(enumMember.Value.Type); }
 
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }

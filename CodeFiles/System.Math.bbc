@@ -1,8 +1,8 @@
 #bf "cos" "float" "float";
 #bf "sin" "float" "float";
 
-[Builtin("cos")]
+[External("cos")]
 export float Cos(float v);
 
-[Builtin("sin")]
+[External("sin")]
 export float Sin(float v);

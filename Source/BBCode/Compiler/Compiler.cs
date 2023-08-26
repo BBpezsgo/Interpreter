@@ -65,13 +65,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
                     Console.Write($" ");
 
-                    if (instruction.Parameter.type == RuntimeType.INT)
+                    if (instruction.Parameter.Type == RuntimeType.INT)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.Write($"{instruction.Parameter.ValueInt}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter.type == RuntimeType.FLOAT)
+                    else if (instruction.Parameter.Type == RuntimeType.FLOAT)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
                         Console.Write($"{instruction.Parameter.ValueFloat}");
@@ -118,7 +118,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public bool PrintInstructions;
             public bool DontOptimize;
             public bool GenerateDebugInstructions;
-            public bool BuiltinFunctionCache;
+            public bool ExternalFunctionsCache;
 
             public static CompilerSettings Default => new()
             {
@@ -127,7 +127,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 PrintInstructions = false,
                 DontOptimize = false,
                 GenerateDebugInstructions = true,
-                BuiltinFunctionCache = true,
+                ExternalFunctionsCache = true,
             };
         }
 
@@ -160,7 +160,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         List<CompileTag> Hashes;
 
-        Dictionary<string, BuiltinFunction> BuiltinFunctions;
+        Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
         CompiledType GetCustomType(string name)
         {
@@ -223,7 +223,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public CompiledGeneralFunction[] GeneralFunctions;
             public CompiledOperator[] Operators;
 
-            public Dictionary<string, BuiltinFunction> BuiltinFunctions;
+            public Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
             public CompiledStruct[] Structs;
             public CompiledClass[] Classes;
@@ -316,24 +316,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledType type = new(function.Type, GetCustomType);
 
-            if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
+            if (attributes.TryGetAttribute("External", out string name))
             {
-                if (BuiltinFunctions.TryGetValue(builtinFunctionName, out var builtinFunction))
+                if (ExternalFunctions.TryGetValue(name, out var externalFunction))
                 {
-                    if (builtinFunction.ParameterCount != function.Parameters.Length)
-                    { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
-                    if (builtinFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
+                    if (externalFunction.ParameterCount != function.Parameters.Length)
+                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
+                    if (externalFunction.ReturnSomething != (type != Type.VOID))
+                    { throw new CompilerException($"Wrong type definied for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
 
-                    for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
+                    for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
                         if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
                         {
-                            if (builtinFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                            if (externalFunction.ParameterTypes[i] != builtinType)
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                     }
 
                     if (function.TemplateInfo != null)
@@ -341,12 +341,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     return new CompiledFunction(type, function)
                     {
-                        ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
+                        ParameterTypes = externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                         CompiledAttributes = attributes,
                     };
                 }
 
-                Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, function.FilePath));
+                Errors.Add(new Error("External function '" + name + "' not found", Position.UnknownPosition, function.FilePath));
             }
 
             CompiledFunction result = new(
@@ -370,34 +370,34 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledType type = new(function.Type, GetCustomType);
 
-            if (attributes.TryGetAttribute("Builtin", out string builtinFunctionName))
+            if (attributes.TryGetAttribute("External", out string name))
             {
-                if (BuiltinFunctions.TryGetValue(builtinFunctionName, out var builtinFunction))
+                if (ExternalFunctions.TryGetValue(name, out var externalFunction))
                 {
-                    if (builtinFunction.ParameterCount != function.Parameters.Length)
-                    { throw new CompilerException("Wrong number of parameters passed to builtin function '" + builtinFunction.Name + "'", function.Identifier, function.FilePath); }
-                    if (builtinFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException("Wrong type definied for builtin function '" + builtinFunction.Name + "'", function.Type.Identifier, function.FilePath); }
+                    if (externalFunction.ParameterCount != function.Parameters.Length)
+                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
+                    if (externalFunction.ReturnSomething != (type != Type.VOID))
+                    { throw new CompilerException($"Wrong type definied for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
 
-                    for (int i = 0; i < builtinFunction.ParameterTypes.Length; i++)
+                    for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
                         if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
                         {
-                            if (builtinFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                            if (externalFunction.ParameterTypes[i] != builtinType)
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException("Wrong type of parameter passed to builtin function '" + builtinFunction.Name + $"'. Parameter index: {i} Requied type: {builtinFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                     }
 
                     return new CompiledOperator(type, function)
                     {
-                        ParameterTypes = builtinFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
+                        ParameterTypes = externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                         CompiledAttributes = attributes,
                     };
                 }
 
-                Errors.Add(new Error("Builtin function '" + builtinFunctionName + "' not found", Position.UnknownPosition, function.FilePath));
+                Errors.Add(new Error($"External function \"{name}\" not found", Position.UnknownPosition, function.FilePath));
             }
 
             return new CompiledOperator(
@@ -419,7 +419,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 );
         }
 
-        CompiledEnum CompileEnum(EnumDefinition @enum)
+        static CompiledEnum CompileEnum(EnumDefinition @enum)
         {
             Dictionary<string, AttributeValues> attributes = new();
 
@@ -541,7 +541,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         Result CompileMainFile(
             ParserResult parserResult,
-            Dictionary<string, BuiltinFunction> builtinFunctions,
+            Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
             Action<string, Output.LogType> printCallback,
@@ -572,7 +572,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
             { CompileFile(collectorResult.CollectedASTs[i]); }
 
-            #region Compile test built-in functions
+            #region Compile test external functions
 
             foreach (var hash in Hashes)
             {
@@ -582,9 +582,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         {
                             if (hash.Parameters.Length < 2)
                             { Errors.Add(new Error($"Hash '{hash.HashName}' requies minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
-                            string bfName = hash.Parameters[0].Value;
+                            string name = hash.Parameters[0].Value;
 
-                            if (builtinFunctions.ContainsKey(bfName)) break;
+                            if (externalFunctions.ContainsKey(name)) break;
 
                             string[] bfParams = new string[hash.Parameters.Length - 1];
                             for (int i = 1; i < hash.Parameters.Length; i++)
@@ -607,30 +607,30 @@ namespace ProgrammingLanguage.BBCode.Compiler
                                 }
                             }
 
-                            var returnType = parameterTypes[0];
-                            var x = parameterTypes.ToList();
+                            Type returnType = parameterTypes[0];
+                            List<Type> x = parameterTypes.ToList();
                             x.RemoveAt(0);
-                            var pTypes = x.ToArray();
+                            Type[] pTypes = x.ToArray();
 
                             if (parameterTypes[0] == Type.VOID)
                             {
-                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, (DataItem[] p) =>
+                                externalFunctions.AddExternalFunction(name, pTypes, (DataItem[] p) =>
                                 {
-                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                 });
                             }
                             else
                             {
-                                builtinFunctions.AddBuiltinFunction(bfName, pTypes, (DataItem[] p) =>
+                                externalFunctions.AddExternalFunction(name, pTypes, (DataItem[] p) =>
                                 {
-                                    Output.Output.Debug($"Built-in function \"{bfName}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                     DataItem returnValue = returnType switch
                                     {
                                         Type.INT => new DataItem((int)0),
                                         Type.BYTE => new DataItem((byte)0),
                                         Type.FLOAT => new DataItem((float)0),
                                         Type.CHAR => new DataItem((char)'\0'),
-                                        _ => throw new RuntimeException($"Invalid return type \"{returnType}\"/{returnType.ToString().ToLower()} from built-in function \"{bfName}\""),
+                                        _ => throw new RuntimeException($"Invalid return type \"{returnType}\"/{returnType.ToString().ToLower()} from external function \"{name}\""),
                                     };
                                     returnValue.Tag = "return value";
                                     return returnValue;
@@ -826,7 +826,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Functions = this.CompiledFunctions,
                 Operators = this.CompiledOperators,
                 GeneralFunctions = this.CompiledGeneralFunctions,
-                BuiltinFunctions = builtinFunctions,
+                ExternalFunctions = externalFunctions,
                 Classes = this.CompiledClasses,
                 Structs = this.CompiledStructs,
                 Enums = this.CompiledEnums,
@@ -868,7 +868,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="System.Exception"/>
         public static Result Compile(ParserResult parserResult,
-            Dictionary<string, BuiltinFunction> builtinFunctions,
+            Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
             Action<string, Output.LogType> printCallback = null,
@@ -884,7 +884,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Hashes = new List<CompileTag>(),
                 GenericParameters = new Stack<Token[]>(),
 
-                BuiltinFunctions = builtinFunctions,
+                ExternalFunctions = externalFunctions,
 
                 Warnings = new List<Warning>(),
                 Errors = new List<Error>(),
@@ -892,7 +892,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
             return compiler.CompileMainFile(
                 parserResult,
-                builtinFunctions,
+                externalFunctions,
                 file,
                 parserSettings,
                 printCallback,

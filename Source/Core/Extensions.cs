@@ -96,11 +96,12 @@ namespace ProgrammingLanguage.Core
             string attributeName)
             => attributes.TryGetValue(attributeName, out _);
 
-        public static object Value(this DataItem item) => item.type switch
+        public static object Value(this DataItem item) => item.Type switch
         {
             RuntimeType.INT => item.ValueInt,
             RuntimeType.FLOAT => item.ValueFloat,
             RuntimeType.CHAR => item.ValueChar,
+            RuntimeType.BYTE => item.ValueByte,
             _ => null,
         };
 

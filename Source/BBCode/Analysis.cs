@@ -131,7 +131,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
     public class Analysis
     {
-        static Dictionary<string, BuiltinFunction> BuiltinFunctions => new();
+        static Dictionary<string, ExternalFunctionBase> ExternalFunctions => new();
 
         public static AnalysisResult Analyze(string code, FileInfo file, string path)
         {
@@ -401,7 +401,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
             var compilerResult1 = Compiler.Compile(
                 parserResult,
-                BuiltinFunctions,
+                ExternalFunctions,
                 null,
                 ParserSettings.Default,
                 null,

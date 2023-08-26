@@ -41,7 +41,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Instruction instruction = self[instructionIndex];
                 if (instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
-                    if (instruction.Parameter.type == RuntimeType.INT)
+                    if (instruction.Parameter.Type == RuntimeType.INT)
                     {
                         if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index)
                         { continue; }
@@ -639,8 +639,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
-        public string BuiltinName => CompiledAttributes.TryGetAttribute("Builtin", out string builtinName) ? builtinName : string.Empty;
+        public bool IsExternal => CompiledAttributes.ContainsKey("External");
+        public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string name) ? name : string.Empty;
 
         public string Key => this.ID();
 
@@ -741,16 +741,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
-        public string BuiltinName
+        public bool IsExternal => CompiledAttributes.ContainsKey("External");
+        public string ExternalFunctionName
         {
             get
             {
-                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
+                if (CompiledAttributes.TryGetValue("External", out var attributeValues))
                 {
-                    if (attributeValues.TryGetValue(0, out string builtinName))
+                    if (attributeValues.TryGetValue(0, out string name))
                     {
-                        return builtinName;
+                        return name;
                     }
                 }
                 return string.Empty;

@@ -29,4 +29,8 @@
     <ProjectReference Include="C:\Users\bazsi\source\repos\Data Utilities\Data Utilities.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Examples\" />
+  </ItemGroup>
+
 </Project>

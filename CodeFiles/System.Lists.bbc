@@ -1,5 +1,6 @@
 using System;
 
+[Define("array")]
 template<T>
 class Array
 {
@@ -37,7 +38,7 @@ class Array
     export constructor(int capacity)
     {
         int pointer = Alloc(1 + capacity * sizeof(T));
-        TArray<T> result = pointer as TArray<T>;
+        Array<T> result = pointer as Array<T>;
         result.capacity = capacity;
         return result;
     }

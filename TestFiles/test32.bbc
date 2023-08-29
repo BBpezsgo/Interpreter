@@ -1,0 +1,5 @@
+using System;
+using System.Lists;
+
+Array<int> bruh = new Array<int>(5);
+bruh[0] = 3;

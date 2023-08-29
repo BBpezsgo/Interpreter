@@ -38,6 +38,14 @@ namespace ProgrammingLanguage.Bytecode
 
         public DataItem[] ToArray() => heap.ToList().ToArray();
 
+        public DataItem[] GetData(int start, int length)
+        {
+            DataItem[] result = new DataItem[length];
+            for (int i = 0; i < length; i++)
+            { result[i] = this[start + i]; }
+            return result;
+        }
+
         internal string GetString(int start, int length)
         {
             int end = start + length;

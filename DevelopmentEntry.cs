@@ -18,7 +18,9 @@ namespace TheProgram
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
-            string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
+
+            //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
+            string path = TestConstants.TestFilesPath + "test32.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -36,10 +38,10 @@ namespace TheProgram
                 // "-decompile",
                 // "-compile",
                 // "-debug",
-                "-console-gui",
+                // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                // "-brainfuck",
+                "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""
@@ -80,7 +82,7 @@ namespace TheProgram
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
                     {
-                        ProgrammingLanguage.Brainfuck.Compiler.CodeGenerator.Result? _code = Brainfuck.ProgramUtils.CompilePlus(settings.Value.File, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
+                        ProgrammingLanguage.Brainfuck.Compiler.CodeGenerator.Result? _code = Brainfuck.ProgramUtils.CompilePlus(settings.Value.File, Brainfuck.ProgramUtils.CompileOptions.None); //, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
                         if (!_code.HasValue)
                         { break; }
                         var code = _code.Value;

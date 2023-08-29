@@ -246,12 +246,31 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public override string ToString() => Function == null ? "null" : Function.ToString();
         }
 
+        protected delegate void BuiltinFunctionCompiler(params StatementWithValue[] parameters);
+
+        protected class BuiltinFunction
+        {
+            public readonly CompiledType[] ParameterTypes;
+            public readonly CompiledType ReturnType;
+            public bool ReturnSomething => ReturnType != Type.VOID;
+
+            readonly BuiltinFunctionCompiler FunctionCompiler;
+
+            public BuiltinFunction(BuiltinFunctionCompiler functionCompiler, CompiledType type, params CompiledType[] parameters)
+            {
+                ParameterTypes = parameters;
+                ReturnType = type;
+                FunctionCompiler = functionCompiler;
+            }
+        }
+
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
+        protected readonly BuiltinFunction[] BuiltinFunctions;
 
         protected IReadOnlyList<CompileableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
         protected IReadOnlyList<CompileableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;

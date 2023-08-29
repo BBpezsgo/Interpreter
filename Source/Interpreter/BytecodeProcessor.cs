@@ -184,10 +184,10 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="UserException"/>
         int THROW()
         {
-            DataItem throwValue = Memory.Stack.Pop();
+            int pointer = Memory.Stack.Pop().ValueInt;
             string value = null;
             try
-            { value = Memory.Heap.GetStringByPointer(throwValue.ValueInt); }
+            { value = Memory.Heap.GetString(pointer + 1, Memory.Heap[pointer].Integer ?? 0); }
             catch (System.Exception) { }
             throw new UserException("User Exception Thrown", value);
         }
@@ -631,7 +631,7 @@ namespace ProgrammingLanguage.Bytecode
 
             int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
 
-            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetStringByPointer(functionNameDataItem.ValueInt);
+            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
 
             if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }

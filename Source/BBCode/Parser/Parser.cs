@@ -1134,7 +1134,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     {
                         StatementWithValue parameter = ExpectExpression();
                         if (parameter == null)
-                        { throw new SyntaxException("Expected expression as parameter", newStructStatement.TotalPosition()); }
+                        { throw new SyntaxException("Expected expression as parameter", newStructStatement); }
 
                         parameters.Add(parameter);
 
@@ -1142,7 +1142,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                         { break; }
 
                         if (!ExpectOperator(","))
-                        { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
+                        { throw new SyntaxException("Expected ',' to separate parameters", parameter); }
                         else
                         { expectParameter = true; }
 
@@ -1302,13 +1302,13 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
 
             if (statement is Literal)
-            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
+            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement); }
 
             if (statement is Identifier)
-            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
+            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement); }
 
             if (statement is NewInstance)
-            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement.TotalPosition()); }
+            { throw new SyntaxException($"Unexpected kind of statement {statement.GetType().Name}", statement); }
 
             if (statement is StatementWithValue statementWithReturnValue)
             {
@@ -1475,7 +1475,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
 
             if (!ExpectOperator(")", out Token tokenZarojel2))
-            { throw new SyntaxException("Expected ')' after \"while\" condition", condition.TotalPosition()); }
+            { throw new SyntaxException("Expected ')' after \"while\" condition", condition); }
 
             if (!ExpectBlock(out Block block))
             { throw new SyntaxException("Expected block", tokenZarojel2.After()); }
@@ -1536,7 +1536,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel); }
 
                 if (!ExpectOperator(")"))
-                { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition.TotalPosition()); }
+                { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition); }
             }
             if (!ExpectBlock(out Block block))
             { throw new SyntaxException("Expected block", tokenIf.After()); }
@@ -1560,7 +1560,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     Keyword = tokenIf,
                     Block = block,
                 },
-                _ => throw new InternalException(),
+                _ => throw new ImpossibleException(),
             };
         }
 
@@ -1646,7 +1646,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 StatementWithValue parameter = ExpectExpression();
                 if (parameter == null)
-                { throw new SyntaxException("Expected expression as parameter", methodCall.TotalPosition()); }
+                { throw new SyntaxException("Expected expression as parameter", methodCall); }
 
                 parameters.Add(parameter);
 
@@ -1654,7 +1654,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException($"Expected ',' to separate parameters, got {CurrentToken}", parameter.TotalPosition()); }
+                { throw new SyntaxException($"Expected ',' to separate parameters, got {CurrentToken}", parameter); }
                 else
                 { expectParameter = true; }
 
@@ -1922,7 +1922,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 }
 
                 if (parameter == null)
-                { throw new SyntaxException("Expected expression as parameter", functionCall.TotalPosition()); }
+                { throw new SyntaxException("Expected expression as parameter", functionCall); }
 
                 parameters.Add(parameter);
 
@@ -1930,7 +1930,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' to separate parameters", parameter.TotalPosition()); }
+                { throw new SyntaxException("Expected ',' to separate parameters", parameter); }
                 else
                 { expectParameter = true; }
 

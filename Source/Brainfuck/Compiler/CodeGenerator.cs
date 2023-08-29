@@ -169,7 +169,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     if (_string != null)
                     { return _string.Length; }
 
-                    throw new NotImplementedException();
+                    throw new ImpossibleException();
                 }
             }
 
@@ -202,7 +202,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         return CharCode.GetByte(_string[i]);
                     }
 
-                    throw new NotImplementedException();
+                    throw new ImpossibleException();
                 }
             }
 
@@ -384,21 +384,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             public readonly int Address;
             public readonly FunctionThingDefinition? Scope;
             public readonly bool HaveToClean;
-            public readonly bool IsArray;
             public readonly CompiledType Type;
             public readonly int Size;
             public bool IsDiscarted;
 
             public readonly bool IsInitialized => Type.SizeOnStack > 0;
 
-            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, CompiledType type, bool isArray, int size)
+            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, CompiledType type, int size)
             {
                 Name = name;
                 Address = address;
                 Scope = scope;
                 HaveToClean = haveToClean;
                 Type = type;
-                IsArray = isArray;
                 IsDiscarted = false;
                 Size = size;
             }
@@ -414,14 +412,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         {
             if (Variables.TryFind(symbolName, out var variable))
             {
-                if (variable.IsArray)
-                {
-                    type = new CompiledType(Type.BYTE);
-                }
-                else
-                {
-                    type = variable.Type;
-                }
+                type = variable.Type;
                 return true;
             }
 
@@ -526,19 +517,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "const":
                     {
                         if (instruction.Parameters.Length != 2)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"const\" (requied 2, passed {instruction.Parameters.Length})", instruction, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"const\" (requied 2, passed {instruction.Parameters.Length})", instruction, CurrentFile); }
 
                         if (instruction.Parameters[0] is not Identifier constIdentifier)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (requied identifier)", instruction.Parameters[0], null); }
+                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (requied identifier)", instruction.Parameters[0], CurrentFile); }
 
                         if (IllegalIdentifiers.Contains(constIdentifier.VariableName.Content))
-                        { throw new CompilerException($"Illegal constant name \"{constIdentifier}\"", constIdentifier, null); }
+                        { throw new CompilerException($"Illegal constant name \"{constIdentifier}\"", constIdentifier, CurrentFile); }
 
                         if (instruction.Parameters[1] is not StatementWithValue constValue)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (requied a value)", instruction.Parameters[1], null); }
+                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (requied a value)", instruction.Parameters[1], CurrentFile); }
 
                         if (Constants.TryFind(constIdentifier.VariableName.Content, out _))
-                        { throw new CompilerException($"Constant \"{constIdentifier.VariableName.Content}\" already defined", instruction.Parameters[0], null); }
+                        { throw new CompilerException($"Constant \"{constIdentifier.VariableName.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
 
                         ConstantValue value = Compute(constValue);
                         Constants.Add(new ConstantVariable(constIdentifier.VariableName.Content, value));
@@ -555,7 +546,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             // { return; }
 
             if (IllegalIdentifiers.Contains(function.Identifier.Content))
-            { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, null); }
+            { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, CurrentFile); }
 
             Precompile(function.Statements);
         }
@@ -571,7 +562,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             else if (statement is OperatorCall expression)
             { return Compute(expression); }
             else
-            { throw new CompilerException($"Statement {statement.GetType().Name} can not be computed at compile time", statement, null); }
+            { throw new CompilerException($"Statement {statement.GetType().Name} can not be computed at compile time", statement, CurrentFile); }
         }
         static ConstantValue Compute(Literal statement)
         {
@@ -585,21 +576,31 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case LiteralType.INT:
                     {
                         int value = int.Parse(statement.Value);
-                        return (byte)value;
+                        return new ConstantValue((byte)value);
                     }
                 case LiteralType.CHAR:
                     {
-                        int value = CharCode.GetByte(statement.Value[0]);
-                        return (byte)value;
+                        byte value = CharCode.GetByte(statement.Value[0]);
+                        return new ConstantValue(value);
                     }
+
+                case LiteralType.FLOAT:
+                    throw new CompilerException($"Floats not supported by brainfuck");
+
+                case LiteralType.BOOLEAN:
+                    {
+                        bool value = bool.Parse(statement.Value);
+                        return new ConstantValue((byte)(value ? 1 : 0));
+                    }
+
                 default:
-                    throw new CompilerException($"Unknown literal type {statement.Type}", statement, null);
+                    throw new ImpossibleException($"Unknown literal type {statement.Type}");
             }
         }
         ConstantValue Compute(Identifier statement)
         {
             if (!Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
-            { throw new CompilerException($"Constant \"{statement}\" not found", statement, null); }
+            { throw new CompilerException($"Constant \"{statement}\" not found", statement, CurrentFile); }
 
             return constant.Value;
         }
@@ -626,7 +627,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 "&&" => (((byte)left != 0) && ((byte)right != 0)) ? 1 : 0,
                 "||" => (((byte)left != 0) || ((byte)right != 0)) ? 1 : 0,
                 "!=" => (left != right) ? 1 : 0,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, null),
+                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
             };
         }
         #endregion
@@ -650,24 +651,32 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 case LiteralType.STRING:
                     {
-                        string _value = statement.Value;
-                        value = _value;
+                        value = new ConstantValue(statement.Value);
                         return true;
                     }
                 case LiteralType.INT:
                     {
-                        int _value = int.Parse(statement.Value);
-                        value = (byte)_value;
+                        value = new ConstantValue((byte)int.Parse(statement.Value));
                         return true;
                     }
                 case LiteralType.CHAR:
                     {
-                        char _value = statement.Value[0];
-                        value = _value;
+                        value = new ConstantValue(statement.Value[0]);
                         return true;
                     }
+
+                case LiteralType.FLOAT:
+                    throw new CompilerException($"Floats not supported by brainfuck");
+
+                case LiteralType.BOOLEAN:
+                    {
+                        bool _value = bool.Parse(statement.Value);
+                        value = new ConstantValue((byte)(_value ? 1 : 0));
+                        return true;
+                    }
+
                 default:
-                    throw new CompilerException($"Unknown literal type {statement.Type}", statement, null);
+                    throw new ImpossibleException($"Unknown literal type {statement.Type}");
             }
         }
         bool TryCompute(Identifier statement, out ConstantValue value)
@@ -707,7 +716,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 "&&" => (((byte)left != 0) && ((byte)right != 0)) ? 1 : 0,
                 "||" => (((byte)left != 0) || ((byte)right != 0)) ? 1 : 0,
                 "!=" => (left != right) ? 1 : 0,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, null),
+                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
             };
             return true;
         }
@@ -733,15 +742,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         int PrecompileVariable(VariableDeclaretion variableDeclaretion)
         {
             if (IllegalIdentifiers.Contains(variableDeclaretion.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name \"{variableDeclaretion.VariableName}\"", variableDeclaretion.VariableName, null); }
+            { throw new CompilerException($"Illegal variable name \"{variableDeclaretion.VariableName}\"", variableDeclaretion.VariableName, CurrentFile); }
 
             StatementWithValue? initialValue = variableDeclaretion.InitialValue;
 
             if (Variables.TryFind(variableDeclaretion.VariableName.Content, out _))
-            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, null); }
+            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, CurrentFile); }
 
             if (Constants.TryFind(variableDeclaretion.VariableName.Content, out _))
-            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, null); }
+            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, CurrentFile); }
 
             return PrecompileVariable(Variables, variableDeclaretion.VariableName.Content, initialValue);
         }
@@ -754,35 +763,38 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             if (initialValue != null)
             {
-                if (initialValue is FunctionCall functionCall &&
-                    functionCall.Identifier == "array")
-                {
-                    if (functionCall.Parameters.Length != 1)
-                    { throw new CompilerException($"Expected 1 parameters, {functionCall.Parameters.Length} passed", functionCall, null); }
+                var initialValueType = FindStatementType(initialValue);
 
-                    if (!TryCompute(functionCall.Parameters[0], out var arraySize))
-                    { throw new CompilerException($"Array size have to be precompiled", functionCall.Parameters[0], null); }
+                if (initialValueType.IsClass &&
+                    initialValueType.Class.CompiledAttributes.HasAttribute("Define", "array") &&
+                    initialValue is ConstructorCall constructorCall)
+                {
+                    if (constructorCall.Parameters.Length != 1)
+                    { throw new CompilerException($"Expected 1 parameters, {constructorCall.Parameters.Length} passed", constructorCall, CurrentFile); }
+
+                    if (!TryCompute(constructorCall.Parameters[0], out var arraySize))
+                    { throw new CompilerException($"Array size have to be precompiled", constructorCall.Parameters[0], CurrentFile); }
 
                     if (arraySize.Type != ValueType.Byte)
-                    { throw new CompilerException($"Expected byte as array size (not {arraySize.Type})", functionCall.Parameters[0], null); }
+                    { throw new CompilerException($"Expected byte as array size (not {arraySize.Type})", constructorCall.Parameters[0], CurrentFile); }
 
-                    int size = (byte)arraySize * 2 + 2;
+                    int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new Variable(name, address, scope, true, new CompiledType(Type.BYTE), true, size));
+                    variables.Push(new Variable(name, address, scope, true, initialValueType, size));
                 }
                 else
                 {
                     int size = GetValueSize(initialValue);
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new Variable(name, address, scope, true, FindStatementType(initialValue), false, size));
+                    variables.Push(new Variable(name, address, scope, true, FindStatementType(initialValue), size));
                 }
             }
             else
             {
                 int size = 1;
                 int address = Stack.PushVirtual(size);
-                variables.Push(new Variable(name, address, scope, true, new CompiledType(Type.BYTE), false, size));
+                variables.Push(new Variable(name, address, scope, true, new CompiledType(Type.BYTE), size));
             }
 
             return 1;
@@ -822,11 +834,38 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement is ConstructorCall constructorCall)
             { return GetValueSize(constructorCall); }
 
-            throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, null);
+            if (statement is IndexCall indexCall)
+            { return GetValueSize(indexCall); }
+
+            throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, CurrentFile);
+        }
+        int GetValueSize(IndexCall indexCall)
+        {
+            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
+
+            if (!arrayType.IsClass)
+            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
+
+            if (arrayType.Class.CompiledAttributes.HasAttribute("Defines", "array"))
+            {
+                var elementType = arrayType.TypeParameters[0];
+                return elementType.SizeOnStack;
+            }
+
+            if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
+            {
+                if (!GetIndexGetterTemplate(arrayType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
+
+                indexerTemplate = AddCompilable(indexerTemplate);
+                indexer = indexerTemplate.Function;
+            }
+
+            return indexer.Type.SizeOnStack;
         }
         int GetValueSize(Field field)
         {
-            var type = FindStatementType(field);
+            CompiledType type = FindStatementType(field);
             return type.Size;
         }
         int GetValueSize(NewInstance newInstance)
@@ -841,18 +880,17 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return 1;
             }
 
-            throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, null);
+            throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
         }
-        static int GetValueSize(Literal statement)
+        static int GetValueSize(Literal statement) => statement.Type switch
         {
-            return statement.Type switch
-            {
-                LiteralType.STRING => statement.Value.Length,
-                LiteralType.INT => 1,
-                LiteralType.CHAR => 1,
-                _ => throw new CompilerException($"Unknown literal type {statement.Type}", statement, null),
-            };
-        }
+            LiteralType.STRING => statement.Value.Length,
+            LiteralType.INT => 1,
+            LiteralType.CHAR => 1,
+            LiteralType.FLOAT => 1,
+            LiteralType.BOOLEAN => 1,
+            _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
+        };
         int GetValueSize(Identifier statement)
         {
             if (statement.VariableName.Content == "IN")
@@ -861,7 +899,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (Variables.TryFind(statement.VariableName.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
-                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, null); }
+                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
 
                 return variable.Size;
             }
@@ -870,7 +908,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return constant.Value.Size;
             }
             else
-            { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, null); }
+            { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
         }
         int GetValueSize(ConstructorCall constructorCall)
         {
@@ -890,10 +928,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 }
             }
 
-            if (@class.CompiledAttributes.TryGetAttribute("Define", out string attributeDefine) && attributeDefine == "array")
+            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
                 if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall.TotalPosition(), CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
                 var t = FindStatementType(constructorCall.Parameters[0]);
                 if (t != Type.INT)
@@ -905,7 +943,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (value.Type != ValueType.Byte)
                 { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
 
-                return ((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack;
+                return Snippets.ARRAY_SIZE(value);
+                // return ((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack;
             }
 
             if (!constructor.CanUse(CurrentFile))
@@ -933,7 +972,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 // if (!function.Modifiers.Contains("macro"))
-                // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, null); }
+                // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
 
                 if (!function.ReturnSomething)
                 { return 0; }
@@ -941,45 +980,33 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return function.Type.Size;
             }
 
-            throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, null);
+            throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
         }
-        static int GetValueSize(OperatorCall statement)
+        int GetValueSize(OperatorCall statement) => statement.Operator.Content switch
         {
-            return statement.Operator.Content switch
-            {
-                "==" => 1,
-                "+" => 1,
-                "-" => 1,
-                "*" => 1,
-                "/" => 1,
-                "^" => 1,
-                "%" => 1,
-                "<" => 1,
-                ">" => 1,
-                "<=" => 1,
-                ">=" => 1,
-                "&" => 1,
-                "|" => 1,
-                "&&" => 1,
-                "||" => 1,
-                "!=" => 1,
-                "<<" => 1,
-                ">>" => 1,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, null),
-            };
-        }
-        static int GetValueSize(AddressGetter addressGetter)
-        {
-            return 1;
-        }
-        static int GetValueSize(Pointer pointer)
-        {
-            return 1;
-        }
-        int GetValueSize(TypeCast typeCast)
-        {
-            return GetValueSize(typeCast.PrevStatement);
-        }
+            "==" => 1,
+            "+" => 1,
+            "-" => 1,
+            "*" => 1,
+            "/" => 1,
+            "^" => 1,
+            "%" => 1,
+            "<" => 1,
+            ">" => 1,
+            "<=" => 1,
+            ">=" => 1,
+            "&" => 1,
+            "|" => 1,
+            "&&" => 1,
+            "||" => 1,
+            "!=" => 1,
+            "<<" => 1,
+            ">>" => 1,
+            _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
+        };
+        static int GetValueSize(AddressGetter _) => 1;
+        static int GetValueSize(Pointer _) => 1;
+        int GetValueSize(TypeCast typeCast) => GetValueSize(typeCast.PrevStatement);
         #endregion
 
         #region TryGetAddress
@@ -998,19 +1025,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement is Field field)
             { return TryGetAddress(field, out address, out size); }
 
-            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, null);
+            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
         }
 
         bool TryGetAddress(IndexCall index, out int address, out int size)
         {
             if (index.PrevStatement is not Identifier arrayIdentifier)
-            { throw new CompilerException($"This must be an identifier", index.PrevStatement, null); }
+            { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
             if (!Variables.TryFind(arrayIdentifier.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, null); }
+            { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
-            if (!variable.IsArray)
-            { throw new CompilerException($"Variable is not an array", arrayIdentifier, null); }
+            if (!variable.Type.IsClass || !variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
+            { throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile); }
 
             address = variable.Address;
             size = variable.Size;
@@ -1047,10 +1074,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         bool TryGetAddress(Pointer pointer, out int address, out int size)
         {
             if (!TryCompute(pointer.PrevStatement, out var addressToSet))
-            { throw new CompilerException($"Runtime pointer address in not supported", pointer.PrevStatement, null); }
+            { throw new CompilerException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
             if (addressToSet.Type != ValueType.Byte)
-            { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, null); }
+            { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
             address = (byte)addressToSet;
             size = 1;
@@ -1061,7 +1088,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         bool TryGetAddress(Identifier identifier, out int address, out int size)
         {
             if (!Variables.TryFind(identifier.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, null); }
+            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             address = variable.Address;
             size = variable.Size;
@@ -1080,7 +1107,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement is Field field)
             { return TryGetRuntimeAddress(field, out pointerAddress, out size); }
 
-            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, null);
+            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
         }
 
         bool TryGetRuntimeAddress(Field field, out int pointerAddress, out int size)
@@ -1114,7 +1141,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
         {
             if (!Variables.TryFind(identifier.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, null); }
+            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             if (!variable.Type.IsClass)
             {
@@ -1165,7 +1192,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, null);
+            throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
         }
 
         void CompileSetter(Identifier statement, StatementWithValue value)
@@ -1175,10 +1202,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             { return; }
 
             if (Constants.TryFind(statement.VariableName.Content, out _))
-            { throw new CompilerException($"This is a constant so you can not modify it's value", statement, null); }
+            { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
             if (!Variables.TryFind(statement.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{statement}\" not found", statement, null); }
+            { throw new CompilerException($"Variable \"{statement}\" not found", statement, CurrentFile); }
 
             CompileSetter(variable, value);
         }
@@ -1188,7 +1215,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (TryGetRuntimeAddress(field, out int pointerAddress, out int size))
             {
                 if (size != GetValueSize(value))
-                { throw new CompilerException($"Field and value size mismatch", value, null); }
+                { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
                 int valueAddress = Stack.NextAddress;
                 Compile(value);
@@ -1212,10 +1239,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
 
             if (!TryGetAddress(field, out int address, out size))
-            { throw new CompilerException($"Failed to get field address", field, null); }
+            { throw new CompilerException($"Failed to get field address", field, CurrentFile); }
 
             if (size != GetValueSize(value))
-            { throw new CompilerException($"Field and value size mismatch", value, null); }
+            { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
             CompileSetter(address, value);
         }
@@ -1232,10 +1259,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 }
 
                 if (valueVariable.IsDiscarted)
-                { throw new CompilerException($"Variable \"{valueVariable.Name}\" is discarted", _identifier, null); }
+                { throw new CompilerException($"Variable \"{valueVariable.Name}\" is discarted", _identifier, CurrentFile); }
 
                 if (variable.Size != valueVariable.Size)
-                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueVariable.Size})", value, null); }
+                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueVariable.Size})", value, CurrentFile); }
 
                 UndiscardVariable(Variables, variable.Name);
 
@@ -1263,7 +1290,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (TryCompute(value, out var constantValue))
                 {
                     if (constantValue.Size != variable.Size)
-                    { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", value, null); }
+                    { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", value, CurrentFile); }
 
                     if (constantValue.Type == ValueType.Byte)
                     {
@@ -1293,7 +1320,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 int valueSize = GetValueSize(value);
 
                 if (valueSize != variable.Size)
-                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueSize})", value, null); }
+                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueSize})", value, CurrentFile); }
 
                 using (Code.Block($"Compute value"))
                 {
@@ -1336,7 +1363,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
 
             if (GetValueSize(value) != 1)
-            { throw new CompilerException($"size 1 bruh alloved on heap thingy", value, null); }
+            { throw new CompilerException($"size 1 bruh alloved on heap thingy", value, CurrentFile); }
 
             int valueAddress = Stack.NextAddress;
             Compile(value);
@@ -1364,7 +1391,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (TryCompute(value, out var constantValue))
                 {
                     if (constantValue.Size != 1)
-                    { throw new CompilerException($"Value size can be only 1", value, null); }
+                    { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
 
                     Code.SetValue(address, (byte)constantValue);
 
@@ -1383,7 +1410,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 int variableSize = Stack.Size - stackSize;
 
                 if (variableSize != 1)
-                { throw new CompilerException($"Value size can be only 1 (not {variableSize})", value, null); }
+                { throw new CompilerException($"Value size can be only 1 (not {variableSize})", value, CurrentFile); }
 
                 using (Code.Block($"Store computed value (from {Stack.LastAddress}) to {address}"))
                 { Stack.PopAndStore(address); }
@@ -1393,89 +1420,47 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         void CompileSetter(IndexCall statement, StatementWithValue value)
         {
             if (statement.PrevStatement is not Identifier _variableIdentifier)
-            { throw new CompilerException($"This must be an identifier", statement.PrevStatement, null); }
+            { throw new CompilerException($"This must be an identifier", statement.PrevStatement, CurrentFile); }
 
             if (!Variables.TryFind(_variableIdentifier.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, null); }
+            { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
 
             if (variable.IsDiscarted)
-            { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", _variableIdentifier, null); }
-
-            if (variable.Type.IsClass &&
-                variable.Type.Class.CompiledAttributes.TryGetAttribute("Define", out string defineAttribute) &&
-                defineAttribute == "array")
-            {
-                CompiledType elementType = variable.Type.TypeParameters[0];
-                CompiledType valueType = FindStatementType(value);
-
-                if (elementType != valueType)
-                { throw new CompilerException("AAAAAAAAAAAaaafasfsdfsd", value, CurrentFile); }
-
-                int elementSize = elementType.Size;
-
-                int indexAddress = Stack.NextAddress;
-
-                using (Code.Block($"Compute index"))
-                {
-                    Compile(statement.Expression);
-
-                    int temp1 = Stack.Push(elementSize);
-                    int temp2 = Stack.PushVirtual(1);
-                    int temp3 = Stack.PushVirtual(1);
-
-                    using (Code.Block($"Multiply by {elementSize}"))
-                    {
-                        Code.MULTIPLY(indexAddress, temp1, temp2, temp3);
-                    }
-
-                    Stack.PopVirtual();
-                    Stack.PopVirtual();
-                    Stack.Pop();
-                }
-
-                int valueAddress = Stack.NextAddress;
-
-                using (Code.Block($"Compute value"))
-                {
-                    Compile(value);
-                }
-
-                throw new NotImplementedException();
-
-                Stack.PopVirtual();
-                Stack.PopVirtual();
-
-                return;
-            }
-
-            if (!variable.IsArray)
-            { throw new CompilerException($"Variable is not an array", _variableIdentifier, null); }
+            { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", _variableIdentifier, CurrentFile); }
 
             using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
-                int valueSize = GetValueSize(value);
-
-                if (valueSize != 1)
-                { throw new CompilerException($"Array element size must be 1", value, null); }
-
-                int indexAddress = Stack.NextAddress;
-
-                using (Code.Block($"Compute index"))
+                if (variable.Type.IsClass && variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
                 {
-                    Compile(statement.Expression);
+                    CompiledType elementType = variable.Type.TypeParameters[0];
+                    CompiledType valueType = FindStatementType(value);
+
+                    if (elementType != valueType)
+                    { throw new CompilerException("AAAAAAAAAAAaaafasfsdfsd", value, CurrentFile); }
+
+                    int elementSize = elementType.Size;
+
+                    if (elementSize != 1)
+                    { throw new CompilerException($"Array element size must be 1 :(", value, CurrentFile); }
+
+                    int indexAddress = Stack.NextAddress;
+                    using (Code.Block($"Compute index"))
+                    { Compile(statement.Expression); }
+
+                    int valueAddress = Stack.NextAddress;
+                    using (Code.Block($"Compute value"))
+                    { Compile(value); }
+
+                    int temp0 = Stack.PushVirtual(1);
+
+                    Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, temp0);
+
+                    Stack.Pop();
+                    Stack.Pop();
+                    Stack.Pop();
+
+                    return;
                 }
-
-                int valueAddress = Stack.NextAddress;
-
-                using (Code.Block($"Compute value"))
-                {
-                    Compile(value);
-                }
-
-                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress);
-
-                Stack.PopVirtual();
-                Stack.PopVirtual();
             }
         }
 
@@ -1520,8 +1505,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             { Compile(constructorCall); }
             else if (statement is Field field)
             { Compile(field); }
+            else if (statement is IndexCall indexCall)
+            { Compile(indexCall); }
             else
-            { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, null); }
+            { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
 
             if (statement is FunctionCall statementWithValue &&
                 !statementWithValue.SaveValue &&
@@ -1539,6 +1526,51 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 InstructionStart = start,
                 InstructionEnd = end,
                 Position = statement.GetPosition(),
+            });
+        }
+        void Compile(IndexCall indexCall)
+        {
+            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
+
+            if (!arrayType.IsClass)
+            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
+
+            if (arrayType.Class.CompiledAttributes.HasAttribute("Define", "array"))
+            {
+                if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
+                { throw new CompilerException($"Failed to get array address", indexCall.PrevStatement, CurrentFile); }
+
+                CompiledType elementType = arrayType.TypeParameters[0];
+
+                int elementSize = elementType.Size;
+
+                if (elementSize != 1)
+                { throw new CompilerException($"Array element size must be 1 :(", indexCall, CurrentFile); }
+
+                int resultAddress = Stack.PushVirtual(elementSize);
+
+                int indexAddress = Stack.NextAddress;
+                using (Code.Block($"Compute index"))
+                { Compile(indexCall.Expression); }
+
+                Code.ARRAY_GET(arrayAddress, indexAddress, resultAddress);
+
+                Stack.Pop();
+
+                return;
+            }
+
+            Compile(new FunctionCall()
+            {
+                Identifier = Token.CreateAnonymous(FunctionNames.IndexerGet),
+                SaveValue = indexCall.SaveValue,
+                PrevStatement = indexCall.PrevStatement,
+                Parameters = new StatementWithValue[]
+                {
+                    indexCall.Expression,
+                },
+                BracketLeft = indexCall.BracketLeft,
+                BracketRight = indexCall.BracketRight,
             });
         }
         void Compile(LinkedIf @if)
@@ -1912,23 +1944,23 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     {
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (requied 0 or 1, passed {statement.Parameters.Length})", statement, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (requied 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         if (statement.Parameters.Length == 1)
                         {
                             // if (GetValueSize(statement.Parameters[0]) != 1)
-                            // { throw new CompilerException($"Return value can be only 1 byte", statement.Parameters[0], null); }
+                            // { throw new CompilerException($"Return value can be only 1 byte", statement.Parameters[0], CurrentFile); }
 
                             if (!Variables.TryFind("@return", out Variable returnVariable))
-                            { throw new CompilerException($"Can't return value for some reason :(", statement, null); }
+                            { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
                             CompileSetter(returnVariable, statement.Parameters[0]);
                         }
 
-                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, null));
+                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, CurrentFile));
 
                         if (ReturnTagStack.Count <= 0)
-                        { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, null); }
+                        { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
 
                         Code.SetValue(ReturnTagStack[^1], 0);
 
@@ -1944,12 +1976,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (requied 0, passed {statement.Parameters.Length})", statement, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (requied 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         if (BreakTagStack.Count <= 0)
-                        { throw new CompilerException($"Looks like this \"break\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, null); }
+                        { throw new CompilerException($"Looks like this \"break\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
 
-                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, null));
+                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, CurrentFile));
 
                         Code.SetValue(BreakTagStack[^1], 0);
 
@@ -1975,7 +2007,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "outraw":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"outraw\" (requied minimum 1, passed {statement.Parameters.Length})", statement, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"outraw\" (requied minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         foreach (var value in statement.Parameters)
                         {
@@ -2049,13 +2081,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     continue;
                                 }
 
-                                throw new CompilerException($"Value failed to compiled", value, null);
+                                throw new CompilerException($"Value failed to compiled", value, CurrentFile);
                             }
 
                             if (value is Identifier identifier && Variables.TryFind(identifier.VariableName.Content, out Variable variable))
                             {
                                 if (variable.IsDiscarted)
-                                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", identifier, null); }
+                                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", identifier, CurrentFile); }
 
                                 using (Code.Block($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
                                 {
@@ -2095,7 +2127,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "out":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"out\" (requied minimum 1, passed {statement.Parameters.Length})", statement, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"out\" (requied minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         foreach (StatementWithValue valueToPrint in statement.Parameters)
                         {
@@ -2173,7 +2205,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             int size = GetValueSize(valueToPrint);
 
                             if (size != 1)
-                            { throw new CompilerException($"The \"outstr\" instruction only accepts value of size 1 (not {size})", valueToPrint, null); }
+                            { throw new CompilerException($"The \"outstr\" instruction only accepts value of size 1 (not {size})", valueToPrint, CurrentFile); }
 
                             using (Code.Block($"Print value {valueToPrint} as text"))
                             {
@@ -2205,7 +2237,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "delete":
                     {
                         if (statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"delete\" (requied 1, passed {statement.Parameters.Length})", statement, null); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"delete\" (requied 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         var deletable = statement.Parameters[0];
                         var deletableType = FindStatementType(deletable);
@@ -2213,7 +2245,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (deletableType.IsClass)
                         {
                             if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
-                            { throw new CompilerException($"Failed to get address", deletable, null); }
+                            { throw new CompilerException($"Failed to get address", deletable, CurrentFile); }
 
                             int _pointerAddress = Stack.PushVirtual(1);
 
@@ -2244,18 +2276,18 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             return;
                         }
 
-                        throw new CompilerException($"Bruh. This propably not stored in heap...", deletable, null);
+                        throw new CompilerException($"Bruh. This propably not stored in heap...", deletable, CurrentFile);
                     }
 
-                default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, null);
+                default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
         }
         void Compile(Assignment statement)
         {
             if (statement.Operator.Content != "=")
-            { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, null); }
+            { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is requied for \'{statement.Operator}\' assignment", statement, null));
+            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is requied for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
         void Compile(CompoundAssignment statement)
         {
@@ -2264,25 +2296,25 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "+=":
                     {
                         if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, null); }
+                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
                         if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
-                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", Position.UnknownPosition, null); }
+                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
 
                         if (statement.Right == null)
-                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, null); }
+                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
 
                         if (TryCompute(statement.Right, out var constantValue) &&
                             constantValue.Size == 1)
                         {
                             if (constantValue.Size != variable.Size)
-                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, null); }
+                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, CurrentFile); }
 
                             Code.AddValue(variable.Address, constantValue[0]);
 
@@ -2308,25 +2340,25 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "-=":
                     {
                         if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, null); }
+                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
                         if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
-                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", variableIdentifier, null); }
+                        { throw new CompilerException($"Bruhhh", variableIdentifier, CurrentFile); }
 
                         if (statement.Right == null)
-                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, null); }
+                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
 
                         if (TryCompute(statement.Right, out var constantValue) &&
                             constantValue.Size == 1)
                         {
                             if (constantValue.Size != variable.Size)
-                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, null); }
+                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, CurrentFile); }
 
                             Code.AddValue(variable.Address, -constantValue[0]);
 
@@ -2362,16 +2394,16 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "++":
                     {
                         if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, null); }
+                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
                         if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
-                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", Position.UnknownPosition, null); }
+                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
 
                         using (Code.Block($"Increment variable {variable.Name} (at {variable.Address})"))
                         {
@@ -2383,16 +2415,16 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "--":
                     {
                         if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, null); }
+                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
                         if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
-                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, null); }
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", Position.UnknownPosition, null); }
+                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
 
                         using (Code.Block($"Decrement variable {variable.Name} (at {variable.Address})"))
                         {
@@ -2402,7 +2434,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         return;
                     }
                 default:
-                    throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, null);
+                    throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
         }
         void Compile(VariableDeclaretion statement)
@@ -2410,7 +2442,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement.InitialValue == null) return;
 
             if (!Variables.TryFind(statement.VariableName.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, null); }
+            { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
 
             CompileSetter(variable, statement.InitialValue);
         }
@@ -2450,13 +2482,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (!GetFunction(functionCall, out CompiledFunction? function))
             {
                 string readableID = functionCall.ReadableID(FindStatementType);
-                throw new CompilerException($"Function \"{readableID}\" not found", functionCall.Identifier, null);
+                throw new CompilerException($"Function \"{readableID}\" not found", functionCall.Identifier, CurrentFile);
             }
 
             // if (!function.Modifiers.Contains("macro"))
-            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, null); }
+            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
 
-            InlineMacro(function, functionCall.Parameters);
+            InlineMacro(function, functionCall.Parameters, functionCall);
         }
         void Compile(ConstructorCall constructorCall)
         {
@@ -2473,10 +2505,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (@class.CompiledAttributes.TryGetAttribute("Define", out string attributeDefine) && attributeDefine == "array")
+            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
                 if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall.TotalPosition(), CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
                 var t = FindStatementType(constructorCall.Parameters[0]);
                 if (t != Type.INT)
@@ -2488,7 +2520,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (value.Type != ValueType.Byte)
                 { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
 
-                Stack.PushVirtual(((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack);
+                CompiledType arrayElementType = new(constructorCall.TypeName.GenericTypes[0], FindType);
+                if (arrayElementType == Type.INT)
+                { Warnings.Add(new Warning($"Integers are not supported by brainfuck so I will threat this as a byte", constructorCall.TypeName.GenericTypes[0], CurrentFile)); }
+
+                Stack.PushVirtual(Snippets.ARRAY_SIZE(value));
+                // Stack.PushVirtual(((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack);
                 return;
             }
 
@@ -2512,9 +2549,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
 
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall.TotalPosition(), CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
-            InlineMacro(constructor, constructorCall.Parameters);
+            InlineMacro(constructor, constructorCall.Parameters, constructorCall);
         }
         void Compile(Literal statement)
         {
@@ -2541,7 +2578,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         }
 
                     default:
-                        throw new CompilerException($"Unknown literal type {statement.Type}", statement, null);
+                        throw new CompilerException($"Unknown literal type {statement.Type}", statement, CurrentFile);
                 }
             }
         }
@@ -2560,17 +2597,17 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (Variables.TryFind(statement.VariableName.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
-                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, null); }
+                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
 
                 if (variable.IsDiscarted)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", statement, null); }
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", statement, CurrentFile); }
 
                 using (Code.Block($"Load variable {variable.Name} (from {variable.Address})"))
                 {
                     int variableSize = variable.Size;
 
                     if (variableSize <= 0)
-                    { throw new CompilerException($"Can't load variable \"{variable.Name}\" becouse it's size is {variableSize} (bruh)", statement, null); }
+                    { throw new CompilerException($"Can't load variable \"{variable.Name}\" becouse it's size is {variableSize} (bruh)", statement, CurrentFile); }
 
                     int loadTarget = Stack.PushVirtual(variableSize);
 
@@ -2605,7 +2642,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, null);
+            throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile);
         }
         void Compile(OperatorCall statement)
         {
@@ -2897,7 +2934,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                             break;
                         }
-                    default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, null);
+                    default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile);
                 }
             }
         }
@@ -3031,7 +3068,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
             else if (instanceType.IsClass)
             {
-                throw new CompilerException($"Not supported :(", newInstance, null);
+                throw new CompilerException($"Not supported :(", newInstance, CurrentFile);
                 /*
                 newInstance.TypeName = newInstance.TypeName.Class(@class);
                 @class.References?.Add(new DefinitionReference(newInstance.TypeName, CurrentFile));
@@ -3093,7 +3130,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 */
             }
             else
-            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newInstance.TypeName, null); }
+            { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newInstance.TypeName, CurrentFile); }
         }
         void Compile(Field field)
         {
@@ -3102,7 +3139,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 using (Code.Block($"Load field {field} (from {address})"))
                 {
                     if (size <= 0)
-                    { throw new CompilerException($"Can't load field \"{field}\" becouse it's size is {size} (bruh)", field, null); }
+                    { throw new CompilerException($"Can't load field \"{field}\" becouse it's size is {size} (bruh)", field, CurrentFile); }
 
                     int loadTarget = Stack.PushVirtual(size);
 
@@ -3167,36 +3204,39 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 Stack.Pop(); // pointerAddress
             }
             else
-            { throw new CompilerException($"Failed to get field memory address", field, null); }
+            { throw new CompilerException($"Failed to get field memory address", field, CurrentFile); }
         }
         void Compile(TypeCast typeCast)
         {
-            Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), null));
+            Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             Compile(typeCast.PrevStatement);
         }
         #endregion
 
-        void InlineMacro(CompiledFunction function, StatementWithValue[] parameters)
+        /// <param name="callerPosition">
+        /// Used for exceptions
+        /// </param>
+        void InlineMacro(CompiledFunction function, StatementWithValue[] parameters, IThingWithPosition callerPosition)
         {
             // if (!function.Modifiers.Contains("macro"))
-            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", Position.UnknownPosition, null); }
+            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
 
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
-                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", Position.UnknownPosition, null); }
+                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (equied {function.Parameters.Length} passed {parameters.Length})", Position.UnknownPosition, null); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (requied {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
             if (function.ReturnSomething)
             {
                 var returnType = function.Type;
-                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, false, returnType.Size);
+                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -3214,24 +3254,24 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 if (passedType != definedType &&
                     !definedType.IsGeneric)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, null); }
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
                 if (IllegalIdentifiers.Contains(defined.Identifier.Content))
-                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, null); }
+                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, CurrentFile); }
 
                 if (compiledParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, null); }
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
 
                 if (constantParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, null); }
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
 
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"Bruh", defined.Identifier, null); }
+                { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
                 if (passed is ModifiedStatement modifiedStatement)
                 {
                     if (!defined.Modifiers.Contains(modifiedStatement.Keyword.Content))
-                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, null); }
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, CurrentFile); }
 
                     switch (modifiedStatement.Keyword.Content)
                     {
@@ -3240,13 +3280,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
                                 if (!Variables.TryFind(modifiedVariable.VariableName.Content, out Variable v))
-                                { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, null); }
+                                { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType &&
                                     !definedType.IsGeneric)
-                                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, null); }
+                                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.IsArray, v.Size));
+                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
                                 break;
                             }
                         case "const":
@@ -3258,25 +3298,25 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 break;
                             }
                         default:
-                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, null);
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, CurrentFile);
                     }
                 }
                 else if (passed is StatementWithValue value)
                 {
                     if (defined.Modifiers.Contains("ref"))
-                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, null); }
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
 
                     if (defined.Modifiers.Contains("const"))
-                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, null); }
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
                     PrecompileVariable(compiledParameters, defined.Identifier.Content, value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
-                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, null); }
+                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
                     if (variable.Type != definedType &&
                         !definedType.IsGeneric)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, null); }
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
@@ -3380,26 +3420,29 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             { BreakTagStack.Push(savedBreakTagStack[i]); }
         }
 
-        void InlineMacro(CompiledGeneralFunction function, StatementWithValue[] parameters)
+        /// <param name="callerPosition">
+        /// Used for exceptions
+        /// </param>
+        void InlineMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, IThingWithPosition callerPosition)
         {
             // if (!function.Modifiers.Contains("macro"))
-            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", Position.UnknownPosition, null); }
+            // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
 
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
-                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", Position.UnknownPosition, null); }
+                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (equied {function.Parameters.Length} passed {parameters.Length})", Position.UnknownPosition, null); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (equied {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
             if (function.ReturnSomething)
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, false, returnType.Size);
+                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -3417,24 +3460,24 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 if (passedType != definedType &&
                     !definedType.IsGeneric)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, null); }
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
                 if (IllegalIdentifiers.Contains(defined.Identifier.Content))
-                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, null); }
+                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, CurrentFile); }
 
                 if (compiledParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, null); }
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
 
                 if (constantParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, null); }
+                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
 
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
-                { throw new CompilerException($"Bruh", defined.Identifier, null); }
+                { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
                 if (passed is ModifiedStatement modifiedStatement)
                 {
                     if (!defined.Modifiers.Contains(modifiedStatement.Keyword.Content))
-                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, null); }
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, CurrentFile); }
 
                     switch (modifiedStatement.Keyword.Content)
                     {
@@ -3443,13 +3486,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
                                 if (!Variables.TryFind(modifiedVariable.VariableName.Content, out Variable v))
-                                { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, null); }
+                                { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType &&
                                     !definedType.IsGeneric)
-                                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, null); }
+                                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.IsArray, v.Size));
+                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
                                 break;
                             }
                         case "const":
@@ -3461,25 +3504,25 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 break;
                             }
                         default:
-                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, null);
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, CurrentFile);
                     }
                 }
                 else if (passed is StatementWithValue value)
                 {
                     if (defined.Modifiers.Contains("ref"))
-                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, null); }
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
 
                     if (defined.Modifiers.Contains("const"))
-                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, null); }
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
                     PrecompileVariable(compiledParameters, defined.Identifier.Content, value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
-                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, null); }
+                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
                     if (variable.Type != definedType &&
                         !definedType.IsGeneric)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, null); }
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
@@ -3695,8 +3738,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 { throw new System.Exception(); }
             }
 
-            if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-            { CleanupVariables(VariableCleanupStack.Pop()); }
+            // if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
+            // { CleanupVariables(VariableCleanupStack.Pop()); }
 
             // Heap.Destroy();
 

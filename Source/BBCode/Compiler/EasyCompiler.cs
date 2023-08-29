@@ -41,7 +41,7 @@ namespace ProgrammingLanguage.BBCode
                 tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
 
                 foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
             }
 
             tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
@@ -59,7 +59,7 @@ namespace ProgrammingLanguage.BBCode
                 parserResult = parser.Parse(tokens, warnings);
 
                 foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (parser.Errors.Count > 0)
                 { throw new Errors.Exception("Failed to parse", parser.Errors[0].ToException()); }
@@ -85,7 +85,7 @@ namespace ProgrammingLanguage.BBCode
                     this.BasePath ?? "");
 
                 foreach (Warning warning in compilerResult.Warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (compilerResult.Errors.Length > 0)
                 { throw new Errors.Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
@@ -104,13 +104,13 @@ namespace ProgrammingLanguage.BBCode
                     Compiler.Compiler.CompileLevel.Minimal);
 
                 foreach (Warning warning in codeGeneratorResult.Warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 foreach (var info in codeGeneratorResult.Informations)
-                { printCallback?.Invoke(info.MessageAll, Output.LogType.Normal); }
+                { printCallback?.Invoke(info.ToString(), Output.LogType.Normal); }
 
                 foreach (var hint in codeGeneratorResult.Hints)
-                { printCallback?.Invoke(hint.MessageAll, Output.LogType.Normal); }
+                { printCallback?.Invoke(hint.ToString(), Output.LogType.Normal); }
 
                 if (codeGeneratorResult.Errors.Length > 0)
                 { throw new Errors.Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }

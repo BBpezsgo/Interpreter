@@ -340,10 +340,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             foreach (var item in currentParameters)
             { this.currentParameters.Add(item); }
-            
+
             foreach (var item in currentVariables)
             { this.currentVariables.Add(item.Key, item.Value); }
-            
+
             this.CurrentFile = file;
         }
 
@@ -411,48 +411,77 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
+    public static class Utils
+    {
+        /// <exception cref="NotImplementedException"/>
+        public static Literal.Type ConvertType(System.Type type)
+        {
+            if (type == typeof(int))
+            { return Literal.Type.Integer; }
+
+            if (type == typeof(float))
+            { return Literal.Type.Float; }
+
+            if (type == typeof(bool))
+            { return Literal.Type.Boolean; }
+
+            if (type == typeof(string))
+            { return Literal.Type.String; }
+
+            throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
+        }
+
+        /// <exception cref="NotImplementedException"/>
+        public static bool TryConvertType(System.Type type, out Literal.Type result)
+        {
+            if (type == typeof(int))
+            {
+                result = Literal.Type.Integer;
+                return true;
+            }
+
+            if (type == typeof(float))
+            {
+                result = Literal.Type.Float;
+                return true;
+            }
+
+            if (type == typeof(bool))
+            {
+                result = Literal.Type.Boolean;
+                return true;
+            }
+
+            if (type == typeof(string))
+            {
+                result = Literal.Type.String;
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+    }
+
     public struct AttributeValues
     {
         public List<Literal> parameters;
         public Token Identifier;
-
-        /// <exception cref="NotImplementedException"/>
-        static Literal.Type ConvertType(System.Type type)
-        {
-            if (type == typeof(int))
-            { return Literal.Type.Integer; }
-            if (type == typeof(float))
-            { return Literal.Type.Float; }
-            if (type == typeof(bool))
-            { return Literal.Type.Boolean; }
-            if (type == typeof(string))
-            { return Literal.Type.String; }
-            throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
-        }
 
         public readonly bool TryGetValue<T>(int index, out T value)
         {
             value = default;
             if (parameters == null) return false;
             if (parameters.Count <= index) return false;
-            Literal.Type type = ConvertType(typeof(T));
-            switch (type)
+            Literal.Type type = Utils.ConvertType(typeof(T));
+            value = type switch
             {
-                case Literal.Type.Integer:
-                    value = (T)(object)parameters[index].ValueInt;
-                    break;
-                case Literal.Type.Float:
-                    value = (T)(object)parameters[index].ValueFloat;
-                    break;
-                case Literal.Type.String:
-                    value = (T)(object)parameters[index].ValueString;
-                    break;
-                case Literal.Type.Boolean:
-                    value = (T)(object)parameters[index].ValueBool;
-                    break;
-                default:
-                    break;
-            }
+                Literal.Type.Integer => (T)(object)parameters[index].ValueInt,
+                Literal.Type.Float => (T)(object)parameters[index].ValueFloat,
+                Literal.Type.String => (T)(object)parameters[index].ValueString,
+                Literal.Type.Boolean => (T)(object)parameters[index].ValueBool,
+                _ => default,
+            };
             return true;
         }
 
@@ -585,6 +614,31 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 throw new System.Exception($"Invalid type '{value.GetType().FullName}'");
             }
+        }
+
+        public readonly bool TryConvert<T>(out T value)
+        {
+            if (!Utils.TryConvertType(typeof(T), out Type type))
+            {
+                value = default;
+                return false;
+            }
+
+            if (type != this.type)
+            {
+                value = default;
+                return false;
+            }
+
+            value = type switch
+            {
+                Type.Integer => (T)(object)ValueInt,
+                Type.Float => (T)(object)ValueFloat,
+                Type.String => (T)(object)ValueString,
+                Type.Boolean => (T)(object)ValueBool,
+                _ => default,
+            };
+            return true;
         }
     }
 
@@ -1117,12 +1171,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             string[] typeParameters = TemplateInfo.ToDictionary().Keys.ToArray();
 
             if (typeArguments.Length != typeParameters.Length)
-            { throw new CompilerException($"Ah", Position.UnknownPosition, null); }
+            { throw new CompilerException("Ah"); }
 
             for (int i = 0; i < typeArguments.Length; i++)
             {
                 if (TemplateInfo == null)
-                { throw new CompilerException($"Ah", Position.UnknownPosition, null); }
+                { throw new CompilerException("Ah"); }
 
                 CompiledType value = typeArguments[i];
                 string key = typeParameters[i];
@@ -1397,7 +1451,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     Type.CHAR => "char",
 
                     Type.UNKNOWN => "unknown",
-                    Type.NONE => throw new InternalException("This should never occur"),
+                    Type.NONE => throw new ImpossibleException(),
 
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
@@ -1407,7 +1461,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (@enum != null) return @enum.Identifier.Content;
                 if (function != null) return function.Function.Identifier.Content;
 
-                throw new NotImplementedException();
+                throw new ImpossibleException();
             }
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
@@ -1518,7 +1572,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 RuntimeType.INT => Type.INT,
                 RuntimeType.FLOAT => Type.FLOAT,
                 RuntimeType.CHAR => Type.CHAR,
-                _ => throw new NotImplementedException("This should never occur"),
+                _ => throw new ImpossibleException(),
             };
         }
 

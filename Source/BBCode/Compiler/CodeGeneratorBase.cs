@@ -136,7 +136,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (KeyValuePair<string, CompiledType> pair in TypeArguments)
                 {
                     if (pair.Value.IsGeneric)
-                    { throw new InternalException(); }
+                    { throw new InternalException($"{nameof(pair.Value.IsGeneric)} is {true}"); }
                 }
 
                 if (Function is CompiledFunction compiledFunction)
@@ -728,6 +728,25 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
+        bool GetFunction(string name, IThingWithPosition position, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.Identifier != name) continue;
+
+                if (compiledFunction != null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", position, CurrentFile); }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction != null;
+        }
+
         bool GetFunction(string name, out CompiledFunction compiledFunction)
         {
             compiledFunction = null;
@@ -739,7 +758,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.Identifier != name) continue;
 
                 if (compiledFunction != null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", Position.UnknownPosition, CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -748,7 +767,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         protected bool GetFunction(Identifier variable, out CompiledFunction compiledFunction)
-            => GetFunction(variable.VariableName.Content, out compiledFunction);
+            => GetFunction(variable.VariableName.Content, variable, out compiledFunction);
 
         protected bool GetOperator(OperatorCall @operator, out CompiledOperator compiledOperator)
         {
@@ -1065,7 +1084,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { throw new NotImplementedException($"Initial value for structs is not implemented"); }
 
             if (type.IsClass)
-            { return new DataItem((int)Utils.NULL_POINTER); }
+            { return new DataItem(BBCode.Utils.NULL_POINTER); }
 
             if (type.IsEnum)
             {
@@ -1097,7 +1116,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "clone")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to keyword-function \"clone\": requied {1}, passed {keywordCall.Parameters.Length}", keywordCall.TotalPosition(), CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to keyword-function \"clone\": requied {1}, passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 return FindStatementType(keywordCall.Parameters[0]);
             }
@@ -1183,7 +1202,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             LiteralType.STRING => FindReplacedType("string", literal),
             LiteralType.BOOLEAN => FindReplacedType("boolean", literal),
             LiteralType.CHAR => new CompiledType(Type.CHAR),
-            _ => throw new NotImplementedException($"Unknown literal type {literal.Type}"),
+            _ => throw new ImpossibleException($"Unknown literal type {literal.Type}"),
         };
         protected CompiledType FindStatementType(Identifier variable)
         {
@@ -1267,7 +1286,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
 
-            throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field.TotalPosition(), CurrentFile);
+            throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field, CurrentFile);
         }
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
 
@@ -1383,7 +1402,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 LiteralType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
                 LiteralType.STRING => null,
                 LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
-                _ => throw new NotImplementedException($"This should never occur"),
+                LiteralType.CHAR => throw new NotImplementedException(),
+                _ => throw new ImpossibleException($"This should never occur"),
             };
         protected DataItem? ComputeValue(KeywordCall keywordCall)
         {

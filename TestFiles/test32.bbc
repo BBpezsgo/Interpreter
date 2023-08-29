@@ -1,5 +1,17 @@
 using System;
 using System.Lists;
 
+int eh1 = 44;
+int eh2 = 55;
+
 Array<int> bruh = new Array<int>(5);
-bruh[0] = 3;
+
+bruh[0] = 1;
+bruh[1] = 2;
+bruh[2] = 3;
+bruh[3] = 4;
+bruh[4] = 5;
+
+int eh3 = 66;
+int eh4 = 77;
+int eh5 = 88;

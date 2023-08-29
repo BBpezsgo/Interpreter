@@ -576,9 +576,9 @@ namespace ProgrammingLanguage.Brainfuck
             {
                 Bytecode.RuntimeType.BYTE => Push((int)v.ValueByte),
                 Bytecode.RuntimeType.INT => Push(v.ValueInt),
-                Bytecode.RuntimeType.FLOAT => throw new Errors.CompilerException($"Floats are not supported by the brainfuck compiler", Position.UnknownPosition, null),
+                Bytecode.RuntimeType.FLOAT => throw new Errors.CompilerException("Floats are not supported by the brainfuck compiler"),
                 Bytecode.RuntimeType.CHAR => Push(v.ValueChar),
-                _ => throw new NotImplementedException(),
+                _ => throw new Errors.ImpossibleException(),
             };
         }
 

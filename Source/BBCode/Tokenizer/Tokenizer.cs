@@ -461,21 +461,21 @@ namespace ProgrammingLanguage.BBCode
                 else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
                     if (CurrentToken.Content.Contains(currChar))
-                    { throw new TokenizerException($"Invalid float literal format", CurrentToken); }
+                    { throw new TokenizerException($"Invalid float literal format", CurrentToken.GetPosition()); }
                     CurrentToken.Content += currChar;
                     CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
                 else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.Content.EndsWith('0'))
-                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken); }
+                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken.GetPosition()); }
                     CurrentToken.Content += currChar;
                     CurrentToken.TokenType = TokenType.LITERAL_HEX;
                 }
                 else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.Content.EndsWith('0'))
-                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken); }
+                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken.GetPosition()); }
                     CurrentToken.Content += currChar;
                     CurrentToken.TokenType = TokenType.LITERAL_BIN;
                 }
@@ -722,7 +722,7 @@ namespace ProgrammingLanguage.BBCode
                         {
                             if (token.Content.Length != 1)
                             {
-                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token);
+                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token.GetPosition());
                             }
                         }
                         break;

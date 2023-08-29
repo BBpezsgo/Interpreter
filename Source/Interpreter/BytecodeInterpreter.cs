@@ -87,7 +87,6 @@ namespace ProgrammingLanguage.Bytecode
         public int BasePointer => BytecodeProcessor.BasePointer;
         public IReadOnlyStack<DataItem> Stack => BytecodeProcessor.Memory.Stack;
         public IReadOnlyHeap Heap => BytecodeProcessor.Memory.Heap;
-        public int StackMemorySize => BytecodeProcessor.Memory.Stack.UsedVirtualMemory;
         public string[] CallStack => BytecodeProcessor.Memory.CallStack.ToArray();
 
         #endregion

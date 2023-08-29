@@ -721,7 +721,7 @@ namespace ProgrammingLanguage.Bytecode
                 RuntimeType.INT => valueInt == value.valueInt,
                 RuntimeType.FLOAT => valueFloat == value.valueFloat,
                 RuntimeType.CHAR => valueChar == value.valueChar,
-                _ => throw new NotImplementedException(),
+                _ => throw new ImpossibleException(),
             };
 
         public readonly void DebugPrint()
@@ -783,8 +783,7 @@ namespace ProgrammingLanguage.Bytecode
                 case RuntimeType.CHAR:
                     serializer.Serialize(valueChar.Value);
                     break;
-                default:
-                    throw new NotImplementedException();
+                default: throw new ImpossibleException();
             }
             serializer.Serialize(Tag);
         }
@@ -806,8 +805,7 @@ namespace ProgrammingLanguage.Bytecode
                 case RuntimeType.CHAR:
                     valueChar = deserializer.DeserializeChar();
                     break;
-                default:
-                    throw new NotImplementedException();
+                default: throw new ImpossibleException();
             }
             Tag = deserializer.DeserializeString();
         }
@@ -823,7 +821,7 @@ namespace ProgrammingLanguage.Bytecode
                 RuntimeType.INT => Value.Literal(valueInt.Value),
                 RuntimeType.FLOAT => Value.Literal(valueFloat.Value),
                 RuntimeType.CHAR => Value.Literal(valueChar.Value),
-                _ => throw new NotImplementedException(),
+                _ => throw new ImpossibleException(),
             };
             result["Tag"] = Value.Literal(Tag);
 

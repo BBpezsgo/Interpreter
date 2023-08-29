@@ -69,12 +69,12 @@ namespace ProgrammingLanguage.Output
 
         internal static void Error(Errors.Exception error)
         {
-            LogColor(error.MessageAll, ConsoleColor.Red);
+            LogColor(error.ToString(), ConsoleColor.Red);
         }
 
         internal static void Error(Errors.Error error)
         {
-            LogColor(error.MessageAll, ConsoleColor.Red);
+            LogColor(error.ToString(), ConsoleColor.Red);
         }
 
         internal static void Error(Exception error)
@@ -89,7 +89,7 @@ namespace ProgrammingLanguage.Output
 
         internal static void Warning(Errors.Warning warning)
         {
-            LogColor(warning.MessageAll, ConsoleColor.DarkYellow);
+            LogColor(warning.ToString(), ConsoleColor.DarkYellow);
         }
 
         static void LogColor(string message, ConsoleColor color)

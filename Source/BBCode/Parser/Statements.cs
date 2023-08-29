@@ -449,7 +449,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
                 else if (left is not null && right is not null)
                 { return new StatementWithValue[] { left, right }; }
                 else
-                { throw new Errors.InternalException(); }
+                { throw new Errors.InternalException($"{nameof(Left)} and {nameof(Right)} are both null"); }
             }
         }
         internal int ParameterCount

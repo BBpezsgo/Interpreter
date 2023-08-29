@@ -475,7 +475,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     case LiteralType.STRING:
                         throw new CompilerException($"String literal is not valid for a enum member value", member.Value, @enum.FilePath);
                     default:
-                        throw new NotImplementedException();
+                        throw new ImpossibleException();
                 }
                 compiledEnum.Members[i] = compiledMember;
             }

@@ -36,7 +36,7 @@ namespace ProgrammingLanguage.Brainfuck
                 tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
 
                 foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
             }
 
             tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
@@ -54,7 +54,7 @@ namespace ProgrammingLanguage.Brainfuck
                 parserResult = parser.Parse(tokens, warnings);
 
                 foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (parser.Errors.Count > 0)
                 { throw new Errors.Exception("Failed to parse", parser.Errors[0].ToException()); }
@@ -77,7 +77,7 @@ namespace ProgrammingLanguage.Brainfuck
                     this.BasePath ?? "");
 
                 foreach (Warning warning in compilerResult.Warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (compilerResult.Errors.Length > 0)
                 { throw new Errors.Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
@@ -96,7 +96,7 @@ namespace ProgrammingLanguage.Brainfuck
                     printCallback);
 
                 foreach (Warning warning in codeGeneratorResult.Warnings)
-                { printCallback?.Invoke(warning.MessageAll, Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (codeGeneratorResult.Errors.Length > 0)
                 { throw new Errors.Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }

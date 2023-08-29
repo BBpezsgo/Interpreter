@@ -103,7 +103,7 @@ namespace ProgrammingLanguage.Bytecode
 
                 #endregion
 
-                default: throw new InternalException("Unimplemented instruction " + CurrentInstruction.opcode.ToString());
+                default: throw new ImpossibleException();
             }
         }
 
@@ -564,7 +564,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue), value.Tag),
                         RuntimeType.FLOAT => new DataItem((byte)MathF.Round(value.ValueFloat), value.Tag),
                         RuntimeType.CHAR => new DataItem((byte)value.ValueChar, value.Tag),
-                        _ => throw new NotImplementedException(),
+                        _ => throw new ImpossibleException(),
                     },
                     RuntimeType.INT => value.Type switch
                     {
@@ -572,7 +572,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.INT => new DataItem((int)value.ValueInt, value.Tag),
                         RuntimeType.FLOAT => new DataItem((int)MathF.Round(value.ValueFloat), value.Tag),
                         RuntimeType.CHAR => new DataItem((int)value.ValueChar, value.Tag),
-                        _ => throw new NotImplementedException(),
+                        _ => throw new ImpossibleException(),
                     },
                     RuntimeType.FLOAT => value.Type switch
                     {
@@ -580,7 +580,7 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.INT => new DataItem((float)value.ValueInt, value.Tag),
                         RuntimeType.FLOAT => new DataItem((float)MathF.Round(value.ValueFloat), value.Tag),
                         RuntimeType.CHAR => new DataItem((float)value.ValueChar, value.Tag),
-                        _ => throw new NotImplementedException(),
+                        _ => throw new ImpossibleException(),
                     },
                     RuntimeType.CHAR => value.Type switch
                     {
@@ -588,9 +588,9 @@ namespace ProgrammingLanguage.Bytecode
                         RuntimeType.INT => new DataItem((char)value.ValueInt, value.Tag),
                         RuntimeType.FLOAT => new DataItem((char)MathF.Round(value.ValueFloat), value.Tag),
                         RuntimeType.CHAR => new DataItem((char)value.ValueChar, value.Tag),
-                        _ => throw new NotImplementedException(),
+                        _ => throw new ImpossibleException(),
                     },
-                    _ => throw new NotImplementedException(),
+                    _ => throw new ImpossibleException(),
                 };
             }
 
@@ -629,7 +629,7 @@ namespace ProgrammingLanguage.Bytecode
             if (functionNameDataItem.Type != RuntimeType.INT)
             { throw new InternalException($"Instruction CALL_EXTERNAL need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new InternalException();
+            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new RuntimeException($"This should be an integer");
 
             string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
 

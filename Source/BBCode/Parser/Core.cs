@@ -24,7 +24,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             LiteralType.BOOLEAN => "bool",
             LiteralType.STRING => "string",
             LiteralType.CHAR => "char",
-            _ => throw new NotImplementedException(),
+            _ => throw new Errors.ImpossibleException(),
         };
     }
 

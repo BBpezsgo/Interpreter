@@ -7,24 +7,6 @@ namespace ProgrammingLanguage.Bytecode
 
     internal class DataStack : Stack<DataItem>
     {
-        internal int UsedVirtualMemory
-        {
-            get
-            {
-                static int CalculateItemSize(DataItem item) => item.Type switch
-                {
-                    RuntimeType.INT => 4,
-                    RuntimeType.FLOAT => 4,
-                    _ => throw new NotImplementedException(),
-                };
-
-                int result = 0;
-                for (int i = 0; i < Count; i++)
-                { result += CalculateItemSize(this[i]); }
-                return result;
-            }
-        }
-
         public DataStack() : base() { }
 
         public void Destroy() => base.Clear();

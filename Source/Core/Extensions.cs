@@ -1,10 +1,9 @@
-﻿using ProgrammingLanguage.BBCode;
+﻿using System.Collections.Generic;
+using System.Text;
+using ProgrammingLanguage.BBCode;
 using ProgrammingLanguage.BBCode.Compiler;
 using ProgrammingLanguage.Bytecode;
 using ProgrammingLanguage.Tokenizer;
-
-using System.Collections.Generic;
-using System.Text;
 
 namespace ProgrammingLanguage.Core
 {
@@ -95,6 +94,72 @@ namespace ProgrammingLanguage.Core
             this Dictionary<string, AttributeValues> attributes,
             string attributeName)
             => attributes.TryGetValue(attributeName, out _);
+
+        internal static bool HasAttribute<T0>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            T0 value0)
+            where T0 : System.IEquatable<T0>
+        {
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            if (values.parameters.Count != 1) return false;
+
+            if (!values.parameters[0].TryConvert(out T0 v0) ||
+                !value0.Equals(v0))
+            { return false; }
+
+            return true;
+        }
+
+        internal static bool HasAttribute<T0, T1>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            T0 value0,
+            T1 value1)
+            where T0 : System.IEquatable<T0>
+            where T1 : System.IEquatable<T1>
+        {
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            if (values.parameters.Count != 2) return false;
+
+            if (!values.parameters[0].TryConvert(out T0 v0) ||
+                !value0.Equals(v0))
+            { return false; }
+
+            if (!values.parameters[1].TryConvert(out T1 v1) ||
+                !value1.Equals(v1))
+            { return false; }
+
+            return true;
+        }
+
+        internal static bool HasAttribute<T0, T1, T2>(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName,
+            T0 value0,
+            T1 value1,
+            T2 value2)
+            where T0 : System.IEquatable<T0>
+            where T1 : System.IEquatable<T1>
+            where T2 : System.IEquatable<T2>
+        {
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            if (values.parameters.Count != 3) return false;
+
+            if (!values.parameters[0].TryConvert(out T0 v0) ||
+                !value0.Equals(v0))
+            { return false; }
+
+            if (!values.parameters[1].TryConvert(out T1 v1) ||
+                !value1.Equals(v1))
+            { return false; }
+
+            if (!values.parameters[2].TryConvert(out T2 v2) ||
+                !value2.Equals(v2))
+            { return false; }
+
+            return true;
+        }
 
         public static object Value(this DataItem item) => item.Type switch
         {

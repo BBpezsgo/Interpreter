@@ -2,7 +2,7 @@ using System;
 
 bool A() {
 	PrintLine('A');
-	return false;
+	return true;
 }
 
 bool B() {
@@ -25,6 +25,6 @@ bool E() {
 	return true;
 }
 
-if ((A() || B()) || C()) {
+if (A() && B() || C()) {
 	
 };

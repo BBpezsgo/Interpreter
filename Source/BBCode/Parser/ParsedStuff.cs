@@ -61,8 +61,8 @@ namespace ProgrammingLanguage.BBCode
         public static bool operator ==(TypeInstance a, string b)
         {
             if (a is null && b is null) return true;
-            if (a is not null && b is null) return false;
-            if (a is null && b is not null) return false;
+            if (a is null || b is null) return false;
+
             return a.Identifier.Content == b;
         }
         public static bool operator !=(TypeInstance a, string b) => !(a == b);
@@ -72,19 +72,15 @@ namespace ProgrammingLanguage.BBCode
 
         public override bool Equals(object obj)
         {
-            if (ReferenceEquals(this, obj))
-            { return true; }
-
-            if (obj is null)
-            { return false; }
-
-            if (obj is TypeInstance other)
-            { return this.Equals(other); }
-
-            return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj is null) return false;
+            if (obj is not TypeInstance other) return false;
+            return this.Equals(other);
         }
 
-        public bool Equals(TypeInstance other) => other is not null && this.Identifier.Equals(other.Identifier);
+        public bool Equals(TypeInstance other)
+            => other is not null &&
+            this.Identifier.Equals(other.Identifier);
 
         public override int GetHashCode() => HashCode.Combine(Identifier);
     }
@@ -147,7 +143,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public FunctionDefinition.Attribute[] Attributes;
     }
 
-    public class TemplateInfo : IThingWithPosition
+    public class TemplateInfo : IThingWithPosition, IEquatable<TemplateInfo>
     {
         public Token Keyword;
         public Token LeftP;
@@ -155,6 +151,14 @@ namespace ProgrammingLanguage.BBCode.Parser
         public Token RightP;
 
         public string[] TypeParameterNames => TypeParameters.Select(v => v.Content).ToArray();
+
+        public TemplateInfo(Token keyword, Token leftP, IEnumerable<Token> typeParameters, Token rightP)
+        {
+            Keyword = keyword;
+            LeftP = leftP;
+            TypeParameters = typeParameters.ToArray();
+            RightP = rightP;
+        }
 
         public Dictionary<string, Token> ToDictionary()
         {
@@ -171,16 +175,32 @@ namespace ProgrammingLanguage.BBCode.Parser
             return result;
         }
 
-        public TemplateInfo(Token keyword, Token leftP, IEnumerable<Token> typeParameters, Token rightP)
+        public override bool Equals(object obj)
         {
-            Keyword = keyword;
-            LeftP = leftP;
-            TypeParameters = typeParameters.ToArray();
-            RightP = rightP;
+            if (obj is not TemplateInfo other) return false;
+            return this.Equals(other);
         }
+
+        public bool Equals(TemplateInfo other)
+        {
+            if (this.TypeParameters.Length != other.TypeParameters.Length) return false;
+            return true;
+        }
+
+        public override int GetHashCode() => TypeParameters.GetHashCode();
+
+        public static bool operator ==(TemplateInfo a, TemplateInfo b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
+
+            return a.Equals(b);
+        }
+
+        public static bool operator !=(TemplateInfo a, TemplateInfo b) => !(a == b);
     }
 
-    public abstract class FunctionThingDefinition : IExportable
+    public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>
     {
         public Token BracketStart;
         public Token BracketEnd;
@@ -194,11 +214,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         /// </summary>
         public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
 
-        public Statement.Block Block => new(Statements)
-        {
-            BracketStart = BracketStart,
-            BracketEnd = BracketEnd,
-        };
+        public Statement.Block Block => new(BracketStart, Statements, BracketEnd);
 
         public int ParameterCount => Parameters.Length;
 
@@ -239,6 +255,53 @@ namespace ProgrammingLanguage.BBCode.Parser
             result += ")";
             return result;
         }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is not FunctionThingDefinition other) return false;
+            return Equals(obj);
+        }
+
+        public bool Equals(FunctionThingDefinition other)
+        {
+            if (other is null) return false;
+            if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
+
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (!this.Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
+
+            if (this.Modifiers.Length != other.Modifiers.Length) return false;
+            for (int i = 0; i < this.Modifiers.Length; i++)
+            { if (this.Modifiers[i].Content != other.Modifiers[i].Content) return false; }
+
+            if (!this.TemplateInfo.Equals(other.TemplateInfo)) return false;
+
+            return true;
+        }
+
+        public override int GetHashCode() => HashCode.Combine(
+            Parameters,
+            Statements,
+            Modifiers,
+            FilePath,
+            TemplateInfo,
+            Identifier);
+
+        public static bool operator ==(FunctionThingDefinition a, FunctionThingDefinition b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
+
+            if (!string.Equals(a.Identifier.Content, b.Identifier.Content)) return false;
+
+            if (a.Parameters.Length != b.Parameters.Length) return false;
+            for (int i = 0; i < a.Parameters.Length; i++)
+            { if (!a.Parameters[i].Type.Equals(b.Parameters[i].Type)) return false; }
+
+            return true;
+        }
+        public static bool operator !=(FunctionThingDefinition a, FunctionThingDefinition b) => !(a == b);
     }
 
     public class FunctionDefinition : FunctionThingDefinition

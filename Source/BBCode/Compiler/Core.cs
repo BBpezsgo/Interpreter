@@ -1047,6 +1047,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public readonly bool IsStoredInHEAP;
 
         public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, VariableDeclaretion declaration)
+            : base(declaration.Modifiers, declaration.Type, declaration.VariableName, declaration.InitialValue)
         {
             this.Type = type;
 
@@ -1055,8 +1056,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.IsGlobal = isGlobal;
 
             base.FilePath = declaration.FilePath;
-            base.InitialValue = declaration.InitialValue;
-            base.VariableName = declaration.VariableName;
         }
     }
 

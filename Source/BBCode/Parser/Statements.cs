@@ -4,9 +4,8 @@ using System.Diagnostics;
 
 namespace ProgrammingLanguage.BBCode.Parser.Statement
 {
-    using Core;
-
     using System.Linq;
+    using Core;
 
     public static class StatementFinder
     {
@@ -92,8 +91,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             => this.GetType().Name;
 
         public abstract string PrettyPrint(int ident = 0);
-        public abstract Position TotalPosition();
-        public Position GetPosition() => TotalPosition();
+        public abstract Position GetPosition();
 
         public virtual IEnumerable<Statement> GetStatements()
         { yield break; }
@@ -112,18 +110,19 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
     public class Block : Statement
     {
-        public List<Statement> Statements;
+        public readonly List<Statement> Statements;
 
-        public Token BracketStart;
-        public Token BracketEnd;
+        public readonly Token BracketStart;
+        public readonly Token BracketEnd;
 
-        public Block()
-        { this.Statements = new(); }
+        public Block(Token bracketStart, IEnumerable<Statement> statements, Token bracketEnd)
+        {
+            this.BracketStart = bracketStart;
+            this.Statements = new(statements);
+            this.BracketEnd = bracketEnd;
+        }
 
-        public Block(IEnumerable<Statement> statements)
-        { this.Statements = new(statements); }
-
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(BracketStart, BracketEnd);
 
         public override string PrettyPrint(int ident = 0)
@@ -146,13 +145,18 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
     public abstract class StatementWithBlock : Statement
     {
-        internal Block Block;
+        public readonly Block Block;
+
+        protected StatementWithBlock(Block block)
+        {
+            Block = block;
+        }
     }
 
     public class LinkedIf : StatementWithBlock
     {
-        public Token Keyword;
-        public StatementWithValue Condition;
+        public readonly Token Keyword;
+        public readonly StatementWithValue Condition;
         /// <summary>
         /// Can be:
         /// <list type="bullet">
@@ -163,13 +167,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         /// </summary>
         public Statement NextLink;
 
-        public LinkedIf(Token keyword, StatementWithValue condition)
+        public LinkedIf(Token keyword, StatementWithValue condition, Block block)
+            : base(block)
         {
             Keyword = keyword;
             Condition = condition;
         }
 
-        public override Position TotalPosition() => new(Keyword, Condition, Block);
+        public override Position GetPosition()
+            => new(Keyword, Condition, Block);
 
         public override string PrettyPrint(int ident = 0)
         { throw new NotImplementedException(); }
@@ -177,57 +183,73 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
     public class LinkedElse : StatementWithBlock
     {
-        public Token Keyword;
+        public readonly Token Keyword;
 
-        public LinkedElse(Token keyword)
+        public LinkedElse(Token keyword, Block block)
+            : base(block)
         {
             Keyword = keyword;
         }
 
-        public override Position TotalPosition() => new(Keyword, Block);
+        public override Position GetPosition()
+            => new(Keyword, Block);
 
         public override string PrettyPrint(int ident = 0)
         { throw new NotImplementedException(); }
     }
 
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class CompileTag : Statement, IDefinition
     {
-        public Token HashToken;
-        public Token HashName;
-        public Literal[] Parameters;
+        public readonly Token HashToken;
+        public readonly Token HashName;
+        public readonly Literal[] Parameters;
 
         public string FilePath { get; set; }
 
-        public override string PrettyPrint(int ident = 0)
+        public CompileTag(Token hashToken, Token hashName, Literal[] parameters)
         {
-            return $"# <hasn info>";
+            HashToken = hashToken;
+            HashName = hashName;
+            Parameters = parameters;
         }
 
-        public override Position TotalPosition()
+        public override string ToString()
         {
-            Position result = new(HashToken, HashName);
-            foreach (var item in Parameters)
-            {
-                result.Extend(item.ValueToken);
-            }
-            return result;
+            return $"{HashToken}{HashName}";
         }
+
+        public override string PrettyPrint(int ident = 0)
+        {
+            return $"{HashToken}{HashName} ...";
+        }
+
+        public override Position GetPosition()
+            => new Position(HashToken, HashName).Extend(Parameters);
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class LiteralList : StatementWithValue
     {
-        public Token BracketLeft;
-        public Token BracketRight;
-        public StatementWithValue[] Values;
+        public readonly Token BracketLeft;
+        public readonly Token BracketRight;
+        public readonly StatementWithValue[] Values;
+
         public int Size => Values.Length;
+
+        public LiteralList(Token bracketLeft, StatementWithValue[] values, Token bracketRight)
+        {
+            BracketLeft = bracketLeft;
+            BracketRight = bracketRight;
+            Values = values;
+        }
 
         public override string PrettyPrint(int ident = 0)
         {
             return $"{" ".Repeat(ident)}[{string.Join(", ", Values.ToList())}]";
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(BracketLeft, BracketRight);
 
         public override IEnumerable<Statement> GetStatements()
@@ -240,12 +262,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class VariableDeclaretion : Statement, IDefinition
     {
-        public TypeInstance Type;
-        public Token VariableName;
-        internal StatementWithValue InitialValue;
-        public Token[] Modifiers;
+        public readonly TypeInstance Type;
+        public readonly Token VariableName;
+        public readonly StatementWithValue InitialValue;
+        public readonly Token[] Modifiers;
 
         public string FilePath { get; set; }
+
+        public VariableDeclaretion(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue initialValue)
+        {
+            Type = type;
+            VariableName = variableName;
+            InitialValue = initialValue;
+            Modifiers = modifiers;
+        }
 
         public override string ToString()
         {
@@ -257,29 +287,27 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
         }
 
-        public override Position TotalPosition()
-        {
-            Position result = new(Type, VariableName, InitialValue);
-            return result;
-        }
+        public override Position GetPosition()
+            => new(Type, VariableName, InitialValue);
 
         public override IEnumerable<Statement> GetStatements()
         {
             yield return InitialValue;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class FunctionCall : StatementWithValue, IReadableID
     {
-        public Token Identifier;
+        public readonly Token Identifier;
+        public readonly StatementWithValue[] Parameters;
+        public readonly StatementWithValue PrevStatement;
+
+        public readonly Token BracketLeft;
+        public readonly Token BracketRight;
+
         internal string FunctionName => Identifier.Content;
-        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
         internal bool IsMethodCall => PrevStatement != null;
-        public StatementWithValue PrevStatement;
-
-        public Token BracketLeft;
-        public Token BracketRight;
-
         internal StatementWithValue[] MethodParameters
         {
             get
@@ -290,6 +318,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
                 newList.Insert(0, PrevStatement);
                 return newList.ToArray();
             }
+        }
+
+        public FunctionCall(StatementWithValue prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+        {
+            PrevStatement = prevStatement;
+            Identifier = identifier;
+            BracketLeft = bracketLeft;
+            Parameters = parameters.ToArray();
+            BracketRight = bracketRight;
         }
 
         public override string ToString()
@@ -325,13 +362,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}{FunctionName}({(string.Join(", ", parameters))})";
         }
 
-        public override Position TotalPosition()
-        {
-            Position result = new(BracketLeft, BracketRight);
-            result.Extend(Identifier);
-            result.Extend(MethodParameters);
-            return result;
-        }
+        public override Position GetPosition()
+            => new Position(BracketLeft, BracketRight, Identifier).Extend(MethodParameters);
 
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
@@ -359,12 +391,20 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             { yield return Parameters[i]; }
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class KeywordCall : StatementWithValue, IReadableID
     {
-        public Token Identifier;
-        internal string FunctionName => Identifier.Content;
-        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
+        public readonly Token Identifier;
+        public readonly StatementWithValue[] Parameters;
+
+        public string FunctionName => Identifier.Content;
+
+        public KeywordCall(Token identifier, IEnumerable<StatementWithValue> parameters)
+        {
+            Identifier = identifier;
+            Parameters = parameters.ToArray();
+        }
 
         public override string ToString()
         {
@@ -398,12 +438,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}{FunctionName} {string.Join(" ", parameters)}";
         }
 
-        public override Position TotalPosition()
-        {
-            Position result = new(Identifier);
-            result.Extend(Parameters);
-            return result;
-        }
+        public override Position GetPosition()
+            => new Position(Identifier).Extend(Parameters);
 
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
@@ -427,15 +463,16 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             { yield return Parameters[i]; }
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class OperatorCall : StatementWithValue, IReadableID
     {
         public readonly Token Operator;
-        internal readonly StatementWithValue Left;
-        internal StatementWithValue Right;
-        internal bool InsideBracelet;
+        public readonly StatementWithValue Left;
+        public StatementWithValue Right;
+        public bool InsideBracelet;
 
-        internal StatementWithValue[] Parameters
+        public StatementWithValue[] Parameters
         {
             get
             {
@@ -452,7 +489,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
                 { throw new Errors.InternalException($"{nameof(Left)} and {nameof(Right)} are both null"); }
             }
         }
-        internal int ParameterCount
+        public int ParameterCount
         {
             get
             {
@@ -463,12 +500,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             }
         }
 
-        public OperatorCall(Token op, StatementWithValue left)
-        {
-            this.Operator = op;
-            this.Left = left;
-            this.Right = null;
-        }
+        public OperatorCall(Token op, StatementWithValue left) : this(op, left, null) { }
         public OperatorCall(Token op, StatementWithValue left, StatementWithValue right)
         {
             this.Operator = op;
@@ -621,7 +653,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             }
         }
 
-        public override Position TotalPosition() => new(Operator, Left, Right);
+        public override Position GetPosition()
+            => new(Operator, Left, Right);
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = this.Operator.Content;
@@ -643,14 +676,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Right;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ShortOperatorCall : AnyAssignment, IReadableID
     {
         public readonly Token Operator;
-        internal readonly StatementWithValue Left;
+        public readonly StatementWithValue Left;
 
-        internal StatementWithValue[] Parameters => new StatementWithValue[] { this.Left };
-        internal int ParameterCount => 1;
+        public StatementWithValue[] Parameters => new StatementWithValue[] { this.Left };
+        public int ParameterCount => 1;
 
         public ShortOperatorCall(Token op, StatementWithValue left)
         {
@@ -691,7 +725,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}({v})";
         }
 
-        public override Position TotalPosition() => new(Operator, Left);
+        public override Position GetPosition()
+            => new(Operator, Left);
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
             string result = this.Operator.Content;
@@ -718,24 +753,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             {
                 case "++":
                     {
-                        Literal one = new()
-                        {
-                            ImagineryPosition = Operator.GetPosition(),
-                            SaveValue = true,
-                            Type = LiteralType.INT,
-                            Value = "1",
-                            ValueToken = Token.CreateAnonymous("1", TokenType.LITERAL_NUMBER),
-                        };
+                        Literal one = Literal.CreateAnonymous(LiteralType.INT, "1", Operator.GetPosition());
+                        one.SaveValue = true;
 
                         OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.OPERATOR), Left, one);
 
-                        Token assignmentToken = new()
+                        Token assignmentToken = new(TokenType.OPERATOR, "=", true)
                         {
                             AbsolutePosition = Operator.AbsolutePosition,
                             Position = Operator.Position,
-                            Content = "=",
-                            TokenType = Operator.TokenType,
-                            AnalysedType = Operator.AnalysedType,
                         };
 
                         return new Assignment(assignmentToken, Left, operatorCall);
@@ -743,24 +769,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
                 case "--":
                     {
-                        Literal one = new()
-                        {
-                            ImagineryPosition = Operator.GetPosition(),
-                            SaveValue = true,
-                            Type = LiteralType.INT,
-                            Value = "1",
-                            ValueToken = Token.CreateAnonymous("1", TokenType.LITERAL_NUMBER),
-                        };
+                        Literal one = Literal.CreateAnonymous(LiteralType.INT, "1", Operator.GetPosition());
+                        one.SaveValue = true;
 
                         OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.OPERATOR), Left, one);
 
-                        Token assignmentToken = new()
+                        Token assignmentToken = new(TokenType.OPERATOR, "=", true)
                         {
                             AbsolutePosition = Operator.AbsolutePosition,
                             Position = Operator.Position,
-                            Content = "=",
-                            TokenType = Operator.TokenType,
-                            AnalysedType = Operator.AnalysedType,
                         };
 
                         return new Assignment(assignmentToken, Left, operatorCall);
@@ -770,6 +787,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             }
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Assignment : AnyAssignment
     {
@@ -777,8 +795,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         /// This should always be "="
         /// </summary>
         public readonly Token Operator;
-        internal readonly StatementWithValue Left;
-        internal readonly StatementWithValue Right;
+        public readonly StatementWithValue Left;
+        public readonly StatementWithValue Right;
 
         public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
         {
@@ -791,7 +809,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
 
-        public override Position TotalPosition() => new(Operator, Left, Right);
+        public override Position GetPosition()
+            => new(Operator, Left, Right);
 
         public override IEnumerable<Statement> GetStatements()
         {
@@ -801,13 +820,14 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override Assignment ToAssignment() => this;
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class CompoundAssignment : AnyAssignment
     {
         /// This should always starts with "="
         public readonly Token Operator;
-        internal readonly StatementWithValue Left;
-        internal readonly StatementWithValue Right;
+        public readonly StatementWithValue Left;
+        public readonly StatementWithValue Right;
 
         public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
         {
@@ -820,7 +840,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
 
-        public override Position TotalPosition() => new(Operator, Left, Right);
+        public override Position GetPosition()
+            => new(Operator, Left, Right);
 
         public override IEnumerable<Statement> GetStatements()
         {
@@ -830,34 +851,55 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            OperatorCall statementToAssign = new(new Token()
+            OperatorCall statementToAssign = new(new Token(TokenType.OPERATOR, Operator.Content.Replace("=", ""), true)
             {
                 AbsolutePosition = Operator.AbsolutePosition,
-                Content = Operator.Content.Replace("=", ""),
                 Position = Operator.Position,
-                TokenType = Operator.TokenType,
             }, Left, Right);
 
-            return new Assignment(new Token()
+            return new Assignment(new Token(TokenType.OPERATOR, "=", true)
             {
                 AbsolutePosition = Operator.AbsolutePosition,
-                Content = "=",
                 Position = Operator.Position,
-                TokenType = Operator.TokenType,
             }, Left, statementToAssign);
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Literal : StatementWithValue
     {
-        public LiteralType Type;
-        internal string Value;
+        public readonly LiteralType Type;
+        public readonly string Value;
         /// <summary>
         /// If there is no <c>ValueToken</c>:<br/>
         /// i.e in <c>i++</c> statement
         /// </summary>
-        internal Position ImagineryPosition;
-        public Token ValueToken;
+        public Position ImagineryPosition;
+        public readonly Token ValueToken;
+
+        public Literal(LiteralType type, string value, Token valueToken)
+        {
+            Type = type;
+            Value = value;
+            ValueToken = valueToken;
+        }
+
+        public static Literal CreateAnonymous(LiteralType type, string value, Position position)
+        {
+            TokenType tokenType = type switch
+            {
+                LiteralType.INT => TokenType.LITERAL_NUMBER,
+                LiteralType.FLOAT => TokenType.LITERAL_FLOAT,
+                LiteralType.BOOLEAN => TokenType.IDENTIFIER,
+                LiteralType.STRING => TokenType.LITERAL_STRING,
+                LiteralType.CHAR => TokenType.LITERAL_CHAR,
+                _ => TokenType.IDENTIFIER,
+            };
+            return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
+            {
+                ImagineryPosition = position,
+            };
+        }
 
         public override string ToString() => Type switch
         {
@@ -883,12 +925,21 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
                 _ => null,
             };
 
-        public override Position TotalPosition() => ValueToken == null ? ImagineryPosition : new Position(ValueToken);
+        public override Position GetPosition()
+            => ValueToken == null
+                ? ImagineryPosition
+                : new Position(ValueToken);
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Identifier : StatementWithValue
     {
-        public Token VariableName;
+        public readonly Token VariableName;
+
+        public Identifier(Token identifier)
+        {
+            VariableName = identifier;
+        }
 
         public override string ToString()
             => $"{VariableName.Content}";
@@ -896,18 +947,21 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         public override string PrettyPrint(int ident = 0)
             => $"{" ".Repeat(ident)}{VariableName.Content}";
 
-        public Identifier()
-        {
-
-        }
-
-        public override Position TotalPosition() => new Position(VariableName);
+        public override Position GetPosition()
+            => new(VariableName);
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class AddressGetter : StatementWithValue
     {
-        public Token OperatorToken;
-        internal StatementWithValue PrevStatement;
+        public readonly Token OperatorToken;
+        public readonly StatementWithValue PrevStatement;
+
+        public AddressGetter(Token operatorToken, StatementWithValue prevStatement)
+        {
+            OperatorToken = operatorToken;
+            PrevStatement = prevStatement;
+        }
 
         public override string ToString()
         {
@@ -919,12 +973,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
-        public AddressGetter()
-        {
-
-        }
-
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(OperatorToken, PrevStatement);
 
         public override IEnumerable<Statement> GetStatements()
@@ -932,11 +981,18 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return PrevStatement;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Pointer : StatementWithValue
     {
-        public Token OperatorToken;
-        internal StatementWithValue PrevStatement;
+        public readonly Token OperatorToken;
+        public readonly StatementWithValue PrevStatement;
+
+        public Pointer(Token operatorToken, StatementWithValue prevStatement)
+        {
+            OperatorToken = operatorToken;
+            PrevStatement = prevStatement;
+        }
 
         public override string ToString()
         {
@@ -948,12 +1004,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
         }
 
-        public Pointer()
-        {
-
-        }
-
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(OperatorToken, PrevStatement);
 
         public override IEnumerable<Statement> GetStatements()
@@ -961,11 +1012,19 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return PrevStatement;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class WhileLoop : StatementWithBlock
     {
-        internal Token Keyword;
-        internal StatementWithValue Condition;
+        public readonly Token Keyword;
+        public readonly StatementWithValue Condition;
+
+        public WhileLoop(Token keyword, StatementWithValue condition, Block block)
+            : base(block)
+        {
+            Keyword = keyword;
+            Condition = condition;
+        }
 
         public override string ToString()
         {
@@ -979,7 +1038,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return x;
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(Keyword, Block);
 
         public override IEnumerable<Statement> GetStatements()
@@ -988,13 +1047,23 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ForLoop : StatementWithBlock
     {
-        internal Token Keyword;
-        internal VariableDeclaretion VariableDeclaration;
-        internal StatementWithValue Condition;
-        internal AnyAssignment Expression;
+        public readonly Token Keyword;
+        public readonly VariableDeclaretion VariableDeclaration;
+        public readonly StatementWithValue Condition;
+        public readonly AnyAssignment Expression;
+
+        public ForLoop(Token keyword, VariableDeclaretion variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
+            : base(block)
+        {
+            Keyword = keyword;
+            VariableDeclaration = variableDeclaration;
+            Condition = condition;
+            Expression = expression;
+        }
 
         public override string ToString()
         {
@@ -1008,7 +1077,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return x;
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(Keyword, Block);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1019,9 +1088,15 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     public class IfContainer : Statement
     {
-        public List<BaseBranch> Parts = new();
+        public readonly BaseBranch[] Parts;
+
+        public IfContainer(IEnumerable<BaseBranch> parts)
+        {
+            Parts = parts.ToArray();
+        }
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -1037,12 +1112,12 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return x;
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(Parts);
 
         public override IEnumerable<Statement> GetStatements()
         {
-            for (int i = 0; i < Parts.Count; i++)
+            for (int i = 0; i < Parts.Length; i++)
             {
                 yield return Parts[i];
             }
@@ -1050,44 +1125,47 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         Statement ToLinks(int i)
         {
-            if (i >= Parts.Count)
+            if (i >= Parts.Length)
             { return null; }
 
             if (Parts[i] is ElseIfBranch elseIfBranch)
             {
-                return new LinkedIf(elseIfBranch.Keyword, elseIfBranch.Condition)
+                return new LinkedIf(elseIfBranch.Keyword, elseIfBranch.Condition, elseIfBranch.Block)
                 {
-                    Block = elseIfBranch.Block,
                     NextLink = ToLinks(i + 1),
                 };
             }
 
             if (Parts[i] is ElseBranch elseBranch)
             {
-                return new LinkedElse(elseBranch.Keyword)
-                {
-                    Block = elseBranch.Block,
-                };
+                return new LinkedElse(elseBranch.Keyword, elseBranch.Block);
             }
 
             throw new Exception();
         }
         public LinkedIf ToLinks()
         {
-            if (Parts.Count == 0) throw new Exception();
+            if (Parts.Length == 0) throw new Exception();
             if (Parts[0] is not IfBranch ifBranch) throw new Exception();
-            return new LinkedIf(ifBranch.Keyword, ifBranch.Condition)
+            return new LinkedIf(ifBranch.Keyword, ifBranch.Condition, ifBranch.Block)
             {
-                Block = ifBranch.Block,
                 NextLink = ToLinks(1),
             };
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public abstract class BaseBranch : StatementWithBlock
     {
-        internal Token Keyword;
-        public IfPart Type;
+        public readonly Token Keyword;
+        public readonly IfPart Type;
+
+        protected BaseBranch(Token keyword, IfPart type, Block block)
+            : base(block)
+        {
+            Keyword = keyword;
+            Type = type;
+        }
 
         public enum IfPart
         {
@@ -1101,7 +1179,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{Keyword} {((Type != IfPart.Else) ? "(...)" : "")} {{...}}";
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(Keyword, Block);
 
         public abstract override string PrettyPrint(int ident = 0);
@@ -1111,12 +1189,16 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     public class IfBranch : BaseBranch
     {
-        internal StatementWithValue Condition;
+        public readonly StatementWithValue Condition;
 
-        public IfBranch()
-        { Type = IfPart.If; }
+        public IfBranch(Token keyword, StatementWithValue condition, Block block)
+            : base(keyword, IfPart.If, block)
+        {
+            this.Condition = condition;
+        }
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -1131,12 +1213,16 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     public class ElseIfBranch : BaseBranch
     {
-        internal StatementWithValue Condition;
+        public readonly StatementWithValue Condition;
 
-        public ElseIfBranch()
-        { Type = IfPart.ElseIf; }
+        public ElseIfBranch(Token keyword, StatementWithValue condition, Block block)
+            : base(keyword, IfPart.ElseIf, block)
+        {
+            this.Condition = condition;
+        }
 
         public override string PrettyPrint(int ident = 0)
         {
@@ -1151,14 +1237,16 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     public class ElseBranch : BaseBranch
     {
-        public ElseBranch()
-        { Type = IfPart.Else; }
+        public ElseBranch(Token keyword, Block block)
+            : base(keyword, IfPart.Else, block)
+        { }
 
         public override string PrettyPrint(int ident = 0)
         {
-            var x = $"{" ".Repeat(ident)}else";
+            var x = $"{" ".Repeat(ident)}{Keyword}";
             x += Block.PrettyPrint();
             return x;
         }
@@ -1168,26 +1256,44 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Block;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class NewInstance : StatementWithValue
     {
-        public Token Keyword;
-        public TypeInstance TypeName;
+        public readonly Token Keyword;
+        public readonly TypeInstance TypeName;
+
+        public NewInstance(Token keyword, TypeInstance typeName)
+        {
+            Keyword = keyword;
+            TypeName = typeName;
+        }
 
         public override string ToString() => $"new {TypeName}";
         public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TypeName}";
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(Keyword, TypeName);
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ConstructorCall : StatementWithValue, IReadableID
     {
-        public StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
-        public Token Keyword;
-        public TypeInstance TypeName;
+        public readonly Token Keyword;
+        public readonly TypeInstance TypeName;
 
-        public Token BracketLeft;
-        public Token BracketRight;
+        public readonly StatementWithValue[] Parameters = Array.Empty<StatementWithValue>();
+
+        public readonly Token BracketLeft;
+        public readonly Token BracketRight;
+
+        public ConstructorCall(Token keyword, TypeInstance typeName, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+        {
+            Keyword = keyword;
+            TypeName = typeName;
+            BracketLeft = bracketLeft;
+            Parameters = parameters.ToArray();
+            BracketRight = bracketRight;
+        }
 
         public override string ToString()
         {
@@ -1221,12 +1327,8 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
             return $"{" ".Repeat(ident)}new {TypeName}({(string.Join(", ", parameters))})";
         }
-        public override Position TotalPosition()
-        {
-            Position result = new Position(Keyword, TypeName, BracketLeft, BracketRight);
-            result.Extend(Parameters);
-            return result;
-        }
+        public override Position GetPosition()
+            => new Position(Keyword, TypeName, BracketLeft, BracketRight).Extend(Parameters);
 
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
         {
@@ -1252,16 +1354,17 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             { yield return Parameters[i]; }
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class IndexCall : StatementWithValue, IReadableID
     {
-        internal readonly StatementWithValue Expression;
-        internal StatementWithValue PrevStatement;
+        public StatementWithValue PrevStatement;
 
-        internal readonly Token BracketLeft;
-        internal readonly Token BracketRight;
+        public readonly StatementWithValue Expression;
+        public readonly Token BracketLeft;
+        public readonly Token BracketRight;
 
-        public IndexCall(StatementWithValue indexStatement, Token bracketLeft, Token bracketRight)
+        public IndexCall(Token bracketLeft, StatementWithValue indexStatement, Token bracketRight)
         {
             this.Expression = indexStatement;
             this.BracketLeft = bracketLeft;
@@ -1278,7 +1381,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{PrevStatement}[{Expression.PrettyPrint()}]";
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(PrevStatement, Expression);
 
         public string ReadableID(Func<StatementWithValue, Compiler.CompiledType> TypeSearch)
@@ -1297,11 +1400,18 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return Expression;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Field : StatementWithValue
     {
-        public Token FieldName;
-        internal StatementWithValue PrevStatement;
+        public readonly Token FieldName;
+        public readonly StatementWithValue PrevStatement;
+
+        public Field(StatementWithValue prevStatement, Token fieldName)
+        {
+            PrevStatement = prevStatement;
+            FieldName = fieldName;
+        }
 
         public override string ToString()
         {
@@ -1313,7 +1423,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             return $"{PrevStatement.PrettyPrint()}.{FieldName}";
         }
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(PrevStatement, FieldName);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1321,12 +1431,13 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return PrevStatement;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class TypeCast : StatementWithValue
     {
-        internal StatementWithValue PrevStatement;
-        internal Token Keyword;
-        internal TypeInstance Type;
+        public readonly StatementWithValue PrevStatement;
+        public readonly Token Keyword;
+        public readonly TypeInstance Type;
 
         public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
         {
@@ -1338,7 +1449,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         public override string ToString() => $"{PrevStatement} as {Type}";
         public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{PrevStatement} as {Type}";
 
-        public override Position TotalPosition()
+        public override Position GetPosition()
             => new(PrevStatement, Keyword, Type);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1346,23 +1457,24 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             yield return PrevStatement;
         }
     }
+
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ModifiedStatement : StatementWithValue
     {
-        internal StatementWithValue Statement;
-        internal Token Keyword;
+        public readonly StatementWithValue Statement;
+        public readonly Token Modifier;
 
-        public ModifiedStatement(StatementWithValue statement, Token keyword)
+        public ModifiedStatement(Token modifier, StatementWithValue statement)
         {
             this.Statement = statement;
-            this.Keyword = keyword;
+            this.Modifier = modifier;
         }
 
-        public override string ToString() => $"{Keyword} {Statement}";
-        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{Keyword} {Statement}";
+        public override string ToString() => $"{Modifier} {Statement}";
+        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{Modifier} {Statement}";
 
-        public override Position TotalPosition()
-            => new(Keyword, Statement);
+        public override Position GetPosition()
+            => new(Modifier, Statement);
 
         public override IEnumerable<Statement> GetStatements()
         {

@@ -41,7 +41,7 @@ namespace TheProgram
                 // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                // "-brainfuck",
+                "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""

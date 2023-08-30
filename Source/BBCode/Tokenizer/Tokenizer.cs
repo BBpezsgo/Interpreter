@@ -78,34 +78,27 @@ namespace ProgrammingLanguage.BBCode
 
     public class Token : BaseToken, IEquatable<Token>
     {
-        public TokenType TokenType;
         public TokenAnalysedType AnalysedType;
 
-        public string Content;
+        public readonly TokenType TokenType;
+        public readonly bool IsAnonymous;
 
-        bool isAnonymous;
+        public readonly string Content;
 
-        public bool IsAnonymous => isAnonymous;
-
-        public Token()
+        public Token(TokenType type, string content, bool isAnonymous)
         {
-            TokenType = TokenType.WHITESPACE;
+            TokenType = type;
             AnalysedType = TokenAnalysedType.None;
-            Content = "";
-            isAnonymous = false;
+            Content = content;
+            IsAnonymous = isAnonymous;
         }
 
-        public Token Clone() => new()
+        public Token Clone() => new(TokenType, Content, IsAnonymous)
         {
             Position = Position,
             AbsolutePosition = AbsolutePosition,
 
-            TokenType = TokenType,
             AnalysedType = AnalysedType,
-
-            Content = Content,
-
-            isAnonymous = isAnonymous,
         };
         public override string ToString() => Content;
 
@@ -114,13 +107,10 @@ namespace ProgrammingLanguage.BBCode
             return $"Token:{TokenType} {{ \"{Content}\" {Position} {AnalysedType} }}";
         }
 
-        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new()
+        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new(type, content, true)
         {
             AbsolutePosition = Core.Position.UnknownPosition.AbsolutePosition,
             Position = Core.Position.UnknownPosition.Range,
-            TokenType = type,
-            Content = content,
-            isAnonymous = true,
         };
 
         public override bool Equals(object obj) => obj is Token other && Equals(other);
@@ -131,7 +121,7 @@ namespace ProgrammingLanguage.BBCode
             AbsolutePosition.Equals(other.AbsolutePosition) &&
             TokenType == other.TokenType &&
             Content == other.Content &&
-            isAnonymous == other.isAnonymous;
+            IsAnonymous == other.IsAnonymous;
 
         public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
 
@@ -164,12 +154,60 @@ namespace ProgrammingLanguage.BBCode
         public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
     }
 
+    class PreparationToken : BaseToken, IEquatable<PreparationToken>
+    {
+        public TokenType TokenType;
+
+        public string Content;
+
+        public PreparationToken()
+        {
+            TokenType = TokenType.WHITESPACE;
+            Content = "";
+        }
+
+        public override string ToString() => Content;
+
+        internal string ToFullString()
+        {
+            return $"Token:{TokenType} {{ \"{Content}\" {Position} }}";
+        }
+
+        public override bool Equals(object obj) => obj is PreparationToken other && Equals(other);
+
+        public bool Equals(PreparationToken other) =>
+            other is not null &&
+            Position.Equals(other.Position) &&
+            AbsolutePosition.Equals(other.AbsolutePosition) &&
+            TokenType == other.TokenType &&
+            Content == other.Content;
+
+        public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
+
+        public static bool operator ==(PreparationToken a, string b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null && b is not null) return false;
+            if (a is not null && b is null) return false;
+            return a.Content == b;
+        }
+        public static bool operator !=(PreparationToken a, string b) => !(a == b);
+        public static bool operator ==(string a, PreparationToken b) => b == a;
+        public static bool operator !=(string a, PreparationToken b) => b != a;
+
+        public Token Instantiate() => new(TokenType, Content, false)
+        {
+            AbsolutePosition = AbsolutePosition,
+            Position = Position,
+        };
+    }
+
     /// <summary>
     /// The tokenizer for the BBCode language
     /// </summary>
     public class Tokenizer
     {
-        readonly Token CurrentToken;
+        readonly PreparationToken CurrentToken;
         int CurrentColumn;
         int CurrentLine;
 
@@ -321,7 +359,8 @@ namespace ProgrammingLanguage.BBCode
                         savedUnicode += currChar;
                         continue;
                     }
-                } else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
+                }
+                else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
                 {
                     if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
                     if (savedUnicode.Length == 4)
@@ -367,7 +406,8 @@ namespace ProgrammingLanguage.BBCode
                     };
                     CurrentToken.TokenType = TokenType.LITERAL_STRING;
                     continue;
-                } else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
+                }
+                else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
                 {
                     if (currChar == 'u')
                     {
@@ -776,7 +816,7 @@ namespace ProgrammingLanguage.BBCode
                     CurrentToken.AbsolutePosition.End--;
                     CurrentToken.Content = CurrentToken.Content[..^1];
                     CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
-                    tokens.Add(CurrentToken.Clone());
+                    tokens.Add(CurrentToken.Instantiate());
 
                     CurrentToken.Position.Start.Character = CurrentToken.Position.End.Character + 1;
                     CurrentToken.Position.Start.Line = CurrentToken.Position.End.Line + 1;
@@ -792,11 +832,11 @@ namespace ProgrammingLanguage.BBCode
 
             if (CurrentToken.TokenType != TokenType.WHITESPACE)
             {
-                tokens.Add(CurrentToken.Clone());
+                tokens.Add(CurrentToken.Instantiate());
             }
             else if (!string.IsNullOrEmpty(CurrentToken.Content) && settings.TokenizeWhitespaces)
             {
-                tokens.Add(CurrentToken.Clone());
+                tokens.Add(CurrentToken.Instantiate());
             }
 
             if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
@@ -825,7 +865,7 @@ namespace ProgrammingLanguage.BBCode
 
             for (int i = 0; i < tokens.Count; i++)
             {
-                var token = tokens[i];
+                Token token = tokens[i];
 
                 if (result.Count == 0)
                 {
@@ -833,17 +873,31 @@ namespace ProgrammingLanguage.BBCode
                     continue;
                 }
 
-                var lastToken = result[^1];
+                Token lastToken = result[^1];
 
                 if (token.TokenType == TokenType.WHITESPACE && lastToken.TokenType == TokenType.WHITESPACE)
                 {
-                    lastToken.Content += token.Content;
+                    result[^1] = new Token(
+                        lastToken.TokenType,
+                        lastToken.Content + token.Content,
+                        lastToken.IsAnonymous)
+                    {
+                        Position = lastToken.Position,
+                        AbsolutePosition = lastToken.AbsolutePosition,
+                    };
                     continue;
                 }
 
                 if (token.TokenType == TokenType.LINEBREAK && lastToken.TokenType == TokenType.LINEBREAK && settings.JoinLinebreaks)
                 {
-                    lastToken.Content += token.Content;
+                    result[^1] = new Token(
+                        lastToken.TokenType,
+                        lastToken.Content + token.Content,
+                        lastToken.IsAnonymous)
+                    {
+                        Position = lastToken.Position,
+                        AbsolutePosition = lastToken.AbsolutePosition,
+                    };
                     continue;
                 }
 

@@ -75,9 +75,9 @@ namespace ProgrammingLanguage.Core
         public Position(IEnumerable<IThingWithPosition> elements)
             : this((elements ?? throw new ArgumentNullException(nameof(elements))).ToArray())
         { }
-        internal void Extend(Position other)
+        internal Position Extend(Position other)
         {
-            if (other.AbsolutePosition == Position.UnknownPosition.AbsolutePosition) return;
+            if (other.AbsolutePosition == Position.UnknownPosition.AbsolutePosition) return this;
 
             if (Start.Line > other.Start.Line)
             {
@@ -108,30 +108,43 @@ namespace ProgrammingLanguage.Core
             {
                 AbsolutePosition.End = other.AbsolutePosition.End;
             }
+
+            return this;
         }
 
-        internal void Extend(Range<int> absolutePosition) => AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
-        internal void Extend(int start, int end) => AbsolutePosition.Extend(start, end);
-        internal void Extend(IThingWithPosition other)
+        internal Position Extend(Range<int> absolutePosition)
         {
-            if (other == null) return;
-            if (other is Token token && token.IsAnonymous) return;
-            Extend(other.GetPosition());
+            AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
+            return this;
         }
-        internal void Extend(params IThingWithPosition[] elements)
+        internal Position Extend(int start, int end)
         {
-            if (elements == null) return;
-            if (elements.Length == 0) return;
+            AbsolutePosition.Extend(start, end);
+            return this;
+        }
+        internal Position Extend(IThingWithPosition other)
+        {
+            if (other == null) return this;
+            if (other is Token token && token.IsAnonymous) return this;
+            Extend(other.GetPosition());
+            return this;
+        }
+        internal Position Extend(params IThingWithPosition[] elements)
+        {
+            if (elements == null) return this;
+            if (elements.Length == 0) return this;
 
             for (int i = 0; i < elements.Length; i++)
             { Extend(elements[i]); }
+            return this;
         }
-        internal void Extend(IEnumerable<IThingWithPosition> elements)
+        internal Position Extend(IEnumerable<IThingWithPosition> elements)
         {
-            if (elements == null) return;
+            if (elements == null) return this;
 
             foreach (IThingWithPosition element in elements)
             { Extend(element); }
+            return this;
         }
 
         public readonly string ToMinString()

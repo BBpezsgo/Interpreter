@@ -56,46 +56,32 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
 
-            bool inHeap = GetClass(newVariable.Type.Identifier.Content, out _);
-            CompiledType type = new(newVariable.Type, FindType);
+            CompiledType type;
+
+            if (newVariable.Type == "var")
+            {
+                if (newVariable.InitialValue == null)
+                { throw new CompilerException($"Initial value is requied for variable declaration \"var\"", newVariable, newVariable.FilePath); }
+
+                CompiledType initialValueType = FindStatementType(newVariable.InitialValue);
+
+                type = initialValueType;
+            }
+            else
+            {
+                type = new(newVariable.Type, FindType);
+            }
 
             return new CompiledVariable(
                 -1,
                 type,
                 false,
-                inHeap,
+                type.InHEAP,
                 newVariable);
         }
 
         void AnalyzeNewVariable(VariableDeclaretion newVariable)
         {
-            if (newVariable.Type == "var")
-            {
-                if (newVariable.InitialValue == null)
-                { throw new CompilerException($"Initial value for \"var\" variable declaration is requied", newVariable, CurrentFile); }
-
-                if (newVariable.InitialValue is BBCode.Parser.Statement.Literal literal)
-                {
-                    newVariable.Type = TypeInstance.CreateAnonymous(literal.Type.ToStringRepresentation(), TypeDefinitionReplacer);
-                }
-                else if (newVariable.InitialValue is NewInstance newInstance)
-                {
-                    newVariable.Type = newInstance.TypeName; // TypeInstance.CreateAnonymous(newInstance.TypeName.Identifier.Content, TypeDefinitionReplacer);
-                }
-                else if (newVariable.InitialValue is ConstructorCall constructorCall)
-                {
-                    newVariable.Type = constructorCall.TypeName; //TypeInstance.CreateAnonymous(constructorCall.TypeName.Identifier.Content, TypeDefinitionReplacer);
-                }
-                else
-                {
-                    CompiledType initialTypeRaw = FindStatementType(newVariable.InitialValue);
-                    newVariable.Type = TypeInstance.CreateAnonymous(initialTypeRaw);
-                }
-            }
-
-            if (newVariable.Type == "var")
-            { throw new CompilerException("Invalid or unimplemented initial value", newVariable.InitialValue, newVariable.FilePath); }
-
             this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable));
         }
         void AnalyzeStatements(IEnumerable<Statement> statements)

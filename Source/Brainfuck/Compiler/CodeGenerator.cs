@@ -1560,18 +1560,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            Compile(new FunctionCall()
-            {
-                Identifier = Token.CreateAnonymous(FunctionNames.IndexerGet),
-                SaveValue = indexCall.SaveValue,
-                PrevStatement = indexCall.PrevStatement,
-                Parameters = new StatementWithValue[]
+            Compile(new FunctionCall(
+                indexCall.PrevStatement,
+                Token.CreateAnonymous(FunctionNames.IndexerGet),
+                indexCall.BracketLeft,
+                new StatementWithValue[]
                 {
                     indexCall.Expression,
                 },
-                BracketLeft = indexCall.BracketLeft,
-                BracketRight = indexCall.BracketRight,
-            });
+                indexCall.BracketRight));
         }
         void Compile(LinkedIf @if)
         {
@@ -2202,10 +2199,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 throw new System.Exception();
                             }
 
-                            int size = GetValueSize(valueToPrint);
+                            var valueType = FindStatementType(valueToPrint);
 
-                            if (size != 1)
-                            { throw new CompilerException($"The \"outstr\" instruction only accepts value of size 1 (not {size})", valueToPrint, CurrentFile); }
+                            if (valueType.SizeOnStack != 1)
+                            { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of size 1 (not {valueType.SizeOnStack})", valueToPrint, CurrentFile); }
+
+                            if (!valueType.IsBuiltin)
+                            { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of a builtin type (not {valueType})", valueToPrint, CurrentFile); }
 
                             using (Code.Block($"Print value {valueToPrint} as text"))
                             {
@@ -2220,8 +2220,29 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                                 Code.SetPointer(address);
 
-                                using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                { Code.Code += Snippets.OUT_AS_STRING; }
+                                switch (valueType.BuiltinType)
+                                {
+                                    case Type.BYTE:
+                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                        { Code.Code += Snippets.OUT_AS_STRING; }
+                                        break;
+                                    case Type.INT:
+                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                        { Code.Code += Snippets.OUT_AS_STRING; }
+                                        break;
+                                    case Type.FLOAT:
+                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                        { Code.Code += Snippets.OUT_AS_STRING; }
+                                        break;
+                                    case Type.CHAR:
+                                        Code.Code += ".";
+                                        break;
+                                    case Type.NONE:
+                                    case Type.VOID:
+                                    case Type.UNKNOWN:
+                                    default:
+                                        throw new CompilerException($"Invalid type {valueType.BuiltinType}");
+                                }
 
                                 using (Code.Block($"Clear address {address}"))
                                 { Code.ClearValue(address); }
@@ -2902,16 +2923,22 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             using (Code.Block("Compute left-side value"))
                             { Compile(statement.Left); }
 
+                            int tempLeftAddress = Stack.PushVirtual(1);
+                            Code.CopyValue(leftAddress, tempLeftAddress);
+
+                            Code.JumpStart(tempLeftAddress);
+
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
                             { Compile(statement.Right); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
-                            {
-                                Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
-                            }
+                            { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
 
-                            Stack.Pop();
+                            Stack.Pop(); // Pop rightAddress
+
+                            Code.JumpEnd(tempLeftAddress, true);
+                            Stack.PopVirtual(); // Pop tempLeftAddress
 
                             break;
                         }
@@ -2921,16 +2948,23 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             using (Code.Block("Compute left-side value"))
                             { Compile(statement.Left); }
 
+                            int tempLeftAddress = Stack.PushVirtual(1);
+                            Code.CopyValue(leftAddress, tempLeftAddress);
+                            Code.LOGIC_NOT(tempLeftAddress, tempLeftAddress + 1);
+
+                            Code.JumpStart(tempLeftAddress);
+
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
                             { Compile(statement.Right); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
-                            {
-                                Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1);
-                            }
+                            { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
 
-                            Stack.PopVirtual();
+                            Stack.Pop(); // Pop rightAddress
+
+                            Code.JumpEnd(tempLeftAddress, true);
+                            Stack.PopVirtual(); // Pop tempLeftAddress
 
                             break;
                         }
@@ -3219,12 +3253,24 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         /// </param>
         void InlineMacro(CompiledFunction function, StatementWithValue[] parameters, IThingWithPosition callerPosition)
         {
+            if (function.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                Compile(new KeywordCall(
+                    new Token(TokenType.IDENTIFIER, "out", true)
+                    {
+                        AbsolutePosition = callerPosition.GetPosition().AbsolutePosition,
+                        Position = callerPosition.GetPosition().Range,
+                    },
+                    parameters));
+                return;
+            }
+
             // if (!function.Modifiers.Contains("macro"))
             // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
 
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
-                if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
+                if (CurrentMacro[i] == function)
                 { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
             }
 
@@ -3270,10 +3316,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 if (passed is ModifiedStatement modifiedStatement)
                 {
-                    if (!defined.Modifiers.Contains(modifiedStatement.Keyword.Content))
-                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, CurrentFile); }
+                    if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
 
-                    switch (modifiedStatement.Keyword.Content)
+                    switch (modifiedStatement.Modifier.Content)
                     {
                         case "ref":
                             {
@@ -3298,7 +3344,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 break;
                             }
                         default:
-                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, CurrentFile);
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                     }
                 }
                 else if (passed is StatementWithValue value)
@@ -3476,10 +3522,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 if (passed is ModifiedStatement modifiedStatement)
                 {
-                    if (!defined.Modifiers.Contains(modifiedStatement.Keyword.Content))
-                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Keyword.Content}\"", modifiedStatement.Keyword, CurrentFile); }
+                    if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
 
-                    switch (modifiedStatement.Keyword.Content)
+                    switch (modifiedStatement.Modifier.Content)
                     {
                         case "ref":
                             {
@@ -3504,7 +3550,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 break;
                             }
                         default:
-                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Keyword}\"", modifiedStatement.Keyword, CurrentFile);
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                     }
                 }
                 else if (passed is StatementWithValue value)

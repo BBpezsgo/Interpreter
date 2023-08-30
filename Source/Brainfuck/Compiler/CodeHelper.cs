@@ -307,9 +307,10 @@ namespace ProgrammingLanguage.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> 0
         /// </summary>
-        internal void JumpEnd(int conditionAddress)
+        internal void JumpEnd(int conditionAddress, bool clearCondition = false)
         {
             this.SetPointer(conditionAddress);
+            if (clearCondition) this.ClearCurrent();
             this.Code += "]";
             this.SetPointer(0);
         }

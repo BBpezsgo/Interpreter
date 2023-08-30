@@ -194,12 +194,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { throw new EndlessLoopException(); }
             }
 
-            hashStatement = new CompileTag
-            {
-                HashToken = hashT,
-                HashName = hashName,
-                Parameters = parameters.ToArray()
-            };
+            hashStatement = new CompileTag(hashT, hashName, parameters.ToArray());
 
             return true;
         }
@@ -285,7 +280,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 TopLevelStatements.Add(statement);
 
                 if (!ExpectOperator(";"))
-                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
+                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
             }
         }
 
@@ -845,17 +840,15 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectListValue(out LiteralList listValue)
         {
-            listValue = null;
-
-            if (!ExpectOperator("[", out var o0))
-            { return false; }
+            if (!ExpectOperator("[", out var bracketLeft))
+            {
+                listValue = null;
+                return false;
+            }
 
             List<StatementWithValue> values = new();
-            listValue = new LiteralList()
-            {
-                Values = Array.Empty<StatementWithValue>(),
-                BracketLeft = o0,
-            };
+
+            Token bracketRight;
 
             int endlessSafe = 0;
             while (true)
@@ -867,25 +860,23 @@ namespace ProgrammingLanguage.BBCode.Parser
 
                     if (!ExpectOperator(","))
                     {
-                        if (!ExpectOperator("]", out var o1))
-                        { throw new SyntaxException("Unbalanced '['", o0); }
-                        listValue.BracketRight = o1;
+                        if (!ExpectOperator("]", out bracketRight))
+                        { throw new SyntaxException("Unbalanced '['", bracketLeft); }
                         break;
                     }
                 }
                 else
                 {
-                    if (!ExpectOperator("]", out var o1))
-                    { throw new SyntaxException("Unbalanced '['", o0); }
-                    listValue.BracketRight = o1;
+                    if (!ExpectOperator("]", out bracketRight))
+                    { throw new SyntaxException("Unbalanced '['", bracketLeft); }
                     break;
                 }
 
                 endlessSafe++;
                 if (endlessSafe >= 50) { throw new EndlessLoopException(); }
             }
-            listValue.Values = values.ToArray();
 
+            listValue = new LiteralList(bracketLeft, values.ToArray(), bracketRight);
             return true;
         }
 
@@ -895,12 +886,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
-                Literal literal = new()
-                {
-                    Value = CurrentToken.Content.Replace("_", ""),
-                    Type = LiteralType.FLOAT,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.FLOAT, CurrentToken.Content.Replace("_", ""), CurrentToken);
 
                 currentTokenIndex++;
 
@@ -909,12 +895,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
             {
-                Literal literal = new()
-                {
-                    Value = CurrentToken.Content.Replace("_", ""),
-                    Type = LiteralType.INT,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.INT, CurrentToken.Content.Replace("_", ""), CurrentToken);
 
                 currentTokenIndex++;
 
@@ -923,12 +904,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
             {
-                Literal literal = new()
-                {
-                    Value = Convert.ToInt32(CurrentToken.Content, 16).ToString(),
-                    Type = LiteralType.INT,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content, 16).ToString(), CurrentToken);
 
                 currentTokenIndex++;
 
@@ -937,12 +913,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
             {
-                Literal literal = new()
-                {
-                    Value = Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(),
-                    Type = LiteralType.INT,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(), CurrentToken);
 
                 currentTokenIndex++;
 
@@ -951,12 +922,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
-                Literal literal = new()
-                {
-                    Value = CurrentToken.Content,
-                    Type = LiteralType.STRING,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.STRING, CurrentToken.Content, CurrentToken);
 
                 currentTokenIndex++;
 
@@ -965,12 +931,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
             {
-                Literal literal = new()
-                {
-                    Value = CurrentToken.Content,
-                    Type = LiteralType.CHAR,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.CHAR, CurrentToken.Content, CurrentToken);
 
                 currentTokenIndex++;
 
@@ -979,12 +940,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (ExpectIdentifier("true", out var tTrue))
             {
-                Literal literal = new()
-                {
-                    Value = "true",
-                    Type = LiteralType.BOOLEAN,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.BOOLEAN, tTrue.Content, tTrue);
 
                 tTrue.AnalysedType = TokenAnalysedType.Keyword;
 
@@ -993,12 +949,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (ExpectIdentifier("false", out var tFalse))
             {
-                Literal literal = new()
-                {
-                    Value = "false",
-                    Type = LiteralType.BOOLEAN,
-                    ValueToken = CurrentToken,
-                };
+                Literal literal = new(LiteralType.BOOLEAN, tFalse.Content, tFalse);
 
                 tFalse.AnalysedType = TokenAnalysedType.Keyword;
 
@@ -1052,7 +1003,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("]", out Token bracketRight))
             { throw new SyntaxException("Unbalanced [", bracketLeft); }
 
-            statement = new IndexCall(expression, bracketLeft, bracketRight);
+            statement = new IndexCall(bracketLeft, expression, bracketRight);
             return true;
         }
 
@@ -1118,13 +1069,6 @@ namespace ProgrammingLanguage.BBCode.Parser
 
                 if (ExpectOperator("(", out Token bracketLeft))
                 {
-                    ConstructorCall newStructStatement = new()
-                    {
-                        TypeName = instanceTypeName,
-                        Keyword = newIdentifier,
-                        BracketLeft = bracketLeft,
-                    };
-
                     bool expectParameter = false;
                     List<StatementWithValue> parameters = new();
 
@@ -1134,7 +1078,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     {
                         StatementWithValue parameter = ExpectExpression();
                         if (parameter == null)
-                        { throw new SyntaxException("Expected expression as parameter", newStructStatement); }
+                        { throw new SyntaxException("Expected expression as parameter", CurrentToken); }
 
                         parameters.Add(parameter);
 
@@ -1150,20 +1094,14 @@ namespace ProgrammingLanguage.BBCode.Parser
                         if (endlessSafe > 100)
                         { throw new EndlessLoopException(); }
                     }
-                    newStructStatement.Parameters = parameters.ToArray();
-                    newStructStatement.BracketRight = bracketRight;
+
+                    ConstructorCall newStructStatement = new(newIdentifier, instanceTypeName, bracketLeft, parameters, bracketRight);
 
                     returnStatement = newStructStatement;
                 }
                 else
-                {
-                    NewInstance newStructStatement = new()
-                    {
-                        TypeName = instanceTypeName,
-                        Keyword = newIdentifier,
-                    };
-
-                    returnStatement = newStructStatement;
+                { 
+                    returnStatement = new NewInstance(newIdentifier, instanceTypeName);
                 }
             }
             else if (ExpectIdentifier(out Token variableName))
@@ -1178,10 +1116,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 }
                 else
                 {
-                    Identifier variableNameStatement = new()
-                    {
-                        VariableName = variableName,
-                    };
+                    Identifier variableNameStatement = new(variableName);
 
                     if (variableName.Content == "this")
                     { variableName.AnalysedType = TokenAnalysedType.Keyword; }
@@ -1204,9 +1139,8 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 if (ExpectOperator(".", out var tokenDot))
                 {
-                    if (ExpectMethodCall(false, out var methodCall))
+                    if (ExpectMethodCall(false, returnStatement, out var methodCall))
                     {
-                        methodCall.PrevStatement = returnStatement;
                         returnStatement = methodCall;
                     }
                     else
@@ -1214,12 +1148,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                         if (!ExpectIdentifier(out Token fieldName))
                         { throw new SyntaxException("Expected field or method", tokenDot); }
 
-                        var fieldStatement = new Field()
-                        {
-                            FieldName = fieldName,
-                            PrevStatement = returnStatement
-                        };
-                        returnStatement = fieldStatement;
+                        returnStatement = new Field(returnStatement, fieldName);
                     }
 
                     continue;
@@ -1253,7 +1182,8 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectVariableAddressGetter(out AddressGetter statement)
         {
-            var parseStart = currentTokenIndex;
+            int parseStart = currentTokenIndex;
+
             if (!ExpectOperator("&", out var refToken))
             {
                 statement = null;
@@ -1261,13 +1191,9 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return false;
             }
 
-            var prevStatement = ExpectOneValue();
+            StatementWithValue prevStatement = ExpectOneValue();
 
-            statement = new AddressGetter()
-            {
-                OperatorToken = refToken,
-                PrevStatement = prevStatement,
-            };
+            statement = new AddressGetter(refToken, prevStatement);
             return true;
         }
 
@@ -1283,11 +1209,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             var prevStatement = ExpectOneValue();
 
-            statement = new Pointer()
-            {
-                OperatorToken = refToken,
-                PrevStatement = prevStatement,
-            };
+            statement = new Pointer(refToken, prevStatement);
             return true;
         }
 
@@ -1336,18 +1258,14 @@ namespace ProgrammingLanguage.BBCode.Parser
                 statements.Add(statement);
 
                 if (!ExpectOperator(";"))
-                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
+                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
 
 
                 endlessSafe++;
                 if (endlessSafe > 500) throw new EndlessLoopException();
             }
 
-            block = new Block(statements)
-            {
-                BracketStart = braceletStart,
-                BracketEnd = braceletEnd,
-            };
+            block = new Block(braceletStart, statements, braceletEnd);
             return true;
         }
 
@@ -1369,7 +1287,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 statements.Add(statement);
 
                 if (!ExpectOperator(";"))
-                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.TotalPosition().After())); }
+                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
 
 
                 endlessSafe++;
@@ -1394,16 +1312,11 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             possibleVariableName.AnalysedType = TokenAnalysedType.VariableName;
 
-            VariableDeclaretion statement = new()
-            {
-                VariableName = possibleVariableName,
-                Type = possibleType,
-                Modifiers = constModifier == null ? Array.Empty<Token>() : new Token[1] { constModifier },
-            };
+            StatementWithValue initialValue = null;
 
             if (ExpectOperator("=", out var eqT))
             {
-                statement.InitialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
+                initialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
             }
             else
             {
@@ -1411,7 +1324,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Identifier); }
             }
 
-            return statement;
+            return new VariableDeclaretion(constModifier == null ? Array.Empty<Token>() : new Token[1] { constModifier }, possibleType, possibleVariableName, initialValue);
         }
 
         ForLoop ExpectForStatement()
@@ -1429,35 +1342,26 @@ namespace ProgrammingLanguage.BBCode.Parser
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
             if (!ExpectOperator(";"))
-            { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.TotalPosition().After()); }
+            { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
 
             StatementWithValue condition = ExpectExpression();
             if (condition == null)
             { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
 
             if (!ExpectOperator(";"))
-            { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.TotalPosition().After()); }
+            { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
 
             AnyAssignment expression = ExpectAnySetter();
             if (expression == null)
             { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
 
             if (!ExpectOperator(")", out Token tokenZarojel2))
-            { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.TotalPosition().After()); }
+            { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.GetPosition().After()); }
 
             if (!ExpectBlock(out Block block))
             { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenZarojel2.After()); }
 
-            ForLoop forStatement = new()
-            {
-                Keyword = tokenFor,
-                VariableDeclaration = variableDeclaration,
-                Condition = condition,
-                Expression = expression,
-                Block = block,
-            };
-
-            return forStatement;
+            return new ForLoop(tokenFor, variableDeclaration, condition, expression, block);
         }
 
         WhileLoop ExpectWhileStatement()
@@ -1480,14 +1384,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectBlock(out Block block))
             { throw new SyntaxException("Expected block", tokenZarojel2.After()); }
 
-            WhileLoop whileStatement = new()
-            {
-                Keyword = tokenWhile,
-                Condition = condition,
-                Block = block,
-            };
-
-            return whileStatement;
+            return new WhileLoop(tokenWhile, condition, block);
         }
 
         IfContainer ExpectIfStatement()
@@ -1495,15 +1392,15 @@ namespace ProgrammingLanguage.BBCode.Parser
             BaseBranch ifStatement = ExpectIfSegmentStatement("if", BaseBranch.IfPart.If, true);
             if (ifStatement == null) return null;
 
-            IfContainer statement = new();
-            statement.Parts.Add(ifStatement);
+            List<BaseBranch> branches = new()
+            { ifStatement };
 
             int endlessSafe = 0;
             while (true)
             {
                 BaseBranch elseifStatement = ExpectIfSegmentStatement("elseif", BaseBranch.IfPart.ElseIf, true);
                 if (elseifStatement == null) break;
-                statement.Parts.Add(elseifStatement);
+                branches.Add(elseifStatement);
 
                 endlessSafe++;
                 if (endlessSafe > 100)
@@ -1513,10 +1410,10 @@ namespace ProgrammingLanguage.BBCode.Parser
             BaseBranch elseStatement = ExpectIfSegmentStatement("else", BaseBranch.IfPart.Else, false);
             if (elseStatement != null)
             {
-                statement.Parts.Add(elseStatement);
+                branches.Add(elseStatement);
             }
 
-            return statement;
+            return new IfContainer(branches);
         }
 
         BaseBranch ExpectIfSegmentStatement(string ifSegmentName, BaseBranch.IfPart ifSegmentType, bool needParameters)
@@ -1543,23 +1440,9 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             return ifSegmentType switch
             {
-                BaseBranch.IfPart.If => new IfBranch()
-                {
-                    Keyword = tokenIf,
-                    Condition = condition,
-                    Block = block,
-                },
-                BaseBranch.IfPart.ElseIf => new ElseIfBranch()
-                {
-                    Keyword = tokenIf,
-                    Condition = condition,
-                    Block = block,
-                },
-                BaseBranch.IfPart.Else => new ElseBranch()
-                {
-                    Keyword = tokenIf,
-                    Block = block,
-                },
+                BaseBranch.IfPart.If => new IfBranch(tokenIf, condition, block),
+                BaseBranch.IfPart.ElseIf => new ElseIfBranch(tokenIf, condition, block),
+                BaseBranch.IfPart.Else => new ElseBranch(tokenIf, block),
                 _ => throw new ImpossibleException(),
             };
         }
@@ -1611,42 +1494,43 @@ namespace ProgrammingLanguage.BBCode.Parser
             return statement;
         }
 
-        bool ExpectMethodCall(bool expectDot, out FunctionCall methodCall)
+        bool ExpectMethodCall(bool expectDot, StatementWithValue prevStatement, out FunctionCall methodCall)
         {
             int startTokenIndex = currentTokenIndex;
 
-            methodCall = null;
-
-            if (expectDot)
+            if (expectDot && !ExpectOperator("."))
             {
-                if (!ExpectOperator("."))
-                { currentTokenIndex = startTokenIndex; return false; }
+                currentTokenIndex = startTokenIndex;
+                methodCall = null;
+                return false;
             }
 
             if (!ExpectIdentifier(out var possibleFunctionName))
-            { currentTokenIndex = startTokenIndex; return false; }
+            {
+                currentTokenIndex = startTokenIndex;
+                methodCall = null;
+                return false;
+            }
 
             if (!ExpectOperator("(", out Token bracketLeft))
-            { currentTokenIndex = startTokenIndex; return false; }
+            {
+                currentTokenIndex = startTokenIndex;
+                methodCall = null;
+                return false;
+            }
 
             possibleFunctionName.AnalysedType = TokenAnalysedType.FunctionName;
-
-            methodCall = new()
-            {
-                Identifier = possibleFunctionName,
-                BracketLeft = bracketLeft,
-            };
 
             bool expectParameter = false;
 
             List<StatementWithValue> parameters = new();
             int endlessSafe = 0;
-            Token bracketRight = null;
+            Token bracketRight;
             while (!ExpectOperator(")", out bracketRight) || expectParameter)
             {
                 StatementWithValue parameter = ExpectExpression();
                 if (parameter == null)
-                { throw new SyntaxException("Expected expression as parameter", methodCall); }
+                { throw new SyntaxException("Expected expression as parameter", CurrentToken); }
 
                 parameters.Add(parameter);
 
@@ -1662,8 +1546,8 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (endlessSafe > 100)
                 { throw new EndlessLoopException(); }
             }
-            methodCall.Parameters = parameters.ToArray();
-            methodCall.BracketRight = bracketRight;
+
+            methodCall = new(prevStatement, possibleFunctionName, bracketLeft, parameters, bracketRight);
 
             return true;
         }
@@ -1850,7 +1734,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (value == null)
             { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
 
-            modifiedStatement = new ModifiedStatement(value, modifier);
+            modifiedStatement = new ModifiedStatement(modifier, value);
             return true;
         }
 
@@ -1896,12 +1780,6 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
 
-            FunctionCall functionCall = new()
-            {
-                Identifier = possibleFunctionName,
-                BracketLeft = bracketLeft,
-            };
-
             bool expectParameter = false;
             List<StatementWithValue> parameters = new();
 
@@ -1909,8 +1787,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             Token bracketRight = null;
             while (!ExpectOperator(")", out bracketRight) || expectParameter)
             {
-
-                StatementWithValue parameter = null;
+                StatementWithValue parameter;
 
                 if (ExpectModifiedValue(out ModifiedStatement modifiedStatement, PassedParameterModifiers))
                 {
@@ -1922,7 +1799,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 }
 
                 if (parameter == null)
-                { throw new SyntaxException("Expected expression as parameter", functionCall); }
+                { throw new SyntaxException("Expected expression as parameter", CurrentToken); }
 
                 parameters.Add(parameter);
 
@@ -1937,11 +1814,9 @@ namespace ProgrammingLanguage.BBCode.Parser
                 endlessSafe++;
                 if (endlessSafe > 100)
                 { throw new EndlessLoopException(); }
-            }
-            functionCall.Parameters = parameters.ToArray();
-            functionCall.BracketRight = bracketRight;
+            };
 
-            return functionCall;
+            return new FunctionCall(null, possibleFunctionName, bracketLeft, parameters, bracketRight);
         }
 
         KeywordCall ExpectKeywordCall(string name, int parameterCount)
@@ -1958,10 +1833,6 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             possibleFunctionName.AnalysedType = TokenAnalysedType.Statement;
 
-            KeywordCall functionCall = new()
-            {
-                Identifier = possibleFunctionName,
-            };
             List<StatementWithValue> parameters = new();
 
             int endlessSafe = 16;
@@ -1977,7 +1848,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { break; }
             }
 
-            functionCall.Parameters = parameters.ToArray();
+            KeywordCall functionCall = new(possibleFunctionName, parameters);
 
             if (functionCall.Parameters.Length < minParameterCount)
             { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requies minimum {minParameterCount} parameters but you passed {parameters.Count}", functionCall); }

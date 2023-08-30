@@ -85,11 +85,10 @@
     public class AnalysedToken : Token
     {
         internal AnalysedToken(Token token)
+            : base(token.TokenType, new string(token.Content), token.IsAnonymous)
         {
             AbsolutePosition = token.AbsolutePosition;
-            Content = new string(token.Content);
             Position = token.Position;
-            TokenType = token.TokenType;
         }
     }
 

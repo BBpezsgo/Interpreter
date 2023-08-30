@@ -95,6 +95,16 @@ namespace ProgrammingLanguage.Core
             string attributeName)
             => attributes.TryGetValue(attributeName, out _);
 
+        internal static bool HasAttribute(
+            this Dictionary<string, AttributeValues> attributes,
+            string attributeName)
+        {
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            if (values.parameters.Count != 0) return false;
+
+            return true;
+        }
+
         internal static bool HasAttribute<T0>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,

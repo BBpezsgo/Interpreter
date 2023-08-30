@@ -63,26 +63,26 @@ export void PrintD(String message)
 
 export void PrintLine()
 {
-    PrintD("\r\n");
+    Print('\r');
+    Print('\n');
 }
 
 export void PrintLine(String message)
 {
     Print(message);
-    PrintD("\r\n");
+    PrintLine();
 }
 
 export void PrintLineD(String message)
 {
     PrintD(message);
-    PrintD("\r\n");
+    PrintLine();
 }
 
 export void PrintLine(char message)
 {
     Print(message);
-    Print('\r');
-    Print('\n');
+    PrintLine();
 }
 
 export void PrintLine(int message)

@@ -35,15 +35,7 @@ namespace ProgrammingLanguage.Bytecode
                 if (parameter is DataItem dataItem && dataItem.Type == RuntimeType.INT) return dataItem.ValueInt;
                 throw new Errors.InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
             }
-        }
-        public DataItem ParameterData
-        {
-            get
-            {
-                if (parameter.IsNull) return DataItem.Null;
-                if (parameter is DataItem dataItem) return dataItem;
-                return DataItem.Null;
-            }
+            set => parameter = new DataItem(value, parameter.Tag);
         }
         public DataItem Parameter
         {

@@ -1386,9 +1386,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
                 { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': requied {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
+                int jumpInstruction = -1;
+
                 GenerateCodeForStatement(@operator.Left);
+
+                if (opcode == Opcode.LOGIC_AND)
+                {
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+                    jumpInstruction = GeneratedCode.Count;
+                    AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+                }
+                else if (opcode == Opcode.LOGIC_OR)
+                {
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+                    AddInstruction(Opcode.LOGIC_NOT);
+                    jumpInstruction = GeneratedCode.Count;
+                    AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+                }
+
                 if (@operator.Right != null) GenerateCodeForStatement(@operator.Right);
                 AddInstruction(opcode);
+
+                if (jumpInstruction != -1)
+                { GeneratedCode[jumpInstruction].ParameterInt = GeneratedCode.Count - jumpInstruction; }
             }
             else if (@operator.Operator.Content == "=")
             {

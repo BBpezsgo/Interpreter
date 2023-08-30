@@ -1,0 +1,30 @@
+using System;
+
+bool A() {
+	PrintLine('A');
+	return false;
+}
+
+bool B() {
+	PrintLine('B');
+	return true;
+}
+
+bool C() {
+	PrintLine('C');
+	return true;
+}
+
+bool D() {
+	PrintLine('D');
+	return true;
+}
+
+bool E() {
+	PrintLine('E');
+	return true;
+}
+
+if ((A() || B()) || C()) {
+	
+};

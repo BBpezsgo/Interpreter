@@ -1182,8 +1182,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledType rightType = FindStatementType(@operator.Right);
 
-            if (!leftType.IsBuiltin || !rightType.IsBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
-            { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
+            // if (!leftType.IsBuiltin || !rightType.IsBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
+            // { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
             DataItem leftValue = GetInitialValue(leftType);
             DataItem rightValue = GetInitialValue(rightType);

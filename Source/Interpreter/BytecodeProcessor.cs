@@ -467,7 +467,7 @@ namespace ProgrammingLanguage.Bytecode
 
         int PUSH_VALUE()
         {
-            DataItem value = CurrentInstruction.ParameterData;
+            DataItem value = CurrentInstruction.Parameter;
             value.Tag = CurrentInstruction.tag;
 
             Memory.Stack.Push(value);

@@ -433,7 +433,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { AnalyzeStatement(field.PrevStatement); }
             else if (statement is Identifier variable)
             {
-                if (GetFunction(variable, out var function))
+                if (GetFunction(variable.Name, out var function))
                 {
                     // function.AddReference(variable);
 

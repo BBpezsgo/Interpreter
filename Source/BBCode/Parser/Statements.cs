@@ -934,21 +934,21 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Identifier : StatementWithValue
     {
-        public readonly Token VariableName;
+        public readonly Token Name;
+        public string Content => Name.Content;
 
         public Identifier(Token identifier)
         {
-            VariableName = identifier;
+            Name = identifier;
         }
 
-        public override string ToString()
-            => $"{VariableName.Content}";
+        public override string ToString() => Name.Content;
 
         public override string PrettyPrint(int ident = 0)
-            => $"{" ".Repeat(ident)}{VariableName.Content}";
+            => $"{" ".Repeat(ident)}{Name.Content}";
 
         public override Position GetPosition()
-            => new(VariableName);
+            => new(Name);
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
+    using System.Linq;
     using Bytecode;
 
     using Core;
@@ -728,25 +729,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        bool GetFunction(string name, IThingWithPosition position, out CompiledFunction compiledFunction)
-        {
-            compiledFunction = null;
-
-            for (int i = 0; i < this.CompiledFunctions.Length; i++)
-            {
-                CompiledFunction function = this.CompiledFunctions[i];
-
-                if (function.Identifier != name) continue;
-
-                if (compiledFunction != null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", position, CurrentFile); }
-
-                compiledFunction = function;
-            }
-
-            return compiledFunction != null;
-        }
-
         bool GetFunction(string name, out CompiledFunction compiledFunction)
         {
             compiledFunction = null;
@@ -766,8 +748,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return compiledFunction != null;
         }
 
-        protected bool GetFunction(Identifier variable, out CompiledFunction compiledFunction)
-            => GetFunction(variable.VariableName.Content, variable, out compiledFunction);
+        protected bool GetFunction(Token name, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.Identifier != name.Content) continue;
+
+                if (compiledFunction != null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", name, CurrentFile); }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction != null;
+        }
 
         protected bool GetOperator(OperatorCall @operator, out CompiledOperator compiledOperator)
         {
@@ -908,6 +906,42 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
+        protected bool GetField(Field field, out CompiledField compiledField)
+        {
+            compiledField = null;
+
+            CompiledType type = FindStatementType(field.PrevStatement);
+            if (type is null) return false;
+
+            if (type.IsClass)
+            {
+                CompiledClass @class = type.Class;
+                for (int i = 0; i < @class.Fields.Length; i++)
+                {
+                    if (@class.Fields[i].Identifier.Content != field.FieldName.Content) continue;
+
+                    compiledField = @class.Fields[i];
+                    return true;
+                }
+                return false;
+            }
+
+            if (type.IsStruct)
+            {
+                CompiledStruct @struct = type.Struct;
+                for (int i = 0; i < @struct.Fields.Length; i++)
+                {
+                    if (@struct.Fields[i].Identifier.Content != field.FieldName.Content) continue;
+
+                    compiledField = @struct.Fields[i];
+                    return true;
+                }
+                return false;
+            }
+
+            return false;
+        }
+
         #endregion
 
         #region GetStruct()
@@ -1023,6 +1057,52 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < typeParameterNames.Length; i++)
             { typeParameters[typeParameterNames[i].Content] = type.TypeParameters[i]; }
+        }
+
+        protected CompiledVariable CompileVariable(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
+        {
+            if (Constants.Keywords.Contains(newVariable.VariableName.Content))
+            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
+
+            CompiledType type;
+            if (newVariable.Type.Identifier == "var")
+            {
+                if (newVariable.InitialValue == null)
+                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable, newVariable.FilePath); }
+
+                type = FindStatementType(newVariable.InitialValue);
+            }
+            else
+            {
+                type = new CompiledType(newVariable.Type, FindType);
+            }
+
+            return new CompiledVariable(
+                memoryOffset,
+                type,
+                isGlobal,
+                type.InHEAP,
+                newVariable);
+        }
+
+        protected CompiledFunction GetCodeEntry()
+        {
+            for (int i = 0; i < CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                for (int j = 0; j < function.Attributes.Length; j++)
+                {
+                    if (function.Attributes[j].Identifier.Content != "CodeEntry") continue;
+
+                    if (function.IsTemplate)
+                    { throw new CompilerException($"Code entry can not be a template function", function.TemplateInfo, function.FilePath); }
+
+                    return function;
+                }
+            }
+
+            return null;
         }
 
         #region GetInitialValue()
@@ -1203,24 +1283,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
         };
         protected CompiledType FindStatementType(Identifier variable)
         {
-            if (variable.VariableName.Content == "nullptr")
+            if (variable.Content == "nullptr")
             { return new CompiledType(Type.INT); }
 
-            if (GetLocalSymbolType(variable.VariableName.Content, out CompiledType type))
+            if (GetLocalSymbolType(variable.Content, out CompiledType type))
             { return type; }
 
-            if (GetEnum(variable.VariableName.Content, out var @enum))
+            if (GetEnum(variable.Content, out var @enum))
             { return new CompiledType(@enum); }
 
-            if (GetFunction(variable, out var function))
+            if (GetFunction(variable.Name, out var function))
             { return new CompiledType(function); }
 
             try
-            { return FindType(variable.VariableName); }
+            { return FindType(variable.Name); }
             catch (Exception)
             { }
 
-            throw new CompilerException($"Local symbol/enum/function \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+            throw new CompilerException($"Local symbol/enum/function \"{variable.Content}\" not found", variable, CurrentFile);
         }
         protected static CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
         protected static CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);

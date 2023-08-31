@@ -463,7 +463,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (_statement == null) continue;
 
                 if (_statement is Identifier identifier &&
-                    Variables.TryFind(identifier.VariableName.Content, out var _variable) &&
+                    Variables.TryFind(identifier.Content, out var _variable) &&
                     _variable.Name == variable.Name
                     )
                 {
@@ -505,19 +505,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (instruction.Parameters[0] is not Identifier constIdentifier)
                         { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (requied identifier)", instruction.Parameters[0], CurrentFile); }
 
-                        if (IllegalIdentifiers.Contains(constIdentifier.VariableName.Content))
+                        if (IllegalIdentifiers.Contains(constIdentifier.Content))
                         { throw new CompilerException($"Illegal constant name \"{constIdentifier}\"", constIdentifier, CurrentFile); }
 
                         if (instruction.Parameters[1] is not StatementWithValue constValue)
                         { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (requied a value)", instruction.Parameters[1], CurrentFile); }
 
-                        if (Constants.TryFind(constIdentifier.VariableName.Content, out _))
-                        { throw new CompilerException($"Constant \"{constIdentifier.VariableName.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
+                        if (Constants.TryFind(constIdentifier.Content, out _))
+                        { throw new CompilerException($"Constant \"{constIdentifier.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
 
                         if (!TryCompute(constValue, out DataItem value))
                         { throw new CompilerException($"Constant must have a constant value", constValue, CurrentFile); }
 
-                        Constants.Add(new ConstantVariable(constIdentifier.VariableName.Content, value));
+                        Constants.Add(new ConstantVariable(constIdentifier.Content, value));
 
                         break;
                     }
@@ -882,17 +882,17 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         };
         int GetValueSize(Identifier statement)
         {
-            if (statement.VariableName.Content == "IN")
+            if (statement.Content == "IN")
             { return 1; }
 
-            if (Variables.TryFind(statement.VariableName.Content, out Variable variable))
+            if (Variables.TryFind(statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
 
                 return variable.Size;
             }
-            else if (Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
+            else if (Constants.TryFind(statement.Content, out ConstantVariable constant))
             {
                 return 1;
             }
@@ -1022,7 +1022,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (index.PrevStatement is not Identifier arrayIdentifier)
             { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
-            if (!Variables.TryFind(arrayIdentifier.VariableName.Content, out Variable variable))
+            if (!Variables.TryFind(arrayIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
             if (!variable.Type.IsClass || !variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
@@ -1076,7 +1076,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         bool TryGetAddress(Identifier identifier, out int address, out int size)
         {
-            if (!Variables.TryFind(identifier.VariableName.Content, out Variable variable))
+            if (!Variables.TryFind(identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             address = variable.Address;
@@ -1129,7 +1129,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
         {
-            if (!Variables.TryFind(identifier.VariableName.Content, out Variable variable))
+            if (!Variables.TryFind(identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             if (!variable.Type.IsClass)
@@ -1190,10 +1190,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 functionCall.Identifier == "array")
             { return; }
 
-            if (Constants.TryFind(statement.VariableName.Content, out _))
+            if (Constants.TryFind(statement.Content, out _))
             { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
-            if (!Variables.TryFind(statement.VariableName.Content, out Variable variable))
+            if (!Variables.TryFind(statement.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement}\" not found", statement, CurrentFile); }
 
             CompileSetter(variable, value);
@@ -1239,7 +1239,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         void CompileSetter(Variable variable, StatementWithValue value)
         {
             if (value is Identifier _identifier &&
-                Variables.TryFind(_identifier.VariableName.Content, out Variable valueVariable))
+                Variables.TryFind(_identifier.Content, out Variable valueVariable))
             {
                 if (variable.Address == valueVariable.Address)
                 {
@@ -1405,7 +1405,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new CompilerException($"This must be an identifier", statement.PrevStatement, CurrentFile); }
 
-            if (!Variables.TryFind(_variableIdentifier.VariableName.Content, out Variable variable))
+            if (!Variables.TryFind(_variableIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
 
             if (variable.IsDiscarted)
@@ -2082,7 +2082,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 throw new CompilerException($"Value failed to compile", value, CurrentFile);
                             }
 
-                            if (value is Identifier identifier && Variables.TryFind(identifier.VariableName.Content, out Variable variable))
+                            if (value is Identifier identifier && Variables.TryFind(identifier.Content, out Variable variable))
                             {
                                 if (variable.IsDiscarted)
                                 { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", identifier, CurrentFile); }
@@ -2338,7 +2338,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
+                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
@@ -2396,7 +2396,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
+                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
@@ -2464,7 +2464,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
+                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
@@ -2485,7 +2485,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.VariableName.Content, out Variable variable))
+                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarted)
@@ -2652,7 +2652,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         }
         void Compile(Identifier statement)
         {
-            if (statement.VariableName.Content == "IN")
+            if (statement.Content == "IN")
             {
                 int address = Stack.PushVirtual(1);
                 Code.MovePointer(address);
@@ -2662,7 +2662,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            if (Variables.TryFind(statement.VariableName.Content, out Variable variable))
+            if (Variables.TryFind(statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -2700,7 +2700,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            if (Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
+            if (Constants.TryFind(statement.Content, out ConstantVariable constant))
             {
                 using (Code.Block($"Load constant {variable.Name} (with value {constant.Value})"))
                 {
@@ -2758,7 +2758,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         {
                             {
                                 if (statement.Left is Identifier _left &&
-                                    Variables.TryFind(_left.VariableName.Content, out var left) &&
+                                    Variables.TryFind(_left.Content, out var left) &&
                                     !left.IsDiscarted &&
                                     TryCompute(statement.Right, out var right) &&
                                     right.Type == RuntimeType.BYTE)
@@ -3372,7 +3372,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!Variables.TryFind(modifiedVariable.VariableName.Content, out Variable v))
+                                if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType &&
@@ -3579,7 +3579,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!Variables.TryFind(modifiedVariable.VariableName.Content, out Variable v))
+                                if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType &&

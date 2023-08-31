@@ -378,24 +378,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
         #endregion
 
-        bool GetCompiledField(Field field, out CompiledField compiledField)
-        {
-            compiledField = null;
-
-            CompiledType type = FindStatementType(field.PrevStatement);
-            if (type is null) return false;
-            if (!type.IsClass) return false;
-            var @class = type.Class;
-            for (int i = 0; i < @class.Fields.Length; i++)
-            {
-                if (@class.Fields[i].Identifier.Content != field.FieldName.Content) continue;
-
-                compiledField = @class.Fields[i];
-                return true;
-            }
-            return false;
-        }
-
         #region GenerateCodeForStatement
 
         void GenerateCodeForStatement(VariableDeclaretion newVariable)
@@ -1461,7 +1443,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void GenerateCodeForStatement(Identifier variable)
         {
-            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter param))
             {
                 // variable.VariableName = variable.VariableName.Variable(param);
 
@@ -1469,7 +1451,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset);
             }
-            else if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
+            else if (GetVariable(variable.Content, out CompiledVariable val))
             {
                 // variable.VariableName = variable.VariableName.Variable(val);
 
@@ -1482,18 +1464,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     LoadFromStack(val.MemoryAddress, val.Type.Size, !val.IsGlobal);
                 }
             }
-            else if (GetFunction(variable, out var compiledFunction))
+            else if (GetFunction(variable.Name, out var compiledFunction))
             {
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, variable, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
 
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset, $"(function) {compiledFunction.ReadableID()}");
 
-                variable.VariableName.AnalysedType = TokenAnalysedType.FunctionName;
+                variable.Name.AnalysedType = TokenAnalysedType.FunctionName;
             }
             else
             {
-                throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+                throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
             }
         }
         void GenerateCodeForStatement(AddressGetter addressGetter)
@@ -1844,7 +1826,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (prevType.IsClass)
             {
-                if (!GetCompiledField(field, out var compiledField))
+                if (!GetField(field, out var compiledField))
                 { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in class \"{prevType.Class.Name}\"", field, CurrentFile); }
 
                 if (CurrentContext.Context != null)
@@ -2130,7 +2112,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             CompiledType valueType = FindStatementType(value);
 
-            if (GetParameter(statementToSet.VariableName.Content, out CompiledParameter parameter))
+            if (GetParameter(statementToSet.Content, out CompiledParameter parameter))
             {
                 // statementToSet.VariableName = statementToSet.VariableName.Variable(parameter);
 
@@ -2140,7 +2122,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 GenerateCodeForStatement(value);
                 AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
             }
-            else if (GetVariable(statementToSet.VariableName.Content, out CompiledVariable variable))
+            else if (GetVariable(statementToSet.Content, out CompiledVariable variable))
             {
                 // statementToSet.VariableName = statementToSet.VariableName.Variable(variable);
 
@@ -2152,7 +2134,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             else
             {
-                throw new CompilerException($"Variable \"{statementToSet.VariableName.Content}\" not found", statementToSet.VariableName, CurrentFile);
+                throw new CompilerException($"Variable \"{statementToSet.Content}\" not found", statementToSet, CurrentFile);
             }
         }
         void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
@@ -2656,13 +2638,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         int GetDataAddress(Identifier variable, out AddressingMode addressingMode)
         {
-            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter param))
             {
                 addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
                 return GetDataAddress(param);
             }
 
-            if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable val))
             {
                 if (val.IsStoredInHEAP)
                 { throw new InternalException($"This should never occur: trying to GetDataAddress of variable \"{val.VariableName.Content}\" wich's type is {val.Type}"); }
@@ -2672,7 +2654,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return val.MemoryAddress;
             }
 
-            throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+            throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
         }
 
         /// <summary>
@@ -2692,7 +2674,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (field.PrevStatement is Identifier _prevVar)
                     {
-                        if (GetParameter(_prevVar.VariableName.Content, out CompiledParameter param))
+                        if (GetParameter(_prevVar.Content, out CompiledParameter param))
                         {
                             addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
 
@@ -2710,7 +2692,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (field.PrevStatement is Identifier _prevVar)
                     {
-                        if (GetParameter(_prevVar.VariableName.Content, out CompiledParameter param))
+                        if (GetParameter(_prevVar.Content, out CompiledParameter param))
                         {
                             addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
 
@@ -2777,16 +2759,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         int GetBaseAddress(Identifier variable, out AddressingMode addressingMode)
         {
-            if (GetParameter(variable.VariableName.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter param))
             {
                 addressingMode = AddressingMode.BASEPOINTER_RELATIVE;
                 return GetDataAddress(param);
             }
 
-            if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable val))
             { return GetBaseAddress(val, out addressingMode); }
 
-            throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+            throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
         }
         /// <summary>
         /// Returns the <paramref name="variable"/>'s <b>memory address on the stack</b>
@@ -2824,7 +2806,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         bool IsItInHeap(Identifier variable)
         {
-            if (GetParameter(variable.VariableName.Content, out var parameter))
+            if (GetParameter(variable.Content, out var parameter))
             {
                 if (parameter.Type.IsStruct) return false;
                 if (parameter.Type.IsClass) return true;
@@ -2832,10 +2814,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 throw new NotImplementedException();
             }
 
-            if (GetVariable(variable.VariableName.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable val))
             { return val.IsStoredInHEAP; }
 
-            throw new CompilerException($"Variable \"{variable.VariableName.Content}\" not found", variable.VariableName, CurrentFile);
+            throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
         }
         /// <summary>
         /// Checks if the <paramref name="field"/> is stored on the heap or not
@@ -2881,7 +2863,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else
             { offset += LocalVariablesSize; }
 
-            CompiledVariable compiledVariable = GetVariableInfo(newVariable, offset, isGlobal);
+            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, isGlobal);
 
             compiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
 
@@ -3071,34 +3053,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
-        CompiledVariable GetVariableInfo(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
-        {
-            if (Constants.Keywords.Contains(newVariable.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
-
-            CompiledType type;
-            if (newVariable.Type.Identifier == "var")
-            {
-                if (newVariable.InitialValue == null)
-                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable, newVariable.FilePath); }
-
-                type = FindStatementType(newVariable.InitialValue);
-            }
-            else
-            {
-                type = new CompiledType(newVariable.Type, FindType);
-            }
-
-            return new CompiledVariable(
-                memoryOffset,
-                type,
-                isGlobal,
-                type.InHEAP,
-                newVariable);
-        }
-
-        #region Result Structs
-
         public struct Result
         {
             public Instruction[] Code;
@@ -3115,28 +3069,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public Information[] Informations;
             public Warning[] Warnings;
             public Error[] Errors;
-        }
-
-        #endregion
-
-        CompiledFunction GetCodeEntry()
-        {
-            for (int i = 0; i < CompiledFunctions.Length; i++)
-            {
-                CompiledFunction function = this.CompiledFunctions[i];
-
-                for (int j = 0; j < function.Attributes.Length; j++)
-                {
-                    if (function.Attributes[j].Identifier.Content != "CodeEntry") continue;
-
-                    if (function.IsTemplate)
-                    { throw new CompilerException($"Code entry can not be a template function", function.TemplateInfo, function.FilePath); }
-
-                    return function;
-                }
-            }
-
-            return null;
         }
 
         Result GenerateCode(
@@ -3379,8 +3311,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 else if (item.VariableStatement != null)
                 {
-                    if (!GetFunction(item.VariableStatement, out function))
-                    { throw new CompilerException($"Function {item.VariableStatement}() not found", item.VariableStatement.VariableName, CurrentFile); }
+                    if (!GetFunction(item.VariableStatement.Name, out function))
+                    { throw new CompilerException($"Function {item.VariableStatement}() not found", item.VariableStatement.Name, CurrentFile); }
                     useAbsolute = true;
                 }
                 else if (item.IndexStatement != null)

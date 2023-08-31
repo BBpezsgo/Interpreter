@@ -517,7 +517,7 @@ namespace ProgrammingLanguage.Bytecode
 
         int GET_BASEPOINTER()
         {
-            Memory.Stack.Push(new DataItem(BasePointer, null));
+            Memory.Stack.Push(new DataItem(BasePointer, "basepointer"));
             Step();
             return 1;
         }

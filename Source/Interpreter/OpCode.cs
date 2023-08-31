@@ -8,9 +8,11 @@
         // === STACK OPERATIONS ===
         /// <summary>
         /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        /// </para><br/><br/>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c><see cref="Instruction.parameter"/></c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from Instruction
@@ -21,7 +23,9 @@
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
-        /// </para><br/><br/>
+        ///     <c>any value</c><br/>
+        /// </para>
+        /// <br/><br/>
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -34,13 +38,17 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c><see cref="int"/> address</c> (optional)<br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from Instruction or value
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetStackAddress"/>)
         /// </para>
         /// </summary>
         LOAD_VALUE,
@@ -50,29 +58,23 @@
         ///     <c>...</c><br/>
         ///     <c>value</c><br/>
         ///     <c><see cref="int"/> address</c> (optional)<br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from value
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetStackAddress"/>)
         /// </para>
         /// </summary>
         STORE_VALUE,
         // === ===
 
         // === FLOW CONTROL ===
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
-        /// </para>
-        /// </summary>
         EXIT,
 
         /// <summary>
@@ -81,13 +83,11 @@
         ///     <c>...</c><br/>
         ///     <c>condition</c><br/>
         ///     <c><see cref="int"/> relative address</c> (optional)<br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
         /// </para>
         /// </summary>
         JUMP_BY_IF_FALSE,
@@ -96,13 +96,11 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c><see cref="int"/> relative address</c> (optional)<br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
         /// </para>
         /// </summary>
         JUMP_BY,
@@ -124,12 +122,14 @@
 
         /// <summary>
         /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        /// </para><br/><br/>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c><see cref="int"/> basepointer</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
-        ///     none
+        ///     "basepointer"
         /// </para>
         /// </summary>
         GET_BASEPOINTER,
@@ -206,11 +206,7 @@
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
-        ///     <c>(<see cref="string"/>) value</c><br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
+        ///     <c>*<see cref="string"/> message</c><br/>
         /// </para>
         /// </summary>
         THROW,
@@ -223,7 +219,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -236,7 +240,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -249,7 +261,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -262,7 +282,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -275,7 +303,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -288,7 +324,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -301,7 +345,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -314,7 +366,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -327,7 +387,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none
@@ -339,7 +407,15 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c>value</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from value
@@ -353,7 +429,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -366,7 +450,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -382,7 +474,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -395,7 +495,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -408,7 +516,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -421,7 +537,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -434,7 +558,15 @@
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
         ///     <c>right</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from left side
@@ -449,13 +581,23 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c><see cref="int"/> address</c> (optional)<br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from value
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
         /// </para>
         /// </summary>
         HEAP_GET,
@@ -465,13 +607,17 @@
         ///     <c>...</c><br/>
         ///     <c>value</c><br/>
         ///     <c><see cref="int"/> address</c> (optional)<br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from value
         /// </para>
-        /// <para><br/><br/>
-        /// <b>Uses</b> <see cref="AddressingMode"/>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
         /// </para>
         /// </summary>
         HEAP_SET,
@@ -481,7 +627,15 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c><see cref="int"/> size</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c><see cref="int"/> pointer</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     Inherits from Instruction
@@ -493,7 +647,9 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c><see cref="int"/> pointer</c><br/>
-        /// </para><br/><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
         /// <para>
         ///     <b>Tag:</b><br/>
         ///     none

@@ -364,16 +364,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void AddInstruction(Opcode opcode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, string tag = null) => AddInstruction(new Instruction(opcode) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, new DataItem(param0)) { tag = tag ?? string.Empty });
 
         void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, DataItem param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, param0) { tag = tag ?? string.Empty });
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, float param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, byte param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
-        void AddInstruction(Opcode opcode, AddressingMode addressingMode, char param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
 
         void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
         #endregion
@@ -1381,20 +1374,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
             switch (literal.Type)
             {
                 case LiteralType.INT:
-                    AddInstruction(Opcode.PUSH_VALUE, int.Parse(literal.Value));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(int.Parse(literal.Value)));
                     break;
                 case LiteralType.FLOAT:
-                    AddInstruction(Opcode.PUSH_VALUE, float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture)));
                     break;
                 case LiteralType.STRING:
                     GenerateCodeForLiteralString(literal);
                     break;
                 case LiteralType.BOOLEAN:
-                    AddInstruction(Opcode.PUSH_VALUE, (bool.Parse(literal.Value) ? 1 : 0));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem((bool.Parse(literal.Value) ? 1 : 0)));
                     break;
                 case LiteralType.CHAR:
                     if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
-                    AddInstruction(Opcode.PUSH_VALUE, literal.Value[0]);
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[0]));
                     break;
                 default: throw new ImpossibleException();
             }
@@ -1426,7 +1419,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             for (int i = 0; i < literal.Length; i++)
             {
                 // Prepare value
-                AddInstruction(Opcode.PUSH_VALUE, literal[i]);
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal[i]));
 
                 // Calculate pointer
                 AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
@@ -1917,7 +1910,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (type.IsBuiltin && targetType.IsBuiltin)
             {
-                AddInstruction(Opcode.PUSH_VALUE, (byte)targetType.BuiltinType.Convert(), $"typecast target type");
+                AddInstruction(Opcode.PUSH_VALUE, new DataItem((byte)targetType.BuiltinType.Convert()), $"typecast target type");
                 AddInstruction(Opcode.TYPE_SET);
             }
         }
@@ -3148,7 +3141,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     for (int i = 0; i < function.Length; i++)
                     {
                         // Prepare value
-                        AddInstruction(Opcode.PUSH_VALUE, function[i]);
+                        AddInstruction(Opcode.PUSH_VALUE, new DataItem(function[i]));
 
                         // Calculate pointer
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);

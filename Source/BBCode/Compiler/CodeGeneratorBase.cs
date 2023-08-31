@@ -1188,12 +1188,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             DataItem leftValue = GetInitialValue(leftType);
             DataItem rightValue = GetInitialValue(rightType);
 
-            DataItem? predictedValue = ComputeValue(@operator.Operator.Content, leftValue, rightValue);
+            DataItem predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
 
-            if (!predictedValue.HasValue)
-            { throw new InternalException($"Failed to compute {leftType} {@operator.Operator.Content} {rightType}"); }
-
-            return new CompiledType(predictedValue.Value.Type);
+            return new CompiledType(predictedValue.Type);
         }
         protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal) => literal.Type switch
         {
@@ -1341,9 +1338,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #endregion
 
-        #region ComputeValue()
-        protected static DataItem? ComputeValue(string @operator, DataItem left, DataItem right)
-            => @operator switch
+        #region TryCompute()
+        protected static DataItem Compute(string @operator, DataItem left, DataItem right)
+        {
+            return @operator switch
             {
                 "!" => !left,
 
@@ -1371,46 +1369,79 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 ">=" => new DataItem(left >= right, null),
                 _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
             };
+        }
 
-        protected DataItem? ComputeValue(OperatorCall @operator)
+        protected bool TryCompute(OperatorCall @operator, out DataItem value)
         {
             if (GetOperator(@operator, out _))
-            { return null; }
+            {
+                value = DataItem.Null;
+                return false;
+            }
 
-            var leftValue = ComputeValue(@operator.Left);
-            if (!leftValue.HasValue) return null;
+            if (!TryCompute(@operator.Left, out var leftValue))
+            {
+                value = DataItem.Null;
+                return false;
+            }
 
             if (@operator.Operator.Content == "!")
             {
-                return !leftValue;
+                value = !leftValue;
+                return true;
             }
 
             if (@operator.Right != null)
             {
-                var rightValue = ComputeValue(@operator.Right);
-                if (!rightValue.HasValue) return null;
+                if (!TryCompute(@operator.Right, out var rightValue))
+                {
+                    value = DataItem.Null;
+                    return false;
+                }
 
-                return ComputeValue(@operator.Operator.Content, leftValue.Value, rightValue.Value);
+                value = Compute(@operator.Operator.Content, leftValue, rightValue);
+                return true;
             }
 
-            return leftValue;
+            value = leftValue;
+            return true;
         }
-        protected static DataItem? ComputeValue(BBCode.Parser.Statement.Literal literal)
-            => literal.Type switch
+        protected static bool TryCompute(BBCode.Parser.Statement.Literal literal, out DataItem value)
+        {
+            switch (literal.Type)
             {
-                LiteralType.INT => new DataItem(int.Parse(literal.Value), null),
-                LiteralType.FLOAT => new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null),
-                LiteralType.STRING => null,
-                LiteralType.BOOLEAN => new DataItem(bool.Parse(literal.Value), null),
-                LiteralType.CHAR => throw new NotImplementedException(),
-                _ => throw new ImpossibleException($"This should never occur"),
-            };
-        protected DataItem? ComputeValue(KeywordCall keywordCall)
+                case LiteralType.INT:
+                    value = new DataItem(int.Parse(literal.Value), null);
+                    return true;
+                case LiteralType.FLOAT:
+                    value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null);
+                    return true;
+                case LiteralType.BOOLEAN:
+                    value = new DataItem(bool.Parse(literal.Value), null);
+                    return true;
+                case LiteralType.CHAR:
+                    if (literal.Value.Length != 1)
+                    {
+                        value = DataItem.Null;
+                        return false;
+                    }
+                    value = new DataItem(literal.Value[0], null);
+                    return true;
+                case LiteralType.STRING:
+                default:
+                    value = DataItem.Null;
+                    return false;
+            }
+        }
+        protected bool TryCompute(KeywordCall keywordCall, out DataItem value)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { return null; }
+                {
+                    value = DataItem.Null;
+                    return false;
+                }
 
                 StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
@@ -1418,24 +1449,27 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!param0Type.IsClass)
                 { throw new CompilerException($"{param0Type} is not a reference type", param0, CurrentFile); }
 
-                return new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
+                value = new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
+                return true;
             }
 
-            return null;
+            value = DataItem.Null;
+            return false;
         }
 
-        protected DataItem? ComputeValue(StatementWithValue st)
+        protected bool TryCompute(StatementWithValue st, out DataItem value)
         {
             if (st is BBCode.Parser.Statement.Literal literal)
-            { return ComputeValue(literal); }
+            { return TryCompute(literal, out value); }
 
             if (st is OperatorCall @operator)
-            { return ComputeValue(@operator); }
+            { return TryCompute(@operator, out value); }
 
             if (st is KeywordCall keywordCall)
-            { return ComputeValue(keywordCall); }
+            { return TryCompute(keywordCall, out value); }
 
-            return null;
+            value = DataItem.Null;
+            return false;
         }
         #endregion
 

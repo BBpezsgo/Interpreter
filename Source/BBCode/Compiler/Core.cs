@@ -1759,6 +1759,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public bool Equals(RuntimeType other)
         {
+            if (this.IsEnum)
+            {
+                for (int i = 0; i < this.@enum.Members.Length; i++)
+                {
+                    if (this.@enum.Members[i].Value.Type == other)
+                    { return true; }
+                }
+            }
+
             if (!this.IsBuiltin) return false;
             return this.RuntimeType == other;
         }

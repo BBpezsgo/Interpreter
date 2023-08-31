@@ -1216,41 +1216,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void GenerateCodeForStatement(OperatorCall @operator)
         {
-            if (OptimizeCode)
+            if (OptimizeCode && TryCompute(@operator, out DataItem predictedValue))
             {
-                DataItem? predictedValueN = ComputeValue(@operator);
-                if (predictedValueN.HasValue)
-                {
-                    var predictedValue = predictedValueN.Value;
-
-                    switch (predictedValue.Type)
-                    {
-                        case RuntimeType.BYTE:
-                            {
-                                AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueByte);
-                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueByte}", @operator, CurrentFile));
-                                return;
-                            }
-                        case RuntimeType.INT:
-                            {
-                                AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueInt);
-                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueInt}", @operator, CurrentFile));
-                                return;
-                            }
-                        case RuntimeType.FLOAT:
-                            {
-                                AddInstruction(Opcode.PUSH_VALUE, predictedValue.ValueFloat);
-                                Informations.Add(new Information($"Predicted value: {predictedValue.ValueFloat}", @operator, CurrentFile));
-                                return;
-                            }
-
-                        case RuntimeType.CHAR:
-                            {
-                                break;
-                            }
-                        default: throw new ImpossibleException();
-                    }
-                }
+                AddInstruction(Opcode.PUSH_VALUE, predictedValue);
+                Informations.Add(new Information($"Predicted value: {predictedValue}", @operator, CurrentFile));
+                return;
             }
 
             if (GetOperator(@operator, out CompiledOperator operatorDefinition))
@@ -1548,8 +1518,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
-            var conditionValue = ComputeValue(whileLoop.Condition);
-            if (conditionValue.HasValue && conditionValue.Value.IsFalsy() && TrimUnreachableCode)
+            bool conditionIsComputed = TryCompute(whileLoop.Condition, out DataItem computedCondition);
+            if (conditionIsComputed && computedCondition.IsFalsy() && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
                 Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
@@ -1582,9 +1552,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
 
-            if (conditionValue.HasValue)
+            if (conditionIsComputed)
             {
-                if (conditionValue.Value.IsFalsy())
+                if (computedCondition.IsFalsy())
                 { Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
                 else if (BreakInstructions.Last.Count == 0)
                 { Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }

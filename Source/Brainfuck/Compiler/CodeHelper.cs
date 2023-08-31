@@ -226,6 +226,31 @@ namespace ProgrammingLanguage.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
+        /// <exception cref="Errors.CompilerException"/>
+        /// <exception cref="Errors.ImpossibleException"/>
+        internal void SetValue(int address, Bytecode.DataItem value)
+        {
+            switch (value.Type)
+            {
+                case Bytecode.RuntimeType.BYTE:
+                    SetValue(address, value.ValueByte);
+                    return;
+                case Bytecode.RuntimeType.INT:
+                    SetValue(address, value.ValueInt);
+                    return;
+                case Bytecode.RuntimeType.FLOAT:
+                    throw new Errors.CompilerException($"Floats not supported by brainfuck :(");
+                case Bytecode.RuntimeType.CHAR:
+                    SetValue(address, value.ValueChar);
+                    return;
+                default:
+                    throw new Errors.ImpossibleException();
+            }
+        }
+
+        /// <summary>
+        /// <b>Pointer:</b> <paramref name="address"/>
+        /// </summary>
         internal void ClearValue(int address)
         {
             SetPointer(address);

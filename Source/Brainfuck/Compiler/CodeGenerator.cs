@@ -12,6 +12,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
     using ProgrammingLanguage.BBCode.Compiler;
     using ProgrammingLanguage.BBCode.Parser;
     using ProgrammingLanguage.BBCode.Parser.Statement;
+    using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
     using Literal = BBCode.Parser.Statement.Literal;
@@ -351,21 +352,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         readonly struct ConstantVariable : ISearchable<string>
         {
             internal readonly string Name;
-            internal readonly ConstantValue Value;
+            internal readonly DataItem Value;
 
-            public ConstantVariable(string name, byte value)
-            {
-                Name = name;
-                Value = new ConstantValue(value);
-            }
-
-            public ConstantVariable(string name, string value)
-            {
-                Name = name;
-                Value = new ConstantValue(value);
-            }
-
-            public ConstantVariable(string name, ConstantValue value)
+            public ConstantVariable(string name, DataItem value)
             {
                 Name = name;
                 Value = value;
@@ -418,13 +407,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             if (Constants.TryFind(symbolName, out var constant))
             {
-                type = constant.Value.Type switch
-                {
-                    ValueType.Byte => new CompiledType(Type.BYTE),
-                    ValueType.Char => new CompiledType(Type.CHAR),
-                    ValueType.String => new CompiledType(Type.BYTE),
-                    _ => new CompiledType(Type.BYTE),
-                };
+                type = new CompiledType(constant.Value.Type);
                 return true;
             }
 
@@ -531,7 +514,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (Constants.TryFind(constIdentifier.VariableName.Content, out _))
                         { throw new CompilerException($"Constant \"{constIdentifier.VariableName.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
 
-                        ConstantValue value = Compute(constValue);
+                        if (!TryCompute(constValue, out DataItem value))
+                        { throw new CompilerException($"Constant must have a constant value", constValue, CurrentFile); }
+
                         Constants.Add(new ConstantVariable(constIdentifier.VariableName.Content, value));
 
                         break;
@@ -552,6 +537,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         }
         #endregion
 
+        /*
         #region Compute
         ConstantValue Compute(StatementWithValue statement)
         {
@@ -631,7 +617,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             };
         }
         #endregion
+        */
 
+        /*
         #region TryCompute
         bool TryCompute(StatementWithValue statement, out ConstantValue value)
         {
@@ -721,6 +709,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             return true;
         }
         #endregion
+        */
 
         #region PrecompileVariables
         int PrecompileVariables(Block block)
@@ -775,10 +764,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     if (!TryCompute(constructorCall.Parameters[0], out var arraySize))
                     { throw new CompilerException($"Array size have to be precompiled", constructorCall.Parameters[0], CurrentFile); }
 
-                    if (arraySize.Type != ValueType.Byte)
+                    if (arraySize.Type != RuntimeType.BYTE)
                     { throw new CompilerException($"Expected byte as array size (not {arraySize.Type})", constructorCall.Parameters[0], CurrentFile); }
 
-                    int size = Snippets.ARRAY_SIZE(arraySize);
+                    int size = Snippets.ARRAY_SIZE(arraySize.ValueByte);
 
                     int address = Stack.PushVirtual(size);
                     variables.Push(new Variable(name, address, scope, true, initialValueType, size));
@@ -905,7 +894,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
             else if (Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
             {
-                return constant.Value.Size;
+                return 1;
             }
             else
             { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
@@ -937,13 +926,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (t != Type.INT)
                 { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
 
-                if (!TryCompute(constructorCall.Parameters[0], out ConstantValue value))
+                if (!TryCompute(constructorCall.Parameters[0], out DataItem value))
                 { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
 
-                if (value.Type != ValueType.Byte)
+                if (value.Type != RuntimeType.BYTE)
                 { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
 
-                return Snippets.ARRAY_SIZE(value);
+                return Snippets.ARRAY_SIZE(value.ValueByte);
                 // return ((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack;
             }
 
@@ -1076,10 +1065,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (!TryCompute(pointer.PrevStatement, out var addressToSet))
             { throw new CompilerException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
-            if (addressToSet.Type != ValueType.Byte)
+            if (addressToSet.Type != RuntimeType.BYTE)
             { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
-            address = (byte)addressToSet;
+            address = addressToSet.ValueByte;
             size = 1;
 
             return true;
@@ -1289,20 +1278,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (TryCompute(value, out var constantValue))
                 {
-                    if (constantValue.Size != variable.Size)
-                    { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", value, CurrentFile); }
+                    if (variable.Type != constantValue.Type)
+                    { throw new CompilerException($"Cannot set {constantValue.GetTypeText()} to variable of type {variable.Type}", value, CurrentFile); }
 
-                    if (constantValue.Type == ValueType.Byte)
-                    {
-                        Code.SetValue(variable.Address, (byte)constantValue);
-                    }
+                    Code.SetValue(variable.Address, constantValue);
 
-                    if (constantValue.Type == ValueType.Char)
-                    {
-                        Code.SetValue(variable.Address, (char)constantValue);
-                    }
-
-                    if (constantValue.Type == ValueType.String)
+                    /*
+                    if (constantValue.Type == RuntimeType.String)
                     {
                         string v = (string)constantValue;
                         for (int i = 0; i < v.Length; i++)
@@ -1310,6 +1292,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             Code.SetValue(variable.Address + i, v[i]);
                         }
                     }
+                    */
 
                     optimalizations++;
 
@@ -1390,10 +1373,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (TryCompute(value, out var constantValue))
                 {
-                    if (constantValue.Size != 1)
-                    { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
+                    // if (constantValue.Size != 1)
+                    // { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
 
-                    Code.SetValue(address, (byte)constantValue);
+                    Code.SetValue(address, constantValue.Byte ?? 0);
 
                     optimalizations++;
 
@@ -2008,15 +1991,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                         foreach (var value in statement.Parameters)
                         {
-                            if (TryCompute(value, out ConstantValue constantValue))
+                            if (TryCompute(value, out DataItem constantValue))
                             {
-                                if (constantValue.Type == ValueType.Byte)
+                                if (constantValue.Type == RuntimeType.BYTE)
                                 {
-                                    using (Code.Block($"Print value {(byte)constantValue}"))
+                                    using (Code.Block($"Print value {constantValue.ValueByte}"))
                                     {
                                         Code.SetPointer(Stack.NextAddress);
                                         Code.ClearCurrent();
-                                        Code.AddValue((byte)constantValue);
+                                        Code.AddValue(constantValue.ValueByte);
 
                                         Code += ".";
 
@@ -2026,13 +2009,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     continue;
                                 }
 
-                                if (constantValue.Type == ValueType.Char)
+                                if (constantValue.Type == RuntimeType.INT)
                                 {
-                                    using (Code.Block($"Print value '{(char)constantValue}'"))
+                                    using (Code.Block($"Print value {constantValue.ValueInt}"))
                                     {
                                         Code.SetPointer(Stack.NextAddress);
                                         Code.ClearCurrent();
-                                        Code.AddValue((char)constantValue);
+                                        Code.AddValue(constantValue.ValueInt);
 
                                         Code += ".";
 
@@ -2042,6 +2025,23 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     continue;
                                 }
 
+                                if (constantValue.Type == RuntimeType.CHAR)
+                                {
+                                    using (Code.Block($"Print value '{constantValue.ValueChar}'"))
+                                    {
+                                        Code.SetPointer(Stack.NextAddress);
+                                        Code.ClearCurrent();
+                                        Code.AddValue(constantValue.ValueChar);
+
+                                        Code += ".";
+
+                                        Code.ClearCurrent();
+                                        Code.SetPointer(0);
+                                    }
+                                    continue;
+                                }
+
+                                /*
                                 if (constantValue.Type == ValueType.String)
                                 {
                                     using (Code.Block($"Print value \"{(string)constantValue}\""))
@@ -2077,8 +2077,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     }
                                     continue;
                                 }
+                                */
 
-                                throw new CompilerException($"Value failed to compiled", value, CurrentFile);
+                                throw new CompilerException($"Value failed to compile", value, CurrentFile);
                             }
 
                             if (value is Identifier identifier && Variables.TryFind(identifier.VariableName.Content, out Variable variable))
@@ -2128,14 +2129,14 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                         foreach (StatementWithValue valueToPrint in statement.Parameters)
                         {
-                            if (TryCompute(valueToPrint, out ConstantValue constantToPrint))
+                            if (TryCompute(valueToPrint, out DataItem constantToPrint))
                             {
-                                if (constantToPrint.Type == ValueType.Char)
+                                if (constantToPrint.Type == RuntimeType.CHAR)
                                 {
                                     int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print character '{(char)constantToPrint}' (on address {tempAddress})"))
+                                    using (Code.Block($"Print character '{constantToPrint.ValueChar}' (on address {tempAddress})"))
                                     {
-                                        Code.SetValue(tempAddress, (char)constantToPrint);
+                                        Code.SetValue(tempAddress, constantToPrint.ValueChar);
                                         Code.SetPointer(tempAddress);
                                         Code += ".";
                                         Code.ClearValue(tempAddress);
@@ -2144,12 +2145,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     continue;
                                 }
 
-                                if (constantToPrint.Type == ValueType.Byte)
+                                if (constantToPrint.Type == RuntimeType.BYTE)
                                 {
                                     int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print number {(byte)constantToPrint} as text (on address {tempAddress})"))
+                                    using (Code.Block($"Print number {constantToPrint.ValueByte} as text (on address {tempAddress})"))
                                     {
-                                        Code.SetValue(tempAddress, (byte)constantToPrint);
+                                        Code.SetValue(tempAddress, constantToPrint.ValueByte);
                                         Code.SetPointer(tempAddress);
 
                                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
@@ -2160,6 +2161,23 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     continue;
                                 }
 
+                                if (constantToPrint.Type == RuntimeType.INT)
+                                {
+                                    int tempAddress = Stack.NextAddress;
+                                    using (Code.Block($"Print number {constantToPrint.ValueInt} as text (on address {tempAddress})"))
+                                    {
+                                        Code.SetValue(tempAddress, constantToPrint.ValueInt);
+                                        Code.SetPointer(tempAddress);
+
+                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                        { Code.Code += Snippets.OUT_AS_STRING; }
+                                        Code.ClearValue(tempAddress);
+                                        Code.SetPointer(0);
+                                    }
+                                    continue;
+                                }
+
+                                /*
                                 if (constantToPrint.Type == ValueType.String)
                                 {
                                     string v = constantToPrint;
@@ -2195,6 +2213,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     }
                                     continue;
                                 }
+                                */
 
                                 throw new System.Exception();
                             }
@@ -2331,13 +2350,27 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Right == null)
                         { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                        if (TryCompute(statement.Right, out var constantValue) &&
-                            constantValue.Size == 1)
+                        if (TryCompute(statement.Right, out var constantValue))
                         {
-                            if (constantValue.Size != variable.Size)
-                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, CurrentFile); }
+                            if (variable.Type != constantValue.Type)
+                            { throw new CompilerException($"Variable and value type mistach ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
 
-                            Code.AddValue(variable.Address, constantValue[0]);
+                            switch (constantValue.Type)
+                            {
+                                case RuntimeType.BYTE:
+                                    Code.AddValue(variable.Address, constantValue.ValueByte);
+                                    break;
+                                case RuntimeType.INT:
+                                    Code.AddValue(variable.Address, constantValue.ValueInt);
+                                    break;
+                                case RuntimeType.FLOAT:
+                                    throw new CompilerException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
+                                case RuntimeType.CHAR:
+                                    Code.AddValue(variable.Address, constantValue.ValueChar);
+                                    break;
+                                default:
+                                    throw new ImpossibleException();
+                            }
 
                             optimalizations++;
                             return;
@@ -2375,13 +2408,27 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (statement.Right == null)
                         { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                        if (TryCompute(statement.Right, out var constantValue) &&
-                            constantValue.Size == 1)
+                        if (TryCompute(statement.Right, out var constantValue))
                         {
-                            if (constantValue.Size != variable.Size)
-                            { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {constantValue.Size})", statement.Right, CurrentFile); }
+                            if (variable.Type != constantValue.Type)
+                            { throw new CompilerException($"Variable and value type mistach ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
 
-                            Code.AddValue(variable.Address, -constantValue[0]);
+                            switch (constantValue.Type)
+                            {
+                                case RuntimeType.BYTE:
+                                    Code.AddValue(variable.Address, -constantValue.ValueByte);
+                                    break;
+                                case RuntimeType.INT:
+                                    Code.AddValue(variable.Address, -constantValue.ValueInt);
+                                    break;
+                                case RuntimeType.FLOAT:
+                                    throw new CompilerException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
+                                case RuntimeType.CHAR:
+                                    Code.AddValue(variable.Address, -constantValue.ValueChar);
+                                    break;
+                                default:
+                                    throw new ImpossibleException();
+                            }
 
                             optimalizations++;
                             return;
@@ -2535,17 +2582,17 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (t != Type.INT)
                 { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
 
-                if (!TryCompute(constructorCall.Parameters[0], out ConstantValue value))
+                if (!TryCompute(constructorCall.Parameters[0], out DataItem value))
                 { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
 
-                if (value.Type != ValueType.Byte)
+                if (value.Type != RuntimeType.BYTE)
                 { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
 
                 CompiledType arrayElementType = new(constructorCall.TypeName.GenericTypes[0], FindType);
                 if (arrayElementType == Type.INT)
                 { Warnings.Add(new Warning($"Integers are not supported by brainfuck so I will threat this as a byte", constructorCall.TypeName.GenericTypes[0], CurrentFile)); }
 
-                Stack.PushVirtual(Snippets.ARRAY_SIZE(value));
+                Stack.PushVirtual(Snippets.ARRAY_SIZE(value.ValueByte));
                 // Stack.PushVirtual(((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack);
                 return;
             }
@@ -2714,13 +2761,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     Variables.TryFind(_left.VariableName.Content, out var left) &&
                                     !left.IsDiscarted &&
                                     TryCompute(statement.Right, out var right) &&
-                                    right.Type == ValueType.Byte)
+                                    right.Type == RuntimeType.BYTE)
                                 {
                                     int resultAddress = Stack.PushVirtual(1);
 
                                     Code.CopyValueWithTemp(left.Address, Stack.NextAddress, resultAddress);
 
-                                    Code.AddValue(resultAddress, -(byte)right);
+                                    Code.AddValue(resultAddress, -right.ValueByte);
 
                                     optimalizations++;
 
@@ -3338,7 +3385,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         case "const":
                             {
                                 var valueStatement = modifiedStatement.Statement;
-                                ConstantValue value = Compute(valueStatement);
+                                if (!TryCompute(valueStatement, out DataItem value))
+                                { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                                 constantParameters.Add(new ConstantVariable(defined.Identifier.Content, value));
                                 break;
@@ -3544,7 +3592,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         case "const":
                             {
                                 var valueStatement = modifiedStatement.Statement;
-                                ConstantValue value = Compute(valueStatement);
+                                if (!TryCompute(valueStatement, out DataItem value))
+                                { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
                                 constantParameters.Add(new ConstantVariable(defined.Identifier.Content, value));
                                 break;

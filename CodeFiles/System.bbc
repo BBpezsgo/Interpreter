@@ -1,144 +1,15 @@
 #bf "sleep" "void" "int";
 
-#bf "stdout" "void" "char";
-#bf "stderr" "void" "char";
-#bf "stdin" "char";
-
-#bf "console-set" "void" "char" "int" "int";
-#bf "console-clear" "void";
-
 #bf "int-to-float" "float" "int";
 #bf "float-to-int" "int" "float";
 
-[External("stdout")]
-[StandardOutput]
-export void Print(char data);
-
-[External("stderr")]
-export void PrintError(char data);
-  
-[External("console-set")]
-export void Set(char data, int x, int y);
-
-[External("console-clear")]
-export void Clear();
+using System.Console;
 
 [Define("boolean")]
 enum bool
 {
     False = 0,
     True = 1,
-}
-
-[StandardOutput]
-export void Print(int message)
-{
-    String _message = message.ToString();
-    Print(_message);
-    delete _message;
-}
-
-[StandardOutput]
-export void Print(String message)
-{
-    if (&message < 0)
-    {
-        PrintD("null");
-    }
-    else
-    {
-        int length = message.length;
-        for (int i; i < length; i++)
-        {
-            Print(message[i]);
-        };
-    };
-}
-
-export void PrintD(String message)
-{
-    Print(message);
-    delete message;
-}
-
-export void PrintLine()
-{
-    Print('\r');
-    Print('\n');
-}
-
-export void PrintLine(String message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export void PrintLineD(String message)
-{
-    PrintD(message);
-    PrintLine();
-}
-
-export void PrintLine(char message)
-{
-    Print(message);
-    PrintLine();
-}
-
-export void PrintLine(int message)
-{
-    PrintLineD(message.ToString());
-}
-
-export void PrintLine(byte message)
-{
-    PrintLineD(message.ToString());
-}
-
-export void PrintLine(bool message)
-{
-    if (message)
-    {
-        PrintLineD("true");
-    }
-    else
-    {
-        PrintLineD("false");
-    };
-}
-
-[External("stdin")]
-char StdIn();
-
-export char ReadKey()
-{
-    char in = StdIn();
-    Print(in);
-    return in;
-}
-
-export String ReadLine() {
-    String result = new String(0);
-    while (true)
-    {
-        char inpChar = ReadKey();
-        if (inpChar == '\n') { break; };
-        if (inpChar == '\r') { break; };
-
-        String newResult = new String(result.length + 1);
-
-        for (int i = 0; i < result.length; i++)
-        {
-            newResult[i] = result[i];
-        };
-
-        newResult[result.length] = inpChar;
-      
-        delete result;
-
-        result = newResult;
-    };
-    return result;
 }
 
 char DigitToChar(int digit)

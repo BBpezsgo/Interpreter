@@ -142,105 +142,113 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (Function is CompiledFunction compiledFunction)
                 {
-                    for (int i = 0; i < compiledFunction.ParameterTypes.Length; i++)
-                    {
-                        if (compiledFunction.ParameterTypes[i].IsGeneric)
-                        {
-                            if (!TypeArguments.TryGetValue(compiledFunction.ParameterTypes[i].Name, out CompiledType bruh))
-                            { throw new InternalException(); }
-
-                            compiledFunction.ParameterTypes[i] = bruh;
-                            continue;
-                        }
-
-                        if (compiledFunction.ParameterTypes[i].IsClass && compiledFunction.ParameterTypes[i].Class.TemplateInfo != null)
-                        {
-                            Token[] classTypeParameters = compiledFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
-
-                            CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
-
-                            foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
-                            {
-                                if (compiledFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
-                                { classTypeParameterValues[j] = item.Value; }
-                            }
-
-                            for (int j = 0; j < classTypeParameterValues.Length; j++)
-                            {
-                                if (classTypeParameterValues[j] is null ||
-                                    classTypeParameterValues[j].IsGeneric)
-                                { throw new InternalException(); }
-                            }
-
-                            compiledFunction.ParameterTypes[i] = new CompiledType(compiledFunction.ParameterTypes[i].Class, classTypeParameterValues);
-                            continue;
-                        }
-                    }
-
-                    if (compiledFunction.Type.IsGeneric)
-                    {
-                        if (!TypeArguments.TryGetValue(compiledFunction.Type.Name, out CompiledType bruh))
-                        { throw new InternalException(); }
-
-                        compiledFunction.Type = bruh;
-                    }
-
-                    if (compiledFunction.Context != null && compiledFunction.Context.TemplateInfo != null)
-                    {
-                        compiledFunction.Context = compiledFunction.Context.Duplicate();
-                        compiledFunction.Context.AddTypeArguments(TypeArguments);
-                    }
+                    FinishInitialization(compiledFunction);
                 }
                 else if (Function is CompiledGeneralFunction compiledGeneralFunction)
                 {
-                    for (int i = 0; i < compiledGeneralFunction.ParameterTypes.Length; i++)
+                    FinishInitialization(compiledGeneralFunction);
+                }
+            }
+            void FinishInitialization(CompiledFunction compiledFunction)
+            {
+                for (int i = 0; i < compiledFunction.ParameterTypes.Length; i++)
+                {
+                    if (compiledFunction.ParameterTypes[i].IsGeneric)
                     {
-                        if (compiledGeneralFunction.ParameterTypes[i].IsGeneric)
-                        {
-                            if (!TypeArguments.TryGetValue(compiledGeneralFunction.ParameterTypes[i].Name, out CompiledType bruh))
-                            { throw new InternalException(); }
+                        if (!TypeArguments.TryGetValue(compiledFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                        { throw new InternalException(); }
 
-                            compiledGeneralFunction.ParameterTypes[i] = bruh;
-                            continue;
-                        }
-
-                        if (compiledGeneralFunction.Type.IsGeneric)
-                        {
-                            if (!TypeArguments.TryGetValue(compiledGeneralFunction.Type.Name, out CompiledType bruh))
-                            { throw new InternalException(); }
-
-                            compiledGeneralFunction.Type = bruh;
-                        }
-
-                        if (compiledGeneralFunction.ParameterTypes[i].IsClass && compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo != null)
-                        {
-                            Token[] classTypeParameters = compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
-
-                            CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
-
-                            foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
-                            {
-                                if (compiledGeneralFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
-                                { classTypeParameterValues[j] = item.Value; }
-                            }
-
-                            for (int j = 0; j < classTypeParameterValues.Length; j++)
-                            {
-                                if (classTypeParameterValues[j] is null ||
-                                    classTypeParameterValues[j].IsGeneric)
-                                { throw new InternalException(); }
-                            }
-
-                            compiledGeneralFunction.ParameterTypes[i] = new CompiledType(compiledGeneralFunction.ParameterTypes[i].Class, classTypeParameterValues);
-                            continue;
-                        }
+                        compiledFunction.ParameterTypes[i] = bruh;
+                        continue;
                     }
 
-                    if (compiledGeneralFunction.Context != null && compiledGeneralFunction.Context.TemplateInfo != null)
+                    if (compiledFunction.ParameterTypes[i].IsClass && compiledFunction.ParameterTypes[i].Class.TemplateInfo != null)
                     {
-                        compiledGeneralFunction.Context = compiledGeneralFunction.Context.Duplicate();
-                        compiledGeneralFunction.Context.AddTypeArguments(TypeArguments);
+                        Token[] classTypeParameters = compiledFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+
+                        CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
+
+                        foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
+                        {
+                            if (compiledFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                            { classTypeParameterValues[j] = item.Value; }
+                        }
+
+                        for (int j = 0; j < classTypeParameterValues.Length; j++)
+                        {
+                            if (classTypeParameterValues[j] is null ||
+                                classTypeParameterValues[j].IsGeneric)
+                            { throw new InternalException(); }
+                        }
+
+                        compiledFunction.ParameterTypes[i] = new CompiledType(compiledFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                        continue;
                     }
+                }
+
+                if (compiledFunction.Type.IsGeneric)
+                {
+                    if (!TypeArguments.TryGetValue(compiledFunction.Type.Name, out CompiledType bruh))
+                    { throw new InternalException(); }
+
+                    compiledFunction.Type = bruh;
+                }
+
+                if (compiledFunction.Context != null && compiledFunction.Context.TemplateInfo != null)
+                {
+                    compiledFunction.Context = compiledFunction.Context.Duplicate();
+                    compiledFunction.Context.AddTypeArguments(TypeArguments);
+                }
+            }
+            void FinishInitialization(CompiledGeneralFunction compiledGeneralFunction)
+            {
+                for (int i = 0; i < compiledGeneralFunction.ParameterTypes.Length; i++)
+                {
+                    if (compiledGeneralFunction.ParameterTypes[i].IsGeneric)
+                    {
+                        if (!TypeArguments.TryGetValue(compiledGeneralFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                        { throw new InternalException(); }
+
+                        compiledGeneralFunction.ParameterTypes[i] = bruh;
+                        continue;
+                    }
+
+                    if (compiledGeneralFunction.Type.IsGeneric)
+                    {
+                        if (!TypeArguments.TryGetValue(compiledGeneralFunction.Type.Name, out CompiledType bruh))
+                        { throw new InternalException(); }
+
+                        compiledGeneralFunction.Type = bruh;
+                    }
+
+                    if (compiledGeneralFunction.ParameterTypes[i].IsClass && compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo != null)
+                    {
+                        Token[] classTypeParameters = compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+
+                        CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
+
+                        foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
+                        {
+                            if (compiledGeneralFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                            { classTypeParameterValues[j] = item.Value; }
+                        }
+
+                        for (int j = 0; j < classTypeParameterValues.Length; j++)
+                        {
+                            if (classTypeParameterValues[j] is null ||
+                                classTypeParameterValues[j].IsGeneric)
+                            { throw new InternalException(); }
+                        }
+
+                        compiledGeneralFunction.ParameterTypes[i] = new CompiledType(compiledGeneralFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                        continue;
+                    }
+                }
+
+                if (compiledGeneralFunction.Context != null && compiledGeneralFunction.Context.TemplateInfo != null)
+                {
+                    compiledGeneralFunction.Context = compiledGeneralFunction.Context.Duplicate();
+                    compiledGeneralFunction.Context.AddTypeArguments(TypeArguments);
                 }
             }
 
@@ -283,8 +291,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         protected readonly Dictionary<string, CompiledType> TypeArguments;
 
-        protected List<Error> Errors;
-        protected List<Warning> Warnings;
+        protected readonly List<Error> Errors;
+        protected readonly List<Warning> Warnings;
 
         protected string CurrentFile;
 

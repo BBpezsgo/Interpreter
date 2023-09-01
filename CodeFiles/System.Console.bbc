@@ -1,0 +1,164 @@
+#bf "stdout" "void" "char";
+#bf "stderr" "void" "char";
+#bf "stdin" "char";
+
+#bf "console-set" "void" "char" "int" "int";
+#bf "console-clear" "void";
+
+using System;
+
+[External("console-set")]
+export void Set(char data, int x, int y);
+
+[External("console-clear")]
+export void Clear();
+
+
+
+[External("stderr")]
+export void PrintError(char data);
+
+//
+//  == PRINT ==
+//
+
+[External("stdout")]
+[StandardOutput]
+export void Print(char data);
+
+[StandardOutput]
+export void Print(byte message)
+{
+    String _message = message.ToString();
+    Print(_message);
+    delete _message;
+}
+
+[StandardOutput]
+export void Print(int message)
+{
+    String _message = message.ToString();
+    Print(_message);
+    delete _message;
+}
+
+[StandardOutput]
+export void Print(bool message)
+{
+    if (message)
+    {
+        PrintD("true");
+    }
+    else
+    {
+        PrintD("false");
+    };
+}
+
+[StandardOutput]
+export void Print(String message)
+{
+    if (&message < 0)
+    {
+        PrintD("null");
+    }
+    else
+    {
+        int length = message.length;
+        for (int i; i < length; i++)
+        {
+            Print(message[i]);
+        };
+    };
+}
+
+export void PrintD(String message)
+{
+    Print(message);
+    delete message;
+}
+
+//
+//  == PRINT LINE ==
+//
+
+export void PrintLine()
+{
+    Print('\r');
+    Print('\n');
+}
+
+export void PrintLine(String message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export void PrintLineD(String message)
+{
+    Print(message);
+    delete message;
+    PrintLine();
+}
+
+export void PrintLine(char message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export void PrintLine(int message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export void PrintLine(byte message)
+{
+    Print(message);
+    PrintLine();
+}
+
+export void PrintLine(bool message)
+{
+    Print(message);
+    PrintLine();
+}
+
+//
+//  == INPUT ==
+//
+
+[External("stdin")]
+char StdIn();
+
+export char ReadKey()
+{
+    char in = StdIn();
+    Print(in);
+    return in;
+}
+
+export String ReadLine() {
+    String result = new String(0);
+    while (true)
+    {
+        char inpChar = ReadKey();
+        if (inpChar == '\n') { break; };
+        if (inpChar == '\r') { break; };
+
+        String newResult = new String(result.length + 1);
+
+        for (int i = 0; i < result.length; i++)
+        {
+            newResult[i] = result[i];
+        };
+
+        newResult[result.length] = inpChar;
+      
+        delete result;
+
+        result = newResult;
+    };
+    return result;
+}

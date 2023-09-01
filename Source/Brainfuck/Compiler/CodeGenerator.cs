@@ -958,15 +958,20 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 ))
             { return 1; }
 
-            if (GetFunction(functionCall, out CompiledFunction? function))
+            if (GetFunction(functionCall, out CompiledFunction function))
             {
-                // if (!function.Modifiers.Contains("macro"))
-                // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
-
                 if (!function.ReturnSomething)
                 { return 0; }
 
                 return function.Type.Size;
+            }
+
+            if (GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+            {
+                if (!compilableFunction.Function.ReturnSomething)
+                { return 0; }
+
+                return compilableFunction.Function.Type.Size;
             }
 
             throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
@@ -2547,16 +2552,18 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return;
             }
 
-            if (!GetFunction(functionCall, out CompiledFunction? function))
+            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                string readableID = functionCall.ReadableID(FindStatementType);
-                throw new CompilerException($"Function \"{readableID}\" not found", functionCall.Identifier, CurrentFile);
+                if (!GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+                { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+
+                compiledFunction = compilableFunction.Function;
             }
 
             // if (!function.Modifiers.Contains("macro"))
             // { throw new CompilerException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
 
-            InlineMacro(function, functionCall.Parameters, functionCall);
+            InlineMacro(compiledFunction, functionCall.Parameters, functionCall);
         }
         void Compile(ConstructorCall constructorCall)
         {
@@ -2644,6 +2651,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             Stack.Push(value ? 1 : 0);
                             break;
                         }
+
+                    case LiteralType.FLOAT:
+                        throw new CompilerException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
+                    case LiteralType.STRING:
+                        throw new CompilerException($":(", statement, CurrentFile);
 
                     default:
                         throw new CompilerException($"Unknown literal type {statement.Type}", statement, CurrentFile);
@@ -3786,9 +3798,6 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Compiler.CompilerSettings settings,
             Action<string, Output.LogType>? printCallback = null)
         {
-            base.Warnings = new();
-            base.Errors = new();
-
             base.CompiledFunctions = compilerResult.Functions;
             base.CompiledGeneralFunctions = compilerResult.GeneralFunctions;
             base.CompiledOperators = compilerResult.Operators;
@@ -3833,8 +3842,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 { throw new System.Exception(); }
             }
 
-            // if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-            // { CleanupVariables(VariableCleanupStack.Pop()); }
+            if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
+            { CleanupVariables(VariableCleanupStack.Pop()); }
 
             // Heap.Destroy();
 

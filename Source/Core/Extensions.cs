@@ -9,6 +9,13 @@ namespace ProgrammingLanguage.Core
 {
     public static class Extensions
     {
+        public static void Fill<T>(this IList<T> list, IEnumerable<T> elements)
+        {
+            list.Clear();
+            foreach (T element in elements)
+            { list.Add(element); }
+        }
+
         public static bool Contains(this Token[] tokens, string value)
         {
             for (int i = 0; i < tokens.Length; i++)

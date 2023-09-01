@@ -75,33 +75,32 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #region Fields
 
-        Stack<CleanupItem> CleanupStack;
+        readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        readonly Dictionary<string, int> ExternalFunctionsCache;
 
-        Dictionary<string, ExternalFunctionBase> ExternalFunctions;
-        Dictionary<string, int> ExternalFunctionsCache;
+        readonly Stack<CleanupItem> CleanupStack;
         IAmInContext<CompiledClass> CurrentContext;
+        readonly List<CompiledParameter> CompiledParameters;
+        readonly List<KeyValuePair<string, CompiledVariable>> CompiledVariables;
 
-        List<int> ReturnInstructions;
-        Stack<List<int>> BreakInstructions;
+        readonly List<int> ReturnInstructions;
+        readonly Stack<List<int>> BreakInstructions;
 
-        List<Instruction> GeneratedCode;
+        readonly List<Instruction> GeneratedCode;
 
-        List<UndefinedFunctionOffset> UndefinedFunctionOffsets;
-        List<UndefinedOperatorFunctionOffset> UndefinedOperatorFunctionOffsets;
-        List<UndefinedGeneralFunctionOffset> UndefinedGeneralFunctionOffsets;
+        readonly List<UndefinedFunctionOffset> UndefinedFunctionOffsets;
+        readonly List<UndefinedOperatorFunctionOffset> UndefinedOperatorFunctionOffsets;
+        readonly List<UndefinedGeneralFunctionOffset> UndefinedGeneralFunctionOffsets;
 
-        bool OptimizeCode;
-        bool AddCommentsToCode = true;
+        readonly bool OptimizeCode;
+        readonly bool AddCommentsToCode = true;
         readonly bool TrimUnreachableCode = true;
-        bool GenerateDebugInstructions = true;
+        readonly bool GenerateDebugInstructions = true;
         bool CanReturn;
 
-        List<Information> Informations;
-        public List<Hint> Hints;
-        readonly List<DebugInfo> GeneratedDebugInfo = new();
-
-        List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        List<CompiledParameter> parameters;
+        readonly List<Information> Informations;
+        public readonly List<Hint> Hints;
+        readonly List<DebugInfo> GeneratedDebugInfo;
 
         /// <summary>
         /// Used for keep track of local (after base pointer) tag count that are not variables.
@@ -110,11 +109,33 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <br/>
         /// <c>Return Flag</c>
         /// </summary>
-        Stack<int> TagCount;
+        readonly Stack<int> TagCount;
 
         #endregion
 
-        public CodeGenerator() : base() { }
+        public CodeGenerator(Compiler.CompilerSettings settings) : base()
+        {
+            this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
+            this.AddCommentsToCode = settings.GenerateComments;
+            this.GeneratedCode = new();
+            this.ExternalFunctionsCache = new();
+            this.OptimizeCode = !settings.DontOptimize;
+            this.GeneratedDebugInfo = new();
+            this.CleanupStack = new();
+            this.ReturnInstructions = new();
+            this.BreakInstructions = new();
+            this.UndefinedFunctionOffsets = new();
+            this.UndefinedOperatorFunctionOffsets = new();
+            this.UndefinedGeneralFunctionOffsets = new();
+
+            this.TagCount = new();
+
+            this.CompiledVariables = new();
+            this.CompiledParameters = new();
+
+            this.Informations = new();
+            this.Hints = new();
+        }
 
         #region Helper Functions
 
@@ -218,10 +239,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         bool GetVariable(string variableName, out CompiledVariable compiledVariable)
-            => compiledVariables.TryGetValue(variableName, out compiledVariable);
+            => CompiledVariables.TryGetValue(variableName, out compiledVariable);
 
         bool GetParameter(string parameterName, out CompiledParameter parameter)
-            => parameters.TryGetValue(parameterName, out parameter);
+            => CompiledParameters.TryGetValue(parameterName, out parameter);
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -328,9 +349,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             int sum = 0;
 
-            for (int i = 0; i < parameters.Count; i++)
+            for (int i = 0; i < CompiledParameters.Count; i++)
             {
-                sum += parameters[i].Type.SizeOnStack;
+                sum += CompiledParameters[i].Type.SizeOnStack;
             }
 
             return sum;
@@ -339,11 +360,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             int sum = 0;
 
-            for (int i = 0; i < parameters.Count; i++)
+            for (int i = 0; i < CompiledParameters.Count; i++)
             {
-                if (parameters[i].Index < beforeThis) continue;
+                if (CompiledParameters[i].Index < beforeThis) continue;
 
-                sum += parameters[i].Type.SizeOnStack;
+                sum += CompiledParameters[i].Type.SizeOnStack;
             }
 
             return sum;
@@ -534,7 +555,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     int jumpInstruction = Call(destructor.InstructionOffset);
 
                     if (destructor.InstructionOffset == -1)
-                    { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                    { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
                     AddComment(" Clear Param:");
 
@@ -589,7 +610,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 int jumpInstruction = Call(cloner.InstructionOffset);
 
                 if (cloner.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
 
@@ -725,7 +746,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 int jumpInstruction = Call(function.InstructionOffset);
 
                 if (function.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, this.parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, this.CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
 
@@ -967,7 +988,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
             if (compiledFunction.InstructionOffset == -1)
-            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -1309,7 +1330,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
                 if (operatorDefinition.InstructionOffset == -1)
-                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(jumpInstruction, @operator, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(jumpInstruction, @operator, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
                 AddComment(" Clear Params:");
                 for (int i = 0; i < paramsSize; i++)
@@ -1460,7 +1481,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else if (GetFunction(variable.Name, out var compiledFunction))
             {
                 if (compiledFunction.InstructionOffset == -1)
-                { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, variable, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+                { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, variable, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset, $"(function) {compiledFunction.ReadableID()}");
 
@@ -1784,7 +1805,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = Call(constructor.InstructionOffset);
 
             if (constructor.InstructionOffset == -1)
-            { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, constructorCall, parameters.ToArray(), compiledVariables.ToArray(), CurrentFile)); }
+            { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, constructorCall, CompiledParameters.ToArray(), CompiledVariables.ToArray(), CurrentFile)); }
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -2079,7 +2100,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void PopVariable(int n)
         {
             for (int x = 0; x < n; x++)
-            { compiledVariables.Remove(compiledVariables[^1].Key); }
+            { CompiledVariables.Remove(CompiledVariables[^1].Key); }
         }
 
         void CleanupVariables(CleanupItem cleanupItem)
@@ -2309,13 +2330,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 string CurrentFile
             ) savedThings =
             (
-                this.parameters.ToArray(),
-                compiledVariables.ToArray(),
+                this.CompiledParameters.ToArray(),
+                CompiledVariables.ToArray(),
                 ReturnInstructions.ToArray(),
                 CurrentFile
             );
 
-            this.parameters.Clear();
+            this.CompiledParameters.Clear();
             RemoveLocalVariables();
             ReturnInstructions.Clear();
 
@@ -2346,13 +2367,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddComment("Return");
             AddInstruction(Opcode.CS_POP);
 
-            this.parameters.Clear();
-            RemoveLocalVariables();
-            ReturnInstructions.Clear();
+            CompiledParameters.Fill(savedThings.Parameters);
+            CompiledVariables.Fill(savedThings.Locals);
+            ReturnInstructions.Fill(savedThings.ReturnInstructions);
 
-            this.parameters = new List<CompiledParameter>(savedThings.Parameters);
-            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>(savedThings.Locals);
-            ReturnInstructions = new List<int>(savedThings.ReturnInstructions);
             CurrentFile = savedThings.CurrentFile;
 
             AddComment($" Clear Params (size: {paramsSize}):");
@@ -2841,11 +2859,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="InternalException"></exception>
         CleanupItem GenerateCodeForVariable(VariableDeclaretion newVariable, bool isGlobal)
         {
-            for (int i = 0; i < compiledVariables.Count; i++)
+            for (int i = 0; i < CompiledVariables.Count; i++)
             {
-                if (compiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
+                if (CompiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
                 {
-                    Warnings.Add(new Warning($"Variable \"{compiledVariables[i].Value.VariableName}\" already defined", compiledVariables[i].Value.VariableName, CurrentFile));
+                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Value.VariableName}\" already defined", CompiledVariables[i].Value.VariableName, CurrentFile));
                     return new CleanupItem(0, 0);
                 }
             }
@@ -2858,7 +2876,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledVariable compiledVariable = CompileVariable(newVariable, offset, isGlobal);
 
-            compiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
+            CompiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
 
             AddComment($"Initial value {{");
 
@@ -2895,9 +2913,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 int sum = 0;
 
-                for (int i = 0; i < compiledVariables.Count; i++)
+                for (int i = 0; i < CompiledVariables.Count; i++)
                 {
-                    CompiledVariable variable = compiledVariables[i].Value;
+                    CompiledVariable variable = CompiledVariables[i].Value;
                     sum += variable.Type.SizeOnStack;
                 }
 
@@ -2911,9 +2929,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 int sum = 0;
 
-                for (int i = 0; i < compiledVariables.Count; i++)
+                for (int i = 0; i < CompiledVariables.Count; i++)
                 {
-                    CompiledVariable variable = compiledVariables[i].Value;
+                    CompiledVariable variable = CompiledVariables[i].Value;
 
                     if (variable.IsGlobal) continue;
 
@@ -2926,10 +2944,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void RemoveLocalVariables()
         {
-            for (int i = compiledVariables.Count - 1; i >= 0; i--)
+            for (int i = CompiledVariables.Count - 1; i >= 0; i--)
             {
-                if (compiledVariables[i].Value.IsGlobal) continue;
-                compiledVariables.RemoveAt(i);
+                if (CompiledVariables[i].Value.IsGlobal) continue;
+                CompiledVariables.RemoveAt(i);
             }
         }
 
@@ -2961,7 +2979,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             TagCount.Push(0);
 
-            parameters.Clear();
+            CompiledParameters.Clear();
             RemoveLocalVariables();
             ReturnInstructions.Clear();
 
@@ -2995,7 +3013,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddInstruction(Opcode.CS_POP);
             Return();
 
-            parameters.Clear();
+            CompiledParameters.Clear();
             RemoveLocalVariables();
             ReturnInstructions.Clear();
 
@@ -3031,7 +3049,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 paramIndex++;
                 CompiledType parameterType = new(parameters[i].Type, FindType);
-                this.parameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
+                this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
 
                 if (!Constants.BuiltinTypes.Contains(parameters[i].Type.Identifier.Content))
                 {
@@ -3070,30 +3088,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Action<string, Output.LogType> printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
-            this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
-            this.AddCommentsToCode = settings.GenerateComments;
-            this.GeneratedCode = new();
-            this.ExternalFunctions = compilerResult.ExternalFunctions;
-            this.ExternalFunctionsCache = new();
-            this.OptimizeCode = !settings.DontOptimize;
-            this.GeneratedDebugInfo.Clear();
-            this.CleanupStack = new();
-            this.ReturnInstructions = new();
-            this.BreakInstructions = new();
-            this.UndefinedFunctionOffsets = new();
-            this.UndefinedOperatorFunctionOffsets = new();
-            this.UndefinedGeneralFunctionOffsets = new();
-
-            this.TagCount = new();
-
-            this.compiledVariables = new();
-            this.parameters = new();
-
-            this.Informations = new();
-            this.Hints = new();
-            base.Warnings = new();
-            base.Errors = new();
-
             base.CompiledClasses = compilerResult.Classes;
             base.CompiledStructs = compilerResult.Structs;
 
@@ -3289,9 +3283,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             foreach (UndefinedFunctionOffset item in UndefinedFunctionOffsets)
             {
                 foreach (var pair in item.currentParameters)
-                { parameters.Add(pair); }
+                { CompiledParameters.Add(pair); }
                 foreach (var pair in item.currentVariables)
-                { compiledVariables.Add(pair.Key, pair.Value); }
+                { CompiledVariables.Add(pair.Key, pair.Value); }
 
                 CompiledFunction function;
                 bool useAbsolute;
@@ -3352,16 +3346,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 int offset = useAbsolute ? function.InstructionOffset : function.InstructionOffset - item.CallInstructionIndex;
                 GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(offset);
 
-                parameters.Clear();
-                compiledVariables.Clear();
+                CompiledParameters.Clear();
+                CompiledVariables.Clear();
             }
 
             foreach (UndefinedOperatorFunctionOffset item in UndefinedOperatorFunctionOffsets)
             {
                 foreach (var pair in item.currentParameters)
-                { parameters.Add(pair); }
+                { CompiledParameters.Add(pair); }
                 foreach (var pair in item.currentVariables)
-                { compiledVariables.Add(pair.Key, pair.Value); }
+                { CompiledVariables.Add(pair.Key, pair.Value); }
 
                 if (!GetOperator(item.CallStatement, out var function))
                 { throw new CompilerException($"Operator {item.CallStatement.ReadableID(FindStatementType)} not found", item.CallStatement.Operator, CurrentFile); }
@@ -3371,16 +3365,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(function.InstructionOffset - item.CallInstructionIndex);
 
-                parameters.Clear();
-                compiledVariables.Clear();
+                CompiledParameters.Clear();
+                CompiledVariables.Clear();
             }
 
             foreach (UndefinedGeneralFunctionOffset item in UndefinedGeneralFunctionOffsets)
             {
                 foreach (var pair in item.currentParameters)
-                { parameters.Add(pair); }
+                { CompiledParameters.Add(pair); }
                 foreach (var pair in item.currentVariables)
-                { compiledVariables.Add(pair.Key, pair.Value); }
+                { CompiledVariables.Add(pair.Key, pair.Value); }
 
                 if (item.CallStatement is ConstructorCall constructorCall)
                 {
@@ -3439,8 +3433,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 else
                 { throw new NotImplementedException(); }
 
-                parameters.Clear();
-                compiledVariables.Clear();
+                CompiledParameters.Clear();
+                CompiledVariables.Clear();
             }
 
             if (OptimizeCode)
@@ -3475,7 +3469,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Action<string, Output.LogType> printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
-            CodeGenerator codeGenerator = new();
+            CodeGenerator codeGenerator = new(settings);
             return codeGenerator.GenerateCode(
                 compilerResult,
                 settings,

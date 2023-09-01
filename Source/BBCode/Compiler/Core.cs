@@ -12,6 +12,8 @@ namespace ProgrammingLanguage.BBCode
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
+    using System.Diagnostics;
+    using System.Security.Principal;
     using Bytecode;
 
     using Parser;
@@ -1278,6 +1280,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
+    [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
     public class CompiledParameter : ParameterDefinition
     {
         public new CompiledType Type;
@@ -1301,7 +1304,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public CompiledParameter(CompiledType type, ParameterDefinition definition)
             : this(-1, -1, type, definition) { }
 
-        public override string ToString() => $"{index} {Identifier}";
+        public override string ToString() => $"{Type} {Identifier} {{ i: {Index}, reali: {RealIndex} }}";
     }
 
     public enum Protection

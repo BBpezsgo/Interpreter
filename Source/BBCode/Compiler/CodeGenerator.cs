@@ -115,26 +115,27 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public CodeGenerator(Compiler.CompilerSettings settings) : base()
         {
+            this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
-            this.GeneratedCode = new();
-            this.ExternalFunctionsCache = new();
+            this.GeneratedCode = new List<Instruction>();
+            this.ExternalFunctionsCache = new Dictionary<string, int>();
             this.OptimizeCode = !settings.DontOptimize;
-            this.GeneratedDebugInfo = new();
-            this.CleanupStack = new();
-            this.ReturnInstructions = new();
-            this.BreakInstructions = new();
-            this.UndefinedFunctionOffsets = new();
-            this.UndefinedOperatorFunctionOffsets = new();
-            this.UndefinedGeneralFunctionOffsets = new();
+            this.GeneratedDebugInfo = new List<DebugInfo>();
+            this.CleanupStack = new Stack<CleanupItem>();
+            this.ReturnInstructions = new List<int>();
+            this.BreakInstructions = new Stack<List<int>>();
+            this.UndefinedFunctionOffsets = new List<UndefinedFunctionOffset>();
+            this.UndefinedOperatorFunctionOffsets = new List<UndefinedOperatorFunctionOffset>();
+            this.UndefinedGeneralFunctionOffsets = new List<UndefinedGeneralFunctionOffset>();
 
-            this.TagCount = new();
+            this.TagCount = new Stack<int>();
 
-            this.CompiledVariables = new();
-            this.CompiledParameters = new();
+            this.CompiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
+            this.CompiledParameters = new List<CompiledParameter>();
 
-            this.Informations = new();
-            this.Hints = new();
+            this.Informations = new List<Information>();
+            this.Hints = new List<Hint>();
         }
 
         #region Helper Functions
@@ -1735,7 +1736,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-
             // constructorCall.TypeName = constructorCall.TypeName.Class(instanceType.Class);
             instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
 
@@ -1775,29 +1775,22 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < constructorCall.Parameters.Length; i++)
             {
-                Statement param = constructorCall.Parameters[i];
-                ParameterDefinition definedParam = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
+                Statement passedParameter = constructorCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(constructorCall.Parameters[i]);
+
+                CompiledType parameterType = constructor.ParameterTypes[constructor.IsMethod ? (i + 1) : i];
+                ParameterDefinition parameterDefinition = constructor.Parameters[constructor.IsMethod ? (i + 1) : i];
+
+                if (parameterType != passedParameterType)
+                {
+                    
+                }
 
                 AddComment($" Param {i}:");
-                GenerateCodeForStatement(param);
-                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParam.Identifier);
+                GenerateCodeForStatement(passedParameter);
+                AddInstruction(Opcode.DEBUG_SET_TAG, $"param.{parameterDefinition.Identifier}");
 
-                if (!Constants.BuiltinTypes.Contains(definedParam.Type.Identifier.Content))
-                {
-                    CompiledType paramType = FindType(definedParam.Type);
-                    if (paramType.IsStruct)
-                    {
-                        paramsSize += instanceType.Struct.Size;
-                    }
-                    else if (paramType.IsClass)
-                    {
-                        paramsSize++;
-                    }
-                }
-                else
-                {
-                    paramsSize++;
-                }
+                paramsSize += parameterType.SizeOnStack;
             }
 
             AddComment(" .:");
@@ -2171,7 +2164,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             // { statementToSet.FieldName = statementToSet.FieldName.Field(prevType.Class, statementToSet, type); }
 
             if (type != valueType)
-            { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{type.Name}\" type field.", value, CurrentFile); }
+            { throw new CompilerException($"Can not set a \"{valueType}\" type value to the \"{type}\" type field.", value, CurrentFile); }
 
             if (prevType.IsClass)
             { prevType.Class.AddTypeArguments(prevType.TypeParameters); }
@@ -3090,7 +3083,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             base.CompiledClasses = compilerResult.Classes;
             base.CompiledStructs = compilerResult.Structs;
-
+            this.ExternalFunctions.AddRange(compilerResult.ExternalFunctions);
             base.CompiledEnums = compilerResult.Enums;
 
             (

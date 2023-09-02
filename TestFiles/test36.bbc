@@ -1,0 +1,8 @@
+using System;
+using System.Lists;
+
+LinkedList<int> list = new LinkedList<int>;
+PrintLineD(list.ToString());
+list.Add(5);
+list.Add(6);
+list.Add(44);

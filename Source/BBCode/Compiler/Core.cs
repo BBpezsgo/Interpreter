@@ -766,6 +766,37 @@ namespace ProgrammingLanguage.BBCode.Compiler
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
         };
+        public CompiledOperatorTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        {
+            CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this)
+            {
+                CompiledAttributes = this.CompiledAttributes,
+                Modifiers = this.Modifiers,
+                ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
+                TimesUsed = TimesUsed,
+                TimesUsedTotal = TimesUsedTotal,
+                Template = this,
+            };
+
+            for (int i = 0; i < result.ParameterTypes.Length; i++)
+            {
+                if (result.ParameterTypes[i].IsGeneric)
+                {
+                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
+                    { throw new NotImplementedException(); }
+                    result.ParameterTypes[i] = typeParamater;
+                }
+            }
+
+            if (result.Type.IsGeneric)
+            {
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                { throw new NotImplementedException(); }
+                result.Type = typeParamater;
+            }
+
+            return result;
+        }
     }
 
     public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicateable<CompiledFunction>
@@ -908,6 +939,39 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             return result;
         }
+
+        public CompiledFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        {
+            CompiledFunctionTemplateInstance result = new(Type, this)
+            {
+                CompiledAttributes = this.CompiledAttributes,
+                Context = this.Context,
+                Modifiers = this.Modifiers,
+                ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
+                TimesUsed = TimesUsed,
+                TimesUsedTotal = TimesUsedTotal,
+                Template = this,
+            };
+
+            for (int i = 0; i < result.ParameterTypes.Length; i++)
+            {
+                if (result.ParameterTypes[i].IsGeneric)
+                {
+                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
+                    { throw new NotImplementedException(); }
+                    result.ParameterTypes[i] = typeParamater;
+                }
+            }
+
+            if (result.Type.IsGeneric)
+            {
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                { throw new NotImplementedException(); }
+                result.Type = typeParamater;
+            }
+
+            return result;
+        }
     }
 
     public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicateable<CompiledGeneralFunction>
@@ -1032,6 +1096,75 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             return result;
         }
+
+        public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        {
+            CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this)
+            {
+                Modifiers = this.Modifiers,
+                TimesUsed = this.TimesUsed,
+                TimesUsedTotal = this.TimesUsedTotal,
+                Template = this,
+            };
+
+            for (int i = 0; i < result.ParameterTypes.Length; i++)
+            {
+                if (result.ParameterTypes[i].IsGeneric)
+                {
+                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
+                    { throw new NotImplementedException(); }
+                    result.ParameterTypes[i] = typeParamater;
+                }
+            }
+
+            if (result.Type.IsGeneric)
+            {
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                { throw new NotImplementedException(); }
+                result.Type = typeParamater;
+            }
+
+            return result;
+        }
+    }
+
+    public class CompiledFunctionTemplateInstance : CompiledFunction
+    {
+        public CompiledFunction Template;
+
+        public CompiledFunctionTemplateInstance(CompiledType type, FunctionDefinition functionDefinition)
+            : base(type, functionDefinition)
+        { }
+
+        public CompiledFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition)
+            : base(type, parameterTypes, functionDefinition)
+        { }
+    }
+
+    public class CompiledGeneralFunctionTemplateInstance : CompiledGeneralFunction
+    {
+        public CompiledGeneralFunction Template;
+
+        public CompiledGeneralFunctionTemplateInstance(CompiledType type, GeneralFunctionDefinition functionDefinition)
+            : base(type, functionDefinition)
+        { }
+
+        public CompiledGeneralFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition)
+            : base(type, parameterTypes, functionDefinition)
+        { }
+    }
+
+    public class CompiledOperatorTemplateInstance : CompiledOperator
+    {
+        public CompiledOperator Template;
+
+        public CompiledOperatorTemplateInstance(CompiledType type, FunctionDefinition functionDefinition)
+            : base(type, functionDefinition)
+        { }
+
+        public CompiledOperatorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition)
+            : base(type, parameterTypes, functionDefinition)
+        { }
     }
 
     public interface IFunctionThing
@@ -1595,6 +1728,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
+        public CompiledType(CompiledType other)
+        {
+            if (other is null) throw new ArgumentNullException(nameof(other));
+
+            this.builtinType = other.builtinType;
+            this.@class = other.@class;
+            this.@enum = other.@enum;
+            this.function = other.function;
+            this.genericName = other.genericName;
+            this.@struct = other.@struct;
+            this.typeParameters = new List<CompiledType>(other.typeParameters).ToArray();
+        }
+
+        /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
         public CompiledType(ITypeDefinition type) : this()
         {
@@ -1775,50 +1922,53 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return this.RuntimeType == other;
         }
 
-        public static bool Equals(CompiledType[] a, CompiledType[] b, out Dictionary<string, CompiledType> typeParameters)
+        public static bool DoSomethingWithTypeParameters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
         {
+            typeParameters = null;
+            if (definedParameters is null || passedParameters is null) return false;
+            if (definedParameters.Length != passedParameters.Length) return false;
+
             typeParameters = new Dictionary<string, CompiledType>();
 
-            if (a is null || b is null) return false;
-
-            if (a.Length != b.Length) return false;
-
-            for (int i = 0; i < a.Length; i++)
+            for (int i = 0; i < definedParameters.Length; i++)
             {
-                if (b[i].IsGeneric)
-                { throw new NotImplementedException(); }
+                var passed = passedParameters[i];
+                var defined = definedParameters[i];
 
-                if (a[i].IsGeneric)
+                if (passed.IsGeneric) throw new NotImplementedException();
+
+                if (defined.IsGeneric)
                 {
-                    if (typeParameters.TryGetValue(a[i].Name, out CompiledType addedGenericType))
-                    { if (addedGenericType != b[i]) return false; }
+                    if (typeParameters.TryGetValue(defined.Name, out CompiledType addedTypeParameter))
+                    { if (addedTypeParameter != passed) return false; }
                     else
-                    { typeParameters.Add(a[i].Name, b[i]); }
+                    { typeParameters.Add(defined.Name, passed); }
 
                     continue;
                 }
 
-                if (a[i].IsClass && a[i].Class.TemplateInfo != null)
+                if (defined.IsClass && passed.IsClass)
                 {
-                    Token[] classTypeParameters = a[i].Class.TemplateInfo.TypeParameters;
-                    if (classTypeParameters.Length != b[i].TypeParameters.Length)
-                    { throw new NotImplementedException("Bruh"); }
-
-                    for (int j = 0; j < classTypeParameters.Length; j++)
+                    if (defined.Class.Name.Content != passed.Class.Name.Content) return false;
+                    if (defined.Class.TemplateInfo != null && passed.Class.TemplateInfo != null)
                     {
-                        string typeParameterName = classTypeParameters[j].Content;
-                        CompiledType typeParameterValue = b[i].TypeParameters[j];
+                        if (defined.Class.TemplateInfo.TypeParameters.Length != passed.TypeParameters.Length)
+                        { throw new NotImplementedException(); }
+                        for (int j = 0; j < defined.Class.TemplateInfo.TypeParameters.Length; j++)
+                        {
+                            var typeParamName = defined.Class.TemplateInfo.TypeParameters[i].Content;
+                            var typeParamValue = passed.TypeParameters[i];
 
-                        if (typeParameters.TryGetValue(typeParameterName, out CompiledType addedGenericType))
-                        { if (addedGenericType != typeParameterValue) return false; }
-                        else
-                        { typeParameters.Add(typeParameterName, typeParameterValue); }
+                            if (typeParameters.TryGetValue(typeParamName, out CompiledType addedTypeParameter))
+                            { if (addedTypeParameter != typeParamValue) return false; }
+                            else
+                            { typeParameters.Add(typeParamName, typeParamValue); }
+                        }
+                        continue;
                     }
-
-                    continue;
                 }
 
-                if (a[i] != b[i]) return false;
+                if (defined != passed) return false;
             }
 
             return true;

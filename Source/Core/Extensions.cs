@@ -9,6 +9,30 @@ namespace ProgrammingLanguage.Core
 {
     public static class Extensions
     {
+        public static int IndexOf<T>(this T[] self, T value) where T : System.IEquatable<T>
+        {
+            for (int i = 0; i < self.Length; i++)
+            {
+                if (((System.IEquatable<T>)self[i]).Equals(value))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        public static int IndexOf<T>(this IReadOnlyList<T> self, T value) where T : System.IEquatable<T>
+        {
+            for (int i = 0; i < self.Count; i++)
+            {
+                if (((System.IEquatable<T>)self[i]).Equals(value))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
         public static void Fill<T>(this IList<T> list, IEnumerable<T> elements)
         {
             list.Clear();

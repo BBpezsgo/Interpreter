@@ -20,7 +20,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test34.bbc";
+            string path = TestConstants.TestFilesPath + "test36.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -41,7 +41,7 @@ namespace TheProgram
                 // "-console-gui",
                 // "\".\\output.bin\"",
                 // "-compression", "no",
-                "-brainfuck",
+                // "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""

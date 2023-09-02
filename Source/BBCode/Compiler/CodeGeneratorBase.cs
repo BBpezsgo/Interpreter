@@ -489,7 +489,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (element.Identifier != functionCallStatement.FunctionName) continue;
 
-                if (!CompiledType.Equals(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.DoSomethingWithTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 if (element.Context != null && element.Context.TemplateInfo != null)
                 { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
@@ -497,7 +497,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 compiledFunction = new CompileableTemplate<CompiledFunction>(element, typeParameters);
 
                 if (found)
-                { throw new CompilerException($"Duplicated function definitions: {found} and {element} are the same", element.Identifier, element.FilePath); }
+                { throw new CompilerException($"Duplicated function definitions: {compiledFunction} and {element} are the same", element.Identifier, element.FilePath); }
 
                 found = true;
             }
@@ -520,7 +520,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.Type.Class != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
-                if (!CompiledType.Equals(function.ParameterTypes, parameters, out var typeParameters)) continue;
+                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
 
                 CollectTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
 
@@ -809,7 +809,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier.Content != @operator.Operator.Content) continue;
-                if (!CompiledType.Equals(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
@@ -878,7 +878,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (!CompiledType.Equals(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 compiledGeneralFunction = new CompileableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -1357,7 +1357,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         return prevStatementType.TypeParameters[j];
                     }
 
-                    return definedField.Type;
+                    CompiledType result = new(definedField.Type);
+
+                    for (int j = 0; j < result.TypeParameters.Length; j++)
+                    {
+                        if (result.TypeParameters[j].IsGeneric)
+                        {
+                            if (TypeArguments.TryGetValue(result.TypeParameters[j].Name, out CompiledType genericType))
+                            {
+                                result.TypeParameters[j] = genericType;
+                            }
+                            else if (prevStatementType.Class.TryGetTypeArgumentIndex(result.TypeParameters[j].Name, out int k))
+                            {
+                                if (result.TypeParameters.Length <= k)
+                                { throw new NotImplementedException(); }
+
+                                result.TypeParameters[j] = prevStatementType.TypeParameters[k];
+                            }
+                            else
+                            { throw new CompilerException($"Type argument \"{result.TypeParameters[j].Name}\" not found", definedField, CurrentFile); }
+                        }
+                    }
+
+                    return result;
                 }
 
                 throw new CompilerException($"Field definition \"{prevStatementType}\" not found in class \"{prevStatementType.Class.Name.Content}\"", field.FieldName, CurrentFile);

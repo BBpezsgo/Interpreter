@@ -331,10 +331,6 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override string ToString()
         {
-            string result = "";
-            result += FunctionName;
-            result += "(";
-
             string paramsString = "";
             for (int i = 0; i < Parameters.Length; i++)
             {
@@ -346,9 +342,10 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
                     break;
                 }
             }
-            result += paramsString;
-
-            result += ")";
+            string result = "";
+            if (PrevStatement != null)
+            { result += $"{PrevStatement}."; }
+            result += $"{FunctionName}({paramsString})";
             return result;
         }
 

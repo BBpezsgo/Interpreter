@@ -118,3 +118,75 @@ class Map
         return (x < 0 || y < 0 || x > this.width || y > (this.length / this.width));
     }
 }
+
+template<T>
+class LinkedNode
+{
+    T Value;
+    LinkedNode<T> Next;
+
+    export constructor(T value)
+    {
+        LinkedNode<T> result = new LinkedNode<T>;
+        result.Value = value;
+        return result;
+    }
+}
+
+template<T>
+class LinkedList
+{
+    LinkedNode<T> Root;
+
+    export int Length() {
+        int n = 1;
+        if (this.Root >= 0)
+        {
+            LinkedNode<T> current = this.Root;
+            while (current.Next >= 0) {
+                n++;
+                current = current.Next;
+            };
+        }
+        else
+        {
+            n = 0;
+        };
+        return n;
+    }
+
+    export void Add(T value) {
+        if (this.Root >= 0)
+        {
+            LinkedNode<T> current = this.Root;
+            while (current.Next >= 0) {
+                current = current.Next;
+            };
+            current.Next = new LinkedNode<T>(value);
+        }
+        else
+        {
+            this.Root = new LinkedNode<T>(value);
+        };
+    }
+    
+    export String ToString()
+    {
+        if (this.Root >= 0)
+        {
+            LinkedNode<T> current = this.Root;
+            
+            String result = current.Value.ToString();
+
+            while (current.Next >= 0) {
+                current = current.Next;
+
+                result = result + ", " + current.Value.ToString();
+            };
+            return "{ " + result + " }";
+        } else {
+            return "{ }";
+        };
+    }
+
+}

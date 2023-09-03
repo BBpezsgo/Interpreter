@@ -1,5 +1,6 @@
 ﻿
 #nullable enable
+#pragma warning disable IDE0059 // Unnecessary assignment of a value
 
 namespace ProgrammingLanguage.Brainfuck
 {
@@ -44,39 +45,75 @@ namespace ProgrammingLanguage.Brainfuck
         /// <summary>
         /// Result → <paramref name="addressX"/> (0 or 1)
         /// <br/>
-        /// Pointer: <paramref name="addressTemp2"/>
+        /// Pointer: <paramref name="temp2"/>
         /// <br/>
         /// Preserves <paramref name="addressY"/>
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_==_y"/>
+        /// <br/>
+        /// Attribution: Jeffry Johnston
         /// </summary>
-        public static void LOGIC_EQ(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
+        public static void LOGIC_EQ(this CompiledCode code, int addressX, int addressY, int temp1, int temp2)
         {
-            code.ClearValue(addressTemp1);
-            code.ClearValue(addressTemp2);
+            code.ClearValue(temp1);
+            code.ClearValue(temp2);
 
-            code.MoveValue(addressX, addressTemp2);
+            code.MoveValue(addressX, temp2);
 
             code.AddValue(addressX, 1);
 
             code.SetPointer(addressY);
             code += "[";
-            code.AddValue(addressTemp2, -1);
-            code.AddValue(addressTemp1, 1);
+            code.AddValue(temp2, -1);
+            code.AddValue(temp1, 1);
             code.AddValue(addressY, -1);
             code += "]";
 
-            code.MoveValue(addressTemp1, addressY);
+            code.MoveValue(temp1, addressY);
 
-            code.SetPointer(addressTemp2);
+            code.SetPointer(temp2);
             code += "[";
             code.AddValue(addressX, -1);
-            code.ClearValue(addressTemp2);
+            code.ClearValue(temp2);
             code += "]";
 
-            code.ClearValue(addressTemp1);
-            code.ClearValue(addressTemp2);
+            code.ClearValue(temp1);
+            code.ClearValue(temp2);
+        }
+
+        /// <summary>
+        /// Result → <paramref name="addressX"/> (0 or 1)
+        /// <br/>
+        /// It does not preserve <paramref name="addressY"/>
+        /// <br/>
+        /// <br/>
+        /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_==_y"/>
+        /// <br/>
+        /// Attribution: Jeffry Johnston
+        /// </summary>
+        public static void LOGIC_EQ(this CompiledCode code, int addressX, int addressY)
+        {
+            // x[-y-x]
+            code.SetPointer(addressX);
+            code += "[";
+            code += "-";
+            code.SetPointer(addressY);
+            code += "-";
+            code.SetPointer(addressX);
+            code += "]";
+
+            // +y
+            code += "+";
+            code.SetPointer(addressY);
+
+            // [x-y[-]]
+            code += "[";
+            code.SetPointer(addressX);
+            code += "-";
+            code.SetPointer(addressY);
+            code.ClearCurrent();
+            code += "]";
         }
 
         /// <summary>
@@ -91,8 +128,7 @@ namespace ProgrammingLanguage.Brainfuck
         /// </summary>
         public static void MULTIPLY(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
         {
-            code.ClearValue(addressTemp1);
-            code.ClearValue(addressTemp2);
+            code.ClearValue(addressTemp1, addressTemp2);
 
             code.SetPointer(addressX);
 
@@ -136,13 +172,12 @@ namespace ProgrammingLanguage.Brainfuck
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_/_y"/>
+        /// <br/>
+        /// Attribution: Jeffry Johnston
         /// </summary>
         public static void DIVIDE(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3, int addressTemp4)
         {
-            code.ClearValue(addressTemp1);
-            code.ClearValue(addressTemp2);
-            code.ClearValue(addressTemp3);
-            code.ClearValue(addressTemp4);
+            code.ClearValue(addressTemp1, addressTemp2, addressTemp3, addressTemp4);
 
             code.SetPointer(addressX);
             code += "[";
@@ -212,7 +247,9 @@ namespace ProgrammingLanguage.Brainfuck
         /// It does not preserve <paramref name="addressY"/>
         /// <br/>
         /// <br/>
-        /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_^_y"/>
+        /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x%C2%B4_=_x_%5E_y"/>
+        /// <br/>
+        /// Attribution: chad3814
         /// </summary>
         public static void POWER(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3)
         {
@@ -281,6 +318,8 @@ namespace ProgrammingLanguage.Brainfuck
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.2A_x"/>
+        /// <br/>
+        /// Attribution: Softengy (talk) 15:44, 7 April 2020 (UTC)
         /// </summary>
         public static void MULTIPLY_SELF(this CompiledCode code, int addressX, int tempAddress1, int tempAddress2)
         {
@@ -336,6 +375,7 @@ namespace ProgrammingLanguage.Brainfuck
         public static void SWAP_SIGN(this CompiledCode code, int addressX, int tempAddress)
         {
             code.ClearValue(tempAddress);
+
             code.JumpStart(addressX);
             code.SetPointer(tempAddress);
             code += "-";
@@ -378,12 +418,16 @@ namespace ProgrammingLanguage.Brainfuck
         }
 
         /// <summary>
+        /// Result → <paramref name="addressX"/>
+        /// <br/>
         /// Pointer: <paramref name="tempAddress2"/>
         /// <br/>
         /// Preserves <paramref name="addressY"/>
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.21.3D_y"/>
+        /// <br/>
+        /// Attribution: Jeffry Johnston
         /// </summary>
         public static void LOGIC_NEQ(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
         {
@@ -419,54 +463,54 @@ namespace ProgrammingLanguage.Brainfuck
         /// <summary>
         /// Result → <paramref name="addressX"/> (0 or 1)
         /// <br/>
-        /// Pointer: <paramref name="addressX"/>
-        /// <br/>
         /// Preserves <paramref name="addressY"/>
         /// <br/>
         /// <b>x and y are unsigned.</b>
         /// <br/>
-        /// <b><paramref name="tempAddress2"/> is the first of three consecutive temporary cells.</b>
+        /// <b><paramref name="addressTemp2"/> is the first of three consecutive temporary cells.</b>
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.3C_y"/>
+        /// <br/>
+        /// Attribution: Ian Kelly
         /// </summary>
-        public static void LOGIC_LT(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
+        public static void LOGIC_LT(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
         {
             /*
                 temp1[>-]> [< x- temp0[-] temp1>->]<+<
                 temp0[temp1- [>-]> [< x- temp0[-]+ temp1>->]<+< temp0-]
              */
 
-            code.ClearValue(tempAddress1);
-            code.ClearValue(tempAddress2);
+            code.ClearValue(addressTemp1);
+            code.ClearValue(addressTemp2);
 
-            code.SetValue(tempAddress2 + 1, 1);
-            code.ClearValue(tempAddress2 + 2);
+            code.SetValue(addressTemp2 + 1, 1);
+            code.ClearValue(addressTemp2 + 2);
 
-            code.MoveValue(addressY, tempAddress1, tempAddress2);
+            code.MoveValue(addressY, addressTemp1, addressTemp2);
 
-            code.MoveValue(tempAddress1, addressY);
+            code.MoveValue(addressTemp1, addressY);
 
-            code.MoveValue(addressX, tempAddress1);
+            code.MoveValue(addressX, addressTemp1);
             code.AddValue(1);
 
-            code.SetPointer(tempAddress2);
+            code.SetPointer(addressTemp2);
             code += "[>-]>";
             code += "[<";
 
             code.AddValue(addressX, -1);
 
-            code.ClearValue(tempAddress1);
+            code.ClearValue(addressTemp1);
 
-            code.SetPointer(tempAddress2);
+            code.SetPointer(addressTemp2);
 
             code += ">->]<+<";
 
-            code.SetPointer(tempAddress1);
+            code.SetPointer(addressTemp1);
 
             code += "[";
 
-            code.AddValue(tempAddress2, -1);
+            code.AddValue(addressTemp2, -1);
 
             code += "[>-]>";
 
@@ -474,18 +518,18 @@ namespace ProgrammingLanguage.Brainfuck
 
             code.AddValue(addressX, -1);
 
-            code.SetValue(tempAddress1, 1);
+            code.SetValue(addressTemp1, 1);
 
-            code.SetPointer(tempAddress2);
+            code.SetPointer(addressTemp2);
 
             code += ">->]<+<";
 
-            code.AddValue(tempAddress1, -1);
+            code.AddValue(addressTemp1, -1);
             code += "]";
 
-            code.ClearValue(tempAddress1);
-            code.ClearValue(tempAddress2);
-            code.ClearValue(tempAddress2 + 1);
+            code.ClearValue(addressTemp1);
+            code.ClearValue(addressTemp2);
+            code.ClearValue(addressTemp2 + 1);
 
             code.SetPointer(addressX);
         }
@@ -503,11 +547,12 @@ namespace ProgrammingLanguage.Brainfuck
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#x.C2.B4_.3D_x_.3C.3D_y"/>
+        /// <br/>
+        /// Attribution: Ian Kelly
         /// </summary>
         public static void LOGIC_LTEQ(this CompiledCode code, int addressX, int addressY, int tempAddress1, int tempAddress2)
         {
-            code.ClearValue(tempAddress1);
-            code.ClearValue(tempAddress2);
+            code.ClearValue(tempAddress1, tempAddress2);
             code.SetValue(tempAddress2 + 1, 1);
             code.ClearValue(tempAddress2 + 2);
 
@@ -560,6 +605,17 @@ namespace ProgrammingLanguage.Brainfuck
         /// <br/>
         /// <br/>
         /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_.3D_x_.3E_y"/>
+        /// <br/>
+        /// Attribution: User:ais523
+        /// <para>
+        /// This uses balanced loops only,
+        /// and <b>requires a wrapping implementation</b>
+        /// (and will be very slow with large numbers of bits,
+        /// although the number of bits otherwise doesn't matter.)
+        /// The temporaries and x are left at 0; y is set to y-x.
+        /// (You could make a temporary copy of x via using another temporary
+        /// that's incremented during the loop.)
+        /// </para>
         /// </summary>
         public static void LOGIC_MT(this CompiledCode c, int addressX, int addressY, int addressResult, int tempAddress1, int tempAddress2)
         {

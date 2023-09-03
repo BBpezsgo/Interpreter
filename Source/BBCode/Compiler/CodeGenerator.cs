@@ -373,8 +373,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void AddInstruction(Instruction instruction)
         {
-            if (instruction.opcode == Opcode.COMMENT && !AddCommentsToCode) return;
-            if (instruction.opcode == Opcode.DEBUG_SET_TAG && !GenerateDebugInstructions) return;
+            if (instruction.opcode == Opcode.DEBUG_SET_TAG && !GenerateDebugInstructions)
+            { return; }
 
             GeneratedCode.Add(instruction);
         }
@@ -386,7 +386,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
         void AddInstruction(Opcode opcode, AddressingMode addressingMode) => AddInstruction(new Instruction(opcode, addressingMode));
         void AddInstruction(Opcode opcode, AddressingMode addressingMode, int param0, string tag = null) => AddInstruction(new Instruction(opcode, addressingMode, new DataItem(param0)) { tag = tag ?? string.Empty });
 
-        void AddComment(string comment) => AddInstruction(Opcode.COMMENT, comment);
+        void AddComment(string comment)
+        {
+            if (!AddCommentsToCode) return;
+            AddInstruction(Opcode.COMMENT, comment);
+        }
+        void AddCommentForce(string comment)
+        {
+            AddInstruction(Opcode.COMMENT, comment);
+        }
         #endregion
 
         #region GenerateCodeForStatement
@@ -3173,7 +3181,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     level
                     );
 
-            var codeEntry = GetCodeEntry();
+            CompiledFunction codeEntry = GetCodeEntry();
 
             List<string> UsedExternalFunctions = new();
 
@@ -3252,9 +3260,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     GeneratedCode[entryCallInstruction].Parameter = new DataItem(GeneratedCode.Count - entryCallInstruction);
                 }
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Statements.Length > 0) AddComment("}");
+                if (function.Statements.Length > 0) AddCommentForce("}");
                 CurrentContext = null;
             }
 
@@ -3269,9 +3277,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CurrentContext = function;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Statements.Length > 0) AddComment("}");
+                if (function.Statements.Length > 0) AddCommentForce("}");
                 CurrentContext = null;
             }
 
@@ -3283,11 +3291,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CurrentContext = function;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
 
                 GenerateCodeForFunction(function);
 
-                if (function.Statements.Length > 0) AddComment("}");
+                if (function.Statements.Length > 0) AddCommentForce("}");
 
                 CurrentContext = null;
             }
@@ -3305,11 +3313,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddTypeArguments(function.TypeArguments);
 
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Statements.Length > 0) AddComment("}");
+                if (function.Function.Statements.Length > 0) AddCommentForce("}");
 
                 CurrentContext = null;
                 TypeArguments.Clear();
@@ -3322,11 +3330,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddTypeArguments(function.TypeArguments);
 
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Statements.Length > 0) AddComment("}");
+                if (function.Function.Statements.Length > 0) AddCommentForce("}");
 
                 CurrentContext = null;
                 TypeArguments.Clear();
@@ -3339,11 +3347,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddTypeArguments(function.TypeArguments);
 
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Statements.Length > 0) AddComment("}");
+                if (function.Function.Statements.Length > 0) AddCommentForce("}");
 
                 CurrentContext = null;
                 TypeArguments.Clear();
@@ -3508,10 +3516,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (OptimizeCode)
             {
+                Warnings.Add(new Warning($":(", Position.UnknownPosition, null));
+                /*
                 List<IFunctionThing> functionThings = new();
                 functionThings.AddRange(this.CompiledFunctions);
                 functionThings.AddRange(this.CompiledGeneralFunctions);
                 BasicOptimizer.Optimize(this.GeneratedCode, functionThings.ToArray(), printCallback);
+                */
             }
 
             return new Result()

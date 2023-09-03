@@ -41,7 +41,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             for (int instructionIndex = 0; instructionIndex < self.Count; instructionIndex++)
             {
                 Instruction instruction = self[instructionIndex];
-                if (instruction.opcode == Opcode.JUMP_BY || instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
+
+                if (instruction.opcode == Opcode.JUMP_BY ||
+                    instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
                 {
                     if (instruction.Parameter.Type == RuntimeType.INT)
                     {
@@ -57,9 +59,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         // { throw new Exception($"Can't remove instruction at {index} because instruction {instruction} is referencing to this position"); }
 
                         if (instructionIndex < index)
-                        { instruction.Parameter = new DataItem(instruction.Parameter.ValueInt - 1); changedInstructions++; }
+                        {
+                            instruction.ParameterInt--;
+                            changedInstructions++;
+                        }
                         else if (instructionIndex > index)
-                        { instruction.Parameter = new DataItem(instruction.Parameter.ValueInt + 1); changedInstructions++; }
+                        {
+                            instruction.ParameterInt++;
+                            changedInstructions++;
+                        }
+                    }
+                }
+
+                if (instruction.opcode == Opcode.PUSH_VALUE && instruction.Parameter.Type == RuntimeType.INT && instruction.Parameter.Tag == "saved code pointer")
+                {
+                    if (instructionIndex < index)
+                    {
+                        // instruction.ParameterInt--;
+                        // changedInstructions++;
+                    }
+                    else if (instructionIndex > index)
+                    {
+                        instruction.ParameterInt--;
+                        changedInstructions++;
                     }
                 }
             }

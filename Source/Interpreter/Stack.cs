@@ -9,8 +9,6 @@ namespace ProgrammingLanguage.Bytecode
     {
         public DataStack() : base() { }
 
-        public void Destroy() => base.Clear();
-
         /// <summary>
         /// Gives the last item, and then remove
         /// </summary>

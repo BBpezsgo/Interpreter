@@ -1,5 +1,6 @@
 ﻿using System;
-using System.Linq;
+using System.Collections.Generic;
+using System.IO.Compression;
 
 namespace TheProgram
 {
@@ -7,9 +8,6 @@ namespace TheProgram
     using ProgrammingLanguage.BBCode.Parser;
     using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Output;
-
-    using System.Collections.Generic;
-    using System.IO.Compression;
 
     internal static class ArgumentParser
     {
@@ -265,15 +263,7 @@ namespace TheProgram
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
                         goto ArgParseDone;
                     }
-
-                    if (args[i] == "-bc-clock")
-                    {
-                        i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.ClockCyclesPerUpdate))
-                        { throw new ArgumentException("Expected int value after argument '-bc-clock'"); }
-                        goto ArgParseDone;
-                    }
-
+                    
                     if (args[i] == "-bc-instruction-limit")
                     {
                         i++;
@@ -389,7 +379,7 @@ namespace TheProgram
             public Compiler.CompilerSettings compilerSettings;
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
-            public bool HandleErrors => !ThrowErrors;
+            public readonly bool HandleErrors => !ThrowErrors;
             public string PipeName;
             public int Port;
             public bool LogDebugs;

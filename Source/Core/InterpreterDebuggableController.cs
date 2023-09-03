@@ -22,7 +22,7 @@ namespace ProgrammingLanguage.Core
     {
         readonly List<Record<T>> records;
 
-        int MaxSize = 100;
+        readonly int MaxSize = 100;
         public int Count => records.Count;
 
         public Record<T> this[int i] => records[i];
@@ -64,7 +64,7 @@ namespace ProgrammingLanguage.Core
                 int endlessSafe = 8;
 
                 _breakpoint = value;
-                while (this.details.CompilerResult.compiledCode[_breakpoint].opcode == Bytecode.Opcode.COMMENT)
+                while (this.details.CompilerResult.Code[_breakpoint].opcode == Bytecode.Opcode.COMMENT)
                 {
                     _breakpoint++;
 
@@ -176,9 +176,7 @@ namespace ProgrammingLanguage.Core
         /// <param name="compiledCode"></param>
         public override void ExecuteProgram(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
         {
-            BytecodeInterpreterSettings settigns = bytecodeInterpreterSettings;
-            settigns.ClockCyclesPerUpdate = 1;
-            base.ExecuteProgram(compiledCode, settigns);
+            base.ExecuteProgram(compiledCode, bytecodeInterpreterSettings);
         }
     }
 }

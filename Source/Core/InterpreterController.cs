@@ -5,15 +5,12 @@ using System.IO;
 
 namespace ProgrammingLanguage.Core
 {
-    using ProgrammingLanguage.BBCode;
-
-    using ProgrammingLanguage.Bytecode;
-
-    using ProgrammingLanguage.Errors;
-
-    using ProgrammingLanguage.BBCode.Compiler;
-    using ProgrammingLanguage.Output;
-    using ProgrammingLanguage.BBCode.Parser;
+    using BBCode;
+    using BBCode.Compiler;
+    using BBCode.Parser;
+    using Bytecode;
+    using Errors;
+    using Output;
 
     /// <summary>
     /// This compiles and runs the code
@@ -131,7 +128,7 @@ namespace ProgrammingLanguage.Core
 
         public class InterpreterDetails
         {
-            internal Compiler.CompilerResult CompilerResult;
+            internal CodeGenerator.Result CompilerResult;
             internal InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
             internal BytecodeInterpreter Interpreter => interpreter.BytecodeInterpreter;
             internal State State => interpreter.state;
@@ -142,10 +139,10 @@ namespace ProgrammingLanguage.Core
                 {
                     if (this.interpreter == null) return null;
                     if (this.interpreter.BytecodeInterpreter == null) return null;
-                    for (int cp = this.interpreter.BytecodeInterpreter.CodePointer; cp < this.CompilerResult.compiledCode.Length; cp++)
+                    for (int cp = this.interpreter.BytecodeInterpreter.CodePointer; cp < this.CompilerResult.Code.Length; cp++)
                     {
-                        if (cp < 0 || cp >= this.CompilerResult.compiledCode.Length) return null;
-                        Instruction result = this.CompilerResult.compiledCode[cp];
+                        if (cp < 0 || cp >= this.CompilerResult.Code.Length) return null;
+                        Instruction result = this.CompilerResult.Code[cp];
                         if (result.opcode == Opcode.COMMENT) continue;
                         return result;
                     }
@@ -199,42 +196,14 @@ namespace ProgrammingLanguage.Core
 
         internal struct InstructionOffsets
         {
-            public enum Kind
-            {
-                CodeEntry,
-                CodeEnd,
-                Update,
-            }
+            public int CodeEnd;
+            public int Update;
 
-            public Dictionary<Kind, int> Offsets;
-
-            public readonly int Get(Kind kind) => Offsets[kind];
-            public readonly bool TryGet(Kind kind) => TryGet(kind, out _);
-            public readonly bool TryGet(Kind kind, out int offset)
+            public static InstructionOffsets None => new()
             {
-                offset = -1;
-                if (Offsets.TryGetValue(kind, out int offset_))
-                {
-                    if (offset_ > -1)
-                    {
-                        offset = offset_;
-                        return true;
-                    }
-                    return false;
-                }
-                return false;
-            }
-            public void Set(Kind kind, int offset)
-            {
-                if (Offsets.ContainsKey(kind))
-                {
-                    Offsets[kind] = offset;
-                }
-                else
-                {
-                    Offsets.Add(kind, offset);
-                }
-            }
+                CodeEnd = -1,
+                Update = -1,
+            };
         }
 
         public struct OnExecutedEventArgs
@@ -273,7 +242,6 @@ namespace ProgrammingLanguage.Core
         protected DateTime LastTime = DateTime.Now;
 
         protected bool exitCalled;
-        protected bool startCalled;
         protected bool HandleErrors = true;
         internal string BasePath;
 
@@ -304,68 +272,35 @@ namespace ProgrammingLanguage.Core
             OnOutput?.Invoke(this, "Start code ...", LogType.Debug);
         }
 
-        /*
-        public Instruction[] Read(byte[] code)
+        static InstructionOffsets GetInstructionOffsets(CodeGenerator.Result compilerResult)
         {
-            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
-            return ReadRaw(deserializedCode);
-        }
+            InstructionOffsets result = InstructionOffsets.None;
 
-        public Instruction[] Read(string code)
-        {
-            CompileIntoFile.SerializableCode deserializedCode = CompileIntoFile.Decompile(code);
-            return ReadRaw(deserializedCode);
-        }
-
-        Instruction[] ReadRaw(CompileIntoFile.SerializableCode deserializedCode)
-        {
-            List<Error> errors = new();
-
-            details = new InterpreterDetails(this);
-
-            OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
-
-            instructionOffsets = new() { Offsets = new() };
-
-            instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
-
-            foreach (var compiledFunction in deserializedCode.CompiledFunctions)
+            foreach (CompiledFunction compiledFunction in compilerResult.Functions)
             {
-                if (compiledFunction.TryGetAttribute("Catch", out var attriute))
+                if (compiledFunction.CompiledAttributes.TryGetAttribute("Catch", out string value))
                 {
-                    if (attriute.parameters.Length != 1)
-                    { throw new CompilerException("Attribute 'Catch' requies 1 string parameter", Position.UnknownPosition); }
-                    if (attriute.TryGetValue(0, out string value))
+                    if (value == "update")
                     {
-                        if (value == "update")
-                        {
-                            if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
-                            {
-                                instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
-                            }
-                            else
-                            { throw new CompilerException($"Function '{compiledFunction.Name}' offset not found", Position.UnknownPosition); }
-                        }
-                        else if (value == "end")
-                        {
-                            if (deserializedCode.GetFunctionOffset(compiledFunction, out int i))
-                            {
-                                instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
-                            }
-                            else
-                            { throw new CompilerException($"Function '{compiledFunction.Name}' offset not found", Position.UnknownPosition); }
-                        }
-                        else
-                        { throw new CompilerException("Unknown event '" + value + "'", Position.UnknownPosition); }
+                        if (!compilerResult.GetFunctionOffset(compiledFunction, out int offset))
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
+
+                        result.Update = offset;
+                    }
+                    else if (value == "end")
+                    {
+                        if (!compilerResult.GetFunctionOffset(compiledFunction, out int offset))
+                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
+
+                        result.CodeEnd = offset;
                     }
                     else
-                    { throw new CompilerException("Attribute requies 1 string parameter", Position.UnknownPosition); }
+                    { throw new CompilerException("Unknown event '" + value + "'", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Catch"), compiledFunction.FilePath); }
                 }
             }
 
-            return deserializedCode.Instructions;
+            return result;
         }
-        */
 
         /// <summary>
         /// Compiles the source code into msg list of instructions<br/>
@@ -407,59 +342,16 @@ namespace ProgrammingLanguage.Core
                 BasePath
                 ).CodeGeneratorResult;
 
-            Dictionary<string, int> functionOffsets = new();
-            foreach (var function in codeGeneratorResult.Functions) functionOffsets.Add(function.Key, function.InstructionOffset);
-
-            Compiler.CompilerResult compilerResult1 = new()
-            {
-                compiledCode = codeGeneratorResult.Code,
-                debugInfo = codeGeneratorResult.DebugInfo,
-
-                compiledStructs = codeGeneratorResult.Structs,
-                compiledFunctions = codeGeneratorResult.Functions,
-
-                functionOffsets = functionOffsets,
-            };
-
-            details.CompilerResult = compilerResult1;
+            details.CompilerResult = codeGeneratorResult;
 
             if (compilerSettings.PrintInstructions)
-            { compilerResult1.WriteToConsole(); }
+            { codeGeneratorResult.PrintInstructions(); }
 
             OnOutput?.Invoke(this, "Initializing bytecode interpreter ...", LogType.Debug);
 
-            instructionOffsets = new() { Offsets = new() };
+            instructionOffsets = GetInstructionOffsets(codeGeneratorResult);
 
-            instructionOffsets.Set(InstructionOffsets.Kind.CodeEntry, 0);
-
-            foreach (var compiledFunction in compilerResult1.compiledFunctions)
-            {
-                if (compiledFunction.CompiledAttributes.TryGetAttribute("Catch", out string value))
-                {
-                    if (value == "update")
-                    {
-                        if (compilerResult1.GetFunctionOffset(compiledFunction, out int i))
-                        {
-                            instructionOffsets.Set(InstructionOffsets.Kind.Update, i);
-                        }
-                        else
-                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
-                    }
-                    else if (value == "end")
-                    {
-                        if (compilerResult1.GetFunctionOffset(compiledFunction, out int i))
-                        {
-                            instructionOffsets.Set(InstructionOffsets.Kind.CodeEnd, i);
-                        }
-                        else
-                        { throw new CompilerException($"Function '{compiledFunction.Identifier.Content}' offset not found", compiledFunction.Identifier, compiledFunction.FilePath); }
-                    }
-                    else
-                    { throw new CompilerException("Unknown event '" + value + "'", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("Catch"), compiledFunction.FilePath); }
-                }
-            }
-
-            return compilerResult1.compiledCode;
+            return codeGeneratorResult.Code;
         }
 
         /// <summary>
@@ -486,7 +378,7 @@ namespace ProgrammingLanguage.Core
             else
             {
                 for (int i = 0; i < Streams.Count; i++)
-                { Streams[i].Dispose(); }
+                { Streams[i]?.Dispose(); }
                 Streams.Clear();
             }
 
@@ -524,7 +416,7 @@ namespace ProgrammingLanguage.Core
         public Instruction[] CompileCode(
             FileInfo file,
             Compiler.CompilerSettings compilerSettings,
-            BBCode.Parser.ParserSettings parserSettings,
+            ParserSettings parserSettings,
             bool HandleErrors = false)
         {
             this.HandleErrors = HandleErrors;
@@ -559,7 +451,7 @@ namespace ProgrammingLanguage.Core
 
         void PrintException(Exception error)
         {
-            OnOutput?.Invoke(this, error.GetType().Name + ": " + error.MessageAll, LogType.Error);
+            OnOutput?.Invoke(this, error.GetType().Name + ": " + error.ToString(), LogType.Error);
             ProgrammingLanguage.Output.Debug.Debug.LogError(error);
 
             StackTrace stackTrace = new(error);
@@ -596,12 +488,7 @@ namespace ProgrammingLanguage.Core
                 Streams.Clear();
             }
 
-            if (BytecodeInterpreter != null)
-            {
-                BytecodeInterpreter.Destroy();
-                BytecodeInterpreter = null;
-            }
-
+            BytecodeInterpreter = null;
             state = State.Destroyed;
         }
 
@@ -626,16 +513,16 @@ namespace ProgrammingLanguage.Core
         public void LoadDLL(string path)
         {
             OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", LogType.Debug);
-            var dll = System.Reflection.Assembly.LoadFile(path);
-            var exportedTypes = dll.GetExportedTypes();
+            System.Reflection.Assembly dll = System.Reflection.Assembly.LoadFile(path);
+            System.Type[] exportedTypes = dll.GetExportedTypes();
             int functionsAdded = 0;
 
             foreach (System.Type type in exportedTypes)
             {
-                var methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                foreach (var method in methods)
+                System.Reflection.MethodInfo[] methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                foreach (System.Reflection.MethodInfo method in methods)
                 {
-                    var newFunction = externalFunctions.AddExternalFunction(method);
+                    ExternalFunctionSimple newFunction = externalFunctions.AddExternalFunction(method);
                     OnOutput?.Invoke(this, $" Added function {newFunction.ID}", LogType.Debug);
                     functionsAdded++;
                 }
@@ -889,12 +776,15 @@ namespace ProgrammingLanguage.Core
             if (BytecodeInterpreter == null || PauseCode) return;
 
             try
-            { BytecodeInterpreter.Tick(); }
+            {
+                bool didSomething = BytecodeInterpreter.Tick();
+                if (didSomething) return;
+            }
             catch (UserException error)
             {
-                error.FeedDebugInfo(details.CompilerResult.debugInfo);
+                error.FeedDebugInfo(details.CompilerResult.DebugInfo);
 
-                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToString() + "\r\n" + error.MessageAll, LogType.Error);
+                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToString() + "\r\n" + error.ToString(), LogType.Error);
 
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
@@ -906,9 +796,9 @@ namespace ProgrammingLanguage.Core
             }
             catch (RuntimeException error)
             {
-                error.FeedDebugInfo(details.CompilerResult.debugInfo);
+                error.FeedDebugInfo(details.CompilerResult.DebugInfo);
 
-                OnOutput?.Invoke(this, "Runtime Exception: " + error.MessageAll, LogType.Error);
+                OnOutput?.Invoke(this, "Runtime Exception: " + error.ToString(), LogType.Error);
 
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
@@ -931,37 +821,22 @@ namespace ProgrammingLanguage.Core
                 if (!HandleErrors) throw;
             }
 
-            if (BytecodeInterpreter == null || BytecodeInterpreter.IsExecuting) return;
+            if (BytecodeInterpreter == null || !BytecodeInterpreter.IsDone) return;
 
-            int offset;
-
-            if (!startCalled)
-            {
-                state = State.CallCodeEntry;
-                OnOutput?.Invoke(this, "Call CodeEntry", LogType.Debug);
-
-                startCalled = true;
-                if (!instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEntry, out offset))
-                { throw new RuntimeException("Function with attribute 'CodeEntry' not found"); }
-
-                BytecodeInterpreter.Jump(offset);
-                return;
-            }
-
-            if (instructionOffsets.TryGet(InstructionOffsets.Kind.Update, out offset))
+            if (instructionOffsets.Update != -1)
             {
                 state = State.CallUpdate;
-                WaitForUpdates(10, () => BytecodeInterpreter?.Call(offset, null));
+                WaitForUpdates(10, () => BytecodeInterpreter?.Call(instructionOffsets.Update, null));
                 return;
             }
 
-            if (instructionOffsets.TryGet(InstructionOffsets.Kind.CodeEnd, out offset) && !exitCalled)
+            if (instructionOffsets.CodeEnd != -1 && !exitCalled)
             {
                 state = State.CallCodeEnd;
                 OnOutput?.Invoke(this, "Call CodeEnd", LogType.Debug);
 
                 exitCalled = true;
-                BytecodeInterpreter?.Call(offset, null);
+                BytecodeInterpreter?.Call(instructionOffsets.CodeEnd, null);
                 return;
             }
 

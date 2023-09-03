@@ -3,8 +3,8 @@ using System.Collections.Generic;
 
 namespace ProgrammingLanguage.Bytecode
 {
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using Core;
+    using Errors;
 
     public readonly struct CallStackFrame
     {
@@ -51,38 +51,46 @@ namespace ProgrammingLanguage.Bytecode
         {
             internal readonly int InstructionOffset;
             internal readonly DataItem[] Arguments;
+            internal readonly Action<DataItem> Callback;
+            internal bool NeedReturnValue;
+
             internal bool IsInvoking;
-            internal Action<DataItem> Callback;
 
             internal UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
             {
                 this.InstructionOffset = instructionOffset;
                 this.Arguments = arguments;
-                this.IsInvoking = false;
                 this.Callback = callback;
+                this.NeedReturnValue = true;
+
+                this.IsInvoking = false;
+            }
+
+            internal UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
+            {
+                this.InstructionOffset = instructionOffset;
+                this.Arguments = arguments;
+                this.Callback = (_) => callback?.Invoke();
+                this.NeedReturnValue = false;
+
+                this.IsInvoking = false;
             }
         }
 
-        BytecodeInterpreterSettings Settings;
+        readonly BytecodeInterpreterSettings Settings;
+        readonly BytecodeProcessor BytecodeProcessor;
 
-        BytecodeProcessor BytecodeProcessor;
-
-        // Control
-        bool CanExecuteCode => CodePointer < BytecodeProcessor.Memory.Code.Length;
-        bool isExecuting;
-        bool IsDestroyed;
+        // User Invoke
         bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
-        int RemainingClockCycles;
+        readonly Queue<UserInvoke> UserInvokes = new();
 
         // Safety
         int LastInstructionPointer = -1;
         int EndlessSafe;
 
-        readonly Queue<UserInvoke> UserInvokes = new();
-
         #region Public Properties
 
-        public bool IsExecuting => isExecuting;
+        public bool IsDone => BytecodeProcessor.IsDone;
         public int CodePointer => BytecodeProcessor.CodePointer;
         public int BasePointer => BytecodeProcessor.BasePointer;
         public IReadOnlyStack<DataItem> Stack => BytecodeProcessor.Memory.Stack;
@@ -91,15 +99,11 @@ namespace ProgrammingLanguage.Bytecode
 
         #endregion
 
-        internal BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
+        public BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
         {
             this.Settings = settings;
 
-            this.BytecodeProcessor = new BytecodeProcessor(code, 0, settings.HeapSize, externalFunctions);
-
-            this.isExecuting = false;
-            this.IsDestroyed = false;
-            this.RemainingClockCycles = this.Settings.ClockCyclesPerUpdate;
+            this.BytecodeProcessor = new BytecodeProcessor(code, settings.HeapSize, externalFunctions);
 
             this.EndlessSafe = 0;
             this.LastInstructionPointer = -1;
@@ -107,48 +111,20 @@ namespace ProgrammingLanguage.Bytecode
 
         #region Public Methods
 
-        internal void Jump(int instructionOffset)
+        internal bool Jump(int instructionOffset)
         {
-            if (IsDestroyed) return;
-            if (isExecuting) return;
-
-            isExecuting = true;
+            if (!BytecodeProcessor.IsDone) return false;
 
             BytecodeProcessor.CodePointer = instructionOffset;
             BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
+            return true;
         }
 
-        internal void Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
+        public bool Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
         {
-            if (IsDestroyed) return;
-
             UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
             TryUserInvoke();
-        }
-
-        internal void Destroy()
-        {
-            if (IsDestroyed) return;
-            BytecodeProcessor.Destroy();
-            BytecodeProcessor = null;
-            IsDestroyed = true;
-        }
-
-        /// <exception cref="RuntimeException"></exception>
-        internal void Tick()
-        {
-            if (IsDestroyed) return;
-            RemainingClockCycles = Math.Min(RemainingClockCycles + Settings.ClockCyclesPerUpdate, Settings.ClockCyclesPerUpdate);
-            while (ExecuteNext())
-            {
-
-            }
-        }
-
-        internal void AddValueToStack(DataItem value)
-        {
-            if (IsDestroyed) return;
-            BytecodeProcessor.Memory.Stack.Push(value);
+            return true;
         }
 
         internal Context GetContext() => new()
@@ -163,7 +139,7 @@ namespace ProgrammingLanguage.Bytecode
 
         #endregion
 
-        void PrepareUserInvoke(UserInvoke userInvoke)
+        void DoUserInvoke(UserInvoke userInvoke)
         {
             BytecodeProcessor.CodePointer = userInvoke.InstructionOffset;
             BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "return value"));
@@ -177,24 +153,19 @@ namespace ProgrammingLanguage.Bytecode
 
         bool TryUserInvoke()
         {
-            if (IsDestroyed) return false;
-            if (isExecuting) return false;
+            if (!BytecodeProcessor.IsDone) return false;
             if (UserInvokes.Count == 0) return false;
             if (IsUserInvoking) return false;
 
-            PrepareUserInvoke(UserInvokes.Peek());
+            DoUserInvoke(UserInvokes.Peek());
             UserInvokes.Peek().IsInvoking = true;
-
-            isExecuting = true;
 
             return true;
         }
 
-        /// <exception cref="RuntimeException"></exception>
-        bool ExecuteNext()
+        /// <exception cref="RuntimeException"/>
+        public bool Tick()
         {
-            if (IsDestroyed) return false;
-
             if (EndlessSafe > Settings.InstructionLimit)
             {
                 BytecodeProcessor.CodePointer = BytecodeProcessor.Memory.Code.Length;
@@ -206,7 +177,7 @@ namespace ProgrammingLanguage.Bytecode
                 throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext());
             }
 
-            if (!CanExecuteCode)
+            if (BytecodeProcessor.IsDone)
             {
                 OnStop();
                 return false;
@@ -222,7 +193,7 @@ namespace ProgrammingLanguage.Bytecode
 
             try
             {
-                RemainingClockCycles -= Math.Max(1, BytecodeProcessor.Clock());
+                BytecodeProcessor.Tick();
             }
             catch (UserException error)
             {
@@ -241,43 +212,36 @@ namespace ProgrammingLanguage.Bytecode
 
             if (LastInstructionPointer == BytecodeProcessor.CodePointer)
             {
-                throw new RuntimeException($"Possible endless loop!", GetContext());
+                throw new RuntimeException($"Execution stuck at instruction {LastInstructionPointer}", GetContext());
             }
 
             LastInstructionPointer = BytecodeProcessor.CodePointer;
 
-            isExecuting = true;
-
-            if (RemainingClockCycles > 0)
-            {
-                return true;
-            }
-            return false;
+            return true;
         }
 
         void OnStop()
         {
-            if (IsDestroyed) return;
-
             if (IsUserInvoking)
             {
                 UserInvoke userInvoke = UserInvokes.Dequeue();
+                
                 for (int i = 0; i < userInvoke.Arguments.Length; i++)
                 {
                     if (BytecodeProcessor.Memory.Stack.Count == 0)
                     { throw new InternalException($"Tried to pop user-invoked function's parameters but the stack is empty"); }
                     BytecodeProcessor.Memory.Stack.Pop();
                 }
+                
                 if (BytecodeProcessor.Memory.Stack.Count == 0)
                 { throw new InternalException($"Tried to pop user-invoked function's return value but the stack is empty"); }
-                DataItem returnValue = BytecodeProcessor.Memory.Stack.Pop();
+
+                DataItem returnValue = userInvoke.NeedReturnValue ? BytecodeProcessor.Memory.Stack.Pop() : DataItem.Null;
                 userInvoke.Callback?.Invoke(returnValue);
             }
 
             LastInstructionPointer = -1;
             EndlessSafe = 0;
-
-            isExecuting = false;
 
             TryUserInvoke();
         }
@@ -295,18 +259,15 @@ namespace ProgrammingLanguage.Bytecode
 
     public struct BytecodeInterpreterSettings
     {
-        internal int ClockCyclesPerUpdate;
         internal int InstructionLimit;
         internal int StackMaxSize;
         internal int HeapSize;
 
         public static BytecodeInterpreterSettings Default => new()
         {
-            ClockCyclesPerUpdate = int.MaxValue,
             InstructionLimit = 8192,
             StackMaxSize = 128,
             HeapSize = 2048,
         };
     }
-
 }

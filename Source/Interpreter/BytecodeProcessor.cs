@@ -1,10 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace ProgrammingLanguage.Bytecode
 {
-    using System;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using Core;
+    using Errors;
 
     internal class BytecodeProcessor
     {
@@ -16,98 +17,91 @@ namespace ProgrammingLanguage.Bytecode
         internal int BasePointer;
 
         internal Instruction CurrentInstruction => Memory.Code[CodePointer];
+        internal bool IsDone => CodePointer >= Memory.Code.Length;
 
-        public BytecodeProcessor(Instruction[] code, int basePointer, int heapSize, Dictionary<string, ExternalFunctionBase> externalFunctions)
+        public BytecodeProcessor(Instruction[] code, int heapSize, Dictionary<string, ExternalFunctionBase> externalFunctions)
         {
             ExternalFunctions = externalFunctions;
 
-            BasePointer = basePointer;
-            CodePointer = code.Length;
+            BasePointer = 0;
+            CodePointer = 0;
 
             Memory = new(heapSize, code);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Step() => Step(1);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Step(int num) => CodePointer += num;
-
-        public void Destroy()
-        {
-            Memory.Stack.Destroy();
-            Memory.Stack = null;
-            ExternalFunctions = null;
-        }
 
         /// <exception cref="RuntimeException"></exception>
         /// <exception cref="UserException"></exception>
         /// <exception cref="InternalException"></exception>
         /// <exception cref="System.Exception"></exception>
-        public int Clock()
+        public void Tick()
         {
             switch (CurrentInstruction.opcode)
             {
                 case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
-                case Opcode.COMMENT: Step(); return 1;
+                case Opcode.COMMENT: Step(); break;
 
-                #region Instructions
-                case Opcode.EXIT: return EXIT();
+                case Opcode.EXIT: EXIT(); break;
 
-                case Opcode.PUSH_VALUE: return PUSH_VALUE();
-                case Opcode.POP_VALUE: return POP_VALUE();
+                case Opcode.PUSH_VALUE: PUSH_VALUE(); break;
+                case Opcode.POP_VALUE: POP_VALUE(); break;
 
-                case Opcode.LOAD_VALUE: return LOAD_VALUE();
-                case Opcode.STORE_VALUE: return STORE_VALUE();
+                case Opcode.LOAD_VALUE: LOAD_VALUE(); break;
+                case Opcode.STORE_VALUE: STORE_VALUE(); break;
 
-                case Opcode.JUMP_BY_IF_FALSE: return JUMP_BY_IF_FALSE();
-                case Opcode.JUMP_BY: return JUMP_BY();
-                case Opcode.THROW: return THROW();
+                case Opcode.JUMP_BY_IF_FALSE: JUMP_BY_IF_FALSE(); break;
+                case Opcode.JUMP_BY: JUMP_BY(); break;
+                case Opcode.THROW: THROW(); break;
 
-                case Opcode.CALL_EXTERNAL: return CALL_EXTERNAL();
+                case Opcode.CALL_EXTERNAL: CALL_EXTERNAL(); break;
 
-                case Opcode.MATH_ADD: return MATH_ADD();
-                case Opcode.MATH_SUB: return MATH_SUB();
-                case Opcode.MATH_MULT: return MATH_MULT();
-                case Opcode.MATH_DIV: return MATH_DIV();
-                case Opcode.MATH_MOD: return MATH_MOD();
+                case Opcode.MATH_ADD: MATH_ADD(); break;
+                case Opcode.MATH_SUB: MATH_SUB(); break;
+                case Opcode.MATH_MULT: MATH_MULT(); break;
+                case Opcode.MATH_DIV: MATH_DIV(); break;
+                case Opcode.MATH_MOD: MATH_MOD(); break;
 
-                case Opcode.BITSHIFT_LEFT: return BITSHIFT_LEFT();
-                case Opcode.BITSHIFT_RIGHT: return BITSHIFT_RIGHT();
+                case Opcode.BITSHIFT_LEFT: BITSHIFT_LEFT(); break;
+                case Opcode.BITSHIFT_RIGHT: BITSHIFT_RIGHT(); break;
 
-                case Opcode.LOGIC_LT: return LOGIC_LT();
-                case Opcode.LOGIC_MT: return LOGIC_MT();
-                case Opcode.LOGIC_AND: return LOGIC_AND();
-                case Opcode.LOGIC_OR: return LOGIC_OR();
-                case Opcode.LOGIC_EQ: return LOGIC_EQ();
-                case Opcode.LOGIC_NEQ: return LOGIC_NEQ();
-                case Opcode.LOGIC_LTEQ: return LOGIC_LTEQ();
-                case Opcode.LOGIC_MTEQ: return LOGIC_MTEQ();
-                case Opcode.LOGIC_XOR: return LOGIC_XOR();
-                case Opcode.LOGIC_NOT: return LOGIC_NOT();
+                case Opcode.LOGIC_LT: LOGIC_LT(); break;
+                case Opcode.LOGIC_MT: LOGIC_MT(); break;
+                case Opcode.LOGIC_AND: LOGIC_AND(); break;
+                case Opcode.LOGIC_OR: LOGIC_OR(); break;
+                case Opcode.LOGIC_EQ: LOGIC_EQ(); break;
+                case Opcode.LOGIC_NEQ: LOGIC_NEQ(); break;
+                case Opcode.LOGIC_LTEQ: LOGIC_LTEQ(); break;
+                case Opcode.LOGIC_MTEQ: LOGIC_MTEQ(); break;
+                case Opcode.LOGIC_XOR: LOGIC_XOR(); break;
+                case Opcode.LOGIC_NOT: LOGIC_NOT(); break;
 
-                case Opcode.HEAP_GET: return HEAP_GET();
-                case Opcode.HEAP_SET: return HEAP_SET();
+                case Opcode.HEAP_GET: HEAP_GET(); break;
+                case Opcode.HEAP_SET: HEAP_SET(); break;
 
-                case Opcode.HEAP_ALLOC: return HEAP_ALLOC();
-                case Opcode.HEAP_DEALLOC: return HEAP_DEALLOC();
+                case Opcode.HEAP_ALLOC: HEAP_ALLOC(); break;
+                case Opcode.HEAP_DEALLOC: HEAP_DEALLOC(); break;
 
-                case Opcode.DEBUG_SET_TAG: return DEBUG_SET_TAG();
-                case Opcode.CS_PUSH: return CS_PUSH();
-                case Opcode.CS_POP: return CS_POP();
+                case Opcode.DEBUG_SET_TAG: DEBUG_SET_TAG(); break;
+                case Opcode.CS_PUSH: CS_PUSH(); break;
+                case Opcode.CS_POP: CS_POP(); break;
 
-                case Opcode.GET_BASEPOINTER: return GET_BASEPOINTER();
-                case Opcode.SET_BASEPOINTER: return SET_BASEPOINTER();
+                case Opcode.GET_BASEPOINTER: GET_BASEPOINTER(); break;
+                case Opcode.SET_BASEPOINTER: SET_BASEPOINTER(); break;
 
-                case Opcode.SET_CODEPOINTER: return SET_CODEPOINTER();
+                case Opcode.SET_CODEPOINTER: SET_CODEPOINTER(); break;
 
-                case Opcode.TYPE_GET: return TYPE_GET();
-                case Opcode.TYPE_SET: return TYPE_SET();
-
-                #endregion
+                case Opcode.TYPE_GET: TYPE_GET(); break;
+                case Opcode.TYPE_SET: TYPE_SET(); break;
 
                 default: throw new ImpossibleException();
             }
         }
 
-        /// <exception cref="System.Exception"/>
+        /// <exception cref="InternalException"/>
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
@@ -117,23 +111,23 @@ namespace ProgrammingLanguage.Bytecode
             AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
             AddressingMode.POP => Memory.Stack.Count - 1,
 
-            _ => throw new System.Exception($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
+            _ => throw new InternalException($"Invalid stack addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
-        /// <exception cref="System.Exception"/>
+        /// <exception cref="InternalException"/>
         int GetAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
 
-            _ => throw new System.Exception($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
+            _ => throw new InternalException($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         #region Instruction Methods
 
         #region HEAP Operations
 
-        int HEAP_ALLOC()
+        void HEAP_ALLOC()
         {
             DataItem sizeData = Memory.Stack.Pop();
             int size = sizeData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_ALLOC, got {sizeData.Type}");
@@ -143,10 +137,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(block, CurrentInstruction.tag));
 
             Step();
-            return 10;
         }
 
-        int HEAP_DEALLOC()
+        void HEAP_DEALLOC()
         {
             DataItem pointerData = Memory.Stack.Pop();
             int pointer = pointerData.Integer ?? throw new RuntimeException($"Expected an integer parameter for opcode HEAP_DEALLOC, got {pointerData.Type}");
@@ -154,27 +147,22 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Heap.Deallocate(pointer);
 
             Step();
-            return 10;
         }
 
-        int HEAP_GET()
+        void HEAP_GET()
         {
             int address = GetAddress();
             var value = Memory.Heap[address];
             Memory.Stack.Push(value);
             Step();
-
-            return 2;
         }
 
-        int HEAP_SET()
+        void HEAP_SET()
         {
             int address = GetAddress();
             var value = Memory.Stack.Pop();
             Memory.Heap[address] = value;
             Step();
-
-            return 2;
         }
 
         #endregion
@@ -182,7 +170,7 @@ namespace ProgrammingLanguage.Bytecode
         #region Flow Control
 
         /// <exception cref="UserException"/>
-        int THROW()
+        void THROW()
         {
             int pointer = Memory.Stack.Pop().ValueInt;
             string value = null;
@@ -192,16 +180,14 @@ namespace ProgrammingLanguage.Bytecode
             throw new UserException("User Exception Thrown", value);
         }
 
-        int JUMP_BY()
+        void JUMP_BY()
         {
             int relativeAddress = GetAddress();
 
             Step(relativeAddress);
-
-            return 1;
         }
 
-        int JUMP_BY_IF_FALSE()
+        void JUMP_BY_IF_FALSE()
         {
             int relativeAddress = GetAddress();
 
@@ -211,52 +197,42 @@ namespace ProgrammingLanguage.Bytecode
             { Step(relativeAddress); }
             else
             { Step(); }
-
-            return 3;
         }
 
-        int EXIT()
+        void EXIT()
         {
             CodePointer = Memory.Code.Length;
-
-            return 1;
         }
 
         #endregion
 
         #region Debug Operations
 
-        int CS_PUSH()
+        void CS_PUSH()
         {
             Memory.CallStack.Push(CurrentInstruction.tag);
             Step();
-
-            return 1;
         }
 
-        int CS_POP()
+        void CS_POP()
         {
             Memory.CallStack.Pop();
             Step();
-
-            return 1;
         }
 
-        int DEBUG_SET_TAG()
+        void DEBUG_SET_TAG()
         {
             DataItem value = Memory.Stack.Pop();
             value.Tag = CurrentInstruction.tag;
             Memory.Stack.Push(value);
             Step();
-
-            return 1;
         }
 
         #endregion
 
         #region Logic Operations
 
-        int BITSHIFT_LEFT()
+        void BITSHIFT_LEFT()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -264,11 +240,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(DataItem.BitshiftLeft(leftSide, rightSide));
 
             Step();
-
-            return 4;
         }
 
-        int BITSHIFT_RIGHT()
+        void BITSHIFT_RIGHT()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -276,11 +250,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(DataItem.BitshiftRight(leftSide, rightSide));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_LT()
+        void LOGIC_LT()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -288,20 +260,16 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide < rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_NOT()
+        void LOGIC_NOT()
         {
             var v = Memory.Stack.Pop();
             Memory.Stack.Push(!v);
             Step();
-
-            return 3;
         }
 
-        int LOGIC_MT()
+        void LOGIC_MT()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -309,11 +277,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide > rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_EQ()
+        void LOGIC_EQ()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -321,11 +287,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide == rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_NEQ()
+        void LOGIC_NEQ()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -333,11 +297,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide != rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_OR()
+        void LOGIC_OR()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -345,11 +307,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide | rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_XOR()
+        void LOGIC_XOR()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -357,11 +317,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide ^ rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_LTEQ()
+        void LOGIC_LTEQ()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -369,11 +327,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide <= rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_MTEQ()
+        void LOGIC_MTEQ()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -381,11 +337,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(leftSide >= rightSide, null));
 
             Step();
-
-            return 4;
         }
 
-        int LOGIC_AND()
+        void LOGIC_AND()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -393,15 +347,13 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide & rightSide);
 
             Step();
-
-            return 4;
         }
 
         #endregion
 
         #region Math Operations
 
-        int MATH_ADD()
+        void MATH_ADD()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -409,11 +361,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide + rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int MATH_DIV()
+        void MATH_DIV()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -421,11 +371,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide / rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int MATH_SUB()
+        void MATH_SUB()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -433,11 +381,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide - rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int MATH_MULT()
+        void MATH_MULT()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -445,11 +391,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide * rightSide);
 
             Step();
-
-            return 4;
         }
 
-        int MATH_MOD()
+        void MATH_MOD()
         {
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
@@ -457,15 +401,13 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(leftSide % rightSide);
 
             Step();
-
-            return 4;
         }
 
         #endregion
 
         #region Stack Operations
 
-        int PUSH_VALUE()
+        void PUSH_VALUE()
         {
             DataItem value = CurrentInstruction.Parameter;
             value.Tag = CurrentInstruction.tag;
@@ -473,19 +415,15 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(value);
 
             Step();
-
-            return 2;
         }
 
-        int POP_VALUE()
+        void POP_VALUE()
         {
             Memory.Stack.Pop();
             Step();
-
-            return 2;
         }
 
-        int STORE_VALUE()
+        void STORE_VALUE()
         {
             int address = GetStackAddress();
             var value = Memory.Stack.Pop();
@@ -493,11 +431,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Set(address, value);
 
             Step();
-
-            return 3;
         }
 
-        int LOAD_VALUE()
+        void LOAD_VALUE()
         {
             int address = GetStackAddress();
 
@@ -507,22 +443,19 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(value);
 
             Step();
-
-            return 3;
         }
 
         #endregion
 
         #region Utility Operations
 
-        int GET_BASEPOINTER()
+        void GET_BASEPOINTER()
         {
             Memory.Stack.Push(new DataItem(BasePointer, "basepointer"));
             Step();
-            return 1;
         }
 
-        int SET_BASEPOINTER()
+        void SET_BASEPOINTER()
         {
             BasePointer = CurrentInstruction.AddressingMode switch
             {
@@ -533,10 +466,9 @@ namespace ProgrammingLanguage.Bytecode
             };
 
             Step();
-            return 1;
         }
 
-        int SET_CODEPOINTER()
+        void SET_CODEPOINTER()
         {
             CodePointer = CurrentInstruction.AddressingMode switch
             {
@@ -544,11 +476,9 @@ namespace ProgrammingLanguage.Bytecode
                 AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
                 _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_CODEPOINTER}"),
             };
-
-            return 1;
         }
 
-        int TYPE_SET()
+        void TYPE_SET()
         {
             RuntimeType targetType = (RuntimeType)(Memory.Stack.Pop().Byte ?? throw new RuntimeException($"Expected byte as target type"));
             DataItem value = Memory.Stack.Pop();
@@ -597,10 +527,9 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(newValue);
 
             Step();
-            return 1;
         }
 
-        int TYPE_GET()
+        void TYPE_GET()
         {
             DataItem value = Memory.Stack.Pop();
             byte type = (byte)value.Type;
@@ -608,7 +537,6 @@ namespace ProgrammingLanguage.Bytecode
             Memory.Stack.Push(new DataItem(type));
 
             Step();
-            return 1;
         }
 
         #endregion
@@ -623,7 +551,7 @@ namespace ProgrammingLanguage.Bytecode
 
         /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
-        int CALL_EXTERNAL()
+        void CALL_EXTERNAL()
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.Type != RuntimeType.INT)
@@ -660,8 +588,6 @@ namespace ProgrammingLanguage.Bytecode
             }
 
             Step();
-
-            return 15;
         }
 
         #endregion

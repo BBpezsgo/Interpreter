@@ -15,24 +15,6 @@ namespace ProgrammingLanguage.Errors
     {
         public Position Position => position;
         public readonly string? File;
-        public virtual string MessageAll
-        {
-            get
-            {
-                if (Position.Start.Line == -1)
-                {
-                    return Message;
-                }
-
-                if (Position.Start.Character == -1)
-                {
-                    return $"{Message} (at line {Position.Start.Character}) {InnerException}";
-                }
-
-                return $"{Message} (at line {Position.Start.Line} and column {Position.Start.Character}) {InnerException}";
-            }
-        }
-
         readonly Position position;
 
         protected Exception(string message, Position position, string? file) : base(message)
@@ -48,6 +30,21 @@ namespace ProgrammingLanguage.Errors
             : base(message, inner) { }
         protected Exception(SerializationInfo info, StreamingContext context)
             : base(info, context) { }
+
+        public override string ToString()
+        {
+            if (Position.Start.Line == -1)
+            {
+                return Message;
+            }
+
+            if (Position.Start.Character == -1)
+            {
+                return $"{Message} (at line {Position.Start.Character}) {InnerException}";
+            }
+
+            return $"{Message} (at line {Position.Start.Line} and column {Position.Start.Character}) {InnerException}";
+        }
     }
 
     [Serializable]
@@ -120,55 +117,50 @@ namespace ProgrammingLanguage.Errors
         internal RuntimeException(string message, System.Exception inner)
             : base(message, inner) { }
 
-        public override string MessageAll
+        public override string ToString()
         {
-            get
+            if (!Context.HasValue) return Message + " (no context)";
+            var cont = Context.Value;
+
+            var result = Message;
+            result += $"\n Executed Instructions: {cont.ExecutedInstructionCount}";
+            result += $"\n Code Pointer: {cont.CodePointer}";
+            result += $"\n Call Stack:";
+            if (cont.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
+            else { result += "\n   " + string.Join("\n   ", cont.CallStack); }
+            if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
             {
-                if (!Context.HasValue) return Message + " (no context)";
-                var cont = Context.Value;
-
-                var result = Message;
-                result += $"\n Executed Instructions: {cont.ExecutedInstructionCount}";
-                result += $"\n Code Pointer: {cont.CodePointer}";
-                result += $"\n Call Stack:";
-                if (cont.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
-                else { result += "\n   " + string.Join("\n   ", cont.CallStack); }
-                if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
-                {
-                    result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";
-                }
-                result += $"\n System Stack Trace:";
-                if (StackTrace == null) { result += " (stacktrace is null)"; }
-                else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }
-                else { result += "\n  " + string.Join("\n  ", StackTrace); }
-
-                if (Context.HasValue)
-                {
-                    result += $"\n Stack:";
-                    for (int i = 0; i < Context.Value.Stack.Count; i++)
-                    {
-                        if (Context.Value.Stack[i].IsNull)
-                        {
-                            result += $"\n{i}\t null";
-                        }
-                        else
-                        {
-                            result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].Value()} # {Context.Value.Stack[i].Tag}";
-                        }
-                    }
-
-                    result += $"\n Code:";
-                    for (int offset = 0; offset < Context.Value.Code.Length; offset++)
-                    {
-                        result += $"\n{offset + Context.Value.CodeSampleStart}\t {Context.Value.Code[offset]}";
-                    }
-                }
-
-                return result;
+                result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";
             }
-        }
+            result += $"\n System Stack Trace:";
+            if (StackTrace == null) { result += " (stacktrace is null)"; }
+            else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }
+            else { result += "\n  " + string.Join("\n  ", StackTrace); }
 
-        public override string ToString() => MessageAll;
+            if (Context.HasValue)
+            {
+                result += $"\n Stack:";
+                for (int i = 0; i < Context.Value.Stack.Count; i++)
+                {
+                    if (Context.Value.Stack[i].IsNull)
+                    {
+                        result += $"\n{i}\t null";
+                    }
+                    else
+                    {
+                        result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].Value()} # {Context.Value.Stack[i].Tag}";
+                    }
+                }
+
+                result += $"\n Code:";
+                for (int offset = 0; offset < Context.Value.Code.Length; offset++)
+                {
+                    result += $"\n{offset + Context.Value.CodeSampleStart}\t {Context.Value.Code[offset]}";
+                }
+            }
+
+            return result;
+        }
     }
 
     [Serializable]

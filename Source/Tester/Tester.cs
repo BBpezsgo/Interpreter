@@ -1,16 +1,13 @@
-﻿using ProgrammingLanguage.BBCode;
-using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Core;
-using ProgrammingLanguage.Errors;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 
 namespace ProgrammingLanguage.Tester
 {
+    using Bytecode;
+    using Core;
+    using Errors;
+
     class Tester
     {
         public static void RunTestFile(TheProgram.ArgumentParser.Settings settings) => RunTestFile(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.HandleErrors, settings.TestID);
@@ -181,39 +178,7 @@ namespace ProgrammingLanguage.Tester
             }
 
             while (codeInterpreter.IsExecutingCode)
-            {
-                if (HandleErrors)
-                {
-                    try
-                    {
-                        codeInterpreter.Update();
-                    }
-                    catch (CompilerException error)
-                    {
-                        Output.Output.Error($"CompilerException: {error.MessageAll}");
-                    }
-                    catch (UserException error)
-                    {
-                        Output.Output.Error($"UserException: {error.Value.ToString()}");
-                    }
-                    catch (RuntimeException error)
-                    {
-                        Output.Output.Error($"RuntimeException: {error.MessageAll}");
-                    }
-                    catch (EndlessLoopException)
-                    {
-                        Output.Output.Error($"Endless loop!!!");
-                    }
-                    catch (InternalException error)
-                    {
-                        Output.Output.Error($"InternalException: {error.Message}");
-                    }
-                }
-                else
-                {
-                    codeInterpreter.Update();
-                }
-            }
+            { codeInterpreter.Update(); }
         }
     }
 }

@@ -278,7 +278,6 @@ namespace ConsoleGUI
                 {
                     Interpreter.ExecuteProgram(compiledCode, new ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings()
                     {
-                        ClockCyclesPerUpdate = 1,
                         InstructionLimit = interpreterSettings.InstructionLimit,
                         StackMaxSize = interpreterSettings.StackMaxSize,
                         HeapSize = interpreterSettings.HeapSize,
@@ -494,13 +493,13 @@ namespace ConsoleGUI
             b.ResetColor();
 
             b.AddText("  ");
-            b.AddText($"IsRunning: {this.Interpreter.Details.Interpreter.IsExecuting}");
+            b.AddText($"IsRunning: {!this.Interpreter.Details.Interpreter.IsDone}");
             b.BackgroundColor = BackgroundColor.Black;
             b.FinishLine(sender.Rect.Width);
             b.ForegroundColor = ForegroundColor.Default;
 
             b.AddText("  ");
-            if (this.Interpreter.Details.Interpreter.CodePointer == this.Interpreter.Details.CompilerResult.compiledCode.Length)
+            if (this.Interpreter.Details.Interpreter.CodePointer == this.Interpreter.Details.CompilerResult.Code.Length)
             {
                 b.AddText($"State: {this.Interpreter.Details.State}");
             }
@@ -995,7 +994,7 @@ namespace ConsoleGUI
             int indent = 0;
             for (int i = 0; i < this.Interpreter.Details.Interpreter.CodePointer - 5; i++)
             {
-                var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
+                var instruction = this.Interpreter.Details.CompilerResult.Code[i];
                 if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
@@ -1008,11 +1007,11 @@ namespace ConsoleGUI
             }
 
             bool IsNextInstruction = false;
-            for (int i = Math.Max(0, this.Interpreter.Details.Interpreter.CodePointer - 5); i < this.Interpreter.Details.CompilerResult.compiledCode.Length; i++)
+            for (int i = Math.Max(0, this.Interpreter.Details.Interpreter.CodePointer - 5); i < this.Interpreter.Details.CompilerResult.Code.Length; i++)
             {
                 if (Interpreter.Details.Interpreter != null) if (Interpreter.Details.Interpreter.CodePointer == i) IsNextInstruction = true;
 
-                var instruction = this.Interpreter.Details.CompilerResult.compiledCode[i];
+                var instruction = this.Interpreter.Details.CompilerResult.Code[i];
                 if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))

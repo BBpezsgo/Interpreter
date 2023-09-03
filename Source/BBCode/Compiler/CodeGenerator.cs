@@ -4,14 +4,10 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using Analysis;
 
     using Bytecode;
-
     using Core;
-
     using Errors;
-
     using Parser;
     using Parser.Statement;
 
@@ -1783,7 +1779,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (parameterType != passedParameterType)
                 {
-                    
+
                 }
 
                 AddComment($" Param {i}:");
@@ -3073,6 +3069,86 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public Information[] Informations;
             public Warning[] Warnings;
             public Error[] Errors;
+
+            public readonly bool GetFunctionOffset(CompiledFunction compiledFunction, out int offset)
+            {
+                offset = -1;
+                for (int i = 0; i < Functions.Length; i++)
+                {
+                    if (Functions[i].IsSame(compiledFunction))
+                    {
+                        if (offset != -1)
+                        { throw new System.Exception($"BRUH"); }
+                        offset = i;
+                    }
+                }
+                return offset != -1;
+            }
+
+            public readonly void PrintInstructions() => Result.PrintInstructions(Code);
+            public static void PrintInstructions(Instruction[] code)
+            {
+                Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
+                int indent = 0;
+
+                for (int i = 0; i < code.Length; i++)
+                {
+                    Instruction instruction = code[i];
+                    if (instruction.opcode == Opcode.COMMENT)
+                    {
+                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
+                        {
+                            indent--;
+                        }
+
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
+                        Console.ResetColor();
+
+                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
+                        {
+                            indent++;
+                        }
+
+                        continue;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.DarkYellow;
+                    Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
+                    Console.Write($" ");
+
+                    if (instruction.Parameter.Type == RuntimeType.INT)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write($"{instruction.Parameter.ValueInt}");
+                        Console.Write($" ");
+                    }
+                    else if (instruction.Parameter.Type == RuntimeType.FLOAT)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Cyan;
+                        Console.Write($"{instruction.Parameter.ValueFloat}");
+                        Console.Write($" ");
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.White;
+                        Console.Write($"{instruction.Parameter}");
+                        Console.Write($" ");
+                    }
+
+                    if (!string.IsNullOrEmpty(instruction.tag))
+                    {
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"{instruction.tag}");
+                    }
+
+                    Console.Write("\n\r");
+
+                    Console.ResetColor();
+                }
+
+                Console.WriteLine("\n\r === ===\n\r");
+            }
         }
 
         Result GenerateCode(

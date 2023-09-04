@@ -419,8 +419,8 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
             return new Compiler.CompilerResult()
             {
-                compiledStructs = codeGeneratorResult.Structs.ToArray(),
-                compiledFunctions = codeGeneratorResult.Functions.ToArray(),
+                Structs = codeGeneratorResult.Structs.ToArray(),
+                Functions = codeGeneratorResult.Functions.ToArray(),
             };
         }
 

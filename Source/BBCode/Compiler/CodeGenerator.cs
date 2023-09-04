@@ -4,7 +4,6 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
-
     using Bytecode;
     using Core;
     using Errors;

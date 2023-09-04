@@ -1,20 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
 
 #nullable enable
 
 namespace ProgrammingLanguage.Brainfuck.Compiler
 {
-    using System.Diagnostics;
-    using ProgrammingLanguage.BBCode;
-    using ProgrammingLanguage.BBCode.Analysis;
-    using ProgrammingLanguage.BBCode.Compiler;
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statement;
-    using ProgrammingLanguage.Bytecode;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using BBCode;
+    using BBCode.Compiler;
+    using BBCode.Parser;
+    using BBCode.Parser.Statement;
+    using Bytecode;
+    using Core;
+    using Errors;
     using Literal = BBCode.Parser.Statement.Literal;
 
     readonly struct CleanupItem
@@ -51,29 +50,25 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         #region Fields
 
-        readonly Statement[] statements;
         CompiledCode Code;
 
         readonly Stack<Variable> Variables;
+        readonly List<ConstantVariable> Constants;
+
         readonly StackCodeHelper Stack;
         readonly BasicHeapCodeHelper Heap;
+        
         readonly Stack<int> VariableCleanupStack;
         readonly Stack<int> ReturnCount;
         readonly Stack<int> BreakCount;
-        /// <summary>
-        /// Contains the "return tag" address
-        /// </summary>
+        /// <summary> Contains the "return tag" address </summary>
         readonly Stack<int> ReturnTagStack;
-        /// <summary>
-        /// Contains the "break tag" address
-        /// </summary>
+        /// <summary> Contains the "break tag" address </summary>
         readonly Stack<int> BreakTagStack;
 
-        int optimalizations;
+        int Optimalizations;
 
         readonly Stack<FunctionThingDefinition> CurrentMacro;
-
-        readonly List<ConstantVariable> Constants;
 
         readonly Settings GeneratorSettings;
 
@@ -83,9 +78,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         #endregion
 
-        public CodeGenerator(Statement[] statements, Settings settings) : base()
+        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base()
         {
-            this.statements = statements;
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
             this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
@@ -135,217 +129,6 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 HeapStart = 32,
                 HeapSize = 8,
             };
-        }
-
-        [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        public readonly struct ConstantValue : IEquatable<ConstantValue>
-        {
-            public readonly ValueType Type
-            {
-                get
-                {
-                    if (_byte.HasValue)
-                    { return ValueType.Byte; }
-
-                    if (_char.HasValue)
-                    { return ValueType.Char; }
-
-                    if (_string != null)
-                    { return ValueType.String; }
-
-                    throw new System.Exception();
-                }
-            }
-
-            public int Size
-            {
-                get
-                {
-                    if (_byte.HasValue)
-                    { return 1; }
-
-                    if (_char.HasValue)
-                    { return 1; }
-
-                    if (_string != null)
-                    { return _string.Length; }
-
-                    throw new ImpossibleException();
-                }
-            }
-
-            readonly byte? _byte;
-            readonly string? _string;
-            readonly char? _char;
-
-            /// <exception cref="IndexOutOfRangeException"></exception>
-            /// <exception cref="NotImplementedException"></exception>
-            public byte this[int i]
-            {
-                get
-                {
-                    if (_byte.HasValue)
-                    {
-                        if (i != 0)
-                        { throw new IndexOutOfRangeException(); }
-                        return _byte.Value;
-                    }
-
-                    if (_char.HasValue)
-                    {
-                        if (i != 0)
-                        { throw new IndexOutOfRangeException(); }
-                        return CharCode.GetByte(_char.Value);
-                    }
-
-                    if (_string != null)
-                    {
-                        return CharCode.GetByte(_string[i]);
-                    }
-
-                    throw new ImpossibleException();
-                }
-            }
-
-            public ConstantValue(byte value)
-            {
-                _byte = value;
-                _string = null;
-                _char = null;
-            }
-
-            public ConstantValue(string value)
-            {
-                _byte = null;
-                _string = value;
-                _char = null;
-            }
-
-            public ConstantValue(char value)
-            {
-                _byte = null;
-                _string = null;
-                _char = value;
-            }
-
-            public static implicit operator byte(ConstantValue v)
-            {
-                if (v._byte == null)
-                { throw new System.Exception($"This is not a byte"); }
-                return v._byte.Value;
-            }
-
-            public static implicit operator int(ConstantValue v)
-            {
-                if (v._byte == null)
-                { throw new System.Exception($"This is not a byte"); }
-                return v._byte.Value;
-            }
-
-            public static implicit operator string(ConstantValue v)
-            {
-                if (v._string == null)
-                { throw new System.Exception($"This is not a string"); }
-                return v._string;
-            }
-
-            public static implicit operator char(ConstantValue v)
-            {
-                if (v._char == null)
-                { throw new System.Exception($"This is not a char"); }
-                return v._char.Value;
-            }
-
-            public static bool operator ==(ConstantValue a, ConstantValue b)
-            {
-                if (a.Type != b.Type) return false;
-
-                switch (a.Type)
-                {
-                    case ValueType.Byte:
-                        return a._byte == b._byte;
-                    case ValueType.Char:
-                        return a._char == b._char;
-                    case ValueType.String:
-                        return a._string == b._string;
-                    default:
-                        break;
-                }
-
-                return false;
-            }
-            public static bool operator !=(ConstantValue a, ConstantValue b) => !(a == b);
-
-            public static implicit operator ConstantValue(byte v)
-                => new(v);
-
-            public static implicit operator ConstantValue(string v)
-                => new(v);
-
-            public static implicit operator ConstantValue(int v)
-                => new((byte)v);
-
-            public static implicit operator ConstantValue(char v)
-                => new(v);
-
-            public override string? ToString()
-            {
-                if (_byte.HasValue)
-                { return _byte.Value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
-
-                if (_char.HasValue)
-                { return _char.Value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
-
-                if (_string != null)
-                { return _string.ToString(System.Globalization.CultureInfo.InvariantCulture); }
-
-                return null;
-            }
-
-            public override bool Equals(object? obj)
-                => obj is ConstantValue other && Equals(other);
-
-            public bool Equals(ConstantValue other)
-            {
-                if (_byte.HasValue)
-                {
-                    return other._byte.HasValue && _byte.Value == other._byte.Value;
-                }
-
-                if (_char.HasValue)
-                {
-                    return other._char.HasValue && _char.Value == other._char.Value;
-                }
-
-                if (_string != null)
-                {
-                    return _string != null && _string == other._string;
-                }
-
-                return false;
-            }
-
-            public override int GetHashCode()
-            {
-                if (_byte.HasValue)
-                {
-                    return HashCode.Combine(Type, _byte.Value);
-                }
-
-                if (_char.HasValue)
-                {
-                    return HashCode.Combine(Type, _char.Value);
-                }
-
-                if (_string != null)
-                {
-                    return HashCode.Combine(Type, _string);
-                }
-
-                throw new System.Exception();
-            }
-
-            string GetDebuggerDisplay() => ToString() ?? "";
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -479,10 +262,6 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         }
 
         #region Precompile
-        void Precompile()
-        {
-            Precompile(statements);
-        }
         void Precompile(Statement[] statements)
         {
             foreach (Statement statement in statements)
@@ -536,180 +315,6 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Precompile(function.Statements);
         }
         #endregion
-
-        /*
-        #region Compute
-        ConstantValue Compute(StatementWithValue statement)
-        {
-            if (statement is Literal literal)
-            { return Compute(literal); }
-            else if (statement is Identifier variable)
-            { return Compute(variable); }
-            else if (statement is OperatorCall expression)
-            { return Compute(expression); }
-            else
-            { throw new CompilerException($"Statement {statement.GetType().Name} can not be computed at compile time", statement, CurrentFile); }
-        }
-        static ConstantValue Compute(Literal statement)
-        {
-            switch (statement.Type)
-            {
-                case LiteralType.STRING:
-                    {
-                        string value = statement.Value;
-                        return value;
-                    }
-                case LiteralType.INT:
-                    {
-                        int value = int.Parse(statement.Value);
-                        return new ConstantValue((byte)value);
-                    }
-                case LiteralType.CHAR:
-                    {
-                        byte value = CharCode.GetByte(statement.Value[0]);
-                        return new ConstantValue(value);
-                    }
-
-                case LiteralType.FLOAT:
-                    throw new CompilerException($"Floats not supported by brainfuck");
-
-                case LiteralType.BOOLEAN:
-                    {
-                        bool value = bool.Parse(statement.Value);
-                        return new ConstantValue((byte)(value ? 1 : 0));
-                    }
-
-                default:
-                    throw new ImpossibleException($"Unknown literal type {statement.Type}");
-            }
-        }
-        ConstantValue Compute(Identifier statement)
-        {
-            if (!Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
-            { throw new CompilerException($"Constant \"{statement}\" not found", statement, CurrentFile); }
-
-            return constant.Value;
-        }
-        ConstantValue Compute(OperatorCall statement)
-        {
-            byte left = Compute(statement.Left);
-            byte right = Compute(statement.Right);
-
-            return statement.Operator.Content switch
-            {
-                "=" => (left == right) ? (byte)1 : (byte)0,
-                "+" => (byte)(left + right),
-                "-" => (byte)(left - right),
-                "*" => (byte)(left * right),
-                "/" => (byte)(left / right),
-                "^" => (byte)Math.Pow(left, right),
-                "%" => (byte)(left % right),
-                "<" => (left < right) ? 1 : 0,
-                ">" => (left > right) ? 1 : 0,
-                "<=" => (left <= right) ? 1 : 0,
-                ">=" => (left >= right) ? 1 : 0,
-                "&" => (byte)(left & right),
-                "|" => (byte)(left | right),
-                "&&" => (((byte)left != 0) && ((byte)right != 0)) ? 1 : 0,
-                "||" => (((byte)left != 0) || ((byte)right != 0)) ? 1 : 0,
-                "!=" => (left != right) ? 1 : 0,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-            };
-        }
-        #endregion
-        */
-
-        /*
-        #region TryCompute
-        bool TryCompute(StatementWithValue statement, out ConstantValue value)
-        {
-            if (statement is Literal literal)
-            { return TryCompute(literal, out value); }
-            else if (statement is Identifier variable)
-            { return TryCompute(variable, out value); }
-            else if (statement is OperatorCall expression)
-            { return TryCompute(expression, out value); }
-
-            value = default;
-            return false;
-        }
-        static bool TryCompute(Literal statement, out ConstantValue value)
-        {
-            switch (statement.Type)
-            {
-                case LiteralType.STRING:
-                    {
-                        value = new ConstantValue(statement.Value);
-                        return true;
-                    }
-                case LiteralType.INT:
-                    {
-                        value = new ConstantValue((byte)int.Parse(statement.Value));
-                        return true;
-                    }
-                case LiteralType.CHAR:
-                    {
-                        value = new ConstantValue(statement.Value[0]);
-                        return true;
-                    }
-
-                case LiteralType.FLOAT:
-                    throw new CompilerException($"Floats not supported by brainfuck");
-
-                case LiteralType.BOOLEAN:
-                    {
-                        bool _value = bool.Parse(statement.Value);
-                        value = new ConstantValue((byte)(_value ? 1 : 0));
-                        return true;
-                    }
-
-                default:
-                    throw new ImpossibleException($"Unknown literal type {statement.Type}");
-            }
-        }
-        bool TryCompute(Identifier statement, out ConstantValue value)
-        {
-            if (Constants.TryFind(statement.VariableName.Content, out ConstantVariable constant))
-            {
-                value = constant.Value;
-                return true;
-            }
-
-            value = default;
-            return false;
-        }
-        bool TryCompute(OperatorCall statement, out ConstantValue value)
-        {
-            if (!TryCompute(statement.Left, out var left) || !TryCompute(statement.Right, out var right))
-            {
-                value = default;
-                return false;
-            }
-
-            value = statement.Operator.Content switch
-            {
-                "=" => (left == right) ? (byte)1 : (byte)0,
-                "+" => (byte)((byte)left + (byte)right),
-                "-" => (byte)(left - right),
-                "*" => (byte)(left * right),
-                "/" => (byte)(left / right),
-                "^" => (byte)Math.Pow(left, right),
-                "%" => (byte)(left % right),
-                "<" => (left < right) ? 1 : 0,
-                ">" => (left > right) ? 1 : 0,
-                "<=" => (left <= right) ? 1 : 0,
-                ">=" => (left >= right) ? 1 : 0,
-                "&" => (byte)(left & right),
-                "|" => (byte)(left | right),
-                "&&" => (((byte)left != 0) && ((byte)right != 0)) ? 1 : 0,
-                "||" => (((byte)left != 0) || ((byte)right != 0)) ? 1 : 0,
-                "!=" => (left != right) ? 1 : 0,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-            };
-            return true;
-        }
-        #endregion
-        */
 
         #region PrecompileVariables
         int PrecompileVariables(Block block)
@@ -892,7 +497,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 return variable.Size;
             }
-            else if (Constants.TryFind(statement.Content, out ConstantVariable constant))
+            else if (Constants.TryFind(statement.Content, out _))
             {
                 return 1;
             }
@@ -1248,7 +853,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (variable.Address == valueVariable.Address)
                 {
-                    optimalizations++;
+                    Optimalizations++;
                     return;
                 }
 
@@ -1271,7 +876,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     Code.CopyValueWithTemp(offsettedSource, tempAddress, offsettedTarget);
                 }
 
-                optimalizations++;
+                Optimalizations++;
 
                 return;
             }
@@ -1299,7 +904,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     }
                     */
 
-                    optimalizations++;
+                    Optimalizations++;
 
                     VariableCanBeDiscated = null;
                     return;
@@ -1383,7 +988,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                     Code.SetValue(address, constantValue.Byte ?? 0);
 
-                    optimalizations++;
+                    Optimalizations++;
 
                     return;
                 }
@@ -2377,7 +1982,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     throw new ImpossibleException();
                             }
 
-                            optimalizations++;
+                            Optimalizations++;
                             return;
                         }
 
@@ -2435,7 +2040,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     throw new ImpossibleException();
                             }
 
-                            optimalizations++;
+                            Optimalizations++;
                             return;
                         }
 
@@ -2700,7 +2305,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         {
                             Code.MoveValue(offsettedSource, offsettedTarget);
                             DiscardVariable(Variables, variable.Name);
-                            optimalizations++;
+                            Optimalizations++;
                         }
                         else
                         {
@@ -2781,7 +2386,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                                     Code.AddValue(resultAddress, -right.ValueByte);
 
-                                    optimalizations++;
+                                    Optimalizations++;
 
                                     return;
                                 }
@@ -3798,25 +3403,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Compiler.CompilerSettings settings,
             Action<string, Output.LogType>? printCallback = null)
         {
-            base.CompiledFunctions = compilerResult.Functions;
-            base.CompiledGeneralFunctions = compilerResult.GeneralFunctions;
-            base.CompiledOperators = compilerResult.Operators;
-            base.CompiledClasses = compilerResult.Classes;
-            base.CompiledStructs = compilerResult.Structs;
-
-            base.CompiledStructs = compilerResult.Structs;
-            base.CompiledClasses = compilerResult.Classes;
-            base.CompiledEnums = compilerResult.Enums;
-
-            this.Precompile();
+            this.Precompile(compilerResult.TopLevelStatements);
 
             foreach (CompiledFunction? function in CompiledFunctions)
             { Precompile(function); }
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-            { VariableCleanupStack.Push(PrecompileVariables(statements)); }
+            { VariableCleanupStack.Push(PrecompileVariables(compilerResult.TopLevelStatements)); }
             else
-            { PrecompileVariables(statements); }
+            { PrecompileVariables(compilerResult.TopLevelStatements); }
 
             // Heap.Init();
 
@@ -3826,7 +3421,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 ReturnTagStack.Push(Stack.Push(1));
             }
 
-            foreach (Statement statement in statements)
+            foreach (Statement statement in compilerResult.TopLevelStatements)
             { Compile(statement); }
 
             {
@@ -3852,7 +3447,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             return new Result()
             {
                 Code = Code.ToString(),
-                Optimalizations = optimalizations,
+                Optimalizations = Optimalizations,
                 DebugInfo = DebugInfo,
                 Tokens = compilerResult.Tokens,
 
@@ -3867,7 +3462,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Settings generatorSettings,
             Action<string, Output.LogType>? printCallback = null)
         {
-            CodeGenerator codeGenerator = new(compilerResult.TopLevelStatements, generatorSettings);
+            CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(
                 compilerResult,
                 settings,

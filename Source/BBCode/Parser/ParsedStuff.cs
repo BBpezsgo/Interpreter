@@ -113,7 +113,8 @@ namespace ProgrammingLanguage.BBCode.Parser
         public TypeInstance Type;
         public Token ProtectionToken;
 
-        public Position GetPosition() => new Position(Identifier, Type, ProtectionToken);
+        public Position GetPosition()
+            => new(Identifier, Type, ProtectionToken);
 
         public override string ToString() => $"{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
         internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
@@ -259,7 +260,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         public override bool Equals(object obj)
         {
             if (obj is not FunctionThingDefinition other) return false;
-            return Equals(obj);
+            return Equals(other);
         }
 
         public bool Equals(FunctionThingDefinition other)

@@ -5,109 +5,41 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
+    using Analysis;
+    using Bytecode;
+    using Core;
     using DataUtilities.Serializer;
-
-    using ProgrammingLanguage.BBCode.Analysis;
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statement;
-    using ProgrammingLanguage.Bytecode;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using Errors;
+    using Parser;
+    using Parser.Statement;
 
     public class Compiler
     {
         public class CompilerResult : ISerializable<CompilerResult>
         {
-            public Instruction[] compiledCode { get; set; }
+            public Instruction[] Code { get; set; }
 
-            public CompiledFunction[] compiledFunctions { get; set; }
-            public CompiledStruct[] compiledStructs { get; set; }
+            public CompiledFunction[] Functions { get; set; }
+            public CompiledStruct[] Structs { get; set; }
 
-            public Dictionary<string, int> functionOffsets { get; set; }
-            internal DebugInfo[] debugInfo { get; set; }
+            public Dictionary<string, int> Offsets { get; set; }
+            internal DebugInfo[] DebugInfo { get; set; }
 
             public CompilerResult()
             {
 
             }
 
-            public bool GetFunctionOffset(FunctionDefinition functionCallStatement, out int functionOffset)
-                => functionOffsets.TryGetValue(functionCallStatement.Identifier.Content, out functionOffset);
-
-            internal void WriteToConsole()
-            {
-                Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
-                int indent = 0;
-
-                for (int i = 0; i < this.compiledCode.Length; i++)
-                {
-                    Instruction instruction = this.compiledCode[i];
-                    if (instruction.opcode == Opcode.COMMENT)
-                    {
-                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
-                        {
-                            indent--;
-                        }
-
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
-                        Console.ResetColor();
-
-                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
-                        {
-                            indent++;
-                        }
-
-                        continue;
-                    }
-
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
-                    Console.Write($" ");
-
-                    if (instruction.Parameter.Type == RuntimeType.INT)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueInt}");
-                        Console.Write($" ");
-                    }
-                    else if (instruction.Parameter.Type == RuntimeType.FLOAT)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueFloat}");
-                        Console.Write($" ");
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{instruction.Parameter}");
-                        Console.Write($" ");
-                    }
-
-                    if (!string.IsNullOrEmpty(instruction.tag))
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write($"{instruction.tag}");
-                    }
-
-                    Console.Write("\n\r");
-
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("\n\r === ===\n\r");
-            }
-
             void ISerializable<CompilerResult>.Serialize(Serializer serializer)
             {
-                serializer.Serialize(compiledCode);
-                serializer.Serialize(functionOffsets);
+                serializer.Serialize(Code);
+                serializer.Serialize(Offsets);
             }
 
             void ISerializable<CompilerResult>.Deserialize(Deserializer deserializer)
             {
-                this.compiledCode = deserializer.DeserializeObjectArray<Instruction>();
-                this.functionOffsets = deserializer.DeserializeDictionary<string, int>();
+                this.Code = deserializer.DeserializeObjectArray<Instruction>();
+                this.Offsets = deserializer.DeserializeDictionary<string, int>();
             }
         }
 

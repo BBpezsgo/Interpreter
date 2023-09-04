@@ -9,9 +9,9 @@ using TheProgram.Brainfuck;
 
 namespace ProgrammingLanguage.Brainfuck
 {
-    struct AutoPrintCodeString
+    readonly struct AutoPrintCodeString
     {
-        string v;
+        readonly string v;
 
         public AutoPrintCodeString(string v)
         {
@@ -600,36 +600,12 @@ namespace ProgrammingLanguage.Brainfuck
         {
             return v.Type switch
             {
-                Bytecode.RuntimeType.BYTE => Push((int)v.ValueByte),
+                Bytecode.RuntimeType.BYTE => Push(v.ValueByte),
                 Bytecode.RuntimeType.INT => Push(v.ValueInt),
                 Bytecode.RuntimeType.FLOAT => throw new Errors.CompilerException("Floats are not supported by the brainfuck compiler"),
                 Bytecode.RuntimeType.CHAR => Push(v.ValueChar),
                 _ => throw new Errors.ImpossibleException(),
             };
-        }
-
-        /// <summary>
-        /// <b>Pointer:</b> Restored to the last state
-        /// </summary>
-        internal int Push(Compiler.CodeGenerator.ConstantValue v)
-        {
-            if (v.Size == 1)
-            {
-                return Push((int)v[0]);
-            }
-
-            int address = PushVirtual(v.Size);
-
-            if (Size > MaxSize)
-            { Code.PRINT(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
-
-            for (int offset = 0; offset < v.Size; offset++)
-            {
-                int offsettedValue = address + offset;
-                Code.SetValue(offsettedValue, v[offset]);
-            }
-
-            return address;
         }
 
         /// <summary>

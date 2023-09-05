@@ -102,6 +102,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (GenericParameters[i][j].Content == name)
                     {
+                        GenericParameters[i][j].AnalysedType = TokenAnalysedType.TypeParameter;
                         return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
                     }
                 }
@@ -244,7 +245,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
 
             if (function.TemplateInfo != null)
-            { GenericParameters.Push(function.TemplateInfo.TypeParameters); }
+            {
+                GenericParameters.Push(function.TemplateInfo.TypeParameters);
+                foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
+                { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+            }
 
             CompiledType type = new(function.Type, GetCustomType);
 
@@ -633,7 +638,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             for (int i = 0; i < CompiledClasses.Length; i++)
             {
                 if (CompiledClasses[i].TemplateInfo != null)
-                { GenericParameters.Push(CompiledClasses[i].TemplateInfo.TypeParameters); }
+                {
+                    GenericParameters.Push(CompiledClasses[i].TemplateInfo.TypeParameters);
+                    foreach (Token typeParameter in CompiledClasses[i].TemplateInfo.TypeParameters)
+                    { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+                }
 
                 for (int j = 0; j < CompiledClasses[i].Fields.Length; j++)
                 {
@@ -677,7 +686,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (CompiledClass compiledClass in CompiledClasses)
                 {
                     if (compiledClass.TemplateInfo != null)
-                    { GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters); }
+                    {
+                        GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters);
+                        foreach (Token typeParameter in compiledClass.TemplateInfo.TypeParameters)
+                        { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+                    }
 
                     foreach (var method in compiledClass.GeneralMethods)
                     {

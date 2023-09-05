@@ -1,6 +1,6 @@
 using System;
 
-template <T>
+template<T>
 void Bruh(T eh) {
 	T copy = eh;
 	PrintLine(eh);

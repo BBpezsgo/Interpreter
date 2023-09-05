@@ -58,6 +58,7 @@ namespace ProgrammingLanguage.BBCode
         BuiltinType,
         Enum,
         EnumMember,
+        TypeParameter,
     }
 
     public struct TokenizerSettings

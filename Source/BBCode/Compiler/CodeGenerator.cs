@@ -2874,6 +2874,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
 
+            if (compiledVariable.Type.IsGeneric)
+            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.TypeParameter; }
+
             AddComment($"Initial value {{");
 
             int size = GenerateInitialValue(compiledVariable.Type, "var." + newVariable.VariableName.Content);
@@ -3045,6 +3048,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 paramIndex++;
                 CompiledType parameterType = new(parameters[i].Type, FindType);
+
+                if (parameterType.IsGeneric)
+                { parameters[i].Type.Identifier.AnalysedType = TokenAnalysedType.TypeParameter; }
+
                 this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
 
                 if (!Constants.BuiltinTypes.Contains(parameters[i].Type.Identifier.Content))

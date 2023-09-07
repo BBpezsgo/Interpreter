@@ -1845,12 +1845,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
         { throw new NotImplementedException(); }
         void GenerateCodeForStatement(TypeCast @as)
         {
-            GenerateCodeForStatement(@as.PrevStatement);
-
-            CompiledType type = FindStatementType(@as.PrevStatement);
             CompiledType targetType = new(@as.Type, FindType);
 
-            if (type == targetType)
+            GenerateCodeForStatement(@as.PrevStatement, targetType);
+
+            CompiledType type = FindStatementType(@as.PrevStatement, targetType);
+
+            if (!targetType.IsFunction && type == targetType)
             {
                 Hints.Add(new Hint($"Redundant type conversion", @as.Keyword, CurrentFile));
                 return;

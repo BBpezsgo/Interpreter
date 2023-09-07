@@ -6,6 +6,8 @@ class Array
 {
     private int capacity;
 
+    export int Length() { return this.capacity; }
+
     export String ToString()
     {
         int capacity = this.capacity;

@@ -431,8 +431,56 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         protected abstract bool GetLocalSymbolType(string symbolName, out CompiledType type);
 
+        protected bool GetFunctionByPointer(FunctionType functionType, out CompiledFunction compiledFunction)
+        {
+            bool found = false;
+            compiledFunction = null;
+
+            foreach (CompiledFunction function in CompiledFunctions)
+            {
+                if (function == null) continue;
+
+                if (function.IsTemplate) continue;
+
+                if (!functionType.Equals(function)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
+
+                compiledFunction = function;
+                found = true;
+            }
+
+            foreach (CompileableTemplate<CompiledFunction> function in compilableFunctions)
+            {
+                if (function.Function == null) continue;
+
+                if (!functionType.Equals(function.Function)) continue;
+
+                if (found)
+                { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Function.Identifier, function.Function.FilePath); }
+
+                compiledFunction = function.Function;
+                found = true;
+            }
+
+            return found;
+        }
+
         protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
-            => GetFunction(functionCallStatement.FunctionName, FindStatementTypes(functionCallStatement.MethodParameters), out compiledFunction);
+        {
+            Token functionIdentifier = functionCallStatement.Identifier;
+            StatementWithValue[] passedParameters = functionCallStatement.MethodParameters;
+
+            if (TryGetFunction(functionIdentifier, passedParameters.Length, out CompiledFunction possibleFunction))
+            {
+                return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction);
+            }
+            else
+            {
+                return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters), out compiledFunction);
+            }
+        }
 
         protected bool GetFunction(string name, CompiledType[] parameters, out CompiledFunction compiledFunction)
         {
@@ -737,6 +785,70 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
+        bool TryGetFunction(string name, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.Identifier != name) continue;
+
+                if (compiledFunction is not null)
+                { return false; }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction is not null;
+        }
+        protected bool TryGetFunction(Token name, out CompiledFunction compiledFunction)
+            => TryGetFunction(name.Content, out compiledFunction);
+
+        bool TryGetFunction(string name, int parameterCount, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.Identifier != name) continue;
+
+                if (function.ParameterCount != parameterCount) continue;
+
+                if (compiledFunction is not null)
+                { return false; }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction is not null;
+        }
+        protected bool TryGetFunction(Token name, int parameterCount, out CompiledFunction compiledFunction)
+            => TryGetFunction(name.Content, parameterCount, out compiledFunction);
+
+        protected bool GetFunction(FunctionType type, out CompiledFunction compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (!CompiledType.Equals(function.ParameterTypes, type.Parameters)) continue;
+                if (!function.Type.Equals(type.ReturnType)) continue;
+
+                if (compiledFunction != null)
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction != null;
+        }
+
         bool GetFunction(string name, out CompiledFunction compiledFunction)
         {
             compiledFunction = null;
@@ -766,13 +878,51 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (function.Identifier != name.Content) continue;
 
-                if (compiledFunction != null)
+                if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", name, CurrentFile); }
 
                 compiledFunction = function;
             }
 
-            return compiledFunction != null;
+            return compiledFunction is not null;
+        }
+
+        protected bool GetFunction(Token name, CompiledType type, out CompiledFunction compiledFunction)
+        {
+            if (type is null || !type.IsFunction)
+            { return GetFunction(name, out compiledFunction); }
+            return GetFunction(name, type.Function, out compiledFunction);
+        }
+        protected bool GetFunction(Token name, FunctionType type, out CompiledFunction compiledFunction)
+        {
+            if (type is null)
+            { return GetFunction(name, out compiledFunction); }
+
+            compiledFunction = null;
+            bool success = true;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.Identifier != name.Content) continue;
+
+                if (type.ReturnType.Equals(function.Type) &&
+                    CompiledType.Equals(function.ParameterTypes, type.Parameters))
+                {
+                    compiledFunction = function;
+                    return true;
+                }
+
+                if (compiledFunction is not null)
+                {
+                    success = false;
+                }
+
+                compiledFunction = function;
+            }
+
+            return success && compiledFunction is not null;
         }
 
         protected bool GetOperator(OperatorCall @operator, out CompiledOperator compiledOperator)
@@ -1216,12 +1366,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledType prevType = FindStatementType(index.PrevStatement);
 
             if (!prevType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{prevType.Name}\" not found", index, CurrentFile); }
+            { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
 
             if (!GetIndexGetter(prevType, out CompiledFunction indexer))
             {
                 if (!GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
+                { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
 
                 indexer = indexerTemplate.Function;
             }
@@ -1248,6 +1398,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             return compiledFunction.Type;
         }
+
         protected CompiledType FindStatementType(OperatorCall @operator)
         {
             if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
@@ -1289,26 +1440,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
             LiteralType.CHAR => new CompiledType(Type.CHAR),
             _ => throw new ImpossibleException($"Unknown literal type {literal.Type}"),
         };
-        protected CompiledType FindStatementType(Identifier variable)
+        protected CompiledType FindStatementType(Identifier identifier, CompiledType expectedType = null)
         {
-            if (variable.Content == "nullptr")
+            if (identifier.Content == "nullptr")
             { return new CompiledType(Type.INT); }
 
-            if (GetLocalSymbolType(variable.Content, out CompiledType type))
+            if (GetLocalSymbolType(identifier.Content, out CompiledType type))
             { return type; }
 
-            if (GetEnum(variable.Content, out var @enum))
+            if (GetEnum(identifier.Content, out var @enum))
             { return new CompiledType(@enum); }
 
-            if (GetFunction(variable.Name, out var function))
+            if (GetFunction(identifier.Name, expectedType, out var function))
             { return new CompiledType(function); }
 
             try
-            { return FindType(variable.Name); }
+            { return FindType(identifier.Name); }
             catch (Exception)
             { }
 
-            throw new CompilerException($"Local symbol/enum/function \"{variable.Content}\" not found", variable, CurrentFile);
+            throw new CompilerException($"Local symbol/enum/function \"{identifier.Content}\" not found", identifier, CurrentFile);
         }
         protected static CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
         protected static CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
@@ -1398,6 +1549,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
 
         protected CompiledType FindStatementType(StatementWithValue statement)
+            => FindStatementType(statement, null);
+        protected CompiledType FindStatementType(StatementWithValue statement, CompiledType expectedType)
         {
             if (statement is FunctionCall functionCall)
             { return FindStatementType(functionCall); }
@@ -1409,7 +1562,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { return FindStatementType(literal); }
 
             if (statement is Identifier variable)
-            { return FindStatementType(variable); }
+            { return FindStatementType(variable, expectedType); }
 
             if (statement is AddressGetter memoryAddressGetter)
             { return FindStatementType(memoryAddressGetter); }
@@ -1446,6 +1599,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
+        protected CompiledType[] FindStatementTypes(StatementWithValue[] statements, CompiledType[] expectedTypes)
+        {
+            CompiledType[] result = new CompiledType[statements.Length];
+            for (int i = 0; i < statements.Length; i++)
+            {
+                CompiledType expectedType = null;
+                if (i < expectedTypes.Length) expectedType = expectedTypes[i];
+                result[i] = FindStatementType(statements[i], expectedType);
+            }
+            return result;
+        }
+
         #endregion
 
         #region TryCompute()
@@ -1461,8 +1626,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 "/" => left,
                 "%" => left,
 
-                "&&" => new DataItem((!left.IsFalsy()) && (!right.IsFalsy()), null),
-                "||" => new DataItem((!left.IsFalsy()) || (!right.IsFalsy()), null),
+                "&&" => new DataItem((!left.IsFalsy()) && (!right.IsFalsy())),
+                "||" => new DataItem((!left.IsFalsy()) || (!right.IsFalsy())),
 
                 "&" => left & right,
                 "|" => left | right,
@@ -1471,12 +1636,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 "<<" => DataItem.BitshiftLeft(left, right),
                 ">>" => DataItem.BitshiftRight(left, right),
 
-                "<" => new DataItem(left < right, null),
-                ">" => new DataItem(left > right, null),
-                "==" => new DataItem(left == right, null),
-                "!=" => new DataItem(left != right, null),
-                "<=" => new DataItem(left <= right, null),
-                ">=" => new DataItem(left >= right, null),
+                "<" => new DataItem(left < right),
+                ">" => new DataItem(left > right),
+                "==" => new DataItem(left == right),
+                "!=" => new DataItem(left != right),
+                "<=" => new DataItem(left <= right),
+                ">=" => new DataItem(left >= right),
                 _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
             };
         }
@@ -1521,13 +1686,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             switch (literal.Type)
             {
                 case LiteralType.INT:
-                    value = new DataItem(int.Parse(literal.Value), null);
+                    value = new DataItem(int.Parse(literal.Value));
                     return true;
                 case LiteralType.FLOAT:
-                    value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value), null);
+                    value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value));
                     return true;
                 case LiteralType.BOOLEAN:
-                    value = new DataItem(bool.Parse(literal.Value), null);
+                    value = new DataItem(bool.Parse(literal.Value));
                     return true;
                 case LiteralType.CHAR:
                     if (literal.Value.Length != 1)
@@ -1535,7 +1700,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         value = DataItem.Null;
                         return false;
                     }
-                    value = new DataItem(literal.Value[0], null);
+                    value = new DataItem(literal.Value[0]);
                     return true;
                 case LiteralType.STRING:
                 default:

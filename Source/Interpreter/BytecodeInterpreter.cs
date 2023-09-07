@@ -185,7 +185,9 @@ namespace ProgrammingLanguage.Bytecode
 
             if (BytecodeProcessor.CurrentInstruction.opcode == Opcode.COMMENT)
             {
-                BytecodeProcessor.Step();
+                int max = 10;
+                while (BytecodeProcessor.CurrentInstruction.opcode == Opcode.COMMENT && max-- > 0)
+                { BytecodeProcessor.Step(); }
                 return true;
             }
 
@@ -225,14 +227,14 @@ namespace ProgrammingLanguage.Bytecode
             if (IsUserInvoking)
             {
                 UserInvoke userInvoke = UserInvokes.Dequeue();
-                
+
                 for (int i = 0; i < userInvoke.Arguments.Length; i++)
                 {
                     if (BytecodeProcessor.Memory.Stack.Count == 0)
                     { throw new InternalException($"Tried to pop user-invoked function's parameters but the stack is empty"); }
                     BytecodeProcessor.Memory.Stack.Pop();
                 }
-                
+
                 if (BytecodeProcessor.Memory.Stack.Count == 0)
                 { throw new InternalException($"Tried to pop user-invoked function's return value but the stack is empty"); }
 

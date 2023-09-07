@@ -1,12 +1,11 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace ProgrammingLanguage.Core
 {
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    internal class Stack<T> : IReadOnlyStack<T>
+    public class Stack<T> : IReadOnlyStack<T>
     {
         readonly List<T> stack;
 

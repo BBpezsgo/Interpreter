@@ -10,8 +10,8 @@ namespace ProgrammingLanguage.Core
     [Flags]
     public enum ExternalFunctionFlags : byte
     {
-        CheckParamLength    = 1,
-        CheckParamType      = 2,
+        CheckParamLength = 1,
+        CheckParamType = 2,
     }
 
     public abstract class ExternalFunctionBase : BBCode.Compiler.IHaveKey<string>
@@ -158,13 +158,9 @@ namespace ProgrammingLanguage.Core
                     object[] parameterValues = GetValues(parameters);
                     object returnValue = method.Invoke(null, parameterValues);
                     if (returnValue is null)
-                    {
-                        return DataItem.Null;
-                    }
+                    { return DataItem.Null; }
                     else
-                    {
-                        return GetValue(returnValue, $"{method.Name}() result");
-                    }
+                    { return DataItem.GetValue(returnValue, $"{method.Name}() result"); }
                 }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
             }
             else
@@ -397,28 +393,6 @@ namespace ProgrammingLanguage.Core
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }
 
-        static DataItem GetValue(object value, string tag)
-        {
-            if (value is null) throw new NotImplementedException($"Value is null");
-
-            if (value is byte @byte)
-            { return new DataItem(@byte, tag); }
-
-            if (value is int @int)
-            { return new DataItem(@int, tag); }
-
-            if (value is float @float)
-            { return new DataItem(@float, tag); }
-
-            if (value is bool @bool)
-            { return new DataItem(@bool, tag); }
-
-            if (value is char @char)
-            { return new DataItem(@char, tag); }
-
-            throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
-        }
-
         public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<object> callback)
         {
             var types = Array.Empty<BBCode.Compiler.Type>();
@@ -429,7 +403,7 @@ namespace ProgrammingLanguage.Core
                 CheckParameters(name, types, args);
 
                 object resultData = callback?.Invoke();
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -446,7 +420,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T0>(args[0])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -464,7 +438,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T1>(args[1])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -483,7 +457,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T2>(args[2])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -503,7 +477,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T3>(args[3])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -524,7 +498,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T4>(args[4])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -546,7 +520,7 @@ namespace ProgrammingLanguage.Core
                     GetValue<T5>(args[5])
                     );
 
-                return GetValue(resultData, $"{name}() result");
+                return DataItem.GetValue(resultData, $"{name}() result");
             });
         }
 

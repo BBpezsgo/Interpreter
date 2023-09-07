@@ -116,7 +116,42 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        void AnalyzeStatement(Statement statement)
+        void AnalyzeStatements(Statement[] statements, CompiledType[] expectedTypes)
+        {
+            int variablesAdded = 0;
+            foreach (var st in statements)
+            {
+                if (st is VariableDeclaretion newVar)
+                {
+                    AnalyzeNewVariable(newVar);
+                    variablesAdded++;
+                }
+                else if (st is ForLoop forLoop)
+                {
+                    AnalyzeNewVariable(forLoop.VariableDeclaration);
+                    variablesAdded++;
+                }
+            }
+
+            for (int i = 0; i < statements.Length; i++)
+            {
+                CompiledType expectedType = null;
+                if (i < expectedTypes.Length) expectedType = expectedTypes[i];
+                AnalyzeStatement(statements[i], expectedType);
+
+                if (statements[i] is StatementWithBlock pr)
+                {
+                    AnalyzeStatements(pr.Block.Statements);
+                }
+            }
+
+            for (int i = 0; i < variablesAdded; i++)
+            {
+                this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key);
+            }
+        }
+
+        void AnalyzeStatement(Statement statement, CompiledType expectedType = null)
         {
             if (statement is ShortOperatorCall shortOperatorCall)
             {
@@ -169,7 +204,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     indexerTemplate.OriginalFunction.AddReference(index);
                     indexerTemplate.Function.AddReference(index);
 
-                    if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                    if (CurrentFunction == null || !indexerTemplate.Function.IsSame(CurrentFunction))
                     {
                         indexerTemplate.OriginalFunction.TimesUsed++;
                         indexerTemplate.Function.TimesUsed++;
@@ -294,7 +329,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             else if (statement is FunctionCall functionCall)
             {
-                AnalyzeStatements(functionCall.Parameters);
+                if (TryGetFunction(functionCall.Identifier, functionCall.MethodParameters.Length, out CompiledFunction possibleFunction))
+                {
+                    AnalyzeStatements(functionCall.Parameters, possibleFunction.ParameterTypes);
+                }
+                else
+                {
+                    AnalyzeStatements(functionCall.Parameters);
+                }
 
                 if (functionCall.PrevStatement != null)
                 { AnalyzeStatement(functionCall.PrevStatement); }
@@ -305,6 +347,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (functionCall.FunctionName == "Alloc")
                 { return; }
 
+                if (GetParameter(functionCall.Identifier.Content, out _))
+                { return; }
+
+                if (GetVariable(functionCall.Identifier.Content, out _))
+                { return; }
+
                 if (GetFunction(functionCall, out CompiledFunction function))
                 {
                     function.AddReference(functionCall);
@@ -313,7 +361,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { function.TimesUsed++; }
                     function.TimesUsedTotal++;
                 }
-                else if (GetFunctionTemplate(functionCall, out var compilableFunction))
+                else if (GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
                 {
                     compilableFunction.OriginalFunction.AddReference(functionCall);
 
@@ -433,10 +481,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { AnalyzeStatement(field.PrevStatement); }
             else if (statement is Identifier variable)
             {
-                if (GetFunction(variable.Name, out var function))
+                if (GetFunction(variable.Name, expectedType, out var function))
                 {
-                    // function.AddReference(variable);
-
                     if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                     { function.TimesUsed++; }
                     function.TimesUsedTotal++;

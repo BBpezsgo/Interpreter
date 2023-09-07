@@ -20,7 +20,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test36.bbc";
+            string path = TestConstants.TestFilesPath + "test37.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -31,8 +31,8 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 "-hide-system",
-                "-c-generate-comments false",
-                "-no-debug-info",
+                // "-c-generate-comments false",
+                // "-no-debug-info",
                 // "-dont-optimize",
                 // "-test",
                 // "-decompile",

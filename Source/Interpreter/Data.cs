@@ -131,60 +131,8 @@ namespace ProgrammingLanguage.Bytecode
 
             this.Tag = tag;
         }
-        DataItem(RuntimeType type)
-        {
-            this.type = type;
-
-            this.valueInt = null;
-            this.valueByte = null;
-            this.valueFloat = null;
-            this.valueChar = null;
-
-            this.Tag = null;
-        }
-
-        public DataItem(object value, string tag)
-        {
-            if (value is null)
-            { throw new ArgumentNullException(nameof(value)); }
-
-            Tag = tag;
-
-            valueByte = null;
-            valueChar = null;
-            valueFloat = null;
-            valueInt = null;
-
-            if (value is int @int)
-            {
-                valueInt = @int;
-                type = RuntimeType.INT;
-                return;
-            }
-
-            if (value is byte @byte)
-            {
-                valueByte = @byte;
-                type = RuntimeType.BYTE;
-                return;
-            }
-
-            if (value is float @float)
-            {
-                valueFloat = @float;
-                type = RuntimeType.FLOAT;
-                return;
-            }
-
-            if (value is char @char)
-            {
-                valueChar = @char;
-                type = RuntimeType.CHAR;
-                return;
-            }
-
-            throw new System.Exception($"Unknown type {value.GetType().FullName}");
-        }
+        DataItem(RuntimeType type) : this(type, null)
+        { }
 
         public DataItem(int value, string tag) : this(RuntimeType.INT, tag)
         { this.valueInt = value; }
@@ -853,5 +801,29 @@ namespace ProgrammingLanguage.Bytecode
             Tag = data["Tag"].String;
         }
         #endregion
+
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="ArgumentNullException"/>
+        public static DataItem GetValue(object value, string tag = null)
+        {
+            if (value is null) throw new ArgumentNullException(nameof(value));
+
+            if (value is byte @byte)
+            { return new DataItem(@byte, tag); }
+
+            if (value is int @int)
+            { return new DataItem(@int, tag); }
+
+            if (value is float @float)
+            { return new DataItem(@float, tag); }
+
+            if (value is bool @bool)
+            { return new DataItem(@bool, tag); }
+
+            if (value is char @char)
+            { return new DataItem(@char, tag); }
+
+            throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
+        }
     }
 }

@@ -95,13 +95,16 @@ namespace ProgrammingLanguage.BBCode.Parser
         public string FilePath { get; set; }
     }
 
-    public class ParameterDefinition : Compiler.IHaveKey<string>
+    public class ParameterDefinition : Compiler.IHaveKey<string>, IThingWithPosition
     {
         public Token Identifier;
         public TypeInstance Type;
         public Token[] Modifiers;
 
         public string Key => Identifier.Content;
+
+        public Position GetPosition()
+            => new Position(Identifier, Type).Extend(Modifiers);
 
         public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
         internal string PrettyPrint() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();

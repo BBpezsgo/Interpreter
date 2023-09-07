@@ -257,7 +257,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide < rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide < rightSide));
 
             Step();
         }
@@ -274,7 +274,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide > rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide > rightSide));
 
             Step();
         }
@@ -284,7 +284,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide == rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide == rightSide));
 
             Step();
         }
@@ -294,7 +294,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide != rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide != rightSide));
 
             Step();
         }
@@ -324,7 +324,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide <= rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide <= rightSide));
 
             Step();
         }
@@ -334,7 +334,7 @@ namespace ProgrammingLanguage.Bytecode
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(new DataItem(leftSide >= rightSide, null));
+            Memory.Stack.Push(new DataItem(leftSide >= rightSide));
 
             Step();
         }
@@ -461,7 +461,7 @@ namespace ProgrammingLanguage.Bytecode
             {
                 AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
                 AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
-                AddressingMode.RELATIVE => Memory.Stack.Count,
+                AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
                 _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_BASEPOINTER}"),
             };
 

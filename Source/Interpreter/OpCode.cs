@@ -164,7 +164,7 @@
         ///                 <see cref="AddressingMode.RELATIVE"/>
         ///             </term>
         ///             <description>
-        ///                 Uses the stack's size as a new value
+        ///                 Uses the stack's size as a new value and adds the instruction's parameter as an offset
         ///             </description>
         ///         </item>
         ///     </list>

@@ -14,6 +14,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 {
     using System.Diagnostics;
     using System.Security.Principal;
+    using System.Text;
     using Bytecode;
 
     using Parser;
@@ -309,128 +310,84 @@ namespace ProgrammingLanguage.BBCode.Compiler
         #endregion
     }
 
-    struct UndefinedOperatorFunctionOffset
+    readonly struct UndefinedOperatorFunctionOffset
     {
-        public int CallInstructionIndex;
+        public readonly int CallInstructionIndex;
 
-        public OperatorCall CallStatement;
-        public List<CompiledParameter> currentParameters;
-        public Dictionary<string, CompiledVariable> currentVariables;
-        internal string CurrentFile;
+        public readonly CompiledOperator Operator;
+        public readonly OperatorCall CallStatement;
 
-        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        internal readonly string CurrentFile;
+
+        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall statement, CompiledOperator @operator, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
-            this.CallStatement = functionCallStatement;
 
-            this.currentParameters = new();
-            this.currentVariables = new();
-
-            foreach (var item in currentParameters)
-            { this.currentParameters.Add(item); }
-
-            foreach (var item in currentVariables)
-            { this.currentVariables.Add(item.Key, item.Value); }
+            this.Operator = @operator;
+            this.CallStatement = statement;
 
             this.CurrentFile = file;
         }
     }
 
-    struct UndefinedFunctionOffset
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    readonly struct UndefinedFunctionOffset
     {
-        public int CallInstructionIndex;
+        public readonly int CallInstructionIndex;
 
-        public FunctionCall CallStatement;
-        public Identifier VariableStatement;
-        public IndexCall IndexStatement;
-        public bool IsSetter;
-        public StatementWithValue ValueToAssign;
+        public readonly CompiledFunction Function;
+        public readonly FunctionCall CallStatement;
+        public readonly Identifier VariableStatement;
+        public readonly IndexCall IndexStatement;
 
-        public List<CompiledParameter> currentParameters;
-        public Dictionary<string, CompiledVariable> currentVariables;
-        internal string CurrentFile;
+        internal readonly string CurrentFile;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledFunction function, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
             this.VariableStatement = null;
             this.IndexStatement = null;
-            this.IsSetter = false;
-            this.ValueToAssign = null;
-
-            this.currentParameters = new();
-            this.currentVariables = new();
-
-            foreach (var item in currentParameters)
-            { this.currentParameters.Add(item); }
-
-            foreach (var item in currentVariables)
-            { this.currentVariables.Add(item.Key, item.Value); }
+            this.Function = function;
 
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledFunction function, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
             this.VariableStatement = variable;
             this.IndexStatement = null;
-            this.IsSetter = false;
-            this.ValueToAssign = null;
+            this.Function = function;
 
-            this.currentParameters = new();
-            this.currentVariables = new();
-
-            foreach (var item in currentParameters)
-            { this.currentParameters.Add(item); }
-            foreach (var item in currentVariables)
-            { this.currentVariables.Add(item.Key, item.Value); }
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, IndexCall index, StatementWithValue valueToAssign, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        private readonly string GetDebuggerDisplay()
         {
-            this.CallInstructionIndex = callInstructionIndex;
-            this.CallStatement = null;
-            this.VariableStatement = null;
-            this.IndexStatement = index;
-            this.IsSetter = valueToAssign != null;
-            this.ValueToAssign = valueToAssign;
-
-            this.currentParameters = new();
-            this.currentVariables = new();
-
-            foreach (var item in currentParameters)
-            { this.currentParameters.Add(item); }
-            foreach (var item in currentVariables)
-            { this.currentVariables.Add(item.Key, item.Value); }
-            this.CurrentFile = file;
+            if (CallStatement != null) return CallStatement.ToString();
+            if (VariableStatement != null) return VariableStatement.ToString();
+            return "null";
         }
     }
 
-    struct UndefinedGeneralFunctionOffset
+    readonly struct UndefinedGeneralFunctionOffset
     {
-        public int CallInstructionIndex;
+        public readonly int CallInstructionIndex;
 
-        public Statement CallStatement;
-        public List<CompiledParameter> currentParameters;
-        public Dictionary<string, CompiledVariable> currentVariables;
-        internal string CurrentFile;
+        public readonly Statement CallStatement;
+        public readonly CompiledGeneralFunction GeneralFunction;
 
-        public UndefinedGeneralFunctionOffset(int callInstructionIndex, Statement functionCallStatement, CompiledParameter[] currentParameters, KeyValuePair<string, CompiledVariable>[] currentVariables, string file)
+        internal readonly string CurrentFile;
+
+        public UndefinedGeneralFunctionOffset(int callInstructionIndex, Statement functionCallStatement, CompiledGeneralFunction generalFunction, string file)
         {
             this.CallInstructionIndex = callInstructionIndex;
+
             this.CallStatement = functionCallStatement;
+            this.GeneralFunction = generalFunction;
 
-            this.currentParameters = new();
-            this.currentVariables = new();
-
-            foreach (var item in currentParameters)
-            { this.currentParameters.Add(item); }
-            foreach (var item in currentVariables)
-            { this.currentVariables.Add(item.Key, item.Value); }
             this.CurrentFile = file;
         }
     }
@@ -1429,8 +1386,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 result += '>';
             }
-            result += ' ';
-            result += "{...}";
             return result;
         }
     }
@@ -1514,19 +1469,40 @@ namespace ProgrammingLanguage.BBCode.Compiler
         UNKNOWN,
     }
 
-    public class FunctionType : ITypeDefinition, IEquatable<FunctionType>
+    [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
+    public class FunctionType : IEquatable<FunctionType>, IEquatable<CompiledFunction>
     {
-        public readonly CompiledFunction Function;
+        public readonly CompiledType ReturnType;
+        public readonly CompiledType[] Parameters;
+
+        public bool ReturnSomething => ReturnType != Type.VOID;
 
         public FunctionType(CompiledFunction function)
         {
-            Function = function ?? throw new ArgumentNullException(nameof(function));
+            ReturnType = function.Type;
+            Parameters = new CompiledType[function.ParameterTypes.Length];
+            Array.Copy(function.ParameterTypes, Parameters, function.Parameters.Length);
         }
 
-        public string FilePath
+        public FunctionType(CompiledType returnType, CompiledType[] parameters)
         {
-            get => Function.FilePath;
-            set => Function.FilePath = value;
+            ReturnType = returnType;
+            Parameters = parameters;
+        }
+
+        public override string ToString()
+        {
+            StringBuilder result = new();
+            result.Append(ReturnType?.ToString() ?? "null");
+            result.Append('(');
+            if (Parameters != null) for (int i = 0; i < Parameters.Length; i++)
+                {
+                    if (i > 0) result.Append(", ");
+                    result.Append(Parameters[i]?.ToString() ?? "null");
+                }
+            result.Append(')');
+
+            return result.ToString();
         }
 
         public override bool Equals(object obj)
@@ -1541,10 +1517,25 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             if (other is null) return false;
 
-            return Function.IsSame(other.Function);
+            if (!other.ReturnType.Equals(ReturnType)) return false;
+
+            if (!CompiledType.Equals(Parameters, other.Parameters)) return false;
+
+            return true;
         }
 
-        public override int GetHashCode() => HashCode.Combine(Function);
+        public bool Equals(CompiledFunction other)
+        {
+            if (other is null) return false;
+
+            if (!other.Type.Equals(ReturnType)) return false;
+
+            if (!CompiledType.Equals(Parameters, other.ParameterTypes)) return false;
+
+            return true;
+        }
+
+        public override int GetHashCode() => HashCode.Combine(ReturnType, Parameters);
 
         public static bool operator ==(FunctionType a, FunctionType b)
         {
@@ -1613,22 +1604,22 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
 
-                if (@struct != null) return @struct.Name.Content;
-                if (@class != null) return @class.Name.Content;
-                if (@enum != null) return @enum.Identifier.Content;
-                if (function != null) return function.Function.Identifier.Content;
+                if (@struct is not null) return @struct.Name.Content;
+                if (@class is not null) return @class.Name.Content;
+                if (@enum is not null) return @enum.Identifier.Content;
+                if (function is not null) return function.ToString();
 
                 throw new ImpossibleException();
             }
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
-        internal bool IsClass => @class != null;
+        internal bool IsClass => @class is not null;
         /// <summary><c><see cref="Enum"/> != <see langword="null"/></c></summary>
-        internal bool IsEnum => @enum != null;
+        internal bool IsEnum => @enum is not null;
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
-        internal bool IsStruct => @struct != null;
+        internal bool IsStruct => @struct is not null;
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
-        internal bool IsFunction => function != null;
+        internal bool IsFunction => function is not null;
         internal bool IsBuiltin => builtinType != Type.NONE;
         internal bool InHEAP => IsClass;
         internal bool IsGeneric => !string.IsNullOrEmpty(genericName);
@@ -1688,6 +1679,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
+        internal CompiledType(FunctionType function) : this()
+        {
+            this.function = function ?? throw new ArgumentNullException(nameof(function));
+        }
+
+        /// <exception cref="ArgumentNullException"/>
         internal CompiledType(CompiledClass @class) : this()
         {
             this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
@@ -1741,6 +1738,31 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
+
+            if (type.Identifier.Content == "func")
+            {
+                type.Identifier.AnalysedType = TokenAnalysedType.Keyword;
+
+                CompiledType funcRet;
+                CompiledType[] funcParams;
+                if (type.GenericTypes.Count == 0)
+                {
+                    funcRet = new(Type.VOID);
+                    funcParams = Array.Empty<CompiledType>();
+                }
+                else
+                {
+                    funcRet = new(type.GenericTypes[0], typeFinder);
+                    funcParams = new CompiledType[type.GenericTypes.Count - 1];
+                    for (int i = 1; i < type.GenericTypes.Count; i++)
+                    {
+                        TypeInstance genericType = type.GenericTypes[i];
+                        funcParams[i - 1] = new CompiledType(genericType, typeFinder);
+                    }
+                }
+                function = new FunctionType(funcRet, funcParams);
+                return;
+            }
 
             if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
 

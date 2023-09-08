@@ -67,6 +67,21 @@ namespace ProgrammingLanguage.Core
             _ => throw new System.NotImplementedException(),
         };
 
+        public static Type[] Convert(this RuntimeType[] v)
+        {
+            Type[] result = new Type[v.Length];
+            for (int i = 0; i < result.Length; i++)
+            { result[i] = v[i].Convert(); }
+            return result;
+        }
+        public static RuntimeType[] Convert(this Type[] v)
+        {
+            RuntimeType[] result = new RuntimeType[v.Length];
+            for (int i = 0; i < result.Length; i++)
+            { result[i] = v[i].Convert(); }
+            return result;
+        }
+
         internal static bool TryGetAttribute<T0, T1, T2>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,
@@ -201,15 +216,6 @@ namespace ProgrammingLanguage.Core
 
             return true;
         }
-
-        public static object Value(this DataItem item) => item.Type switch
-        {
-            RuntimeType.INT => item.ValueInt,
-            RuntimeType.FLOAT => item.ValueFloat,
-            RuntimeType.CHAR => item.ValueChar,
-            RuntimeType.BYTE => item.ValueByte,
-            _ => null,
-        };
 
         public static string Repeat(this string v, int count)
         {

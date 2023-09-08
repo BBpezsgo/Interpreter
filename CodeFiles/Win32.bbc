@@ -1,0 +1,17 @@
+using System;
+
+[External("MessageBox")]
+export int MessageBox(int handle, int textPointer, int captionPointer, int type);
+
+export int MessageBox(int handle, String text, String caption, int type)
+{
+	return MessageBox(handle, text as int, caption as int, type);
+}
+
+export int MessageBoxD(int handle, String text, String caption, int type)
+{
+	int result = MessageBox(handle, text as int, caption as int, type);
+	delete text;
+	delete caption;
+	return result;
+}

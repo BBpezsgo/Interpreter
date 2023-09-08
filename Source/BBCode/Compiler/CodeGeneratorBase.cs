@@ -1654,13 +1654,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return false;
             }
 
-            if (!TryCompute(@operator.Left, out var leftValue))
+            if (!TryCompute(@operator.Left, out DataItem leftValue))
             {
                 value = DataItem.Null;
                 return false;
             }
 
-            if (@operator.Operator.Content == "!")
+            string op = @operator.Operator.Content;
+
+            if (op == "!")
             {
                 value = !leftValue;
                 return true;
@@ -1668,14 +1670,36 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (@operator.Right != null)
             {
-                if (!TryCompute(@operator.Right, out var rightValue))
+                if (TryCompute(@operator.Right, out DataItem rightValue))
                 {
-                    value = DataItem.Null;
-                    return false;
+                    value = Compute(op, leftValue, rightValue);
+                    return true;
                 }
 
-                value = Compute(@operator.Operator.Content, leftValue, rightValue);
-                return true;
+                switch (op)
+                {
+                    case "&&":
+                        {
+                            if (leftValue.IsFalsy())
+                            {
+                                value = new DataItem(false);
+                                return true;
+                            }
+                            break;
+                        }
+                    case "||":
+                        {
+                            if (!leftValue.IsFalsy())
+                            {
+                                value = new DataItem(true);
+                                return true;
+                            }
+                            break;
+                        }
+                    default:
+                        value = DataItem.Null;
+                        return false;
+                }
             }
 
             value = leftValue;

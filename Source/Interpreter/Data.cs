@@ -606,6 +606,15 @@ namespace ProgrammingLanguage.Bytecode
             _ => null,
         };
 
+        public readonly object GetValue() => type switch
+        {
+            RuntimeType.BYTE => valueByte.Value,
+            RuntimeType.INT => valueInt.Value,
+            RuntimeType.FLOAT => valueFloat.Value,
+            RuntimeType.CHAR => (object)valueChar.Value,
+            _ => throw new ImpossibleException(),
+        };
+
         /// <exception cref="RuntimeException"/>
         public readonly override string ToString() => this.IsNull ? "null" : Type switch
         {
@@ -823,7 +832,59 @@ namespace ProgrammingLanguage.Bytecode
             if (value is char @char)
             { return new DataItem(@char, tag); }
 
+            if (value is Enum @enum)
+            {
+                TypeCode underlyingType = @enum.GetTypeCode();
+                object enumValue = underlyingType switch
+                {
+                    TypeCode.Empty => throw new NotImplementedException(),
+                    TypeCode.Object => throw new NotImplementedException(),
+                    TypeCode.DBNull => throw new NotImplementedException(),
+                    TypeCode.Boolean => (System.Boolean)value,
+                    TypeCode.Char => (System.Char)value,
+                    TypeCode.SByte => (System.SByte)value,
+                    TypeCode.Byte => (System.Byte)value,
+                    TypeCode.Int16 => (System.Int16)value,
+                    TypeCode.UInt16 => (System.UInt16)value,
+                    TypeCode.Int32 => (System.Int32)value,
+                    TypeCode.UInt32 => (System.UInt32)value,
+                    TypeCode.Int64 => (System.Int64)value,
+                    TypeCode.UInt64 => (System.UInt64)value,
+                    TypeCode.Single => (System.Single)value,
+                    TypeCode.Double => (System.Double)value,
+                    TypeCode.Decimal => (System.Decimal)value,
+                    TypeCode.DateTime => (System.DateTime)value,
+                    TypeCode.String => (System.String)value,
+                    _ => throw new ImpossibleException(),
+                };
+                return DataItem.GetValue(enumValue, tag);
+            }
+
             throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
         }
+
+        public static DataItem GetDefaultValue(RuntimeType type, string tag = null)
+            => type switch
+            {
+                RuntimeType.BYTE => new DataItem((byte)0, tag),
+                RuntimeType.INT => new DataItem((int)0, tag),
+                RuntimeType.FLOAT => new DataItem((float)0f, tag),
+                RuntimeType.CHAR => new DataItem((char)'\0', tag),
+                _ => DataItem.Null,
+            };
+
+        /// <exception cref="InternalException"/>
+        public static DataItem GetDefaultValue(BBCode.Compiler.Type type, string tag = null)
+            => type switch
+            {
+                BBCode.Compiler.Type.BYTE => new DataItem((byte)0, tag),
+                BBCode.Compiler.Type.INT => new DataItem((int)0, tag),
+                BBCode.Compiler.Type.FLOAT => new DataItem((float)0f, tag),
+                BBCode.Compiler.Type.CHAR => new DataItem((char)'\0', tag),
+                BBCode.Compiler.Type.NONE => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                BBCode.Compiler.Type.VOID => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                BBCode.Compiler.Type.UNKNOWN => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                _ => DataItem.Null,
+            };
     }
 }

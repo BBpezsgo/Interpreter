@@ -7,7 +7,7 @@ namespace ProgrammingLanguage.Bytecode
     using Core;
     using Errors;
 
-    internal class BytecodeProcessor
+    public class BytecodeProcessor
     {
         internal readonly Memory Memory;
 
@@ -577,13 +577,13 @@ namespace ProgrammingLanguage.Bytecode
             {
                 if (function.ReturnSomething)
                 {
-                    DataItem returnValue = simpleFunction.Callback(parameters.ToArray());
+                    DataItem returnValue = simpleFunction.Callback(this, parameters.ToArray());
                     returnValue.Tag ??= $"{function.Name}() result";
                     Memory.Stack.Push(returnValue);
                 }
                 else
                 {
-                    simpleFunction.Callback(parameters.ToArray());
+                    simpleFunction.Callback(this, parameters.ToArray());
                 }
             }
 

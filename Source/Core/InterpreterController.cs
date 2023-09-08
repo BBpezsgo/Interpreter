@@ -550,11 +550,7 @@ namespace ProgrammingLanguage.Core
                 }
             });
 
-            externalFunctions.AddExternalFunction("stdout",
-                (char @char) =>
-                {
-                    OnStdOut?.Invoke(this, @char.ToString());
-                });
+            externalFunctions.AddExternalFunction("stdout", (char @char) => OnStdOut?.Invoke(this, @char.ToString()));
 
             externalFunctions.AddExternalFunction("console-set",
                 (char @char, int x, int y) =>
@@ -566,34 +562,19 @@ namespace ProgrammingLanguage.Core
                     Console.SetCursorPosition(lx, ly);
                 });
 
-            externalFunctions.AddExternalFunction("console-clear", () =>
-            {
-                Console.Clear();
-            });
+            externalFunctions.AddExternalFunction("console-clear", Console.Clear);
 
-            externalFunctions.AddExternalFunction("stderr",
-                (char @char) =>
-                {
-                    OnStdError?.Invoke(this, @char.ToString());
-                });
+            externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char.ToString()));
 
-            externalFunctions.AddExternalFunction("sleep",
-                (int t) =>
-                {
-                    PauseCodeTime = t;
-                });
+            externalFunctions.AddExternalFunction("sleep", (int t) => PauseCodeTime = t);
 
             #endregion
 
             #region Math
 
-            externalFunctions.AddExternalFunction("cos",
-                (float v) =>
-                { return MathF.Cos(v); });
+            externalFunctions.AddExternalFunction("cos", (float v) => MathF.Cos(v));
 
-            externalFunctions.AddExternalFunction("sin",
-                (float v) =>
-                { return MathF.Sin(v); });
+            externalFunctions.AddExternalFunction("sin", (float v) => MathF.Sin(v));
 
             #endregion
 
@@ -715,6 +696,12 @@ namespace ProgrammingLanguage.Core
 
                     throw new RuntimeException($"Stream {id} not found");
                 });
+
+            #endregion
+
+            #region Win32
+
+            externalFunctions.AddExternalFunction<int, string, string, uint, Windows.Win32.MessageBoxResult>("MessageBox", Windows.Win32.MessageBoxW);
 
             #endregion
         }

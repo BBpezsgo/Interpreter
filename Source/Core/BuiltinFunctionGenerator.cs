@@ -4,6 +4,7 @@ using System.Collections.Generic;
 namespace ProgrammingLanguage.Core
 {
     using System.Linq;
+    using System.Runtime.CompilerServices;
     using ProgrammingLanguage.Bytecode;
     using ProgrammingLanguage.Errors;
 
@@ -63,41 +64,41 @@ namespace ProgrammingLanguage.Core
             { throw new RuntimeException($"Wrong number of parameters passed to external function {Name} ({parameters.Length}): expected {ParameterTypes.Length}"); }
 
             if (CheckParameterType)
-            { ExternalFunctionGenerator.CheckTypes(parameters, ParameterTypes.Select(v => v.Convert()).ToArray()); }
+            { ExternalFunctionGenerator.CheckTypes(parameters, ParameterTypes); }
         }
     }
 
     public class ExternalFunctionSimple : ExternalFunctionBase
     {
-        protected Func<DataItem[], DataItem> callback;
+        protected Func<BytecodeProcessor, DataItem[], DataItem> callback;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ExternalFunctionSimple(Action<DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+        public ExternalFunctionSimple(Action<BytecodeProcessor, DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
                  : base(name, parameters, false, flags)
         {
-            this.callback = (v) =>
+            this.callback = (sender, v) =>
             {
-                callback?.Invoke(v);
+                callback?.Invoke(sender, v);
                 return DataItem.Null;
             };
         }
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ExternalFunctionSimple(Func<DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+        public ExternalFunctionSimple(Func<BytecodeProcessor, DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
                  : base(name, parameters, true, flags)
         {
             this.callback = callback;
         }
 
         /// <exception cref="InternalException"></exception>
-        public DataItem Callback(DataItem[] parameters)
+        public DataItem Callback(BytecodeProcessor sender, DataItem[] parameters)
         {
             base.BeforeCallback(parameters);
 
             if (callback == null)
             { throw new InternalException("Callback is null"); }
 
-            return callback.Invoke(parameters);
+            return callback.Invoke(sender, parameters);
         }
     }
 
@@ -142,18 +143,20 @@ namespace ProgrammingLanguage.Core
     {
         #region AddExternalFunction()
 
-        /// <exception cref="InternalException"></exception>
-        /// <exception cref="RuntimeException"></exception>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="RuntimeException"/>
         public static ExternalFunctionSimple AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, System.Reflection.MethodInfo method)
         {
+            if (!method.IsStatic)
+            { throw new InternalException($"Only static functions can be added as an external function"); }
+
             BBCode.Compiler.Type[] parameterTypes = GetTypes(method.GetParameters());
 
-            bool returnSomething = method.ReturnType != typeof(void);
-
             ExternalFunctionSimple function;
-            if (returnSomething)
+
+            if (method.ReturnType != typeof(void))
             {
-                function = new((parameters) =>
+                function = new((sender, parameters) =>
                 {
                     object[] parameterValues = GetValues(parameters);
                     object returnValue = method.Invoke(null, parameterValues);
@@ -165,25 +168,264 @@ namespace ProgrammingLanguage.Core
             }
             else
             {
-                function = new((parameters) =>
+                function = new((sender, parameters) =>
                 {
                     object[] parameterValues = GetValues(parameters);
                     method.Invoke(null, parameterValues);
                 }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
             }
 
-            if (!functions.ContainsKey(method.Name))
+            functions.AddExternalFunction(method.Name, function);
+            return function;
+        }
+
+        public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+            => functions.AddExternalFunction(name, new ExternalFunctionManaged(callback, name, parameterTypes, flags));
+
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+            => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+            => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
+
+        static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
+        {
+            if (!functions.ContainsKey(name))
             {
-                functions.Add(method.Name, function);
+                functions.Add(name, function);
             }
             else
             {
-                functions[method.Name] = function;
-                Output.Output.Warning($"External function '{method.Name}' is already defined, so I'll override it");
+                functions[name] = function;
+                Output.Output.Warning($"External function function \"{name}\" is already defined, so I'll override it");
             }
-
-            return function;
         }
+
+        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
+        {
+            var types = Array.Empty<BBCode.Compiler.Type>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke();
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0> callback)
+        {
+            var types = GetTypes<T0>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]));
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1> callback)
+        {
+            var types = GetTypes<T0, T1>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]));
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2> callback)
+        {
+            var types = GetTypes<T0, T1, T2>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]));
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]));
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]),
+                    GetValue<T4>(sender, args[4]));
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                callback?.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]),
+                    GetValue<T4>(sender, args[4]),
+                    GetValue<T5>(sender, args[5]));
+            });
+        }
+
+
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<TResult> callback)
+        {
+            var types = Array.Empty<BBCode.Compiler.Type>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke();
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, TResult> callback)
+        {
+            var types = GetTypes<T0>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, TResult> callback)
+        {
+            var types = GetTypes<T0, T1>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, TResult> callback)
+        {
+            var types = GetTypes<T0, T1, T2>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, TResult> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, TResult> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]),
+                    GetValue<T4>(sender, args[4]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+        /// <exception cref="NotImplementedException"/>
+        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
+        {
+            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+
+            functions.AddExternalFunction(name, types, (sender, args) =>
+            {
+                Array.Reverse(args);
+                CheckParameters(name, types, args);
+                TResult result = callback.Invoke(
+                    GetValue<T0>(sender, args[0]),
+                    GetValue<T1>(sender, args[1]),
+                    GetValue<T2>(sender, args[2]),
+                    GetValue<T3>(sender, args[3]),
+                    GetValue<T4>(sender, args[4]),
+                    GetValue<T5>(sender, args[5]));
+
+                return DataItem.GetValue(result, $"{name}() result");
+            });
+        }
+
 
         /// <exception cref="RuntimeException"/>
         internal static void CheckTypes(DataItem[] values, RuntimeType[] types)
@@ -198,330 +440,56 @@ namespace ProgrammingLanguage.Core
             }
         }
 
+        /// <exception cref="RuntimeException"/>
+        internal static void CheckTypes(DataItem[] values, BBCode.Compiler.Type[] types)
+        {
+            int n = Math.Min(values.Length, types.Length);
+            for (int i = 0; i < n; i++)
+            {
+                if (values[i].Type.Convert() != types[i])
+                {
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLower()}: expected {types[i].ToString().ToLower()}");
+                }
+            }
+        }
+
         internal static object[] GetValues(DataItem[] values)
         {
             object[] result = new object[values.Length];
             for (int i = 0; i < values.Length; i++)
-            { result[i] = values[i].Value(); }
+            { result[i] = values[i].GetValue(); }
             return result;
         }
 
-        public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
-        {
-            ExternalFunctionManaged function = new(callback, name, parameterTypes, flags);
-
-            if (!functions.ContainsKey(name))
-            {
-                functions.Add(name, function);
-            }
-            else
-            {
-                functions[name] = function;
-                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
-            }
-        }
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
-        {
-            ExternalFunctionSimple function = new(callback, name, parameterTypes, flags);
-
-            if (!functions.ContainsKey(name))
-            {
-                functions.Add(name, function);
-            }
-            else
-            {
-                functions[name] = function;
-                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
-            }
-        }
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
-        {
-            ExternalFunctionSimple function = new(p =>
-            {
-                return callback.Invoke();
-            }, name, Array.Empty<BBCode.Compiler.Type>(), flags);
-
-            if (!functions.ContainsKey(name))
-            {
-                functions.Add(name, function);
-            }
-            else
-            {
-                functions[name] = function;
-                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
-            }
-        }
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[]> callback, ExternalFunctionFlags checkParameterLength = ExternalFunctionBase.DefaultFlags)
-        {
-            ExternalFunctionSimple function = new(callback, name, parameterTypes, checkParameterLength);
-
-            if (!functions.ContainsKey(name))
-            {
-                functions.Add(name, function);
-            }
-            else
-            {
-                functions[name] = function;
-                Output.Output.Warning($"External function function '{name}' is already defined, so I'll override it");
-            }
-        }
-
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
-        {
-            var types = Array.Empty<BBCode.Compiler.Type>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke();
-            });
-        }
         /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0> callback)
-        {
-            var types = GetTypes<T0>();
+        static T GetValue<T>(BytecodeProcessor bytecodeProcessor, DataItem data)
+            => (T)GetValue(typeof(T), bytecodeProcessor, data);
 
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]));
-            });
-        }
         /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1> callback)
+        static object GetValue(Type type, BytecodeProcessor bytecodeProcessor, DataItem data)
         {
-            var types = GetTypes<T0, T1>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]));
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2> callback)
-        {
-            var types = GetTypes<T0, T1, T2>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]));
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3]));
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3, T4>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3]),
-                    GetValue<T4>(args[4]));
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-                callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3]),
-                    GetValue<T4>(args[4]),
-                    GetValue<T5>(args[5]));
-            });
-        }
-
-        static T GetValue<T>(DataItem data)
-        {
-            Type type = typeof(T);
-
             if (type == typeof(byte))
-            { return (T)(object)(data.Byte ?? (byte)0); }
+            { return (byte)(data.Byte ?? (byte)0); }
 
             if (type == typeof(int))
-            { return (T)(object)(data.Integer ?? 0); }
+            { return (int)(data.Integer ?? 0); }
 
             if (type == typeof(float))
-            { return (T)(object)(data.Float ?? 0f); }
+            { return (float)(data.Float ?? 0f); }
 
             if (type == typeof(bool))
-            { return (T)(object)((data.Integer ?? 0) != 0); }
+            { return (bool)((data.Integer ?? 0) != 0); }
 
             if (type == typeof(char))
-            { return (T)(object)(char)(data.Integer ?? 0); }
+            { return (char)(data.Integer ?? 0); }
 
-            throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
-        }
+            if (type == typeof(string))
+            { return (string)bytecodeProcessor.Memory.Heap.GetStringByPointer(data.Integer.Value); }
 
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<object> callback)
-        {
-            var types = Array.Empty<BBCode.Compiler.Type>();
+            if (type == typeof(uint))
+            { return (uint)(data.Integer ?? 0); }
 
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke();
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, object> callback)
-        {
-            var types = GetTypes<T0>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, object> callback)
-        {
-            var types = GetTypes<T0, T1>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, object> callback)
-        {
-            var types = GetTypes<T0, T1, T2>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, object> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, object> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3, T4>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3]),
-                    GetValue<T4>(args[4])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
-        }
-        /// <exception cref="NotImplementedException"/>
-        public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, T5, object> callback)
-        {
-            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
-
-            functions.AddExternalFunction(name, types, (args) =>
-            {
-                Array.Reverse(args);
-                CheckParameters(name, types, args);
-
-                object resultData = callback?.Invoke(
-                    GetValue<T0>(args[0]),
-                    GetValue<T1>(args[1]),
-                    GetValue<T2>(args[2]),
-                    GetValue<T3>(args[3]),
-                    GetValue<T4>(args[4]),
-                    GetValue<T5>(args[5])
-                    );
-
-                return DataItem.GetValue(resultData, $"{name}() result");
-            });
+            throw new NotImplementedException($"Type conversion for type {type} not implemented");
         }
 
         public static void SetInterpreter(this Dictionary<string, ExternalFunctionBase> functions, BytecodeInterpreter interpreter)
@@ -593,12 +561,21 @@ namespace ProgrammingLanguage.Core
 
             if (type_ == typeof(byte))
             { return BBCode.Compiler.Type.BYTE; }
+
             if (type_ == typeof(int))
             { return BBCode.Compiler.Type.INT; }
+
             if (type_ == typeof(float))
             { return BBCode.Compiler.Type.FLOAT; }
+
             if (type_ == typeof(char))
             { return BBCode.Compiler.Type.CHAR; }
+
+            if (type_.IsClass)
+            { return BBCode.Compiler.Type.INT; }
+
+            if (type_ == typeof(uint))
+            { return BBCode.Compiler.Type.INT; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }

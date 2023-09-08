@@ -894,10 +894,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         AddComment($" Param {i}:");
                         GenerateCodeForStatement(functionCall.Parameters[i]);
                     }
-                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.ExternalFunctionName.Length, "ID Length");
 
                     AddComment($" Load Function Name String Pointer (Cache):");
-                    AddInstruction(Opcode.PUSH_VALUE, cacheAddress + 1, "(pointer)");
+
+                    AddInstruction(Opcode.PUSH_VALUE, compiledFunction.ExternalFunctionName.Length, "ID Length");
+
+                    AddInstruction(Opcode.PUSH_VALUE, cacheAddress);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME);
 
                     AddComment(" .:");
                     AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
@@ -3177,7 +3180,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 AddComment("Clear external functions cache {");
                 foreach (KeyValuePair<string, int> externalFunction in ExternalFunctionsCache)
                 {
-                    AddInstruction(Opcode.PUSH_VALUE, externalFunction.Value + 1);
+                    // AddInstruction(Opcode.PUSH_VALUE, externalFunction.Value + 1);
                     AddInstruction(Opcode.HEAP_DEALLOC);
                 }
                 AddComment("}");
@@ -3362,17 +3365,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
                 else
                 { throw new NotImplementedException(); }
-            }
-
-            if (OptimizeCode)
-            {
-                Warnings.Add(new Warning($":(", Position.UnknownPosition, null));
-                /*
-                List<IFunctionThing> functionThings = new();
-                functionThings.AddRange(this.CompiledFunctions);
-                functionThings.AddRange(this.CompiledGeneralFunctions);
-                BasicOptimizer.Optimize(this.GeneratedCode, functionThings.ToArray(), printCallback);
-                */
             }
 
             return new Result()

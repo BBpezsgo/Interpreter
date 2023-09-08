@@ -264,13 +264,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
-                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
-                        {
-                            if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
-                        }
-                        else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        Type definedParameterType = externalFunction.ParameterTypes[i];
+                        CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+
+                        if (passedParameterType == definedParameterType)
+                        { continue; }
+
+                        if (passedParameterType.IsClass && definedParameterType == Type.INT)
+                        { continue; }
+
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Requied type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type.Identifier, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
@@ -551,26 +554,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                             if (parameterTypes[0] == Type.VOID)
                             {
-                                externalFunctions.AddExternalFunction(name, pTypes, (DataItem[] p) =>
+                                externalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                 });
                             }
                             else
                             {
-                                externalFunctions.AddExternalFunction(name, pTypes, (DataItem[] p) =>
+                                externalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                                    DataItem returnValue = returnType switch
-                                    {
-                                        Type.INT => new DataItem((int)0),
-                                        Type.BYTE => new DataItem((byte)0),
-                                        Type.FLOAT => new DataItem((float)0),
-                                        Type.CHAR => new DataItem((char)'\0'),
-                                        _ => throw new RuntimeException($"Invalid return type \"{returnType}\"/{returnType.ToString().ToLower()} from external function \"{name}\""),
-                                    };
-                                    returnValue.Tag = "return value";
-                                    return returnValue;
+                                    return DataItem.GetDefaultValue(returnType, "return value");
                                 });
                             }
                         }

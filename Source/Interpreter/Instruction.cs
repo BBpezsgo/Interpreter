@@ -1,7 +1,6 @@
-﻿using DataUtilities.ReadableFileFormat;
+﻿using System;
+using DataUtilities.ReadableFileFormat;
 using DataUtilities.Serializer;
-
-using System;
 
 namespace ProgrammingLanguage.Bytecode
 {
@@ -107,16 +106,16 @@ namespace ProgrammingLanguage.Bytecode
         {
             serializer.Serialize((byte)this.opcode);
             serializer.Serialize((byte)this.AddressingMode);
-            serializer.Serialize(this.tag);
             serializer.Serialize(this.parameter);
+            serializer.Serialize(this.tag);
         }
 
         public void Deserialize(Deserializer deserializer)
         {
             this.opcode = (Opcode)deserializer.DeserializeByte();
             this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
-            this.tag = deserializer.DeserializeString();
             this.parameter = deserializer.DeserializeObject<DataItem>();
+            this.tag = deserializer.DeserializeString();
         }
 
         public Value SerializeText()
@@ -125,17 +124,17 @@ namespace ProgrammingLanguage.Bytecode
 
             result["OpCode"] = Value.Literal(opcode.ToString());
             result["AddressingMode"] = Value.Literal(AddressingMode.ToString());
+            result["Parameter"] = Value.Object(parameter);
             result["Tag"] = Value.Literal(tag);
-            result["ParameterValue"] = Value.Object(parameter);
             return result;
         }
 
         public void DeserializeText(Value data)
         {
-            opcode = Enum.Parse<Opcode>(data["OpCode"].String);
-            AddressingMode = Enum.Parse<AddressingMode>(data["AddressingMode"].String);
+            opcode = data["OpCode"].Enum<Opcode>();
+            AddressingMode = data["AddressingMode"].Enum<AddressingMode>();
+            parameter = data["Parameter"].Object<DataItem>();
             tag = data["Tag"].String;
-            parameter = data["ParameterValue"].Deserialize<DataItem>();
         }
         #endregion
     }

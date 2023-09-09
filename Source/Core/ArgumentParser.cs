@@ -20,6 +20,7 @@ namespace TheProgram
             Decompile,
             ConsoleGUI,
             Brainfuck,
+            IL,
         }
 
         public enum FileType
@@ -137,6 +138,21 @@ namespace TheProgram
                         if (result.RunType != RunType.Normal) throw new ArgumentException(
                             $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}");
                         result.RunType = RunType.Brainfuck;
+                        goto ArgParseDone;
+                    }
+
+                    if (args[i] == "-il")
+                    {
+                        if (result.RunType != RunType.Normal) throw new ArgumentException(
+                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}");
+                        result.RunType = RunType.IL;
+
+                        i++;
+                        if (i >= args.Length - 1)
+                        { throw new ArgumentException("Expected string value after argument '-il'"); }
+
+                        result.CompileOutput = args[i];
+
                         goto ArgParseDone;
                     }
 

@@ -31,15 +31,15 @@ namespace TheProgram
                 // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 "-hide-system",
-                // "-c-generate-comments false",
-                // "-no-debug-info",
+                "-c-generate-comments false",
+                "-no-debug-info",
                 // "-dont-optimize",
                 // "-test",
-                // "-decompile",
-                // "-compile",
-                // "-debug",
                 // "-console-gui",
-                // "\".\\output.bin\"",
+                // "-decompile",
+                "-il",
+                // "-debug",
+                "\".\\output.bin\"",
                 // "-compression", "no",
                 // "-brainfuck",
                 "-heap 2048",
@@ -77,7 +77,10 @@ namespace TheProgram
                     ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    throw new NotImplementedException();
+                    ProgrammingLanguage.BBCode.EasyCompiler.Result yeah = ProgrammingLanguage.BBCode.EasyCompiler.Compile(new System.IO.FileInfo(path), new System.Collections.Generic.Dictionary<string, ProgrammingLanguage.Core.ExternalFunctionBase>(), ProgrammingLanguage.BBCode.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
+                    ProgrammingLanguage.Bytecode.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
+                    System.IO.File.WriteAllBytes(settings.Value.CompileOutput, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
+                    break;
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
@@ -164,6 +167,22 @@ namespace TheProgram
                         }
                     }
                     break;
+                case ArgumentParser.RunType.IL:
+                    {
+                        ProgrammingLanguage.BBCode.Tokenizer tokenizer = new(ProgrammingLanguage.BBCode.TokenizerSettings.Default, null); ;
+                        ProgrammingLanguage.BBCode.Token[] tokens = tokenizer.Parse(System.IO.File.ReadAllText(settings.Value.File.FullName));
+
+                        ProgrammingLanguage.BBCode.Parser.Parser parser = new();
+                        ProgrammingLanguage.BBCode.Parser.ParserResult ast = parser.Parse(tokens, new System.Collections.Generic.List<ProgrammingLanguage.Errors.Warning>());
+
+                        ProgrammingLanguage.BBCode.Compiler.Compiler.Result compiled = ProgrammingLanguage.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, ProgrammingLanguage.Core.ExternalFunctionBase>(), settings.Value.File, ProgrammingLanguage.BBCode.Parser.ParserSettings.Default, null, settings.Value.BasePath);
+
+                        ProgrammingLanguage.IL.Compiler.CodeGenerator.Result code = ProgrammingLanguage.IL.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
+
+                        System.Reflection.Assembly assembly = code.Assembly;
+
+                        break;
+                    }
             }
 
             return true;

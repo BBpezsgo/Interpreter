@@ -1,3 +1,5 @@
+#bf "MessageBox" "int" "int" "int" "int" "int";
+
 using System;
 
 [External("MessageBox")]

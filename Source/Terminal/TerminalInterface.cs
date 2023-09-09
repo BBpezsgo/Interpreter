@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace ProgrammingLanguage.Output
 {
+    public delegate void PrintCallback(string message, LogType logType);
+
     namespace Debug
     {
         internal static class Debug
@@ -174,74 +177,97 @@ namespace ProgrammingLanguage.TerminalInterface
 {
     internal class TerminalInterface
     {
-        internal static TerminalInterface Instance;
-        string currentInput = "";
-        int currentLineWidth = 0;
-        readonly string[] suggestions = new string[]
-        {
-            "hello",
-            "bruh"
-        };
+        string Input = string.Empty;
+        int CurrentLineWidth = 0;
+        bool ShouldClose = false;
 
-        internal TerminalInterface()
+        bool TryGetSuggestion(out string suggestion)
         {
-            Instance = this;
-            while (true)
+            suggestion = null;
+            if (Input.Length == 0) return false;
+
+            List<string> suggestions = new();
+
+            if (Input.StartsWith("run "))
             {
-                char inp = Console.ReadKey().KeyChar;
-                if (inp == '\r')
+
+            }
+            else
+            {
+                suggestions.Add("run");
+            }
+
+            foreach (string item in suggestions)
+            {
+                if (!item.StartsWith(Input)) continue;
+
+                suggestion = item;
+                return true;
+            }
+
+            return false;
+        }
+
+        void Tick()
+        {
+            char inp = Console.ReadKey().KeyChar;
+            if (inp == '\r')
+            {
+                if (!string.IsNullOrEmpty(Input))
                 {
-                    Console.WriteLine(currentInput);
-                    ProcessInput(currentInput);
-                    currentInput = "";
+                    Console.Write(" > ");
+                    Console.WriteLine(Input);
+                    ProcessInput(Input);
+                    Console.Write(" > ");
                 }
-                else
+                Input = string.Empty;
+                return;
+            }
+
+            string suggestion;
+
+            ClearLastLine(CurrentLineWidth + 3);
+
+            CurrentLineWidth = 0;
+
+            if (inp == '\b')
+            {
+                if (Input.Length > 0) Input = Input[..^1];
+            }
+            else if (inp == '\t')
+            {
+                TryGetSuggestion(out suggestion);
+
+                if (suggestion != null)
                 {
-                    ClearLastLine(currentLineWidth + 3);
-
-                    currentLineWidth = currentInput.Length;
-                    if (inp == '\b')
-                    {
-                        if (currentInput.Length > 0) currentInput = currentInput[..^1];
-                    }
-                    else if (inp == '\t')
-                    {
-                        if (currentInput.Length > 0) foreach (var item in suggestions)
-                            {
-                                if (item.StartsWith(currentInput))
-                                {
-                                    currentInput = item;
-                                    currentLineWidth = currentInput.Length;
-                                    break;
-                                }
-                            }
-                    }
-                    else
-                    {
-                        currentInput += inp;
-                    }
-
-                    if (currentInput.Length > 0) foreach (var item in suggestions)
-                        {
-                            if (item.StartsWith(currentInput))
-                            {
-                                currentLineWidth += item[currentInput.Length..].Length;
-                                break;
-                            }
-                        }
-
-                    Console.Write(currentInput);
-                    if (currentInput.Length > 0) foreach (var item in suggestions)
-                        {
-                            if (item.StartsWith(currentInput))
-                            {
-                                Console.ForegroundColor = ConsoleColor.DarkCyan;
-                                Console.Write(item[currentInput.Length..]);
-                                Console.ResetColor();
-                                break;
-                            }
-                        }
+                    Input = suggestion + " ";
                 }
+            }
+            else if (char.IsControl(inp))
+            { }
+            else
+            {
+                Input += inp;
+            }
+
+            TryGetSuggestion(out suggestion);
+
+            Console.Write(" > ");
+            CurrentLineWidth += 3;
+
+            Console.Write(Input);
+            CurrentLineWidth += Input.Length;
+
+            if (suggestion != null)
+            {
+                int cur = Console.CursorLeft;
+                Console.ForegroundColor = ConsoleColor.DarkCyan;
+
+                Console.Write(suggestion[Input.Length..]);
+                CurrentLineWidth += suggestion[Input.Length..].Length;
+
+                Console.ResetColor();
+                Console.CursorLeft = cur;
             }
         }
 
@@ -254,9 +280,15 @@ namespace ProgrammingLanguage.TerminalInterface
         static void ClearLastLine(int width)
         {
             Console.Write('\r');
-            for (int i = width - 1; i >= 0; i--)
-            { Console.Write(' '); }
+            Console.Write(new string(' ', width));
             Console.Write('\r');
+        }
+
+        public static void Start()
+        {
+            TerminalInterface terminalInterface = new();
+            Console.Write(" > ");
+            while (!terminalInterface.ShouldClose) terminalInterface.Tick();
         }
     }
 }

@@ -12,7 +12,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         List<string> AlreadyCompiledCodes;
         List<Warning> Warnings;
         List<Error> Errors;
-        System.Action<string, Output.LogType> PrintCallback;
+        Output.PrintCallback Print;
 
         internal struct CollectedAST
         {
@@ -45,12 +45,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (AlreadyCompiledCodes.Contains(path))
                 {
-                    PrintCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
+                    Print?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
                     return (null, path);
                 }
                 AlreadyCompiledCodes.Add(path);
 
-                PrintCallback?.Invoke($" Download file \"{path}\" ...", Output.LogType.Debug);
+                Print?.Invoke($" Download file \"{path}\" ...", Output.LogType.Debug);
                 System.DateTime started = System.DateTime.Now;
                 System.Net.Http.HttpClient httpClient = new();
                 System.Threading.Tasks.Task<string> req;
@@ -65,7 +65,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 req.Wait();
                 @using.DownloadTime = (System.DateTime.Now - started).TotalMilliseconds;
 
-                PrintCallback?.Invoke($" File \"{path}\" downloaded", Output.LogType.Debug);
+                Print?.Invoke($" File \"{path}\" downloaded", Output.LogType.Debug);
 
                 return (req.Result, path);
             }
@@ -118,7 +118,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (AlreadyCompiledCodes.Contains(path))
                 {
-                    PrintCallback?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
+                    Print?.Invoke($" Skip file \"{path}\" ...", Output.LogType.Debug);
                     return (null, path);
                 }
                 AlreadyCompiledCodes.Add(path);
@@ -139,7 +139,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             List<CollectedAST> collectedASTs = new();
 
-            PrintCallback?.Invoke($" Parse file \"{path}\" ...", Output.LogType.Debug);
+            Print?.Invoke($" Parse file \"{path}\" ...", Output.LogType.Debug);
             ParserResult parserResult2;
             {
 
@@ -148,7 +148,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
                 System.DateTime parseStarted = System.DateTime.Now;
-                PrintCallback?.Invoke("  Parsing ...", Output.LogType.Debug);
+                Print?.Invoke("  Parsing ...", Output.LogType.Debug);
 
                 Parser parser = new();
                 parserResult2 = parser.Parse(tokens, Warnings);
@@ -156,7 +156,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (parser.Errors.Count > 0)
                 { throw new Exception("Failed to parse", parser.Errors[0].ToException()); }
 
-                PrintCallback?.Invoke($"  Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug);
+                Print?.Invoke($"  Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug);
             }
 
             parserResult2.SetFile(path);
@@ -186,7 +186,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             string basePath)
         {
             if (parserResult.Usings.Length > 0)
-            { PrintCallback?.Invoke("Parse usings ...", Output.LogType.Debug); }
+            { Print?.Invoke("Parse usings ...", Output.LogType.Debug); }
 
             List<CollectedAST> collectedASTs = new();
 
@@ -210,7 +210,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             ParserResult parserResult,
             FileInfo file,
             ParserSettings parserSettings,
-            System.Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             string basePath = "")
         {
             SourceCodeManager sourceCodeManager = new()
@@ -218,7 +218,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 AlreadyCompiledCodes = new() { file.FullName },
                 Errors = new List<Error>(),
                 Warnings = new List<Warning>(),
-                PrintCallback = printCallback,
+                Print = printCallback,
             };
 
             return sourceCodeManager.Entry(

@@ -160,7 +160,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
 
-            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count);
+            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -188,7 +188,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
 
-            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count);
+            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -215,7 +215,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
 
-            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count);
+            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -233,7 +233,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY, AddressingMode.ABSOLUTE, absoluteAddress - GeneratedCode.Count);
 
-            GeneratedCode[returnToValueInstruction].Parameter = new DataItem(GeneratedCode.Count);
+            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -1493,7 +1493,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             FinishJumpInstructions(BreakInstructions.Last);
 
-            GeneratedCode[conditionJumpOffset].Parameter = new DataItem(GeneratedCode.Count - conditionJumpOffset);
+            GeneratedCode[conditionJumpOffset].ParameterInt = GeneratedCode.Count - conditionJumpOffset;
 
             OnScopeExit();
 
@@ -1538,7 +1538,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("Jump back");
             AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - GeneratedCode.Count);
-            GeneratedCode[conditionJumpOffsetFor].Parameter = new DataItem(GeneratedCode.Count - conditionJumpOffsetFor);
+            GeneratedCode[conditionJumpOffsetFor].ParameterInt = GeneratedCode.Count - conditionJumpOffsetFor;
 
             FinishJumpInstructions(BreakInstructions.Pop());
 
@@ -1570,7 +1570,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
+                    GeneratedCode[jumpNextInstruction].ParameterInt = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is ElseIfBranch partElseif)
                 {
@@ -1590,7 +1590,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].Parameter = new DataItem(GeneratedCode.Count - jumpNextInstruction);
+                    GeneratedCode[jumpNextInstruction].ParameterInt = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is ElseBranch partElse)
                 {
@@ -1604,7 +1604,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             foreach (var item in jumpOutInstructions)
             {
-                GeneratedCode[item].Parameter = new DataItem(GeneratedCode.Count - item);
+                GeneratedCode[item].ParameterInt = GeneratedCode.Count - item;
             }
         }
         void GenerateCodeForStatement(NewInstance newObject)
@@ -2891,7 +2891,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             foreach (int jumpInstruction in jumpInstructions)
             {
-                GeneratedCode[jumpInstruction].Parameter = new DataItem(jumpTo - jumpInstruction);
+                GeneratedCode[jumpInstruction].ParameterInt = jumpTo - jumpInstruction;
             }
         }
 
@@ -3103,7 +3103,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             base.CompiledClasses = compilerResult.Classes;
@@ -3178,11 +3178,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (ExternalFunctionsCache.Count > 0)
             {
                 AddComment("Clear external functions cache {");
-                foreach (KeyValuePair<string, int> externalFunction in ExternalFunctionsCache)
-                {
-                    // AddInstruction(Opcode.PUSH_VALUE, externalFunction.Value + 1);
-                    AddInstruction(Opcode.HEAP_DEALLOC);
-                }
+                for (int i = 0; i < ExternalFunctionsCache.Count; i++)
+                { AddInstruction(Opcode.HEAP_DEALLOC); }
                 AddComment("}");
             }
 
@@ -3199,7 +3196,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (var attribute in function.Attributes)
                 {
                     if (attribute.Identifier.Content != "CodeEntry") continue;
-                    GeneratedCode[entryCallInstruction].Parameter = new DataItem(GeneratedCode.Count - entryCallInstruction);
+                    GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
                 }
 
                 AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
@@ -3250,7 +3247,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 foreach (var attribute in function.Function.Attributes)
                 {
                     if (attribute.Identifier.Content != "CodeEntry") continue;
-                    GeneratedCode[entryCallInstruction].Parameter = new DataItem(GeneratedCode.Count - entryCallInstruction);
+                    GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
                 }
 
                 AddTypeArguments(function.TypeArguments);
@@ -3317,7 +3314,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 { throw new InternalException($"Function {function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
                 int offset = useAbsolute ? function.InstructionOffset : function.InstructionOffset - item.CallInstructionIndex;
-                GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(offset);
+                GeneratedCode[item.CallInstructionIndex].ParameterInt = offset;
             }
 
             foreach (UndefinedOperatorFunctionOffset item in UndefinedOperatorFunctionOffsets)
@@ -3325,7 +3322,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (item.Operator.InstructionOffset == -1)
                 { throw new InternalException($"Operator {item.Operator.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(item.Operator.InstructionOffset - item.CallInstructionIndex);
+                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Operator.InstructionOffset - item.CallInstructionIndex;
             }
 
             foreach (UndefinedGeneralFunctionOffset item in UndefinedGeneralFunctionOffsets)
@@ -3335,7 +3332,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (item.GeneralFunction.InstructionOffset == -1)
                     { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
 
-                    GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(item.GeneralFunction.InstructionOffset - item.CallInstructionIndex);
+                    GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                 }
                 else if (item.CallStatement is KeywordCall functionCall)
                 {
@@ -3344,21 +3341,21 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Constructor for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
 
-                        GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(item.GeneralFunction.InstructionOffset - item.CallInstructionIndex);
+                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else if (functionCall.Identifier.Content == "clone")
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Cloner for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
 
-                        GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(item.GeneralFunction.InstructionOffset - item.CallInstructionIndex);
+                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else if (functionCall.Identifier.Content == "out")
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Function {item.GeneralFunction.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                        GeneratedCode[item.CallInstructionIndex].Parameter = new DataItem(item.GeneralFunction.InstructionOffset - item.CallInstructionIndex);
+                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else
                     { throw new NotImplementedException(); }
@@ -3388,7 +3385,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public static Result Generate(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             CodeGenerator codeGenerator = new(settings);

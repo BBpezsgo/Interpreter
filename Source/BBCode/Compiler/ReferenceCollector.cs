@@ -685,7 +685,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        void AnalyzeFunctions(Statement[] topLevelStatements, Action<string, Output.LogType> printCallback = null)
+        void AnalyzeFunctions(Statement[] topLevelStatements, Output.PrintCallback printCallback = null)
         {
             printCallback?.Invoke($"  Collect references ...", Output.LogType.Debug);
 
@@ -696,7 +696,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public static void CollectReferences(
             Compiler.Result compilerResult,
-            Action<string, Output.LogType> printCallback = null)
+            Output.PrintCallback printCallback = null)
         {
             ReferenceCollector referenceCollector = new()
             {

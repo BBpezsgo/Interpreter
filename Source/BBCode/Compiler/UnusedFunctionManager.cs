@@ -52,7 +52,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         bool GetParameter(string parameterName, out CompiledParameter parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        int DoTheThing(Action<string, Output.LogType> printCallback = null)
+        int DoTheThing(Output.PrintCallback printCallback = null)
         {
             printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
 
@@ -139,7 +139,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public static (CompiledFunction[] functions, CompiledOperator[] operators, CompiledGeneralFunction[] generalFunctions) RemoveUnusedFunctions(
             Compiler.Result compilerResult,
             int iterations,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             UnusedFunctionManager unusedFunctionManager = new(level)

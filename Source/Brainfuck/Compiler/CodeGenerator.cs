@@ -3401,7 +3401,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            Action<string, Output.LogType>? printCallback = null)
+            Output.PrintCallback? printCallback = null)
         {
             this.Precompile(compilerResult.TopLevelStatements);
 
@@ -3460,7 +3460,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
-            Action<string, Output.LogType>? printCallback = null)
+            Output.PrintCallback? printCallback = null)
         {
             CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(

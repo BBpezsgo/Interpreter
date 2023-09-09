@@ -729,7 +729,10 @@ namespace ProgrammingLanguage.Bytecode
             switch (type)
             {
                 case RuntimeType.BYTE:
-                    serializer.Serialize(valueByte.Value);
+                    if (valueByte.HasValue)
+                    { serializer.Serialize(valueByte.Value); }
+                    else
+                    { serializer.Serialize((byte)0); }
                     break;
                 case RuntimeType.INT:
                     serializer.Serialize(valueInt.Value);

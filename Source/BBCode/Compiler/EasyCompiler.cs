@@ -1,20 +1,20 @@
-﻿using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.BBCode.Parser;
-using ProgrammingLanguage.Core;
-using ProgrammingLanguage.Errors;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
 namespace ProgrammingLanguage.BBCode
 {
+    using Compiler;
+    using Parser;
+    using Core;
+    using Errors;
+
     public class EasyCompiler
     {
         Dictionary<string, ExternalFunctionBase> externalFunctions;
         string BasePath;
         TokenizerSettings tokenizerSettings;
-        Parser.ParserSettings parserSettings;
+        ParserSettings parserSettings;
         Compiler.Compiler.CompilerSettings compilerSettings;
 
         public struct Result
@@ -27,7 +27,7 @@ namespace ProgrammingLanguage.BBCode
 
         Result Compile_(
             FileInfo file,
-            Action<string, Output.LogType> printCallback
+            Output.PrintCallback printCallback
             )
         {
             string sourceCode = File.ReadAllText(file.FullName);
@@ -46,7 +46,7 @@ namespace ProgrammingLanguage.BBCode
 
             tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
-            Parser.ParserResult parserResult;
+            ParserResult parserResult;
 
             {
                 DateTime parseStarted = DateTime.Now;
@@ -62,7 +62,7 @@ namespace ProgrammingLanguage.BBCode
                 { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (parser.Errors.Count > 0)
-                { throw new Errors.Exception("Failed to parse", parser.Errors[0].ToException()); }
+                { throw new Exception("Failed to parse", parser.Errors[0].ToException()); }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
@@ -80,7 +80,7 @@ namespace ProgrammingLanguage.BBCode
                     parserResult,
                     this.externalFunctions,
                     file,
-                    Parser.ParserSettings.Default,
+                    ParserSettings.Default,
                     printCallback,
                     this.BasePath ?? "");
 
@@ -88,7 +88,7 @@ namespace ProgrammingLanguage.BBCode
                 { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
 
                 if (compilerResult.Errors.Length > 0)
-                { throw new Errors.Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
+                { throw new Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
             }
 
             CodeGenerator.Result codeGeneratorResult;
@@ -113,7 +113,7 @@ namespace ProgrammingLanguage.BBCode
                 { printCallback?.Invoke(hint.ToString(), Output.LogType.Normal); }
 
                 if (codeGeneratorResult.Errors.Length > 0)
-                { throw new Errors.Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
+                { throw new Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
 
                 printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
             }
@@ -131,9 +131,9 @@ namespace ProgrammingLanguage.BBCode
             FileInfo file,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
-            Parser.ParserSettings parserSettings,
+            ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             string basePath = ""
             )
         {

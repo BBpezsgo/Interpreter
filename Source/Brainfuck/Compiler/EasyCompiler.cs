@@ -22,7 +22,7 @@ namespace ProgrammingLanguage.Brainfuck
 
         Result Compile_(
             FileInfo file,
-            Action<string, Output.LogType> printCallback
+            Output.PrintCallback printCallback
             )
         {
             string sourceCode = File.ReadAllText(file.FullName);
@@ -114,7 +114,7 @@ namespace ProgrammingLanguage.Brainfuck
             FileInfo file,
             BBCode.Compiler.Compiler.CompilerSettings compilerSettings,
             CodeGenerator.Settings generatorSettings,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             string basePath = ""
             )
         {

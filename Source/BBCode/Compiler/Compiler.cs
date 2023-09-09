@@ -169,7 +169,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public Token[] Tokens;
         }
 
-        internal static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
+        static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
         {
             Dictionary<string, AttributeValues> result = new();
 
@@ -196,7 +196,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
-        internal static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, CompiledType> unknownTypeCallback)
+        static CompiledType[] CompileTypes(ParameterDefinition[] parameters, Func<string, CompiledType> unknownTypeCallback)
         {
             CompiledType[] result = new CompiledType[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
@@ -484,7 +484,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
-            Action<string, Output.LogType> printCallback,
+            Output.PrintCallback printCallback,
             string basePath)
         {
             Structs.AddRange(parserResult.Structs);
@@ -781,23 +781,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <summary>
         /// Does some checks and prepares the AST for the <see cref="CodeGenerator"/>
         /// </summary>
-        /// <param name="code">
-        /// The source code
-        /// </param>
         /// <param name="file">
         /// The source code file
-        /// </param>
-        /// <param name="result">
-        /// The codeGenerator result
-        /// </param>
-        /// <param name="warnings">
-        /// A list that this can fill with warnings
-        /// </param>
-        /// <param name="errors">
-        /// A list that this can fill with errors
-        /// </param>
-        /// <param name="printCallback">
-        /// Optional: Print callback
         /// </param>
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
@@ -806,11 +791,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="System.Exception"/>
-        public static Result Compile(ParserResult parserResult,
+        public static Result Compile(
+            ParserResult parserResult,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
-            Action<string, Output.LogType> printCallback = null,
+            Output.PrintCallback printCallback = null,
             string basePath = "")
         {
             Compiler compiler = new()
@@ -837,6 +823,60 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 printCallback,
                 basePath
                 );
+        }
+
+        public static Result Compile(
+            FileInfo file,
+            Dictionary<string, ExternalFunctionBase> externalFunctions,
+            TokenizerSettings tokenizerSettings,
+            ParserSettings parserSettings,
+            Output.PrintCallback printCallback = null,
+            string basePath = "")
+        {
+            string sourceCode = File.ReadAllText(file.FullName);
+
+            Token[] tokens;
+
+            {
+                Tokenizer tokenizer = new(tokenizerSettings, printCallback);
+                List<Warning> warnings = new();
+
+                tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
+
+                foreach (Warning warning in warnings)
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
+            }
+
+            tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
+
+            ParserResult parserResult;
+
+            {
+                DateTime parseStarted = DateTime.Now;
+                if (printCallback != null)
+                { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
+
+                Parser parser = new();
+                List<Warning> warnings = new();
+
+                parserResult = parser.Parse(tokens, warnings);
+
+                foreach (Warning warning in warnings)
+                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
+
+                if (parser.Errors.Count > 0)
+                { throw new Exception("Failed to parse", parser.Errors[0].ToException()); }
+
+                if (printCallback != null)
+                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
+
+                if (parserSettings.PrintInfo)
+                { parserResult.WriteToConsole(); }
+            }
+
+            parserResult.SetFile(file.FullName);
+
+            return Compile(parserResult, externalFunctions, file, parserSettings, printCallback, basePath);
         }
     }
 }

@@ -212,27 +212,22 @@ namespace ProgrammingLanguage.BBCode
         int CurrentColumn;
         int CurrentLine;
 
-        readonly List<Token> tokens;
+        readonly List<Token> Tokens;
 
-        readonly TokenizerSettings settings;
-        readonly Action<string, Output.LogType> printCallback;
+        readonly TokenizerSettings Settings;
+        readonly Output.PrintCallback Print;
 
-        void Print(string message, Output.LogType type) => printCallback?.Invoke(message, type);
-
-        static readonly char[] bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
-        static readonly char[] banned = new char[] { '\r', '\u200B' };
-        static readonly char[] operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
-        static readonly string[] doubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
-        static readonly char[] simpleOperators = new char[] { ';', ',', '#' };
+        static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
+        static readonly char[] Banned = new char[] { '\r', '\u200B' };
+        static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
+        static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
+        static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
 
         /// <param name="settings">
         /// Tokenizer settings<br/>
         /// Use <see cref="TokenizerSettings.Default"/> if you don't know
         /// </param>
-        /// <param name="printCallback">
-        /// Optional: Print callback
-        /// </param>
-        public Tokenizer(TokenizerSettings settings, Action<string, Output.LogType> printCallback = null)
+        public Tokenizer(TokenizerSettings settings, Output.PrintCallback printCallback = null)
         {
             CurrentToken = new()
             {
@@ -246,10 +241,10 @@ namespace ProgrammingLanguage.BBCode
             CurrentColumn = 0;
             CurrentLine = 1;
 
-            tokens = new();
+            Tokens = new();
 
-            this.settings = settings;
-            this.printCallback = printCallback;
+            this.Settings = settings;
+            this.Print = printCallback;
         }
 
         Position GetCurrentPosition(int OffsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(OffsetTotal, OffsetTotal + 1));
@@ -298,7 +293,7 @@ namespace ProgrammingLanguage.BBCode
         public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out SimpleToken[] unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
-            Print("Tokenizing ...", Output.LogType.Debug);
+            Print?.Invoke("Tokenizing ...", Output.LogType.Debug);
 
             string savedUnicode = null;
             List<SimpleToken> _unicodeCharacters = new();
@@ -314,7 +309,7 @@ namespace ProgrammingLanguage.BBCode
                     CurrentLine++;
                 }
 
-                if (banned.Contains(currChar)) continue;
+                if (Banned.Contains(currChar)) continue;
 
                 if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
                 {
@@ -593,14 +588,14 @@ namespace ProgrammingLanguage.BBCode
                         CurrentToken.Content += currChar;
                     }
                 }
-                else if (bracelets.Contains(currChar))
+                else if (Bracelets.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
                     CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
                 }
-                else if (simpleOperators.Contains(currChar))
+                else if (SimpleOperators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
@@ -609,7 +604,7 @@ namespace ProgrammingLanguage.BBCode
                 }
                 else if (currChar == '=')
                 {
-                    if (CurrentToken.Content.Length == 1 && operators.Contains(CurrentToken.Content[0]))
+                    if (CurrentToken.Content.Length == 1 && Operators.Contains(CurrentToken.Content[0]))
                     {
                         CurrentToken.Content += currChar;
                         EndToken(OffsetTotal);
@@ -621,7 +616,7 @@ namespace ProgrammingLanguage.BBCode
                         CurrentToken.Content += currChar;
                     }
                 }
-                else if (doubleOperators.Contains(CurrentToken.Content + currChar))
+                else if (DoubleOperators.Contains(CurrentToken.Content + currChar))
                 {
                     CurrentToken.Content += currChar;
                     EndToken(OffsetTotal);
@@ -640,7 +635,7 @@ namespace ProgrammingLanguage.BBCode
                         CurrentToken.Content += currChar;
                     }
                 }
-                else if (operators.Contains(currChar))
+                else if (Operators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
@@ -662,7 +657,7 @@ namespace ProgrammingLanguage.BBCode
                     else
                     {
                         EndToken(OffsetTotal);
-                        CurrentToken.TokenType = settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
+                        CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
                         CurrentToken.Content = currChar.ToString();
                         EndToken(OffsetTotal);
                     }
@@ -728,12 +723,12 @@ namespace ProgrammingLanguage.BBCode
 
             EndToken(sourceCode.Length);
 
-            Print($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", Output.LogType.Debug);
+            Print?.Invoke($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", Output.LogType.Debug);
 
-            CheckTokens(tokens.ToArray());
+            CheckTokens(Tokens.ToArray());
 
             unicodeCharacters = _unicodeCharacters.ToArray();
-            return NormalizeTokens(tokens, settings).ToArray();
+            return NormalizeTokens(Tokens, Settings).ToArray();
         }
 
         /// <exception cref="TokenizerException"></exception>
@@ -817,7 +812,7 @@ namespace ProgrammingLanguage.BBCode
                     CurrentToken.AbsolutePosition.End--;
                     CurrentToken.Content = CurrentToken.Content[..^1];
                     CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
-                    tokens.Add(CurrentToken.Instantiate());
+                    Tokens.Add(CurrentToken.Instantiate());
 
                     CurrentToken.Position.Start.Character = CurrentToken.Position.End.Character + 1;
                     CurrentToken.Position.Start.Line = CurrentToken.Position.End.Line + 1;
@@ -833,11 +828,11 @@ namespace ProgrammingLanguage.BBCode
 
             if (CurrentToken.TokenType != TokenType.WHITESPACE)
             {
-                tokens.Add(CurrentToken.Instantiate());
+                Tokens.Add(CurrentToken.Instantiate());
             }
-            else if (!string.IsNullOrEmpty(CurrentToken.Content) && settings.TokenizeWhitespaces)
+            else if (!string.IsNullOrEmpty(CurrentToken.Content) && Settings.TokenizeWhitespaces)
             {
-                tokens.Add(CurrentToken.Instantiate());
+                Tokens.Add(CurrentToken.Instantiate());
             }
 
             if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Text;
 
 namespace ProgrammingLanguage.BBCode
 {
@@ -12,16 +14,11 @@ namespace ProgrammingLanguage.BBCode
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
-    using System.Diagnostics;
-    using System.Security.Principal;
-    using System.Text;
     using Bytecode;
-
     using Parser;
     using Parser.Statement;
-
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using Core;
+    using Errors;
     using ProgrammingLanguage.Tokenizer;
 
     public interface IDuplicateable<T>

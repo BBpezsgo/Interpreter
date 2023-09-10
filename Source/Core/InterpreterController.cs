@@ -566,7 +566,7 @@ namespace ProgrammingLanguage.Core
 
             externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char.ToString()));
 
-            externalFunctions.AddExternalFunction("sleep", (int t) => PauseCodeTime = t);
+            externalFunctions.AddExternalFunction("sleep", (int t) => { PauseCodeTime = t; });
 
             #endregion
 

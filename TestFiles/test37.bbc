@@ -15,3 +15,5 @@ void Do(Array<int> list, func<void, int> func) {
 void PrintElement(int element) { PrintLine(element); }
 
 Do(bruhs, PrintLine);
+
+delete bruhs;

@@ -1,15 +1,14 @@
-﻿
+﻿using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+
 namespace ProgrammingLanguage.BBCode.Analysis
 {
-    using ProgrammingLanguage.BBCode.Compiler;
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statement;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
-
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Linq;
+    using Compiler;
+    using Core;
+    using Errors;
+    using Parser;
+    using Parser.Statement;
 
     public struct AnalysisResult
     {
@@ -175,13 +174,12 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     tokens_ = tokens_.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
                     if (tokens_ == null) continue;
                     if (tokens_.Length < 3) continue;
-                    Parser parser = new();
-                    ParserResultHeader codeHeader = parser.ParseCodeHeader(tokens_, new List<Warning>());
+                    ParserResultHeader codeHeader = Parser.ParseCodeHeader(tokens_);
                     for (int i = 0; i < codeHeader.Usings.Count; i++)
                     {
                         var @using = codeHeader.Usings[i];
                         var usingFile = dir.FullName + "\\" + @using.PathString + "." + FileExtensions.Code;
-                        if (!System.IO.File.Exists(usingFile)) continue;
+                        if (!File.Exists(usingFile)) continue;
                         if (usingFile.Replace('\\', '/') != path) continue;
                         fileReferences.Add(file_.FullName);
                     }
@@ -274,9 +272,8 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
                     List<Error> parserErrors = new();
-                    List<Warning> parserWarnings = new();
 
-                    ParserResult? parserResult2_ = Parse(tokens, parserWarnings, parserErrors, usingFile.Replace('\\', '/'), out Exception parserFatalError, out _);
+                    ParserResult? parserResult2_ = Parse(tokens, parserErrors, usingFile.Replace('\\', '/'), out Exception parserFatalError, out _);
 
                     if (parserErrors.Count > 0)
                     { throw new Exception("Failed to parse", parserErrors[0].ToException()); }
@@ -424,19 +421,19 @@ namespace ProgrammingLanguage.BBCode.Analysis
             };
         }
 
-        static ParserResult? Parse(Token[] tokens, List<Warning> warnings, List<Error> errors, string path, out Exception fatalError, out Token[] modifyedTokens)
+        static ParserResult? Parse(Token[] tokens, List<Error> errors, string path, out Exception fatalError, out Token[] modifyedTokens)
         {
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
 
-            Parser parser = new();
             fatalError = null;
 
+            ParserResult result;
             try
             {
-                ParserResult result = parser.Parse(tokens, warnings);
+                result = Parser.Parse(tokens);
                 result.SetFile(path);
-                errors.AddRange(parser.Errors);
+                errors.AddRange(result.Errors);
                 modifyedTokens = tokens;
 
                 return result;
@@ -444,7 +441,6 @@ namespace ProgrammingLanguage.BBCode.Analysis
             catch (Exception error)
             {
                 fatalError = error;
-                errors.AddRange(parser.Errors);
                 modifyedTokens = tokens;
 
                 return null;
@@ -452,7 +448,6 @@ namespace ProgrammingLanguage.BBCode.Analysis
             catch (System.Exception error)
             {
                 fatalError = new Exception(error.Message, error);
-                errors.AddRange(parser.Errors);
                 modifyedTokens = tokens;
 
                 return null;
@@ -467,7 +462,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
             List<Error> errors = new();
             List<Warning> warnings = new();
 
-            ParserResult? parserResult = Parse(tokens, warnings, errors, path, out Exception parserError, out var modifyedTokens);
+            ParserResult? parserResult = Parse(tokens, errors, path, out Exception parserError, out var modifyedTokens);
 
             if (errors.Count > 0 || parserError != null)
                 return AnalysisResult

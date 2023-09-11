@@ -48,16 +48,10 @@ namespace ProgrammingLanguage.Brainfuck
                 if (printCallback != null)
                 { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
 
-                List<Warning> warnings = new();
-                BBCode.Parser.Parser parser = new();
+                parserResult = BBCode.Parser.Parser.Parse(tokens);
 
-                parserResult = parser.Parse(tokens, warnings);
-
-                foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
-
-                if (parser.Errors.Count > 0)
-                { throw new Errors.Exception("Failed to parse", parser.Errors[0].ToException()); }
+                if (parserResult.Errors.Length > 0)
+                { throw new Errors.Exception("Failed to parse", parserResult.Errors[0].ToException()); }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }

@@ -175,7 +175,10 @@ namespace ProgrammingLanguage.Bytecode
             int pointer = Memory.Stack.Pop().ValueInt;
             string value = null;
             try
-            { value = Memory.Heap.GetString(pointer + 1, Memory.Heap[pointer].Integer ?? 0); }
+            {
+                value = Memory.Heap.GetString(pointer + 1, Memory.Heap[pointer].Integer ?? 0);
+                Memory.Heap.Deallocate(pointer);
+            }
             catch (System.Exception) { }
             throw new UserException("User Exception Thrown", value);
         }
@@ -567,6 +570,7 @@ namespace ProgrammingLanguage.Bytecode
             List<DataItem> parameters = new();
             for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
             { parameters.Add(Memory.Stack.Pop()); }
+            parameters.Reverse();
 
             if (function is ExternalFunctionManaged managedFunction)
             {

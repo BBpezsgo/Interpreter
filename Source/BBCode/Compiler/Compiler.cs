@@ -73,8 +73,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         List<Error> Errors;
         List<Warning> Warnings;
 
-        // Action<string, Output.LogType> PrintCallback;
-
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
         CompiledOperator[] CompiledOperators;
@@ -856,16 +854,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (printCallback != null)
                 { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
 
-                Parser parser = new();
-                List<Warning> warnings = new();
+                parserResult = Parser.Parse(tokens);
 
-                parserResult = parser.Parse(tokens, warnings);
-
-                foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
-
-                if (parser.Errors.Count > 0)
-                { throw new Exception("Failed to parse", parser.Errors[0].ToException()); }
+                if (parserResult.Errors.Length > 0)
+                { throw new Exception("Failed to parse", parserResult.Errors[0].ToException()); }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }

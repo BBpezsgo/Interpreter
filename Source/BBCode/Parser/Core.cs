@@ -47,6 +47,8 @@ namespace ProgrammingLanguage.BBCode.Parser
 
     public readonly struct ParserResult
     {
+        public readonly Errors.Error[] Errors;
+
         public readonly FunctionDefinition[] Functions;
         public readonly StructDefinition[] Structs;
         public readonly ClassDefinition[] Classes;
@@ -57,8 +59,10 @@ namespace ProgrammingLanguage.BBCode.Parser
         public readonly EnumDefinition[] Enums;
         public readonly Token[] Tokens;
 
-        public ParserResult(IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, Token[] tokens)
+        public ParserResult(IEnumerable<Errors.Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, Token[] tokens)
         {
+            Errors = errors.ToArray();
+
             Functions = functions.ToArray();
             Structs = structs.ToArray();
             Usings = usings.ToArray();
@@ -236,7 +240,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
-                if (!Compiler.Constants.BuiltinTypes.Contains(item.Type.Identifier.Content))
+                if (!Constants.BuiltinTypes.Contains(item.Type.Identifier.Content))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                 }
@@ -258,7 +262,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     Console.ForegroundColor = ConsoleColor.Blue;
                     foreach (var modifier in param.Modifiers)
                     { Console.Write($"{modifier.Content} "); }
-                    if (!Compiler.Constants.BuiltinTypes.Contains(param.Type.Identifier.Content))
+                    if (!Constants.BuiltinTypes.Contains(param.Type.Identifier.Content))
                     { Console.ForegroundColor = ConsoleColor.Green; }
                     Console.Write($"{param.Type} ");
                     Console.ForegroundColor = ConsoleColor.White;

@@ -206,7 +206,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke();
             });
@@ -218,7 +217,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]));
@@ -231,7 +229,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -245,7 +242,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -260,7 +256,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -276,7 +271,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -293,7 +287,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 callback?.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -313,7 +306,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke();
 
@@ -327,7 +319,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]));
@@ -342,7 +333,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -358,7 +348,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -375,7 +364,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -393,7 +381,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -412,7 +399,6 @@ namespace ProgrammingLanguage.Core
 
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
-                Array.Reverse(args);
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
@@ -425,7 +411,6 @@ namespace ProgrammingLanguage.Core
                 return DataItem.GetValue(result, $"{name}() result");
             });
         }
-
 
         /// <exception cref="RuntimeException"/>
         internal static void CheckTypes(DataItem[] values, RuntimeType[] types)

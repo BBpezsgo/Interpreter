@@ -150,11 +150,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 System.DateTime parseStarted = System.DateTime.Now;
                 Print?.Invoke("  Parsing ...", Output.LogType.Debug);
 
-                Parser parser = new();
-                parserResult2 = parser.Parse(tokens, Warnings);
+                parserResult2 = Parser.Parse(tokens);
 
-                if (parser.Errors.Count > 0)
-                { throw new Exception("Failed to parse", parser.Errors[0].ToException()); }
+                if (parserResult2.Errors.Length > 0)
+                { throw new Exception("Failed to parse", parserResult2.Errors[0].ToException()); }
 
                 Print?.Invoke($"  Parsed in {(System.DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug);
             }

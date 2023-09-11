@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 
+#pragma warning disable IDE0051 // Remove unused private members
+
 namespace ProgrammingLanguage.BBCode.Compiler
 {
     using Bytecode;
@@ -2347,9 +2349,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #region HEAP Helpers
 
-        void CopyToHeap(int to, int size)
+        void BoxData(int to, int size)
         {
-            AddComment($"Copy to heap: {{");
+            AddComment($"Box: {{");
             for (int currentOffset = 0; currentOffset < size; currentOffset++)
             {
                 int currentReversedOffset = size - currentOffset - 1;
@@ -2363,6 +2365,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             AddComment("}");
         }
+        void UnboxData(int from, int size)
+        {
+            AddComment($"Unbox: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                AddComment($"Element {currentOffset}:");
+
+                AddInstruction(Opcode.PUSH_VALUE, currentOffset + from);
+                AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+            }
+            AddComment("}");
+        }
+
         void CopyToStack(int to, int size, bool basepointerRelative)
         {
             AddComment($"Copy to stack: {{");
@@ -2381,19 +2396,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             AddComment("}");
         }
-
-        void LoadFromHeap(int from, int size)
-        {
-            AddComment($"Load from heap: {{");
-            for (int currentOffset = 0; currentOffset < size; currentOffset++)
-            {
-                AddComment($"Element {currentOffset}:");
-
-                AddInstruction(Opcode.PUSH_VALUE, currentOffset + from);
-                AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-            }
-            AddComment("}");
-        }
         void LoadFromStack(int from, int size, bool basepointerRelative)
         {
             AddComment($"Load from stack: {{");
@@ -2407,157 +2409,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             AddComment("}");
         }
-
-        /*
-        void Deallocate(CompiledVariable variable)
-        {
-            if (!variable.IsStoredInHEAP) return;
-            AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
-            AddInstruction(Opcode.HEAP_DEALLOC);
-            return;
-            AddComment("Deallocate {");
-            for (int offset = 0; offset < variable.Type.Size; offset++)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-                AddInstruction(Opcode.PUSH_VALUE, offset);
-                AddInstruction(Opcode.LOAD_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
-                AddInstruction(Opcode.MATH_ADD);
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-            }
-            AddComment("}");
-        }
-
-        void Deallocate(int from, int length)
-        {
-            AddComment("Deallocate {");
-
-            AddInstruction(Opcode.PUSH_VALUE, from);
-            AddInstruction(Opcode.PUSH_VALUE, length);
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
-
-            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
-
-        /// <summary>
-        /// <b>Expected Stack:</b> <br/><br/>
-        /// <code>
-        /// ... <br/>
-        /// <see langword="int"/> FROM <br/>
-        /// <see langword="int"/> LENGTH <br/>
-        /// </code>
-        /// This will pop these two stack elements.
-        /// </summary>
-        void DynamicDeallocateWithParametersAlreadyExists()
-        {
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.HEAP_DEALLOC);
-            return;
-
-            AddComment("Deallocate {");
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
-
-            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
-
-        void DynamicDeallocate(StatementWithReturnValue from, StatementWithReturnValue length)
-        {
-            GenerateCodeForStatement(from);
-            AddInstruction(Opcode.HEAP_DEALLOC);
-
-            return;
-            AddComment("Dynamic Deallocate {");
-
-            GenerateCodeForStatement(from);
-            GenerateCodeForStatement(length);
-
-            AddComment("While _length_ != 0 :");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
-            int skipIfZeroInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY_IF_FALSE, int.MaxValue);
-
-            AddComment($"Decrement _length_:");
-            AddInstruction(Opcode.PUSH_VALUE, -1);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Null value:");
-            AddInstruction(Opcode.PUSH_VALUE, DataItem.Null);
-
-            AddComment("Calculate address (_length_ + _start_):");
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -4);
-            AddInstruction(Opcode.MATH_ADD);
-
-            AddComment("Store null value:");
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-
-            AddComment("Jump back to loop:");
-            AddInstruction(Opcode.JUMP_BY, skipIfZeroInstruction - GeneratedCode.Count - 1);
-
-            GeneratedCode[skipIfZeroInstruction].Parameter = GeneratedCode.Count - skipIfZeroInstruction;
-
-            AddComment("Cleanup parameters:");
-            AddInstruction(Opcode.POP_VALUE);
-            AddInstruction(Opcode.POP_VALUE);
-
-            AddComment("}");
-        }
-        */
 
         #endregion
 
@@ -2989,14 +2840,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
 
-                if (!Constants.BuiltinTypes.Contains(parameters[i].Type.Identifier.Content))
-                {
-                    paramsSize += parameterType.SizeOnStack;
-                }
-                else
-                {
-                    paramsSize++;
-                }
+                paramsSize += parameterType.SizeOnStack;
             }
         }
 

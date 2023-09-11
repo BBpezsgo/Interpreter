@@ -4,63 +4,75 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Parser
 {
+    using System.ComponentModel.DataAnnotations;
     using Core;
-
     using Errors;
-
     using Statement;
 
-    /// <summary>
-    /// The parser for the BBCode language
-    /// </summary>
     public class Parser
     {
-        int currentTokenIndex;
-        readonly List<Token> tokens = new();
-        public Token[] Tokens => tokens.ToArray();
+        int CurrentTokenIndex;
+        readonly Token[] Tokens;
 
-        Token CurrentToken => (currentTokenIndex >= 0 && currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
+        Token CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
 
         static readonly string[] Modifiers = new string[]
         {
-                "export",
-                "macro",
-                "adaptive",
+            "export",
+            "macro",
+            "adaptive",
         };
 
         static readonly string[] VariableModifiers = new string[]
         {
-                "const",
+            "const",
         };
 
         static readonly string[] ParameterModifiers = new string[]
         {
-                "this",
-                "ref",
-                "const",
+            "this",
+            "ref",
+            "const",
         };
 
         static readonly string[] PassedParameterModifiers = new string[]
         {
-                "ref",
-                "const",
+            "ref",
+            "const",
         };
 
-        static readonly string[] types = new string[]
+        static readonly string[] OverloadableOperators = new string[]
         {
-                "int",
-                "void",
-                "float",
-                "bool",
-                "byte",
-                "char",
+            "<<", ">>",
+            "+", "-", "*", "/", "%",
+            "&", "|", "^",
+            "<", ">", ">=", "<=", "!=", "==",
+            "&&", "||",
         };
-        readonly Dictionary<string, int> operators = new();
 
-        List<Warning> Warnings;
-        public readonly List<Error> Errors = new();
+        static readonly string[] CompoundAssignmentOperators = new string[]
+        {
+            "+=", "-=", "*=", "/=", "%=",
+            "&=", "|=", "^=",
+        };
+
+        static readonly string[] BinaryOperators = new string[]
+        {
+            "<<", ">>",
+            "+", "-", "*", "/", "%",
+            "&", "|", "^",
+            "<", ">", ">=", "<=", "!=", "==", "&&", "||",
+        };
+
+        static readonly string[] UnaryPrefixOperators = new string[]
+        {
+            "!",
+        };
+
+        static readonly string[] UnaryPostfixOperators = Array.Empty<string>();
 
         // === Result ===
+        readonly List<Error> Errors = new();
         readonly List<FunctionDefinition> Functions = new();
         readonly List<EnumDefinition> Enums = new();
         readonly Dictionary<string, StructDefinition> Structs = new();
@@ -70,68 +82,23 @@ namespace ProgrammingLanguage.BBCode.Parser
         readonly List<Statement.Statement> TopLevelStatements = new();
         // === ===
 
-        public Parser()
+        Parser(Token[] tokens)
         {
-            operators.Add("|", 4);
-            operators.Add("&", 4);
-            operators.Add("^", 4);
-            operators.Add("<<", 4);
-            operators.Add(">>", 4);
-
-            operators.Add("!=", 5);
-            operators.Add(">=", 5);
-            operators.Add("<=", 5);
-            operators.Add("==", 5);
-
-            operators.Add("=", 10);
-
-            operators.Add("+=", 11);
-            operators.Add("-=", 11);
-
-            operators.Add("*=", 12);
-            operators.Add("/=", 12);
-            operators.Add("%=", 12);
-
-            operators.Add("<", 20);
-            operators.Add(">", 20);
-
-            operators.Add("+", 30);
-            operators.Add("-", 30);
-
-            operators.Add("*", 31);
-            operators.Add("/", 31);
-            operators.Add("%", 31);
-
-            operators.Add("++", 40);
-            operators.Add("--", 40);
-
-            operators.Add("&&", 2);
-            operators.Add("||", 2);
+            this.Tokens = tokens;
         }
 
-        /// <summary>
-        /// Parses tokens into AST
-        /// </summary>
-        /// <param name="_tokens">
-        /// The list of tokens<br/>
-        /// This should be generated using <see cref="ProgrammingLanguage.BBCode.Tokenizer"/>
-        /// </param>
-        /// <param name="warnings">
-        /// A list that the parser can fill with warnings
-        /// </param>
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="Exception"/>
-        /// <returns>
-        /// The generated AST
-        /// </returns>
-        public ParserResult Parse(Token[] _tokens, List<Warning> warnings)
-        {
-            Warnings = warnings;
-            tokens.Clear();
-            tokens.AddRange(_tokens);
+        /// <exception cref="ImpossibleException"/>
+        public static ParserResult Parse(Token[] tokens)
+            => new Parser(tokens).ParseInternal();
 
-            currentTokenIndex = 0;
+        public static ParserResultHeader ParseCodeHeader(Token[] tokens)
+            => new Parser(tokens).ParseCodeHeaderInternal();
+
+        ParserResult ParseInternal()
+        {
+            CurrentTokenIndex = 0;
 
             ParseCodeHeader();
 
@@ -144,16 +111,12 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (endlessSafe > 500) { throw new EndlessLoopException(); }
             }
 
-            return new ParserResult(this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.tokens.ToArray());
+            return new ParserResult(this.Errors, this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.Tokens.ToArray());
         }
 
-        public ParserResultHeader ParseCodeHeader(Token[] _tokens, List<Warning> warnings)
+        ParserResultHeader ParseCodeHeaderInternal()
         {
-            Warnings = warnings;
-            tokens.Clear();
-            tokens.AddRange(_tokens);
-
-            currentTokenIndex = 0;
+            CurrentTokenIndex = 0;
 
             ParseCodeHeader();
 
@@ -211,7 +174,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
                 tokens.Add(CurrentToken);
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
             else
             {
@@ -286,7 +249,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectEnumDefinition(out EnumDefinition enumDefinition)
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             enumDefinition = null;
 
             List<FunctionDefinition.Attribute> attributes = new();
@@ -310,7 +273,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
 
             if (!ExpectIdentifier("enum", out Token keyword))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             keyword.AnalysedType = TokenAnalysedType.Keyword;
 
@@ -331,18 +294,20 @@ namespace ProgrammingLanguage.BBCode.Parser
 
                 enumMemberIdentifier.AnalysedType = TokenAnalysedType.EnumMember;
 
-                EnumMemberDefinition newMember = new();
-                newMember.Identifier = enumMemberIdentifier;
+                Literal enumMemberValue = null;
 
                 if (ExpectOperator("=", out Token assignOperator))
                 {
-                    if (!ExpectLiteral(out Literal value))
+                    if (!ExpectLiteral(out enumMemberValue))
                     { throw new SyntaxException($"Expected literal after enum member assignment", assignOperator.After()); }
 
-                    newMember.Value = value;
                 }
 
-                members.Add(newMember);
+                members.Add(new EnumMemberDefinition()
+                {
+                    Identifier = enumMemberIdentifier,
+                    Value = enumMemberValue,
+                });
 
                 if (ExpectOperator("}"))
                 { break; }
@@ -365,7 +330,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectOperatorDefinition(out FunctionDefinition function)
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             function = null;
 
             List<FunctionDefinition.Attribute> attributes = new();
@@ -392,18 +357,13 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             TypeInstance possibleType = ExpectType(false);
             if (possibleType == null)
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
-            if (!ExpectOperator(new string[]
-            {
-                    "<<", ">>",
-                    "+", "-", "*", "/", "%", "&", "|",
-                    "<", ">", ">=", "<=", "!=", "==", "&&", "||", "^"
-            }, out Token possibleName))
-            { currentTokenIndex = parseStart; return false; }
+            if (!ExpectOperator(OverloadableOperators, out Token possibleName))
+            { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectOperator("("))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             possibleName.AnalysedType = TokenAnalysedType.FunctionName;
 
@@ -503,7 +463,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectFunctionDefinition(out FunctionDefinition function)
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             function = null;
 
             List<FunctionDefinition.Attribute> attributes = new();
@@ -532,13 +492,13 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             TypeInstance possibleType = ExpectType(false);
             if (possibleType == null)
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectIdentifier(out Token possibleNameT))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectOperator("("))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
 
@@ -601,16 +561,16 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition function)
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             function = null;
 
             Token[] modifiers = ParseModifiers();
 
             if (!ExpectIdentifier(out Token possibleNameT))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectOperator("("))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
 
@@ -669,7 +629,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectClassDefinition()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             List<FunctionDefinition.Attribute> attributes = new();
             while (ExpectAttribute(out var attr))
@@ -696,7 +656,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             Token[] modifiers = ParseModifiers();
 
             if (!ExpectIdentifier("class", out Token keyword))
-            { currentTokenIndex = startTokenIndex; return false; }
+            { CurrentTokenIndex = startTokenIndex; return false; }
 
             if (!ExpectIdentifier(out Token possibleClassName))
             { throw new SyntaxException("Expected class identifier after keyword 'class'", keyword); }
@@ -757,14 +717,14 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             Classes.Add(classDefinition.Name.Content, classDefinition);
 
-            Warnings.Add(new Warning($"Class is experimental feature!", keyword, classDefinition.FilePath));
+            // Warnings.Add(new Warning($"Class is experimental feature!", keyword, classDefinition.FilePath));
 
             return true;
         }
 
         bool ExpectStructDefinition()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             List<FunctionDefinition.Attribute> attributes = new();
             while (ExpectAttribute(out var attr))
@@ -789,7 +749,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             Token[] modifiers = ParseModifiers();
 
             if (!ExpectIdentifier("struct", out Token keyword))
-            { currentTokenIndex = startTokenIndex; return false; }
+            { CurrentTokenIndex = startTokenIndex; return false; }
 
             if (!ExpectIdentifier(out Token possibleStructName))
             { throw new SyntaxException("Expected struct identifier after keyword 'struct'", keyword); }
@@ -882,13 +842,13 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectLiteral(out Literal statement)
         {
-            int savedToken = currentTokenIndex;
+            int savedToken = CurrentTokenIndex;
 
             if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
                 Literal literal = new(LiteralType.FLOAT, CurrentToken.Content.Replace("_", ""), CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -897,7 +857,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.INT, CurrentToken.Content.Replace("_", ""), CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -906,7 +866,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content, 16).ToString(), CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -915,7 +875,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(), CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -924,7 +884,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.STRING, CurrentToken.Content, CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -933,7 +893,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.CHAR, CurrentToken.Content, CurrentToken);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
 
                 statement = literal;
                 return true;
@@ -957,37 +917,10 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return true;
             }
 
-            currentTokenIndex = savedToken;
+            CurrentTokenIndex = savedToken;
 
             statement = null;
             return false;
-        }
-
-        bool ExpectAs(out TypeCast statement)
-        {
-            int parseStart = currentTokenIndex;
-            statement = null;
-
-            StatementWithValue prevStatement = ExpectOneValue();
-            if (prevStatement == null)
-            {
-                currentTokenIndex = parseStart;
-                return false;
-            }
-
-            if (!ExpectIdentifier("as", out Token keyword))
-            {
-                currentTokenIndex = parseStart;
-                return false;
-            }
-
-            TypeInstance type = ExpectType(false, false);
-
-            if (type == null)
-            { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
-
-            statement = new TypeCast(prevStatement, keyword, type);
-            return true;
         }
 
         bool ExpectIndex(out IndexCall statement)
@@ -1007,28 +940,9 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
 
-        /// <returns>
-        /// <list type="bullet">
-        /// <item>
-        ///  <seealso cref="FunctionCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Literal"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="NewInstance"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Field"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Identifier"></seealso>
-        /// </item>
-        /// </list>
-        /// </returns>
         StatementWithValue ExpectOneValue()
         {
-            int savedToken = currentTokenIndex;
+            int savedToken = CurrentTokenIndex;
 
             StatementWithValue returnStatement = null;
 
@@ -1073,7 +987,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     List<StatementWithValue> parameters = new();
 
                     int endlessSafe = 0;
-                    Token bracketRight = null;
+                    Token bracketRight;
                     while (!ExpectOperator(")", out bracketRight) || expectParameter)
                     {
                         StatementWithValue parameter = ExpectExpression();
@@ -1100,18 +1014,15 @@ namespace ProgrammingLanguage.BBCode.Parser
                     returnStatement = newStructStatement;
                 }
                 else
-                { 
+                {
                     returnStatement = new NewInstance(newIdentifier, instanceTypeName);
                 }
             }
             else if (ExpectIdentifier(out Token variableName))
             {
-                // if (variableName.Content == "this")
-                // { Errors.Add(new Error("The keyword 'this' does not avaiable in the current context", variableName)); }
-
                 if (ExpectOperator("("))
                 {
-                    currentTokenIndex = savedToken;
+                    CurrentTokenIndex = savedToken;
                     returnStatement = ExpectFunctionCall();
                 }
                 else
@@ -1182,12 +1093,9 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectVariableAddressGetter(out AddressGetter statement)
         {
-            int parseStart = currentTokenIndex;
-
             if (!ExpectOperator("&", out var refToken))
             {
                 statement = null;
-                currentTokenIndex = parseStart;
                 return false;
             }
 
@@ -1199,15 +1107,13 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectVariableAddressFinder(out Pointer statement)
         {
-            var parseStart = currentTokenIndex;
             if (!ExpectOperator("*", out var refToken))
             {
                 statement = null;
-                currentTokenIndex = parseStart;
                 return false;
             }
 
-            var prevStatement = ExpectOneValue();
+            StatementWithValue prevStatement = ExpectOneValue();
 
             statement = new Pointer(refToken, prevStatement);
             return true;
@@ -1240,7 +1146,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectBlock(out Block block)
         {
-            if (!ExpectOperator("{", out var braceletStart))
+            if (!ExpectOperator("{", out Token braceletStart))
             {
                 block = null;
                 return false;
@@ -1249,7 +1155,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             List<Statement.Statement> statements = new();
 
             int endlessSafe = 0;
-            Token braceletEnd = null;
+            Token braceletEnd;
             while (!ExpectOperator("}", out braceletEnd))
             {
                 Statement.Statement statement = ExpectStatement();
@@ -1299,24 +1205,24 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         VariableDeclaretion ExpectVariableDeclaration()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             ExpectIdentifier("const", out Token constModifier);
 
             TypeInstance possibleType = ExpectType();
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (!ExpectIdentifier(out Token possibleVariableName))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             possibleVariableName.AnalysedType = TokenAnalysedType.VariableName;
 
             StatementWithValue initialValue = null;
 
-            if (ExpectOperator("=", out var eqT))
+            if (ExpectOperator("=", out Token eqOperatorToken))
             {
-                initialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqT);
+                initialValue = ExpectExpression() ?? throw new SyntaxException("Expected initial value after '=' in variable declaration", eqOperatorToken);
             }
             else
             {
@@ -1337,7 +1243,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("(", out Token tokenZarojel))
             { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
 
-            var variableDeclaration = ExpectVariableDeclaration();
+            VariableDeclaretion variableDeclaration = ExpectVariableDeclaration();
             if (variableDeclaration == null)
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
 
@@ -1447,34 +1353,6 @@ namespace ProgrammingLanguage.BBCode.Parser
             };
         }
 
-        /// <returns>
-        /// <list type="bullet">
-        /// <item>
-        ///  <seealso cref="WhileLoop"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="ForLoop"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="FunctionCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="KeywordCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="IfContainer"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="VariableDeclaretion"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Assignment"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="ExpectExpression"></seealso>
-        /// </item>
-        /// </list>
-        /// </returns>
         Statement.Statement ExpectStatement()
         {
             Statement.Statement statement = ExpectWhileStatement();
@@ -1487,34 +1365,32 @@ namespace ProgrammingLanguage.BBCode.Parser
             statement ??= ExpectKeywordCall("out", 1, 64);
             statement ??= ExpectIfStatement();
             statement ??= ExpectVariableDeclaration();
-            statement ??= ExpectShortOperator();
-            statement ??= ExpectCompoundSetter();
-            statement ??= ExpectSetter();
+            statement ??= ExpectAnySetter();
             statement ??= ExpectExpression();
             return statement;
         }
 
         bool ExpectMethodCall(bool expectDot, StatementWithValue prevStatement, out FunctionCall methodCall)
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             if (expectDot && !ExpectOperator("."))
             {
-                currentTokenIndex = startTokenIndex;
+                CurrentTokenIndex = startTokenIndex;
                 methodCall = null;
                 return false;
             }
 
             if (!ExpectIdentifier(out var possibleFunctionName))
             {
-                currentTokenIndex = startTokenIndex;
+                CurrentTokenIndex = startTokenIndex;
                 methodCall = null;
                 return false;
             }
 
             if (!ExpectOperator("(", out Token bracketLeft))
             {
-                currentTokenIndex = startTokenIndex;
+                CurrentTokenIndex = startTokenIndex;
                 methodCall = null;
                 return false;
             }
@@ -1552,78 +1428,40 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
 
-        /// <returns>
-        /// <list type="bullet">
-        /// <item>
-        ///  <seealso cref="FunctionCall"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Literal"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="NewInstance"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Field"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="Identifier"></seealso>
-        /// </item>
-        /// <item>
-        ///  <seealso cref="OperatorCall"></seealso>
-        /// </item>
-        /// </list>
-        /// </returns>
-        /// <exception cref="SyntaxException"></exception>
         StatementWithValue ExpectExpression()
         {
-            if (ExpectOperator("!", out var tNotOperator))
+            if (ExpectOperator(UnaryPrefixOperators, out Token unaryPrefixOperator))
             {
                 StatementWithValue statement = ExpectOneValue();
                 if (statement == null)
-                { throw new SyntaxException($"Expected OneValue after operator ('{tNotOperator}'), got {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected value after operator \"{unaryPrefixOperator}\", got {CurrentToken}", CurrentToken); }
 
-                return new OperatorCall(tNotOperator, statement);
+                return new OperatorCall(unaryPrefixOperator, statement);
             }
-
-            /*
-            if (ExpectOperator("-", out var tMinusOperator))
-            {
-                Statement statement = ExpectOneValue();
-                if (statement == null)
-                { throw new SyntaxException("Expected value or expression after '-' operator", tMinusOperator); }
-
-                return new Statement_Operator(tMinusOperator, statement);
-            }
-            */
 
             StatementWithValue leftStatement = ExpectOneValue();
             if (leftStatement == null) return null;
 
             while (true)
             {
-                if (!ExpectOperator(new string[] {
-                        "<<", ">>",
-                        "+", "-", "*", "/", "%", "&", "|",
-                        "<", ">", ">=", "<=", "!=", "==", "&&", "||", "^"
-                    }, out Token op)) break;
+                if (!ExpectOperator(BinaryOperators, out Token binaryOperator)) break;
 
                 StatementWithValue rightStatement = ExpectOneValue();
 
                 if (rightStatement == null)
-                { throw new SyntaxException($"Expected OneValue after operator ('{op}'), got {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\", got {CurrentToken}", CurrentToken); }
 
-                int rightSidePrecedence = OperatorPrecedence(op.Content);
+                int rightSidePrecedence = OperatorPrecedence(binaryOperator.Content);
 
                 OperatorCall rightmostStatement = FindRightmostStatement(leftStatement, rightSidePrecedence);
                 if (rightmostStatement != null)
                 {
-                    OperatorCall operatorCall = new(op, rightmostStatement.Right, rightStatement);
+                    OperatorCall operatorCall = new(binaryOperator, rightmostStatement.Right, rightStatement);
                     rightmostStatement.Right = operatorCall;
                 }
                 else
                 {
-                    OperatorCall operatorCall = new(op, leftStatement, rightStatement);
+                    OperatorCall operatorCall = new(binaryOperator, leftStatement, rightStatement);
                     leftStatement = operatorCall;
                 }
             }
@@ -1631,7 +1469,6 @@ namespace ProgrammingLanguage.BBCode.Parser
             return leftStatement;
         }
 
-        /// <exception cref="SyntaxException"></exception>
         AnyAssignment ExpectAnySetter()
         {
             AnyAssignment statement = null;
@@ -1641,20 +1478,19 @@ namespace ProgrammingLanguage.BBCode.Parser
             return statement;
         }
 
-        /// <exception cref="SyntaxException"></exception>
         Assignment ExpectSetter()
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             StatementWithValue leftStatement = ExpectExpression();
             if (leftStatement == null)
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return null;
             }
 
             if (!ExpectOperator("=", out Token @operator))
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return null;
             }
 
@@ -1665,23 +1501,19 @@ namespace ProgrammingLanguage.BBCode.Parser
             return new Assignment(@operator, leftStatement, valueToAssign);
         }
 
-        /// <exception cref="SyntaxException"></exception>
         CompoundAssignment ExpectCompoundSetter()
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             StatementWithValue leftStatement = ExpectExpression();
             if (leftStatement == null)
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return null;
             }
 
-            if (!ExpectOperator(new string[] {
-                    "+=", "-=", "*=", "/=", "%=",
-                    "&=", "|=", "^=",
-                }, out var @operator))
+            if (!ExpectOperator(CompoundAssignmentOperators, out var @operator))
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return null;
             }
 
@@ -1692,15 +1524,14 @@ namespace ProgrammingLanguage.BBCode.Parser
             return new CompoundAssignment(@operator, leftStatement, valueToAssign);
         }
 
-        /// <exception cref="SyntaxException"></exception>
         ShortOperatorCall ExpectShortOperator()
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             StatementWithValue leftStatement = ExpectExpression();
 
             if (leftStatement == null)
             {
-                currentTokenIndex = parseStart;
+                CurrentTokenIndex = parseStart;
                 return null;
             }
 
@@ -1714,11 +1545,10 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return new ShortOperatorCall(t1, leftStatement);
             }
 
-            currentTokenIndex = parseStart;
+            CurrentTokenIndex = parseStart;
             return null;
         }
 
-        /// <exception cref="SyntaxException"></exception>
         bool ExpectModifiedValue(out ModifiedStatement modifiedStatement, params string[] validModifiers)
         {
             if (!ExpectIdentifier(out Token modifier, validModifiers))
@@ -1738,11 +1568,6 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="statement"></param>
-        /// <param name="rightSidePrecedence"></param>
         /// <returns>
         /// <see langword="null"/> or <see cref="OperatorCall"/>
         /// </returns>
@@ -1758,25 +1583,25 @@ namespace ProgrammingLanguage.BBCode.Parser
             return right;
         }
 
-        int OperatorPrecedence(string str)
+        static int OperatorPrecedence(string @operator)
         {
-            if (operators.TryGetValue(str, out int precedence))
+            if (Constants.Operators.Precedences.TryGetValue(@operator, out int precedence))
             { return precedence; }
-            else throw new InternalException($"Precedence for operator {str} not found");
+            throw new InternalException($"Precedence for operator \"{@operator}\" not found");
         }
 
         FunctionCall ExpectFunctionCall()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             if (!ExpectIdentifier(out Token possibleFunctionName))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (possibleFunctionName == null)
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (!ExpectOperator("(", out Token bracketLeft))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
 
@@ -1784,7 +1609,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             List<StatementWithValue> parameters = new();
 
             int endlessSafe = 0;
-            Token bracketRight = null;
+            Token bracketRight;
             while (!ExpectOperator(")", out bracketRight) || expectParameter)
             {
                 StatementWithValue parameter;
@@ -1823,13 +1648,13 @@ namespace ProgrammingLanguage.BBCode.Parser
             => ExpectKeywordCall(name, parameterCount, parameterCount);
         KeywordCall ExpectKeywordCall(string name, int minParameterCount, int maxParameterCount)
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             if (!ExpectIdentifier(out Token possibleFunctionName))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (possibleFunctionName.Content != name)
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             possibleFunctionName.AnalysedType = TokenAnalysedType.Statement;
 
@@ -1863,14 +1688,14 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         bool ExpectAttribute(out FunctionDefinition.Attribute attribute)
         {
-            int parseStart = currentTokenIndex;
+            int parseStart = CurrentTokenIndex;
             attribute = new();
 
             if (!ExpectOperator("[", out var t0))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectIdentifier(out Token attributeT))
-            { currentTokenIndex = parseStart; return false; }
+            { CurrentTokenIndex = parseStart; return false; }
 
             attributeT.AnalysedType = TokenAnalysedType.Attribute;
 
@@ -1903,7 +1728,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         FieldDefinition ExpectField()
         {
-            int startTokenIndex = currentTokenIndex;
+            int startTokenIndex = CurrentTokenIndex;
 
             if (ExpectIdentifier("private", out Token protectionToken))
             {
@@ -1912,13 +1737,13 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             TypeInstance possibleType = ExpectType();
             if (possibleType == null)
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (!ExpectIdentifier(out Token possibleVariableName))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             if (ExpectOperator("("))
-            { currentTokenIndex = startTokenIndex; return null; }
+            { CurrentTokenIndex = startTokenIndex; return null; }
 
             possibleVariableName.AnalysedType = TokenAnalysedType.None;
 
@@ -1945,31 +1770,31 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 value = float.Parse(CurrentToken.Content.Replace("_", ""));
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
             {
                 value = int.Parse(CurrentToken.Content.Replace("_", ""));
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
             {
                 value = Convert.ToInt32(CurrentToken.Content, 16);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
             {
                 value = Convert.ToInt32(CurrentToken.Content.Replace("_", ""), 2);
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
                 value = CurrentToken.Content;
 
-                currentTokenIndex++;
+                CurrentTokenIndex++;
             }
         }
 
@@ -2019,9 +1844,10 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             return modifiers.ToArray();
         }
-        void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
+
+        static void CheckModifiers(IEnumerable<Token> modifiers, params string[] validModifiers)
         {
-            foreach (var modifier in modifiers)
+            foreach (Token modifier in modifiers)
             {
                 if (!validModifiers.Contains(modifier.Content))
                 { throw new SyntaxException($"Modifier \"{modifier}\" not valid in the current context", modifier); }
@@ -2037,7 +1863,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             result = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
 
             return true;
         }
@@ -2061,7 +1887,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (name.Contains(CurrentToken.Content) == false) return false;
 
             result = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
 
             return true;
         }
@@ -2073,15 +1899,13 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             result = CurrentToken;
-            currentTokenIndex++;
+            CurrentTokenIndex++;
 
             return true;
         }
 
         TypeInstance ExpectType(bool allowVarKeyword = true, bool allowAnyKeyword = false)
         {
-            int parseStart = currentTokenIndex;
-
             if (!ExpectIdentifier(out Token possibleType)) return null;
 
             possibleType.AnalysedType = TokenAnalysedType.Keyword;
@@ -2110,18 +1934,8 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             TypeInstance newType = new(possibleType);
 
-            if (types.Contains(possibleType.Content))
-            {
-
-                newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType;
-            }
-            else
-            {
-                if (TryGetStruct(possibleType.Content, out _))
-                { newType.Identifier.AnalysedType = TokenAnalysedType.Struct; }
-                else if (TryGetClass(possibleType.Content, out _))
-                { newType.Identifier.AnalysedType = TokenAnalysedType.Class; }
-            }
+            if (Constants.BuiltinTypes.Contains(possibleType.Content))
+            { newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType; }
 
             if (ExpectOperator("<"))
             {
@@ -2141,16 +1955,11 @@ namespace ProgrammingLanguage.BBCode.Parser
                 }
             }
 
-            if (ExpectOperator("[", out var listToken0))
+            if (ExpectOperator("[", out _))
             { return null; }
 
             return newType;
         }
-
-        bool TryGetStruct(string name, out StructDefinition @struct)
-            => Structs.TryGetValue(name, out @struct);
-        bool TryGetClass(string name, out ClassDefinition @class)
-            => Classes.TryGetValue(name, out @class);
 
         #endregion
     }

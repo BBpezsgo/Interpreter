@@ -388,7 +388,7 @@ namespace ConsoleGUI
                         }
 
                         string param = parameters2[j];
-                        if (ProgrammingLanguage.BBCode.Compiler.Constants.BuiltinTypes.Contains(param))
+                        if (ProgrammingLanguage.Constants.BuiltinTypes.Contains(param))
                         {
                             sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
                         }

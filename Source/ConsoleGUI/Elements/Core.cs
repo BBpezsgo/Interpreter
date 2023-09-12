@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using Win32;
 
 namespace ConsoleGUI
 {
@@ -420,7 +421,7 @@ namespace ConsoleGUI
             {
                 if (elements[i] is not IElementWithEvents element) continue;
                 if (elements[i].Rect.IsEmpty) continue;
-                if (!elements[i].Contains(e.X, e.Y)) continue;
+                if (!elements[i].Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                 element.OnMouseEvent(e);
             }
         }

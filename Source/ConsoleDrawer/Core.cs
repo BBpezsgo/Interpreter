@@ -1,45 +1,9 @@
-﻿using ConsoleDrawer;
-
-using System;
+﻿using System;
 using System.Diagnostics;
+using Win32;
 
 namespace ConsoleGUI
 {
-    [Flags]
-    public enum ForegroundColor : short
-    {
-        Black = 0,
-        Gray = CharInfoAttributes.FOREGROUND_INTENSITY,
-        Red = CharInfoAttributes.FOREGROUND_RED,
-        DarkGreen = CharInfoAttributes.FOREGROUND_GREEN,
-        DarkBlue = CharInfoAttributes.FOREGROUND_BLUE,
-        Orange = Red | DarkGreen,
-        LightBlue = DarkGreen | DarkBlue,
-        Magenta = DarkBlue | Red,
-        Default = Red | DarkGreen | DarkBlue,
-
-        LightRed = Red | CharInfoAttributes.FOREGROUND_INTENSITY,
-        Green = DarkGreen | CharInfoAttributes.FOREGROUND_INTENSITY,
-        Blue = DarkBlue | CharInfoAttributes.FOREGROUND_INTENSITY,
-        Yellow = Orange | CharInfoAttributes.FOREGROUND_INTENSITY,
-        Cyan = LightBlue | CharInfoAttributes.FOREGROUND_INTENSITY,
-        White = Default | CharInfoAttributes.FOREGROUND_INTENSITY,
-    }
-
-    [Flags]
-    public enum BackgroundColor : short
-    {
-        Black = ForegroundColor.Black << 4,
-        Gray = ForegroundColor.Gray << 4,
-        Red = ForegroundColor.Red << 4,
-        Green = ForegroundColor.Green << 4,
-        Blue = ForegroundColor.Blue << 4,
-        Yellow = ForegroundColor.Yellow << 4,
-        Cyan = ForegroundColor.Cyan << 4,
-        Magenta = ForegroundColor.Magenta << 4,
-        White = ForegroundColor.White << 4,
-    }
-
     public static class ConsoleColorExtensions
     {
         public static BackgroundColor ToBackground(this ForegroundColor color)

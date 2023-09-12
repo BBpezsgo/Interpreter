@@ -3,11 +3,10 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using Win32;
 
 namespace ConsoleGUI
 {
-    using ConsoleDrawer;
-
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Output.Debug;
 
@@ -817,7 +816,7 @@ namespace ConsoleGUI
 
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
-                    b.ForegroundColor = ForegroundColor.LightBlue;
+                    b.ForegroundColor = ForegroundColor.Blue;
                     b.AddText("►");
                     basepointerShown = true;
                     b.ForegroundColor = ForegroundColor.Gray;
@@ -920,7 +919,7 @@ namespace ConsoleGUI
             {
                 if (this.Interpreter.Details.Interpreter.BasePointer == i)
                 {
-                    b.ForegroundColor = ForegroundColor.LightBlue;
+                    b.ForegroundColor = ForegroundColor.Blue;
                     b.AddText("►");
                     basepointerShown = true;
                     b.ForegroundColor = ForegroundColor.Gray;
@@ -1035,7 +1034,7 @@ namespace ConsoleGUI
                 }
 
                 LinePrefix((i + 1).ToString());
-                b.ForegroundColor = ForegroundColor.Orange;
+                b.ForegroundColor = ForegroundColor.Yellow;
                 b.AddText($"{new string(' ', Math.Max(0, indent * 2))} ");
                 if (IsNextInstruction)
                 {
@@ -1118,7 +1117,7 @@ namespace ConsoleGUI
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
 
-            if (!e.KeyDown && e.AsciiChar == 9)
+            if (!e.IsDown && e.AsciiChar == 9)
             {
                 if (this.CurrentlyJumping <= 0)
                 {
@@ -1133,7 +1132,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.KeyDown && e.AsciiChar == 43)
+            if (e.IsDown && e.AsciiChar == 43)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1146,7 +1145,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.KeyDown && e.AsciiChar == 45)
+            if (e.IsDown && e.AsciiChar == 45)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1161,7 +1160,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.KeyDown && e.AsciiChar == 42)
+            if (e.IsDown && e.AsciiChar == 42)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1174,7 +1173,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.KeyDown && e.AsciiChar == 47)
+            if (e.IsDown && e.AsciiChar == 47)
             {
                 if (this.CurrentlyJumping > 0)
                 {

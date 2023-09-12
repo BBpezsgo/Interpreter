@@ -4,6 +4,7 @@ using Microsoft.Win32.SafeHandles;
 
 using System;
 using System.Collections.Generic;
+using Win32;
 
 namespace ConsoleGUI
 {
@@ -293,7 +294,7 @@ namespace ConsoleGUI
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 ConsoleBuffer[i].Char.UnicodeChar = ' ';
-                ConsoleBuffer[i].Attributes = (short)BackgroundColor.Magenta;
+                ConsoleBuffer[i].Attributes = (ushort)BackgroundColor.Magenta;
             }
 
             try
@@ -333,7 +334,7 @@ namespace ConsoleGUI
                     if (ConsoleBuffer.IsOutside(i)) continue;
 
                     Character chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
-                    ConsoleBuffer[i].Attributes = (short)((short)chr.ForegroundColor | (short)chr.BackgroundColor);
+                    ConsoleBuffer[i].Attributes = (ushort)((int)chr.ForegroundColor | (int)chr.BackgroundColor);
                     ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
                 }
             }
@@ -363,7 +364,7 @@ namespace ConsoleGUI
         void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
         void KeyEvent(KeyEvent e)
         {
-            if (!e.KeyDown)
+            if (!e.IsDown)
             {
                 if (e.AsciiChar == 27)
                 {
@@ -458,14 +459,14 @@ namespace ConsoleGUI
         }
         void MouseEvent(MouseEvent e)
         {
-            MousePosition = e.Position;
+            MousePosition = e.MousePosition;
 
             for (int i = Elements.Length - 1; i >= 0; i--)
             {
                 try
                 {
                     if (Elements[i] is not IElementWithEvents element) continue;
-                    if (!element.Contains(e.X, e.Y)) continue;
+                    if (!element.Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                     element.OnMouseEvent(e);
                     element.BeforeDraw();
                     DrawElement(element);
@@ -484,7 +485,7 @@ namespace ConsoleGUI
                         try
                         {
                             if (elementWithSubelements.Elements[i] is not IElementWithEvents element) continue;
-                            if (!element.Contains(e.X, e.Y)) continue;
+                            if (!element.Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                             element.OnMouseEvent(e);
                         }
                         catch (Exception exception)

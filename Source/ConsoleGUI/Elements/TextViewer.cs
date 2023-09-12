@@ -2,6 +2,7 @@
 
 using System;
 using System.Diagnostics;
+using Win32;
 
 namespace ConsoleGUI
 {

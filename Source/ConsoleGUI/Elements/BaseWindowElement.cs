@@ -1,6 +1,6 @@
-﻿using ConsoleDrawer;
-
-using System.Drawing;
+﻿using System.Drawing;
+using Win32;
+using Point = System.Drawing.Point;
 
 namespace ConsoleGUI
 {
@@ -40,7 +40,7 @@ namespace ConsoleGUI
 
             if (IsDragging)
             {
-                var offset = new Point(mouse.X - MouseDragStart.X, mouse.Y - MouseDragStart.Y);
+                var offset = new Point(mouse.MousePosition.X - MouseDragStart.X, mouse.MousePosition.Y - MouseDragStart.Y);
                 var newRect = Rect;
                 newRect.X = MouseDragStartPos.X + offset.X;
                 newRect.Y = MouseDragStartPos.Y + offset.Y;
@@ -48,10 +48,10 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (mouse.Y != Rect.Top) return;
+            if (mouse.MousePosition.Y != Rect.Top) return;
 
             MouseDragStartPos = Rect.Location;
-            MouseDragStart = new Point(mouse.X, mouse.Y);
+            MouseDragStart = new Point(mouse.MousePosition.X, mouse.MousePosition.Y);
             IsDragging = true;
         }
         public override void RefreshSize()

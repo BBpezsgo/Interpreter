@@ -28,18 +28,24 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-c-remove-unused-functions [byte]` Remove unused instructions iterations
 - `-c-print-instructions [bool]` Prints the generated instructions
 - `-dont-optimize` Disables basic code optimization
+- `-no-debug-info` I forgot what it does
+- `-bf-no-cache` Disables the external function name cache. With this option enabled, every time you perform an external call, the function name is generated on the heap
 
 **Interpreter:**
 - `-bc-clock [int]` Sets the interpreter *clock cycles/update*
 - `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
 - `-bc-stack-size [int]` Sets the interpreter *stack size*
+- `-heap [int]` Sets the heap size
 
 **Modes:**
 > Use only one of these!
-- `-test` Executes a test file.
-- `-decompile` Executes a binary file.
-- `-compile [string]` Compiles and writes the code to the given path
+- `-test` ⚠️ Deprecated! Executes a test file.
+- `-decompile` ⚠️ Deprecated! Executes a binary file.
+- `-compile [string]` ⚠️ Deprecated! Compiles and writes the code to the given path
 - `-console-gui`
+- `-debug` ⚠️ Deprecated!
+- `-il` ⚠️ Do not use this!
+- `-brainfuck` Compiles and executes the code with a brainfuck interpreter
 
 **Other:**
 - `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!

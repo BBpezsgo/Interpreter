@@ -28,18 +28,24 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-c-remove-unused-functions [byte]` Remove unused instructions iterations
 - `-c-print-instructions [bool]` Prints the generated instructions
 - `-dont-optimize` Disables basic code optimization
+- `-no-debug-info` I forgot what it does
+- `-bf-no-cache` Disables the external function name cache. With this option enabled, every time you perform an external call, the function name is generated on the heap
 
 **Interpreter:**
 - `-bc-clock [int]` Sets the interpreter *clock cycles/update*
 - `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
 - `-bc-stack-size [int]` Sets the interpreter *stack size*
+- `-heap [int]` Sets the heap size
 
 **Modes:**
 > Use only one of these!
-- `-test` Executes a test file.
-- `-decompile` Executes a binary file.
-- `-compile [string]` Compiles and writes the code to the given path
+- `-test` ⚠️ Deprecated! Executes a test file.
+- `-decompile` ⚠️ Deprecated! Executes a binary file.
+- `-compile [string]` ⚠️ Deprecated! Compiles and writes the code to the given path
 - `-console-gui`
+- `-debug` ⚠️ Deprecated!
+- `-il` ⚠️ Do not use this!
+- `-brainfuck` Compiles and executes the code with a brainfuck interpreter
 
 **Other:**
 - `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!
@@ -53,26 +59,17 @@ When you've created a source file, just run it with the executable. Or run the e
 [Download System.Net.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.Net.bbc)
 > Some predefined structs and functions.
 
-## [Debugger](https://github.com/BBpezsgo/InterpreterDebugger)
+## [Debugger](https://github.com/BBpezsgo/InterpreterDebugger) ⚠️ Deprecated
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## Hello World:
-```
+```cs
 // This imports the local System.bbc file along with its functions and structures.
 using "../CodeFiles/System";
 
-// Namespaces can only be used to organize code
-namespace Program
-{
-    // The program needs a function with the [CodeEntry] attribute. This function will be executed when the program is started.
-    [CodeEntry]
-    void Main()
-    {
-        // Print a message to the console
-        Console.Log("Hello world");
-    }
-}
+// Prints a message to the console
+PrintLine("hello, world");
 ```
 
 ## Other features
@@ -82,29 +79,28 @@ namespace Program
 You can create a very basic struct.
 A struct can only contain fields.<br>
 Methods are currently not supported.
-```
+```cs
 // Define the struct
 
 struct Foo
 {
   int field1;
-  string field2;
+  byte field2;
 }
 
 // Create an instance:
 
 Foo x = new Foo;
 ```
-> If `Console.Log` is called with a parameter of type `Struct`, it will print `{ ... }`
 ### Function overloading
-Well, this is a test feature, so I don't recommend using function overloading.
+Yeah. It is supported.
 ### Method like functions
 You can create a function that looks like a method.
 Put the `this` keyword before the first parameter and you're done.<br>
 When you call a method like the function
 do not use the first argument,
 instead, put before the function.
-```
+```cs
 // Define the function:
 
 int Add(this int v)
@@ -123,7 +119,7 @@ Two events can be caught:<br>
 `update` and `end`.<br>
 `update` is called every tick.<br>
 `end` is called when the program finishes executing.
-```
+```cs
 [Catch("update")]
 void Update() { }
 ```
@@ -132,56 +128,54 @@ void Update() { }
 
 ## `export` Keyword
 You can use the `export` keyword to specify that the following function definition can be used in other files.
-```
+```cs
 export void Foo()
 { }
 ```
 > **NOTE:**
-> The `export` keyword is not supported on structs: all structs can be used in other files!
+> The `export` keyword is only supported on functions: all structs/classes/enums can be used in other files!
 
-## Predefined Functions
+## Default external functions
 
-### System.bbc
+### "stdin"
+Reads a key from the console. This will block the code execution until a key is pressed.
+- Parameters: none
+- Return value: `char`
 
-`Console.Log(message)` Prints `message` to the console<br>
-`Console.LogWarning(message)` Prints `message` in yellow on the console<br>
-`Console.LogError(message)` Prints `message` in red on the console<br>
-`Console.Input(promt)` Prints the "prompt" to the console and waits for user input<br>
+### "stdout"
+Writes a character to the standard output.
+- Parameters: `char` character
+- Return value: `void`
 
-`Sleep(ms)` Pauses the code execution for `ms` milliseconds<br>
+### "stderr"
+Writes a character to the standard error.
+- Parameters: none
+- Return value: `void`
 
-`Time.Now()` Returns the current time<br>
+### "console-set"
+Sets a character on the console.
+- Parameters: `char` character, `int` x, `int` y
+- Return value: `void`
 
-`<string>.Reverse()` Returns the reverse of the string<br>
-`<string>.Substring(start)` Returns the string after `start`<br>
-`<string>.Substring(start, length)` Returns the `length` long strings after `start`<br>
-`<string>.Split(sep)` Splits the text at the specified (`sep`) separators<br>
+### "console-clear"
+Clears the console.
+- Parameters: none
+- Return value: `void`
 
-`Math.Pow(a, b)` Returns `a` to the power of `b`<br>
-`Math.Abs(v)` Returns the absolute value of `v`<br>
-`Math.Min(a, b)` Returns the smaller of `a` and `b`<br>
-`Math.Max(a, b)` Returns the larger of `a` and `b`<br>
+### "sleep"
+Pauses the code execution for `t` millisecs.
+- Parameters: `int` t
+- Return value: `void`
 
-### System.Lists.bbc
-> **NOTE:**
-> Only int lists supported!
+### "sin"
+Returns the sine of `v` angle.
+- Parameters: `float` v
+- Return value: `float`
 
-`List CreateList(int length)` Creates a new list with a specified length. (Maximum length is 5)<br>
-`int List.ElementAt(int index)` Returns the element at the specified index.<br>
-`void List.Push(int element)` Adds a new element to the end of the list.<br>
-`void List.Pop()` Removes the last element from the list.<br>
-`void List.Insert(int index, int element)` Adds a new element at the specified index.<br>
-`void List.Set(int index, int element)` Sets the value of an element at the specified index.<br>
-`void List.RemoveAt(int index)` Removes the element from the specified index.<br>
-`string List.ToString()` Converts the list to a string. (ie.: "{ 3, 5, 2 }")<br>
-
-### System.Net.bbc
-
-`Http.Get(url)` Sends a HTTP GET request to `url`
+### "cos"
+Returns the cosine of `v` angle.
+- Parameters: `float` v
+- Return value: `float`
 
 ## api-ms-win-crt-string-l1-1-0.dll Missing Error
 This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
-
-## Known issules
-
-The file `/TestFiles/test-matrix.bbc` doesn't work for some reason :(

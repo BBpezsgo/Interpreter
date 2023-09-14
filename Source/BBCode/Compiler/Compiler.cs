@@ -602,21 +602,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             #endregion
 
-            #region Analyse Struct Fields
-
-            foreach (var @struct in Structs)
-            {
-                foreach (var field in @struct.Fields)
-                {
-                    if (CompiledStructs.TryGetValue(field.Type.Identifier.Content, out CompiledStruct fieldStructType))
-                    {
-                        field.Type.Identifier = field.Type.Identifier.Struct(fieldStructType);
-                    }
-                }
-            }
-
-            #endregion
-
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)

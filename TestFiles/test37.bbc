@@ -6,7 +6,7 @@ bruhs[0] = 3;
 bruhs[1] = 6;
 bruhs[2] = 9;
 
-void Do(Array<int> list, func<void, int> func) {
+void Do(Array<int> list, void(int) func) {
 	for (int i; i < list.Length(); i++) {
 		func(list[i]);
 	};
@@ -14,6 +14,8 @@ void Do(Array<int> list, func<void, int> func) {
 
 void PrintElement(int element) { PrintLine(element); }
 
-Do(bruhs, PrintLine);
+void(Array<int>, void(int)) bruh = Do;
+
+bruh(bruhs, PrintElement);
 
 delete bruhs;

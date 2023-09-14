@@ -8,15 +8,28 @@ namespace ProgrammingLanguage.BBCode
 
     using Parser;
 
+    public enum TypeInstanceKind
+    {
+        Simple,
+        Template,
+        Function,
+    }
+
     public class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
     {
-        public Token Identifier;
-        public List<TypeInstance> GenericTypes;
+        public readonly Token Identifier;
+        public readonly TypeInstanceKind Kind;
 
-        public TypeInstance(Token identifier) : base()
+        public readonly List<TypeInstance> GenericTypes;
+        public readonly List<TypeInstance> ParameterTypes;
+
+        public TypeInstance(Token identifier, TypeInstanceKind kind) : base()
         {
             this.Identifier = identifier;
+            this.Kind = kind;
+
             this.GenericTypes = new List<TypeInstance>();
+            this.ParameterTypes = new List<TypeInstance>();
         }
 
         public Position Position
@@ -36,14 +49,9 @@ namespace ProgrammingLanguage.BBCode
         {
             string definedType = typeDefinitionReplacer?.Invoke(name);
             if (definedType == null)
-            { return new TypeInstance(Token.CreateAnonymous(name)); }
+            { return new TypeInstance(Token.CreateAnonymous(name), TypeInstanceKind.Simple); }
             else
-            { return new TypeInstance(Token.CreateAnonymous(definedType)); }
-        }
-        public static TypeInstance CreateAnonymous(Compiler.CompiledType compiledType)
-        {
-            if (compiledType is null) throw new ArgumentNullException(nameof(compiledType));
-            return new TypeInstance(Token.CreateAnonymous(compiledType.Name));
+            { return new TypeInstance(Token.CreateAnonymous(definedType), TypeInstanceKind.Simple); }
         }
 
         public override string ToString()

@@ -18,7 +18,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "donught.bbc";
+            string path = TestConstants.TestFilesPath + "test37.bbc";
 
             if (args.Length == 0) args = new string[]
             {

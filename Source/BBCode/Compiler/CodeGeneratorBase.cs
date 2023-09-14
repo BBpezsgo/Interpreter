@@ -1239,6 +1239,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return type.Enum.Members[0].Value;
             }
 
+            if (type.IsFunction)
+            {
+                return new DataItem(int.MaxValue);
+            }
+
             return GetInitialValue(type.BuiltinType);
         }
 

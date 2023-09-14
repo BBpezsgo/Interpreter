@@ -1729,11 +1729,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
+        public CompiledType(string type, Func<string, CompiledType> typeFinder) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            if (Constants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
+            { return; }
+
+            if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
+
+            Set(typeFinder.Invoke(type));
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
         public CompiledType(TypeInstance type, Func<string, CompiledType> typeFinder) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            if (type.Kind == TypeInstanceKind.Simple &&
+                Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
             if (type.Identifier.Content == "func")
@@ -1757,6 +1772,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         funcParams[i - 1] = new CompiledType(genericType, typeFinder);
                     }
                 }
+                function = new FunctionType(funcRet, funcParams);
+                return;
+            }
+
+            if (type.Kind == TypeInstanceKind.Function)
+            {
+                if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
+
+                CompiledType funcRet = new(type.Identifier.Content, typeFinder);
+                CompiledType[] funcParams = CompiledType.FromArray(type.ParameterTypes, typeFinder);
                 function = new FunctionType(funcRet, funcParams);
                 return;
             }
@@ -2041,8 +2066,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             => new()
             { genericName = content, };
 
-        public static CompiledType[] FromArray(List<TypeInstance> types, Func<string, CompiledType> typeFinder)
-            => CompiledType.FromArray(types.ToArray(), typeFinder);
         public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<string, CompiledType> typeFinder)
             => CompiledType.FromArray(types.ToArray(), typeFinder);
         public static CompiledType[] FromArray(TypeInstance[] types, Func<string, CompiledType> typeFinder)

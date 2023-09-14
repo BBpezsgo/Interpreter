@@ -355,7 +355,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             Token[] modifiers = ParseModifiers();
 
-            TypeInstance possibleType = ExpectType(false);
+            TypeInstance possibleType = ExpectType(AllowedType.None);
             if (possibleType == null)
             { CurrentTokenIndex = parseStart; return false; }
 
@@ -375,7 +375,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
                 CheckModifiers(parameterModifiers, "this");
 
-                TypeInstance possibleParameterType = ExpectType(false, true);
+                TypeInstance possibleParameterType = ExpectType(AllowedType.None);
                 if (possibleParameterType == null)
                 { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -490,7 +490,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             Token[] modifiers = ParseModifiers();
 
-            TypeInstance possibleType = ExpectType(false);
+            TypeInstance possibleType = ExpectType(AllowedType.None);
             if (possibleType == null)
             { CurrentTokenIndex = parseStart; return false; }
 
@@ -510,7 +510,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
                 CheckModifiers(parameterModifiers, "this", "ref");
 
-                TypeInstance possibleParameterType = ExpectType(false, true);
+                TypeInstance possibleParameterType = ExpectType(AllowedType.FunctionPointer);
                 if (possibleParameterType == null)
                 { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -582,7 +582,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
                 CheckModifiers(parameterModifiers);
 
-                TypeInstance possibleParameterType = ExpectType(false, true);
+                TypeInstance possibleParameterType = ExpectType(AllowedType.None);
                 if (possibleParameterType == null)
                 { throw new SyntaxException("Expected parameter type", CurrentToken); }
 
@@ -976,7 +976,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 newIdentifier.AnalysedType = TokenAnalysedType.Keyword;
 
-                TypeInstance instanceTypeName = ExpectType(false, false);
+                TypeInstance instanceTypeName = ExpectType(AllowedType.None);
 
                 if (instanceTypeName == null)
                 { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
@@ -1079,7 +1079,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 if (ExpectIdentifier("as", out Token keyword))
                 {
-                    TypeInstance type = ExpectType(false, false);
+                    TypeInstance type = ExpectType(AllowedType.None);
 
                     if (type == null)
                     { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
@@ -1209,7 +1209,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             ExpectIdentifier("const", out Token constModifier);
 
-            TypeInstance possibleType = ExpectType();
+            TypeInstance possibleType = ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer);
             if (possibleType == null)
             { CurrentTokenIndex = startTokenIndex; return null; }
 
@@ -1434,7 +1434,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 StatementWithValue statement = ExpectOneValue();
                 if (statement == null)
-                { throw new SyntaxException($"Expected value after operator \"{unaryPrefixOperator}\", got {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected value after operator \"{unaryPrefixOperator}\", got \"{CurrentToken}\"", CurrentToken); }
 
                 return new OperatorCall(unaryPrefixOperator, statement);
             }
@@ -1449,7 +1449,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 StatementWithValue rightStatement = ExpectOneValue();
 
                 if (rightStatement == null)
-                { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\", got {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\", got \"{CurrentToken}\"", CurrentToken); }
 
                 int rightSidePrecedence = OperatorPrecedence(binaryOperator.Content);
 
@@ -1735,7 +1735,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             }
 
-            TypeInstance possibleType = ExpectType();
+            TypeInstance possibleType = ExpectType(AllowedType.Implicit);
             if (possibleType == null)
             { CurrentTokenIndex = startTokenIndex; return null; }
 
@@ -1904,7 +1904,16 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
 
-        TypeInstance ExpectType(bool allowVarKeyword = true, bool allowAnyKeyword = false)
+        [Flags]
+        enum AllowedType
+        {
+            None = 0b_0000_0000,
+            Implicit = 0b_0000_0001,
+            ExplicitAny = 0b_0000_0010,
+            FunctionPointer = 0b_0000_0100,
+        }
+
+        TypeInstance ExpectType(AllowedType flags)
         {
             if (!ExpectIdentifier(out Token possibleType)) return null;
 
@@ -1912,36 +1921,44 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             if (possibleType.Content == "any")
             {
-                if (!allowAnyKeyword)
+                if ((flags & AllowedType.ExplicitAny) == 0)
                 {
-                    Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
+                    Errors.Add(new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType));
                     return null;
                 }
 
-                return new TypeInstance(possibleType);
+                if (ExpectOperator(new string[] { "<", "(", "[" }, out Token illegalT))
+                { throw new SyntaxException($"This is not allowed", illegalT); }
+
+                return new TypeInstance(possibleType, TypeInstanceKind.Simple);
             }
 
             if (possibleType.Content == "var")
             {
-                if (!allowVarKeyword)
+                if ((flags & AllowedType.Implicit) == 0)
                 {
-                    Errors.Add(new Error($"Type '{possibleType.Content}' is not valid in the current context", possibleType));
+                    Errors.Add(new Error($"implicit type not allowed in the current context", possibleType));
                     return null;
                 }
 
-                return new TypeInstance(possibleType);
+                if (ExpectOperator(new string[] { "<", "(", "[" }, out Token illegalT))
+                { throw new SyntaxException($"This is not allowed", illegalT); }
+
+                return new TypeInstance(possibleType, TypeInstanceKind.Simple);
             }
 
-            TypeInstance newType = new(possibleType);
+            TypeInstance newType;
 
-            if (Constants.BuiltinTypes.Contains(possibleType.Content))
-            { newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType; }
+            int afterIdentifier = CurrentTokenIndex;
 
             if (ExpectOperator("<"))
             {
+                newType = new TypeInstance(possibleType, TypeInstanceKind.Template);
+
                 while (true)
                 {
-                    var type = ExpectType(false, false);
+                    TypeInstance type = ExpectType(AllowedType.FunctionPointer);
+
                     if (type == null)
                     { throw new SyntaxException($"Expected type as generic parameter", CurrentToken); }
 
@@ -1954,9 +1971,48 @@ namespace ProgrammingLanguage.BBCode.Parser
                     { continue; }
                 }
             }
+            else if (ExpectOperator("("))
+            {
+                if ((flags & AllowedType.FunctionPointer) == 0)
+                {
+                    CurrentTokenIndex = afterIdentifier;
+                    return new TypeInstance(possibleType, TypeInstanceKind.Simple);
+                }
+
+                newType = new TypeInstance(possibleType, TypeInstanceKind.Function);
+
+                while (true)
+                {
+                    TypeInstance type = ExpectType(AllowedType.FunctionPointer);
+
+                    if (type == null)
+                    {
+                        CurrentTokenIndex = afterIdentifier;
+                        return new TypeInstance(possibleType, TypeInstanceKind.Simple);
+                        // throw new SyntaxException($"Expected type as function-pointer parameter tyoe", CurrentToken);
+                    }
+
+                    newType.ParameterTypes.Add(type);
+
+                    if (ExpectOperator(")"))
+                    { break; }
+
+                    if (ExpectOperator(","))
+                    { continue; }
+                }
+            }
+            else
+            {
+                newType = new TypeInstance(possibleType, TypeInstanceKind.Simple);
+            }
+
+            if (Constants.BuiltinTypes.Contains(possibleType.Content))
+            { newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType; }
 
             if (ExpectOperator("[", out _))
-            { return null; }
+            {
+                return null;
+            }
 
             return newType;
         }

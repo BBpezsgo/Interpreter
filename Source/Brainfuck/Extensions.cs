@@ -1,7 +1,8 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 #nullable enable
- 
+
 namespace ProgrammingLanguage.Brainfuck
 {
     internal interface ISearchable<T>
@@ -40,7 +41,7 @@ namespace ProgrammingLanguage.Brainfuck
         }
 
 
-        public static bool TryFind<TElement, TQuery>(this TElement[] list, TQuery query, out TElement result) where TElement : ISearchable<TQuery>
+        public static bool TryFind<TElement, TQuery>(this TElement[] list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
         {
             for (int i = 0; i < list.Length; i++)
             {
@@ -50,13 +51,12 @@ namespace ProgrammingLanguage.Brainfuck
                     return true;
                 }
             }
-#pragma warning disable CS8601 // Possible null reference assignment.
+
             result = default;
-#pragma warning restore CS8601 // Possible null reference assignment.
             return false;
         }
 
-        public static bool TryFind<TElement, TQuery>(this IEnumerable<TElement> list, TQuery query, out TElement result) where TElement : ISearchable<TQuery>
+        public static bool TryFind<TElement, TQuery>(this IEnumerable<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
         {
             foreach (TElement v in list)
             {
@@ -66,13 +66,12 @@ namespace ProgrammingLanguage.Brainfuck
                     return true;
                 }
             }
-#pragma warning disable CS8601 // Possible null reference assignment.
+
             result = default;
-#pragma warning restore CS8601 // Possible null reference assignment.
             return false;
         }
 
-        public static bool TryFind<TElement, TQuery>(this List<TElement> list, TQuery query, out TElement result) where TElement : ISearchable<TQuery>
+        public static bool TryFind<TElement, TQuery>(this List<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
         {
             for (int i = 0; i < list.Count; i++)
             {
@@ -82,13 +81,12 @@ namespace ProgrammingLanguage.Brainfuck
                     return true;
                 }
             }
-#pragma warning disable CS8601 // Possible null reference assignment.
+
             result = default;
-#pragma warning restore CS8601 // Possible null reference assignment.
             return false;
         }
 
-        public static bool TryFind<TElement, TQuery>(this ProgrammingLanguage.Core.Stack<TElement> list, TQuery query, out TElement result) where TElement : ISearchable<TQuery>
+        public static bool TryFind<TElement, TQuery>(this ProgrammingLanguage.Core.Stack<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
         {
             for (int i = 0; i < list.Count; i++)
             {
@@ -98,9 +96,8 @@ namespace ProgrammingLanguage.Brainfuck
                     return true;
                 }
             }
-#pragma warning disable CS8601 // Possible null reference assignment.
+
             result = default;
-#pragma warning restore CS8601 // Possible null reference assignment.
             return false;
         }
     }

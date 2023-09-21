@@ -83,7 +83,7 @@ namespace ProgrammingLanguage.BBCode
 
     public class Token : BaseToken, IEquatable<Token>
     {
-        public TokenAnalysedType AnalysedType;
+        public TokenAnalysedType AnalyzedType;
 
         public readonly TokenType TokenType;
         public readonly bool IsAnonymous;
@@ -93,7 +93,7 @@ namespace ProgrammingLanguage.BBCode
         public Token(TokenType type, string content, bool isAnonymous)
         {
             TokenType = type;
-            AnalysedType = TokenAnalysedType.None;
+            AnalyzedType = TokenAnalysedType.None;
             Content = content;
             IsAnonymous = isAnonymous;
         }
@@ -103,13 +103,13 @@ namespace ProgrammingLanguage.BBCode
             Position = Position,
             AbsolutePosition = AbsolutePosition,
 
-            AnalysedType = AnalysedType,
+            AnalyzedType = AnalyzedType,
         };
         public override string ToString() => Content;
 
         internal string ToFullString()
         {
-            return $"Token:{TokenType} {{ \"{Content}\" {Position} {AnalysedType} }}";
+            return $"Token:{TokenType} {{ \"{Content}\" {Position} {AnalyzedType} }}";
         }
 
         public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new(type, content, true)
@@ -802,8 +802,7 @@ namespace ProgrammingLanguage.BBCode
                     CurrentToken.Position.End.Character--;
                     CurrentToken.Position.End.Line--;
                     CurrentToken.AbsolutePosition.End--;
-                    CurrentToken.Content.Clear();
-                    CurrentToken.Content.Append(CurrentToken.ToString()[..^1]);
+                    CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
                     CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     Tokens.Add(CurrentToken.Instantiate());
 

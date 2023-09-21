@@ -7,6 +7,7 @@ using System.Linq;
 
 namespace ProgrammingLanguage.Brainfuck.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using BBCode;
     using BBCode.Compiler;
     using BBCode.Parser;
@@ -180,7 +181,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 => $"{Name}: *{Address} ({Type.SizeOnStack} bytes)";
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [MaybeNullWhen(false)] out CompiledType? type)
         {
             if (Variables.TryFind(symbolName, out var variable))
             {
@@ -194,9 +195,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return true;
             }
 
-#pragma warning disable CS8625
             type = null;
-#pragma warning restore CS8625
             return false;
         }
 
@@ -448,7 +447,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
             {
-                if (!GetIndexGetterTemplate(arrayType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
@@ -571,7 +570,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 return function.Type.Size;
             }
 
-            if (GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+            if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
             {
                 if (!compilableFunction.Function.ReturnSomething)
                 { return 0; }
@@ -2198,7 +2197,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                if (!GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+                if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;

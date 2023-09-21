@@ -430,17 +430,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void GenerateCodeForStatement(VariableDeclaretion newVariable)
         {
-            newVariable.VariableName.AnalysedType = TokenAnalysedType.VariableName;
+            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
 
             if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
             { throw new CompilerException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.VariableName, CurrentFile); }
 
             if (compiledVariable.Type.IsClass)
-            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Class; }
+            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Class; }
             else if (compiledVariable.Type.IsStruct)
-            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Struct; }
+            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Struct; }
             else if (compiledVariable.Type.IsEnum)
-            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.Enum; }
+            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Enum; }
 
             if (newVariable.InitialValue == null) return;
 
@@ -457,7 +457,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "return")
             {
                 if (keywordCall.Parameters.Length > 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"return\": requied {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 if (keywordCall.Parameters.Length == 1)
                 {
@@ -494,7 +494,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "throw")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"throw\": requied {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"throw\": required {1} passed {keywordCall.Parameters}", keywordCall, CurrentFile); }
 
                 AddComment(" Param 0:");
 
@@ -522,7 +522,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "sizeof")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": requied {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
@@ -535,7 +535,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "delete")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"delete\": requied {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"delete\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
 
@@ -596,7 +596,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "clone")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"clone\": requied {1} passed {0}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"clone\": required {1} passed {0}", keywordCall, CurrentFile); }
 
                 var paramType = FindStatementType(keywordCall.Parameters[0]);
 
@@ -654,7 +654,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "out")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"out\": requied {1} passed {0}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"out\": required {1} passed {0}", keywordCall, CurrentFile); }
 
                 var outType = FindStatementType(keywordCall.Parameters[0]);
 
@@ -794,7 +794,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (functionCall.FunctionName == "sizeof")
             {
                 if (functionCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": requied {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
                 StatementWithValue param0 = functionCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
@@ -807,7 +807,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (functionCall.FunctionName == "Alloc")
             {
                 if (functionCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"Alloc\": requied {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"Alloc\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
                 GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
 
@@ -836,7 +836,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                if (!GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+                if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compilableFunction = AddCompilable(compilableFunction);
@@ -857,14 +857,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
 
             if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: requied {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
             if (compiledFunction.IsMacro)
             {
-                Warnings.Add(new Warning($"I can not inline macros becouse of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile));
+                Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile));
                 // InlineMacro(compiledFunction, functionCall.MethodParameters, functionCall.SaveValue);
                 // return;
             }
@@ -1045,10 +1045,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment($"Call {compiledVariable.Type.Function} {{");
 
-            functionCall.Identifier.AnalysedType = TokenAnalysedType.VariableName;
+            functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: requied {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
             int returnValueSize = 0;
             if (functionType.ReturnSomething)
@@ -1113,10 +1113,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment($"Call {compiledParameter.Type.Function} {{");
 
-            functionCall.Identifier.AnalysedType = TokenAnalysedType.VariableName;
+            functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: requied {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
             int returnValueSize = 0;
             if (functionType.ReturnSomething)
@@ -1197,7 +1197,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 }
 
                 if (@operator.ParameterCount != operatorDefinition.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ReadableID()}: requied {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ReadableID()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
 
                 if (operatorDefinition.IsExternal)
                 {
@@ -1306,7 +1306,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
                 if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': requied {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
                 int jumpInstruction = -1;
 
@@ -1335,7 +1335,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else if (@operator.Operator.Content == "=")
             {
                 if (@operator.ParameterCount != 2)
-                { throw new CompilerException($"Wrong number of parameters passed to assigment operator '{@operator.Operator.Content}': requied {2} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
                 GenerateCodeForValueSetter(@operator.Left, @operator.Right);
             }
@@ -1438,7 +1438,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset, $"(function) {compiledFunction.ReadableID()}");
 
-                variable.Name.AnalysedType = TokenAnalysedType.FunctionName;
+                variable.Name.AnalyzedType = TokenAnalysedType.FunctionName;
 
                 return;
             }
@@ -1617,14 +1617,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (instanceType.IsStruct)
             {
-                // newObject.TypeName = newObject.TypeName.Struct(instanceType.Struct);
                 instanceType.Struct.References?.Add(new DefinitionReference(newObject.TypeName.Identifier, CurrentFile));
 
-                throw new NotImplementedException();
+                GenerateInitialValue(instanceType);
             }
             else if (instanceType.IsClass)
             {
-                // newObject.TypeName = newObject.TypeName.Class(instanceType.Class);
                 instanceType.Class.References?.Add(new DefinitionReference(newObject.TypeName.Identifier, CurrentFile));
 
                 if (instanceType.Class.TemplateInfo != null)
@@ -1715,7 +1713,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
 
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
             int returnValueSize = 0;
             if (constructor.ReturnSomething)
@@ -1767,7 +1765,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         void GenerateCodeForStatement(Field field)
         {
-            field.FieldName.AnalysedType = TokenAnalysedType.FieldName;
+            field.FieldName.AnalyzedType = TokenAnalysedType.FieldName;
 
             var prevType = FindStatementType(field.PrevStatement);
 
@@ -1826,7 +1824,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (!GetIndexGetter(prevType, out CompiledFunction indexer))
             {
-                if (!GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
@@ -2084,7 +2082,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
         {
-            statementToSet.FieldName.AnalysedType = TokenAnalysedType.FieldName;
+            statementToSet.FieldName.AnalyzedType = TokenAnalysedType.FieldName;
 
             CompiledType valueType = FindStatementType(value);
 
@@ -2145,7 +2143,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (!GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
             {
-                if (!GetIndexSetterTemplate(prevType, valueType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                if (!GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index setter for class \"{prevType.Class.Name}\" not found", statementToSet, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
@@ -2252,7 +2250,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment(" .:");
 
-            macro.Identifier.AnalysedType = TokenAnalysedType.FunctionName;
+            macro.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
 
             (
                 CompiledParameter[] Parameters,
@@ -2438,7 +2436,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
                 if (val.IsStoredInHEAP)
-                { throw new InternalException($"This should never occur: trying to GetDataAddress of variable \"{val.VariableName.Content}\" wich's type is {val.Type}"); }
+                { throw new InternalException($"This should never occur: trying to GetDataAddress of variable \"{val.VariableName.Content}\" which's type is {val.Type}"); }
 
                 addressingMode = val.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE;
 
@@ -2659,7 +2657,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
 
             if (compiledVariable.Type.IsGeneric)
-            { newVariable.Type.Identifier.AnalysedType = TokenAnalysedType.TypeParameter; }
+            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.TypeParameter; }
 
             AddComment($"Initial value {{");
 
@@ -2749,7 +2747,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (Constants.Keywords.Contains(function.Identifier.Content))
             { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
-            function.Identifier.AnalysedType = TokenAnalysedType.FunctionName;
+            function.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
 
             if (function is FunctionDefinition functionDefinition)
             {
@@ -2834,7 +2832,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CompiledType parameterType = new(parameters[i].Type, FindType);
 
                 if (parameterType.IsGeneric)
-                { parameters[i].Type.Identifier.AnalysedType = TokenAnalysedType.TypeParameter; }
+                { parameters[i].Type.Identifier.AnalyzedType = TokenAnalysedType.TypeParameter; }
 
                 this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
 

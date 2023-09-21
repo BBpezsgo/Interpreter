@@ -185,7 +185,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { indexer.TimesUsed++; }
                     indexer.TimesUsedTotal++;
                 }
-                else if (GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                else if (GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 {
                     indexerTemplate = AddCompilable(indexerTemplate);
 
@@ -250,7 +250,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         { indexer.TimesUsed++; }
                         indexer.TimesUsedTotal++;
                     }
-                    else if (GetIndexSetterTemplate(prevType, valueType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                    else if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                     {
                         indexerTemplate = AddCompilable(indexerTemplate);
 
@@ -291,14 +291,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         { indexer.TimesUsed++; }
                         indexer.TimesUsedTotal++;
                     }
-                    else if (GetIndexSetterTemplate(prevType, valueType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                    else if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                     {
                         indexerTemplate = AddCompilable(indexerTemplate);
 
                         indexerTemplate.OriginalFunction.AddReference(indexSetter);
                         indexerTemplate.Function.AddReference(indexSetter);
 
-                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
                         {
                             indexerTemplate.OriginalFunction.TimesUsed++;
                             indexerTemplate.Function.TimesUsed++;
@@ -349,7 +349,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { function.TimesUsed++; }
                     function.TimesUsedTotal++;
                 }
-                else if (GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+                else if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 {
                     compilableFunction.OriginalFunction.AddReference(functionCall);
 
@@ -518,6 +518,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { AnalyzeStatement(memoryAddressFinder.PrevStatement); }
             else if (statement is LiteralList listValue)
             { AnalyzeStatements(listValue.Values); }
+            else if (statement is ModifiedStatement modifiedStatement)
+            {
+                Warnings.Add(new Warning($"Modifiers not supported", modifiedStatement.Modifier, CurrentFile));
+                AnalyzeStatement(modifiedStatement.Statement);
+            }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
         }
@@ -590,7 +595,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < this.CompilableFunctions.Count; i++)
             {
-                CompileableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
+                CompliableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
 
                 AddTypeArguments(function.TypeArguments);
 
@@ -610,7 +615,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < this.CompilableOperators.Count; i++)
             {
-                CompileableTemplate<CompiledOperator> function = this.CompilableOperators[i];
+                CompliableTemplate<CompiledOperator> function = this.CompilableOperators[i];
 
                 AddTypeArguments(function.TypeArguments);
 
@@ -630,7 +635,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < this.CompilableGeneralFunctions.Count; i++)
             {
-                CompileableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
+                CompliableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
 
                 AddTypeArguments(function.TypeArguments);
 

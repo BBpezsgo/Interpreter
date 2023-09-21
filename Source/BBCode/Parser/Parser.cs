@@ -132,12 +132,12 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("#", out var hashT))
             { return false; }
 
-            hashT.AnalysedType = TokenAnalysedType.Hash;
+            hashT.AnalyzedType = TokenAnalysedType.Hash;
 
             if (!ExpectIdentifier(out var hashName))
             { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", hashT); }
 
-            hashName.AnalysedType = TokenAnalysedType.Hash;
+            hashName.AnalyzedType = TokenAnalysedType.Hash;
 
             List<Literal> parameters = new();
             int endlessSafe = 50;
@@ -146,7 +146,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (!ExpectLiteral(out var parameter))
                 { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", CurrentToken); }
 
-                parameter.ValueToken.AnalysedType = TokenAnalysedType.HashParameter;
+                parameter.ValueToken.AnalyzedType = TokenAnalysedType.HashParameter;
                 parameters.Add(parameter);
 
                 if (ExpectOperator(";"))
@@ -168,7 +168,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier("using", out var keyword))
             { return false; }
 
-            keyword.AnalysedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalysedType.Keyword;
 
             List<Token> tokens = new();
             if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
@@ -275,7 +275,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier("enum", out Token keyword))
             { CurrentTokenIndex = parseStart; return false; }
 
-            keyword.AnalysedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalysedType.Keyword;
 
             if (!ExpectIdentifier(out Token identifier))
             { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.After()); }
@@ -283,7 +283,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("{"))
             { throw new SyntaxException($"Expected '{{' after enum identifier", identifier.After()); }
 
-            identifier.AnalysedType = TokenAnalysedType.Enum;
+            identifier.AnalyzedType = TokenAnalysedType.Enum;
 
             List<EnumMemberDefinition> members = new();
 
@@ -292,7 +292,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (!ExpectIdentifier(out Token enumMemberIdentifier))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                enumMemberIdentifier.AnalysedType = TokenAnalysedType.EnumMember;
+                enumMemberIdentifier.AnalyzedType = TokenAnalysedType.EnumMember;
 
                 Literal enumMemberValue = null;
 
@@ -365,7 +365,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleName.AnalysedType = TokenAnalysedType.FunctionName;
+            possibleName.AnalyzedType = TokenAnalysedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -382,7 +382,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (!ExpectIdentifier(out Token possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new()
                 {
@@ -500,7 +500,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
+            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -517,7 +517,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (!ExpectIdentifier(out Token possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new()
                 {
@@ -572,7 +572,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleNameT.AnalysedType = TokenAnalysedType.FunctionName;
+            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -589,7 +589,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (!ExpectIdentifier(out Token possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalysedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new()
                 {
@@ -616,7 +616,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             };
 
             if (ExpectOperator(";", out var tIdk))
-            { throw new SyntaxException($"Body is requied for general function definition", tIdk); }
+            { throw new SyntaxException($"Body is required for general function definition", tIdk); }
 
             List<Statement.Statement> statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
             function.BracketStart = braceletStart;
@@ -664,8 +664,8 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("{", out var braceletStart))
             { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
 
-            possibleClassName.AnalysedType = TokenAnalysedType.Class;
-            keyword.AnalysedType = TokenAnalysedType.Keyword;
+            possibleClassName.AnalyzedType = TokenAnalysedType.Class;
+            keyword.AnalyzedType = TokenAnalysedType.Keyword;
 
             List<FieldDefinition> fields = new();
             List<FunctionDefinition> methods = new();
@@ -757,7 +757,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("{", out var braceletStart))
             { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
-            keyword.AnalysedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalysedType.Keyword;
 
             List<FieldDefinition> fields = new();
             Dictionary<string, FunctionDefinition> methods = new();
@@ -864,7 +864,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
             {
-                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content, 16).ToString(), CurrentToken);
+                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 16).ToString(), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -902,7 +902,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.BOOLEAN, tTrue.Content, tTrue);
 
-                tTrue.AnalysedType = TokenAnalysedType.Keyword;
+                tTrue.AnalyzedType = TokenAnalysedType.Keyword;
 
                 statement = literal;
                 return true;
@@ -911,7 +911,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 Literal literal = new(LiteralType.BOOLEAN, tFalse.Content, tFalse);
 
-                tFalse.AnalysedType = TokenAnalysedType.Keyword;
+                tFalse.AnalyzedType = TokenAnalysedType.Keyword;
 
                 statement = literal;
                 return true;
@@ -974,7 +974,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (ExpectIdentifier("new", out Token newIdentifier))
             {
-                newIdentifier.AnalysedType = TokenAnalysedType.Keyword;
+                newIdentifier.AnalyzedType = TokenAnalysedType.Keyword;
 
                 TypeInstance instanceTypeName = ExpectType(AllowedType.None);
 
@@ -1030,9 +1030,9 @@ namespace ProgrammingLanguage.BBCode.Parser
                     Identifier variableNameStatement = new(variableName);
 
                     if (variableName.Content == "this")
-                    { variableName.AnalysedType = TokenAnalysedType.Keyword; }
+                    { variableName.AnalyzedType = TokenAnalysedType.Keyword; }
                     else
-                    { variableName.AnalysedType = TokenAnalysedType.VariableName; }
+                    { variableName.AnalyzedType = TokenAnalysedType.VariableName; }
 
                     returnStatement = variableNameStatement;
                 }
@@ -1216,7 +1216,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier(out Token possibleVariableName))
             { CurrentTokenIndex = startTokenIndex; return null; }
 
-            possibleVariableName.AnalysedType = TokenAnalysedType.VariableName;
+            possibleVariableName.AnalyzedType = TokenAnalysedType.VariableName;
 
             StatementWithValue initialValue = null;
 
@@ -1227,7 +1227,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             else
             {
                 if (possibleType.Identifier.Content == "var")
-                { throw new SyntaxException("Initial value for 'var' variable declaration is requied", possibleType.Identifier); }
+                { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType.Identifier); }
             }
 
             return new VariableDeclaretion(constModifier == null ? Array.Empty<Token>() : new Token[1] { constModifier }, possibleType, possibleVariableName, initialValue);
@@ -1238,34 +1238,34 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier("for", out Token tokenFor))
             { return null; }
 
-            tokenFor.AnalysedType = TokenAnalysedType.Statement;
+            tokenFor.AnalyzedType = TokenAnalysedType.Statement;
 
-            if (!ExpectOperator("(", out Token tokenZarojel))
+            if (!ExpectOperator("(", out Token tokenParenthesesOpen))
             { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
 
             VariableDeclaretion variableDeclaration = ExpectVariableDeclaration();
             if (variableDeclaration == null)
-            { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenZarojel); }
+            { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";"))
             { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
 
             StatementWithValue condition = ExpectExpression();
             if (condition == null)
-            { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenZarojel); }
+            { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";"))
             { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
 
             AnyAssignment expression = ExpectAnySetter();
             if (expression == null)
-            { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenZarojel); }
+            { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenParenthesesOpen); }
 
-            if (!ExpectOperator(")", out Token tokenZarojel2))
+            if (!ExpectOperator(")", out Token tokenParenthesesClosed))
             { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.GetPosition().After()); }
 
             if (!ExpectBlock(out Block block))
-            { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenZarojel2.After()); }
+            { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenParenthesesClosed.After()); }
 
             return new ForLoop(tokenFor, variableDeclaration, condition, expression, block);
         }
@@ -1275,20 +1275,20 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier("while", out Token tokenWhile))
             { return null; }
 
-            tokenWhile.AnalysedType = TokenAnalysedType.Statement;
+            tokenWhile.AnalyzedType = TokenAnalysedType.Statement;
 
-            if (!ExpectOperator("(", out Token tokenZarojel))
+            if (!ExpectOperator("(", out Token tokenParenthesesOpen))
             { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
 
             StatementWithValue condition = ExpectExpression();
             if (condition == null)
-            { throw new SyntaxException("Expected condition after \"while\" statement", tokenZarojel); }
+            { throw new SyntaxException("Expected condition after \"while\" statement", tokenParenthesesOpen); }
 
-            if (!ExpectOperator(")", out Token tokenZarojel2))
+            if (!ExpectOperator(")", out Token tokenParenthesesClose))
             { throw new SyntaxException("Expected ')' after \"while\" condition", condition); }
 
             if (!ExpectBlock(out Block block))
-            { throw new SyntaxException("Expected block", tokenZarojel2.After()); }
+            { throw new SyntaxException("Expected block", tokenParenthesesClose.After()); }
 
             return new WhileLoop(tokenWhile, condition, block);
         }
@@ -1327,16 +1327,16 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier(ifSegmentName, out Token tokenIf))
             { return null; }
 
-            tokenIf.AnalysedType = TokenAnalysedType.Statement;
+            tokenIf.AnalyzedType = TokenAnalysedType.Statement;
 
             StatementWithValue condition = null;
             if (needParameters)
             {
-                if (!ExpectOperator("(", out Token tokenZarojel))
+                if (!ExpectOperator("(", out Token tokenParenthesesOpen))
                 { throw new SyntaxException("Expected '(' after \"" + ifSegmentName + "\" statement", tokenIf); }
                 condition = ExpectExpression();
                 if (condition == null)
-                { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenZarojel); }
+                { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenParenthesesOpen); }
 
                 if (!ExpectOperator(")"))
                 { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition); }
@@ -1395,7 +1395,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return false;
             }
 
-            possibleFunctionName.AnalysedType = TokenAnalysedType.FunctionName;
+            possibleFunctionName.AnalyzedType = TokenAnalysedType.FunctionName;
 
             bool expectParameter = false;
 
@@ -1557,7 +1557,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return false;
             }
 
-            modifier.AnalysedType = TokenAnalysedType.Keyword;
+            modifier.AnalyzedType = TokenAnalysedType.Keyword;
 
             var value = ExpectOneValue();
 
@@ -1603,7 +1603,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectOperator("(", out Token bracketLeft))
             { CurrentTokenIndex = startTokenIndex; return null; }
 
-            possibleFunctionName.AnalysedType = TokenAnalysedType.BuiltinType;
+            possibleFunctionName.AnalyzedType = TokenAnalysedType.BuiltinType;
 
             bool expectParameter = false;
             List<StatementWithValue> parameters = new();
@@ -1656,7 +1656,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (possibleFunctionName.Content != name)
             { CurrentTokenIndex = startTokenIndex; return null; }
 
-            possibleFunctionName.AnalysedType = TokenAnalysedType.Statement;
+            possibleFunctionName.AnalyzedType = TokenAnalysedType.Statement;
 
             List<StatementWithValue> parameters = new();
 
@@ -1676,10 +1676,10 @@ namespace ProgrammingLanguage.BBCode.Parser
             KeywordCall functionCall = new(possibleFunctionName, parameters);
 
             if (functionCall.Parameters.Length < minParameterCount)
-            { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requies minimum {minParameterCount} parameters but you passed {parameters.Count}", functionCall); }
+            { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", functionCall); }
 
             if (functionCall.Parameters.Length > maxParameterCount)
-            { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requies maximum {maxParameterCount} parameters but you passed {parameters.Count}", functionCall); }
+            { throw new SyntaxException($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", functionCall); }
 
             return functionCall;
         }
@@ -1697,7 +1697,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (!ExpectIdentifier(out Token attributeT))
             { CurrentTokenIndex = parseStart; return false; }
 
-            attributeT.AnalysedType = TokenAnalysedType.Attribute;
+            attributeT.AnalyzedType = TokenAnalysedType.Attribute;
 
             if (ExpectOperator("(", out var t3))
             {
@@ -1745,7 +1745,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             if (ExpectOperator("("))
             { CurrentTokenIndex = startTokenIndex; return null; }
 
-            possibleVariableName.AnalysedType = TokenAnalysedType.None;
+            possibleVariableName.AnalyzedType = TokenAnalysedType.None;
 
             FieldDefinition field = new()
             {
@@ -1808,7 +1808,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 if (ExpectIdentifier(out Token modifier, ParameterModifiers))
                 {
-                    modifier.AnalysedType = TokenAnalysedType.Keyword;
+                    modifier.AnalyzedType = TokenAnalysedType.Keyword;
                     modifiers.Add(modifier);
 
                     if (modifier == "this" && parameterIndex != 0)
@@ -1833,7 +1833,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             {
                 if (ExpectIdentifier(out Token modifier, Modifiers))
                 {
-                    modifier.AnalysedType = TokenAnalysedType.Keyword;
+                    modifier.AnalyzedType = TokenAnalysedType.Keyword;
                     modifiers.Add(modifier);
                 }
                 else
@@ -1917,7 +1917,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         {
             if (!ExpectIdentifier(out Token possibleType)) return null;
 
-            possibleType.AnalysedType = TokenAnalysedType.Keyword;
+            possibleType.AnalyzedType = TokenAnalysedType.Keyword;
 
             if (possibleType.Content == "any")
             {
@@ -1989,7 +1989,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                     {
                         CurrentTokenIndex = afterIdentifier;
                         return new TypeInstance(possibleType, TypeInstanceKind.Simple);
-                        // throw new SyntaxException($"Expected type as function-pointer parameter tyoe", CurrentToken);
+                        // throw new SyntaxException($"Expected type as function-pointer parameter type", CurrentToken);
                     }
 
                     newType.ParameterTypes.Add(type);
@@ -2007,7 +2007,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
 
             if (Constants.BuiltinTypes.Contains(possibleType.Content))
-            { newType.Identifier.AnalysedType = TokenAnalysedType.BuiltinType; }
+            { newType.Identifier.AnalyzedType = TokenAnalysedType.BuiltinType; }
 
             if (ExpectOperator("[", out _))
             {

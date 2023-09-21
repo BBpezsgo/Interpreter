@@ -100,7 +100,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     if (GenericParameters[i][j].Content == name)
                     {
-                        GenericParameters[i][j].AnalysedType = TokenAnalysedType.TypeParameter;
+                        GenericParameters[i][j].AnalyzedType = TokenAnalysedType.TypeParameter;
                         return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
                     }
                 }
@@ -175,7 +175,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 FunctionDefinition.Attribute attribute = attributes[i];
 
-                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
+                attribute.Identifier.AnalyzedType = TokenAnalysedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 {
@@ -207,7 +207,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (Constants.Keywords.Contains(@struct.Name.Content))
             { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
 
-            @struct.Name.AnalysedType = TokenAnalysedType.Struct;
+            @struct.Name.AnalyzedType = TokenAnalysedType.Struct;
 
             if (CompiledStructs.ContainsKey(@struct.Name.Content))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
@@ -225,7 +225,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (Constants.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
-            @class.Name.AnalysedType = TokenAnalysedType.Struct;
+            @class.Name.AnalyzedType = TokenAnalysedType.Struct;
 
             if (CompiledClasses.ContainsKey(@class.Name.Content))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
@@ -246,7 +246,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 GenericParameters.Push(function.TemplateInfo.TypeParameters);
                 foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
-                { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+                { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
             }
 
             CompiledType type = new(function.Type, GetCustomType);
@@ -363,7 +363,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             foreach (var attribute in @enum.Attributes)
             {
-                attribute.Identifier.AnalysedType = TokenAnalysedType.Attribute;
+                attribute.Identifier.AnalyzedType = TokenAnalysedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -618,7 +618,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 {
                     GenericParameters.Push(CompiledClasses[i].TemplateInfo.TypeParameters);
                     foreach (Token typeParameter in CompiledClasses[i].TemplateInfo.TypeParameters)
-                    { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+                    { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
                 }
 
                 for (int j = 0; j < CompiledClasses[i].Fields.Length; j++)
@@ -666,7 +666,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     {
                         GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters);
                         foreach (Token typeParameter in compiledClass.TemplateInfo.TypeParameters)
-                        { typeParameter.AnalysedType = TokenAnalysedType.TypeParameter; }
+                        { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
                     }
 
                     foreach (var method in compiledClass.GeneralMethods)

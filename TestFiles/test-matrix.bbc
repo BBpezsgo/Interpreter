@@ -1,18 +1,17 @@
-﻿using "../CodeFiles/System";
+﻿using System;
+using System.Lists;
 
 [CodeEntry]
 void Start()
 {
-	int[][] matrix;
+	Array<Array<int> > matrix = new Array<Array<int> >(5);
 
 	for (int y; y < 5; y++)
 	{
-		matrix.Push([1]);
+		matrix[y] = new Array<int>(10);
 		for (int x; x < 10; x++)
 		{
-			int[] row = matrix[y];
-			row.Push(x);
-			matrix[y] = row;
+			matrix[y][x] = x;
 		};
 	};
 }

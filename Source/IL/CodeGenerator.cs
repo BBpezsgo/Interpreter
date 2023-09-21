@@ -136,7 +136,7 @@ namespace ProgrammingLanguage.IL.Compiler
 
             if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
             {
-                if (!GetIndexGetterTemplate(arrayType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
@@ -240,7 +240,7 @@ namespace ProgrammingLanguage.IL.Compiler
                 return function.Type.Size;
             }
 
-            if (GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+            if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
             {
                 if (!compilableFunction.Function.ReturnSomething)
                 { return 0; }
@@ -549,7 +549,7 @@ namespace ProgrammingLanguage.IL.Compiler
 
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
-                if (!GetFunctionTemplate(functionCall, out CompileableTemplate<CompiledFunction> compilableFunction))
+                if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;

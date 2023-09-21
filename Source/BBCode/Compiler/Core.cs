@@ -1742,7 +1742,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (type.Identifier.Content == "func")
             {
-                type.Identifier.AnalysedType = TokenAnalysedType.Keyword;
+                type.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
 
                 CompiledType funcRet;
                 CompiledType[] funcParams;

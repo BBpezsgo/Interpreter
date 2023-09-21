@@ -1,3 +1,5 @@
+using System;
+
 macro void IsPrime(int n, ref int divisors) {
 	int _macro_prime_iterator = 0;
 

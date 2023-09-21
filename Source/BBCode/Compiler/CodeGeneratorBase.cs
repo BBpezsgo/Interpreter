@@ -24,13 +24,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
     public abstract class CodeGeneratorBase
     {
-        protected readonly struct CompileableTemplate<T> where T : IDuplicateable<T>
+        protected readonly struct CompliableTemplate<T> where T : IDuplicateable<T>
         {
             internal readonly T OriginalFunction;
             internal readonly T Function;
             internal readonly Dictionary<string, CompiledType> TypeArguments;
 
-            public CompileableTemplate(T function, Dictionary<string, CompiledType> typeArguments)
+            public CompliableTemplate(T function, Dictionary<string, CompiledType> typeArguments)
             {
                 OriginalFunction = function;
                 Function = function.Duplicate();
@@ -164,37 +164,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         protected delegate void BuiltinFunctionCompiler(params StatementWithValue[] parameters);
 
-        protected class BuiltinFunction
-        {
-            public readonly CompiledType[] ParameterTypes;
-            public readonly CompiledType ReturnType;
-            public bool ReturnSomething => ReturnType != Type.VOID;
-
-            readonly BuiltinFunctionCompiler FunctionCompiler;
-
-            public BuiltinFunction(BuiltinFunctionCompiler functionCompiler, CompiledType type, params CompiledType[] parameters)
-            {
-                ParameterTypes = parameters;
-                ReturnType = type;
-                FunctionCompiler = functionCompiler;
-            }
-        }
-
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
-        protected readonly BuiltinFunction[] BuiltinFunctions;
 
-        protected IReadOnlyList<CompileableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
-        protected IReadOnlyList<CompileableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
-        protected IReadOnlyList<CompileableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
+        protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
+        protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
+        protected IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
 
-        readonly List<CompileableTemplate<CompiledFunction>> compilableFunctions = new();
-        readonly List<CompileableTemplate<CompiledOperator>> compilableOperators = new();
-        readonly List<CompileableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
+        readonly List<CompliableTemplate<CompiledFunction>> compilableFunctions = new();
+        readonly List<CompliableTemplate<CompiledOperator>> compilableOperators = new();
+        readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
 
         protected readonly Dictionary<string, CompiledType> TypeArguments;
 
@@ -219,9 +202,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             TypeArguments = new Dictionary<string, CompiledType>();
 
-            compilableFunctions = new List<CompileableTemplate<CompiledFunction>>();
-            compilableOperators = new List<CompileableTemplate<CompiledOperator>>();
-            compilableGeneralFunctions = new List<CompileableTemplate<CompiledGeneralFunction>>();
+            compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
+            compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
+            compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
         protected CodeGeneratorBase(Compiler.Result compilerResult) : this()
@@ -240,14 +223,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             TypeArguments = new Dictionary<string, CompiledType>();
 
-            compilableFunctions = new List<CompileableTemplate<CompiledFunction>>();
-            compilableOperators = new List<CompileableTemplate<CompiledOperator>>();
-            compilableGeneralFunctions = new List<CompileableTemplate<CompiledGeneralFunction>>();
+            compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
+            compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
+            compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
         #region Helper Functions
 
-        protected CompileableTemplate<CompiledFunction> AddCompilable(CompileableTemplate<CompiledFunction> compilable)
+        protected CompliableTemplate<CompiledFunction> AddCompilable(CompliableTemplate<CompiledFunction> compilable)
         {
             for (int i = 0; i < compilableFunctions.Count; i++)
             {
@@ -258,7 +241,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return compilable;
         }
 
-        protected CompileableTemplate<CompiledOperator> AddCompilable(CompileableTemplate<CompiledOperator> compilable)
+        protected CompliableTemplate<CompiledOperator> AddCompilable(CompliableTemplate<CompiledOperator> compilable)
         {
             for (int i = 0; i < compilableOperators.Count; i++)
             {
@@ -269,7 +252,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return compilable;
         }
 
-        protected CompileableTemplate<CompiledGeneralFunction> AddCompilable(CompileableTemplate<CompiledGeneralFunction> compilable)
+        protected CompliableTemplate<CompiledGeneralFunction> AddCompilable(CompliableTemplate<CompiledGeneralFunction> compilable)
         {
             for (int i = 0; i < compilableGeneralFunctions.Count; i++)
             {
@@ -379,7 +362,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 found = true;
             }
 
-            foreach (CompileableTemplate<CompiledFunction> function in compilableFunctions)
+            foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
             {
                 if (function.Function == null) continue;
 
@@ -432,7 +415,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 found = true;
             }
 
-            foreach (CompileableTemplate<CompiledFunction> function in compilableFunctions)
+            foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
             {
                 if (function.Function == null) continue;
 
@@ -450,7 +433,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return found;
         }
 
-        protected bool GetFunctionTemplate(FunctionCall functionCallStatement, out CompileableTemplate<CompiledFunction> compiledFunction)
+        protected bool GetFunctionTemplate(FunctionCall functionCallStatement, out CompliableTemplate<CompiledFunction> compiledFunction)
         {
             CompiledType[] parameters = FindStatementTypes(functionCallStatement.MethodParameters);
 
@@ -470,7 +453,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (element.Context != null && element.Context.TemplateInfo != null)
                 { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
 
-                compiledFunction = new CompileableTemplate<CompiledFunction>(element, typeParameters);
+                compiledFunction = new CompliableTemplate<CompiledFunction>(element, typeParameters);
 
                 if (found)
                 { throw new CompilerException($"Duplicated function definitions: {compiledFunction} and {element} are the same", element.Identifier, element.FilePath); }
@@ -481,7 +464,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return found;
         }
 
-        protected bool GetConstructorTemplate(CompiledClass @class, ConstructorCall constructorCall, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
+        protected bool GetConstructorTemplate(CompiledClass @class, ConstructorCall constructorCall, out CompliableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
         {
             bool found = false;
             compiledGeneralFunction = default;
@@ -500,7 +483,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 CollectTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
 
-                compiledGeneralFunction = new CompileableTemplate<CompiledGeneralFunction>(function, typeParameters);
+                compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
                 if (found)
                 { throw new CompilerException($"Duplicated function definitions: {found} and {function} are the same", function.Identifier, function.FilePath); }
@@ -631,7 +614,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool GetIndexGetterTemplate(CompiledType prevType, out CompileableTemplate<CompiledFunction> compiledFunction)
+        protected bool GetIndexGetterTemplate(CompiledType prevType, out CompliableTemplate<CompiledFunction> compiledFunction)
         {
             if (!prevType.IsClass)
             {
@@ -661,7 +644,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
 
-                compiledFunction = new CompileableTemplate<CompiledFunction>(function, typeParameters);
+                compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
                 return true;
             }
 
@@ -669,7 +652,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool GetIndexSetterTemplate(CompiledType prevType, CompiledType elementType, out CompileableTemplate<CompiledFunction> compiledFunction)
+        protected bool GetIndexSetterTemplate(CompiledType prevType, CompiledType elementType, out CompliableTemplate<CompiledFunction> compiledFunction)
         {
             if (!prevType.IsClass)
             {
@@ -705,7 +688,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
 
-                compiledFunction = new CompileableTemplate<CompiledFunction>(function, typeParameters);
+                compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
                 return true;
             }
 
@@ -876,7 +859,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return found;
         }
 
-        protected bool GetOperatorTemplate(OperatorCall @operator, out CompileableTemplate<CompiledOperator> compiledOperator)
+        protected bool GetOperatorTemplate(OperatorCall @operator, out CompliableTemplate<CompiledOperator> compiledOperator)
         {
             CompiledType[] parameters = FindStatementTypes(@operator.Parameters);
 
@@ -892,7 +875,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
 
-                compiledOperator = new CompileableTemplate<CompiledOperator>(function, typeParameters);
+                compiledOperator = new CompliableTemplate<CompiledOperator>(function, typeParameters);
 
                 found = true;
             }
@@ -944,9 +927,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool GetGeneralFunctionTemplate(CompiledClass @class, string name, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
+        protected bool GetGeneralFunctionTemplate(CompiledClass @class, string name, out CompliableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
             => GetGeneralFunctionTemplate(@class, Array.Empty<CompiledType>(), name, out compiledGeneralFunction);
-        protected bool GetGeneralFunctionTemplate(CompiledClass @class, CompiledType[] parameters, string name, out CompileableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
+        protected bool GetGeneralFunctionTemplate(CompiledClass @class, CompiledType[] parameters, string name, out CompliableTemplate<CompiledGeneralFunction> compiledGeneralFunction)
         {
             bool found = false;
             compiledGeneralFunction = default;
@@ -958,7 +941,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.Type.Class != @class) continue;
                 if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
-                compiledGeneralFunction = new CompileableTemplate<CompiledGeneralFunction>(function, typeParameters);
+                compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
                 if (found)
                 { throw new CompilerException($"Duplicated function definitions: {compiledGeneralFunction.OriginalFunction} and {function} are the same", function.Identifier, function.FilePath); }
@@ -1154,7 +1137,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (newVariable.Type.Identifier == "var")
             {
                 if (newVariable.InitialValue == null)
-                { throw new CompilerException($"Initial value for 'var' variable declaration is requied", newVariable, newVariable.FilePath); }
+                { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.FilePath); }
 
                 type = FindStatementType(newVariable.InitialValue);
             }
@@ -1265,7 +1248,12 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return new DataItem(int.MaxValue);
             }
 
-            return GetInitialValue(type.BuiltinType);
+            if (type.IsBuiltin)
+            {
+                return GetInitialValue(type.BuiltinType);
+            }
+
+            throw new NotImplementedException();
         }
 
         #endregion
@@ -1287,7 +1275,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (keywordCall.FunctionName == "clone")
             {
                 if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to keyword-function \"clone\": requied {1}, passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to keyword-function \"clone\": required {1}, passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 return FindStatementType(keywordCall.Parameters[0]);
             }
@@ -1303,7 +1291,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (!GetIndexGetter(prevType, out CompiledFunction indexer))
             {
-                if (!GetIndexGetterTemplate(prevType, out CompileableTemplate<CompiledFunction> indexerTemplate))
+                if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
 
                 indexer = indexerTemplate.Function;
@@ -1337,7 +1325,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
                 if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': requied {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
             }
             else
             { opcode = Opcode.UNKNOWN; }

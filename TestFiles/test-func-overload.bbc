@@ -2,19 +2,19 @@
 
 void Foo()
 {
-  Console.Log("none");
+  PrintLineD("none");
 }
 void Foo(int p)
 {
-  Console.Log("int");
+  PrintLineD("int");
 }
 void Foo(bool p)
 {
-  Console.Log("str");
+  PrintLineD("str");
 }
 void Foo(int p1, int p2)
 {
-  Console.Log("int int");
+  PrintLineD("int int");
 }
 
 [CodeEntry]

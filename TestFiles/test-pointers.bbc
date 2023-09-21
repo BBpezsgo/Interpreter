@@ -2,10 +2,10 @@ using System;
 
 [CodeEntry]
 void Start() {
-	string value = "Hello";
+	String value = "Hello";
 	int valueAddress = &value;
-	Console.Log(value);
-	Console.Log(valueAddress);
-	string yeah = *valueAddress;
-	Console.Log(yeah);
+	PrintLine(value);
+	PrintLine(valueAddress);
+	String yeah = (*valueAddress) as String;
+	PrintLine(yeah);
 }

@@ -3,5 +3,5 @@
 [CodeEntry]
 void Start()
 {
-    Console.Log(5 + 10);
+    PrintLine(5 + 10);
 }

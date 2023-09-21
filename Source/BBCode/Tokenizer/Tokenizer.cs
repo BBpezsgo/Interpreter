@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode
 {
+    using System.Text;
     using ProgrammingLanguage.Core;
     using ProgrammingLanguage.Errors;
     using ProgrammingLanguage.Tokenizer;
@@ -68,12 +69,15 @@ namespace ProgrammingLanguage.BBCode
         /// <summary> The Tokenizer will produce <see cref="TokenType.LINEBREAK"/> </summary>
         public bool DistinguishBetweenSpacesAndNewlines;
         public bool JoinLinebreaks;
+        /// <summary> The Tokenizer will produce <see cref="TokenType.COMMENT"/> and <see cref="TokenType.COMMENT_MULTILINE"/> </summary>
+        public bool TokenizeComments;
 
         public static TokenizerSettings Default => new()
         {
             TokenizeWhitespaces = false,
             DistinguishBetweenSpacesAndNewlines = false,
             JoinLinebreaks = true,
+            TokenizeComments = false,
         };
     }
 
@@ -155,48 +159,21 @@ namespace ProgrammingLanguage.BBCode
         public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
     }
 
-    class PreparationToken : BaseToken, IEquatable<PreparationToken>
+    class PreparationToken : BaseToken
     {
         public TokenType TokenType;
 
-        public string Content;
+        public readonly StringBuilder Content;
 
         public PreparationToken()
         {
             TokenType = TokenType.WHITESPACE;
-            Content = "";
+            Content = new StringBuilder();
         }
 
-        public override string ToString() => Content;
+        public override string ToString() => Content.ToString();
 
-        internal string ToFullString()
-        {
-            return $"Token:{TokenType} {{ \"{Content}\" {Position} }}";
-        }
-
-        public override bool Equals(object obj) => obj is PreparationToken other && Equals(other);
-
-        public bool Equals(PreparationToken other) =>
-            other is not null &&
-            Position.Equals(other.Position) &&
-            AbsolutePosition.Equals(other.AbsolutePosition) &&
-            TokenType == other.TokenType &&
-            Content == other.Content;
-
-        public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
-
-        public static bool operator ==(PreparationToken a, string b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null && b is not null) return false;
-            if (a is not null && b is null) return false;
-            return a.Content == b;
-        }
-        public static bool operator !=(PreparationToken a, string b) => !(a == b);
-        public static bool operator ==(string a, PreparationToken b) => b == a;
-        public static bool operator !=(string a, PreparationToken b) => b != a;
-
-        public Token Instantiate() => new(TokenType, Content, false)
+        public Token Instantiate() => new(TokenType, Content.ToString(), false)
         {
             AbsolutePosition = AbsolutePosition,
             Position = Position,
@@ -258,7 +235,7 @@ namespace ProgrammingLanguage.BBCode
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode)
-            => Parse(sourceCode, null, null, out _);
+            => Parse(sourceCode, null, null, null);
 
         /// <summary>
         /// Convert source code into tokens
@@ -269,7 +246,7 @@ namespace ProgrammingLanguage.BBCode
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings)
-            => Parse(sourceCode, warnings, null, out _);
+            => Parse(sourceCode, warnings, null, null);
 
         /// <summary>
         /// Convert source code into tokens
@@ -280,7 +257,7 @@ namespace ProgrammingLanguage.BBCode
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath)
-            => Parse(sourceCode, warnings, filePath, out _);
+            => Parse(sourceCode, warnings, filePath, null);
 
         /// <summary>
         /// Convert source code into tokens
@@ -290,13 +267,12 @@ namespace ProgrammingLanguage.BBCode
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, out SimpleToken[] unicodeCharacters)
+        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, List<SimpleToken> unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
             Print?.Invoke("Tokenizing ...", Output.LogType.Debug);
 
             string savedUnicode = null;
-            List<SimpleToken> _unicodeCharacters = new();
 
             for (int OffsetTotal = 0; OffsetTotal < sourceCode.Length; OffsetTotal++)
             {
@@ -314,7 +290,7 @@ namespace ProgrammingLanguage.BBCode
                 if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
                 {
                     EndToken(OffsetTotal);
-                    CurrentToken.Content = "";
+                    CurrentToken.Content.Clear();
                     CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                 }
 
@@ -337,12 +313,12 @@ namespace ProgrammingLanguage.BBCode
                     if (savedUnicode.Length == 4)
                     {
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        _unicodeCharacters.Add(new SimpleToken(
-                            unicodeChar,
-                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
-                            new Range<int>(OffsetTotal - 6, OffsetTotal)
-                        ));
-                        CurrentToken.Content += unicodeChar;
+                        unicodeCharacters?.Add(new SimpleToken(
+                                unicodeChar,
+                                new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                                new Range<int>(OffsetTotal - 6, OffsetTotal)
+                            ));
+                        CurrentToken.Content.Append(unicodeChar);
                         CurrentToken.TokenType = TokenType.LITERAL_STRING;
                         savedUnicode = null;
                     }
@@ -362,12 +338,12 @@ namespace ProgrammingLanguage.BBCode
                     if (savedUnicode.Length == 4)
                     {
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        _unicodeCharacters.Add(new SimpleToken(
+                        unicodeCharacters?.Add(new SimpleToken(
                             unicodeChar,
                             new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
                             new Range<int>(OffsetTotal - 6, OffsetTotal)
                         ));
-                        CurrentToken.Content += unicodeChar;
+                        CurrentToken.Content.Append(unicodeChar);
                         CurrentToken.TokenType = TokenType.LITERAL_CHAR;
                         savedUnicode = null;
                     }
@@ -387,10 +363,10 @@ namespace ProgrammingLanguage.BBCode
                     if (currChar == 'u')
                     {
                         CurrentToken.TokenType = TokenType.STRING_UNICODE_CHARACTER;
-                        savedUnicode = "";
+                        savedUnicode = string.Empty;
                         continue;
                     }
-                    CurrentToken.Content += currChar switch
+                    CurrentToken.Content.Append(currChar switch
                     {
                         'n' => "\n",
                         'r' => "\r",
@@ -399,7 +375,7 @@ namespace ProgrammingLanguage.BBCode
                         '"' => "\"",
                         '0' => "\0",
                         _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in string.", GetCurrentPosition(OffsetTotal)),
-                    };
+                    });
                     CurrentToken.TokenType = TokenType.LITERAL_STRING;
                     continue;
                 }
@@ -408,10 +384,10 @@ namespace ProgrammingLanguage.BBCode
                     if (currChar == 'u')
                     {
                         CurrentToken.TokenType = TokenType.CHAR_UNICODE_CHARACTER;
-                        savedUnicode = "";
+                        savedUnicode = string.Empty;
                         continue;
                     }
-                    CurrentToken.Content += currChar switch
+                    CurrentToken.Content.Append(currChar switch
                     {
                         'n' => "\n",
                         'r' => "\r",
@@ -420,7 +396,7 @@ namespace ProgrammingLanguage.BBCode
                         '\'' => "\'",
                         '0' => "\0",
                         _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in char.", GetCurrentPosition(OffsetTotal)),
-                    };
+                    });
                     CurrentToken.TokenType = TokenType.LITERAL_CHAR;
                     continue;
                 }
@@ -429,14 +405,14 @@ namespace ProgrammingLanguage.BBCode
                     CurrentToken.TokenType = TokenType.OPERATOR;
                     if (currChar == '=')
                     {
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                     EndToken(OffsetTotal);
                     continue;
                 }
                 else if (CurrentToken.TokenType == TokenType.COMMENT && currChar != '\n')
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     continue;
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_STRING && currChar != '"')
@@ -446,7 +422,7 @@ namespace ProgrammingLanguage.BBCode
                         CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE;
                         continue;
                     }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     continue;
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR && currChar != '\'')
@@ -456,13 +432,13 @@ namespace ProgrammingLanguage.BBCode
                         CurrentToken.TokenType = TokenType.CHAR_ESCAPE_SEQUENCE;
                         continue;
                     }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     continue;
                 }
 
                 if (CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                     EndToken(OffsetTotal);
                     continue;
@@ -470,7 +446,7 @@ namespace ProgrammingLanguage.BBCode
 
                 if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE && currChar == '*')
                     {
                         CurrentToken.TokenType = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
@@ -490,29 +466,29 @@ namespace ProgrammingLanguage.BBCode
 
                 if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                     EndToken(OffsetTotal);
                 }
                 else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
-                    if (CurrentToken.Content.Contains(currChar))
+                    if (CurrentToken.ToString().Contains(currChar))
                     { throw new TokenizerException($"Invalid float literal format", CurrentToken.GetPosition()); }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
                 else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.Content.EndsWith('0'))
+                    if (!CurrentToken.ToString().EndsWith('0'))
                     { throw new TokenizerException($"Invalid hex number literal format", CurrentToken.GetPosition()); }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_HEX;
                 }
                 else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
-                    if (!CurrentToken.Content.EndsWith('0'))
+                    if (!CurrentToken.ToString().EndsWith('0'))
                     { throw new TokenizerException($"Invalid bin number literal format", CurrentToken.GetPosition()); }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_BIN;
                 }
                 else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
@@ -526,7 +502,7 @@ namespace ProgrammingLanguage.BBCode
                     { CurrentToken.TokenType = TokenType.LITERAL_FLOAT; }
                     else if (CurrentToken.TokenType == TokenType.OPERATOR)
                     {
-                        if (CurrentToken.Content != "-")
+                        if (CurrentToken.ToString() != "-")
                         { EndToken(OffsetTotal); }
                         CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     }
@@ -540,37 +516,37 @@ namespace ProgrammingLanguage.BBCode
                         }
                     }
 
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (currChar == '.')
                 {
                     if (CurrentToken.TokenType == TokenType.WHITESPACE)
                     {
                         CurrentToken.TokenType = TokenType.POTENTIAL_FLOAT;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                     else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                     {
                         CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                     else
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                         EndToken(OffsetTotal);
                     }
                 }
@@ -579,46 +555,46 @@ namespace ProgrammingLanguage.BBCode
                     if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                     {
                         CurrentToken.TokenType = TokenType.COMMENT;
-                        CurrentToken.Content = "";
+                        CurrentToken.Content.Clear();
                     }
                     else
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = TokenType.POTENTIAL_COMMENT;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                 }
                 else if (Bracelets.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     EndToken(OffsetTotal);
                 }
                 else if (SimpleOperators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     EndToken(OffsetTotal);
                 }
                 else if (currChar == '=')
                 {
                     if (CurrentToken.Content.Length == 1 && Operators.Contains(CurrentToken.Content[0]))
                     {
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                         EndToken(OffsetTotal);
                     }
                     else
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                 }
-                else if (DoubleOperators.Contains(CurrentToken.Content + currChar))
+                else if (DoubleOperators.Contains(CurrentToken.ToString() + currChar))
                 {
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     EndToken(OffsetTotal);
                 }
                 else if (currChar == '*' && CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
@@ -626,26 +602,26 @@ namespace ProgrammingLanguage.BBCode
                     if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                     {
                         CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                     else
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                 }
                 else if (Operators.Contains(currChar))
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (currChar == ' ' || currChar == '\t')
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.WHITESPACE;
-                    CurrentToken.Content = currChar.ToString();
+                    CurrentToken.Content.Append(currChar);
                 }
                 else if (currChar == '\n')
                 {
@@ -658,7 +634,7 @@ namespace ProgrammingLanguage.BBCode
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
-                        CurrentToken.Content = currChar.ToString();
+                        CurrentToken.Content.Append(currChar);
                         EndToken(OffsetTotal);
                     }
                 }
@@ -690,7 +666,7 @@ namespace ProgrammingLanguage.BBCode
                 {
                     EndToken(OffsetTotal);
                     CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                     EndToken(OffsetTotal);
                 }
                 else if (CurrentToken.TokenType == TokenType.LITERAL_HEX)
@@ -700,7 +676,7 @@ namespace ProgrammingLanguage.BBCode
                         RefreshTokenPosition(OffsetTotal);
                         throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.After());
                     }
-                    CurrentToken.Content += currChar;
+                    CurrentToken.Content.Append(currChar);
                 }
                 else
                 {
@@ -712,11 +688,11 @@ namespace ProgrammingLanguage.BBCode
                     {
                         EndToken(OffsetTotal);
                         CurrentToken.TokenType = TokenType.IDENTIFIER;
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                     else
                     {
-                        CurrentToken.Content += currChar;
+                        CurrentToken.Content.Append(currChar);
                     }
                 }
             }
@@ -727,7 +703,6 @@ namespace ProgrammingLanguage.BBCode
 
             CheckTokens(Tokens.ToArray());
 
-            unicodeCharacters = _unicodeCharacters.ToArray();
             return NormalizeTokens(Tokens, Settings).ToArray();
         }
 
@@ -803,14 +778,32 @@ namespace ProgrammingLanguage.BBCode
             CurrentToken.Position.End.Line = CurrentLine;
             CurrentToken.AbsolutePosition.End = OffsetTotal;
 
+            // Skip comments if they should be ignored
+            if (!Settings.TokenizeComments &&
+                (CurrentToken.TokenType == TokenType.COMMENT ||
+                CurrentToken.TokenType == TokenType.COMMENT_MULTILINE))
+            { goto Finish; }
+
+            // Skip whitespaces if they should be ignored
+            if (!Settings.TokenizeWhitespaces &&
+                CurrentToken.TokenType == TokenType.WHITESPACE)
+            { goto Finish; }
+
+            // Skip empty whitespaces
+            if (Settings.TokenizeWhitespaces &&
+                CurrentToken.TokenType == TokenType.WHITESPACE &&
+                string.IsNullOrEmpty(CurrentToken.ToString()))
+            { goto Finish; }
+
             if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
-                if (CurrentToken.Content.EndsWith('.'))
+                if (CurrentToken.ToString().EndsWith('.'))
                 {
                     CurrentToken.Position.End.Character--;
                     CurrentToken.Position.End.Line--;
                     CurrentToken.AbsolutePosition.End--;
-                    CurrentToken.Content = CurrentToken.Content[..^1];
+                    CurrentToken.Content.Clear();
+                    CurrentToken.Content.Append(CurrentToken.ToString()[..^1]);
                     CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     Tokens.Add(CurrentToken.Instantiate());
 
@@ -822,22 +815,14 @@ namespace ProgrammingLanguage.BBCode
                     CurrentToken.Position.End.Line++;
                     CurrentToken.AbsolutePosition.End++;
                     CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content = ".";
+                    CurrentToken.Content.Clear();
+                    CurrentToken.Content.Append('.');
                 }
-            }
-
-            if (CurrentToken.TokenType != TokenType.WHITESPACE)
-            {
-                Tokens.Add(CurrentToken.Instantiate());
-            }
-            else if (!string.IsNullOrEmpty(CurrentToken.Content) && Settings.TokenizeWhitespaces)
-            {
-                Tokens.Add(CurrentToken.Instantiate());
             }
 
             if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
             {
-                if (CurrentToken.Content.CompareTo(".") == 0)
+                if (CurrentToken.ToString().CompareTo(".") == 0)
                 {
                     CurrentToken.TokenType = TokenType.OPERATOR;
                 }
@@ -847,12 +832,14 @@ namespace ProgrammingLanguage.BBCode
                 }
             }
 
+            Tokens.Add(CurrentToken.Instantiate());
+
+        Finish:
             CurrentToken.TokenType = TokenType.WHITESPACE;
-            CurrentToken.Content = "";
+            CurrentToken.Content.Clear();
             CurrentToken.Position.Start.Line = CurrentLine;
             CurrentToken.Position.Start.Character = CurrentColumn;
             CurrentToken.AbsolutePosition.Start = OffsetTotal;
-
         }
 
         static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
@@ -902,37 +889,6 @@ namespace ProgrammingLanguage.BBCode
             }
 
             return result;
-        }
-    }
-
-    public static class Extensions
-    {
-        public static Token[] RemoveTokens(this IEnumerable<Token> tokens, TokenType tokenType)
-        {
-            List<Token> _tokens = new(tokens);
-
-            for (int i = _tokens.Count - 1; i >= 0; i--)
-            {
-                if (_tokens[i].TokenType != tokenType) continue;
-
-                _tokens.RemoveAt(i);
-            }
-
-            return _tokens.ToArray();
-        }
-
-        public static Token[] RemoveTokens(this IEnumerable<Token> tokens, params TokenType[] tokenTypes)
-        {
-            List<Token> _tokens = new(tokens);
-
-            for (int i = _tokens.Count - 1; i >= 0; i--)
-            {
-                if (!tokenTypes.Contains(_tokens[i].TokenType)) continue;
-
-                _tokens.RemoveAt(i);
-            }
-
-            return _tokens.ToArray();
         }
     }
 }

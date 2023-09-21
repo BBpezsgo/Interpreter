@@ -18,7 +18,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test37.bbc";
+            string path = TestConstants.TestFilesPath + "test33.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -26,24 +26,18 @@ namespace TheProgram
                 "-basepath \"../CodeFiles/\"",
                 // "-c-print-instructions true",
                 // "-c-remove-unused-functions 5",
-                // "C:\\Users\\bazsi\\.vscode\\extensions\\bbc\\TestFiles\\a.bbc",
                 // "-hide-debug",
                 "-hide-system",
                 //"-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
+                "-debug",
                 // "-test",
                 // "-console-gui",
-                // "-decompile",
-                // "-il",
-                // "-debug",
-                // "\".\\output.bin\"",
-                // "-compression", "no",
                 // "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""
-                // $"\"{TestConstants.TestFilesPath}tester.bbct\""
             };
 #endif
 #if RELEASE_TEST
@@ -67,9 +61,7 @@ namespace TheProgram
                     { gui.Tick(); }
                     return true;
                 case ArgumentParser.RunType.Debugger:
-                    throw new NotImplementedException();
-                case ArgumentParser.RunType.Tester:
-                    ProgrammingLanguage.Tester.Tester.RunTestFile(settings.Value);
+                    _ = new Debugger(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
                     ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
@@ -82,88 +74,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    {
-                        ProgrammingLanguage.Brainfuck.Compiler.CodeGenerator.Result? _code = Brainfuck.ProgramUtils.CompilePlus(settings.Value.File, Brainfuck.ProgramUtils.CompileOptions.None); //, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
-                        if (!_code.HasValue)
-                        { break; }
-                        var code = _code.Value;
-
-                        ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code.Code)
-                        {
-                            DebugInfo = code.DebugInfo.ToArray(),
-                            OriginalCode = code.Tokens,
-                        };
-
-                        int runMode = 2;
-
-                        if (runMode == 0)
-                        {
-                            Console.WriteLine();
-                            Console.Write("Press any key to start the interpreter");
-                            Console.ReadKey();
-
-                            interpreter.RunWithUI(true, 5);
-                        }
-                        else if (runMode == 1)
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine($" === RESULT ===");
-                            Console.WriteLine();
-
-                            Brainfuck.ProgramUtils.SpeedTest(code.Code, 3);
-                        }
-                        else
-                        {
-                            Console.WriteLine();
-                            Console.WriteLine($" === RESULT ===");
-                            Console.WriteLine();
-
-                            Stopwatch sw = Stopwatch.StartNew();
-                            interpreter.Run();
-                            sw.Stop();
-
-                            Console.WriteLine();
-                            Console.WriteLine();
-                            Console.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
-
-                            Console.ResetColor();
-                            Console.WriteLine();
-                            Console.WriteLine();
-                            Console.WriteLine($" === MEMORY ===");
-                            Console.WriteLine();
-                            Console.ResetColor();
-
-                            {
-                                int zerosToShow = 10;
-                                int finalIndex = 0;
-
-                                for (int i = 0; i < interpreter.Memory.Length; i++)
-                                { if (interpreter.Memory[i] != 0) finalIndex = i; }
-                                finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
-                                finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
-
-                                for (int i = 0; i < finalIndex; i++)
-                                {
-                                    var cell = interpreter.Memory[i];
-                                    if (i == interpreter.MemoryPointer)
-                                    { Console.ForegroundColor = ConsoleColor.Red; }
-                                    else if (cell == 0)
-                                    { Console.ForegroundColor = ConsoleColor.DarkGray; }
-                                    Console.Write($" {cell} ");
-                                    Console.ResetColor();
-                                }
-
-                                if (interpreter.Memory.Length - finalIndex > 0)
-                                {
-                                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                                    Console.Write($" ... ");
-                                    Console.ResetColor();
-                                }
-
-                                Console.WriteLine();
-                            }
-                        }
-                    }
+                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None);
                     break;
                 case ArgumentParser.RunType.IL:
                     {

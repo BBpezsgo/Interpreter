@@ -15,7 +15,6 @@ namespace TheProgram
         {
             Normal,
             Debugger,
-            Tester,
             Compile,
             Decompile,
             ConsoleGUI,
@@ -252,6 +251,12 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-hide-warning")
+                    {
+                        result.LogWarnings = false;
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-dont-optimize")
                     {
                         result.compilerSettings.DontOptimize = true;
@@ -314,9 +319,7 @@ namespace TheProgram
 
                     if (args[i] == "-test")
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Tester}");
-                        result.RunType = RunType.Tester;
+                        result.IsTest = true;
                         goto ArgParseDone;
                     }
 
@@ -398,20 +401,25 @@ namespace TheProgram
             public readonly bool HandleErrors => !ThrowErrors;
             public string PipeName;
             public int Port;
+
             public bool LogDebugs;
             public bool LogSystem;
+            public bool LogWarnings;
+
             public RunType RunType;
             public string CompileOutput;
             public CompressionLevel CompressionLevel;
             public string BasePath;
             public string TestID;
             public FileType CompileToFileType;
+            internal bool IsTest;
 
             public static Settings Default() => new()
             {
                 ThrowErrors = false,
                 LogDebugs = true,
                 LogSystem = true,
+                LogWarnings = true,
                 BasePath = "",
                 RunType = RunType.Normal,
                 compilerSettings = Compiler.CompilerSettings.Default,
@@ -423,6 +431,7 @@ namespace TheProgram
                 Port = -1,
                 TestID = null,
                 CompileToFileType = FileType.Binary,
+                IsTest = false,
             };
         }
 

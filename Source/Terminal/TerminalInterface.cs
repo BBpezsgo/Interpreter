@@ -6,14 +6,12 @@ namespace ProgrammingLanguage.Output
 {
     public delegate void PrintCallback(string message, LogType logType);
 
-    namespace Debug
+    internal static class Debug
     {
-        internal static class Debug
-        {
-            internal static void Log(string msg) => System.Diagnostics.Debug.WriteLine(msg);
-            internal static void LogError(Errors.Exception error) => System.Diagnostics.Debug.WriteLine(error);
-            internal static void LogWarning(string msg) => System.Diagnostics.Debug.WriteLine(msg);
-        }
+        internal static void Log(string msg) => System.Diagnostics.Debug.WriteLine(msg);
+        internal static void LogError(Errors.Exception error) => System.Diagnostics.Debug.WriteLine(error);
+        internal static void LogError(System.Exception error) => System.Diagnostics.Debug.WriteLine(error);
+        internal static void LogWarning(string msg) => System.Diagnostics.Debug.WriteLine(msg);
     }
 
     internal static class Output

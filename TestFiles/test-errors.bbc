@@ -15,5 +15,5 @@ void Start()
 void End()
 {
   Foo v;
-  Console.Log(v.v);
+  PrintLineD(v.v);
 }

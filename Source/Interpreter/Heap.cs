@@ -171,15 +171,15 @@ namespace ProgrammingLanguage.Bytecode
                         // If the next block is exists
                         if (nextHeaderPointer < heap.Length)
                         {
-                            // Calculate remaing size
-                            int _remaingSize = blockSize - sizeNeed - BLOCK_HEADER_SIZE;
+                            // Calculate remaining size
+                            int _remainingSize = blockSize - sizeNeed - BLOCK_HEADER_SIZE;
 
                             // If a larger block is allocated than needed
-                            if (_remaingSize >= 0)
+                            if (_remainingSize >= 0)
                             {
-                                ushort remaingSize = (ushort)_remaingSize;
+                                ushort remainingSize = (ushort)_remainingSize;
                                 // Update the next block's header
-                                heap[nextHeaderPointer] = GetHeader(remaingSize, false);
+                                heap[nextHeaderPointer] = GetHeader(remainingSize, false);
                             }
                         }
 
@@ -227,7 +227,7 @@ namespace ProgrammingLanguage.Bytecode
                 (int blockSize, bool blockUsed) = GetHeader(heap[offset]);
                 int prevOffset = offset - prevBlockSize - BLOCK_HEADER_SIZE;
 
-                // This is a free block that is not at the begining of the heap
+                // This is a free block that is not at the beginning of the heap
                 if (offset != 0 && !blockUsed)
                 {
                     (_, bool prevBlockUsed) = GetHeader(heap[prevOffset]);

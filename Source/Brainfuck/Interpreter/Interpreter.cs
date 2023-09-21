@@ -293,25 +293,29 @@ namespace ProgrammingLanguage.Brainfuck
             };
 
             int lastCodePosition = 0;
-
             int halfWidth = width / 2;
 
+            void Draw()
             {
+                int line = 0;
+
                 int center = CodePointer - halfWidth;
                 lastCodePosition = Math.Clamp(lastCodePosition, center - 20, center + 20);
                 int codePrintStart = Math.Max(0, lastCodePosition);
                 int codePrintEnd = Math.Min(Code.Length - 1, lastCodePosition + width - 1);
-                DrawCode(renderer, codePrintStart, codePrintEnd, 0, 1, width);
+                DrawCode(renderer, codePrintStart, codePrintEnd, 0, line++, width);
 
                 int memoryPrintStart = Math.Max(0, MemoryPointer - halfWidth);
                 int memoryPrintEnd = Math.Min(Memory.Length - 1, MemoryPointer + (halfWidth - 1));
-                DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, 2, width);
-                DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, 3, width);
-                DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, 4, width);
-                DrawOutput(renderer, outputBuffer, 0, 5, width, height);
+                DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
+                DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
+                DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
+                DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
                 renderer.RefreshConsole();
             }
+
+            Draw();
 
             Thread.Sleep(100);
             inputBuffer.Clear();
@@ -326,26 +330,7 @@ namespace ProgrammingLanguage.Brainfuck
 
             while (Step())
             {
-                {
-                    int y = 0;
-                    // DrawOriginalCode(renderer, 0, y, width, 30);
-                    // y += 30;
-
-                    int center = CodePointer - halfWidth;
-                    lastCodePosition = Math.Clamp(lastCodePosition, center - 20, center + 20);
-                    int codePrintStart = Math.Max(0, lastCodePosition);
-                    int codePrintEnd = Math.Min(Code.Length - 1, lastCodePosition + width - 1);
-                    DrawCode(renderer, codePrintStart, codePrintEnd, 0, y++, width);
-
-                    int memoryPrintStart = Math.Max(0, MemoryPointer - halfWidth);
-                    int memoryPrintEnd = Math.Min(Memory.Length - 1, MemoryPointer + (halfWidth - 1));
-                    DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, y++, width);
-                    DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, y++, width);
-                    DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, y++, width);
-                    DrawOutput(renderer, outputBuffer, 0, y++, width, height);
-
-                    renderer.RefreshConsole();
-                }
+                Draw();
 
                 if (!autoTick || isPaused)
                 {
@@ -360,22 +345,7 @@ namespace ProgrammingLanguage.Brainfuck
                 }
             }
 
-            {
-                int center = CodePointer - halfWidth;
-                lastCodePosition = Math.Clamp(lastCodePosition, center - 20, center + 20);
-                int codePrintStart = Math.Max(0, lastCodePosition);
-                int codePrintEnd = Math.Min(Code.Length - 1, lastCodePosition + width - 1);
-                DrawCode(renderer, codePrintStart, codePrintEnd, 0, 1, width);
-
-                int memoryPrintStart = Math.Max(0, MemoryPointer - halfWidth);
-                int memoryPrintEnd = Math.Min(Memory.Length - 1, MemoryPointer + (halfWidth - 1));
-                DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, 2, width);
-                DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, 3, width);
-                DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, 4, width);
-                DrawOutput(renderer, outputBuffer, 0, 5, width, height);
-
-                renderer.RefreshConsole();
-            }
+            Draw();
         }
 
         void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)

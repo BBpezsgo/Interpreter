@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 
 namespace Communicating
@@ -17,21 +18,12 @@ namespace Communicating
         readonly Interface @interface;
         internal Interface.Type CommunicationType => @interface.CommunicationType;
 
-        void Log(string v)
+        public static readonly JsonSerializerOptions SerializerOptions = new()
         {
-            switch (CommunicationType)
-            {
-                case Interface.Type.Standard:
-                    IngameCoding.Output.File.WriteLine(v);
-                    break;
-                case Interface.Type.Pipe:
-                    Console.WriteLine(v);
-                    break;
-                case Interface.Type.Socket:
-                    Console.WriteLine(v);
-                    break;
-            }
-        }
+
+        };
+
+        public void Log(string v) => @interface.Log(v);
 
         public InterProcessCommunication()
         {
@@ -46,15 +38,15 @@ namespace Communicating
 
         private void OnRecive(string data)
         {
-            var message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim());
+            var message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
 
-            if (message.type == "base/ping/req")
+            if (message.Type == "base/ping/req")
             {
-                Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(), message.id);
+                Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(), message.Id);
                 return;
             }
 
-            if (message.type == "base/ping/res")
+            if (message.Type == "base/ping/res")
             {
                 return;
             }
@@ -62,9 +54,15 @@ namespace Communicating
             OnRecived?.Invoke(this, message);
         }
 
-        public void Reply<T>(string messageType, T messageData, string reply)
+        public void Reply<T>(string messageType, T messageData, string replyToId)
         {
-            OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData, reply));
+            OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData, replyToId));
+            TrySendNext();
+        }
+
+        public void Reply<T, T2>(string messageType, T messageData, IPCMessage<T2> replyTo)
+        {
+            OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData, replyTo.Id));
             TrySendNext();
         }
 
@@ -80,7 +78,7 @@ namespace Communicating
 
             try
             {
-                @interface.Send(JsonSerializer.Serialize(OutgoingMessages[0]));
+                @interface.Send(JsonSerializer.Serialize(OutgoingMessages[0], SerializerOptions));
             }
             catch (System.Exception error)
             {
@@ -111,12 +109,12 @@ namespace Communicating
 
         internal Type CommunicationType => Type.Standard; // PipeName != null ? Type.Pipe : Port != -1 ? Type.Socket : Type.Standard;
 
-        void Log(string v)
+        public void Log(string v)
         {
             switch (CommunicationType)
             {
                 case Type.Standard:
-                    IngameCoding.Output.File.WriteLine(v);
+                    ProgrammingLanguage.Output.File.WriteLine(v);
                     break;
                 case Type.Pipe:
                     Console.WriteLine(v);
@@ -206,7 +204,7 @@ namespace Communicating
 
                 Incoming = Incoming.Shift(Incoming.IndexOf(EOM), out string message);
                 if (string.IsNullOrWhiteSpace(message) || string.IsNullOrEmpty(message)) break;
-                
+
                 if (message.Contains(EOM))
                 {
                     Console.Error.WriteLine($" WTF: {message}");
@@ -220,23 +218,27 @@ namespace Communicating
 
     public class IPCMessage<T>
     {
-        public string type { get; set; }
-        public string id { get; set; }
-        public string reply { get; set; }
-        public T data { get; set; }
+        [JsonInclude, JsonPropertyName("type")]
+        public string Type;
+        [JsonInclude, JsonPropertyName("id")]
+        public string Id;
+        [JsonInclude, JsonPropertyName("reply")]
+        public string Reply;
+        [JsonInclude, JsonPropertyName("data")]
+        public T Data;
 
         public IPCMessage(string type, string id, T data, string reply = null)
         {
-            this.id = id;
-            this.type = type;
-            this.data = data;
-            this.reply = reply;
+            this.Id = id;
+            this.Type = type;
+            this.Data = data;
+            this.Reply = reply;
         }
 
-        public string Serialize() => JsonSerializer.Serialize(this);
-        public static IPCMessage<T> Deserialize(string data) => JsonSerializer.Deserialize<IPCMessage<T>>(data);
+        public string Serialize() => JsonSerializer.Serialize(this, InterProcessCommunication.SerializerOptions);
+        public static IPCMessage<T> Deserialize(string data) => JsonSerializer.Deserialize<IPCMessage<T>>(data, InterProcessCommunication.SerializerOptions);
 
-        public override string ToString() => $"IPCMessage<{typeof(T)}>{{ type: {type ?? "<null>"}, id: {id ?? "<null>"}, reply: {reply ?? "<null>"}, data: {{{data.ToString() ?? "<null>"}}} }}";
+        public override string ToString() => $"IPCMessage<{typeof(T)}>{{ type: {Type ?? "null"}, id: {Id ?? "null"}, reply: {Reply ?? "null"}, data: {{{Data.ToString() ?? "null"}}} }}";
     }
 
     static class Extensions

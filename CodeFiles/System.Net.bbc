@@ -1,7 +1,0 @@
-﻿#bf "http_get" "string" "string";
-
-namespace Http
-{
-  [External("http_get")]
-  export string Get(string url);
-}

@@ -44,8 +44,6 @@ namespace ProgrammingLanguage.BBCode
                 { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
             }
 
-            tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
-
             ParserResult parserResult;
 
             {

@@ -10,6 +10,6 @@ void Main()
 {
   // Console.Log((0).Add(5).Add(2).ToString());
   // Console.Log(Time.tmnw().Split(":")[2]);
-  Console.Log(Time.Now().ToTimeSpanString());
-  Main();
+  PrintLineD(Time.Now().ToTimeSpanString());
+  // Main();
 }

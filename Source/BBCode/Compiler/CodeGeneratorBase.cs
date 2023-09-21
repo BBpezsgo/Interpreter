@@ -224,6 +224,27 @@ namespace ProgrammingLanguage.BBCode.Compiler
             compilableGeneralFunctions = new List<CompileableTemplate<CompiledGeneralFunction>>();
         }
 
+        protected CodeGeneratorBase(Compiler.Result compilerResult) : this()
+        {
+            CompiledStructs = compilerResult.Structs;
+            CompiledClasses = compilerResult.Classes;
+            CompiledFunctions = compilerResult.Functions;
+            CompiledOperators = compilerResult.Operators;
+            CompiledGeneralFunctions = compilerResult.GeneralFunctions;
+            CompiledEnums = compilerResult.Enums;
+
+            Errors = new List<Error>();
+            Warnings = new List<Warning>();
+
+            CurrentFile = null;
+
+            TypeArguments = new Dictionary<string, CompiledType>();
+
+            compilableFunctions = new List<CompileableTemplate<CompiledFunction>>();
+            compilableOperators = new List<CompileableTemplate<CompiledOperator>>();
+            compilableGeneralFunctions = new List<CompileableTemplate<CompiledGeneralFunction>>();
+        }
+
         #region Helper Functions
 
         protected CompileableTemplate<CompiledFunction> AddCompilable(CompileableTemplate<CompiledFunction> compilable)
@@ -1070,19 +1091,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         #region FindType()
 
-        /// <exception cref="InternalException"></exception>
+        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(Token name) => FindType(name.Content, name);
 
-        /// <exception cref="InternalException"></exception>
+        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name, IThingWithPosition position) => FindType(name, position.GetPosition());
 
-        /// <exception cref="InternalException"></exception>
+        /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
 
         /// <param name="position">
         /// Used for exceptions
         /// </param>
-        /// <exception cref="InternalException"></exception>
+        /// <exception cref="CompilerException"/>
         CompiledType FindType(string name, Position position)
         {
             if (CompiledStructs.TryGetValue(name, out CompiledStruct @struct)) return new CompiledType(@struct);
@@ -1368,10 +1389,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             try
             { return FindType(identifier.Name); }
-            catch (Exception)
+            catch (CompilerException)
             { }
 
-            throw new CompilerException($"Local symbol/enum/function \"{identifier.Content}\" not found", identifier, CurrentFile);
+            throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
         }
         protected static CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
         protected static CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
@@ -1459,6 +1480,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
             throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field, CurrentFile);
         }
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
+        protected CompiledType FindStatementType(ModifiedStatement modifiedStatement)
+        {
+            if (modifiedStatement.Modifier == "ref")
+            {
+                return FindStatementType(modifiedStatement.Statement);
+            }
+
+            throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
+        }
 
         protected CompiledType FindStatementType(StatementWithValue statement)
             => FindStatementType(statement, null);
@@ -1499,6 +1529,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (statement is IndexCall index)
             { return FindStatementType(index); }
+
+            if (statement is ModifiedStatement modifiedStatement)
+            { return FindStatementType(modifiedStatement); }
 
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
         }

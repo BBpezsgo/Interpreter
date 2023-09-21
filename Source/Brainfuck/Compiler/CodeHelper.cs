@@ -111,13 +111,13 @@ namespace ProgrammingLanguage.Brainfuck
         #endregion
 
         /// <summary>
-        /// <b>Requies 1 more cell to the right of the <paramref name="target"/>!</b><br/>
+        /// <b>Requires 1 more cell to the right of the <paramref name="target"/>!</b><br/>
         /// <b>Pointer:</b> <paramref name="target"/> + 1
         /// </summary>
         internal void CopyValue(int source, int target)
             => CopyValueWithTemp(source, target + 1, target);
         /// <summary>
-        /// <b>Requies 1 more cell to the right of the <paramref name="targets"/>!</b><br/>
+        /// <b>Requires 1 more cell to the right of the <paramref name="targets"/>!</b><br/>
         /// <b>Pointer:</b> The last target + 1 or not modified
         /// </summary>
         internal void CopyValue(int source, params int[] targets)
@@ -1185,7 +1185,7 @@ namespace ProgrammingLanguage.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enought of memory")}\n");
+            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry
@@ -1225,7 +1225,7 @@ namespace ProgrammingLanguage.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enought of memory")}\n");
+            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry
@@ -1296,7 +1296,7 @@ namespace ProgrammingLanguage.Brainfuck
             Code.SetPointer(resultAddress);
         }
 
-        internal void Allocate(int resultAddress, int requiedSizeAddress, int tempAddressesStart)
+        internal void Allocate(int resultAddress, int requiredSizeAddress, int tempAddressesStart)
         {
             /*
 	            int result = Alloc();
@@ -1325,7 +1325,7 @@ namespace ProgrammingLanguage.Brainfuck
             Allocate(resultAddress);
 
             // int i = size;
-            Code.CopyValueWithTemp(requiedSizeAddress, tempAddressesStart, i);
+            Code.CopyValueWithTemp(requiredSizeAddress, tempAddressesStart, i);
 
             // i--;
             Code.AddValue(i, -1);
@@ -1379,7 +1379,7 @@ namespace ProgrammingLanguage.Brainfuck
                 this.Free(intermediateResultAddress);
 
                 // i = size;
-                Code.CopyValueWithTemp(requiedSizeAddress, temp, i);
+                Code.CopyValueWithTemp(requiredSizeAddress, temp, i);
 
                 Code.ClearValue(temp);
             }

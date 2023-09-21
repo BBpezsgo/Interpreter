@@ -1,12 +1,7 @@
-﻿using "../CodeFiles/System";
+﻿using System;
 
 [CodeEntry]
 void Start()
 {
-	Console.Log((5 + 5 * 5).ToString());
+	PrintLineD((5 + 5 * 5).ToString());
 }
-
-void None(any p) { }
-void None(float p) { }
-void None(bool p) { }
-void None(int p) { }

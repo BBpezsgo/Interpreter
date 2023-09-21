@@ -12,7 +12,7 @@ namespace ProgrammingLanguage.Core
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, !settings.ThrowErrors, settings.BasePath);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, !settings.ThrowErrors, settings.BasePath);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -30,6 +30,7 @@ namespace ProgrammingLanguage.Core
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
             bool LogDebug = true,
             bool LogSystem = true,
+            bool LogWarnings = true,
             bool HandleErrors = true,
             string BasePath = ""
             )
@@ -47,19 +48,22 @@ namespace ProgrammingLanguage.Core
                 switch (logType)
                 {
                     case Output.LogType.System:
-                        if (LogSystem) Output.Output.Log(message);
+                        if (!LogSystem) break;
+                        Output.Output.Log(message);
                         break;
                     case Output.LogType.Normal:
                         Output.Output.Log(message);
                         break;
                     case Output.LogType.Warning:
+                        if (!LogWarnings) break;
                         Output.Output.Warning(message);
                         break;
                     case Output.LogType.Error:
                         Output.Output.Error(message);
                         break;
                     case Output.LogType.Debug:
-                        if (LogDebug) Output.Output.Debug(message);
+                        if (!LogDebug) break;
+                        Output.Output.Debug(message);
                         break;
                 }
             };
@@ -121,65 +125,6 @@ namespace ProgrammingLanguage.Core
             {
                 interpreter.Update();
             }
-        }
-
-        static void PrintHeap(DataItem[] heap)
-        {
-            int elementsToShow = heap.Length;
-
-            for (int i = heap.Length - 1; i >= 0; i--)
-            {
-                elementsToShow = i + 1;
-                if (!heap[i].IsNull) break;
-            }
-            elementsToShow += 10;
-
-            for (int i = 0; i < elementsToShow; i++)
-            {
-                if (i < 0 || i >= heap.Length)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.Write("OOR");
-                }
-                else if (heap[i].IsNull)
-                {
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.Write("null");
-                }
-                else
-                {
-                    string v;
-                    switch (heap[i].Type)
-                    {
-                        case RuntimeType.BYTE:
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            v = heap[i].ValueByte.ToString();
-                            break;
-                        case RuntimeType.INT:
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            v = heap[i].ValueInt.ToString();
-                            break;
-                        case RuntimeType.FLOAT:
-                            Console.ForegroundColor = ConsoleColor.Cyan;
-                            v = heap[i].ValueFloat.ToString() + "f";
-                            break;
-                        case RuntimeType.CHAR:
-                            Console.ForegroundColor = ConsoleColor.Yellow;
-                            v = "'" + heap[i].ValueChar.Escape() + "'";
-                            break;
-                        default:
-                            Console.ForegroundColor = ConsoleColor.Gray;
-                            v = heap[i].ToString();
-                            break;
-                    }
-                    Console.Write(v);
-                    if (4 - v.Length > 0)
-                    { Console.Write(new string(' ', 4 - v.Length)); }
-                }
-                Console.Write(' ');
-                Console.ResetColor();
-            }
-            Console.WriteLine($"");
         }
     }
 }

@@ -143,9 +143,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             ParserResult parserResult2;
             {
 
-                var tokenizer = new Tokenizer(TokenizerSettings.Default);
-                var tokens = tokenizer.Parse(content, Warnings);
-                tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
+                Tokenizer tokenizer = new(TokenizerSettings.Default);
+                Token[] tokens = tokenizer.Parse(content, Warnings);
 
                 System.DateTime parseStarted = System.DateTime.Now;
                 Print?.Invoke("  Parsing ...", Output.LogType.Debug);

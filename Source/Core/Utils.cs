@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ProgrammingLanguage
 {
@@ -10,7 +6,7 @@ namespace ProgrammingLanguage
     {
         internal static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
 
-        internal static string GetEllapsedTime(double ms)
+        internal static string GetElapsedTime(double ms)
         {
             var val = ms;
 

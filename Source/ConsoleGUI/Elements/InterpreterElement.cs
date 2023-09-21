@@ -8,7 +8,7 @@ using Win32;
 namespace ConsoleGUI
 {
     using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Output.Debug;
+    using ProgrammingLanguage.Output;
 
     internal sealed class InterpreterElement : WindowElement
     {
@@ -163,12 +163,12 @@ namespace ConsoleGUI
                 int b = 3;
                 int min = Math.Min(a, b);
                 int max = Math.Max(a, b);
-                if (e.ButtonState == MouseButtonState.ScrollDown)
+                if (e.ButtonState == (uint)MouseButtonState.ScrollDown)
                 {
                     ConsoleScrollOffset++;
                     ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
                 }
-                else if (e.ButtonState == MouseButtonState.ScrollUp)
+                else if (e.ButtonState == (uint)MouseButtonState.ScrollUp)
                 {
                     ConsoleScrollOffset--;
                     ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
@@ -1117,7 +1117,7 @@ namespace ConsoleGUI
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
 
-            if (!e.IsDown && e.AsciiChar == 9)
+            if (e.IsDown == 0 && e.AsciiChar == 9)
             {
                 if (this.CurrentlyJumping <= 0)
                 {
@@ -1132,7 +1132,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.IsDown && e.AsciiChar == 43)
+            if (e.IsDown != 0 && e.AsciiChar == 43)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1145,7 +1145,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.IsDown && e.AsciiChar == 45)
+            if (e.IsDown != 0 && e.AsciiChar == 45)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1160,7 +1160,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.IsDown && e.AsciiChar == 42)
+            if (e.IsDown != 0 && e.AsciiChar == 42)
             {
                 if (this.CurrentlyJumping > 0)
                 {
@@ -1173,7 +1173,7 @@ namespace ConsoleGUI
                 return;
             }
 
-            if (e.IsDown && e.AsciiChar == 47)
+            if (e.IsDown != 0 && e.AsciiChar == 47)
             {
                 if (this.CurrentlyJumping > 0)
                 {

@@ -153,7 +153,6 @@ namespace ProgrammingLanguage.Tester.Parser
 
         Token CurrentToken => (currentTokenIndex >= 0 && currentTokenIndex < tokens.Count) ? tokens[currentTokenIndex] : null;
 
-        List<Warning> Warnings;
         public readonly List<Error> Errors = new();
 
         // === Result ===
@@ -164,9 +163,8 @@ namespace ProgrammingLanguage.Tester.Parser
         public Parser()
         { }
 
-        public ParserResult Parse(Token[] _tokens, List<Warning> warnings)
+        public ParserResult Parse(Token[] _tokens)
         {
-            Warnings = warnings;
             tokens.Clear();
             tokens.AddRange(_tokens);
 
@@ -193,14 +191,13 @@ namespace ProgrammingLanguage.Tester.Parser
         {
             var tokenizer = new BBCode.Tokenizer(TokenizerSettings.Default);
             var tokens = tokenizer.Parse(code, warnings);
-            tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
             System.DateTime parseStarted = System.DateTime.Now;
             if (printCallback != null)
             { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
 
             Parser parser = new();
-            var result = parser.Parse(tokens, warnings);
+            var result = parser.Parse(tokens);
 
             if (parser.Errors.Count > 0)
             {
@@ -278,8 +275,7 @@ namespace ProgrammingLanguage.Tester.Parser
             if (!ExpectIdentifier("test", out var keyword))
             { currentTokenIndex = parseStart; return false; }
 
-            Token name;
-            if (!ExpectLiteral(out name))
+            if (!ExpectLiteral(out Token name))
             {
                 if (!ExpectIdentifier(out name))
                 { throw new SyntaxException("Expected test name after keyword 'test'", CurrentToken ?? keyword); }
@@ -326,8 +322,7 @@ namespace ProgrammingLanguage.Tester.Parser
             {
                 if (ExpectOperator(";") != null) break;
 
-                Token parameter;
-                if (!ExpectLiteral(out parameter))
+                if (!ExpectLiteral(out Token parameter))
                 {
                     if (!ExpectIdentifier(out parameter))
                     { throw new SyntaxException("Expected parameter or ';'", CurrentToken ?? keyword); }

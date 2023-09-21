@@ -486,9 +486,9 @@ namespace ProgrammingLanguage.Core
         #endregion
 
         /// <exception cref="RuntimeException"/>
-        static void CheckParameters(string functionName, BBCode.Compiler.Type[] requied, DataItem[] passed)
+        static void CheckParameters(string functionName, BBCode.Compiler.Type[] required, DataItem[] passed)
         {
-            if (passed.Length != requied.Length) throw new RuntimeException($"Wrong number of parameters passed to external function '{functionName}' ({passed.Length}) wich requies {requied.Length}");
+            if (passed.Length != required.Length) throw new RuntimeException($"Wrong number of parameters passed to external function '{functionName}' ({passed.Length}) which requires {required.Length}");
         }
 
         #region GetTypes<>()

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 
 namespace ProgrammingLanguage.Core
@@ -52,7 +51,7 @@ namespace ProgrammingLanguage.Core
             internal System.IO.Stream SystemStream;
 
             internal bool SystemHasData => (SystemStream.Position >= SystemStream.Length);
-            internal int RemaingBufferSize => (BufferSize - Length);
+            internal int RemainingBufferSize => (BufferSize - Length);
 
             public InputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
                 : base(id, memoryAddress, bufferSize)
@@ -65,31 +64,31 @@ namespace ProgrammingLanguage.Core
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
 
-                Debug.WriteLine($"[STREAM {ID}]: Disposed");
+                Debug.Log($"[STREAM {ID}]: Disposed");
             }
 
             internal void ClearBuffer()
             {
                 this.Length = 0;
 
-                Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
+                Debug.Log($"[STREAM {ID}]: Buffer cleared");
             }
 
             internal override void Tick(IHeap heap)
             {
-                if (RemaingBufferSize == 0) return;
+                if (RemainingBufferSize == 0) return;
                 if (SystemHasData) return;
 
-                byte[] buffer = new byte[RemaingBufferSize];
-                int readedCount = SystemStream.Read(buffer, 0, RemaingBufferSize);
+                byte[] buffer = new byte[RemainingBufferSize];
+                int readCount = SystemStream.Read(buffer, 0, RemainingBufferSize);
 
-                for (int i = 0; i < readedCount; i++)
+                for (int i = 0; i < readCount; i++)
                 {
                     heap[i + MemoryAddress] = new DataItem(buffer[i]);
                 }
-                Length += readedCount;
+                Length += readCount;
 
-                Debug.WriteLine($"[STREAM {ID}]: (AUTO) Readed {readedCount} bytes");
+                Debug.Log($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
             }
         }
 
@@ -110,7 +109,7 @@ namespace ProgrammingLanguage.Core
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
 
-                Debug.WriteLine($"[STREAM {ID}]: Disposed");
+                Debug.Log($"[STREAM {ID}]: Disposed");
             }
 
             internal void Flush(byte[] buffer)
@@ -120,7 +119,7 @@ namespace ProgrammingLanguage.Core
                 this.SystemStream.Write(buffer, 0, buffer.Length);
                 this.SystemStream.Flush();
 
-                Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
+                Debug.Log($"[STREAM {ID}]: Write {buffer.Length} bytes");
             }
 
             internal override void Tick(IHeap heap) { }
@@ -163,7 +162,7 @@ namespace ProgrammingLanguage.Core
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
         /// <summary>
-        /// Will be invoked when the interpeter has output
+        /// Will be invoked when the interpreter has output
         /// </summary>
         public event OnOutputEventHandler OnOutput;
 
@@ -216,7 +215,7 @@ namespace ProgrammingLanguage.Core
             }
 
             public override readonly string ToString() => $"Code executed in {ElapsedTime}";
-            public readonly string ElapsedTime => ProgrammingLanguage.Utils.GetEllapsedTime(ElapsedMilliseconds);
+            public readonly string ElapsedTime => ProgrammingLanguage.Utils.GetElapsedTime(ElapsedMilliseconds);
         }
 
         protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
@@ -451,28 +450,14 @@ namespace ProgrammingLanguage.Core
 
         void PrintException(Exception error)
         {
-            OnOutput?.Invoke(this, error.GetType().Name + ": " + error.ToString(), LogType.Error);
-            ProgrammingLanguage.Output.Debug.Debug.LogError(error);
-
-            StackTrace stackTrace = new(error);
-            var stackFrames = stackTrace.GetFrames();
-
-            OnOutput?.Invoke(this, " Stack Trace:", LogType.Error);
-
-            for (int i = 0; i < stackFrames.Length; i++)
-            {
-                var method = stackFrames[i].GetMethod();
-                if (method != null)
-                { OnOutput?.Invoke(this, $"  {method.Name}()", LogType.Error); }
-                else
-                { OnOutput?.Invoke(this, $"  <null>\r\n", LogType.Error); }
-            }
+            OnOutput?.Invoke(this, $"{error.GetType().Name}: {error}", LogType.Error);
+            Debug.LogError(error);
         }
 
         void PrintException(System.Exception error)
         {
             OnOutput?.Invoke(this, $"InternalException ({error.GetType().Name}): {error.Message}", LogType.Error);
-            Output.Error(error);
+            Debug.LogError(error);
         }
 
         public void Destroy()

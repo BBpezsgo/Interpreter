@@ -2,7 +2,7 @@
 
 void Xd2()
 {
-    Console.Log("ahan");
+    PrintLineD("ahan");
 }
 
 [CodeEntry]
@@ -16,9 +16,9 @@ void Start()
       a = 10;
       b = 5;
     };
-    Console.Log(b);
+    PrintLine(b);
   };
-  Console.Log(a);
+  PrintLine(a);
   Xd();
 }
 

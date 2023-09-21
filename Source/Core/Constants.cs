@@ -96,7 +96,7 @@ namespace ProgrammingLanguage
                 { ">>", 2 },
             };
 
-            public static readonly Dictionary<string, int> Precedences = new()
+            public static readonly Dictionary<string, int> Precedencies = new()
             {
                 { "|", 4 },
                 { "&", 4 },

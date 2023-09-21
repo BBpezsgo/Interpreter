@@ -44,7 +44,7 @@ macro void TestClass() {
 }
 
 macro int Test(int size) {
-	int result = Alloc();
+	int result = Alloc(1);
 	int i = size;
 	while (i) {
 		i--;

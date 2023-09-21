@@ -3,16 +3,16 @@
 [CodeEntry]
 void Start()
 {
-  Console.Log(Foo(0));
-  Console.Log(Time.tmnw());
+  PrintLine(Foo(0));
+  PrintLine(Time.tmnw());
 }
 
 int Foo(int p)
 {
-  string v = "szia";
+  String v = "szia";
   return 2;
   if (p == 1)
   {
-    string v2 = "hello";
+    String v2 = "hello";
   };
 }

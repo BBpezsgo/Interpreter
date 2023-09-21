@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace ProgrammingLanguage.Bytecode
+﻿namespace ProgrammingLanguage.Bytecode
 {
     static class Extensions
     {

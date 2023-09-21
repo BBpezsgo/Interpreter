@@ -1,19 +1,19 @@
 ﻿using System;
 using System.IO;
+using Communicating;
+
+using ProgrammingLanguage.BBCode.Compiler;
+using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Core;
+using ProgrammingLanguage.Errors;
 
 namespace TheProgram
 {
-    using Communicating;
-
-    using IngameCoding.BBCode.Compiler;
-    using IngameCoding.Bytecode;
-    using IngameCoding.Core;
-
     internal class Debugger
     {
         readonly InterProcessCommunication Ipc;
         readonly string SourceCode;
-        Interpreter Interpreter;
+        InterpreterDebuggabble Interpreter;
 
         int CurrentLine
         {
@@ -21,9 +21,9 @@ namespace TheProgram
             {
                 int result = -1;
 
-                for (int i = 0; i < Interpreter.Details.CompilerResult.debugInfo.Length; i++)
+                for (int i = 0; i < Interpreter.Details.CompilerResult.DebugInfo.Length; i++)
                 {
-                    DebugInfo item = Interpreter.Details.CompilerResult.debugInfo[i];
+                    DebugInfo item = Interpreter.Details.CompilerResult.DebugInfo[i];
                     if (item.InstructionStart > Interpreter.Details.Interpreter.CodePointer) continue;
                     if (item.InstructionEnd < Interpreter.Details.Interpreter.CodePointer) continue;
 
@@ -51,7 +51,7 @@ namespace TheProgram
         void InitInterpreter(ArgumentParser.Settings settings)
         {
             Interpreter?.Destroy();
-            Interpreter = new Interpreter();
+            Interpreter = new InterpreterDebuggabble();
 
             Interpreter.OnOutput += (sender, message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
             Interpreter.OnStdOut += (_, message) => Ipc.Send("stdout", message);
@@ -69,96 +69,99 @@ namespace TheProgram
         static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)
         {
             ArgumentParser.Settings result = settings;
-            result.bytecodeInterpreterSettings.ClockCyclesPerUpdate = 1;
             return result;
         }
 
         void OnMessage(IPCMessage<object> message)
         {
-            switch (message.type)
+            switch (message.Type)
             {
-                case "intp/stepline":
+                case "debug/step":
                     {
-                        int startedLine = CurrentLine;
-                        int endlessSafe = 8;
-                        while (Interpreter.IsExecutingCode && startedLine == CurrentLine)
-                        {
-                            if (endlessSafe-- <= 0) break;
-                            Interpreter.Update();
-                        }
-                        Ipc.Reply("intp/updated", "null", message.id);
+                        Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
+                        Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
+
+                        Interpreter.Breakpoint = Math.Max(1, Interpreter.Breakpoint + 1);
+
+                        Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
+                        Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
+
+                        try
+                        { Interpreter.Continue(2); }
+                        catch (EndlessLoopException) { }
+                        Ipc.Reply("interpreter/updated", "null", message);
                     }
                     break;
-                case "intp/step":
+                case "debug/stepinto":
+                    {
+                        Interpreter.StepInto();
+                        Ipc.Reply("interpreter/updated", "null", message);
+                    }
+                    break;
+
+                case "interpreter/tick":
                     {
                         Interpreter.Update();
-                        Ipc.Reply("intp/updated", "null", message.id);
+                        Ipc.Reply("interpreter/updated", "null", message);
                     }
                     break;
-                case "comp/debuginfo":
+
+                case "compiler/debuginfo":
                     {
-                        Ipc.Reply("comp/debuginfo",
-                            (Interpreter.Details.CompilerResult.debugInfo == null) ?
+                        Ipc.Reply("compiler/debuginfo",
+                            (Interpreter.Details.CompilerResult.DebugInfo == null) ?
                                 Array.Empty<Data_DebugInfo>() :
-                                Interpreter.Details.CompilerResult.debugInfo.ToData(v => new Data_DebugInfo(v)),
-                            message.id);
+                                Interpreter.Details.CompilerResult.DebugInfo.ToData(v => new Data_DebugInfo(v)),
+                            message);
                     }
                     break;
-                case "comp/code":
+                case "compiler/code":
                     {
-                        Ipc.Reply("comp/code",
-                            (Interpreter.Details.CompilerResult.compiledCode == null) ?
+                        Ipc.Reply("compiler/code",
+                            (Interpreter.Details.CompilerResult.Code == null) ?
                                 Array.Empty<Data_Instruction>() :
-                                Interpreter.Details.CompilerResult.compiledCode.ToData(v => new Data_Instruction(v)),
-                            message.id);
+                                Interpreter.Details.CompilerResult.Code.ToData(v => new Data_Instruction(v)),
+                            message);
                     }
                     break;
-                case "get-intp-data":
+
+                case "interpreter/details":
                     {
                         if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("intp-data",
-                            new Data_BytecodeInterpreterDetails(Interpreter.Details.Interpreter),
-                            message.id);
+                        Ipc.Reply("interpreter/details", new Data_BytecodeInterpreterDetails(Interpreter.Details.Interpreter), message);
                     }
                     break;
-                case "intp/pointers":
+                case "interpreter/registers":
                     {
                         if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("intp/pointers",
-                            new BytecodeProcessorPointers(Interpreter.Details.Interpreter),
-                            message.id);
+                        Ipc.Reply("interpreter/registers", new BytecodeProcessorRegisters(Interpreter.Details.Interpreter), message);
                     }
                     break;
-                case "intp/stack":
+                case "interpreter/stack":
                     {
                         if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("intp/stack",
-                            new Stack_(Interpreter.Details.Interpreter),
-                            message.id);
+                        Ipc.Reply("interpreter/stack", new Stack_(Interpreter.Details.Interpreter), message);
                     }
                     break;
+                case "interpreter/state":
+                    {
+                        Ipc.Reply("interpreter/state", Interpreter.Details.State.ToString(), message);
+                    }
+                    break;
+                case "interpreter/callstack":
+                    {
+                        Ipc.Reply("interpreter/callstack", Interpreter.Details.Interpreter.CallStack, message);
+                    }
+                    break;
+
                 case "eval":
                     {
                         if (Interpreter.Details.Interpreter == null) return;
                     }
                     break;
-                case "intp/state":
-                    {
-                        Ipc.Reply("intp/state",
-                            Interpreter.Details.State.ToString(),
-                            message.id);
-                    }
-                    break;
-                case "intp/callstack":
-                    {
-                        Ipc.Reply("intp/callstack",
-                            Interpreter.Details.Interpreter.CallStack,
-                            message.id);
-                    }
-                    break;
                 case "stdin":
                     if (!NeedStdin) break;
-                    Interpreter.OnInput(message.data.ToString()[0]);
+                    Interpreter.OnInput(message.Data.ToString()[0]);
                     NeedStdin = false;
                     break;
             }
@@ -187,12 +190,12 @@ namespace TheProgram
 #pragma warning restore IDE0060 // Remove unused parameter
     }
 
-    public struct BytecodeProcessorPointers
+    public struct BytecodeProcessorRegisters
     {
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
 
-        internal BytecodeProcessorPointers(BytecodeInterpreter v)
+        internal BytecodeProcessorRegisters(BytecodeInterpreter v)
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
@@ -201,12 +204,10 @@ namespace TheProgram
 
     public struct Stack_
     {
-        public int StackMemorySize { get; set; }
         public Data_StackItem[] Stack { get; set; }
 
         internal Stack_(BytecodeInterpreter v)
         {
-            StackMemorySize = v.StackMemorySize;
             Stack = v.Stack.ToArray().ToData(v => new Data_StackItem(v));
         }
     }
@@ -230,12 +231,20 @@ namespace TheProgram
         public string Tag { get; set; }
         public bool IsHeapAddress { get; set; }
 
-        public Data_StackItem(DataItem v) : base(v)
+        public Data_StackItem(DataItem data) : base(data)
         {
-            var v_v = v.Value();
-            Type = v.type.ToString();
-            Value = v_v == null ? "null" : v_v.ToString();
-            Tag = v.Tag;
+            if (data.IsNull)
+            {
+                Type = "BYTE";
+                Value = "null";
+            }
+            else
+            {
+                object value = data.GetValue();
+                Type = data.Type.ToString();
+                Value = value == null ? "null" : value.ToString();
+            }
+            Tag = data.Tag;
         }
     }
 
@@ -289,38 +298,14 @@ namespace TheProgram
 
     public class Data_Instruction : Data_Serializable<Instruction>
     {
-        public string Tag { get; set; }
-        public object Parameter { get; set; }
-        public bool ParameterIsComplicated { get; set; }
         public string Opcode { get; set; }
+        public Data_StackItem Parameter { get; set; }
+        public string Tag { get; set; }
+
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
-            if (v.Parameter is DataItem v2)
-            {
-                switch (v2.type)
-                {
-                    case RuntimeType.INT:
-                        Parameter = "INT";
-                        break;
-                    case RuntimeType.FLOAT:
-                        Parameter = "FLOAT";
-                        break;
-                    case RuntimeType.STRING:
-                        Parameter = "STRING";
-                        break;
-                    case RuntimeType.BOOLEAN:
-                        Parameter = "BOOLEAN";
-                        break;
-                    default: throw new NotImplementedException();
-                }
-                ParameterIsComplicated = true;
-            }
-            else
-            {
-                Parameter = v.Parameter;
-                ParameterIsComplicated = false;
-            }
+            Parameter = new Data_StackItem(v.Parameter);
             Tag = v.tag;
         }
     }
@@ -331,7 +316,7 @@ namespace TheProgram
         public string Type { get; set; }
         public Data_Context Context { get; set; }
 
-        public Data_Log(IngameCoding.Output.LogType type, string message, Data_Context context)
+        public Data_Log(ProgrammingLanguage.Output.LogType type, string message, Data_Context context)
         {
             Type = type.ToString();
             Message = message;

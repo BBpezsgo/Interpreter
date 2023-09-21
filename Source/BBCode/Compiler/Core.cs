@@ -439,6 +439,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
             result = default;
             return false;
         }
+
+        public static void SetTypeParameters(CompiledType[] typeParameters, Dictionary<string, CompiledType> typeValues)
+        {
+            for (int i = 0; i < typeParameters.Length; i++)
+            {
+                if (typeParameters[i].IsGeneric)
+                {
+                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType typeParamater))
+                    { throw new NotImplementedException(); }
+                    typeParameters[i] = typeParamater;
+                }
+            }
+        }
     }
 
     public struct AttributeValues
@@ -754,15 +767,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Template = this,
             };
 
-            for (int i = 0; i < result.ParameterTypes.Length; i++)
-            {
-                if (result.ParameterTypes[i].IsGeneric)
-                {
-                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
-                    { throw new NotImplementedException(); }
-                    result.ParameterTypes[i] = typeParamater;
-                }
-            }
+            Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {
@@ -929,15 +934,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Template = this,
             };
 
-            for (int i = 0; i < result.ParameterTypes.Length; i++)
-            {
-                if (result.ParameterTypes[i].IsGeneric)
-                {
-                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
-                    { throw new NotImplementedException(); }
-                    result.ParameterTypes[i] = typeParamater;
-                }
-            }
+            Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {
@@ -1083,15 +1080,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Template = this,
             };
 
-            for (int i = 0; i < result.ParameterTypes.Length; i++)
-            {
-                if (result.ParameterTypes[i].IsGeneric)
-                {
-                    if (!typeParameters.TryGetValue(result.ParameterTypes[i].Name, out CompiledType typeParamater))
-                    { throw new NotImplementedException(); }
-                    result.ParameterTypes[i] = typeParamater;
-                }
-            }
+            Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {

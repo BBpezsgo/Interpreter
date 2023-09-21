@@ -1585,7 +1585,7 @@ namespace ProgrammingLanguage.BBCode.Parser
 
         static int OperatorPrecedence(string @operator)
         {
-            if (Constants.Operators.Precedences.TryGetValue(@operator, out int precedence))
+            if (Constants.Operators.Precedencies.TryGetValue(@operator, out int precedence))
             { return precedence; }
             throw new InternalException($"Precedence for operator \"{@operator}\" not found");
         }

@@ -6,4 +6,4 @@ void Bruh(T eh) {
 	PrintLine(eh);
 }
 
-Bruh(553);
+Bruh(53);

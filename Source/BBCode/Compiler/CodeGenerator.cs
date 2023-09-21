@@ -1940,9 +1940,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else if (statement is TypeCast @as)
             { GenerateCodeForStatement(@as); }
             else
-            {
-                Output.Debug.Debug.Log("[Compiler]: Unimplemented statement " + statement.GetType().Name);
-            }
+            { throw new InternalException($"Unimplemented statement {statement.GetType().Name}"); }
 
             debugInfo.InstructionEnd = GeneratedCode.Count - 1;
             debugInfo.Position = statement.GetPosition();

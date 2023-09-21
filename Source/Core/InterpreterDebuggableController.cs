@@ -1,11 +1,12 @@
-﻿using ProgrammingLanguage.Bytecode;
-
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 
 namespace ProgrammingLanguage.Core
 {
+    using BBCode.Compiler;
+    using Bytecode;
+
     public readonly struct Record<T>
     {
         public readonly T Value;
@@ -43,53 +44,91 @@ namespace ProgrammingLanguage.Core
 
     public class InterpreterDebuggabble : Interpreter
     {
-        int _breakpoint = int.MinValue;
+        int _absoluteBreakpoint = int.MinValue;
 
         bool _stackOperation = false;
         bool _heapOperation = false;
         bool _externalFunctionOperation = false;
         bool _aluOperation = false;
 
-        public int Breakpoint
+        public int AbsoluteBreakpoint
         {
-            get => _breakpoint;
+            get => _absoluteBreakpoint;
             set
             {
                 if (value == int.MinValue)
                 {
-                    _breakpoint = int.MinValue;
+                    _absoluteBreakpoint = int.MinValue;
                     return;
                 }
 
                 int endlessSafe = 8;
 
-                _breakpoint = value;
-                while (this.details.CompilerResult.Code[_breakpoint].opcode == Bytecode.Opcode.COMMENT)
+                _absoluteBreakpoint = value;
+                while (Code[_absoluteBreakpoint].opcode == Opcode.COMMENT)
                 {
-                    _breakpoint++;
+                    _absoluteBreakpoint++;
 
                     if (endlessSafe-- < 0) throw new Errors.EndlessLoopException();
                 }
             }
         }
+        public int Breakpoint
+        {
+            get
+            {
+                DebugInfo[] debugInfo = DebugInfo;
 
+                int smallestPartSize = int.MaxValue;
+
+                int result = -1;
+
+                for (int i = 0; i < debugInfo.Length; i++)
+                {
+                    DebugInfo item = debugInfo[i];
+                    int partSize = item.Position.End.Line - item.Position.Start.Line;
+
+                    if (partSize < smallestPartSize)
+                    {
+                        smallestPartSize = partSize;
+                        result = item.Position.Start.Line;
+                    }
+
+                    if (smallestPartSize == 0) break;
+                }
+
+                return result;
+            }
+            set
+            {
+                DebugInfo[] debugInfo = DebugInfo;
+
+                for (int i = 0; i < debugInfo.Length; i++)
+                {
+                    DebugInfo item = debugInfo[i];
+                    bool isInside = (item.Position.Start.Line >= _absoluteBreakpoint ||
+                        item.Position.End.Line <= _absoluteBreakpoint);
+
+                    if (isInside)
+                    {
+                        AbsoluteBreakpoint = value;
+                        break;
+                    }
+                }
+            }
+        }
         public bool StackOperation => _stackOperation;
         public bool HeapOperation => _heapOperation;
         public bool ExternalFunctionOperation => _externalFunctionOperation;
         public bool AluOperation => _aluOperation;
-
         public readonly Records<float> HeapUsage = new();
 
-        public void Step()
-        {
-            Breakpoint = BytecodeInterpreter.CodePointer + 1;
-            Continue();
-            Breakpoint = int.MinValue;
-        }
+        DebugInfo[] DebugInfo => details.CompilerResult.DebugInfo;
+        Instruction[] Code => details.CompilerResult.Code;
 
-        internal void DoUpdate()
+        public void DoUpdate()
         {
-            Instruction nextInstruction = this.details.NextInstruction;
+            Instruction nextInstruction = details.NextInstruction;
             if (nextInstruction != null)
             {
                 _externalFunctionOperation =
@@ -140,9 +179,8 @@ namespace ProgrammingLanguage.Core
 
         public void StepInto()
         {
-            Breakpoint = int.MinValue;
+            AbsoluteBreakpoint = int.MinValue;
             DoUpdate();
-            Breakpoint = int.MinValue;
         }
 
         internal void SampleHeap()
@@ -151,20 +189,19 @@ namespace ProgrammingLanguage.Core
             if (this.Details.Interpreter.Heap == null) return;
             if (this.Details.Interpreter.Heap is HEAP heap)
             {
-                var heapDiagnostics = heap.Diagnostics();
+                (int, int, int) heapDiagnostics = heap.Diagnostics();
                 HeapUsage.Add((float)heapDiagnostics.Item1 / (float)heap.Size);
             }
         }
 
         /// <exception cref="Errors.EndlessLoopException"></exception>
-        public void Continue()
+        public void Continue(int endlessSafe = 1024)
         {
-            int endlessSafe = 1024;
             while (true)
             {
                 DoUpdate();
 
-                if (BytecodeInterpreter.CodePointer == Breakpoint) break;
+                if (BytecodeInterpreter.CodePointer == AbsoluteBreakpoint) break;
 
                 if (endlessSafe-- < 0) throw new Errors.EndlessLoopException();
             }
@@ -175,8 +212,6 @@ namespace ProgrammingLanguage.Core
         /// </summary>
         /// <param name="compiledCode"></param>
         public override void ExecuteProgram(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
-        {
-            base.ExecuteProgram(compiledCode, bytecodeInterpreterSettings);
-        }
+            => base.ExecuteProgram(compiledCode, bytecodeInterpreterSettings);
     }
 }

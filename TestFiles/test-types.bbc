@@ -4,21 +4,21 @@
 void Main()
 {
 	var bytes = 666.ToByteArray();
-	Console.Log(GetInt(bytes));
+	Print(GetInt(bytes));
 }
 
 void LogArray(int[] array)
 {
-	Console.Write("[");
+	Print("[");
 
 	for (int i; i < array.Length; i++)
 	{
 	  var item = array[i];
-	  if (i > 0) { Console.Write(", "); };
-	  Console.Write(item.ToString());
+	  if (i > 0) { Print(", "); };
+	  Print(item.ToString());
 	};
 
-	Console.Log("]");
+	Print("]");
 }
 
 int GetInt(int[] bytes)

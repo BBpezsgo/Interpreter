@@ -1,19 +1,21 @@
-macro Hey(message bruh) {
-	out message
-	out '\n'
-	outstr bruh
+using System;
+
+macro void Hey(String message, int bruh) {
+	out message;
+	out '\n';
+	out bruh;
 }
 
-set a "01abc"
-set b "66"
-set c a
-set a "01abb"
+String a = "01abc";
+String b = "66";
+String c = a;
+a = "01abb";
 
-out b
-out '\n'
-out a
-out '\n'
-out c
-out '\n'
+out b;
+out '\n';
+out a;
+out '\n';
+out c;
+out '\n';
 
-Hey(c 55)
+Hey(c, 55);

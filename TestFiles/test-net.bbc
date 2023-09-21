@@ -1,8 +1,0 @@
-﻿using System;
-using System.Net;
-
-[CodeEntry]
-void Start()
-{
-  Http.Get("https://www.google.com/");
-}

@@ -17,12 +17,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Source\Debugger\**" />
-    <EmbeddedResource Remove="Source\Debugger\**" />
-    <None Remove="Source\Debugger\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Remove="ConsoleGUI.cs" />
     <Compile Remove="Core.cs" />
     <Compile Remove="SomeTests.cs" />

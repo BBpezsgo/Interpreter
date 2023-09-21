@@ -120,14 +120,14 @@ namespace ProgrammingLanguage.Errors
         public override string ToString()
         {
             if (!Context.HasValue) return Message + " (no context)";
-            var cont = Context.Value;
+            Bytecode.Context context = Context.Value;
 
-            var result = Message;
-            result += $"\n Executed Instructions: {cont.ExecutedInstructionCount}";
-            result += $"\n Code Pointer: {cont.CodePointer}";
+            string result = Message;
+            result += $"\n Executed Instructions: {context.ExecutedInstructionCount}";
+            result += $"\n Code Pointer: {context.CodePointer}";
             result += $"\n Call Stack:";
-            if (cont.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
-            else { result += "\n   " + string.Join("\n   ", cont.CallStack); }
+            if (context.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
+            else { result += "\n   " + string.Join("\n   ", context.CallStack); }
             if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
             {
                 result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";

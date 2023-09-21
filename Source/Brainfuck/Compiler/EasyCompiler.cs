@@ -1,14 +1,14 @@
-﻿using ProgrammingLanguage.BBCode;
-using ProgrammingLanguage.Brainfuck.Compiler;
-using ProgrammingLanguage.Core;
-using ProgrammingLanguage.Errors;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
 namespace ProgrammingLanguage.Brainfuck
 {
+    using BBCode;
+    using Compiler;
+    using Core;
+    using Errors;
+
     public class EasyCompiler
     {
         string BasePath;
@@ -38,8 +38,6 @@ namespace ProgrammingLanguage.Brainfuck
                 foreach (Warning warning in warnings)
                 { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
             }
-
-            tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
             BBCode.Parser.ParserResult parserResult;
 

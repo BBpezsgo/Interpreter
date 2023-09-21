@@ -239,7 +239,7 @@ namespace ConsoleGUI
             ConsoleBuffer = new CharInfo[Width * Height];
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
-                ConsoleBuffer[i].Char.UnicodeChar = ' ';
+                ConsoleBuffer[i].Char = ' ';
             }
             ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = Width, Bottom = Height };
         }
@@ -293,7 +293,7 @@ namespace ConsoleGUI
 
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
-                ConsoleBuffer[i].Char.UnicodeChar = ' ';
+                ConsoleBuffer[i].Char = ' ';
                 ConsoleBuffer[i].Attributes = (ushort)BackgroundColor.Magenta;
             }
 
@@ -335,7 +335,7 @@ namespace ConsoleGUI
 
                     Character chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
                     ConsoleBuffer[i].Attributes = (ushort)((int)chr.ForegroundColor | (int)chr.BackgroundColor);
-                    ConsoleBuffer[i].Char.UnicodeChar = chr.Char;
+                    ConsoleBuffer[i].Char = chr.Char;
                 }
             }
         }
@@ -364,7 +364,7 @@ namespace ConsoleGUI
         void WindowBufferSizeEvent(WindowBufferSizeEvent e) => ResizeElements = true;
         void KeyEvent(KeyEvent e)
         {
-            if (!e.IsDown)
+            if (e.IsDown == 0)
             {
                 if (e.AsciiChar == 27)
                 {

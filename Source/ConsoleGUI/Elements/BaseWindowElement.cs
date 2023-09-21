@@ -28,7 +28,7 @@ namespace ConsoleGUI
         {
             if (!CanDrag) return;
 
-            if (mouse.ButtonState != MouseButtonState.Left)
+            if (mouse.ButtonState != (uint)MouseButtonState.Left)
             {
                 MouseDragStart = Point.Empty;
                 MouseDragStartPos = Point.Empty;

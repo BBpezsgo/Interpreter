@@ -33,14 +33,14 @@ void Start()
   v2 = new Foo;
   Faa(v2.f);
   Faa(Xy().f);
-  Faa([false, true, true, false][3]);
+  // Faa([false, true, true, false][3]);
 }
 
-void Faa(int p) { Console.Log(type (p)); }
-void Faa(bool p) { Console.Log(type (p)); }
-void Faa(string p) { Console.Log(type (p)); }
-void Faa(float p) { Console.Log(type (p)); }
-void Faa(bool[] p) { Console.Log(type (p)); }
-void Faa(Xy p) { Console.Log(type (p)); }
-void Faa(Foo2 p) { Console.Log(type (p)); }
-void Faa(Foo p) { Console.Log(type (p)); }
+void Faa(int p) { PrintLine(type (p)); }
+void Faa(bool p) { PrintLine(type (p)); }
+void Faa(String p) { PrintLine(type (p)); }
+void Faa(float p) { PrintLine(type (p)); }
+// void Faa(bool[] p) { PrintLine(type (p)); }
+// void Faa(Xy p) { PrintLine(type (p)); }
+void Faa(Foo2 p) { PrintLine(type (p)); }
+void Faa(Foo p) { PrintLine(type (p)); }

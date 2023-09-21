@@ -141,10 +141,10 @@ namespace ProgrammingLanguage.BBCode.Analysis
             try
             {
                 Tokenizer tokenizer = new(TokenizerSettings.Default);
-                result = Analyze(tokenizer.Parse(code, tokenizerWarnings, path, out var unicodeChars), file, path);
-                result.Tokens = result.Tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
+                List<SimpleToken> unicodeChars = new();
+                result = Analyze(tokenizer.Parse(code, tokenizerWarnings, path, unicodeChars), file, path);
                 result.TokenizerWarnings = tokenizerWarnings.ToArray();
-                result.TokenizerInicodeChars = unicodeChars;
+                result.TokenizerInicodeChars = unicodeChars.ToArray();
             }
             catch (Exception error)
             {
@@ -171,7 +171,6 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     string code_ = System.IO.File.ReadAllText(file_.FullName);
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
                     Token[] tokens_ = tokenizer.Parse(code_);
-                    tokens_ = tokens_.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
                     if (tokens_ == null) continue;
                     if (tokens_.Length < 3) continue;
                     ParserResultHeader codeHeader = Parser.ParseCodeHeader(tokens_);
@@ -269,7 +268,6 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
                     Tokenizer tokenizer = new(TokenizerSettings.Default);
                     Token[] tokens = tokenizer.Parse(code);
-                    tokens = tokens.RemoveTokens(TokenType.COMMENT, TokenType.COMMENT_MULTILINE);
 
                     List<Error> parserErrors = new();
 

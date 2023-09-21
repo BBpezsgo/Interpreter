@@ -1,10 +1,12 @@
+using System;
+
 int i = 0;
 while (1) {
 	i++;
 	out i;
 	out '\n';
 
-	if (i == 50) {
+	if (i == 4) {
 		out "Break!";
 		break;
 		out "What?";

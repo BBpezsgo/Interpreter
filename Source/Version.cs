@@ -36,7 +36,7 @@ namespace TheProgram
         {
             Thread thread = new(new ThreadStart(() =>
             {
-                StateCallback?.Invoke("Preapre for download");
+                StateCallback?.Invoke("Prepare for download");
                 System.Net.Http.HttpClient httpClient = new();
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
 

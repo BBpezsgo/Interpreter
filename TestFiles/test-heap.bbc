@@ -17,15 +17,15 @@ void Start()
   foo.Func();
   Foo foo2 = foo;
   foo2.v = 3;
-  Console.Log(foo.v);
-  Console.Log(foo2.v);
+  PrintLine(foo.v);
+  PrintLine(foo2.v);
 
   Hehe hehe = new Hehe;
   hehe.Func();
   Hehe hehe2 = hehe;
   hehe2.w = 3;
-  Console.Log(hehe.w);
-  Console.Log(hehe2.w);
+  PrintLine(hehe.w);
+  PrintLine(hehe2.w);
 }
 
 void Func(this Foo p)

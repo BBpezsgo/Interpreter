@@ -558,7 +558,7 @@ namespace ProgrammingLanguage.Bytecode
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.Type != RuntimeType.INT)
-            { throw new InternalException($"Instruction CALL_EXTERNAL need a Strint pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.Type} {functionNameDataItem}"); }
+            { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.Type} {functionNameDataItem}"); }
 
             int functionNameLength = Memory.Stack.Pop().Integer ?? throw new RuntimeException($"This should be an integer");
 

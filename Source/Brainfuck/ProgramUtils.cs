@@ -1,18 +1,169 @@
-﻿using ProgrammingLanguage.Brainfuck;
-using ProgrammingLanguage.Brainfuck.Compiler;
-using ProgrammingLanguage.Core;
-
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using ProgrammingLanguage.Brainfuck;
+using ProgrammingLanguage.Brainfuck.Compiler;
+using ProgrammingLanguage.Core;
 
 #nullable enable
 
 namespace TheProgram.Brainfuck
 {
+    public enum RunKind : int
+    {
+        Default,
+        UI,
+        SpeedTest,
+    }
+
+    [Flags]
+    public enum PrintFlags : int
+    {
+        None = 0,
+        PrintResultLabel = 1,
+        PrintExecutionTime = 2,
+        PrintMemory = 4,
+    }
+
     internal static class ProgramUtils
     {
+        public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags)
+        {
+            CompileOptions flags =
+                CompileOptions.None;
+
+            void PrintCallback(string message, ProgrammingLanguage.Output.LogType level)
+            {
+                switch (level)
+                {
+                    case ProgrammingLanguage.Output.LogType.System:
+                        if (!args.LogSystem) break;
+                        ProgrammingLanguage.Output.Output.Log(message);
+                        break;
+                    case ProgrammingLanguage.Output.LogType.Normal:
+                        ProgrammingLanguage.Output.Output.Log(message);
+                        break;
+                    case ProgrammingLanguage.Output.LogType.Warning:
+                        if (!args.LogWarnings) break;
+                        ProgrammingLanguage.Output.Output.Warning(message);
+                        break;
+                    case ProgrammingLanguage.Output.LogType.Error:
+                        ProgrammingLanguage.Output.Output.Error(message);
+                        break;
+                    case ProgrammingLanguage.Output.LogType.Debug:
+                        if (!args.LogDebugs) break;
+                            ProgrammingLanguage.Output.Output.Debug(message);
+                        break;
+                    default:
+                        ProgrammingLanguage.Output.Output.Log(message);
+                        break;
+                }
+            }
+
+            CodeGenerator.Result? _code = ProgramUtils.CompilePlus(args.File, flags, args.compilerSettings, PrintCallback);
+            if (!_code.HasValue)
+            { return; }
+
+            CodeGenerator.Result code = _code.Value;
+
+            ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code.Code)
+            {
+                DebugInfo = code.DebugInfo.ToArray(),
+                OriginalCode = code.Tokens,
+            };
+
+            switch (runKind)
+            {
+                case RunKind.UI:
+                    {
+                        Console.WriteLine();
+                        Console.Write("Press any key to start the interpreter");
+                        Console.ReadKey();
+
+                        interpreter.RunWithUI(true, 5);
+                        break;
+                    }
+                case RunKind.SpeedTest:
+                    {
+                        if (runFlags.HasFlag(PrintFlags.PrintResultLabel))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine($" === RESULT ===");
+                            Console.WriteLine();
+                        }
+
+                        SpeedTest(code.Code, 3);
+                        break;
+                    }
+                case RunKind.Default:
+                    {
+                        if (runFlags.HasFlag(PrintFlags.PrintResultLabel))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine($" === RESULT ===");
+                            Console.WriteLine();
+                        }
+
+                        if (runFlags.HasFlag(PrintFlags.PrintExecutionTime))
+                        {
+                            Stopwatch sw = Stopwatch.StartNew();
+                            interpreter.Run();
+                            sw.Stop();
+
+                            Console.WriteLine();
+                            Console.WriteLine();
+                            Console.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
+                        }
+                        else
+                        {
+                            interpreter.Run();
+                        }
+
+                        if (runFlags.HasFlag(PrintFlags.PrintMemory))
+                        {
+                            Console.ResetColor();
+                            Console.WriteLine();
+                            Console.WriteLine();
+                            Console.WriteLine($" === MEMORY ===");
+                            Console.WriteLine();
+                            Console.ResetColor();
+
+                            int zerosToShow = 10;
+                            int finalIndex = 0;
+
+                            for (int i = 0; i < interpreter.Memory.Length; i++)
+                            { if (interpreter.Memory[i] != 0) finalIndex = i; }
+
+                            finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
+                            finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
+
+                            for (int i = 0; i < finalIndex; i++)
+                            {
+                                var cell = interpreter.Memory[i];
+                                if (i == interpreter.MemoryPointer)
+                                { Console.ForegroundColor = ConsoleColor.Red; }
+                                else if (cell == 0)
+                                { Console.ForegroundColor = ConsoleColor.DarkGray; }
+                                Console.Write($" {cell} ");
+                                Console.ResetColor();
+                            }
+
+                            if (interpreter.Memory.Length - finalIndex > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                Console.Write($" ... ");
+                                Console.ResetColor();
+                            }
+
+                            Console.WriteLine();
+                        }
+
+                        break;
+                    }
+            }
+        }
+
         public static void SpeedTest(string code, int iterations)
         {
             ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code, _ => { });
@@ -47,9 +198,9 @@ namespace TheProgram.Brainfuck
             PrintFinal = 0b_1000,
         }
 
-        public static CodeGenerator.Result? CompilePlus(FileInfo file, CompileOptions options)
-                => CompilePlus(file, (int)options);
-        public static CodeGenerator.Result? CompilePlus(FileInfo file, int options)
+        public static CodeGenerator.Result? CompilePlus(FileInfo file, CompileOptions options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+                => CompilePlus(file, (int)options, compilerSettings, printCallback);
+        public static CodeGenerator.Result? CompilePlus(FileInfo file, int options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings _compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
         {
             CodeGenerator.Settings compilerSettings = CodeGenerator.Settings.Default;
 
@@ -63,8 +214,8 @@ namespace TheProgram.Brainfuck
 
             try
             {
-                compilerResult = EasyCompiler.Compile(file, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings.Default, compilerSettings, PrintMessage).CodeGeneratorResult;
-                Console.WriteLine($"Optimalized {compilerResult.Optimalizations} statements");
+                compilerResult = EasyCompiler.Compile(file, _compilerSettings, compilerSettings, printCallback).CodeGeneratorResult;
+                printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", ProgrammingLanguage.Output.LogType.Debug);
             }
             catch (ProgrammingLanguage.Errors.Exception exception)
             {
@@ -131,31 +282,6 @@ namespace TheProgram.Brainfuck
             return compilerResult;
         }
 
-        static void PrintMessage(string message, ProgrammingLanguage.Output.LogType level)
-        {
-            switch (level)
-            {
-                case ProgrammingLanguage.Output.LogType.System:
-                    ProgrammingLanguage.Output.Output.Log(message);
-                    break;
-                case ProgrammingLanguage.Output.LogType.Normal:
-                    ProgrammingLanguage.Output.Output.Log(message);
-                    break;
-                case ProgrammingLanguage.Output.LogType.Warning:
-                    ProgrammingLanguage.Output.Output.Warning(message);
-                    break;
-                case ProgrammingLanguage.Output.LogType.Error:
-                    ProgrammingLanguage.Output.Output.Error(message);
-                    break;
-                case ProgrammingLanguage.Output.LogType.Debug:
-                    ProgrammingLanguage.Output.Output.Debug(message);
-                    break;
-                default:
-                    ProgrammingLanguage.Output.Output.Log(message);
-                    break;
-            }
-        }
-
         public static string? Compile(string code, CompileOptions options)
             => Compile(code, (int)options);
         public static string Compile(string code, int options)
@@ -174,9 +300,9 @@ namespace TheProgram.Brainfuck
             return compiled;
         }
 
-        public static string? CompileFile(string file, CompileOptions options)
-            => CompileFile(file, (int)options);
-        public static string? CompileFile(string file, int options)
+        public static string? CompileFile(string file, CompileOptions options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+            => CompileFile(file, (int)options, compilerSettings, printCallback);
+        public static string? CompileFile(string file, int options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
         {
             if (!File.Exists(file))
             {
@@ -189,7 +315,7 @@ namespace TheProgram.Brainfuck
             string extension = Path.GetExtension(file)[1..];
             if (extension == "bfpp")
             {
-                return CompilePlus(new FileInfo(file), options)?.Code;
+                return CompilePlus(new FileInfo(file), options, compilerSettings, printCallback)?.Code;
             }
 
             if (extension == "bf")

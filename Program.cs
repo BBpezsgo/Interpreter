@@ -1,13 +1,13 @@
 ﻿namespace TheProgram
 {
-    internal class Program
+    public class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
-            if (DevelopmentEntry.Start()) return;
+            if (args.Length == 0 && DevelopmentEntry.Start()) return;
 
-            var settings = ArgumentParser.Parse(args);
-            if (!settings.HasValue) goto ExitProgram;
+            ArgumentParser.Settings? settings = ArgumentParser.Parse(args);
+            if (!settings.HasValue) throw new System.Exception($"Invalid arguments");
 
             switch (settings.Value.RunType)
             {
@@ -17,9 +17,7 @@
                     System.Console.ResetColor();
                     return;
                 case ArgumentParser.RunType.Debugger:
-                    throw new System.NotImplementedException();
-                case ArgumentParser.RunType.Tester:
-                    ProgrammingLanguage.Tester.Tester.RunTestFile(settings.Value);
+                    _ = new Debugger(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
                     ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
@@ -29,14 +27,17 @@
                 case ArgumentParser.RunType.Decompile:
                     throw new System.NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    throw new System.NotImplementedException();
+                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None);
+                    break;
             }
 
-        ExitProgram:
-            System.Console.WriteLine();
-            System.Console.WriteLine();
-            System.Console.WriteLine("Press any key to exit");
-            System.Console.ReadKey();
+            if (!settings.Value.IsTest)
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine();
+                System.Console.WriteLine("Press any key to exit");
+                System.Console.ReadKey();
+            }
         }
     }
 }

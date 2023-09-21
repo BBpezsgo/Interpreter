@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
 
 #nullable enable
 
@@ -57,7 +57,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         readonly StackCodeHelper Stack;
         readonly BasicHeapCodeHelper Heap;
-        
+
         readonly Stack<int> VariableCleanupStack;
         readonly Stack<int> ReturnCount;
         readonly Stack<int> BreakCount;
@@ -66,19 +66,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         /// <summary> Contains the "break tag" address </summary>
         readonly Stack<int> BreakTagStack;
 
-        int Optimalizations;
+        int Optimizations;
 
         readonly Stack<FunctionThingDefinition> CurrentMacro;
 
         readonly Settings GeneratorSettings;
 
-        string? VariableCanBeDiscated = null;
+        string? VariableCanBeDiscarded = null;
 
         readonly List<DebugInfo> DebugInfo;
 
         #endregion
 
-        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base()
+        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base(compilerResult)
         {
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
@@ -105,7 +105,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         public struct Result
         {
             public string Code;
-            public int Optimalizations;
+            public int Optimizations;
             public Token[] Tokens;
 
             public Warning[] Warnings;
@@ -158,7 +158,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             public readonly bool HaveToClean;
             public readonly CompiledType Type;
             public readonly int Size;
-            public bool IsDiscarted;
+            public bool IsDiscarded;
 
             public readonly bool IsInitialized => Type.SizeOnStack > 0;
 
@@ -169,7 +169,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 Scope = scope;
                 HaveToClean = haveToClean;
                 Type = type;
-                IsDiscarted = false;
+                IsDiscarded = false;
                 Size = size;
             }
 
@@ -206,7 +206,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (variables[i].Name != name) continue;
                 Variable v = variables[i];
-                v.IsDiscarted = true;
+                v.IsDiscarded = true;
                 variables[i] = v;
                 return;
             }
@@ -217,7 +217,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (variables[i].Name != name) continue;
                 Variable v = variables[i];
-                v.IsDiscarted = false;
+                v.IsDiscarded = false;
                 variables[i] = v;
                 return;
             }
@@ -279,16 +279,16 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "const":
                     {
                         if (instruction.Parameters.Length != 2)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"const\" (requied 2, passed {instruction.Parameters.Length})", instruction, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"const\" (required 2, passed {instruction.Parameters.Length})", instruction, CurrentFile); }
 
                         if (instruction.Parameters[0] is not Identifier constIdentifier)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (requied identifier)", instruction.Parameters[0], CurrentFile); }
+                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (required identifier)", instruction.Parameters[0], CurrentFile); }
 
                         if (IllegalIdentifiers.Contains(constIdentifier.Content))
                         { throw new CompilerException($"Illegal constant name \"{constIdentifier}\"", constIdentifier, CurrentFile); }
 
                         if (instruction.Parameters[1] is not StatementWithValue constValue)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (requied a value)", instruction.Parameters[1], CurrentFile); }
+                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (required a value)", instruction.Parameters[1], CurrentFile); }
 
                         if (Constants.TryFind(constIdentifier.Content, out _))
                         { throw new CompilerException($"Constant \"{constIdentifier.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
@@ -333,20 +333,20 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             return PrecompileVariable(instruction);
         }
-        int PrecompileVariable(VariableDeclaretion variableDeclaretion)
+        int PrecompileVariable(VariableDeclaretion variableDeclaration)
         {
-            if (IllegalIdentifiers.Contains(variableDeclaretion.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name \"{variableDeclaretion.VariableName}\"", variableDeclaretion.VariableName, CurrentFile); }
+            if (IllegalIdentifiers.Contains(variableDeclaration.VariableName.Content))
+            { throw new CompilerException($"Illegal variable name \"{variableDeclaration.VariableName}\"", variableDeclaration.VariableName, CurrentFile); }
 
-            StatementWithValue? initialValue = variableDeclaretion.InitialValue;
+            StatementWithValue? initialValue = variableDeclaration.InitialValue;
 
-            if (Variables.TryFind(variableDeclaretion.VariableName.Content, out _))
-            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, CurrentFile); }
+            if (Variables.TryFind(variableDeclaration.VariableName.Content, out _))
+            { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
-            if (Constants.TryFind(variableDeclaretion.VariableName.Content, out _))
-            { throw new CompilerException($"Variable \"{variableDeclaretion.VariableName.Content}\" already defined", variableDeclaretion.VariableName, CurrentFile); }
+            if (Constants.TryFind(variableDeclaration.VariableName.Content, out _))
+            { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
-            return PrecompileVariable(Variables, variableDeclaretion.VariableName.Content, initialValue);
+            return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, initialValue);
         }
         int PrecompileVariable(Stack<Variable> variables, string name, StatementWithValue? initialValue)
         {
@@ -525,11 +525,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
                 if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
                 var t = FindStatementType(constructorCall.Parameters[0]);
                 if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
+                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: required {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
 
                 if (!TryCompute(constructorCall.Parameters[0], out DataItem value))
                 { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
@@ -853,15 +853,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             {
                 if (variable.Address == valueVariable.Address)
                 {
-                    Optimalizations++;
+                    Optimizations++;
                     return;
                 }
 
-                if (valueVariable.IsDiscarted)
-                { throw new CompilerException($"Variable \"{valueVariable.Name}\" is discarted", _identifier, CurrentFile); }
+                if (valueVariable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{valueVariable.Name}\" is discarded", _identifier, CurrentFile); }
 
                 if (variable.Size != valueVariable.Size)
-                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueVariable.Size})", value, CurrentFile); }
+                { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueVariable.Size})", value, CurrentFile); }
 
                 UndiscardVariable(Variables, variable.Name);
 
@@ -876,13 +876,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     Code.CopyValueWithTemp(offsettedSource, tempAddress, offsettedTarget);
                 }
 
-                Optimalizations++;
+                Optimizations++;
 
                 return;
             }
 
             if (SafeToDiscardVariable(value, variable))
-            { VariableCanBeDiscated = variable.Name; }
+            { VariableCanBeDiscarded = variable.Name; }
 
             using (Code.Block($"Set variable {variable.Name} (at {variable.Address}) to {value}"))
             {
@@ -904,16 +904,16 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     }
                     */
 
-                    Optimalizations++;
+                    Optimizations++;
 
-                    VariableCanBeDiscated = null;
+                    VariableCanBeDiscarded = null;
                     return;
                 }
 
                 int valueSize = GetValueSize(value);
 
                 if (valueSize != variable.Size)
-                { throw new CompilerException($"Variable and value size mistach ({variable.Size} != {valueSize})", value, CurrentFile); }
+                { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
 
                 using (Code.Block($"Compute value"))
                 {
@@ -925,7 +925,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 UndiscardVariable(Variables, variable.Name);
 
-                VariableCanBeDiscated = null;
+                VariableCanBeDiscarded = null;
             }
         }
 
@@ -956,7 +956,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
 
             if (GetValueSize(value) != 1)
-            { throw new CompilerException($"size 1 bruh alloved on heap thingy", value, CurrentFile); }
+            { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
 
             int valueAddress = Stack.NextAddress;
             Compile(value);
@@ -988,7 +988,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                     Code.SetValue(address, constantValue.Byte ?? 0);
 
-                    Optimalizations++;
+                    Optimizations++;
 
                     return;
                 }
@@ -1018,8 +1018,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (!Variables.TryFind(_variableIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
 
-            if (variable.IsDiscarted)
-            { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", _variableIdentifier, CurrentFile); }
+            if (variable.IsDiscarded)
+            { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", _variableIdentifier, CurrentFile); }
 
             using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
@@ -1029,7 +1029,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     CompiledType valueType = FindStatementType(value);
 
                     if (elementType != valueType)
-                    { throw new CompilerException("AAAAAAAAAAAaaafasfsdfsd", value, CurrentFile); }
+                    { throw new CompilerException("Bruh", value, CurrentFile); }
 
                     int elementSize = elementType.Size;
 
@@ -1088,8 +1088,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             { Compile(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
             { Compile(compoundAssignment); }
-            else if (statement is VariableDeclaretion variableDeclaretion)
-            { Compile(variableDeclaretion); }
+            else if (statement is VariableDeclaretion variableDeclaration)
+            { Compile(variableDeclaration); }
             else if (statement is TypeCast typeCast)
             { Compile(typeCast); }
             else if (statement is NewInstance newInstance)
@@ -1534,7 +1534,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     {
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (requied 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         if (statement.Parameters.Length == 1)
                         {
@@ -1547,7 +1547,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             CompileSetter(returnVariable, statement.Parameters[0]);
                         }
 
-                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, CurrentFile));
+                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                         if (ReturnTagStack.Count <= 0)
                         { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
@@ -1566,12 +1566,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (requied 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         if (BreakTagStack.Count <= 0)
                         { throw new CompilerException($"Looks like this \"break\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
 
-                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behaviour!", statement.Identifier, CurrentFile));
+                        Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                         Code.SetValue(BreakTagStack[^1], 0);
 
@@ -1597,7 +1597,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "outraw":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"outraw\" (requied minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"outraw\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         foreach (var value in statement.Parameters)
                         {
@@ -1694,8 +1694,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                             if (value is Identifier identifier && Variables.TryFind(identifier.Content, out Variable variable))
                             {
-                                if (variable.IsDiscarted)
-                                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", identifier, CurrentFile); }
+                                if (variable.IsDiscarded)
+                                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", identifier, CurrentFile); }
 
                                 using (Code.Block($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
                                 {
@@ -1735,7 +1735,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "out":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"out\" (requied minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"out\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         foreach (StatementWithValue valueToPrint in statement.Parameters)
                         {
@@ -1830,55 +1830,94 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                             var valueType = FindStatementType(valueToPrint);
 
-                            if (valueType.SizeOnStack != 1)
-                            { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of size 1 (not {valueType.SizeOnStack})", valueToPrint, CurrentFile); }
-
-                            if (!valueType.IsBuiltin)
-                            { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of a builtin type (not {valueType})", valueToPrint, CurrentFile); }
-
-                            using (Code.Block($"Print value {valueToPrint} as text"))
+                            if (valueToPrint is Literal literal && valueType == FindReplacedType("string", valueToPrint))
                             {
-                                int address = Stack.NextAddress;
-
-                                using (Code.Block($"Compute value"))
+                                string valueToPrint2 = literal.Value;
+                                using (Code.Block($"Print string value \"{valueToPrint2}\""))
                                 {
-                                    Compile(valueToPrint);
+                                    int address = Stack.NextAddress;
+
+                                    Code.ClearValue(address);
+
+                                    byte prevValue = 0;
+                                    for (int i = 0; i < valueToPrint2.Length; i++)
+                                    {
+                                        Code.SetPointer(address);
+                                        byte charToPrint = CharCode.GetByte(valueToPrint2[i]);
+
+                                        while (prevValue > charToPrint)
+                                        {
+                                            Code += "-";
+                                            prevValue--;
+                                        }
+
+                                        while (prevValue < charToPrint)
+                                        {
+                                            Code += "+";
+                                            prevValue++;
+                                        }
+
+                                        prevValue = charToPrint;
+
+                                        Code += ".";
+                                    }
+
+                                    Code.ClearValue(address);
+                                    Code.SetPointer(0);
                                 }
+                            }
+                            else
+                            {
+                                if (valueType.SizeOnStack != 1)
+                                { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of size 1 (not {valueType.SizeOnStack})", valueToPrint, CurrentFile); }
 
-                                Code.CommentLine($"Computed value is on {address}");
+                                if (!valueType.IsBuiltin)
+                                { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of a builtin type (not {valueType})", valueToPrint, CurrentFile); }
 
-                                Code.SetPointer(address);
-
-                                switch (valueType.BuiltinType)
+                                using (Code.Block($"Print value {valueToPrint} as text"))
                                 {
-                                    case Type.BYTE:
-                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                        { Code.Code += Snippets.OUT_AS_STRING; }
-                                        break;
-                                    case Type.INT:
-                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                        { Code.Code += Snippets.OUT_AS_STRING; }
-                                        break;
-                                    case Type.FLOAT:
-                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                        { Code.Code += Snippets.OUT_AS_STRING; }
-                                        break;
-                                    case Type.CHAR:
-                                        Code.Code += ".";
-                                        break;
-                                    case Type.NONE:
-                                    case Type.VOID:
-                                    case Type.UNKNOWN:
-                                    default:
-                                        throw new CompilerException($"Invalid type {valueType.BuiltinType}");
+                                    int address = Stack.NextAddress;
+
+                                    using (Code.Block($"Compute value"))
+                                    {
+                                        Compile(valueToPrint);
+                                    }
+
+                                    Code.CommentLine($"Computed value is on {address}");
+
+                                    Code.SetPointer(address);
+
+                                    switch (valueType.BuiltinType)
+                                    {
+                                        case Type.BYTE:
+                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                            { Code.Code += Snippets.OUT_AS_STRING; }
+                                            break;
+                                        case Type.INT:
+                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                            { Code.Code += Snippets.OUT_AS_STRING; }
+                                            break;
+                                        case Type.FLOAT:
+                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                                            { Code.Code += Snippets.OUT_AS_STRING; }
+                                            break;
+                                        case Type.CHAR:
+                                            Code.Code += ".";
+                                            break;
+                                        case Type.NONE:
+                                        case Type.VOID:
+                                        case Type.UNKNOWN:
+                                        default:
+                                            throw new CompilerException($"Invalid type {valueType.BuiltinType}");
+                                    }
+
+                                    using (Code.Block($"Clear address {address}"))
+                                    { Code.ClearValue(address); }
+
+                                    Stack.PopVirtual();
+
+                                    Code.SetPointer(0);
                                 }
-
-                                using (Code.Block($"Clear address {address}"))
-                                { Code.ClearValue(address); }
-
-                                Stack.PopVirtual();
-
-                                Code.SetPointer(0);
                             }
                         }
                         break;
@@ -1887,7 +1926,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "delete":
                     {
                         if (statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"delete\" (requied 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"delete\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         var deletable = statement.Parameters[0];
                         var deletableType = FindStatementType(deletable);
@@ -1926,7 +1965,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             return;
                         }
 
-                        throw new CompilerException($"Bruh. This propably not stored in heap...", deletable, CurrentFile);
+                        throw new CompilerException($"Bruh. This probably not stored in heap...", deletable, CurrentFile);
                     }
 
                 default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
@@ -1937,7 +1976,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is requied for \'{statement.Operator}\' assignment", statement, CurrentFile));
+            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
         void Compile(CompoundAssignment statement)
         {
@@ -1951,19 +1990,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
-                        if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
+                        { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
                         if (statement.Right == null)
-                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
+                        { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
                         if (TryCompute(statement.Right, out var constantValue))
                         {
                             if (variable.Type != constantValue.Type)
-                            { throw new CompilerException($"Variable and value type mistach ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
+                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
 
                             switch (constantValue.Type)
                             {
@@ -1982,7 +2021,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     throw new ImpossibleException();
                             }
 
-                            Optimalizations++;
+                            Optimizations++;
                             return;
                         }
 
@@ -2009,19 +2048,19 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
-                        if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", variableIdentifier, CurrentFile); }
+                        { throw new CompilerException($"Bruh", variableIdentifier, CurrentFile); }
 
                         if (statement.Right == null)
-                        { throw new CompilerException($"Value is requied for '{statement.Operator}' assignment", statement, CurrentFile); }
+                        { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
                         if (TryCompute(statement.Right, out var constantValue))
                         {
                             if (variable.Type != constantValue.Type)
-                            { throw new CompilerException($"Variable and value type mistach ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
+                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
 
                             switch (constantValue.Type)
                             {
@@ -2040,7 +2079,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                     throw new ImpossibleException();
                             }
 
-                            Optimalizations++;
+                            Optimizations++;
                             return;
                         }
 
@@ -2077,11 +2116,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
-                        if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
+                        { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
                         using (Code.Block($"Increment variable {variable.Name} (at {variable.Address})"))
                         {
@@ -2098,11 +2137,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
-                        if (variable.IsDiscarted)
-                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", variableIdentifier, CurrentFile); }
+                        if (variable.IsDiscarded)
+                        { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", variableIdentifier, CurrentFile); }
 
                         if (variable.Size != 1)
-                        { throw new CompilerException($"Bruhhh", statement.Left, CurrentFile); }
+                        { throw new CompilerException($"Bruh", statement.Left, CurrentFile); }
 
                         using (Code.Block($"Decrement variable {variable.Name} (at {variable.Address})"))
                         {
@@ -2188,11 +2227,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
                 if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
                 var t = FindStatementType(constructorCall.Parameters[0]);
                 if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
+                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: required {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
 
                 if (!TryCompute(constructorCall.Parameters[0], out DataItem value))
                 { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
@@ -2229,7 +2268,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
 
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
             InlineMacro(constructor, constructorCall.Parameters, constructorCall);
         }
@@ -2284,15 +2323,15 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
 
-                if (variable.IsDiscarted)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", statement, CurrentFile); }
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
 
                 using (Code.Block($"Load variable {variable.Name} (from {variable.Address})"))
                 {
                     int variableSize = variable.Size;
 
                     if (variableSize <= 0)
-                    { throw new CompilerException($"Can't load variable \"{variable.Name}\" becouse it's size is {variableSize} (bruh)", statement, CurrentFile); }
+                    { throw new CompilerException($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement, CurrentFile); }
 
                     int loadTarget = Stack.PushVirtual(variableSize);
 
@@ -2301,11 +2340,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         int offsettedSource = variable.Address + offset;
                         int offsettedTarget = loadTarget + offset;
 
-                        if (VariableCanBeDiscated != null && VariableCanBeDiscated == variable.Name)
+                        if (VariableCanBeDiscarded != null && VariableCanBeDiscarded == variable.Name)
                         {
                             Code.MoveValue(offsettedSource, offsettedTarget);
                             DiscardVariable(Variables, variable.Name);
-                            Optimalizations++;
+                            Optimizations++;
                         }
                         else
                         {
@@ -2376,7 +2415,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                             {
                                 if (statement.Left is Identifier _left &&
                                     Variables.TryFind(_left.Content, out var left) &&
-                                    !left.IsDiscarted &&
+                                    !left.IsDiscarded &&
                                     TryCompute(statement.Right, out var right) &&
                                     right.Type == RuntimeType.BYTE)
                                 {
@@ -2386,7 +2425,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                                     Code.AddValue(resultAddress, -right.ValueByte);
 
-                                    Optimalizations++;
+                                    Optimizations++;
 
                                     return;
                                 }
@@ -2648,9 +2687,9 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
             foreach (Statement statement in block.Statements)
             {
-                VariableCanBeDiscated = null;
+                VariableCanBeDiscarded = null;
                 Compile(statement);
-                VariableCanBeDiscated = null;
+                VariableCanBeDiscarded = null;
             }
 
             if (ReturnTagStack.Count > 0)
@@ -2671,8 +2710,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (!Variables.TryFind(identifier.Value.Content, out Variable variable))
                 { throw new CompilerException($"Variable \"{identifier}\" not found", identifier); }
 
-                if (variable.IsDiscarted)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarted", identifier); }
+                if (variable.IsDiscarded)
+                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", identifier); }
 
                 using (Code.Block($"Load variable address {variable.Name} ({variable.Address})"))
                 {
@@ -2774,12 +2813,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 int pointerAddress = Stack.PushVirtual(1);
 
                 {
-                    int requiedSizeAddress = Stack.Push(@class.Size);
+                    int requiredSizeAddress = Stack.Push(@class.Size);
                     int tempAddressesStart = Stack.PushVirtual(1);
 
-                    using (Code.Block($"Allocate (size: {@class.Size} (at {requiedSizeAddress}) result at: {pointerAddress})"))
+                    using (Code.Block($"Allocate (size: {@class.Size} (at {requiredSizeAddress}) result at: {pointerAddress})"))
                     {
-                        Heap.Allocate(pointerAddress, requiedSizeAddress, tempAddressesStart);
+                        Heap.Allocate(pointerAddress, requiredSizeAddress, tempAddressesStart);
 
                         using (Code.Block("Clear temps (5x pop)"))
                         {
@@ -2837,7 +2876,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 using (Code.Block($"Load field {field} (from {address})"))
                 {
                     if (size <= 0)
-                    { throw new CompilerException($"Can't load field \"{field}\" becouse it's size is {size} (bruh)", field, CurrentFile); }
+                    { throw new CompilerException($"Can't load field \"{field}\" because it's size is {size} (bruh)", field, CurrentFile); }
 
                     int loadTarget = Stack.PushVirtual(size);
 
@@ -2935,11 +2974,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (requied {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (required {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
@@ -3142,11 +3181,11 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
-                { throw new CompilerException($"Recursive macro inlining is not alloved (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (equied {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (required {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
@@ -3340,13 +3379,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         void FinishReturnStatements()
         {
-            int accumlatedReturnCount = ReturnCount.Pop();
-            using (Code.Block($"Finish {accumlatedReturnCount} \"return\" statements"))
+            int accumulatedReturnCount = ReturnCount.Pop();
+            using (Code.Block($"Finish {accumulatedReturnCount} \"return\" statements"))
             {
                 Code.SetPointer(Stack.NextAddress);
                 Code.ClearCurrent();
                 Code.CommentLine($"Pointer: {Code.Pointer}");
-                for (int i = 0; i < accumlatedReturnCount; i++)
+                for (int i = 0; i < accumulatedReturnCount; i++)
                 {
                     Code += "]";
                     Code.LineBreak();
@@ -3369,13 +3408,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
         void FinishBreakStatements()
         {
-            int accumlatedBreakCount = BreakCount.Pop();
-            using (Code.Block($"Finish {accumlatedBreakCount} \"break\" statements"))
+            int accumulatedBreakCount = BreakCount.Pop();
+            using (Code.Block($"Finish {accumulatedBreakCount} \"break\" statements"))
             {
                 Code.SetPointer(Stack.NextAddress);
                 Code.ClearCurrent();
                 Code.CommentLine($"Pointer: {Code.Pointer}");
-                for (int i = 0; i < accumlatedBreakCount; i++)
+                for (int i = 0; i < accumulatedBreakCount; i++)
                 {
                     Code += "]";
                     Code.LineBreak();
@@ -3447,7 +3486,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             return new Result()
             {
                 Code = Code.ToString(),
-                Optimalizations = Optimalizations,
+                Optimizations = Optimizations,
                 DebugInfo = DebugInfo,
                 Tokens = compilerResult.Tokens,
 

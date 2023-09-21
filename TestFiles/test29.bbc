@@ -1,3 +1,5 @@
+using System;
+
 template<T>
 macro void PrintT(T v) {
 	out v;

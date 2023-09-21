@@ -84,7 +84,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable));
         }
-        void AnalyzeStatements(IEnumerable<Statement> statements)
+
+        int AnalyzeNewVariables(IEnumerable<Statement> statements)
         {
             int variablesAdded = 0;
             foreach (var st in statements)
@@ -100,55 +101,42 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     variablesAdded++;
                 }
             }
+            return variablesAdded;
+        }
+
+        void AnalyzeStatements(IEnumerable<Statement> statements)
+        {
+            int variablesAdded = AnalyzeNewVariables(statements);
 
             foreach (var st in statements)
             {
                 AnalyzeStatement(st);
+
                 if (st is StatementWithBlock pr)
-                {
-                    AnalyzeStatements(pr.Block.Statements);
-                }
+                { AnalyzeStatements(pr.Block.Statements); }
             }
 
             for (int i = 0; i < variablesAdded; i++)
-            {
-                this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key);
-            }
+            { this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key); }
         }
 
         void AnalyzeStatements(Statement[] statements, CompiledType[] expectedTypes)
         {
-            int variablesAdded = 0;
-            foreach (var st in statements)
-            {
-                if (st is VariableDeclaretion newVar)
-                {
-                    AnalyzeNewVariable(newVar);
-                    variablesAdded++;
-                }
-                else if (st is ForLoop forLoop)
-                {
-                    AnalyzeNewVariable(forLoop.VariableDeclaration);
-                    variablesAdded++;
-                }
-            }
+            int variablesAdded = AnalyzeNewVariables(statements);
 
             for (int i = 0; i < statements.Length; i++)
             {
                 CompiledType expectedType = null;
                 if (i < expectedTypes.Length) expectedType = expectedTypes[i];
+
                 AnalyzeStatement(statements[i], expectedType);
 
                 if (statements[i] is StatementWithBlock pr)
-                {
-                    AnalyzeStatements(pr.Block.Statements);
-                }
+                { AnalyzeStatements(pr.Block.Statements); }
             }
 
             for (int i = 0; i < variablesAdded; i++)
-            {
-                this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key);
-            }
+            { this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key); }
         }
 
         void AnalyzeStatement(Statement statement, CompiledType expectedType = null)
@@ -238,7 +226,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { compilableOperator.Function.TimesUsed++; }
                     compilableOperator.Function.TimesUsedTotal++;
 
-                    compilableOperator = AddCompilable(compilableOperator);
+                    AddCompilable(compilableOperator);
                 }
             }
             else if (statement is CompoundAssignment compoundAssignment)
@@ -373,7 +361,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     compilableFunction.OriginalFunction.TimesUsedTotal++;
                     compilableFunction.Function.TimesUsedTotal++;
 
-                    compilableFunction = AddCompilable(compilableFunction);
+                    AddCompilable(compilableFunction);
                 }
             }
             else if (statement is KeywordCall keywordCall)
@@ -430,7 +418,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
                         compilableGeneralFunction.Function.TimesUsedTotal++;
 
-                        compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
+                        AddCompilable(compilableGeneralFunction);
                     }
                 }
 
@@ -517,7 +505,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     compilableGeneralFunction.OriginalFunction.TimesUsedTotal++;
                     compilableGeneralFunction.Function.TimesUsedTotal++;
 
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
+                    AddCompilable(compilableGeneralFunction);
                 }
             }
             else if (statement is BBCode.Parser.Statement.Literal)

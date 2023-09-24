@@ -4,7 +4,7 @@ using System;
 void Start()
 {
 	PrintD("Type something > ");
-	String input = Console.ReadLine();
+	String input = ReadLine();
 	PrintLine();
 	PrintLine("Input: " + input);
 }

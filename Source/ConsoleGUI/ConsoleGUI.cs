@@ -1,9 +1,7 @@
-﻿using ConsoleDrawer;
-
-using Microsoft.Win32.SafeHandles;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
+using ConsoleDrawer;
+using Microsoft.Win32.SafeHandles;
 using Win32;
 
 namespace ConsoleGUI
@@ -201,7 +199,13 @@ namespace ConsoleGUI
             ConsoleListener.Start();
 
             Log("Setup console handler");
-            ConsoleHandle = Kernel32.CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, System.IO.FileMode.Open, 0, IntPtr.Zero);
+            unsafe
+            {
+                fixed (char* fileNamePtr = "CONOUT$")
+                {
+                    ConsoleHandle = Kernel32.CreateFile(fileNamePtr, 0x40000000, 2, null, (uint)System.IO.FileMode.Open, 0, IntPtr.Zero);
+                }
+            }
 
             Width = (short)Console.WindowWidth;
             Height = (short)Console.WindowHeight;
@@ -352,10 +356,11 @@ namespace ConsoleGUI
                 return;
             }
 
-            Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
+            if (Kernel32.WriteConsoleOutputW(ConsoleHandle, ConsoleBuffer,
                 new Coord((short)Console.WindowWidth, (short)Console.WindowHeight),
                 new Coord(0, 0),
-                ref rect);
+                ref rect) == 0)
+            { throw WindowsException.Get(); }
         }
 
         void KeyEventThread(KeyEvent e) => KeyEvents.Add(e);

@@ -12,7 +12,7 @@ namespace ProgrammingLanguage.Core
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, !settings.ThrowErrors, settings.BasePath);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.BasePath);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -31,6 +31,7 @@ namespace ProgrammingLanguage.Core
             bool LogDebug = true,
             bool LogSystem = true,
             bool LogWarnings = true,
+            bool LogInfo = true,
             bool HandleErrors = true,
             string BasePath = ""
             )
@@ -52,6 +53,7 @@ namespace ProgrammingLanguage.Core
                         Output.Output.Log(message);
                         break;
                     case Output.LogType.Normal:
+                        if (!LogInfo) break;
                         Output.Output.Log(message);
                         break;
                     case Output.LogType.Warning:

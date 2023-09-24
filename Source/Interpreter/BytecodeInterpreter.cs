@@ -261,9 +261,9 @@ namespace ProgrammingLanguage.Bytecode
 
     public struct BytecodeInterpreterSettings
     {
-        internal int InstructionLimit;
-        internal int StackMaxSize;
-        internal int HeapSize;
+        public int InstructionLimit;
+        public int StackMaxSize;
+        public int HeapSize;
 
         public static BytecodeInterpreterSettings Default => new()
         {

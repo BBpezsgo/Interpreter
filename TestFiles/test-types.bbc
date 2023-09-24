@@ -6,6 +6,7 @@ void Main()
 {
 	var bytes = 666.ToByteArray();
 	Print(GetInt(bytes));
+	delete bytes;
 }
 
 void LogArray(Array<int> array)

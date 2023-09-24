@@ -4,7 +4,7 @@ int i = 0;
 while (1) {
 	i++;
 	out i;
-	out '\n';
+	out "\r\n";
 
 	if (i == 4) {
 		out "Break!";
@@ -13,7 +13,7 @@ while (1) {
 	};
 	
 	out i;
-	out " Late\n";
+	out " Late\r\n";
 };
 
 out "Huhu";

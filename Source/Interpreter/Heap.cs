@@ -20,6 +20,59 @@ namespace ProgrammingLanguage.Bytecode
         }
 
         public int Size => this.heap.Length;
+
+        public int UsedSize
+        {
+            get
+            {
+                int used = 0;
+
+                int endlessSafe = heap.Length;
+                int i = 0;
+                int blockIndex = 0;
+                while (i + 1 < heap.Length)
+                {
+                    (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
+
+                    if (blockIsUsed)
+                    { used += blockSize; }
+
+                    i += blockSize + 1;
+                    blockIndex++;
+
+                    if (endlessSafe-- < 0) throw new EndlessLoopException();
+                }
+
+                return used;
+            }
+        }
+
+        public int FreeSize
+        {
+            get
+            {
+                int free = 0;
+
+                int endlessSafe = heap.Length;
+                int i = 0;
+                int blockIndex = 0;
+                while (i + 1 < heap.Length)
+                {
+                    (int blockSize, bool blockIsUsed) = GetHeader(heap[i]);
+
+                    if (!blockIsUsed)
+                    { free += blockSize; }
+
+                    i += blockSize + 1;
+                    blockIndex++;
+
+                    if (endlessSafe-- < 0) throw new EndlessLoopException();
+                }
+
+                return free;
+            }
+        }
+
         public DataItem this[int i]
         {
             get
@@ -37,34 +90,6 @@ namespace ProgrammingLanguage.Bytecode
         }
 
         public DataItem[] ToArray() => heap.ToList().ToArray();
-
-        public DataItem[] GetData(int start, int length)
-        {
-            DataItem[] result = new DataItem[length];
-            for (int i = 0; i < length; i++)
-            { result[i] = this[start + i]; }
-            return result;
-        }
-
-        internal string GetString(int start, int length)
-        {
-            int end = start + length;
-            string result = "";
-            for (int i = start; i < end; i++)
-            {
-                if (this[i].Type != RuntimeType.CHAR)
-                {
-                    throw new InternalException($"Unexpected data type {this[i].Type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
-                }
-                result += this[i].ValueChar;
-            }
-            return result;
-        }
-        internal string GetStringByPointer(int pointer)
-        {
-            int length = this[pointer].ValueInt;
-            return GetString(pointer + 1, length);
-        }
 
         const int BLOCK_SIZE_MASK = 0b_0000_0000_0000_0000_1111_1111_1111_1111;
         const int BLOCK_STAT_MASK = 0b_0000_0000_0000_1111_0000_0000_0000_0000;
@@ -293,6 +318,37 @@ namespace ProgrammingLanguage.Bytecode
         }
     }
 
+    public static class HeapExtensions
+    {
+        public static DataItem[] GetData(this IReadOnlyHeap heap, int start, int length)
+        {
+            DataItem[] result = new DataItem[length];
+            for (int i = 0; i < length; i++)
+            { result[i] = heap[start + i]; }
+            return result;
+        }
+
+        public static string GetString(this IReadOnlyHeap heap, int start, int length)
+        {
+            int end = start + length;
+            string result = "";
+            for (int i = start; i < end; i++)
+            {
+                if (heap[i].Type != RuntimeType.CHAR)
+                {
+                    throw new InternalException($"Unexpected data type {heap[i].Type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
+                }
+                result += heap[i].ValueChar;
+            }
+            return result;
+        }
+        public static string GetStringByPointer(this IReadOnlyHeap heap, int pointer)
+        {
+            int length = heap[pointer].ValueInt;
+            return heap.GetString(pointer + 1, length);
+        }
+    }
+
     public interface IHeap : IReadOnlyHeap
     {
         public new DataItem this[int i] { get; set; }
@@ -306,5 +362,7 @@ namespace ProgrammingLanguage.Bytecode
         public DataItem[] ToArray();
         public DataItem this[int i] { get; }
         public int Size { get; }
+        public int UsedSize { get; }
+        public int FreeSize { get; }
     }
 }

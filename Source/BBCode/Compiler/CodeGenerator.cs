@@ -2190,7 +2190,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AssignTypeCheck(variable.Type, valueType, value);
 
-            GenerateCodeForStatement(value);
+            if (variable.Type.IsBuiltin && variable.Type.BuiltinType == Type.BYTE &&
+                TryCompute(value, out DataItem yeah) &&
+                yeah.Type == RuntimeType.INT)
+            {
+                AddInstruction(Opcode.PUSH_VALUE, yeah);
+            }
+            else
+            {
+                GenerateCodeForStatement(value);
+            }
 
             if (valueType.InHEAP)
             {
@@ -2214,6 +2223,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (valueType.IsEnum)
             { if (CodeGeneratorBase.SameType(valueType.Enum, destination)) return; }
+
+            if (destination.IsBuiltin && destination.BuiltinType == Type.BYTE &&
+                TryCompute(value, out DataItem yeah) &&
+                yeah.Type == RuntimeType.INT)
+            { return; }
 
             throw new CompilerException($"Can not set a {valueType} type value to the {destination} type variable.", value, CurrentFile);
         }

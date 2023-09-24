@@ -1,17 +1,8 @@
 ﻿#pragma warning disable IDE0044 // Add readonly modifier
 #pragma warning disable CS0649
 
-using Microsoft.Win32.SafeHandles;
-
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using Win32;
 
 namespace ConsoleDrawer
@@ -22,9 +13,11 @@ namespace ConsoleDrawer
         {
             IntPtr inputHandle = Kernel32.GetStdHandle(Kernel32.STD_INPUT_HANDLE);
             uint mode = 0;
-            Kernel32.GetConsoleMode(inputHandle, ref mode);
+            if (Kernel32.GetConsoleMode(inputHandle, ref mode) == 0)
+            { throw WindowsException.Get(); }
             InputMode.Default(ref mode);
-            Kernel32.SetConsoleMode(inputHandle, mode);
+            if (Kernel32.SetConsoleMode(inputHandle, mode) == 0)
+            { throw WindowsException.Get(); }
 
             Console.CursorVisible = false;
         }

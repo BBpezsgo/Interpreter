@@ -6,5 +6,5 @@ void Start()
 	int number = -44;
 	String str = number.ToString();
 	Print(str);
-	str.Deallocate();
+	delete str;
 }

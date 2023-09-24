@@ -127,12 +127,12 @@ namespace ProgrammingLanguage.Core
 
         public class InterpreterDetails
         {
-            internal CodeGenerator.Result CompilerResult;
-            internal InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
-            internal BytecodeInterpreter Interpreter => interpreter.BytecodeInterpreter;
-            internal State State => interpreter.state;
+            public CodeGenerator.Result CompilerResult;
+            public InstructionOffsets InstructionOffsets => interpreter.instructionOffsets;
+            public BytecodeInterpreter Interpreter => interpreter.BytecodeInterpreter;
+            public State State => interpreter.state;
 
-            internal Instruction NextInstruction
+            public Instruction NextInstruction
             {
                 get
                 {
@@ -193,7 +193,7 @@ namespace ProgrammingLanguage.Core
         /// </summary>
         public bool IsExecutingCode => CurrentlyRunningCode;
 
-        internal struct InstructionOffsets
+        public struct InstructionOffsets
         {
             public int CodeEnd;
             public int Update;
@@ -242,7 +242,7 @@ namespace ProgrammingLanguage.Core
 
         protected bool exitCalled;
         protected bool HandleErrors = true;
-        internal string BasePath;
+        public string BasePath;
 
         protected int waitForUpdatesCounter;
         protected Action waitForUpdatesCallback;
@@ -370,7 +370,7 @@ namespace ProgrammingLanguage.Core
                 OnOutput?.Invoke(this, "Can't run the program: currently running another", LogType.Warning);
                 return false;
             }
-            this.CurrentlyRunningCode = true;
+            CurrentlyRunningCode = true;
 
             if (Streams == null)
             { Streams = new List<Stream>(); }
@@ -427,7 +427,6 @@ namespace ProgrammingLanguage.Core
             catch (Exception error)
             {
                 OnDone?.Invoke(this, false);
-                BytecodeInterpreter = null;
                 CurrentlyRunningCode = false;
 
                 PrintException(error);
@@ -437,7 +436,6 @@ namespace ProgrammingLanguage.Core
             catch (System.Exception error)
             {
                 OnDone?.Invoke(this, false);
-                BytecodeInterpreter = null;
                 CurrentlyRunningCode = false;
 
                 PrintException(error);
@@ -473,7 +471,6 @@ namespace ProgrammingLanguage.Core
                 Streams.Clear();
             }
 
-            BytecodeInterpreter = null;
             state = State.Destroyed;
         }
 
@@ -696,7 +693,6 @@ namespace ProgrammingLanguage.Core
             OnDone?.Invoke(this, true);
             var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
             OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
-            BytecodeInterpreter = null;
             CurrentlyRunningCode = false;
 
             state = State.CodeExecuted;
@@ -745,7 +741,7 @@ namespace ProgrammingLanguage.Core
                 return;
             }
 
-            if (BytecodeInterpreter == null || PauseCode) return;
+            if (!CurrentlyRunningCode || PauseCode) return;
 
             try
             {
@@ -761,7 +757,6 @@ namespace ProgrammingLanguage.Core
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
-                BytecodeInterpreter = null;
                 CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
@@ -775,7 +770,6 @@ namespace ProgrammingLanguage.Core
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
-                BytecodeInterpreter = null;
                 CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
@@ -787,13 +781,12 @@ namespace ProgrammingLanguage.Core
                 OnDone?.Invoke(this, false);
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
-                BytecodeInterpreter = null;
                 CurrentlyRunningCode = false;
 
                 if (!HandleErrors) throw;
             }
 
-            if (BytecodeInterpreter == null || !BytecodeInterpreter.IsDone) return;
+            if (!CurrentlyRunningCode || !BytecodeInterpreter.IsDone) return;
 
             if (instructionOffsets.Update != -1)
             {

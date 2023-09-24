@@ -6,6 +6,7 @@ void Start() {
 	int valueAddress = &value;
 	PrintLine(value);
 	PrintLine(valueAddress);
-	String yeah = (*valueAddress) as String;
+	String yeah = valueAddress as String;
 	PrintLine(yeah);
+	delete yeah;
 }

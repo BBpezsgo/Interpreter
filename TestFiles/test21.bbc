@@ -1,13 +1,13 @@
-macro void InputChar(ref char input) {
+void InputChar(ref char input) {
 	input = IN;
 	out input;
 }
 
-macro void InputByte(ref byte input) {
+void InputByte(ref byte input) {
 	char _char = IN;
 	out _char;
 
-	int result = 0;
+	byte result = 0;
 
 	while (_char - '\r') {
 		result = result * 10;
@@ -23,5 +23,5 @@ macro void InputByte(ref byte input) {
 	input = result;
 }
 
-int input = 0;
+byte input = 0;
 InputByte(ref input);

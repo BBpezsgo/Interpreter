@@ -844,9 +844,13 @@ namespace ProgrammingLanguage.BBCode.Parser
         {
             int savedToken = CurrentTokenIndex;
 
+            string v = CurrentToken.Content;
+
             if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
             {
-                Literal literal = new(LiteralType.FLOAT, CurrentToken.Content.Replace("_", ""), CurrentToken);
+                v = v.Replace("_", "");
+
+                Literal literal = new(LiteralType.FLOAT, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -855,7 +859,9 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
             {
-                Literal literal = new(LiteralType.INT, CurrentToken.Content.Replace("_", ""), CurrentToken);
+                v = v.Replace("_", "");
+
+                Literal literal = new(LiteralType.INT, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -864,7 +870,10 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
             {
-                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 16).ToString(), CurrentToken);
+                v = v[2..];
+                v = v.Replace("_", "");
+
+                Literal literal = new(LiteralType.INT, Convert.ToInt32(v, 16).ToString(), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -873,7 +882,10 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
             {
-                Literal literal = new(LiteralType.INT, Convert.ToInt32(CurrentToken.Content[2..].Replace("_", ""), 2).ToString(), CurrentToken);
+                v = v[2..];
+                v = v.Replace("_", "");
+
+                Literal literal = new(LiteralType.INT, Convert.ToInt32(v, 2).ToString(), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -882,7 +894,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
-                Literal literal = new(LiteralType.STRING, CurrentToken.Content, CurrentToken);
+                Literal literal = new(LiteralType.STRING, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -891,7 +903,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
             {
-                Literal literal = new(LiteralType.CHAR, CurrentToken.Content, CurrentToken);
+                Literal literal = new(LiteralType.CHAR, v, CurrentToken);
 
                 CurrentTokenIndex++;
 

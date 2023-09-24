@@ -257,6 +257,12 @@ namespace TheProgram
                         goto ArgParseDone;
                     }
 
+                    if (args[i] == "-hide-info")
+                    {
+                        result.LogInfo = false;
+                        goto ArgParseDone;
+                    }
+
                     if (args[i] == "-dont-optimize")
                     {
                         result.compilerSettings.DontOptimize = true;
@@ -405,6 +411,7 @@ namespace TheProgram
             public bool LogDebugs;
             public bool LogSystem;
             public bool LogWarnings;
+            public bool LogInfo;
 
             public RunType RunType;
             public string CompileOutput;
@@ -420,6 +427,7 @@ namespace TheProgram
                 LogDebugs = true,
                 LogSystem = true,
                 LogWarnings = true,
+                LogInfo = true,
                 BasePath = "",
                 RunType = RunType.Normal,
                 compilerSettings = Compiler.CompilerSettings.Default,

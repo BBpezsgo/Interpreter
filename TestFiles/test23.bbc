@@ -2,7 +2,7 @@ using System;
 
 macro void Hey(String message, int bruh) {
 	out message;
-	out '\n';
+	out "\r\n";
 	out bruh;
 }
 
@@ -12,10 +12,10 @@ String c = a;
 a = "01abb";
 
 out b;
-out '\n';
+out "\r\n";
 out a;
-out '\n';
+out "\r\n";
 out c;
-out '\n';
+out "\r\n";
 
 Hey(c, 55);

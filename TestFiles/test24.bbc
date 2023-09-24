@@ -6,19 +6,18 @@ macro void Half() {
 	while (1) {
 		i++;
 		out i;
-		out '\n';
+		out "\r\n";
 
 		if (i == 50) {
-			out "a\n";
+			out "a\r\n";
 			return;
-			out "nope\n";
+			out "nope\r\n";
 		};
 		out 'b';
 	};
 
-	out "BRUH\n";
-	Half();
+	out "BRUH\r\n";
 }
 
 Half();
-out "hello\n";
+out "hello\r\n";

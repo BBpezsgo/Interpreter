@@ -12,25 +12,25 @@ addressB = Alloc(1);
 addressB = Alloc(1);
 
 out addressA;
-out '\n';
+out "\r\n";
 
 out addressB;
-out '\n';
+out "\r\n";
 
 *addressA = 10;
 *addressB = 11;
 
 out (*addressA) as int;
-out '\n';
+out "\r\n";
 
 out (*addressB) as int;
-out '\n';
+out "\r\n";
 
 *addressA = 55;
 *addressB = 22;
 
 out (*addressA) as int;
-out '\n';
+out "\r\n";
 
 out (*addressB) as int;
-out '\n';
+out "\r\n";

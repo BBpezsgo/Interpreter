@@ -1,5 +1,6 @@
 ﻿using ProgrammingLanguage.Brainfuck.Compiler;
 using ProgrammingLanguage.Brainfuck.Renderer;
+using ProgrammingLanguage.Bytecode;
 using ProgrammingLanguage.Core;
 
 using System;
@@ -14,13 +15,13 @@ using System.Threading;
 
 namespace ProgrammingLanguage.Brainfuck
 {
-    readonly struct Value
+    public readonly struct Value
     {
         readonly byte value;
 
         public byte V => value;
 
-        internal Value(byte v) => value = v;
+        public Value(byte v) => value = v;
         public Value(int v) => this.value = (byte)v;
 
         public static Value operator +(Value a, Value b) => a + b.value;
@@ -58,7 +59,7 @@ namespace ProgrammingLanguage.Brainfuck
         public static bool operator ==(Value a, int b) => a.value == b;
         public static bool operator !=(Value a, int b) => a.value != b;
 
-        internal char ToChar() => Convert.ToChar(value);
+        public char ToChar() => Convert.ToChar(value);
 
         public override bool Equals([NotNullWhen(true)] object? obj)
             => obj is Value value &&
@@ -69,11 +70,11 @@ namespace ProgrammingLanguage.Brainfuck
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    class Memory<T>
+    public class Memory<T>
     {
         readonly T[] memory;
 
-        internal T this[int i]
+        public T this[int i]
         {
             get
             {
@@ -81,18 +82,18 @@ namespace ProgrammingLanguage.Brainfuck
                 if (i_ < 0) i_ += Length;
                 return memory[i_];
             }
-            set
+            internal set
             {
                 int i_ = i;
                 if (i_ < 0) i_ += Length;
                 memory[i_] = value;
             }
         }
-        internal int Length => memory.Length;
+        public int Length => memory.Length;
 
         internal Memory(int size) => memory = new T[size];
 
-        private string GetDebuggerDisplay()
+        string GetDebuggerDisplay()
         {
             string result = "";
 
@@ -108,18 +109,25 @@ namespace ProgrammingLanguage.Brainfuck
 
             return result.Trim();
         }
+
+        public Value[] ToArray()
+        {
+            Value[] result = new Value[memory.Length];
+            Array.Copy(memory, result, memory.Length);
+            return result;
+        }
     }
 
     public class Interpreter
     {
         char[] Code;
-        internal Memory<Value> Memory;
+        public Memory<Value> Memory;
 
         Action<char> OnOutput;
         Func<char> OnInput;
 
-        internal int CodePointer { get; private set; }
-        internal int MemoryPointer { get; private set; }
+        public int CodePointer { get; private set; }
+        public int MemoryPointer { get; private set; }
 
         internal Value CurrentMemory => Memory[MemoryPointer];
         internal char CurrentInstruction => Code[CodePointer];

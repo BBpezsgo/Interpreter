@@ -871,7 +871,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
         /// If there is no <c>ValueToken</c>:<br/>
         /// i.e in <c>i++</c> statement
         /// </summary>
-        public Position ImagineryPosition;
+        public Position ImaginaryPosition;
         public readonly Token ValueToken;
 
         public Literal(LiteralType type, string value, Token valueToken)
@@ -894,7 +894,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
             };
             return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
             {
-                ImagineryPosition = position,
+                ImaginaryPosition = position,
             };
         }
 
@@ -924,7 +924,7 @@ namespace ProgrammingLanguage.BBCode.Parser.Statement
 
         public override Position GetPosition()
             => ValueToken == null
-                ? ImagineryPosition
+                ? ImaginaryPosition
                 : new Position(ValueToken);
     }
 

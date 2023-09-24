@@ -4,7 +4,7 @@ using System.Lists;
 [CodeEntry]
 void Start()
 {
-  Array list = new Array(3, 5);
+  Array<int> list = new Array<int>(3);
 
   PrintLineD(list.ToString());
   // list.Push(420);

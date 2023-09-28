@@ -889,5 +889,56 @@ namespace ProgrammingLanguage.Bytecode
                 BBCode.Compiler.Type.UNKNOWN => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
                 _ => DataItem.Null,
             };
+
+        public static bool TryShrinkToByte(DataItem value, out DataItem result)
+        {
+            switch (value.type)
+            {
+                case RuntimeType.BYTE:
+                    result = value;
+                    return true;
+                case RuntimeType.INT:
+                    int v = value.valueInt.Value;
+                    if (v < byte.MinValue || v > byte.MaxValue)
+                    {
+                        result = default;
+                        return false;
+                    }
+                    result = new DataItem((byte)v, value.Tag);
+                    return true;
+                case RuntimeType.FLOAT:
+                    result = default;
+                    return false;
+                case RuntimeType.CHAR:
+                    result = default;
+                    return false;
+                default:
+                    result = default;
+                    return false;
+            }
+        }
+
+        public static bool TryShrinkToByte(ref DataItem value)
+        {
+            switch (value.type)
+            {
+                case RuntimeType.BYTE:
+                    return true;
+                case RuntimeType.INT:
+                    int v = value.valueInt.Value;
+                    if (v < byte.MinValue || v > byte.MaxValue)
+                    {
+                        return false;
+                    }
+                    value = new DataItem((byte)v, value.Tag);
+                    return true;
+                case RuntimeType.FLOAT:
+                    return false;
+                case RuntimeType.CHAR:
+                    return false;
+                default:
+                    return false;
+            }
+        }
     }
 }

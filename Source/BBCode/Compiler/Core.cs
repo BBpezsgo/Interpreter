@@ -21,7 +21,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
     using Errors;
     using ProgrammingLanguage.Tokenizer;
 
-    public interface IDuplicateable<T>
+    public interface IDuplicatable<T>
     {
         public T Duplicate();
     }
@@ -446,9 +446,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 if (typeParameters[i].IsGeneric)
                 {
-                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType typeParamater))
+                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType etypeParameter))
                     { throw new NotImplementedException(); }
-                    typeParameters[i] = typeParamater;
+                    typeParameters[i] = etypeParameter;
                 }
             }
         }
@@ -657,7 +657,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public void ClearReferences();
     }
 
-    public class CompiledOperator : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicateable<CompiledOperator>
+    public class CompiledOperator : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicatable<CompiledOperator>
     {
         public CompiledType[] ParameterTypes;
 
@@ -747,7 +747,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return IsSame(other2);
         }
 
-        CompiledOperator IDuplicateable<CompiledOperator>.Duplicate() => new(this.Type, this)
+        CompiledOperator IDuplicatable<CompiledOperator>.Duplicate() => new(this.Type, this)
         {
             CompiledAttributes = this.CompiledAttributes,
             Modifiers = this.Modifiers,
@@ -771,16 +771,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
                 { throw new NotImplementedException(); }
-                result.Type = typeParamater;
+                result.Type = typeParameter;
             }
 
             return result;
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicateable<CompiledFunction>
+    public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicatable<CompiledFunction>
     {
         public CompiledType[] ParameterTypes;
 
@@ -938,16 +938,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
                 { throw new NotImplementedException(); }
-                result.Type = typeParamater;
+                result.Type = typeParameter;
             }
 
             return result;
         }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicateable<CompiledGeneralFunction>
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicatable<CompiledGeneralFunction>
     {
         public CompiledType[] ParameterTypes;
 
@@ -1084,9 +1084,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParamater))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
                 { throw new NotImplementedException(); }
-                result.Type = typeParamater;
+                result.Type = typeParameter;
             }
 
             return result;
@@ -1181,19 +1181,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 Dictionary<string, int> result = new();
                 int currentOffset = 0;
-                foreach (var field in Fields)
+                foreach (CompiledField field in Fields)
                 {
                     result.Add(field.Identifier.Content, currentOffset);
-                    switch (field.Type.BuiltinType)
-                    {
-                        case Type.BYTE:
-                        case Type.INT:
-                        case Type.FLOAT:
-                        case Type.CHAR:
-                            currentOffset++;
-                            break;
-                        default: throw new NotImplementedException();
-                    }
+                    currentOffset += field.Type.SizeOnStack;
                 }
                 return result;
             }
@@ -1224,7 +1215,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
     }
 
-    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>, IDuplicateable<CompiledClass>
+    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>, IDuplicatable<CompiledClass>
     {
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
@@ -1381,17 +1372,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
     {
         public new CompiledType Type;
 
-        readonly int index;
         readonly int currentParamsSize;
 
-        public int Index => index;
-        public int RealIndex => (-2) - (currentParamsSize + 1 - index);
+        public readonly int Index;
+        public int RealIndex => (-2) - (currentParamsSize + 1 - Index);
+        public bool IsRef => Modifiers.Contains("ref");
 
         public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition)
         {
-            this.index = index;
+            this.Index = index;
             this.currentParamsSize = currentParamsSize;
             this.Type = type;
+            this.Modifiers = definition.Modifiers;
 
             base.Identifier = definition.Identifier;
             base.Modifiers = definition.Modifiers;
@@ -1400,7 +1392,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public CompiledParameter(CompiledType type, ParameterDefinition definition)
             : this(-1, -1, type, definition) { }
 
-        public override string ToString() => $"{Type} {Identifier} {{ i: {Index}, reali: {RealIndex} }}";
+        public override string ToString() => $"{(IsRef ? "ref " : string.Empty)}{Type} {Identifier} {{ Index: {Index} RealIndex: {RealIndex} }}";
     }
 
     public enum Protection
@@ -1607,6 +1599,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
         internal bool IsFunction => function is not null;
         internal bool IsBuiltin => builtinType != Type.NONE;
+        internal bool CanBeBuiltin
+        {
+            get
+            {
+                if (builtinType != Type.NONE) return true;
+                if (IsEnum) return true;
+
+                return false;
+            }
+        }
         internal bool InHEAP => IsClass;
         internal bool IsGeneric => !string.IsNullOrEmpty(genericName);
 
@@ -1635,7 +1637,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
         /// <summary>
-        /// Returns the struct's size or 1 if it is not a class
+        /// Returns the struct size or 1 if it is not a class
         /// </summary>
         public int SizeOnStack
         {

@@ -59,6 +59,18 @@ namespace ProgrammingLanguage.Errors
             : base(info, context) { }
     }
 
+    [Serializable]
+    public class NotSupportedException : CompilerException
+    {
+        public NotSupportedException(string message, Position position, string file) : base(message, position, file) { }
+        public NotSupportedException(string message, string file) : base(message, Position.UnknownPosition, file) { }
+        public NotSupportedException(string message) : base(message) { }
+        public NotSupportedException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
+
+        protected NotSupportedException(SerializationInfo info, StreamingContext context)
+            : base(info, context) { }
+    }
+
     /// <summary> Thrown by the <see cref="BBCode.Tokenizer"/> </summary>
     [Serializable]
     public class TokenizerException : Exception

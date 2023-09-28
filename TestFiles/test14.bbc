@@ -6,5 +6,5 @@ void Start()
 	PrintD("Type something > ");
 	String input = ReadLine();
 	PrintLine();
-	PrintLine("Input: " + input);
+	PrintLineD("Input: " + input);
 }

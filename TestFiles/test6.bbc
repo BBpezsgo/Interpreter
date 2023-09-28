@@ -1,0 +1,13 @@
+using System; 
+
+void Yeah(ref char v) {
+	v = 'E';
+}
+
+[CodeEntry]
+void Main() {
+	char yea = 'a';
+	Yeah(ref yea);
+
+	Print(yea);
+}

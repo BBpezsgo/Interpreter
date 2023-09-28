@@ -558,11 +558,9 @@ namespace ProgrammingLanguage.Bytecode
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
             if (functionNameDataItem.Type != RuntimeType.INT)
-            { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, recived {functionNameDataItem.Type} {functionNameDataItem}"); }
+            { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-            int functionNameLength = Memory.Stack.Pop().Integer ?? throw new RuntimeException($"This should be an integer");
-
-            string functionName = (functionNameLength > 0) ? Memory.Heap.GetString(functionNameDataItem.ValueInt, functionNameLength) : Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
+            string functionName = Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
 
             if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }

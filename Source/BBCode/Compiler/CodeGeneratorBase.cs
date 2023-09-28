@@ -24,7 +24,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
     public abstract class CodeGeneratorBase
     {
-        protected readonly struct CompliableTemplate<T> where T : IDuplicateable<T>
+        protected readonly struct CompliableTemplate<T> where T : IDuplicatable<T>
         {
             internal readonly T OriginalFunction;
             internal readonly T Function;
@@ -621,14 +621,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 compiledFunction = default;
                 return false;
             }
-            CompiledClass @class = prevType.Class;
 
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = CompiledFunctions[i];
 
                 if (!function.IsTemplate) continue;
-                if (function.Context != @class) continue;
+                if (function.Context != prevType.Class) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
@@ -642,7 +641,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 Dictionary<string, CompiledType> typeParameters = new();
 
-                CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
+                CollectTypeParameters(prevType, typeParameters);
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
                 return true;
@@ -1128,6 +1127,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { typeParameters[typeParameterNames[i].Content] = type.TypeParameters[i]; }
         }
 
+        /// <summary>
+        /// <para>
+        /// Collects the type parameters from <paramref name="type"/> and puts the result to <paramref name="typeParameters"/>
+        /// </para>
+        /// <para>
+        /// <paramref name="type"/> must be a class template type!
+        /// </para>
+        /// </summary>
+        /// <exception cref="NotImplementedException"/>
+        static void CollectTypeParameters(CompiledType type, Dictionary<string, CompiledType> typeParameters)
+        {
+            if (!type.IsClass)
+            { return; }
+
+            if (type.Class.TemplateInfo == null)
+            { return; }
+
+            CollectTypeParameters(type, type.Class.TemplateInfo.TypeParameters, typeParameters);
+        }
+
         protected CompiledVariable CompileVariable(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
         {
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
@@ -1320,7 +1339,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return compiledFunction.Type;
         }
 
-        protected CompiledType FindStatementType(OperatorCall @operator)
+        protected CompiledType FindStatementType(OperatorCall @operator, CompiledType expectedType)
         {
             if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
@@ -1342,29 +1361,55 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CompiledType rightType = FindStatementType(@operator.Right);
 
-            // if (!leftType.IsBuiltin || !rightType.IsBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
-            // { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
+            if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
+            { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
             DataItem leftValue = GetInitialValue(leftType);
             DataItem rightValue = GetInitialValue(rightType);
 
             DataItem predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
 
-            return new CompiledType(predictedValue.Type);
+            CompiledType result = new(predictedValue.Type);
+
+            if (expectedType is not null &&
+                expectedType.IsEnum &&
+                expectedType.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
+            {
+                if (result == Type.INT)
+                { result = expectedType; }
+            }
+
+            return result;
         }
-        protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal) => literal.Type switch
+        protected CompiledType FindStatementType(BBCode.Parser.Statement.Literal literal, CompiledType expectedType)
         {
-            LiteralType.INT => new CompiledType(Type.INT),
-            LiteralType.FLOAT => new CompiledType(Type.FLOAT),
-            LiteralType.STRING => FindReplacedType("string", literal),
-            LiteralType.BOOLEAN => FindReplacedType("boolean", literal),
-            LiteralType.CHAR => new CompiledType(Type.CHAR),
-            _ => throw new ImpossibleException($"Unknown literal type {literal.Type}"),
-        };
+            switch (literal.Type)
+            {
+                case LiteralType.INT:
+                    if (expectedType == Type.BYTE &&
+                        int.TryParse(literal.Value, out int value) &&
+                        value >= byte.MinValue && value <= byte.MaxValue)
+                    { return new CompiledType(Type.BYTE); }
+                    return new CompiledType(Type.INT);
+                case LiteralType.FLOAT:
+                    return new CompiledType(Type.FLOAT);
+                case LiteralType.BOOLEAN:
+                    return FindReplacedType("boolean", literal);
+                case LiteralType.STRING:
+                    return FindReplacedType("string", literal);
+                case LiteralType.CHAR:
+                    return new CompiledType(Type.CHAR);
+                default:
+                    throw new ImpossibleException($"Unknown literal type {literal.Type}");
+            }
+        }
         protected CompiledType FindStatementType(Identifier identifier, CompiledType expectedType = null)
         {
             if (identifier.Content == "nullptr")
             { return new CompiledType(Type.INT); }
+
+            if (identifier.Content == "IN")
+            { return new CompiledType(Type.CHAR); }
 
             if (GetLocalSymbolType(identifier.Content, out CompiledType type))
             { return type; }
@@ -1399,7 +1444,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     if (definedField.Identifier.Content != field.FieldName.Content) continue;
 
                     if (definedField.Type.IsGeneric)
-                    { throw new CompilerException($"Struct templates not supported :(", definedField, prevStatementType.Struct.FilePath); }
+                    { throw new NotSupportedException($"Struct templates not supported :(", definedField, prevStatementType.Struct.FilePath); }
 
                     return definedField.Type;
                 }
@@ -1468,11 +1513,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field, CurrentFile);
         }
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
-        protected CompiledType FindStatementType(ModifiedStatement modifiedStatement)
+        protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType expectedType)
         {
             if (modifiedStatement.Modifier == "ref")
             {
-                return FindStatementType(modifiedStatement.Statement);
+                return FindStatementType(modifiedStatement.Statement, expectedType);
             }
 
             throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
@@ -1486,10 +1531,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { return FindStatementType(functionCall); }
 
             if (statement is OperatorCall @operator)
-            { return FindStatementType(@operator); }
+            { return FindStatementType(@operator, expectedType); }
 
             if (statement is BBCode.Parser.Statement.Literal literal)
-            { return FindStatementType(literal); }
+            { return FindStatementType(literal, expectedType); }
 
             if (statement is Identifier variable)
             { return FindStatementType(variable, expectedType); }
@@ -1519,7 +1564,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { return FindStatementType(index); }
 
             if (statement is ModifiedStatement modifiedStatement)
-            { return FindStatementType(modifiedStatement); }
+            { return FindStatementType(modifiedStatement, expectedType); }
 
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
         }
@@ -1579,7 +1624,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             };
         }
 
-        protected bool TryCompute(OperatorCall @operator, out DataItem value)
+        protected bool TryCompute(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
         {
             if (GetOperator(@operator, out _))
             {
@@ -1587,7 +1632,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return false;
             }
 
-            if (!TryCompute(@operator.Left, out DataItem leftValue))
+            if (!TryCompute(@operator.Left, expectedType, out DataItem leftValue))
             {
                 value = DataItem.Null;
                 return false;
@@ -1603,7 +1648,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             if (@operator.Right != null)
             {
-                if (TryCompute(@operator.Right, out DataItem rightValue))
+                if (TryCompute(@operator.Right, expectedType, out DataItem rightValue))
                 {
                     value = Compute(op, leftValue, rightValue);
                     return true;
@@ -1638,12 +1683,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
             value = leftValue;
             return true;
         }
-        protected static bool TryCompute(BBCode.Parser.Statement.Literal literal, out DataItem value)
+        protected static bool TryCompute(BBCode.Parser.Statement.Literal literal, RuntimeType? expectedType, out DataItem value)
         {
             switch (literal.Type)
             {
                 case LiteralType.INT:
                     value = new DataItem(int.Parse(literal.Value));
+                    if (expectedType.HasValue &&
+                        expectedType.Value == RuntimeType.BYTE &&
+                        value.ValueInt >= byte.MinValue && value.ValueInt <= byte.MaxValue)
+                    { value = new DataItem((byte)value.ValueInt); }
                     return true;
                 case LiteralType.FLOAT:
                     value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value));
@@ -1665,7 +1714,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     return false;
             }
         }
-        protected bool TryCompute(KeywordCall keywordCall, out DataItem value)
+        protected bool TryCompute(KeywordCall keywordCall, RuntimeType? expectedType, out DataItem value)
         {
             if (keywordCall.FunctionName == "sizeof")
             {
@@ -1689,16 +1738,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return false;
         }
 
-        protected bool TryCompute(StatementWithValue st, out DataItem value)
+        protected bool TryCompute(StatementWithValue statement, RuntimeType? expectedType, out DataItem value)
         {
-            if (st is BBCode.Parser.Statement.Literal literal)
-            { return TryCompute(literal, out value); }
+            if (statement is BBCode.Parser.Statement.Literal literal)
+            { return TryCompute(literal, expectedType, out value); }
 
-            if (st is OperatorCall @operator)
-            { return TryCompute(@operator, out value); }
+            if (statement is OperatorCall @operator)
+            { return TryCompute(@operator, expectedType, out value); }
 
-            if (st is KeywordCall keywordCall)
-            { return TryCompute(keywordCall, out value); }
+            if (statement is KeywordCall keywordCall)
+            { return TryCompute(keywordCall, expectedType, out value); }
 
             value = DataItem.Null;
             return false;

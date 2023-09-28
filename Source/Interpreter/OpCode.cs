@@ -110,8 +110,7 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c>parameters</c> (as much as needed)<br/>
-        ///     <c><see cref="int"/> function name length</c><br/>
-        ///     <c><see cref="int"/> function name address</c><br/>
+        ///     <c><see cref="int"/> function name address (string pointer)</c><br/>
         /// </para><br/><br/>
         /// <para>
         ///     <b>Tag:</b><br/>

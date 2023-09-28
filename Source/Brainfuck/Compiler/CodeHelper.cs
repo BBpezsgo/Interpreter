@@ -239,7 +239,7 @@ namespace ProgrammingLanguage.Brainfuck
                     SetValue(address, value.ValueInt);
                     return;
                 case Bytecode.RuntimeType.FLOAT:
-                    throw new Errors.CompilerException($"Floats not supported by brainfuck :(");
+                    throw new Errors.NotSupportedException($"Floats not supported by brainfuck :(");
                 case Bytecode.RuntimeType.CHAR:
                     SetValue(address, value.ValueChar);
                     return;
@@ -602,7 +602,7 @@ namespace ProgrammingLanguage.Brainfuck
             {
                 Bytecode.RuntimeType.BYTE => Push(v.ValueByte),
                 Bytecode.RuntimeType.INT => Push(v.ValueInt),
-                Bytecode.RuntimeType.FLOAT => throw new Errors.CompilerException("Floats are not supported by the brainfuck compiler"),
+                Bytecode.RuntimeType.FLOAT => throw new Errors.NotSupportedException("Floats are not supported by the brainfuck compiler"),
                 Bytecode.RuntimeType.CHAR => Push(v.ValueChar),
                 _ => throw new Errors.ImpossibleException(),
             };

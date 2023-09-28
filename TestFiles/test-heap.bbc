@@ -26,6 +26,8 @@ void Start()
   hehe2.w = 3;
   PrintLine(hehe.w);
   PrintLine(hehe2.w);
+
+  delete foo;
 }
 
 void Func(this Foo p)

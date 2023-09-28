@@ -3,7 +3,7 @@ using System;
 struct Yes
 {
   float YesField;
-  string YesField2;
+  String YesField2;
 }
 
 class Foo
@@ -22,24 +22,24 @@ void Start()
   
   Yes yes2 = foo.yes;
   
-  Console.Log("yes2.YesField: " + yes2.YesField);
-  Console.Log("yes2.YesField2: " + yes2.YesField2);
+  PrintLineD("yes2.YesField: " + yes2.YesField);
+  PrintLineD("yes2.YesField2: " + yes2.YesField2);
 
-  Console.Log("foo.yes.YesField: " + foo.yes.YesField);
+  PrintLineD("foo.yes.YesField: " + foo.yes.YesField);
 
   foo.field0 = 55;
-  Console.Log("foo.field0: " + foo.field0);
-  Console.Log("&foo.field0: " + &foo.field0);
+  PrintLineD("foo.field0: " + foo.field0);
+  PrintLineD("&foo.field0: " + &foo.field0);
 
   Foo foo2;
   foo2 = foo;
-  Console.Log("foo.field0: " + foo.field0);
+  PrintLineD("foo.field0: " + foo.field0);
 
   int res = Bar(foo2, foo, 420);
-  Console.Log(res);
+  PrintLineD(res);
 
-  Console.Log("foo.field0: " + foo.field0);
-  Console.Log("foo2.field0: " + foo2.field0);
+  PrintLineD("foo.field0: " + foo.field0);
+  PrintLineD("foo2.field0: " + foo2.field0);
 }
 
 int Bar(Foo p0, Foo p1, int p2)

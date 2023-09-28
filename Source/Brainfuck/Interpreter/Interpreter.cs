@@ -1,21 +1,21 @@
-﻿using ProgrammingLanguage.Brainfuck.Compiler;
-using ProgrammingLanguage.Brainfuck.Renderer;
-using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Core;
-
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using ProgrammingLanguage.Brainfuck.Compiler;
+using ProgrammingLanguage.Brainfuck.Renderer;
+using ProgrammingLanguage.Bytecode;
+using ProgrammingLanguage.Core;
 
 #nullable enable
 
 namespace ProgrammingLanguage.Brainfuck
 {
-    public readonly struct Value
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    public readonly struct Value : IEquatable<Value>
     {
         readonly byte value;
 
@@ -61,12 +61,16 @@ namespace ProgrammingLanguage.Brainfuck
 
         public char ToChar() => Convert.ToChar(value);
 
-        public override bool Equals([NotNullWhen(true)] object? obj)
-            => obj is Value value &&
-            value.value == this.value;
+        public override bool Equals([NotNullWhen(true)] object? obj) =>
+            obj is Value other &&
+            Equals(other);
+        public bool Equals(Value other) =>
+            other.value == this.value;
+
         public override int GetHashCode() => HashCode.Combine(value);
 
         public override string ToString() => value.ToString();
+        string GetDebuggerDisplay() => ToString();
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -143,10 +147,10 @@ namespace ProgrammingLanguage.Brainfuck
         void OnDefaultOutput(char data) => Console.Write(data);
         char OnDefaultInput() => Console.ReadKey(true).KeyChar;
 
-		public Interpreter(Uri url, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => new System.Net.Http.HttpClient().GetStringAsync(url).ContinueWith((code) => this.Code = ParseCode(code.Result)).Wait();
-		public Interpreter(FileInfo file, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(File.ReadAllText(file.FullName), OnOutput, OnInput) { }
-		public Interpreter(string code, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => this.Code = ParseCode(code);
-		public Interpreter(Action<char>? OnOutput = null, Func<char>? OnInput = null)
+        public Interpreter(Uri url, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => new System.Net.Http.HttpClient().GetStringAsync(url).ContinueWith((code) => this.Code = ParseCode(code.Result)).Wait();
+        public Interpreter(FileInfo file, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(File.ReadAllText(file.FullName), OnOutput, OnInput) { }
+        public Interpreter(string code, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => this.Code = ParseCode(code);
+        public Interpreter(Action<char>? OnOutput = null, Func<char>? OnInput = null)
         {
             this.OnOutput = OnOutput ?? OnDefaultOutput;
             this.OnInput = OnInput ?? OnDefaultInput;
@@ -175,7 +179,7 @@ namespace ProgrammingLanguage.Brainfuck
             Interpreter interpreter = new(code);
             while (interpreter.Step()) ;
         }
-		public static void Run(string code, int limit)
+        public static void Run(string code, int limit)
         {
             Interpreter interpreter = new(code);
             int i = 0;
@@ -191,8 +195,8 @@ namespace ProgrammingLanguage.Brainfuck
             }
         }
 
-		/// <exception cref="BrainfuckException"></exception>
-		public bool Step()
+        /// <exception cref="BrainfuckException"></exception>
+        public bool Step()
         {
             if (OutOfCode) return false;
 
@@ -270,7 +274,7 @@ namespace ProgrammingLanguage.Brainfuck
             return !OutOfCode;
         }
 
-		public void Run()
+        public void Run()
         { while (Step()) ; }
 
         internal void RunWithUI(bool autoTick = true, int wait = 0)

@@ -1,0 +1,9 @@
+{
+  "commands": {
+    "new": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c TestFiles\\new.bat"
+    }
+  }
+}

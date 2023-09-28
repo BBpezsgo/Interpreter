@@ -73,9 +73,8 @@ export String ToString(this byte number)
 
 	String reversed = result.Reverse();
 	delete result;
-	result = reversed;
 
-	return result;
+	return reversed;
 }
 
 export String ToString(this int number)
@@ -116,9 +115,8 @@ export String ToString(this int number)
 
 	String reversed = result.Reverse();
 	delete result;
-	result = reversed;
 
-	return result;
+	return reversed;
 }
 
 [External("sleep")]
@@ -289,9 +287,6 @@ class String
         {
             result[al + i] = b[i];
         };
-
-        delete a;
-        delete b;
 
         return result;
     }

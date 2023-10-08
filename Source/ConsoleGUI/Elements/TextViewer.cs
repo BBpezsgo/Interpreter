@@ -1,7 +1,4 @@
-﻿using ConsoleDrawer;
-
-using System;
-using System.Diagnostics;
+﻿using System;
 using Win32;
 
 namespace ConsoleGUI

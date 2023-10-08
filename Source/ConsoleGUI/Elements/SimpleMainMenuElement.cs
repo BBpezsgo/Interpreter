@@ -1,11 +1,5 @@
-﻿using System;
-using System.Diagnostics;
-
-namespace ConsoleGUI
+﻿namespace ConsoleGUI
 {
-    using ConsoleDrawer;
-
-    using System.Timers;
     using Win32;
 
     internal class SimpleMainMenuElement : WindowElement

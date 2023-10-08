@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using ConsoleDrawer;
 using Microsoft.Win32.SafeHandles;
 using Win32;
+using Win32.Utilities;
 
 namespace ConsoleGUI
 {

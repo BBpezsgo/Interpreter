@@ -7,43 +7,43 @@ struct Point {
 	int y;
 }
 
-macro Point NewPoint(int x, int y) {
+Point NewPoint(int x, int y) {
 	Point result = new Point;
 	result.x = x;
 	result.y = y;
 	return result;
 }
 
-macro void TestPoint() {
+void TestPoint() {
 	Point p0 = NewPoint(55, 48);
 	Point p1 = new Point;
 
 	p1.x = 5;
 	p1.y = 4;
 
-	out p0.x '\n';
+	PrintLine(p0.x);
 
-	out p0.y '\n';
+	PrintLine(p0.y);
 
 	p0 = p1;
 
-	out p0.x '\n';
+	PrintLine(p0.x);
 
-	out p0.y '\n';
+	PrintLine(p0.y);
 }
 
-macro void TestClass() {
+void TestClass() {
 	Player player = new Player;
 	
 	// player.x = 69;
 	// player.y = 80;
 
-	// out player.x '\n';
+	// PrintLine(player.x);
 
 	// delete player;
 }
 
-macro int Test(int size) {
+int Test(int size) {
 	int result = Alloc(1);
 	int i = size;
 	while (i) {

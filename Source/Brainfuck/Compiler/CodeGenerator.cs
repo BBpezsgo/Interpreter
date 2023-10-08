@@ -570,15 +570,12 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         {
             if (functionCall.Identifier == "Alloc" &&
                 functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 0)
+                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
             { return 1; }
 
             if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.INT
-                ))
+                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
             { return 1; }
 
             if (GetFunction(functionCall, out CompiledFunction function))
@@ -1090,6 +1087,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             { Compile(@if.ToLinks()); }
             else if (statement is WhileLoop @while)
             { Compile(@while); }
+            else if (statement is ForLoop @for)
+            { Compile(@for); }
             else if (statement is Literal literal)
             { Compile(literal); }
             else if (statement is Identifier variable)
@@ -1539,6 +1538,75 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 Stack.Pop();
 
                 Stack.Pop();
+
+                ContinueReturnStatements();
+                ContinueBreakStatements();
+            }
+        }
+        void Compile(ForLoop @for)
+        {
+            using (Code.Block($"For"))
+            {
+                VariableCleanupStack.Push(PrecompileVariable(@for.VariableDeclaration));
+
+                using (Code.Block("Variable Declaration"))
+                { Compile(@for.VariableDeclaration); }
+
+                int conditionAddress = Stack.NextAddress;
+                using (Code.Block("Compute condition"))
+                { Compile(@for.Condition); }
+
+                Code.CommentLine($"Condition result at {conditionAddress}");
+
+                BreakTagStack.Push(Stack.Push(1));
+
+                Code.JumpStart(conditionAddress);
+
+                using (Code.Block("The while statements"))
+                {
+                    Compile(@for.Block);
+                }
+
+                using (Code.Block("Compute condition again"))
+                {
+                    Compile(@for.Condition);
+                    Stack.PopAndStore(conditionAddress);
+                }
+
+                {
+                    int tempAddress = Stack.PushVirtual(1);
+
+                    Code.CopyValue(ReturnTagStack[^1], tempAddress);
+                    Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                    Code.JumpStart(tempAddress);
+
+                    Code.SetValue(conditionAddress, 0);
+
+                    Code.ClearValue(tempAddress);
+                    Code.JumpEnd(tempAddress);
+
+
+                    Code.CopyValue(BreakTagStack[^1], tempAddress);
+                    Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                    Code.JumpStart(tempAddress);
+
+                    Code.SetValue(conditionAddress, 0);
+
+                    Code.ClearValue(tempAddress);
+                    Code.JumpEnd(tempAddress);
+
+                    Stack.PopVirtual();
+                }
+
+                Code.JumpEnd(conditionAddress);
+
+                if (Stack.LastAddress != BreakTagStack.Pop())
+                { throw new System.Exception(); }
+                Stack.Pop();
+
+                Stack.Pop();
+
+                CleanupVariables(VariableCleanupStack.Pop());
 
                 ContinueReturnStatements();
                 ContinueBreakStatements();
@@ -2183,19 +2251,28 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         }
         void Compile(FunctionCall functionCall)
         {
-            if (false &&
-                functionCall.Identifier == "Alloc" &&
+            if (functionCall.Identifier == "Alloc" &&
+                functionCall.IsMethodCall == false &&
+                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
+            { throw new NotSupportedException($"Heap is not supported :(", functionCall, CurrentFile); }
+
+            if (functionCall.Identifier == "AllocFrom" &&
+                functionCall.IsMethodCall == false &&
+                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
+            { throw new NotSupportedException($"Heap is not supported :(", functionCall, CurrentFile); }
+
+            /*
+            if (functionCall.Identifier == "Alloc" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 0)
             {
                 int resultAddress = Stack.PushVirtual(1);
                 // Heap.Allocate(resultAddress);
-
+                throw new NotSupportedException($"Heap is not supported :(");
                 return;
             }
 
-            if (false &&
-                functionCall.Identifier == "AllocFrom" &&
+            if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
@@ -2211,8 +2288,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
 
                 Stack.Pop();
 
+                throw new NotSupportedException($"Heap is not supported :(");
                 return;
             }
+            */
 
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
@@ -3054,22 +3133,28 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                                 compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
-                                break;
+                                continue;
                             }
                         case "const":
                             {
                                 var valueStatement = modifiedStatement.Statement;
-                                if (!TryCompute(valueStatement, null, out DataItem value))
+                                if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                                constantParameters.Add(new ConstantVariable(defined.Identifier.Content, value));
+                                constantParameters.Add(new ConstantVariable(defined.Identifier.Content, constValue));
+                                continue;
+                            }
+                        case "temp":
+                            {
+                                passed = modifiedStatement.Statement;
                                 break;
                             }
                         default:
                             throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                     }
                 }
-                else if (passed is StatementWithValue value)
+
+                if (passed is StatementWithValue value)
                 {
                     if (defined.Modifiers.Contains("ref"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
@@ -3093,11 +3178,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         using (Code.Block($"STORE LAST TO {variable.Address}"))
                         { Stack.PopAndStore(variable.Address); }
                     }
+                    continue;
                 }
-                else
-                {
-                    throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
-                }
+
+                throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
             }
 
 

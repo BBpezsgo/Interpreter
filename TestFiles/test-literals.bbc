@@ -8,7 +8,7 @@ void Start()
 	// PrintLine(5f);
 	// PrintLine(0.5);
 	// PrintLine(.5);
-	PrintLineD("5");
+	PrintLine("5");
 	// PrintLine(5e2);
 	PrintLine(0x0f_1);
 	PrintLine(0b0000_0010);

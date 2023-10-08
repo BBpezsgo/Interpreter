@@ -120,12 +120,12 @@ namespace ConsoleGUI
 
         public override void OnMouseEvent(MouseEvent mouse)
         {
-            if (mouse.ButtonState == (uint)MouseButtonState.ScrollUp)
+            if (mouse.ButtonState == MouseButton.ScrollUp)
             {
                 ClearBuffer();
                 ScrollTo(Scroll - 1);
             }
-            else if (mouse.ButtonState == (uint)MouseButtonState.ScrollDown)
+            else if (mouse.ButtonState == MouseButton.ScrollDown)
             {
                 ClearBuffer();
                 ScrollTo(Scroll + 1);

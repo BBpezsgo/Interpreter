@@ -189,7 +189,7 @@ namespace ConsoleGUI
             };
 
             Log("Setup console");
-            ConsoleHandler.SetupConsole();
+            ConsoleHandler.Setup();
 
             ConsoleListener.MouseEvent += MouseEventThread;
             ConsoleListener.KeyEvent += KeyEventThread;
@@ -223,6 +223,8 @@ namespace ConsoleGUI
             TimerOnStart?.Stop();
 
             ConsoleListener.Stop();
+
+            ConsoleHandler.Restore();
         }
 
         internal void Start()

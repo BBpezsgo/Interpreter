@@ -5,7 +5,7 @@
 #bf "console-set" "void" "char" "int" "int";
 #bf "console-clear" "void";
 
-using System;
+using System.String;
 
 [External("console-set")]
 export void Set(char data, int x, int y);
@@ -29,17 +29,13 @@ export void Print(char data);
 [StandardOutput]
 export void Print(byte message)
 {
-    String _message = message.ToString();
-    Print(_message);
-    delete _message;
+    Print(temp message.ToString());
 }
 
 [StandardOutput]
 export void Print(int message)
 {
-    String _message = message.ToString();
-    Print(_message);
-    delete _message;
+    Print(temp message.ToString());
 }
 
 [StandardOutput]
@@ -47,20 +43,20 @@ export void Print(bool message)
 {
     if (message)
     {
-        PrintD("true");
+        Print("true");
     }
     else
     {
-        PrintD("false");
+        Print("false");
     };
 }
 
 [StandardOutput]
-export void Print(String message)
+export void Print(temp String message)
 {
     if (&message < 0)
     {
-        PrintD("null");
+        Print("null");
     }
     else
     {
@@ -70,12 +66,6 @@ export void Print(String message)
             Print(message[i]);
         };
     };
-}
-
-export void PrintD(String message)
-{
-    Print(message);
-    delete message;
 }
 
 //
@@ -88,16 +78,9 @@ export void PrintLine()
     Print('\n');
 }
 
-export void PrintLine(String message)
+export macro PrintLine(message)
 {
     Print(message);
-    PrintLine();
-}
-
-export void PrintLineD(String message)
-{
-    Print(message);
-    delete message;
     PrintLine();
 }
 

@@ -176,7 +176,23 @@ namespace ProgrammingLanguage.BBCode.Parser
         {
             Dictionary<string, Token> result = new();
             for (int i = 0; i < TypeParameters.Length; i++)
-            { result.Add(TypeParameters[i].Content, TypeParameters[i]); }
+            {
+                result.Add(TypeParameters[i].Content, TypeParameters[i]);
+            }
+            return result;
+        }
+
+        public Dictionary<string, T> ToDictionary<T>(T[] typeArgumentValues)
+        {
+            Dictionary<string, T> result = new();
+
+            if (TypeParameters.Length != typeArgumentValues.Length)
+            { throw new NotImplementedException(); }
+
+            for (int i = 0; i < TypeParameters.Length; i++)
+            {
+                result.Add(TypeParameters[i].Content, typeArgumentValues[i]);
+            }
             return result;
         }
 
@@ -314,6 +330,102 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
         public static bool operator !=(FunctionThingDefinition a, FunctionThingDefinition b) => !(a == b);
+    }
+
+    public class MacroDefinition : IExportable, IEquatable<MacroDefinition>
+    {
+        public Token BracketStart;
+        public Token BracketEnd;
+
+        public Token[] Parameters;
+        public Statement.Statement[] Statements;
+        public Token[] Modifiers;
+
+        public Statement.Block Block => new(BracketStart, Statements, BracketEnd);
+
+        public int ParameterCount => Parameters.Length;
+
+        public bool IsExport => Modifiers.Contains("export");
+
+        public string FilePath { get; set; }
+
+        public MacroDefinition(Token identifier, IEnumerable<Token> modifiers)
+        {
+            Identifier = identifier;
+
+            Parameters = Array.Empty<Token>();
+            Statements = Array.Empty<Statement.Statement>();
+            Modifiers = modifiers.ToArray();
+        }
+
+
+        public readonly Token Identifier;
+
+        public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
+
+        public string ReadableID()
+        {
+            string result = this.Identifier.ToString();
+            result += "(";
+            for (int j = 0; j < this.Parameters.Length; j++)
+            {
+                if (j > 0) { result += ", "; }
+                result += "any"; // this.Parameters[j].ToString();
+            }
+            result += ")";
+            return result;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is not MacroDefinition other) return false;
+            return Equals(other);
+        }
+
+        public bool Equals(MacroDefinition other)
+        {
+            if (other is null) return false;
+            if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
+
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < this.Parameters.Length; i++)
+            { if (!this.Parameters[i].Equals(other.Parameters[i])) return false; }
+
+            if (this.Modifiers.Length != other.Modifiers.Length) return false;
+            for (int i = 0; i < this.Modifiers.Length; i++)
+            { if (this.Modifiers[i].Content != other.Modifiers[i].Content) return false; }
+
+            return true;
+        }
+
+        public override int GetHashCode() => HashCode.Combine(
+            Parameters,
+            Statements,
+            Modifiers,
+            FilePath,
+            Identifier);
+
+        public static bool operator ==(MacroDefinition a, MacroDefinition b)
+        {
+            if (a is null && b is null) return true;
+            if (a is null || b is null) return false;
+
+            if (!string.Equals(a.Identifier.Content, b.Identifier.Content)) return false;
+
+            if (a.Parameters.Length != b.Parameters.Length) return false;
+            for (int i = 0; i < a.Parameters.Length; i++)
+            { if (!a.Parameters[i].Equals(b.Parameters[i])) return false; }
+
+            return true;
+        }
+        public static bool operator !=(MacroDefinition a, MacroDefinition b) => !(a == b);
+
+        public bool IsSame(MacroDefinition other)
+        {
+            if (this.Identifier.Content != other.Identifier.Content) return false;
+            if (this.Parameters.Length != other.Parameters.Length) return false;
+            return true;
+        }
     }
 
     public class FunctionDefinition : FunctionThingDefinition

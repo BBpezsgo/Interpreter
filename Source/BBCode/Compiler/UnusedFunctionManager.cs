@@ -148,6 +148,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CompiledStructs = compilerResult.Structs,
 
                 CompiledFunctions = compilerResult.Functions,
+                CompiledMacros = compilerResult.Macros,
                 CompiledOperators = compilerResult.Operators,
                 CompiledGeneralFunctions = compilerResult.GeneralFunctions,
 

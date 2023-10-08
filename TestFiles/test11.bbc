@@ -6,7 +6,7 @@ void Start()
 {
   Array<int> list = new Array<int>(3);
 
-  PrintLineD(list.ToString());
+  PrintLine(temp list.ToString());
   // list.Push(420);
 
   /*

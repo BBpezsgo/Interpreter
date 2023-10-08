@@ -163,12 +163,12 @@ namespace ConsoleGUI
                 int b = 3;
                 int min = Math.Min(a, b);
                 int max = Math.Max(a, b);
-                if (e.ButtonState == (uint)MouseButtonState.ScrollDown)
+                if (e.ButtonState == MouseButton.ScrollDown)
                 {
                     ConsoleScrollOffset++;
                     ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
                 }
-                else if (e.ButtonState == (uint)MouseButtonState.ScrollUp)
+                else if (e.ButtonState == MouseButton.ScrollUp)
                 {
                     ConsoleScrollOffset--;
                     ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
@@ -661,12 +661,12 @@ namespace ConsoleGUI
 
                 b.ForegroundColor = ForegroundColor.Gray;
                 b.AddText(i.ToString());
-                b.ForegroundColor = ForegroundColor.Default;
+                b.ForegroundColor = ForegroundColor.White;
                 b.AddSpace(5, sender.Rect.Width);
 
                 if (isHeader)
                 {
-                    b.BackgroundColor = BackgroundColor.Gray;
+                    b.BackgroundColor = BackgroundColor.DarkGray;
                     b.AddText("HEADER | ");
                     b.AddText(header.Item1.ToString());
                     b.AddText(" | ");

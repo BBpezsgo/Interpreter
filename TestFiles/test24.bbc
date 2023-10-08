@@ -1,6 +1,6 @@
 using System;
 
-macro void Half() {
+void Half() {
 	int i = 0;
 
 	while (1) {

@@ -1,6 +1,6 @@
 using System;
 
-macro void IsPrime(int n, ref int divisors) {
+void IsPrime(int n, ref int divisors) {
 	int _macro_prime_iterator = 0;
 
 	while (_macro_prime_iterator - n) {
@@ -53,42 +53,42 @@ while (i - 100) {
 	if (i % 3 == 0) {
 		either = False;
 	
-		out "Fizz";
+		Print("Fizz");
 	};
 	
 	if (i % 5 == 0) {
 		either = False;
 	
-		out "Buzz";
+		Print("Buzz");
 	};
 
 	if (i % 7 == 0) {
 		either = False;
 	
-		out "Rizz";
+		Print("Rizz");
 	};
 
 	if (i % 11 == 0) {
 		either = False;
 	
-		out "Jazz";
+		Print("Jazz");
 	};
 
 	if (120 % i == 0) {
 		either = False;
 	
-		out "Dizz";
+		Print("Dizz");
 	};
 
 	if (isPrime) {
 		either = False;
 	
-		out "Prizz";
+		Print("Prizz");
 	};
 
 	if (either) {
-		out i;
+		Print(i);
 	};
 	
-	out '\n';
+	Print('\n');
 };

@@ -82,6 +82,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         List<FunctionDefinition> Operators;
         List<FunctionDefinition> Functions;
+        List<MacroDefinition> Macros;
         List<StructDefinition> Structs;
         List<ClassDefinition> Classes;
         List<EnumDefinition> Enums;
@@ -151,6 +152,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public struct Result
         {
             public CompiledFunction[] Functions;
+            public MacroDefinition[] Macros;
             public CompiledGeneralFunction[] GeneralFunctions;
             public CompiledOperator[] Operators;
 
@@ -431,6 +433,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 Functions.Add(func);
             }
 
+            foreach (var macro in collectedAST.ParserResult.Macros)
+            {
+                if (Macros.ContainsSameDefinition(macro))
+                { Errors.Add(new Error($"Macro {macro.ReadableID()} already defined", macro.Identifier, macro.FilePath)); continue; }
+
+                Macros.Add(macro);
+            }
+
             /*
             foreach (var func in collectedAST.ParserResult.Operators)
             {
@@ -488,6 +498,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
             Functions.AddRange(parserResult.Functions);
+            Macros.AddRange(parserResult.Macros);
 
             SourceCodeManager.Result collectorResult;
             if (file != null)
@@ -746,6 +757,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return new Result()
             {
                 Functions = this.CompiledFunctions,
+                Macros = this.Macros.ToArray(),
                 Operators = this.CompiledOperators,
                 GeneralFunctions = this.CompiledGeneralFunctions,
                 ExternalFunctions = externalFunctions,
@@ -785,6 +797,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             Compiler compiler = new()
             {
                 Functions = new List<FunctionDefinition>(),
+                Macros = new List<MacroDefinition>(),
                 Operators = new List<FunctionDefinition>(),
                 Structs = new List<StructDefinition>(),
                 Classes = new List<ClassDefinition>(),

@@ -15,10 +15,10 @@ namespace ProgrammingLanguage.BBCode
 namespace ProgrammingLanguage.BBCode.Compiler
 {
     using Bytecode;
-    using Parser;
-    using Parser.Statement;
     using Core;
     using Errors;
+    using Parser;
+    using Parser.Statement;
     using ProgrammingLanguage.Tokenizer;
 
     public interface IDuplicatable<T>
@@ -110,6 +110,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         public static bool ContainsSameDefinition(this IEnumerable<FunctionDefinition> functions, FunctionDefinition other)
+        {
+            foreach (var function in functions)
+            { if (function.IsSame(other)) return true; }
+            return false;
+        }
+
+        public static bool ContainsSameDefinition(this IEnumerable<MacroDefinition> functions, MacroDefinition other)
         {
             foreach (var function in functions)
             { if (function.IsSame(other)) return true; }
@@ -1248,44 +1255,44 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        public void AddTypeArguments(IEnumerable<CompiledType> typeArguments)
-             => AddTypeArguments(typeArguments.ToArray());
-        public void AddTypeArguments(CompiledType[] typeArguments)
+        public void AddTypeArguments(IEnumerable<CompiledType> typeParameters)
+             => AddTypeArguments(typeParameters.ToArray());
+        public void AddTypeArguments(CompiledType[] typeParameters)
         {
             if (TemplateInfo == null)
             { return; }
 
-            if (typeArguments == null || typeArguments.Length == 0)
+            if (typeParameters == null || typeParameters.Length == 0)
             { return; }
 
-            string[] typeParameters = TemplateInfo.ToDictionary().Keys.ToArray();
+            string[] typeParameterNames = TemplateInfo.ToDictionary().Keys.ToArray();
 
-            if (typeArguments.Length != typeParameters.Length)
+            if (typeParameters.Length != typeParameterNames.Length)
             { throw new CompilerException("Ah"); }
 
-            for (int i = 0; i < typeArguments.Length; i++)
+            for (int i = 0; i < typeParameters.Length; i++)
             {
                 if (TemplateInfo == null)
                 { throw new CompilerException("Ah"); }
 
-                CompiledType value = typeArguments[i];
-                string key = typeParameters[i];
+                CompiledType value = typeParameters[i];
+                string key = typeParameterNames[i];
 
-                currentTypeArguments[key] = value;
+                currentTypeArguments[key] = new CompiledType(value);
             }
         }
-        internal void AddTypeArguments(Dictionary<string, CompiledType> typeArguments)
+        internal void AddTypeArguments(Dictionary<string, CompiledType> typeParameters)
         {
             if (TemplateInfo == null)
             { return; }
 
-            string[] typeParameters = TemplateInfo.ToDictionary().Keys.ToArray();
+            string[] typeParameterNames = TemplateInfo.ToDictionary().Keys.ToArray();
 
-            for (int i = 0; i < typeParameters.Length; i++)
+            for (int i = 0; i < typeParameterNames.Length; i++)
             {
-                if (!typeArguments.TryGetValue(typeParameters[i], out var ehhh))
+                if (!typeParameters.TryGetValue(typeParameterNames[i], out CompiledType typeParameterValue))
                 { continue; }
-                currentTypeArguments[typeParameters[i]] = ehhh;
+                currentTypeArguments[typeParameterNames[i]] = new CompiledType(typeParameterValue);
             }
         }
 
@@ -1979,7 +1986,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return this.RuntimeType == other;
         }
 
-        public static bool DoSomethingWithTypeParameters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
+        public static bool TryGetTypeParamaters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
         {
             typeParameters = null;
             if (definedParameters is null || passedParameters is null) return false;
@@ -1989,17 +1996,21 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             for (int i = 0; i < definedParameters.Length; i++)
             {
-                var passed = passedParameters[i];
-                var defined = definedParameters[i];
+                CompiledType passed = passedParameters[i];
+                CompiledType defined = definedParameters[i];
 
-                if (passed.IsGeneric) throw new NotImplementedException();
+                if (passed.IsGeneric) throw new NotImplementedException($"This should be non-generic");
 
                 if (defined.IsGeneric)
                 {
                     if (typeParameters.TryGetValue(defined.Name, out CompiledType addedTypeParameter))
-                    { if (addedTypeParameter != passed) return false; }
+                    {
+                        if (addedTypeParameter != passed) return false;
+                    }
                     else
-                    { typeParameters.Add(defined.Name, passed); }
+                    {
+                        typeParameters.Add(defined.Name, passed);
+                    }
 
                     continue;
                 }
@@ -2013,8 +2024,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                         { throw new NotImplementedException(); }
                         for (int j = 0; j < defined.Class.TemplateInfo.TypeParameters.Length; j++)
                         {
-                            var typeParamName = defined.Class.TemplateInfo.TypeParameters[i].Content;
-                            var typeParamValue = passed.TypeParameters[i];
+                            string typeParamName = defined.Class.TemplateInfo.TypeParameters[i].Content;
+                            CompiledType typeParamValue = passed.TypeParameters[i];
 
                             if (typeParameters.TryGetValue(typeParamName, out CompiledType addedTypeParameter))
                             { if (addedTypeParameter != typeParamValue) return false; }
@@ -2031,7 +2042,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return true;
         }
 
-        public static bool Equals(CompiledType[] a, CompiledType[] b)
+        public static bool Equals(CompiledType[] a, params CompiledType[] b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;

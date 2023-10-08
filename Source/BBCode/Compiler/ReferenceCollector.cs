@@ -341,6 +341,16 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (GetVariable(functionCall.Identifier.Content, out _))
                 { return; }
 
+                if (TryGetMacro(functionCall, out MacroDefinition macro))
+                {
+                    var inlinedMacro = InlineMacro(macro, functionCall.Parameters);
+                    if (inlinedMacro is Block block)
+                    { AnalyzeStatements(block.Statements); }
+                    else
+                    { AnalyzeStatement(inlinedMacro, expectedType); }
+                    return;
+                }
+
                 if (GetFunction(functionCall, out CompiledFunction function))
                 {
                     function.AddReference(functionCall);
@@ -600,8 +610,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 AddTypeArguments(function.TypeArguments);
 
                 parameters.Clear();
-                foreach (ParameterDefinition parameter in function.Function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                for (int j = 0; j < function.Function.Parameters.Length; j++)
+                {
+                    parameters.Add(new CompiledParameter(function.Function.ParameterTypes[j], function.Function.Parameters[j]));
+                }
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
@@ -697,6 +709,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CompiledStructs = compilerResult.Structs,
 
                 CompiledFunctions = compilerResult.Functions,
+                CompiledMacros = compilerResult.Macros,
                 CompiledOperators = compilerResult.Operators,
                 CompiledGeneralFunctions = compilerResult.GeneralFunctions,
 

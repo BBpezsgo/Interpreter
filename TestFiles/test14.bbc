@@ -3,8 +3,8 @@ using System;
 [CodeEntry]
 void Start()
 {
-	PrintD("Type something > ");
-	String input = ReadLine();
+	Print("Type something > ");
+	temp String input = ReadLine();
 	PrintLine();
-	PrintLineD("Input: " + input);
+	PrintLine("Input: " + input);
 }

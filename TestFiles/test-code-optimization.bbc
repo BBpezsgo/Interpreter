@@ -3,5 +3,5 @@
 [CodeEntry]
 void Start()
 {
-	PrintLineD((5 + 5 * 5).ToString());
+	PrintLine(temp (5 + 5 * 5).ToString());
 }

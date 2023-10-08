@@ -1,6 +1,6 @@
 using System;
 
-macro void Hey(String message, int bruh) {
+void Hey(String message, int bruh) {
 	out message;
 	out "\r\n";
 	out bruh;

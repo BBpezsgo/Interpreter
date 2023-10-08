@@ -3,5 +3,5 @@
 [CodeEntry]
 void Start() {
     Print("Enter your name > ");
-    PrintLineD("Hello " + ReadLine() + "!");
+    PrintLine("Hello " + (temp ReadLine()) + "!");
 }

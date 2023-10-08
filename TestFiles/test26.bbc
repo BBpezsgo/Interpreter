@@ -5,9 +5,9 @@ int b = 3;
 
 if (a+b)
 {
-  out "true";
+  Print("true");
 }
 else
 {
-  out "false";
+  Print("false");
 };

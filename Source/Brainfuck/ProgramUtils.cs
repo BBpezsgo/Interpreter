@@ -28,11 +28,8 @@ namespace TheProgram.Brainfuck
 
     internal static class ProgramUtils
     {
-        public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags)
+        public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags, CompileOptions flags = CompileOptions.None)
         {
-            CompileOptions flags =
-                CompileOptions.None;
-
             void PrintCallback(string message, ProgrammingLanguage.Output.LogType level)
             {
                 switch (level)

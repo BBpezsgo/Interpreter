@@ -5,7 +5,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 {
     using System.Linq;
     using Bytecode;
-
+    using ConsoleGUI;
     using Core;
 
     using Errors;
@@ -167,6 +167,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         protected CompiledStruct[] CompiledStructs;
         protected CompiledClass[] CompiledClasses;
         protected CompiledFunction[] CompiledFunctions;
+        protected MacroDefinition[] CompiledMacros;
         protected CompiledOperator[] CompiledOperators;
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
@@ -183,6 +184,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         protected readonly List<Error> Errors;
         protected readonly List<Warning> Warnings;
+        protected readonly List<Hint> Hints;
 
         protected string CurrentFile;
 
@@ -191,12 +193,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledClasses = Array.Empty<CompiledClass>();
             CompiledFunctions = Array.Empty<CompiledFunction>();
+            CompiledMacros = Array.Empty<MacroDefinition>();
             CompiledOperators = Array.Empty<CompiledOperator>();
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
             Errors = new List<Error>();
             Warnings = new List<Warning>();
+            Hints = new List<Hint>();
 
             CurrentFile = null;
 
@@ -212,6 +216,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CompiledStructs = compilerResult.Structs;
             CompiledClasses = compilerResult.Classes;
             CompiledFunctions = compilerResult.Functions;
+            CompiledMacros = compilerResult.Macros;
             CompiledOperators = compilerResult.Operators;
             CompiledGeneralFunctions = compilerResult.GeneralFunctions;
             CompiledEnums = compilerResult.Enums;
@@ -229,6 +234,39 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
 
         #region Helper Functions
+
+        protected bool StatementCanBeDeallocated(StatementWithValue statement)
+            => StatementCanBeDeallocated(statement, out _);
+        protected bool StatementCanBeDeallocated(StatementWithValue statement, out bool explicitly)
+        {
+            if (statement is ModifiedStatement modifiedStatement &&
+                modifiedStatement.Modifier == "temp")
+            {
+                if (modifiedStatement.Statement is BBCode.Parser.Statement.Literal ||
+                    modifiedStatement.Statement is OperatorCall)
+                {
+                    Hints.Add(new Hint($"Unnecessary explicit temp modifier (this kind of statements (\"{modifiedStatement.Statement.GetType().Name}\") are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
+                }
+
+                explicitly = true;
+                return true;
+            }
+
+            if (statement is BBCode.Parser.Statement.Literal)
+            {
+                explicitly = false;
+                return true;
+            }
+
+            if (statement is OperatorCall)
+            {
+                explicitly = false;
+                return true;
+            }
+
+            explicitly = default;
+            return false;
+        }
 
         protected CompliableTemplate<CompiledFunction> AddCompilable(CompliableTemplate<CompiledFunction> compilable)
         {
@@ -378,6 +416,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return found;
         }
 
+        protected bool TryGetMacro(FunctionCall functionCallStatement, out MacroDefinition macro)
+            => TryGetMacro(functionCallStatement.Identifier.Content, functionCallStatement.MethodParameters.Length, out macro);
+
         protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
         {
             Token functionIdentifier = functionCallStatement.Identifier;
@@ -448,10 +489,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 if (element.Identifier != functionCallStatement.FunctionName) continue;
 
-                if (!CompiledType.DoSomethingWithTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParamaters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
-                if (element.Context != null && element.Context.TemplateInfo != null)
-                { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
+                // if (element.Context != null && element.Context.TemplateInfo != null)
+                // { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(element, typeParameters);
 
@@ -479,9 +520,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.Type.Class != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
-                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out var typeParameters)) continue;
 
-                CollectTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
+                MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -501,14 +542,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 compiledFunction = null;
                 return false;
             }
-            CompiledClass @class = prevType.Class;
+            CompiledClass context = prevType.Class;
 
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = CompiledFunctions[i];
 
                 if (function.IsTemplate) continue;
-                if (function.Context != @class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
@@ -528,7 +569,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledFunction function = compilableFunctions[i].Function;
 
-                if (function.Context != @class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
@@ -555,14 +596,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 compiledFunction = null;
                 return false;
             }
-            CompiledClass @class = prevType.Class;
+            CompiledClass context = prevType.Class;
 
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = CompiledFunctions[i];
 
                 if (function.IsTemplate) continue;
-                if (function.Context != @class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
@@ -588,7 +629,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 CompiledFunction function = compilableFunctions[i].Function;
 
-                if (function.Context != @class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
@@ -622,12 +663,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return false;
             }
 
+            CompiledClass context = prevType.Class;
+
+            context.AddTypeArguments(prevType.TypeParameters);
+            context.AddTypeArguments(TypeArguments);
+
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = CompiledFunctions[i];
 
                 if (!function.IsTemplate) continue;
-                if (function.Context != prevType.Class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
@@ -639,15 +685,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!function.ReturnSomething)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
-                Dictionary<string, CompiledType> typeParameters = new();
-
-                CollectTypeParameters(prevType, typeParameters);
+                Dictionary<string, CompiledType> typeParameters = new(context.CurrentTypeArguments);
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
+                context.ClearTypeArguments();
                 return true;
             }
 
             compiledFunction = default;
+            context.ClearTypeArguments();
             return false;
         }
 
@@ -658,14 +704,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 compiledFunction = default;
                 return false;
             }
-            CompiledClass @class = prevType.Class;
+
+            CompiledClass context = prevType.Class;
+
+            context.AddTypeArguments(prevType.TypeParameters);
+            context.AddTypeArguments(TypeArguments);
 
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = CompiledFunctions[i];
 
                 if (!function.IsTemplate) continue;
-                if (function.Context != @class) continue;
+                if (function.Context != context) continue;
                 if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
@@ -683,15 +733,15 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (function.ReturnSomething)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
-                Dictionary<string, CompiledType> typeParameters = new();
-
-                CollectTypeParameters(prevType, @class.TemplateInfo.TypeParameters, typeParameters);
+                Dictionary<string, CompiledType> typeParameters = new(context.CurrentTypeArguments);
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
+                context.ClearTypeArguments();
                 return true;
             }
 
             compiledFunction = default;
+            context.ClearTypeArguments();
             return false;
         }
 
@@ -738,6 +788,29 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         protected bool TryGetFunction(Token name, int parameterCount, out CompiledFunction compiledFunction)
             => TryGetFunction(name.Content, parameterCount, out compiledFunction);
+
+        bool TryGetMacro(string name, int parameterCount, out MacroDefinition macro)
+        {
+            macro = null;
+
+            for (int i = 0; i < this.CompiledMacros.Length; i++)
+            {
+                MacroDefinition _macro = this.CompiledMacros[i];
+
+                if (_macro.Identifier != name) continue;
+
+                if (_macro.ParameterCount != parameterCount) continue;
+
+                if (macro is not null)
+                { return false; }
+
+                macro = _macro;
+            }
+
+            return macro is not null;
+        }
+        protected bool TryGetMacro(Token name, int parameterCount, out MacroDefinition macro)
+            => TryGetMacro(name.Content, parameterCount, out macro);
 
         protected bool GetFunction(FunctionType type, out CompiledFunction compiledFunction)
         {
@@ -869,7 +942,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier.Content != @operator.Operator.Content) continue;
-                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
@@ -938,7 +1011,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (!CompiledType.DoSomethingWithTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -1111,20 +1184,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        void CollectTypeParameters(TypeInstance type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
-            => CollectTypeParameters(new CompiledType(type, FindType), typeParameterNames, typeParameters);
+        void MapTypeParameters(TypeInstance type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+            => MapTypeParameters(new CompiledType(type, FindType), typeParameterNames, typeParameters);
 
         /// <summary>
         /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        static void CollectTypeParameters(CompiledType type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+        static void MapTypeParameters(CompiledType type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
         {
             if (type.TypeParameters.Length != typeParameterNames.Length)
-            { throw new NotImplementedException(); }
+            { throw new NotImplementedException($"There should be the same number of type parameter values as type parameter names"); }
 
-            for (int i = 0; i < typeParameterNames.Length; i++)
-            { typeParameters[typeParameterNames[i].Content] = type.TypeParameters[i]; }
+            ProgrammingLanguage.Utils.Map(typeParameterNames, type.TypeParameters, typeParameters);
         }
 
         /// <summary>
@@ -1136,7 +1208,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         /// </para>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        static void CollectTypeParameters(CompiledType type, Dictionary<string, CompiledType> typeParameters)
+        static void MapTypeParameters(CompiledType type, Dictionary<string, CompiledType> typeParameters)
         {
             if (!type.IsClass)
             { return; }
@@ -1144,7 +1216,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (type.Class.TemplateInfo == null)
             { return; }
 
-            CollectTypeParameters(type, type.Class.TemplateInfo.TypeParameters, typeParameters);
+            MapTypeParameters(type, type.Class.TemplateInfo.TypeParameters, typeParameters);
         }
 
         protected CompiledVariable CompileVariable(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
@@ -1312,7 +1384,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
-
                 indexer = indexerTemplate.Function;
             }
 
@@ -1327,6 +1398,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (functionCall.FunctionName == "AllocFrom") return new CompiledType(Type.INT);
 
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
+
+            if (TryGetMacro(functionCall, out MacroDefinition macro))
+            { return FindMacroType(macro, functionCall.Parameters); }
 
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
@@ -1364,20 +1438,23 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
             { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
-            DataItem leftValue = GetInitialValue(leftType);
-            DataItem rightValue = GetInitialValue(rightType);
+            if ((expectedType is not null && expectedType.IsBuiltin) ?
+                TryCompute(@operator, expectedType.RuntimeType, out DataItem predictedValue) :
+                TryCompute(@operator, null, out predictedValue))
+            {
 
-            DataItem predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
+            }
+            else
+            {
+                DataItem leftValue = GetInitialValue(leftType);
+                DataItem rightValue = GetInitialValue(rightType);
+
+                predictedValue = Compute(@operator.Operator.Content, leftValue, rightValue);
+            }
 
             CompiledType result = new(predictedValue.Type);
 
-            if (expectedType is not null &&
-                expectedType.IsEnum &&
-                expectedType.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
-            {
-                if (result == Type.INT)
-                { result = expectedType; }
-            }
+            if (CanConvertImplicitly(result, expectedType)) return expectedType;
 
             return result;
         }
@@ -1520,6 +1597,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return FindStatementType(modifiedStatement.Statement, expectedType);
             }
 
+            if (modifiedStatement.Modifier == "temp")
+            {
+                return FindStatementType(modifiedStatement.Statement, expectedType);
+            }
+
             throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
         }
 
@@ -1589,7 +1671,137 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return result;
         }
 
+        protected CompiledType FindMacroType(MacroDefinition macro, params StatementWithValue[] parameters)
+        {
+            Statement inlinedMacro = InlineMacro(macro, parameters);
+            List<CompiledType> result = new();
+            StatementFinder.GetAllStatement(inlinedMacro, (statement) =>
+            {
+                if (statement is KeywordCall keywordCall &&
+                    keywordCall.Identifier == "return" &&
+                    keywordCall.Parameters.Length > 0)
+                {
+                    if (keywordCall.Parameters.Length > 0)
+                    { result.Add(FindStatementType(keywordCall.Parameters[0])); }
+                    else
+                    { result.Add(new CompiledType(Type.VOID)); }
+                }
+                return false;
+            });
+            if (result.Count == 0)
+            { return new CompiledType(Type.VOID); }
+
+            CompiledType result2 = result[0];
+            for (int i = 1; i < result.Count; i++)
+            {
+                if (result[i] != result2)
+                {
+                    throw new CompilerException($"Macro \"{macro.ReadableID()}\" returns more than one type of value", macro.Block, macro.FilePath);
+                }
+            }
+            return result2;
+        }
+
         #endregion
+
+        protected static Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
+        {
+            Dictionary<string, StatementWithValue> _parameters = new();
+            ProgrammingLanguage.Utils.Map(macro.Parameters, parameters, _parameters);
+            if (macro.Statements.Length == 0)
+            { throw new CompilerException($"Macro \"{macro.ReadableID()}\" has no statements", macro.Block, macro.FilePath); }
+            else if (macro.Statements.Length == 1)
+            { return InlineMacro(macro.Statements[0], _parameters); }
+            else
+            { return InlineMacro(macro.Block, _parameters); }
+        }
+
+        protected static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
+        {
+            Statement[] statements = new Statement[block.Statements.Count];
+            for (int i = 0; i < block.Statements.Count; i++)
+            {
+                Statement statement = block.Statements[i];
+                statements[i] = InlineMacro(statement, parameters);
+
+                if (statement is KeywordCall keywordCall &&
+                    keywordCall.Identifier == "return")
+                { break; }
+            }
+            return new Block(block.BracketStart, statements, block.BracketEnd);
+        }
+
+        protected static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
+        {
+            var left = InlineMacro(operatorCall.Left, parameters);
+            var right = InlineMacro(operatorCall.Right, parameters);
+            return new OperatorCall(operatorCall.Operator, left, right);
+        }
+
+        protected static KeywordCall InlineMacro(KeywordCall keywordCall, Dictionary<string, StatementWithValue> parameters)
+        {
+            StatementWithValue[] _parameters = InlineMacro(keywordCall.Parameters, parameters);
+            return new KeywordCall(keywordCall.Identifier, _parameters);
+        }
+
+        protected static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
+        {
+            StatementWithValue[] _parameters = InlineMacro(functionCall.Parameters, parameters);
+            StatementWithValue prevStatement = functionCall.PrevStatement;
+            if (prevStatement != null)
+            { prevStatement = InlineMacro(prevStatement, parameters); ; }
+            return new FunctionCall(prevStatement, functionCall.Identifier, functionCall.BracketLeft, _parameters, functionCall.BracketRight);
+        }
+
+        protected static StatementWithValue[] InlineMacro(StatementWithValue[] statements, Dictionary<string, StatementWithValue> parameters)
+        {
+            StatementWithValue[] _parameters = new StatementWithValue[statements.Length];
+            for (int i = 0; i < _parameters.Length; i++)
+            {
+                _parameters[i] = InlineMacro(statements[i], parameters);
+            }
+            return _parameters;
+        }
+        protected static Statement[] InlineMacro(Statement[] statements, Dictionary<string, StatementWithValue> parameters)
+        {
+            Statement[] _parameters = new Statement[statements.Length];
+            for (int i = 0; i < _parameters.Length; i++)
+            {
+                _parameters[i] = InlineMacro(statements[i], parameters);
+            }
+            return _parameters;
+        }
+
+        protected static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement is Block block)
+            { return InlineMacro(block, parameters); }
+
+            if (statement is StatementWithValue statementWithValue)
+            { return InlineMacro(statementWithValue, parameters); }
+
+            throw new NotImplementedException();
+        }
+
+        protected static StatementWithValue InlineMacro(StatementWithValue statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement is Identifier identifier)
+            {
+                if (parameters.TryGetValue(identifier.Content, out StatementWithValue inlinedStatement))
+                { return inlinedStatement; }
+            }
+
+            if (statement is OperatorCall operatorCall)
+            { return InlineMacro(operatorCall, parameters); }
+
+            if (statement is KeywordCall keywordCall)
+            { return InlineMacro(keywordCall, parameters); }
+
+            if (statement is FunctionCall functionCall)
+            { return InlineMacro(functionCall, parameters); }
+
+            throw new NotImplementedException();
+        }
 
         #region TryCompute()
         protected static DataItem Compute(string @operator, DataItem left, DataItem right)
@@ -1737,6 +1949,25 @@ namespace ProgrammingLanguage.BBCode.Compiler
             value = DataItem.Null;
             return false;
         }
+        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
+        {
+            value = default;
+
+            if (!TryGetMacro(functionCall, out MacroDefinition macro))
+            { return false; }
+
+            Statement inlined = InlineMacro(macro, functionCall.Parameters);
+            if (inlined is KeywordCall keywordCall &&
+                keywordCall.Identifier == "return")
+            {
+                if (keywordCall.Parameters.Length > 0)
+                {
+                    return TryCompute(keywordCall.Parameters[0], expectedType, out value);
+                }
+            }
+
+            return false;
+        }
 
         protected bool TryCompute(StatementWithValue statement, RuntimeType? expectedType, out DataItem value)
         {
@@ -1749,10 +1980,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
             if (statement is KeywordCall keywordCall)
             { return TryCompute(keywordCall, expectedType, out value); }
 
+            if (statement is FunctionCall functionCall)
+            { return TryCompute(functionCall, expectedType, out value); }
+
             value = DataItem.Null;
             return false;
         }
         #endregion
 
+        protected bool CanConvertImplicitly(CompiledType from, CompiledType to)
+        {
+            if (from is null || to is null) return false;
+
+            if (from == Type.INT &&
+                to.IsEnum &&
+                to.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
+            { return true; }
+
+            return false;
+        }
     }
 }

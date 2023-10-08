@@ -1,7 +1,7 @@
 using System;
 
 template<T>
-macro void PrintT(T v) {
+void PrintT(T v) {
 	out v;
 }
 

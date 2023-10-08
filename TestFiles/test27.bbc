@@ -3,17 +3,17 @@ using System;
 int i = 0;
 while (1) {
 	i++;
-	out i;
-	out "\r\n";
+	Print(i);
+	Print("\r\n");
 
 	if (i == 4) {
-		out "Break!";
+		Print("Break!");
 		break;
-		out "What?";
+		Print("What?");
 	};
 	
-	out i;
-	out " Late\r\n";
+	Print(i);
+	Print(" Late\r\n");
 };
 
-out "Huhu";
+Print("Huhu");

@@ -19,13 +19,18 @@ namespace ProgrammingLanguage.BBCode.Parser
         static readonly string[] Modifiers = new string[]
         {
             "export",
-            "macro",
             "adaptive",
+        };
+
+        static readonly string[] GeneralStatementModifiers = new string[]
+        {
+            "temp",
         };
 
         static readonly string[] VariableModifiers = new string[]
         {
             "const",
+            "temp",
         };
 
         static readonly string[] ParameterModifiers = new string[]
@@ -33,12 +38,14 @@ namespace ProgrammingLanguage.BBCode.Parser
             "this",
             "ref",
             "const",
+            "temp",
         };
 
         static readonly string[] PassedParameterModifiers = new string[]
         {
             "ref",
             "const",
+            "temp",
         };
 
         static readonly string[] OverloadableOperators = new string[]
@@ -74,6 +81,7 @@ namespace ProgrammingLanguage.BBCode.Parser
         // === Result ===
         readonly List<Error> Errors = new();
         readonly List<FunctionDefinition> Functions = new();
+        readonly List<MacroDefinition> Macros = new();
         readonly List<EnumDefinition> Enums = new();
         readonly Dictionary<string, StructDefinition> Structs = new();
         readonly Dictionary<string, ClassDefinition> Classes = new();
@@ -111,7 +119,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 if (endlessSafe > 500) { throw new EndlessLoopException(); }
             }
 
-            return new ParserResult(this.Errors, this.Functions, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.Tokens.ToArray());
+            return new ParserResult(this.Errors, this.Functions, this.Macros, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.Tokens.ToArray());
         }
 
         ParserResultHeader ParseCodeHeaderInternal()
@@ -228,6 +236,8 @@ namespace ProgrammingLanguage.BBCode.Parser
         {
             if (ExpectStructDefinition()) { }
             else if (ExpectClassDefinition()) { }
+            else if (ExpectMacroDefinition(out var macroDefinition))
+            { Macros.Add(macroDefinition); }
             else if (ExpectFunctionDefinition(out var functionDefinition))
             { Functions.Add(functionDefinition); }
             else if (ExpectEnumDefinition(out var enumDefinition))
@@ -373,7 +383,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-                CheckModifiers(parameterModifiers, "this");
+                CheckModifiers(parameterModifiers, "this", "temp");
 
                 TypeInstance possibleParameterType = ExpectType(AllowedType.None);
                 if (possibleParameterType == null)
@@ -461,6 +471,85 @@ namespace ProgrammingLanguage.BBCode.Parser
             return true;
         }
 
+        bool ExpectMacroDefinition(out MacroDefinition function)
+        {
+            int parseStart = CurrentTokenIndex;
+            function = null;
+
+            List<FunctionDefinition.Attribute> attributes = new();
+            while (ExpectAttribute(out var attr))
+            {
+                bool alreadyHave = false;
+                foreach (var attribute in attributes)
+                {
+                    if (attribute.Identifier == attr.Identifier)
+                    {
+                        alreadyHave = true;
+                        break;
+                    }
+                }
+                if (!alreadyHave)
+                {
+                    attributes.Add(attr);
+                }
+                else
+                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the macro", attr.Identifier)); }
+            }
+
+            Token[] modifiers = ParseModifiers();
+
+            if (!ExpectIdentifier("macro", out Token macroKeyword))
+            { CurrentTokenIndex = parseStart; return false; }
+
+            if (!ExpectIdentifier(out Token possibleNameT))
+            { CurrentTokenIndex = parseStart; return false; }
+
+            if (!ExpectOperator("("))
+            { CurrentTokenIndex = parseStart; return false; }
+
+            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
+
+            List<Token> parameters = new();
+
+            var expectParameter = false;
+            while (!ExpectOperator(")") || expectParameter)
+            {
+                if (!ExpectIdentifier(out Token possibleParameterNameT))
+                { throw new SyntaxException("Expected a parameter name", CurrentToken); }
+
+                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
+                parameters.Add(possibleParameterNameT);
+
+                if (ExpectOperator(")"))
+                { break; }
+
+                if (!ExpectOperator(","))
+                { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                else
+                { expectParameter = true; }
+            }
+
+            CheckModifiers(modifiers, "export");
+
+            function = new(possibleNameT, modifiers)
+            {
+                Parameters = parameters.ToArray(),
+            };
+
+            List<Statement.Statement> statements = new();
+
+            if (!ExpectOperator(";"))
+            {
+                statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                function.BracketStart = braceletStart;
+                function.BracketEnd = braceletEnd;
+            }
+
+            function.Statements = statements.ToArray();
+
+            return true;
+        }
+
         bool ExpectFunctionDefinition(out FunctionDefinition function)
         {
             int parseStart = CurrentTokenIndex;
@@ -508,7 +597,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-                CheckModifiers(parameterModifiers, "this", "ref");
+                CheckModifiers(parameterModifiers, "this", "ref", "temp");
 
                 TypeInstance possibleParameterType = ExpectType(AllowedType.FunctionPointer);
                 if (possibleParameterType == null)
@@ -580,7 +669,7 @@ namespace ProgrammingLanguage.BBCode.Parser
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
-                CheckModifiers(parameterModifiers);
+                CheckModifiers(parameterModifiers, "temp");
 
                 TypeInstance possibleParameterType = ExpectType(AllowedType.None);
                 if (possibleParameterType == null)
@@ -1219,7 +1308,9 @@ namespace ProgrammingLanguage.BBCode.Parser
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            ExpectIdentifier("const", out Token constModifier);
+            List<Token> modifiers = new();
+            while (ExpectIdentifier(out Token modifier, VariableModifiers))
+            { modifiers.Add(modifier); }
 
             TypeInstance possibleType = ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer);
             if (possibleType == null)
@@ -1242,7 +1333,7 @@ namespace ProgrammingLanguage.BBCode.Parser
                 { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType.Identifier); }
             }
 
-            return new VariableDeclaretion(constModifier == null ? Array.Empty<Token>() : new Token[1] { constModifier }, possibleType, possibleVariableName, initialValue);
+            return new VariableDeclaretion(modifiers.ToArray(), possibleType, possibleVariableName, initialValue);
         }
 
         ForLoop ExpectForStatement()
@@ -1451,14 +1542,14 @@ namespace ProgrammingLanguage.BBCode.Parser
                 return new OperatorCall(unaryPrefixOperator, statement);
             }
 
-            StatementWithValue leftStatement = ExpectOneValue();
+            StatementWithValue leftStatement = ExpectModifiedOrOneValue(GeneralStatementModifiers);
             if (leftStatement == null) return null;
 
             while (true)
             {
                 if (!ExpectOperator(BinaryOperators, out Token binaryOperator)) break;
 
-                StatementWithValue rightStatement = ExpectOneValue();
+                StatementWithValue rightStatement = ExpectModifiedOrOneValue(GeneralStatementModifiers);
 
                 if (rightStatement == null)
                 { throw new SyntaxException($"Expected value after operator \"{binaryOperator}\", got \"{CurrentToken}\"", CurrentToken); }
@@ -1559,6 +1650,23 @@ namespace ProgrammingLanguage.BBCode.Parser
 
             CurrentTokenIndex = parseStart;
             return null;
+        }
+
+        StatementWithValue ExpectModifiedOrOneValue(params string[] validModifiers)
+        {
+            if (!ExpectIdentifier(out Token modifier, validModifiers))
+            {
+                return ExpectOneValue();
+            }
+
+            modifier.AnalyzedType = TokenAnalysedType.Keyword;
+
+            var value = ExpectOneValue();
+
+            if (value == null)
+            { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
+
+            return new ModifiedStatement(modifier, value);
         }
 
         bool ExpectModifiedValue(out ModifiedStatement modifiedStatement, params string[] validModifiers)
@@ -1928,6 +2036,9 @@ namespace ProgrammingLanguage.BBCode.Parser
         TypeInstance ExpectType(AllowedType flags)
         {
             if (!ExpectIdentifier(out Token possibleType)) return null;
+
+            if (possibleType == "macro")
+            { return null; }
 
             possibleType.AnalyzedType = TokenAnalysedType.Keyword;
 

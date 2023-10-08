@@ -3,10 +3,10 @@ int NotMacro(int p0, int p1)
 	return p0 + p1;
 }
 
-macro int Macro(int p0, int p1)
+macro Macro(p0, p1)
 {
 	return p0 + p1;
 }
 
-int result = NotMacro(3, 6);
+int result = Macro(3, 6);
 *Alloc(1) = result;

@@ -2,7 +2,7 @@ using System;
 
 struct Yes
 {
-  float YesField;
+  int YesField;
   String YesField2;
 }
 
@@ -18,28 +18,28 @@ void Start()
 {
   Foo foo = new Foo; // Bar2();
   
-  foo.yes.YesField = 4.6;
+  foo.yes.YesField = 46;
   
   Yes yes2 = foo.yes;
   
-  PrintLineD("yes2.YesField: " + yes2.YesField);
-  PrintLineD("yes2.YesField2: " + yes2.YesField2);
+  // PrintLine("yes2.YesField: " + yes2.YesField);
+  // PrintLine("yes2.YesField2: " + yes2.YesField2);
 
-  PrintLineD("foo.yes.YesField: " + foo.yes.YesField);
+  // PrintLine("foo.yes.YesField: " + foo.yes.YesField);
 
   foo.field0 = 55;
-  PrintLineD("foo.field0: " + foo.field0);
-  PrintLineD("&foo.field0: " + &foo.field0);
+  PrintLine("foo.field0: " + foo.field0);
+  PrintLine("&foo.field0: " + &foo.field0);
 
   Foo foo2;
   foo2 = foo;
-  PrintLineD("foo.field0: " + foo.field0);
+  PrintLine("foo.field0: " + foo.field0);
 
   int res = Bar(foo2, foo, 420);
-  PrintLineD(res);
+  PrintLine(res);
 
-  PrintLineD("foo.field0: " + foo.field0);
-  PrintLineD("foo2.field0: " + foo2.field0);
+  PrintLine("foo.field0: " + foo.field0);
+  PrintLine("foo2.field0: " + foo2.field0);
 }
 
 int Bar(Foo p0, Foo p1, int p2)

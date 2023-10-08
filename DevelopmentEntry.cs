@@ -18,7 +18,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test20.bbc";
+            string path = TestConstants.TestFilesPath + "test30.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -72,7 +72,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None);
+                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory);
                     break;
                 case ArgumentParser.RunType.IL:
                     {

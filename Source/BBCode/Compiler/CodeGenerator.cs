@@ -6,31 +6,41 @@ using System.Linq;
 
 namespace ProgrammingLanguage.BBCode.Compiler
 {
+    using System.ComponentModel;
+    using System.Diagnostics;
     using Bytecode;
     using Core;
     using Errors;
     using Parser;
     using Parser.Statement;
 
-    readonly struct CleanupItem
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    public readonly struct CleanupItem
     {
         /// <summary>
-        /// The actual data size on the stack
+        /// Data size on the stack
         /// </summary>
-        internal readonly int Size;
-        /// <summary>
-        /// The element count
-        /// </summary>
-        internal readonly int Count;
+        public readonly int Size;
 
-        public CleanupItem(int size, int count)
+        public readonly bool ShouldDeallocate;
+
+        public readonly CompiledType Type;
+
+        public CleanupItem(int size, bool shouldDeallocate, CompiledType type)
         {
             Size = size;
-            Count = count;
+            ShouldDeallocate = shouldDeallocate;
+            Type = type;
         }
 
-        public static CleanupItem operator +(CleanupItem a, CleanupItem b)
-            => new(a.Size + b.Size, a.Count + b.Count);
+        public static CleanupItem Null => new(0, false, null);
+
+        public override string ToString()
+        {
+            if (Type is null && Size == 0 && !ShouldDeallocate) return "null";
+            return $"({(ShouldDeallocate ? "temp " : string.Empty)}{Type} : {Size} bytes)";
+        }
+        string GetDebuggerDisplay() => ToString();
     }
 
     public class DebugInfo
@@ -75,13 +85,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
         readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
         readonly Dictionary<string, int> ExternalFunctionsCache;
 
-        readonly Stack<CleanupItem> CleanupStack;
+        readonly Stack<CleanupItem[]> CleanupStack;
         IAmInContext<CompiledClass> CurrentContext;
         readonly List<CompiledParameter> CompiledParameters;
         readonly List<KeyValuePair<string, CompiledVariable>> CompiledVariables;
 
         readonly Stack<List<int>> ReturnInstructions;
         readonly Stack<List<int>> BreakInstructions;
+        readonly Stack<bool> InMacro;
 
         readonly List<Instruction> GeneratedCode;
 
@@ -96,7 +107,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         bool CanReturn;
 
         readonly List<Information> Informations;
-        public readonly List<Hint> Hints;
         readonly List<DebugInfo> GeneratedDebugInfo;
 
         /// <summary>
@@ -119,12 +129,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.ExternalFunctionsCache = new Dictionary<string, int>();
             this.OptimizeCode = !settings.DontOptimize;
             this.GeneratedDebugInfo = new List<DebugInfo>();
-            this.CleanupStack = new Stack<CleanupItem>();
+            this.CleanupStack = new Stack<CleanupItem[]>();
             this.ReturnInstructions = new Stack<List<int>>();
             this.BreakInstructions = new Stack<List<int>>();
             this.UndefinedFunctionOffsets = new List<UndefinedFunctionOffset>();
             this.UndefinedOperatorFunctionOffsets = new List<UndefinedOperatorFunctionOffset>();
             this.UndefinedGeneralFunctionOffsets = new List<UndefinedGeneralFunctionOffset>();
+            this.InMacro = new Stack<bool>();
 
             this.TagCount = new Stack<int>();
 
@@ -132,7 +143,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.CompiledParameters = new List<CompiledParameter>();
 
             this.Informations = new List<Information>();
-            this.Hints = new List<Hint>();
         }
 
         #region Helper Functions
@@ -435,6 +445,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
 
+            if (InMacro.Last)
+            { throw new NotImplementedException(); }
+
             if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
             { throw new CompilerException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.VariableName, CurrentFile); }
 
@@ -462,6 +475,20 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (keywordCall.Parameters.Length > 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
+                if (InMacro.Last)
+                {
+                    AddComment(" Return from macro:");
+
+                    if (keywordCall.Parameters.Length == 1)
+                    {
+                        StatementWithValue returnValue = keywordCall.Parameters[0];
+                        GenerateCodeForStatement(returnValue);
+                    }
+
+                    AddComment("}");
+                    return;
+                }
+
                 if (keywordCall.Parameters.Length == 1)
                 {
                     AddComment(" Param 0:");
@@ -470,8 +497,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     CompiledType returnValueType = FindStatementType(returnValue);
 
                     GenerateCodeForStatement(returnValue);
-                    int offset = ReturnValueOffset;
 
+                    int offset = ReturnValueOffset;
                     for (int i = 0; i < returnValueType.SizeOnStack; i++)
                     { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset - i); }
                 }
@@ -511,6 +538,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             {
                 if (BreakInstructions.Count == 0)
                 { throw new CompilerException($"The keyword \"break\" does not available in the current context", keywordCall.Identifier, CurrentFile); }
+
+                if (InMacro.Last)
+                { throw new NotImplementedException(); }
 
                 BreakInstructions.Last.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY, 0);
@@ -832,6 +862,26 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 return;
             }
 
+            if (TryGetMacro(functionCall, out MacroDefinition macro))
+            {
+                string prevFile = CurrentFile;
+                IAmInContext<CompiledClass> prevContext = CurrentContext;
+
+                CurrentFile = macro.FilePath;
+                CurrentContext = null;
+                
+                AddInstruction(Opcode.CS_PUSH, $"{macro.ReadableID()};{CurrentFile};{GeneratedCode.Count};{macro.Identifier.Position.Start.Line}");
+                
+                GenerateCodeForInlinedMacro(InlineMacro(macro, functionCall.Parameters));
+                
+                AddInstruction(Opcode.CS_POP);
+
+                CurrentContext = prevContext;
+                CurrentFile = prevFile;
+
+                return;
+            }
+
             if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
@@ -859,9 +909,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
             if (compiledFunction.IsMacro)
-            {
-                Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile));
-            }
+            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
 
             AddComment($"Call {compiledFunction.ReadableID()} {{");
 
@@ -984,15 +1032,31 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
             }
 
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
-                Statement param = functionCall.Parameters[i];
-                string paramName = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i].Identifier.Content;
-                CompiledType paramType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+                StatementWithValue passedParameter = functionCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
+                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
                 AddComment($" Param {i}:");
-                GenerateCodeForStatement(param, paramType);
-                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + paramName);
+
+                bool canDeallocate = passedParameterType.InHEAP && definedParameter.Modifiers.Contains("temp");
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                }
+                else
+                { canDeallocate = false; }
+
+                GenerateCodeForStatement(passedParameter, definedParameterType);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParameter.Identifier.Content);
+
+                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
             }
 
             AddComment(" .:");
@@ -1003,21 +1067,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
             { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, compiledFunction, CurrentFile)); }
 
             AddComment(" Clear Params:");
-            for (int i = functionCall.Parameters.Length - 1; i >= 0; i--)
+            while (parameterCleanup.Count > 0)
             {
-                Statement param = functionCall.Parameters[i];
-                CompiledType paramType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+                var passedParameter = parameterCleanup.Pop();
 
-                if (paramType.InHEAP)
+                if (passedParameter.CanDeallocate && passedParameter.Size == 1)
                 {
-                    if (param is BBCode.Parser.Statement.Literal)
-                    {
-                        AddInstruction(Opcode.HEAP_DEALLOC);
-                        continue;
-                    }
+                    GenerateDeallocator(passedParameter.Type);
+                    continue;
                 }
 
-                for (int j = 0; j < paramType.SizeOnStack; j++)
+                for (int i = 0; i < passedParameter.Size; i++)
                 { AddInstruction(Opcode.POP_VALUE); }
             }
 
@@ -1259,7 +1319,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 int returnValueSize = GenerateInitialValue(operatorDefinition.Type, "returnvalue");
 
-                int paramsSize = 0;
+                Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
 
                 for (int i = 0; i < @operator.Parameters.Length; i++)
                 {
@@ -1272,10 +1332,21 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     { }
 
                     AddComment($" Param {i}:");
+
+                    bool canDeallocate = passedParameterType.InHEAP && definedParameter.Modifiers.Contains("temp");
+
+                    if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                    {
+                        if (explicitDeallocate && !canDeallocate)
+                        { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    }
+                    else
+                    { canDeallocate = false; }
+
                     GenerateCodeForStatement(passedParameter, definedParameterType);
                     AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParameter.Identifier);
 
-                    paramsSize += passedParameterType.SizeOnStack;
+                    parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
                 }
 
                 AddComment(" .:");
@@ -1286,9 +1357,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(jumpInstruction, @operator, operatorDefinition, CurrentFile)); }
 
                 AddComment(" Clear Params:");
-                for (int i = 0; i < paramsSize; i++)
+                while (parameterCleanup.Count > 0)
                 {
-                    AddInstruction(Opcode.POP_VALUE);
+                    var passedParameter = parameterCleanup.Pop();
+
+                    if (passedParameter.CanDeallocate && passedParameter.Size == 1)
+                    {
+                        GenerateDeallocator(passedParameter.Type);
+                        continue;
+                    }
+
+                    for (int i = 0; i < passedParameter.Size; i++)
+                    { AddInstruction(Opcode.POP_VALUE); }
                 }
 
                 if (!@operator.SaveValue)
@@ -1457,6 +1537,18 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 GenerateCodeForStatement(identifier);
                 return;
             }
+            if (addressGetter.PrevStatement is Field field)
+            {
+                if (!IsItInHeap(field))
+                { throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile); }
+
+                int offset = GetFieldOffset(field);
+                int pointerOffset = GetBaseAddress(field, out AddressingMode addressingMode);
+
+                GenerateCodeForValueGetter(pointerOffset, addressingMode);
+                AddInstruction(Opcode.MATH_ADD, offset);
+                return;
+            }
             throw new NotImplementedException();
         }
         void GenerateCodeForStatement(Pointer memoryAddressFinder)
@@ -1518,9 +1610,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             OnScopeEnter(forLoop.Block);
 
             {
-                int s = GenerateCodeForVariable(forLoop.VariableDeclaration, CurrentContext == null);
-                if (s != 0)
-                { CleanupStack[^1] += new CleanupItem(s, 1); }
+                CleanupItem cleanupItem = GenerateCodeForVariable(forLoop.VariableDeclaration, CurrentContext == null);
+                if (cleanupItem.Size != 0)
+                { CleanupStack[^1] = new List<CleanupItem>(CleanupStack[^1]) { cleanupItem }.ToArray(); }
             }
 
             AddComment("FOR Declaration");
@@ -1787,7 +1879,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 if (!GetField(field, out var compiledField))
                 { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in class \"{prevType.Class.Name}\"", field, CurrentFile); }
 
-                if (CurrentContext.Context != null)
+                if (CurrentContext?.Context != null)
                 {
                     switch (compiledField.Protection)
                     {
@@ -1851,6 +1943,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         {
             StatementWithValue statement = modifiedStatement.Statement;
             Token modifier = modifiedStatement.Modifier;
+
             if (modifier == "ref")
             {
                 if (statement is Identifier identifier)
@@ -1888,6 +1981,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     throw new CompilerException($"Local symbol \"{identifier.Content}\" not found");
                 }
             }
+
+            if (modifier == "temp")
+            {
+                GenerateCodeForStatement(statement);
+                return;
+            }
+
             throw new NotImplementedException();
         }
         void GenerateCodeForStatement(LiteralList listValue)
@@ -2053,39 +2153,46 @@ namespace ProgrammingLanguage.BBCode.Compiler
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
 
-        CleanupItem CompileVariables(Block block, bool isGlobal, bool addComments = true)
+        CleanupItem[] CompileVariables(Block block, bool isGlobal, bool addComments = true)
         {
             if (addComments) AddComment("Variables {");
-            int count = 0;
-            int variableSizeSum = 0;
+
+            List<CleanupItem> result = new();
+
             foreach (var s in block.Statements)
             {
-                int size = GenerateCodeForVariable(s, isGlobal);
-                if (size == 0) continue;
+                CleanupItem item = GenerateCodeForVariable(s, isGlobal);
+                if (item.Size == 0) continue;
 
-                variableSizeSum += size;
-                count++;
+                result.Add(item);
             }
+
             if (addComments) AddComment("}");
-            return new CleanupItem(variableSizeSum, count);
-        }
-        void Pop(int n, string comment = null)
-        {
-            if (n <= 0) return;
-            if (comment != null) AddComment(comment);
-            for (int x = 0; x < n; x++)
-            { AddInstruction(Opcode.POP_VALUE); }
-        }
-        void PopVariable(int n)
-        {
-            for (int x = 0; x < n; x++)
-            { CompiledVariables.Remove(CompiledVariables[^1].Key); }
+
+            return result.ToArray();
         }
 
-        void CleanupVariables(CleanupItem cleanupItem)
+        void CleanupVariables(CleanupItem[] cleanupItems)
         {
-            Pop(cleanupItem.Size, "Clear variables");
-            PopVariable(cleanupItem.Count);
+            if (cleanupItems.Length == 0) return;
+            AddComment("Clear Variables");
+            for (int i = cleanupItems.Length - 1; i >= 0; i--)
+            {
+                CleanupItem item = cleanupItems[i];
+
+                if (item.ShouldDeallocate)
+                {
+                    if (item.Size != 1) throw new InternalException();
+                    GenerateDeallocator(item.Type);
+                }
+                else
+                {
+                    for (int x = 0; x < item.Size; x++)
+                    { AddInstruction(Opcode.POP_VALUE); }
+                }
+
+                CompiledVariables.Remove(CompiledVariables[^1].Key);
+            }
         }
 
         void GenerateCodeForValueSetter(Statement statementToSet, StatementWithValue value)
@@ -2103,10 +2210,10 @@ namespace ProgrammingLanguage.BBCode.Compiler
         }
         void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
         {
-            CompiledType valueType = FindStatementType(value);
-
             if (GetParameter(statementToSet.Content, out CompiledParameter parameter))
             {
+                CompiledType valueType = FindStatementType(value, parameter.Type);
+
                 if (parameter.Type != valueType)
                 { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{parameter.Type.Name}\" type parameter.", value, CurrentFile); }
 
@@ -2125,6 +2232,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             else if (GetVariable(statementToSet.Content, out CompiledVariable variable))
             {
+                CompiledType valueType = FindStatementType(value, variable.Type);
+
                 if (variable.Type != valueType)
                 { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{variable.Type.Name}\" type variable.", value, CurrentFile); }
 
@@ -2238,9 +2347,8 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AssignTypeCheck(variable.Type, valueType, value);
 
-            if (variable.Type.IsBuiltin && variable.Type.BuiltinType == Type.BYTE &&
-                TryCompute(value, null, out DataItem yeah) &&
-                yeah.Type == RuntimeType.INT)
+            if (variable.Type.IsBuiltin &&
+                TryCompute(value, null, out DataItem yeah))
             {
                 AddInstruction(Opcode.PUSH_VALUE, yeah);
             }
@@ -2280,105 +2388,65 @@ namespace ProgrammingLanguage.BBCode.Compiler
             throw new CompilerException($"Can not set a {valueType} type value to the {destination} type variable.", value, CurrentFile);
         }
 
-        #endregion
-
-        #region Macro Things
-
-        /*
-        void InlineMacro(CompiledFunction macro, StatementWithValue[] parameters, bool saveValue)
+        void GenerateDeallocator(CompiledType deallocateableType)
         {
-            if (Constants.Keywords.Contains(macro.Identifier.Content))
-            { throw new CompilerException($"The identifier \"{macro.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", macro.Identifier, macro.FilePath); }
-
-            AddComment($"Inline {macro.ReadableID()} {{");
-
-            int returnValueSize = 0;
-            if (macro.ReturnSomething)
-            { returnValueSize = GenerateInitialValue(macro.Type, "returnvalue"); }
-
-            int paramsSize = 0;
-
-            for (int i = 0; i < parameters.Length; i++)
+            if (deallocateableType == Type.INT)
             {
-                StatementWithValue param = parameters[i];
-                string paramName = macro.Parameters[i].Identifier.Content;
-                CompiledType paramType = macro.ParameterTypes[i];
-
-                AddComment($" Param {i}:");
-                GenerateCodeForStatement(param);
-                AddInstruction(Opcode.DEBUG_SET_TAG, "param." + paramName);
-
-                paramsSize += paramType.SizeOnStack;
+                AddInstruction(Opcode.HEAP_DEALLOC);
+                return;
             }
 
-            AddComment(" .:");
-
-            macro.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-            (
-                CompiledParameter[] Parameters,
-                KeyValuePair<string, CompiledVariable>[] Locals,
-                int[] ReturnInstructions,
-                string CurrentFile
-            ) savedThings =
-            (
-                this.CompiledParameters.ToArray(),
-                CompiledVariables.ToArray(),
-                ReturnInstructions.ToArray(),
-                CurrentFile
-            );
-
-            this.CompiledParameters.Clear();
-            RemoveLocalVariables();
-            ReturnInstructions.Clear();
-
-            CompileParameters(macro.Parameters);
-
-            CurrentFile = macro.FilePath;
-
-            AddInstruction(Opcode.CS_PUSH, $"macro_{macro.ReadableID()};{CurrentFile};{GeneratedCode.Count};{macro.Identifier.Position.Start.Line}");
-
-            CanReturn = true;
-            AddInstruction(Opcode.PUSH_VALUE, new DataItem(false), "RETURN_FLAG");
-
-            OnScopeEnter(macro.Block);
-
-            AddComment("Statements {");
-            for (int i = 0; i < macro.Statements.Length; i++)
-            { GenerateCodeForStatement(macro.Statements[i]); }
-            AddComment("}");
-
-            CurrentFile = null;
-
-            CanReturn = false;
-
-            OnScopeExit();
-
-            AddInstruction(Opcode.POP_VALUE, "Pop RETURN_TAG");
-
-            AddComment("Return");
-            AddInstruction(Opcode.CS_POP);
-
-            CompiledParameters.Fill(savedThings.Parameters);
-            CompiledVariables.Fill(savedThings.Locals);
-            ReturnInstructions.Fill(savedThings.ReturnInstructions);
-
-            CurrentFile = savedThings.CurrentFile;
-
-            AddComment($" Clear Params (size: {paramsSize}):");
-            for (int i = 0; i < paramsSize; i++)
-            { AddInstruction(Opcode.POP_VALUE); }
-
-            if (macro.ReturnSomething && !saveValue)
+            if (deallocateableType.IsClass)
             {
-                AddComment($" Clear Return Value (size: {returnValueSize}):");
-                for (int i = 0; i < returnValueSize; i++)
-                { AddInstruction(Opcode.POP_VALUE); }
+                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, FunctionNames.Destructor, out var destructor))
+                {
+                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, FunctionNames.Destructor, out var destructorTemplate))
+                    {
+                        AddInstruction(Opcode.HEAP_DEALLOC);
+                        return;
+                    }
+                    destructorTemplate = AddCompilable(destructorTemplate);
+                    destructor = destructorTemplate.Function;
+                }
+
+                if (!destructor.CanUse(CurrentFile))
+                {
+                    Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    AddComment("}");
+                    return;
+                }
+
+                AddComment(" Param0 (should be already be there):");
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
+
+                AddComment(" .:");
+
+                int jumpInstruction = Call(destructor.InstructionOffset);
+
+                if (destructor.InstructionOffset == -1)
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, null, destructor, CurrentFile)); }
+
+                AddComment(" Clear Param:");
+
+                AddInstruction(Opcode.POP_VALUE);
+
+                AddComment("}");
+
+                return;
             }
 
-            AddComment($"}}");
+            AddInstruction(Opcode.HEAP_DEALLOC);
         }
-        */
+
+        void GenerateCodeForInlinedMacro(Statement inlinedMacro)
+        {
+            InMacro.Push(true);
+            if (inlinedMacro is Block block)
+            { GenerateCodeForStatement(block); }
+            else
+            { GenerateCodeForStatement(inlinedMacro); }
+            InMacro.Pop();
+        }
 
         #endregion
 
@@ -2712,14 +2780,14 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        int GenerateCodeForVariable(VariableDeclaretion newVariable, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(VariableDeclaretion newVariable, bool isGlobal)
         {
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
                 if (CompiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
                 {
                     Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Value.VariableName}\" already defined", CompiledVariables[i].Value.VariableName, CurrentFile));
-                    return 0;
+                    return CleanupItem.Null;
                 }
             }
 
@@ -2745,29 +2813,27 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             AddComment("}");
 
-            return size;
+            return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
-        int GenerateCodeForVariable(Statement st, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
         {
             if (st is VariableDeclaretion newVariable)
             {
                 return GenerateCodeForVariable(newVariable, isGlobal);
             }
-            return 0;
+            return CleanupItem.Null;
         }
-        CleanupItem GenerateCodeForVariable(Statement[] sts, bool isGlobal)
+        CleanupItem[] GenerateCodeForVariable(Statement[] sts, bool isGlobal)
         {
-            int count = 0;
-            int size = 0;
+            List<CleanupItem> result = new();
             for (int i = 0; i < sts.Length; i++)
             {
-                int size_ = GenerateCodeForVariable(sts[i], isGlobal);
-                if (size_ == 0) continue;
+                CleanupItem item = GenerateCodeForVariable(sts[i], isGlobal);
+                if (item.Size == 0) continue;
 
-                size += size_;
-                count++;
+                result.Add(item);
             }
-            return new CleanupItem(size, count);
+            return result.ToArray();
         }
 
         int VariablesSize
@@ -2867,6 +2933,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
 
             TagCount.Push(0);
+            InMacro.Push(false);
 
             CompiledParameters.Clear();
             RemoveLocalVariables();
@@ -2906,6 +2973,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             RemoveLocalVariables();
             ReturnInstructions.Clear();
 
+            InMacro.Pop();
             TagCount.Pop();
         }
 
@@ -2916,6 +2984,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             CurrentFile = null;
             CurrentContext = null;
             TagCount.Push(0);
+            InMacro.Push(false);
             ReturnInstructions.Push(new List<int>());
 
             AddComment("Variables");
@@ -2931,6 +3000,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CleanupVariables(CleanupStack.Pop());
 
+            InMacro.Pop();
             TagCount.Pop();
 
             AddComment("}");
@@ -3064,6 +3134,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             base.CompiledStructs = compilerResult.Structs;
             this.ExternalFunctions.AddRange(compilerResult.ExternalFunctions);
             base.CompiledEnums = compilerResult.Enums;
+            base.CompiledMacros = compilerResult.Macros;
 
             (
                 this.CompiledFunctions,
@@ -3206,27 +3277,33 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 CurrentContext = null;
             }
 
-            foreach (var function in this.CompilableFunctions)
             {
-                CurrentContext = function.Function;
-                function.Function.InstructionOffset = GeneratedCode.Count;
-
-                foreach (var attribute in function.Function.Attributes)
+                int i = 0;
+                while (i < CompilableFunctions.Count)
                 {
-                    if (attribute.Identifier.Content != "CodeEntry") continue;
-                    GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
+                    CompliableTemplate<CompiledFunction> function = CompilableFunctions[i];
+                    i++;
+
+                    CurrentContext = function.Function;
+                    function.Function.InstructionOffset = GeneratedCode.Count;
+
+                    foreach (var attribute in function.Function.Attributes)
+                    {
+                        if (attribute.Identifier.Content != "CodeEntry") continue;
+                        GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
+                    }
+
+                    AddTypeArguments(function.TypeArguments);
+
+                    AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+
+                    GenerateCodeForFunction(function.Function);
+
+                    if (function.Function.Statements.Length > 0) AddCommentForce("}");
+
+                    CurrentContext = null;
+                    TypeArguments.Clear();
                 }
-
-                AddTypeArguments(function.TypeArguments);
-
-                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
-
-                GenerateCodeForFunction(function.Function);
-
-                if (function.Function.Statements.Length > 0) AddCommentForce("}");
-
-                CurrentContext = null;
-                TypeArguments.Clear();
             }
 
             foreach (var function in this.CompilableOperators)
@@ -3294,12 +3371,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             foreach (UndefinedGeneralFunctionOffset item in UndefinedGeneralFunctionOffsets)
             {
-                if (item.CallStatement is ConstructorCall constructorCall)
+                if (item.CallStatement == null) { }
+                else if (item.CallStatement is ConstructorCall constructorCall)
                 {
                     if (item.GeneralFunction.InstructionOffset == -1)
                     { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
-
-                    GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                 }
                 else if (item.CallStatement is KeywordCall functionCall)
                 {
@@ -3307,28 +3383,24 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Constructor for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
-
-                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else if (functionCall.Identifier.Content == "clone")
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Cloner for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
-
-                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else if (functionCall.Identifier.Content == "out")
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Function {item.GeneralFunction.ReadableID()} does not have instruction offset", item.CurrentFile); }
-
-                        GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
                     }
                     else
                     { throw new NotImplementedException(); }
                 }
                 else
                 { throw new NotImplementedException(); }
+
+                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
             }
 
             return new Result()

@@ -2,19 +2,19 @@
 
 void Foo()
 {
-  PrintLineD("none");
+  PrintLine("none");
 }
 void Foo(int p)
 {
-  PrintLineD("int");
+  PrintLine("int");
 }
 void Foo(bool p)
 {
-  PrintLineD("str");
+  PrintLine("str");
 }
 void Foo(int p1, int p2)
 {
-  PrintLineD("int int");
+  PrintLine("int int");
 }
 
 [CodeEntry]

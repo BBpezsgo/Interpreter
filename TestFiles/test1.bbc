@@ -2,7 +2,7 @@
 
 void Xd2()
 {
-    PrintLineD("ahan");
+    PrintLine("ahan");
 }
 
 [CodeEntry]

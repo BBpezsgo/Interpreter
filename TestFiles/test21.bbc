@@ -1,23 +1,20 @@
+using System;
+
 void InputChar(ref char input) {
-	input = IN;
-	out input;
+	input = ReadKey();
+	Print(input);
 }
 
 void InputByte(ref byte input) {
-	char _char = IN;
-	out _char;
+	char _char = ReadKey();
 
 	byte result = 0;
 
-	while (_char - '\r') {
-		result = result * 10;
-		result += _char - 48;
+	while (_char != '\r') {
+		result = (result * 10) as byte;
+		result += (_char - 48) as byte;
 		
-		_char = IN;
-		if (_char - '\r')
-		{
-			out _char;
-		};
+		_char = ReadKey();
 	};
 
 	input = result;

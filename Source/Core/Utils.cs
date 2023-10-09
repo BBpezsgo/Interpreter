@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using ProgrammingLanguage.BBCode;
 
 namespace ProgrammingLanguage
 {
@@ -50,6 +51,31 @@ namespace ProgrammingLanguage
             for (int i = 0; i < keys.Length; i++)
             { typeParameters[keys[i].Content] = values[i]; }
         }
+    }
 
+    namespace Core
+    {
+        public partial struct Range<T>
+        {
+            public static Range<SinglePosition> Create(params Token[] tokens)
+            {
+                if (tokens.Length == 0) throw new ArgumentException($"Array 'tokens' length is 0");
+
+                Range<SinglePosition> result = new()
+                {
+                    Start = tokens[0].Position.Start,
+                    End = tokens[0].Position.End
+                };
+
+                for (int i = 1; i < tokens.Length; i++)
+                {
+                    Token token = tokens[i];
+                    result = result.Extend(token.Position);
+                }
+
+                return result;
+            }
+
+        }
     }
 }

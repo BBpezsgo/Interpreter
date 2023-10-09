@@ -23,7 +23,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             public CompiledStruct[] Structs { get; set; }
 
             public Dictionary<string, int> Offsets { get; set; }
-            internal DebugInfo[] DebugInfo { get; set; }
+            internal DebugInformation DebugInfo { get; set; }
 
             public CompilerResult()
             {

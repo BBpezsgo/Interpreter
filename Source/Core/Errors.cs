@@ -97,21 +97,21 @@ namespace ProgrammingLanguage.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        internal Bytecode.Context? Context;
-        BBCode.Compiler.DebugInfo[]? ContextDebugInfo;
+        public Bytecode.Context? Context;
+        public Position SourcePosition;
+        public FunctionInformations[]? CallStack;
 
-        internal void FeedDebugInfo(BBCode.Compiler.DebugInfo[] DebugInfo)
+        internal void FeedDebugInfo(DebugInformation debugInfo)
         {
             if (!Context.HasValue) return;
-            List<BBCode.Compiler.DebugInfo> contextDebugInfo = new();
-            var context = Context.Value;
-            for (int i = 0; i < DebugInfo.Length; i++)
-            {
-                BBCode.Compiler.DebugInfo item = DebugInfo[i];
-                if (item.InstructionStart > context.CodePointer || item.InstructionEnd < context.CodePointer) continue;
-                contextDebugInfo.Add(item);
-            }
-            ContextDebugInfo = contextDebugInfo.ToArray();
+            Bytecode.Context context = Context.Value;
+
+            if (!debugInfo.TryGetSourceLocation(context.CodePointer, out var sourcePosition))
+            { SourcePosition = Position.UnknownPosition; }
+            else
+            { SourcePosition = sourcePosition.SourcePosition; }
+
+            CallStack = debugInfo.GetFunctionInformations(context.RawCallStack);
         }
 
         internal RuntimeException(string message)
@@ -137,12 +137,23 @@ namespace ProgrammingLanguage.Errors
             string result = Message;
             result += $"\n Executed Instructions: {context.ExecutedInstructionCount}";
             result += $"\n Code Pointer: {context.CodePointer}";
+
             result += $"\n Call Stack:";
-            if (context.RawCallStack.Length == 0) { result += " (callstack is empty)"; }
-            else { result += "\n   " + string.Join("\n   ", context.CallStack); }
-            if (ContextDebugInfo != null && ContextDebugInfo.Length > 0)
+            if (context.RawCallStack.Length == 0)
             {
-                result += $"\n Position: {ContextDebugInfo[0].Position.ToMinString()}";
+                result += " (callstack is empty)";
+            }
+            else
+            {
+                if (CallStack == null)
+                { result += "\n   " + string.Join("\n   ", context.RawCallStack); }
+                else
+                { result += "\n   " + string.Join("\n   ", CallStack); }
+            }
+
+            if (SourcePosition != Position.UnknownPosition)
+            {
+                result += $"\n Position: {SourcePosition.ToMinString()}";
             }
             result += $"\n System Stack Trace:";
             if (StackTrace == null) { result += " (stacktrace is null)"; }

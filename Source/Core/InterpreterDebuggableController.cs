@@ -77,44 +77,17 @@ namespace ProgrammingLanguage.Core
         {
             get
             {
-                DebugInfo[] debugInfo = DebugInfo;
+                if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
+                { return -1; }
 
-                int smallestPartSize = int.MaxValue;
-
-                int result = -1;
-
-                for (int i = 0; i < debugInfo.Length; i++)
-                {
-                    DebugInfo item = debugInfo[i];
-                    int partSize = item.Position.End.Line - item.Position.Start.Line;
-
-                    if (partSize < smallestPartSize)
-                    {
-                        smallestPartSize = partSize;
-                        result = item.Position.Start.Line;
-                    }
-
-                    if (smallestPartSize == 0) break;
-                }
-
-                return result;
+                return sourceLocation.SourcePosition.Start.Line;
             }
             set
             {
-                DebugInfo[] debugInfo = DebugInfo;
+                if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
+                { return; }
 
-                for (int i = 0; i < debugInfo.Length; i++)
-                {
-                    DebugInfo item = debugInfo[i];
-                    bool isInside = (item.Position.Start.Line >= _absoluteBreakpoint ||
-                        item.Position.End.Line <= _absoluteBreakpoint);
-
-                    if (isInside)
-                    {
-                        AbsoluteBreakpoint = value;
-                        break;
-                    }
-                }
+                AbsoluteBreakpoint = sourceLocation.SourcePosition.Start.Line;
             }
         }
         public bool StackOperation => _stackOperation;
@@ -123,7 +96,7 @@ namespace ProgrammingLanguage.Core
         public bool AluOperation => _aluOperation;
         public readonly Records<float> HeapUsage = new();
 
-        DebugInfo[] DebugInfo => details.CompilerResult.DebugInfo;
+        DebugInformation DebugInfo => details.CompilerResult.DebugInfo;
         Instruction[] Code => details.CompilerResult.Code;
 
         public void DoUpdate()

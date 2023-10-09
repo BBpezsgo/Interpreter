@@ -312,10 +312,13 @@ namespace ConsoleGUI
                 }
             }
 
+            var callstack = this.Interpreter.Details.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.Details.Interpreter.CallStack);
+
             int i;
             for (i = 0; i < this.Interpreter.Details.Interpreter.CallStack.Length; i++)
             {
-                ProgrammingLanguage.Bytecode.CallStackFrame frame = new(this.Interpreter.Details.Interpreter.CallStack[i]);
+                int callframeInstruction = this.Interpreter.Details.Interpreter.CallStack[i];
+                FunctionInformations callframe = callstack[i];
 
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
                 sender.DrawBuffer.AddText(" ");
@@ -353,59 +356,74 @@ namespace ConsoleGUI
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
                 sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;
 
-                if (frame.Function.Contains('('))
+                if (!callframe.IsValid)
                 {
-                    string functionName = frame.Function[..frame.Function.IndexOf('(')];
-
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Yellow;
-                    sender.DrawBuffer.AddText($"{functionName}");
-
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    sender.DrawBuffer.AddChar('(');
-
-                    string parameters = frame.Function[(frame.Function.IndexOf('(') + 1)..frame.Function.IndexOf(')')];
-
-                    List<string> parameters2;
-                    if (!parameters.Contains(','))
-                    {
-                        parameters2 = new List<string>() { parameters };
-                    }
-                    else
-                    {
-                        parameters2 = new List<string>();
-                        string[] splitted = parameters.Split(',');
-                        for (int j = 0; j < splitted.Length; j++)
-                        { parameters2.Add(splitted[j].Trim()); }
-                    }
-
-                    for (int j = 0; j < parameters2.Count; j++)
-                    {
-                        if (j > 0)
-                        {
-                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                            sender.DrawBuffer.AddText($", ");
-                        }
-
-                        string param = parameters2[j];
-                        if (ProgrammingLanguage.Constants.BuiltinTypes.Contains(param))
-                        {
-                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
-                        }
-                        else
-                        {
-                            sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
-                        }
-                        sender.DrawBuffer.AddText($"{param}");
-                    }
-
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    sender.DrawBuffer.AddChar(')');
-
-                    sender.DrawBuffer.ResetColor();
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Cyan;
+                    sender.DrawBuffer.AddText(callframeInstruction.ToString());
                 }
                 else
                 {
-                    sender.DrawBuffer.AddText($"{frame.Function}");
+                    if (callframe.IsMacro)
+                    {
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
+                        sender.DrawBuffer.AddText("macro ");
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                    }
+
+                    if (callframe.ReadableIdentifier.Contains('('))
+                    {
+                        string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(')];
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Yellow;
+                        sender.DrawBuffer.AddText($"{functionName}");
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                        sender.DrawBuffer.AddChar('(');
+
+                        string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(') + 1)..callframe.ReadableIdentifier.IndexOf(')')];
+
+                        List<string> parameters2;
+                        if (!parameters.Contains(','))
+                        {
+                            parameters2 = new List<string>() { parameters };
+                        }
+                        else
+                        {
+                            parameters2 = new List<string>();
+                            string[] splitted = parameters.Split(',');
+                            for (int j = 0; j < splitted.Length; j++)
+                            { parameters2.Add(splitted[j].Trim()); }
+                        }
+
+                        for (int j = 0; j < parameters2.Count; j++)
+                        {
+                            if (j > 0)
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                                sender.DrawBuffer.AddText($", ");
+                            }
+
+                            string param = parameters2[j];
+                            if (ProgrammingLanguage.Constants.BuiltinTypes.Contains(param))
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
+                            }
+                            else
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                            }
+                            sender.DrawBuffer.AddText($"{param}");
+                        }
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                        sender.DrawBuffer.AddChar(')');
+
+                        sender.DrawBuffer.ResetColor();
+                    }
+                    else
+                    {
+                        sender.DrawBuffer.AddText($"{callframe.ReadableIdentifier}");
+                    }
                 }
 
                 sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;

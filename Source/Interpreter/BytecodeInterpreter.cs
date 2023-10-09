@@ -27,17 +27,7 @@ namespace ProgrammingLanguage.Bytecode
 
     public struct Context
     {
-        public string[] RawCallStack;
-        public readonly CallStackFrame[] CallStack
-        {
-            get
-            {
-                CallStackFrame[] result = new CallStackFrame[RawCallStack.Length];
-                for (int i = 0; i < result.Length; i++)
-                { result[i] = new CallStackFrame(RawCallStack[i]); }
-                return result;
-            }
-        }
+        public int[] RawCallStack;
         public int CodePointer;
         public int ExecutedInstructionCount;
         public Instruction[] Code;
@@ -95,7 +85,7 @@ namespace ProgrammingLanguage.Bytecode
         public int BasePointer => BytecodeProcessor.BasePointer;
         public IReadOnlyStack<DataItem> Stack => BytecodeProcessor.Memory.Stack;
         public IReadOnlyHeap Heap => BytecodeProcessor.Memory.Heap;
-        public string[] CallStack => BytecodeProcessor.Memory.CallStack.ToArray();
+        public int[] CallStack => BytecodeProcessor.Memory.CallStack.ToArray();
 
         #endregion
 

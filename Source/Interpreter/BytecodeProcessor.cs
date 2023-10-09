@@ -213,7 +213,7 @@ namespace ProgrammingLanguage.Bytecode
 
         void CS_PUSH()
         {
-            Memory.CallStack.Push(CurrentInstruction.tag);
+            Memory.CallStack.Push(CurrentInstruction.ParameterInt);
             Step();
         }
 
@@ -602,7 +602,7 @@ namespace ProgrammingLanguage.Bytecode
         internal DataStack Stack;
         internal HEAP Heap;
         internal Instruction[] Code;
-        internal Stack<string> CallStack;
+        internal Stack<int> CallStack;
 
         public Memory(int heapSize, Instruction[] code)
         {
@@ -611,7 +611,7 @@ namespace ProgrammingLanguage.Bytecode
             Stack = new DataStack();
             Heap = new HEAP(heapSize);
 
-            CallStack = new Stack<string>();
+            CallStack = new Stack<int>();
         }
     }
 }

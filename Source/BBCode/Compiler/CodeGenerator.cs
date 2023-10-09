@@ -43,13 +43,6 @@ namespace ProgrammingLanguage.BBCode.Compiler
         string GetDebuggerDisplay() => ToString();
     }
 
-    public class DebugInfo
-    {
-        internal Position Position;
-        internal int InstructionStart;
-        internal int InstructionEnd;
-    }
-
     public class CodeGenerator : CodeGeneratorBase
     {
         /*
@@ -107,7 +100,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         bool CanReturn;
 
         readonly List<Information> Informations;
-        readonly List<DebugInfo> GeneratedDebugInfo;
+        readonly DebugInformation GeneratedDebugInfo;
 
         /// <summary>
         /// Used for keep track of local (after base pointer) tag count that are not variables.
@@ -128,7 +121,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             this.GeneratedCode = new List<Instruction>();
             this.ExternalFunctionsCache = new Dictionary<string, int>();
             this.OptimizeCode = !settings.DontOptimize;
-            this.GeneratedDebugInfo = new List<DebugInfo>();
+            this.GeneratedDebugInfo = new DebugInformation();
             this.CleanupStack = new Stack<CleanupItem[]>();
             this.ReturnInstructions = new Stack<List<int>>();
             this.BreakInstructions = new Stack<List<int>>();
@@ -869,9 +862,19 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                 CurrentFile = macro.FilePath;
                 CurrentContext = null;
-                
-                AddInstruction(Opcode.CS_PUSH, $"{macro.ReadableID()};{CurrentFile};{GeneratedCode.Count};{macro.Identifier.Position.Start.Line}");
-                
+
+                GeneratedDebugInfo.FunctionInformations.Add(GeneratedCode.Count, new FunctionInformations()
+                {
+                    IsValid = true,
+                    IsMacro = true,
+                    SourcePosition = macro.Identifier.GetPosition(),
+                    Identifier = macro.Identifier.Content,
+                    File = macro.FilePath,
+                    ReadableIdentifier = macro.ReadableID(),
+                });
+
+                AddInstruction(Opcode.CS_PUSH, GeneratedCode.Count);
+
                 GenerateCodeForInlinedMacro(InlineMacro(macro, functionCall.Parameters));
                 
                 AddInstruction(Opcode.CS_POP);
@@ -2041,11 +2044,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         void GenerateCodeForStatement(Statement statement, CompiledType expectedType = null)
         {
-            DebugInfo debugInfo = new()
-            {
-                InstructionStart = GeneratedCode.Count,
-                InstructionEnd = GeneratedCode.Count,
-            };
+            int startInstruction = GeneratedCode.Count;
 
             if (statement is LiteralList listValue)
             { GenerateCodeForStatement(listValue); }
@@ -2088,9 +2087,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
             else
             { throw new InternalException($"Unimplemented statement {statement.GetType().Name}"); }
 
-            debugInfo.InstructionEnd = GeneratedCode.Count - 1;
-            debugInfo.Position = statement.GetPosition();
-            GeneratedDebugInfo.Add(debugInfo);
+            GeneratedDebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
+            {
+                Instructions = (startInstruction, GeneratedCode.Count - 1),
+                SourcePosition = statement.GetPosition(),
+            });
         }
 
         void GenerateCodeForValueGetter(int offset, AddressingMode addressingMode)
@@ -2943,7 +2944,17 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             CurrentFile = function.FilePath;
 
-            AddInstruction(Opcode.CS_PUSH, $"{function.ReadableID()};{CurrentFile};{GeneratedCode.Count};{function.Identifier.Position.Start.Line}");
+            GeneratedDebugInfo.FunctionInformations.Add(GeneratedCode.Count, new FunctionInformations()
+            {
+                IsValid = true,
+                IsMacro = false,
+                SourcePosition = function.Identifier.GetPosition(),
+                Identifier = function.Identifier.Content,
+                File = function.FilePath,
+                ReadableIdentifier = function.ReadableID(),
+            });
+
+            AddInstruction(Opcode.CS_PUSH, GeneratedCode.Count);
 
             CanReturn = true;
             AddInstruction(Opcode.PUSH_VALUE, new DataItem(false), "RETURN_FLAG");
@@ -3029,7 +3040,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public struct Result
         {
             public Instruction[] Code;
-            public DebugInfo[] DebugInfo;
+            public DebugInformation DebugInfo;
 
             public CompiledFunction[] Functions;
             public CompiledOperator[] Operators;
@@ -3406,7 +3417,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             return new Result()
             {
                 Code = GeneratedCode.ToArray(),
-                DebugInfo = GeneratedDebugInfo.ToArray(),
+                DebugInfo = GeneratedDebugInfo,
 
                 Functions = this.CompiledFunctions,
                 Operators = this.CompiledOperators,

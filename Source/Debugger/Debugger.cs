@@ -19,18 +19,10 @@ namespace TheProgram
         {
             get
             {
-                int result = -1;
+                if (Interpreter.Details.CompilerResult.DebugInfo.TryGetSourceLocation(Interpreter.Details.Interpreter.CodePointer, out SourceCodeLocation sourceLocation))
+                { return sourceLocation.SourcePosition.Start.Line; }
 
-                for (int i = 0; i < Interpreter.Details.CompilerResult.DebugInfo.Length; i++)
-                {
-                    DebugInfo item = Interpreter.Details.CompilerResult.DebugInfo[i];
-                    if (item.InstructionStart > Interpreter.Details.Interpreter.CodePointer) continue;
-                    if (item.InstructionEnd < Interpreter.Details.Interpreter.CodePointer) continue;
-
-                    result = item.Position.Start.Line;
-                }
-
-                return result;
+                return -1;
             }
         }
 
@@ -107,14 +99,7 @@ namespace TheProgram
                     break;
 
                 case "compiler/debuginfo":
-                    {
-                        Ipc.Reply("compiler/debuginfo",
-                            (Interpreter.Details.CompilerResult.DebugInfo == null) ?
-                                Array.Empty<Data_DebugInfo>() :
-                                Interpreter.Details.CompilerResult.DebugInfo.ToData(v => new Data_DebugInfo(v)),
-                            message);
-                    }
-                    break;
+                    throw new NotImplementedException();
                 case "compiler/code":
                     {
                         Ipc.Reply("compiler/code",
@@ -282,20 +267,6 @@ namespace TheProgram
         }
     }
 
-    public class Data_DebugInfo : Data_Serializable<DebugInfo>
-    {
-        public int StartOffset { get; set; }
-        public int EndOffset { get; set; }
-        public Data_Position Position { get; set; }
-
-        public Data_DebugInfo(DebugInfo v) : base(v)
-        {
-            StartOffset = v.InstructionStart;
-            EndOffset = v.InstructionEnd;
-            Position = new Data_Position(v.Position);
-        }
-    }
-
     public class Data_Instruction : Data_Serializable<Instruction>
     {
         public string Opcode { get; set; }
@@ -327,7 +298,7 @@ namespace TheProgram
     public class Data_Context : Data_Serializable<Interpreter.InterpreterDetails>
     {
         public int CodePointer { get; set; } = -1;
-        public string[] CallStack { get; set; } = Array.Empty<string>();
+        public int[] CallStack { get; set; } = Array.Empty<int>();
 
         public Data_Context(Interpreter.InterpreterDetails v) : base(v)
         {

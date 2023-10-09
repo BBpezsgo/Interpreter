@@ -12,7 +12,7 @@ namespace ProgrammingLanguage.Core
         public Position GetPosition();
     }
 
-    public struct Position
+    public struct Position : IEquatable<Position>
     {
         public static Position UnknownPosition => new(-1);
 
@@ -155,6 +155,17 @@ namespace ProgrammingLanguage.Core
         }
 
         public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.End.Line, this.End.Character), new SinglePosition(this.End.Line, this.End.Character + 1)), new Range<int>(this.AbsolutePosition.End, this.AbsolutePosition.End + 1));
+
+        public override bool Equals(object obj) => obj is Position position && Equals(position);
+        public bool Equals(Position other) =>
+            AbsolutePosition.Equals(other.AbsolutePosition) &&
+            Start.Equals(other.Start) &&
+            End.Equals(other.End);
+
+        public override readonly int GetHashCode() => HashCode.Combine(AbsolutePosition, Start, End);
+
+        public static bool operator ==(Position left, Position right) => left.Equals(right);
+        public static bool operator !=(Position left, Position right) => !left.Equals(right);
     }
 
     [DebuggerDisplay($"{{{nameof(ToMinString)}(),nq}}")]
@@ -188,85 +199,9 @@ namespace ProgrammingLanguage.Core
 
         public override readonly string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
         public readonly string ToMinString() => $"{Line}:{Character}";
+
         public override readonly bool Equals(object obj) => obj is SinglePosition position && Equals(position);
         public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
         public override readonly int GetHashCode() => HashCode.Combine(Line, Character);
-    }
-
-    public struct Range<T> : IEquatable<Range<T>> where T : IEquatable<T>
-    {
-        public T Start;
-        public T End;
-
-        public Range(T start, T end)
-        {
-            Start = start;
-            End = end;
-        }
-
-        public static Range<SinglePosition> Create(params Token[] tokens)
-        {
-            if (tokens.Length == 0) throw new ArgumentException($"Array 'tokens' length is 0");
-
-            Range<SinglePosition> result = new()
-            {
-                Start = tokens[0].Position.Start,
-                End = tokens[0].Position.End
-            };
-
-            for (int i = 1; i < tokens.Length; i++)
-            {
-                Token token = tokens[i];
-                result = result.Extend(token.Position);
-            }
-
-            return result;
-        }
-
-        public override bool Equals(object obj)
-            => obj is Range<T> other && Equals(other);
-
-        public bool Equals(Range<T> other) =>
-            Start.Equals(other.Start) &&
-            End.Equals(other.End);
-
-        public override readonly int GetHashCode() => HashCode.Combine(Start, End);
-
-        public override readonly string ToString() => $"Range{{start: {Start}, end: {End}}}";
-
-        public static bool operator ==(Range<T> left, Range<T> right) =>
-            (IEquatable<T>)left.Start == (IEquatable<T>)right.Start &&
-            (IEquatable<T>)left.End == (IEquatable<T>)right.End;
-        public static bool operator !=(Range<T> left, Range<T> right) => !(left == right);
-    }
-
-    public struct Couples<T1, T2>
-    {
-        public T1 V1;
-        public T2 V2;
-
-        public Couples(T1 v1, T2 v2)
-        { V1 = v1; V2 = v2; }
-    }
-
-    public struct Couples<T1, T2, T3>
-    {
-        public T1 V1;
-        public T2 V2;
-        public T3 V3;
-
-        public Couples(T1 v1, T2 v2, T3 v3)
-        { V1 = v1; V2 = v2; V3 = v3; }
-    }
-
-    public struct Couples<T1, T2, T3, T4>
-    {
-        public T1 V1;
-        public T2 V2;
-        public T3 V3;
-        public T4 V4;
-
-        public Couples(T1 v1, T2 v2, T3 v3, T4 v4)
-        { V1 = v1; V2 = v2; V3 = v3; V4 = v4; }
     }
 }

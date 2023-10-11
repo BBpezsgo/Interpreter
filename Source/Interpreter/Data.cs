@@ -567,41 +567,49 @@ namespace LanguageCore.Runtime
             throw new RuntimeException($"Can't do ^ operation with type {leftSide.Type} and {rightSide.Type}");
         }
 
-        public readonly bool IsFalsy() => this.Type switch
-        {
-            RuntimeType.BYTE => this.valueByte == 0,
-            RuntimeType.INT => this.valueInt.Value == 0,
-            RuntimeType.FLOAT => this.valueFloat.Value == 0f,
-            RuntimeType.CHAR => this.valueChar.Value == 0,
-            _ => false,
-        };
-
         #endregion
 
+        /// <exception cref="ImpossibleException"></exception>
+        public readonly bool Boolean => this.Type switch
+        {
+            RuntimeType.BYTE => this.valueByte != 0,
+            RuntimeType.INT => this.valueInt.Value != 0,
+            RuntimeType.FLOAT => this.valueFloat.Value != 0f,
+            RuntimeType.CHAR => this.valueChar.Value != 0,
+            _ => throw new ImpossibleException(),
+        };
+        /// <exception cref="ImpossibleException"></exception>
         public readonly int? Integer => Type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
             RuntimeType.CHAR => this.ValueChar,
-            _ => null,
+            RuntimeType.FLOAT => null,
+            _ => throw new ImpossibleException(),
         };
         public readonly byte? Byte
         {
             get
             {
                 int? integer_ = this.Integer;
-                return (!integer_.HasValue || integer_.Value < byte.MinValue || integer_.Value > byte.MaxValue) ?
-                    null :
-                    (byte)integer_.Value;
+
+                if (!integer_.HasValue)
+                { return null; }
+
+                if (integer_.Value < byte.MinValue || integer_.Value > byte.MaxValue)
+                { return null; }
+
+                return (byte)integer_.Value;
             }
         }
-        public readonly float? Float => Type switch
+        /// <exception cref="ImpossibleException"></exception>
+        public readonly float Float => Type switch
         {
             RuntimeType.BYTE => this.ValueByte,
             RuntimeType.INT => this.ValueInt,
             RuntimeType.FLOAT => this.ValueFloat,
             RuntimeType.CHAR => this.ValueChar,
-            _ => null,
+            _ => throw new ImpossibleException(),
         };
 
         public readonly object GetValue() => type switch

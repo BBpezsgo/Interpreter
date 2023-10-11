@@ -130,8 +130,10 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void CopyValueWithTemp(int source, int tempAddress, int target)
         {
+            StartBlock($"CopyValueWithTemp({source}; {tempAddress}; {target})");
             MoveValue(source, target, tempAddress);
             MoveAddValue(tempAddress, source);
+            EndBlock();
         }
         /// <summary>
         /// <b>Pointer:</b> <paramref name="tempAddress"/> or not modified
@@ -269,12 +271,16 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void MoveValue(int from, params int[] to)
         {
-            CommentLine($"Clear the destination ({string.Join("; ", to)}) :");
+            StartBlock($"MoveValue({from}; {string.Join("; ", to)})");
+
+            CommentLine($"Clear the destination {string.Join("; ", to)}:");
             for (int i = 0; i < to.Length; i++)
             { ClearValue(to[i]); }
 
-            CommentLine($"Move the value (from {from}):");
+            CommentLine($"Move value from {from} to {string.Join("; ", to)}:");
             MoveAddValue(from, to);
+
+            EndBlock();
         }
         /// <summary>
         /// <b>Pointer:</b> <paramref name="from"/>
@@ -318,13 +324,23 @@ namespace LanguageCore.Brainfuck
         }
 
         /// <summary>
+        /// <b>Pointer:</b> <paramref name="conditionAddress"/>
+        /// </summary>
+        public JumpBlock Jump(int conditionAddress)
+        {
+            this.SetPointer(conditionAddress);
+            this.Code += "[";
+            return new JumpBlock(this, conditionAddress);
+        }
+
+        /// <summary>
         /// <b>Pointer:</b> 0
         /// </summary>
         public void JumpStart(int conditionAddress)
         {
             this.SetPointer(conditionAddress);
             this.Code += "[";
-            this.SetPointer(0);
+            // this.SetPointer(0);
         }
 
         /// <summary>
@@ -335,7 +351,7 @@ namespace LanguageCore.Brainfuck
             this.SetPointer(conditionAddress);
             if (clearCondition) this.ClearCurrent();
             this.Code += "]";
-            this.SetPointer(0);
+            // this.SetPointer(0);
         }
 
         public static CompiledCode operator +(CompiledCode a, string b)
@@ -557,6 +573,24 @@ namespace LanguageCore.Brainfuck
         public void Dispose()
         {
             this.reference.EndBlock();
+        }
+    }
+
+    public readonly struct JumpBlock : IDisposable
+    {
+        readonly CompiledCode Code;
+        readonly int ConditionAddress;
+
+        public JumpBlock(CompiledCode code, int conditionAddress)
+        {
+            this.Code = code;
+            this.ConditionAddress = conditionAddress;
+        }
+
+        public void Dispose()
+        {
+            this.Code.SetPointer(this.ConditionAddress);
+            this.Code.Code += "]";
         }
     }
 
@@ -1347,7 +1381,7 @@ namespace LanguageCore.Brainfuck
                 // if (result2 - 1 != result) {
 
                 int copiedResult = tempAddressesStart + 1;
-                int resultSub1 = tempAddressesStart; 
+                int resultSub1 = tempAddressesStart;
                 int temp = tempAddressesStart + 2;
 
                 Code.CopyValueWithTemp(resultAddress, temp, copiedResult);

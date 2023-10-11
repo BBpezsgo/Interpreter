@@ -3,13 +3,12 @@ using System;
 int a = 0;
 int b = 255;
 
-while (b) {
-
-	Print('\t');
+while (b)
+{
 	Print(a);
-	Print('\t');
+	Print(' ');
 	Print(b);
-	Print('\t');
+	Print(' ');
 	Print(a || b);
 	Print('\n');
 

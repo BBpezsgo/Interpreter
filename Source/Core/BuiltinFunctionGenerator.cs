@@ -456,10 +456,10 @@ namespace LanguageCore.Runtime
             { return (int)(data.Integer ?? 0); }
 
             if (type == typeof(float))
-            { return (float)(data.Float ?? 0f); }
+            { return (float)(data.Float); }
 
             if (type == typeof(bool))
-            { return (bool)((data.Integer ?? 0) != 0); }
+            { return (bool)data.Boolean; }
 
             if (type == typeof(char))
             { return (char)(data.Integer ?? 0); }

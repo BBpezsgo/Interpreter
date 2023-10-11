@@ -120,7 +120,7 @@ namespace LanguageCore.Runtime
                     nextInstruction.opcode == Opcode.BITSHIFT_LEFT ||
                     nextInstruction.opcode == Opcode.BITSHIFT_RIGHT ||
 
-                    nextInstruction.opcode == Opcode.LOGIC_AND ||
+                    nextInstruction.opcode == Opcode.BITS_AND ||
                     nextInstruction.opcode == Opcode.LOGIC_EQ ||
                     nextInstruction.opcode == Opcode.LOGIC_LT ||
                     nextInstruction.opcode == Opcode.LOGIC_LTEQ ||
@@ -128,8 +128,8 @@ namespace LanguageCore.Runtime
                     nextInstruction.opcode == Opcode.LOGIC_MTEQ ||
                     nextInstruction.opcode == Opcode.LOGIC_NEQ ||
                     nextInstruction.opcode == Opcode.LOGIC_NOT ||
-                    nextInstruction.opcode == Opcode.LOGIC_OR ||
-                    nextInstruction.opcode == Opcode.LOGIC_XOR ||
+                    nextInstruction.opcode == Opcode.BITS_OR ||
+                    nextInstruction.opcode == Opcode.BITS_XOR ||
 
                     nextInstruction.opcode == Opcode.MATH_ADD ||
                     nextInstruction.opcode == Opcode.MATH_DIV ||

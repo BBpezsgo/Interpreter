@@ -64,7 +64,7 @@ namespace TheProgram.Brainfuck
 
             CodeGenerator.Result code = _code.Value;
 
-            LanguageCore.Brainfuck.Interpreter interpreter = new(code.Code)
+            Interpreter interpreter = new(code.Code)
             {
                 DebugInfo = code.DebugInfo.ToArray(),
                 OriginalCode = code.Tokens,
@@ -78,7 +78,7 @@ namespace TheProgram.Brainfuck
                         Console.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI(true, 5);
+                        interpreter.RunWithUI(false, 5);
                         break;
                     }
                 case RunKind.SpeedTest:

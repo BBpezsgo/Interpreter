@@ -1823,8 +1823,8 @@ namespace LanguageCore.BBCode.Compiler
                 "/" => left,
                 "%" => left,
 
-                "&&" => new DataItem((!left.IsFalsy()) && (!right.IsFalsy())),
-                "||" => new DataItem((!left.IsFalsy()) || (!right.IsFalsy())),
+                "&&" => new DataItem(left.Boolean && right.Boolean),
+                "||" => new DataItem(left.Boolean || right.Boolean),
 
                 "&" => left & right,
                 "|" => left | right,
@@ -1877,7 +1877,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     case "&&":
                         {
-                            if (leftValue.IsFalsy())
+                            if (!leftValue.Boolean)
                             {
                                 value = new DataItem(false);
                                 return true;
@@ -1886,7 +1886,7 @@ namespace LanguageCore.BBCode.Compiler
                         }
                     case "||":
                         {
-                            if (!leftValue.IsFalsy())
+                            if (leftValue.Boolean)
                             {
                                 value = new DataItem(true);
                                 return true;

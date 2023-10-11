@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 
-#pragma warning disable IDE0051 // Remove unused private members
-
 namespace LanguageCore.BBCode.Compiler
 {
     using LanguageCore.Runtime;
@@ -1173,7 +1171,7 @@ namespace LanguageCore.BBCode.Compiler
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
             bool conditionIsComputed = TryCompute(whileLoop.Condition, null, out DataItem computedCondition);
-            if (conditionIsComputed && computedCondition.IsFalsy() && TrimUnreachableCode)
+            if (conditionIsComputed && !computedCondition.Boolean && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
                 Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
@@ -1208,7 +1206,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (conditionIsComputed)
             {
-                if (computedCondition.IsFalsy())
+                if (!computedCondition.Boolean)
                 { Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
                 else if (BreakInstructions.Last.Count == 0)
                 { Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }
@@ -1983,7 +1981,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     GenerateCodeForStatement(value);
 
-                    if (GetParameter(identifier.Content, out CompiledParameter param))
+                    if (GetParameter(identifier.Content, out _))
                     { throw new NotImplementedException(); }
 
                     if (GetVariable(identifier.Content, out CompiledVariable variable))

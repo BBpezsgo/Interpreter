@@ -305,9 +305,6 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Precompile(CompiledFunction function)
         {
-            // if (!function.Modifiers.Contains("macro"))
-            // { return; }
-
             if (IllegalIdentifiers.Contains(function.Identifier.Content))
             { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, CurrentFile); }
 
@@ -916,7 +913,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (SafeToDiscardVariable(value, variable))
             { VariableCanBeDiscarded = variable.Name; }
 
-            using (Code.Block($"Set variable {variable.Name} (at {variable.Address}) to {value}"))
+            using (Code.Block($"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
             {
                 if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
                 {
@@ -2094,7 +2091,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Compile(Literal statement)
         {
-            using (Code.Block($"Set address {Stack.NextAddress} to literal {statement}"))
+            using (Code.Block($"Set {statement} to address {Stack.NextAddress}"))
             {
                 switch (statement.Type)
                 {
@@ -2146,15 +2143,15 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (variable.IsDiscarded)
                 { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", statement, CurrentFile); }
 
-                using (Code.Block($"Load variable {variable.Name} (from {variable.Address})"))
+                int variableSize = variable.Size;
+
+                if (variableSize <= 0)
+                { throw new CompilerException($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement, CurrentFile); }
+
+                int loadTarget = Stack.PushVirtual(variableSize);
+
+                using (Code.Block($"Load variable \"{variable.Name}\" (from {variable.Address}) to {loadTarget}"))
                 {
-                    int variableSize = variable.Size;
-
-                    if (variableSize <= 0)
-                    { throw new CompilerException($"Can't load variable \"{variable.Name}\" because it's size is {variableSize} (bruh)", statement, CurrentFile); }
-
-                    int loadTarget = Stack.PushVirtual(variableSize);
-
                     for (int offset = 0; offset < variableSize; offset++)
                     {
                         int offsettedSource = variable.Address + offset;

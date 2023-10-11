@@ -72,7 +72,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory, Brainfuck.ProgramUtils.CompileOptions.PrintCompiled);
+                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
                     break;
                 case ArgumentParser.RunType.IL:
                     {

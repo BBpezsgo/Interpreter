@@ -65,16 +65,19 @@ namespace LanguageCore.Runtime
                 case Opcode.BITSHIFT_LEFT: BITSHIFT_LEFT(); break;
                 case Opcode.BITSHIFT_RIGHT: BITSHIFT_RIGHT(); break;
 
+                case Opcode.BITS_AND: BITS_AND(); break;
+                case Opcode.BITS_OR: BITS_OR(); break;
+                case Opcode.BITS_XOR: BITS_XOR(); break;
+
                 case Opcode.LOGIC_LT: LOGIC_LT(); break;
                 case Opcode.LOGIC_MT: LOGIC_MT(); break;
-                case Opcode.LOGIC_AND: LOGIC_AND(); break;
-                case Opcode.LOGIC_OR: LOGIC_OR(); break;
                 case Opcode.LOGIC_EQ: LOGIC_EQ(); break;
                 case Opcode.LOGIC_NEQ: LOGIC_NEQ(); break;
                 case Opcode.LOGIC_LTEQ: LOGIC_LTEQ(); break;
                 case Opcode.LOGIC_MTEQ: LOGIC_MTEQ(); break;
-                case Opcode.LOGIC_XOR: LOGIC_XOR(); break;
                 case Opcode.LOGIC_NOT: LOGIC_NOT(); break;
+                case Opcode.LOGIC_OR: LOGIC_OR(); break;
+                case Opcode.LOGIC_AND: LOGIC_AND(); break;
 
                 case Opcode.HEAP_GET: HEAP_GET(); break;
                 case Opcode.HEAP_SET: HEAP_SET(); break;
@@ -193,10 +196,10 @@ namespace LanguageCore.Runtime
 
             var condition = Memory.Stack.Pop();
 
-            if (condition.IsFalsy())
-            { Step(relativeAddress); }
-            else
+            if (condition.Boolean)
             { Step(); }
+            else
+            { Step(relativeAddress); }
         }
 
         void EXIT()
@@ -279,6 +282,26 @@ namespace LanguageCore.Runtime
             Step();
         }
 
+        void LOGIC_AND()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide.Boolean && rightSide.Boolean));
+
+            Step();
+        }
+
+        void LOGIC_OR()
+        {
+            var rightSide = Memory.Stack.Pop();
+            var leftSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(new DataItem(leftSide.Boolean || rightSide.Boolean));
+
+            Step();
+        }
+
         void LOGIC_EQ()
         {
             var rightSide = Memory.Stack.Pop();
@@ -299,7 +322,7 @@ namespace LanguageCore.Runtime
             Step();
         }
 
-        void LOGIC_OR()
+        void BITS_OR()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -309,7 +332,7 @@ namespace LanguageCore.Runtime
             Step();
         }
 
-        void LOGIC_XOR()
+        void BITS_XOR()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();
@@ -339,7 +362,7 @@ namespace LanguageCore.Runtime
             Step();
         }
 
-        void LOGIC_AND()
+        void BITS_AND()
         {
             var rightSide = Memory.Stack.Pop();
             var leftSide = Memory.Stack.Pop();

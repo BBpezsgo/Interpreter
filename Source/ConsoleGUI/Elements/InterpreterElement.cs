@@ -825,6 +825,8 @@ namespace ConsoleGUI
                     instruction.opcode == Opcode.MATH_MOD ||
                     instruction.opcode == Opcode.MATH_MULT ||
                     instruction.opcode == Opcode.MATH_SUB ||
+                    instruction.opcode == Opcode.BITS_AND ||
+                    instruction.opcode == Opcode.BITS_OR ||
                     instruction.opcode == Opcode.LOGIC_AND ||
                     instruction.opcode == Opcode.LOGIC_OR)
                 {

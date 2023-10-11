@@ -114,7 +114,7 @@ namespace Communicating
             switch (CommunicationType)
             {
                 case Type.Standard:
-                    ProgrammingLanguage.Output.File.WriteLine(v);
+                    // LanguageCore.ProgrammingLanguage.Output.File.WriteLine(v);
                     break;
                 case Type.Pipe:
                     Console.WriteLine(v);

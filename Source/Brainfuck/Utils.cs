@@ -4,7 +4,7 @@ using System.Text;
 
 #nullable enable
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
     internal static class CharCode
     {
@@ -75,30 +75,6 @@ namespace ProgrammingLanguage.Brainfuck
                 }
             }
             return builder.ToString();
-        }
-
-        internal static int GCF(int a, int b)
-        {
-            while (b != 0)
-            {
-                int temp = b;
-                b = a % b;
-                a = temp;
-            }
-            return a;
-        }
-        internal static int LCM(int a, int b)
-        {
-            return (a / GCF(a, b)) * b;
-        }
-
-        internal static (int, int, int) Split(int v)
-        {
-            double _v = (double)v;
-            double a = Math.Sqrt(_v);
-            int resultA = (int)Math.Floor(a);
-            int resultB = (int)Math.Ceiling(a);
-            return (resultA, resultB, v - (resultA * resultB));
         }
     }
 }

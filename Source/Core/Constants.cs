@@ -1,10 +1,10 @@
 ﻿using System.Collections.Generic;
-using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.Bytecode;
+using LanguageCore.BBCode.Compiler;
+using LanguageCore.Runtime;
 
-namespace ProgrammingLanguage
+namespace LanguageCore
 {
-    public static class Constants
+    public static partial class Constants
     {
         public static readonly string[] Keywords = new string[]
         {

@@ -11,26 +11,20 @@ addressB = Alloc(1);
 addressB = Alloc(1);
 addressB = Alloc(1);
 
-out addressA;
-out "\r\n";
+PrintLine(addressA);
 
-out addressB;
-out "\r\n";
+PrintLine(addressB);
 
 *addressA = 10;
 *addressB = 11;
 
-out (*addressA) as int;
-out "\r\n";
+PrintLine((*addressA) as int);
 
-out (*addressB) as int;
-out "\r\n";
+PrintLine((*addressB) as int);
 
 *addressA = 55;
 *addressB = 22;
 
-out (*addressA) as int;
-out "\r\n";
+PrintLine((*addressA) as int);
 
-out (*addressB) as int;
-out "\r\n";
+PrintLine((*addressB) as int);

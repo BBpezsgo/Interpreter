@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Text;
+using Win32;
 
 #nullable enable
 
-namespace ProgrammingLanguage.Brainfuck.Renderer
+namespace LanguageCore.Brainfuck.Renderer
 {
     internal class ConsoleRenderer : IDisposable
     {
         public static CharInfo NullCharacter => new()
         {
-            Char = new CharUnion() { UnicodeChar = ' ' },
-            Attributes = (short)ForegroundColor.Gray | (short)BackgroundColor.Black,
+            Char = ' ',
+            Background = ByteColor.Black,
+            Foreground = ByteColor.Silver,
         };
 
         readonly Microsoft.Win32.SafeHandles.SafeFileHandle? ConsoleHandleW;
@@ -31,7 +33,7 @@ namespace ProgrammingLanguage.Brainfuck.Renderer
             Kernel32.SetConsoleCP(65001);
             Console.OutputEncoding = Encoding.Unicode;
 
-            this.ConsoleHandle = Kernel32.GetStdHandle(Kernel32.STD_OUTPUT_HANDLE);
+            this.ConsoleHandle = Kernel32.GetStdHandle(StdHandle.STD_OUTPUT_HANDLE);
             this.ConsoleHandleW = null; // Kernel32.CreateFile("CONOUT$", 0x40000000, 2, IntPtr.Zero, FileMode.Open, 0, IntPtr.Zero);
 
             this.width = (short)width;
@@ -59,7 +61,7 @@ namespace ProgrammingLanguage.Brainfuck.Renderer
             set => this[(y * width) + x] = value;
         }
 
-        public void DrawText(int x, int y,  string text, ForegroundColor foregroundColor = ForegroundColor.White, BackgroundColor backgroundColor = BackgroundColor.Black)
+        public void DrawText(int x, int y, string text, byte foregroundColor = ByteColor.White, byte backgroundColor = ByteColor.Black)
         {
             if (x < 0 || y < 0) return;
             if (x >= width || y >= height) return;

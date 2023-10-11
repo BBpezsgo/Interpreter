@@ -1,4 +1,4 @@
-﻿namespace ProgrammingLanguage.Bytecode
+﻿namespace LanguageCore.Runtime
 {
     public enum Opcode : byte
     {

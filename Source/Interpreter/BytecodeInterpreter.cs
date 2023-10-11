@@ -1,11 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
-    using Core;
-    using Errors;
-
     public readonly struct CallStackFrame
     {
         public readonly string Function;
@@ -35,65 +32,59 @@ namespace ProgrammingLanguage.Bytecode
         internal int CodeSampleStart;
     }
 
-    public class BytecodeInterpreter
+    class UserInvoke
     {
-        class UserInvoke
+        internal readonly int InstructionOffset;
+        internal readonly DataItem[] Arguments;
+        internal readonly Action<DataItem> Callback;
+        internal bool NeedReturnValue;
+
+        internal bool IsInvoking;
+
+        internal UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
         {
-            internal readonly int InstructionOffset;
-            internal readonly DataItem[] Arguments;
-            internal readonly Action<DataItem> Callback;
-            internal bool NeedReturnValue;
+            this.InstructionOffset = instructionOffset;
+            this.Arguments = arguments;
+            this.Callback = callback;
+            this.NeedReturnValue = true;
 
-            internal bool IsInvoking;
-
-            internal UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
-            {
-                this.InstructionOffset = instructionOffset;
-                this.Arguments = arguments;
-                this.Callback = callback;
-                this.NeedReturnValue = true;
-
-                this.IsInvoking = false;
-            }
-
-            internal UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
-            {
-                this.InstructionOffset = instructionOffset;
-                this.Arguments = arguments;
-                this.Callback = (_) => callback?.Invoke();
-                this.NeedReturnValue = false;
-
-                this.IsInvoking = false;
-            }
+            this.IsInvoking = false;
         }
 
+        internal UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
+        {
+            this.InstructionOffset = instructionOffset;
+            this.Arguments = arguments;
+            this.Callback = (_) => callback?.Invoke();
+            this.NeedReturnValue = false;
+
+            this.IsInvoking = false;
+        }
+    }
+
+    public class BytecodeInterpreter : BytecodeProcessor
+    {
         readonly BytecodeInterpreterSettings Settings;
-        readonly BytecodeProcessor BytecodeProcessor;
 
         // User Invoke
         bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
         readonly Queue<UserInvoke> UserInvokes = new();
 
+        // Tick Sleeping
+        int SleepTickCounter;
+        Action SleepTickCallback;
+
+        // Time Sleeping
+        double SleepTimeCounter;
+        Action SleepTimeCallback;
+
         // Safety
         int LastInstructionPointer = -1;
         int EndlessSafe;
 
-        #region Public Properties
-
-        public bool IsDone => BytecodeProcessor.IsDone;
-        public int CodePointer => BytecodeProcessor.CodePointer;
-        public int BasePointer => BytecodeProcessor.BasePointer;
-        public IReadOnlyStack<DataItem> Stack => BytecodeProcessor.Memory.Stack;
-        public IReadOnlyHeap Heap => BytecodeProcessor.Memory.Heap;
-        public int[] CallStack => BytecodeProcessor.Memory.CallStack.ToArray();
-
-        #endregion
-
-        public BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings)
+        public BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
         {
             this.Settings = settings;
-
-            this.BytecodeProcessor = new BytecodeProcessor(code, settings.HeapSize, externalFunctions);
 
             this.EndlessSafe = 0;
             this.LastInstructionPointer = -1;
@@ -101,12 +92,30 @@ namespace ProgrammingLanguage.Bytecode
 
         #region Public Methods
 
+        public void SleepTicks(int ticks, Action callback)
+        {
+            SleepTickCounter = ticks;
+            SleepTickCallback = callback;
+
+            SleepTimeCounter = 0;
+            SleepTimeCallback = null;
+        }
+
+        public void SleepTime(double seconds, Action callback)
+        {
+            SleepTimeCounter = DateTime.UtcNow.TimeOfDay.TotalSeconds + seconds;
+            SleepTimeCallback = callback;
+
+            SleepTickCounter = 0;
+            SleepTickCallback = null;
+        }
+
         internal bool Jump(int instructionOffset)
         {
-            if (!BytecodeProcessor.IsDone) return false;
+            if (!IsDone) return false;
 
-            BytecodeProcessor.CodePointer = instructionOffset;
-            BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
+            CodePointer = instructionOffset;
+            BasePointer = Memory.Stack.Count;
             return true;
         }
 
@@ -119,31 +128,31 @@ namespace ProgrammingLanguage.Bytecode
 
         internal Context GetContext() => new()
         {
-            RawCallStack = this.BytecodeProcessor.Memory.CallStack.ToArray(),
+            RawCallStack = this.Memory.CallStack.ToArray(),
             ExecutedInstructionCount = this.EndlessSafe,
-            CodePointer = this.BytecodeProcessor.CodePointer,
-            Code = this.BytecodeProcessor.Memory.Code[Math.Max(this.BytecodeProcessor.CodePointer - 20, 0)..Math.Clamp(this.BytecodeProcessor.CodePointer + 20, 0, this.BytecodeProcessor.Memory.Code.Length - 1)],
-            Stack = this.BytecodeProcessor.Memory.Stack,
-            CodeSampleStart = Math.Max(this.BytecodeProcessor.CodePointer - 20, 0),
+            CodePointer = this.CodePointer,
+            Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
+            Stack = this.Memory.Stack,
+            CodeSampleStart = Math.Max(this.CodePointer - 20, 0),
         };
 
         #endregion
 
         void DoUserInvoke(UserInvoke userInvoke)
         {
-            BytecodeProcessor.CodePointer = userInvoke.InstructionOffset;
-            BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "return value"));
-            BytecodeProcessor.Memory.Stack.PushRange(userInvoke.Arguments, "arg");
+            CodePointer = userInvoke.InstructionOffset;
+            Memory.Stack.Push(new DataItem(0, "return value"));
+            Memory.Stack.PushRange(userInvoke.Arguments, "arg");
 
-            BytecodeProcessor.Memory.Stack.Push(new DataItem(0, "saved base pointer"));
-            BytecodeProcessor.Memory.Stack.Push(new DataItem(BytecodeProcessor.Memory.Code.Length, "saved code pointer"));
+            Memory.Stack.Push(new DataItem(0, "saved base pointer"));
+            Memory.Stack.Push(new DataItem(Memory.Code.Length, "saved code pointer"));
 
-            BytecodeProcessor.BasePointer = BytecodeProcessor.Memory.Stack.Count;
+            BasePointer = Memory.Stack.Count;
         }
 
         bool TryUserInvoke()
         {
-            if (!BytecodeProcessor.IsDone) return false;
+            if (!IsDone) return false;
             if (UserInvokes.Count == 0) return false;
             if (IsUserInvoking) return false;
 
@@ -157,27 +166,48 @@ namespace ProgrammingLanguage.Bytecode
         public bool Tick()
         {
             if (EndlessSafe > Settings.InstructionLimit)
+            { throw new RuntimeException("Instruction limit reached!", GetContext()); }
+
+            if (Memory.Stack.Count > Settings.StackMaxSize)
+            { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
+
+            if (SleepTickCounter > 0)
             {
-                BytecodeProcessor.CodePointer = BytecodeProcessor.Memory.Code.Length;
-                throw new RuntimeException("Instruction limit reached!", GetContext());
+                SleepTickCounter--;
+
+                if (SleepTickCounter <= 0)
+                {
+                    SleepTickCallback?.Invoke();
+                    SleepTickCallback = null;
+                }
+
+                return true;
             }
 
-            if (BytecodeProcessor.Memory.Stack.Count > Settings.StackMaxSize)
+            if (SleepTimeCounter != 0)
             {
-                throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext());
+                if (SleepTimeCounter < DateTime.UtcNow.TimeOfDay.TotalSeconds)
+                {
+                    SleepTimeCallback?.Invoke();
+                    SleepTimeCallback = null;
+
+                    SleepTimeCounter = 0;
+                }
+
+                return true;
             }
 
-            if (BytecodeProcessor.IsDone)
+            if (IsDone)
             {
                 OnStop();
                 return false;
             }
 
-            if (BytecodeProcessor.CurrentInstruction.opcode == Opcode.COMMENT)
+            if (CurrentInstruction.opcode == Opcode.COMMENT)
             {
                 int max = 10;
-                while (BytecodeProcessor.CurrentInstruction.opcode == Opcode.COMMENT && max-- > 0)
-                { BytecodeProcessor.Step(); }
+                while (CurrentInstruction.opcode == Opcode.COMMENT && max-- > 0)
+                { Step(); }
                 return true;
             }
 
@@ -185,7 +215,7 @@ namespace ProgrammingLanguage.Bytecode
 
             try
             {
-                BytecodeProcessor.Tick();
+                base.Process();
             }
             catch (UserException error)
             {
@@ -202,12 +232,12 @@ namespace ProgrammingLanguage.Bytecode
                 throw new RuntimeException(error.Message, error, GetContext());
             }
 
-            if (LastInstructionPointer == BytecodeProcessor.CodePointer)
+            if (LastInstructionPointer == CodePointer)
             {
                 throw new RuntimeException($"Execution stuck at instruction {LastInstructionPointer}", GetContext());
             }
 
-            LastInstructionPointer = BytecodeProcessor.CodePointer;
+            LastInstructionPointer = CodePointer;
 
             return true;
         }
@@ -220,15 +250,15 @@ namespace ProgrammingLanguage.Bytecode
 
                 for (int i = 0; i < userInvoke.Arguments.Length; i++)
                 {
-                    if (BytecodeProcessor.Memory.Stack.Count == 0)
+                    if (Memory.Stack.Count == 0)
                     { throw new InternalException($"Tried to pop user-invoked function's parameters but the stack is empty"); }
-                    BytecodeProcessor.Memory.Stack.Pop();
+                    Memory.Stack.Pop();
                 }
 
-                if (BytecodeProcessor.Memory.Stack.Count == 0)
+                if (Memory.Stack.Count == 0)
                 { throw new InternalException($"Tried to pop user-invoked function's return value but the stack is empty"); }
 
-                DataItem returnValue = userInvoke.NeedReturnValue ? BytecodeProcessor.Memory.Stack.Pop() : DataItem.Null;
+                DataItem returnValue = userInvoke.NeedReturnValue ? Memory.Stack.Pop() : DataItem.Null;
                 userInvoke.Callback?.Invoke(returnValue);
             }
 
@@ -242,9 +272,9 @@ namespace ProgrammingLanguage.Bytecode
         {
             AddressingMode.ABSOLUTE => offset,
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
-            AddressingMode.RELATIVE => BytecodeProcessor.Memory.Stack.Count + offset,
-            AddressingMode.POP => BytecodeProcessor.Memory.Stack.Count - 1,
-            AddressingMode.RUNTIME => BytecodeProcessor.Memory.Stack.Last.ValueInt,
+            AddressingMode.RELATIVE => Memory.Stack.Count + offset,
+            AddressingMode.POP => Memory.Stack.Count - 1,
+            AddressingMode.RUNTIME => Memory.Stack.Last.ValueInt,
             _ => offset,
         };
     }

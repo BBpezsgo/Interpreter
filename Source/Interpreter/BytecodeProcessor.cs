@@ -2,22 +2,19 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
-    using Core;
-    using Errors;
-
     public class BytecodeProcessor
     {
-        internal readonly Memory Memory;
+        public readonly Memory Memory;
 
-        internal Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        public Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
-        internal int CodePointer;
-        internal int BasePointer;
+        public int CodePointer;
+        public int BasePointer;
 
-        internal Instruction CurrentInstruction => Memory.Code[CodePointer];
-        internal bool IsDone => CodePointer >= Memory.Code.Length;
+        public Instruction CurrentInstruction => Memory.Code[CodePointer];
+        public bool IsDone => CodePointer >= Memory.Code.Length;
 
         public BytecodeProcessor(Instruction[] code, int heapSize, Dictionary<string, ExternalFunctionBase> externalFunctions)
         {
@@ -38,7 +35,7 @@ namespace ProgrammingLanguage.Bytecode
         /// <exception cref="UserException"></exception>
         /// <exception cref="InternalException"></exception>
         /// <exception cref="System.Exception"></exception>
-        public void Tick()
+        public void Process()
         {
             switch (CurrentInstruction.opcode)
             {
@@ -597,12 +594,12 @@ namespace ProgrammingLanguage.Bytecode
         #endregion
     }
 
-    internal class Memory
+    public class Memory
     {
-        internal DataStack Stack;
-        internal HEAP Heap;
-        internal Instruction[] Code;
-        internal Stack<int> CallStack;
+        public DataStack Stack;
+        public HEAP Heap;
+        public Instruction[] Code;
+        public Stack<int> CallStack;
 
         public Memory(int heapSize, Instruction[] code)
         {

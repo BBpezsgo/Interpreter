@@ -5,14 +5,14 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using ProgrammingLanguage.Brainfuck.Compiler;
-using ProgrammingLanguage.Brainfuck.Renderer;
-using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Core;
+using  LanguageCore.Brainfuck.Compiler;
+using  LanguageCore.Brainfuck.Renderer;
+using  LanguageCore.Runtime;
+using Win32;
 
 #nullable enable
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public readonly struct Value : IEquatable<Value>
@@ -139,7 +139,7 @@ namespace ProgrammingLanguage.Brainfuck
         internal bool OutOfCode => CodePointer >= Code.Length || CodePointer < 0;
 
         internal DebugInfo[]? DebugInfo = null;
-        internal BBCode.Token[]? OriginalCode = null;
+        internal Tokenizing.Token[]? OriginalCode = null;
         bool isPaused;
 
         internal bool IsPaused => isPaused;
@@ -285,14 +285,14 @@ namespace ProgrammingLanguage.Brainfuck
             int height = Console.WindowHeight;
 
             using ConsoleRenderer renderer = new(width, height);
-            using ConsoleListener input = new();
+            Win32.Utilities.ConsoleListener.Start();
 
             Queue<char> inputBuffer = new();
             string outputBuffer = "";
 
-            input.KeyEvent += (e) =>
+            Win32.Utilities.ConsoleListener.KeyEvent += (e) =>
             {
-                if (!e.IsDown)
+                if (e.IsDown != 0)
                 { inputBuffer.Enqueue(e.UnicodeChar); }
             };
 
@@ -358,6 +358,8 @@ namespace ProgrammingLanguage.Brainfuck
             }
 
             Draw();
+
+            Win32.Utilities.ConsoleListener.Stop();
         }
 
         void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
@@ -423,14 +425,14 @@ namespace ProgrammingLanguage.Brainfuck
                         {
                             if (currentX + offset >= width) return;
 
-                            var foregroundColor = ForegroundColor.White;
-                            var backgroundColor = BackgroundColor.Black;
+                            byte foregroundColor = ByteColor.White;
+                            byte backgroundColor = ByteColor.Black;
 
                             SinglePosition singlePosition = new(OriginalCode[i].Position.Start.Line, OriginalCode[i].Position.Start.Character + offset);
 
                             if (c.Position.Range.Contains(singlePosition))
                             {
-                                backgroundColor = BackgroundColor.Green;
+                                backgroundColor = ByteColor.BrightGreen;
                             }
 
                             renderer[currentX + offset, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
@@ -444,14 +446,14 @@ namespace ProgrammingLanguage.Brainfuck
         {
             for (int i = start; i <= end; i++)
             {
-                BackgroundColor bg = (i == CodePointer) ? BackgroundColor.Gray : BackgroundColor.Black;
-                ForegroundColor fg = Code[i] switch
+                byte bg = (i == CodePointer) ? ByteColor.Silver : ByteColor.Black;
+                byte fg = Code[i] switch
                 {
-                    '>' or '<' => ForegroundColor.Red,
-                    '+' or '-' => ForegroundColor.Blue,
-                    '[' or ']' => ForegroundColor.Green,
-                    '.' or ',' => ForegroundColor.Magenta,
-                    _ => ForegroundColor.Gray,
+                    '>' or '<' => ByteColor.BrightRed,
+                    '+' or '-' => ByteColor.BrightBlue,
+                    '[' or ']' => ByteColor.BrightGreen,
+                    '.' or ',' => ByteColor.BrightMagenta,
+                    _ => ByteColor.Silver,
                 };
                 renderer[x, y] = new CharInfo(Code[i], fg, bg);
 
@@ -483,7 +485,7 @@ namespace ProgrammingLanguage.Brainfuck
                 };
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
-                renderer.DrawText(x, y, textToPrint, ForegroundColor.Gray, BackgroundColor.Black);
+                renderer.DrawText(x, y, textToPrint, ByteColor.Silver);
                 x += textToPrint.Length;
 
                 if (x >= width)
@@ -504,11 +506,11 @@ namespace ProgrammingLanguage.Brainfuck
                 string textToPrint = Memory[m].V.ToString().PadRight(4, ' ');
 
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, textToPrint, ForegroundColor.Red, BackgroundColor.Black); }
+                { renderer.DrawText(x, y, textToPrint, ByteColor.BrightRed); }
                 else if (Memory[m].V == 0)
-                { renderer.DrawText(x, y, textToPrint, ForegroundColor.Gray, BackgroundColor.Black); }
+                { renderer.DrawText(x, y, textToPrint, ByteColor.Silver); }
                 else
-                { renderer.DrawText(x, y, textToPrint, ForegroundColor.White, BackgroundColor.Black); }
+                { renderer.DrawText(x, y, textToPrint, ByteColor.White); }
 
                 x += textToPrint.Length;
 
@@ -528,9 +530,9 @@ namespace ProgrammingLanguage.Brainfuck
             for (int m = start; m <= end; m++)
             {
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, "^   ", ForegroundColor.Red); }
+                { renderer.DrawText(x, y, "^   ", ByteColor.BrightRed); }
                 else
-                { renderer.DrawText(x, y, "    "); }
+                { renderer.DrawText(x, y, "    ", ByteColor.White); }
 
                 x += 4;
 
@@ -565,15 +567,15 @@ namespace ProgrammingLanguage.Brainfuck
                 }
                 else if (text[i] == '\t')
                 {
-                    renderer[_x, _y] = new CharInfo(' ', ForegroundColor.White, BackgroundColor.Black);
+                    renderer[_x, _y] = new CharInfo(' ', ByteColor.White, ByteColor.Black);
                 }
                 else if (text[i] < 32 || text[i] > 127)
                 {
-                    renderer[_x, _y] = new CharInfo(' ', ForegroundColor.White, BackgroundColor.Black);
+                    renderer[_x, _y] = new CharInfo(' ', ByteColor.White, ByteColor.Black);
                 }
                 else
                 {
-                    renderer[_x, _y] = new CharInfo(text[i], ForegroundColor.White, BackgroundColor.Black);
+                    renderer[_x, _y] = new CharInfo(text[i], ByteColor.White, ByteColor.Black);
                 }
 
                 _x++;
@@ -594,7 +596,7 @@ namespace ProgrammingLanguage.Brainfuck
         }
 
         [Serializable]
-        public class BrainfuckException : Exception
+        public class BrainfuckException : System.Exception
         {
             public BrainfuckException() { }
             public BrainfuckException(string message) : base(message) { }

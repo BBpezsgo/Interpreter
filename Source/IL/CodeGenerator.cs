@@ -1,24 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Text;
+using System.Threading;
 
-namespace ProgrammingLanguage.IL.Compiler
+namespace LanguageCore.IL.Compiler
 {
-    using System.IO;
-    using System.Reflection;
-    using System.Reflection.Emit;
-    using System.Runtime.Serialization.Formatters.Binary;
-    using System.Text;
-    using System.Threading;
-    using BBCode;
     using BBCode.Compiler;
-    using BBCode.Parser;
-    using BBCode.Parser.Statement;
-    using Errors;
-    using ProgrammingLanguage.Core;
-    using Literal = BBCode.Parser.Statement.Literal;
-    using Pointer = BBCode.Parser.Statement.Pointer;
+    using LanguageCore.Parser;
+    using LanguageCore.Parser.Statement;
+    using LanguageCore.Tokenizing;
+    using Literal = Parser.Statement.Literal;
+    using Pointer = Parser.Statement.Pointer;
 
     public class CodeGenerator : CodeGeneratorBase
     {
@@ -715,7 +713,7 @@ namespace ProgrammingLanguage.IL.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            Action<string, Output.LogType> printCallback = null)
+            Action<string, LogType> printCallback = null)
         {
             string name = "bruh";
 
@@ -762,7 +760,7 @@ namespace ProgrammingLanguage.IL.Compiler
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
-            Action<string, Output.LogType> printCallback = null)
+            Action<string, LogType> printCallback = null)
         {
             CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(

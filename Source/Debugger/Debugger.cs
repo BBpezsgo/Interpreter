@@ -1,11 +1,9 @@
 ﻿using System;
 using System.IO;
 using Communicating;
-
-using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Core;
-using ProgrammingLanguage.Errors;
+using LanguageCore;
+using LanguageCore.BBCode.Compiler;
+using LanguageCore.Runtime;
 
 namespace TheProgram
 {
@@ -19,7 +17,7 @@ namespace TheProgram
         {
             get
             {
-                if (Interpreter.Details.CompilerResult.DebugInfo.TryGetSourceLocation(Interpreter.Details.Interpreter.CodePointer, out SourceCodeLocation sourceLocation))
+                if (Interpreter.CompilerResult.DebugInfo.TryGetSourceLocation(Interpreter.BytecodeInterpreter.CodePointer, out SourceCodeLocation sourceLocation))
                 { return sourceLocation.SourcePosition.Start.Line; }
 
                 return -1;
@@ -45,17 +43,28 @@ namespace TheProgram
             Interpreter?.Destroy();
             Interpreter = new InterpreterDebuggabble();
 
-            Interpreter.OnOutput += (sender, message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender.Details)));
+            Interpreter.OnOutput += (sender, message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender)));
             Interpreter.OnStdOut += (_, message) => Ipc.Send("stdout", message);
             Interpreter.OnStdError += (_, message) => Ipc.Send("stderr", message);
             Interpreter.OnNeedInput += _ => NeedStdin = true;
 
             if (!Interpreter.Initialize()) return;
 
-            Instruction[] compiledCode = Interpreter.CompileCode(settings.File, settings.compilerSettings, settings.parserSettings, settings.HandleErrors);
-            if (compiledCode == null) return;
+            CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
+                settings.File,
+                Interpreter.GenerateExternalFunctions(),
+                LanguageCore.Tokenizing.TokenizerSettings.Default,
+                settings.parserSettings,
+                settings.compilerSettings,
+                settings.HandleErrors,
+                (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))),
+                settings.BasePath
+                );
 
-            Interpreter.ExecuteProgram(compiledCode, settings.bytecodeInterpreterSettings);
+            if (!compiledCode.HasValue) return;
+
+            Interpreter.CompilerResult = compiledCode.Value;
+            Interpreter.ExecuteProgram(compiledCode.Value.Code, settings.bytecodeInterpreterSettings);
         }
 
         static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)
@@ -103,45 +112,45 @@ namespace TheProgram
                 case "compiler/code":
                     {
                         Ipc.Reply("compiler/code",
-                            (Interpreter.Details.CompilerResult.Code == null) ?
+                            (Interpreter.CompilerResult.Code == null) ?
                                 Array.Empty<Data_Instruction>() :
-                                Interpreter.Details.CompilerResult.Code.ToData(v => new Data_Instruction(v)),
+                                Interpreter.CompilerResult.Code.ToData(v => new Data_Instruction(v)),
                             message);
                     }
                     break;
 
                 case "interpreter/details":
                     {
-                        if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("interpreter/details", new Data_BytecodeInterpreterDetails(Interpreter.Details.Interpreter), message);
+                        if (Interpreter.BytecodeInterpreter == null) return;
+                        Ipc.Reply("interpreter/details", new Data_BytecodeInterpreterDetails(Interpreter.BytecodeInterpreter), message);
                     }
                     break;
                 case "interpreter/registers":
                     {
-                        if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("interpreter/registers", new BytecodeProcessorRegisters(Interpreter.Details.Interpreter), message);
+                        if (Interpreter.BytecodeInterpreter == null) return;
+                        Ipc.Reply("interpreter/registers", new BytecodeProcessorRegisters(Interpreter.BytecodeInterpreter), message);
                     }
                     break;
                 case "interpreter/stack":
                     {
-                        if (Interpreter.Details.Interpreter == null) return;
-                        Ipc.Reply("interpreter/stack", new Stack_(Interpreter.Details.Interpreter), message);
+                        if (Interpreter.BytecodeInterpreter == null) return;
+                        Ipc.Reply("interpreter/stack", new Stack_(Interpreter.BytecodeInterpreter), message);
                     }
                     break;
                 case "interpreter/state":
                     {
-                        Ipc.Reply("interpreter/state", Interpreter.Details.State.ToString(), message);
+                        Ipc.Reply("interpreter/state", Interpreter.State.ToString(), message);
                     }
                     break;
                 case "interpreter/callstack":
                     {
-                        Ipc.Reply("interpreter/callstack", Interpreter.Details.Interpreter.CallStack, message);
+                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.Memory.CallStack.ToArray(), message);
                     }
                     break;
 
                 case "eval":
                     {
-                        if (Interpreter.Details.Interpreter == null) return;
+                        if (Interpreter.BytecodeInterpreter == null) return;
                     }
                     break;
                 case "stdin":
@@ -193,7 +202,7 @@ namespace TheProgram
 
         internal Stack_(BytecodeInterpreter v)
         {
-            Stack = v.Stack.ToArray().ToData(v => new Data_StackItem(v));
+            Stack = v.Memory.Stack.ToArray().ToData(v => new Data_StackItem(v));
         }
     }
 
@@ -203,7 +212,7 @@ namespace TheProgram
 
         internal Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
         {
-            Heap = v.Heap.ToArray().ToData(v => new Data_StackItem(v));
+            Heap = v.Memory.Heap.ToArray().ToData(v => new Data_StackItem(v));
         }
 
         public static Data_BytecodeInterpreterDetails Make(BytecodeInterpreter v) => new(v);
@@ -287,7 +296,7 @@ namespace TheProgram
         public string Type { get; set; }
         public Data_Context Context { get; set; }
 
-        public Data_Log(ProgrammingLanguage.Output.LogType type, string message, Data_Context context)
+        public Data_Log(LogType type, string message, Data_Context context)
         {
             Type = type.ToString();
             Message = message;
@@ -295,25 +304,25 @@ namespace TheProgram
         }
     }
 
-    public class Data_Context : Data_Serializable<Interpreter.InterpreterDetails>
+    public class Data_Context : Data_Serializable<Interpreter>
     {
         public int CodePointer { get; set; } = -1;
         public int[] CallStack { get; set; } = Array.Empty<int>();
 
-        public Data_Context(Interpreter.InterpreterDetails v) : base(v)
+        public Data_Context(Interpreter v) : base(v)
         {
             try
             {
                 if (v == null) return;
-                if (v.Interpreter == null) return;
+                if (v.BytecodeInterpreter == null) return;
             }
             catch (NullReferenceException)
             {
                 return;
             }
 
-            CodePointer = v.Interpreter.CodePointer;
-            CallStack = v.Interpreter.CallStack;
+            CodePointer = v.BytecodeInterpreter.CodePointer;
+            CallStack = v.BytecodeInterpreter.Memory.CallStack.ToArray();
         }
     }
 }

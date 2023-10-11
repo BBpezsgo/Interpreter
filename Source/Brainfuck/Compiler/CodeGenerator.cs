@@ -5,17 +5,15 @@ using System.Linq;
 
 #nullable enable
 
-namespace ProgrammingLanguage.Brainfuck.Compiler
+namespace LanguageCore.Brainfuck.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
-    using BBCode;
     using BBCode.Compiler;
-    using BBCode.Parser;
-    using BBCode.Parser.Statement;
-    using Bytecode;
-    using Core;
-    using Errors;
-    using Literal = BBCode.Parser.Statement.Literal;
+    using LanguageCore.Parser;
+    using LanguageCore.Parser.Statement;
+    using LanguageCore.Runtime;
+    using LanguageCore.Tokenizing;
+    using Literal = LanguageCore.Parser.Statement.Literal;
 
     readonly struct CleanupItem
     {
@@ -66,6 +64,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         readonly Stack<int> ReturnTagStack;
         /// <summary> Contains the "break tag" address </summary>
         readonly Stack<int> BreakTagStack;
+        readonly Stack<bool> InMacro;
 
         int Optimizations;
 
@@ -93,6 +92,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             this.ReturnTagStack = new Stack<int>();
             this.BreakCount = new Stack<int>();
             this.BreakTagStack = new Stack<int>();
+            this.InMacro = new Stack<bool>();
             this.DebugInfo = new List<DebugInfo>();
         }
 
@@ -356,7 +356,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
             else
             {
-                type = new CompiledType(variableDeclaration.Type, FindType);
+                type = new CompiledType(variableDeclaration.Type, FindType, TryCompute);
             }
 
             return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, type, initialValue);
@@ -650,6 +650,23 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             if (!Variables.TryFind(arrayIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
+            if (variable.Type.IsStackArray)
+            {
+                size = variable.Type.StackArrayOf.SizeOnStack;
+                address = variable.Address;
+
+                if (size != 1)
+                { throw new NotSupportedException($"Only elements of size 1 are supported by brainfuck", index, CurrentFile); }
+
+                if (TryCompute(index.Expression, RuntimeType.INT, out DataItem indexValue))
+                {
+                    address = variable.Address + (indexValue.ValueInt * 2 * variable.Type.StackArrayOf.SizeOnStack);
+                    return true;
+                }
+
+                return false;
+            }
+
             if (!variable.Type.IsClass || !variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
             { throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile); }
 
@@ -904,7 +921,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
                 {
                     if (variable.Type != constantValue.Type)
-                    { throw new CompilerException($"Cannot set {constantValue.GetTypeText()} to variable of type {variable.Type}", value, CurrentFile); }
+                    { throw new CompilerException($"Cannot set {constantValue.Type} to variable of type {variable.Type}", value, CurrentFile); }
 
                     Code.SetValue(variable.Address, constantValue);
 
@@ -1028,7 +1045,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         void CompileSetter(IndexCall statement, StatementWithValue value)
         {
             if (statement.PrevStatement is not Identifier _variableIdentifier)
-            { throw new CompilerException($"This must be an identifier", statement.PrevStatement, CurrentFile); }
+            { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
             if (!Variables.TryFind(_variableIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
@@ -1620,13 +1637,13 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                     {
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+
+                        if (InMacro.Last)
+                        { throw new NotImplementedException(); }
 
                         if (statement.Parameters.Length == 1)
                         {
-                            // if (GetValueSize(statement.Parameters[0]) != 1)
-                            // { throw new CompilerException($"Return value can be only 1 byte", statement.Parameters[0], CurrentFile); }
-
                             if (!Variables.TryFind("@return", out Variable returnVariable))
                             { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
@@ -1652,10 +1669,10 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         if (BreakTagStack.Count <= 0)
-                        { throw new CompilerException($"Looks like this \"break\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
+                        { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
 
                         Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
@@ -1669,350 +1686,31 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         break;
                     }
 
-                case "var":
-                    {
-                        if (statement.Parameters[0] is Identifier variableIdentifier && statement.Parameters.Length > 1)
-                        {
-                            CompileSetter(variableIdentifier, statement.Parameters[1]);
-                        }
-                        return;
-                    }
-                case "const":
-                    return;
-
                 case "outraw":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"outraw\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        foreach (var value in statement.Parameters)
-                        {
-                            if (TryCompute(value, null, out DataItem constantValue))
-                            {
-                                if (constantValue.Type == RuntimeType.BYTE)
-                                {
-                                    using (Code.Block($"Print value {constantValue.ValueByte}"))
-                                    {
-                                        Code.SetPointer(Stack.NextAddress);
-                                        Code.ClearCurrent();
-                                        Code.AddValue(constantValue.ValueByte);
+                        foreach (StatementWithValue? value in statement.Parameters)
+                        { CompileRawPrinter(value); }
 
-                                        Code += ".";
-
-                                        Code.ClearCurrent();
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-
-                                if (constantValue.Type == RuntimeType.INT)
-                                {
-                                    using (Code.Block($"Print value {constantValue.ValueInt}"))
-                                    {
-                                        Code.SetPointer(Stack.NextAddress);
-                                        Code.ClearCurrent();
-                                        Code.AddValue(constantValue.ValueInt);
-
-                                        Code += ".";
-
-                                        Code.ClearCurrent();
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-
-                                if (constantValue.Type == RuntimeType.CHAR)
-                                {
-                                    using (Code.Block($"Print value '{constantValue.ValueChar}'"))
-                                    {
-                                        Code.SetPointer(Stack.NextAddress);
-                                        Code.ClearCurrent();
-                                        Code.AddValue(constantValue.ValueChar);
-
-                                        Code += ".";
-
-                                        Code.ClearCurrent();
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-
-                                /*
-                                if (constantValue.Type == ValueType.String)
-                                {
-                                    using (Code.Block($"Print value \"{(string)constantValue}\""))
-                                    {
-                                        Code.ClearValue(Stack.NextAddress);
-
-                                        string valueToPrint = (string)constantValue;
-                                        byte prevValue = 0;
-                                        for (int i = 0; i < valueToPrint.Length; i++)
-                                        {
-                                            Code.SetPointer(Stack.NextAddress);
-                                            byte charToPrint = CharCode.GetByte(valueToPrint[i]);
-
-                                            while (prevValue > charToPrint)
-                                            {
-                                                Code += "-";
-                                                prevValue--;
-                                            }
-
-                                            while (prevValue < charToPrint)
-                                            {
-                                                Code += "+";
-                                                prevValue++;
-                                            }
-
-                                            prevValue = charToPrint;
-
-                                            Code += ".";
-                                        }
-
-                                        Code.ClearCurrent();
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-                                */
-
-                                throw new CompilerException($"Value failed to compile", value, CurrentFile);
-                            }
-
-                            if (value is Identifier identifier && Variables.TryFind(identifier.Content, out Variable variable))
-                            {
-                                if (variable.IsDiscarded)
-                                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", identifier, CurrentFile); }
-
-                                using (Code.Block($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
-                                {
-                                    int size = variable.Size;
-                                    for (int offset = 0; offset < size; offset++)
-                                    {
-                                        int offsettedAddress = variable.Address + offset;
-                                        Code.SetPointer(offsettedAddress);
-                                        Code += ".";
-                                    }
-                                    Code.SetPointer(0);
-                                }
-                                continue;
-                            }
-
-                            using (Code.Block($"Print {value}"))
-                            {
-                                using (Code.Block($"Compute value"))
-                                {
-                                    Compile(value);
-                                }
-
-                                using (Code.Block($"Print computed value"))
-                                {
-                                    Stack.Pop(address =>
-                                    {
-                                        Code.SetPointer(address);
-                                        Code += ".";
-                                        Code.ClearCurrent();
-                                    });
-                                    Code.SetPointer(0);
-                                }
-                            }
-                        }
                         break;
                     }
                 case "out":
                     {
                         if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"out\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         foreach (StatementWithValue valueToPrint in statement.Parameters)
-                        {
-                            if (TryCompute(valueToPrint, null, out DataItem constantToPrint))
-                            {
-                                if (constantToPrint.Type == RuntimeType.CHAR)
-                                {
-                                    int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print character '{constantToPrint.ValueChar}' (on address {tempAddress})"))
-                                    {
-                                        Code.SetValue(tempAddress, constantToPrint.ValueChar);
-                                        Code.SetPointer(tempAddress);
-                                        Code += ".";
-                                        Code.ClearValue(tempAddress);
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
+                        { CompilePrinter(valueToPrint); }
 
-                                if (constantToPrint.Type == RuntimeType.BYTE)
-                                {
-                                    int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print number {constantToPrint.ValueByte} as text (on address {tempAddress})"))
-                                    {
-                                        Code.SetValue(tempAddress, constantToPrint.ValueByte);
-                                        Code.SetPointer(tempAddress);
-
-                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                        { Code.Code += Snippets.OUT_AS_STRING; }
-                                        Code.ClearValue(tempAddress);
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-
-                                if (constantToPrint.Type == RuntimeType.INT)
-                                {
-                                    int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print number {constantToPrint.ValueInt} as text (on address {tempAddress})"))
-                                    {
-                                        Code.SetValue(tempAddress, constantToPrint.ValueInt);
-                                        Code.SetPointer(tempAddress);
-
-                                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                        { Code.Code += Snippets.OUT_AS_STRING; }
-                                        Code.ClearValue(tempAddress);
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-
-                                /*
-                                if (constantToPrint.Type == ValueType.String)
-                                {
-                                    string v = constantToPrint;
-                                    int tempAddress = Stack.NextAddress;
-                                    using (Code.Block($"Print string \"{v}\" (on address {tempAddress})"))
-                                    {
-                                        Code.ClearValue(tempAddress);
-
-                                        byte prevValue = 0;
-                                        for (int i = 0; i < v.Length; i++)
-                                        {
-                                            byte charToPrint = CharCode.GetByte(v[i]);
-
-                                            while (prevValue > charToPrint)
-                                            {
-                                                Code += "-";
-                                                prevValue--;
-                                            }
-
-                                            while (prevValue < charToPrint)
-                                            {
-                                                Code += "+";
-                                                prevValue++;
-                                            }
-
-                                            prevValue = charToPrint;
-
-                                            Code += ".";
-                                        }
-
-                                        Code.ClearValue(tempAddress);
-                                        Code.SetPointer(0);
-                                    }
-                                    continue;
-                                }
-                                */
-
-                                throw new System.Exception();
-                            }
-
-                            var valueType = FindStatementType(valueToPrint);
-
-                            if (valueToPrint is Literal literal && valueType == FindReplacedType("string", valueToPrint))
-                            {
-                                string valueToPrint2 = literal.Value;
-                                using (Code.Block($"Print string value \"{valueToPrint2}\""))
-                                {
-                                    int address = Stack.NextAddress;
-
-                                    Code.ClearValue(address);
-
-                                    byte prevValue = 0;
-                                    for (int i = 0; i < valueToPrint2.Length; i++)
-                                    {
-                                        Code.SetPointer(address);
-                                        byte charToPrint = CharCode.GetByte(valueToPrint2[i]);
-
-                                        while (prevValue > charToPrint)
-                                        {
-                                            Code += "-";
-                                            prevValue--;
-                                        }
-
-                                        while (prevValue < charToPrint)
-                                        {
-                                            Code += "+";
-                                            prevValue++;
-                                        }
-
-                                        prevValue = charToPrint;
-
-                                        Code += ".";
-                                    }
-
-                                    Code.ClearValue(address);
-                                    Code.SetPointer(0);
-                                }
-                            }
-                            else
-                            {
-                                if (valueType.SizeOnStack != 1)
-                                { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of size 1 (not {valueType.SizeOnStack})", valueToPrint, CurrentFile); }
-
-                                if (!valueType.IsBuiltin)
-                                { throw new CompilerException($"The \"{statement.Identifier.Content.ToLower()}\" instruction only accepts value of a builtin type (not {valueType})", valueToPrint, CurrentFile); }
-
-                                using (Code.Block($"Print value {valueToPrint} as text"))
-                                {
-                                    int address = Stack.NextAddress;
-
-                                    using (Code.Block($"Compute value"))
-                                    {
-                                        Compile(valueToPrint);
-                                    }
-
-                                    Code.CommentLine($"Computed value is on {address}");
-
-                                    Code.SetPointer(address);
-
-                                    switch (valueType.BuiltinType)
-                                    {
-                                        case Type.BYTE:
-                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                            { Code.Code += Snippets.OUT_AS_STRING; }
-                                            break;
-                                        case Type.INT:
-                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                            { Code.Code += Snippets.OUT_AS_STRING; }
-                                            break;
-                                        case Type.FLOAT:
-                                            using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                                            { Code.Code += Snippets.OUT_AS_STRING; }
-                                            break;
-                                        case Type.CHAR:
-                                            Code.Code += ".";
-                                            break;
-                                        case Type.NONE:
-                                        case Type.VOID:
-                                        case Type.UNKNOWN:
-                                        default:
-                                            throw new CompilerException($"Invalid type {valueType.BuiltinType}");
-                                    }
-
-                                    using (Code.Block($"Clear address {address}"))
-                                    { Code.ClearValue(address); }
-
-                                    Stack.PopVirtual();
-
-                                    Code.SetPointer(0);
-                                }
-                            }
-                        }
                         break;
                     }
 
                 case "delete":
                     {
                         if (statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"delete\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         var deletable = statement.Parameters[0];
                         var deletableType = FindStatementType(deletable);
@@ -2088,7 +1786,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
                         {
                             if (variable.Type != constantValue.Type)
-                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
+                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
                             switch (constantValue.Type)
                             {
@@ -2146,7 +1844,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                         if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
                         {
                             if (variable.Type != constantValue.Type)
-                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.GetTypeText()})", statement.Right, CurrentFile); }
+                            { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
 
                             switch (constantValue.Type)
                             {
@@ -2293,7 +1991,27 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             }
             */
 
-            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            if (TryGetMacro(functionCall, out MacroDefinition? macro))
+            {
+                string prevFile = CurrentFile;
+                CurrentFile = macro.FilePath;
+
+                InMacro.Push(true);
+
+                Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
+
+                if (inlinedMacro is Block inlinedMacroBlock)
+                { Compile(inlinedMacroBlock); }
+                else
+                { Compile(inlinedMacro); }
+
+                InMacro.Pop();
+
+                CurrentFile = prevFile;
+                return;
+            }
+
+            if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
@@ -3048,6 +2766,269 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         }
         #endregion
 
+        void CompilePrinter(StatementWithValue value)
+        {
+            if (TryCompute(value, null, out DataItem constantToPrint))
+            {
+                CompilePrinter(constantToPrint);
+                return;
+            }
+
+            CompiledType valueType = FindStatementType(value);
+            bool isString = valueType.IsReplacedType("string");
+
+            if (value is Literal literal && isString)
+            {
+                CompilePrinter(literal.Value);
+                return;
+            }
+
+            CompileValuePrinter(value, valueType);
+        }
+        void CompilePrinter(DataItem value)
+        {
+            if (value.Type == RuntimeType.CHAR)
+            {
+                int tempAddress = Stack.NextAddress;
+                using (Code.Block($"Print character '{value.ValueChar}' (on address {tempAddress})"))
+                {
+                    Code.SetValue(tempAddress, value.ValueChar);
+                    Code.SetPointer(tempAddress);
+                    Code += ".";
+                    Code.ClearValue(tempAddress);
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            if (value.Type == RuntimeType.BYTE)
+            {
+                int tempAddress = Stack.NextAddress;
+                using (Code.Block($"Print number {value.ValueByte} as text (on address {tempAddress})"))
+                {
+                    Code.SetValue(tempAddress, value.ValueByte);
+                    Code.SetPointer(tempAddress);
+
+                    using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                    { Code.Code += Snippets.OUT_AS_STRING; }
+                    Code.ClearValue(tempAddress);
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            if (value.Type == RuntimeType.INT)
+            {
+                int tempAddress = Stack.NextAddress;
+                using (Code.Block($"Print number {value.ValueInt} as text (on address {tempAddress})"))
+                {
+                    Code.SetValue(tempAddress, value.ValueInt);
+                    Code.SetPointer(tempAddress);
+
+                    using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                    { Code.Code += Snippets.OUT_AS_STRING; }
+                    Code.ClearValue(tempAddress);
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            throw new NotImplementedException($"Unimplemented constant value type \"{value.Type}\"");
+        }
+        void CompilePrinter(string value)
+        {
+            using (Code.Block($"Print string value \"{value}\""))
+            {
+                int address = Stack.NextAddress;
+
+                Code.ClearValue(address);
+
+                byte prevValue = 0;
+                for (int i = 0; i < value.Length; i++)
+                {
+                    Code.SetPointer(address);
+                    byte charToPrint = CharCode.GetByte(value[i]);
+
+                    while (prevValue > charToPrint)
+                    {
+                        Code += "-";
+                        prevValue--;
+                    }
+
+                    while (prevValue < charToPrint)
+                    {
+                        Code += "+";
+                        prevValue++;
+                    }
+
+                    prevValue = charToPrint;
+
+                    Code += ".";
+                }
+
+                Code.ClearValue(address);
+                Code.SetPointer(0);
+            }
+        }
+        void CompileValuePrinter(StatementWithValue value)
+            => CompileValuePrinter(value, FindStatementType(value));
+        void CompileValuePrinter(StatementWithValue value, CompiledType valueType)
+        {
+            if (valueType.SizeOnStack != 1)
+            { throw new NotSupportedException($"Only value of size 1 (not {valueType.SizeOnStack}) supported by the output printer in brainfuck", value, CurrentFile); }
+
+            if (!valueType.IsBuiltin)
+            { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value, CurrentFile); }
+
+            using (Code.Block($"Print value {value} as text"))
+            {
+                int address = Stack.NextAddress;
+
+                using (Code.Block($"Compute value"))
+                { Compile(value); }
+
+                Code.CommentLine($"Computed value is on {address}");
+
+                Code.SetPointer(address);
+
+                switch (valueType.BuiltinType)
+                {
+                    case Type.BYTE:
+                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        break;
+                    case Type.INT:
+                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        break;
+                    case Type.FLOAT:
+                        using (Code.Block($"SNIPPET OUT_AS_STRING"))
+                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        break;
+                    case Type.CHAR:
+                        Code.Code += ".";
+                        break;
+                    case Type.NONE:
+                    case Type.VOID:
+                    case Type.UNKNOWN:
+                    default:
+                        throw new CompilerException($"Invalid type {valueType.BuiltinType}");
+                }
+
+                using (Code.Block($"Clear address {address}"))
+                { Code.ClearValue(address); }
+
+                Stack.PopVirtual();
+
+                Code.SetPointer(0);
+            }
+        }
+
+        void CompileRawPrinter(StatementWithValue value)
+        {
+            if (TryCompute(value, null, out DataItem constantValue))
+            {
+                CompileRawPrinter(constantValue);
+                return;
+            }
+
+            if (value is Identifier identifier && Variables.TryFind(identifier.Content, out Variable variable))
+            {
+                CompileRawPrinter(variable, identifier);
+                return;
+            }
+
+            CompileRawValuePrinter(value);
+        }
+        void CompileRawPrinter(DataItem value)
+        {
+            if (value.Type == RuntimeType.BYTE)
+            {
+                using (Code.Block($"Print value {value.ValueByte}"))
+                {
+                    Code.SetPointer(Stack.NextAddress);
+                    Code.ClearCurrent();
+                    Code.AddValue(value.ValueByte);
+
+                    Code += ".";
+
+                    Code.ClearCurrent();
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            if (value.Type == RuntimeType.INT)
+            {
+                using (Code.Block($"Print value {value.ValueInt}"))
+                {
+                    Code.SetPointer(Stack.NextAddress);
+                    Code.ClearCurrent();
+                    Code.AddValue(value.ValueInt);
+
+                    Code += ".";
+
+                    Code.ClearCurrent();
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            if (value.Type == RuntimeType.CHAR)
+            {
+                using (Code.Block($"Print value '{value.ValueChar}'"))
+                {
+                    Code.SetPointer(Stack.NextAddress);
+                    Code.ClearCurrent();
+                    Code.AddValue(value.ValueChar);
+
+                    Code += ".";
+
+                    Code.ClearCurrent();
+                    Code.SetPointer(0);
+                }
+                return;
+            }
+
+            throw new NotImplementedException($"Unimplemented constant value type \"{value.Type}\"");
+        }
+        void CompileRawPrinter(Variable variable, IThingWithPosition symbolPosition)
+        {
+            if (variable.IsDiscarded)
+            { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", symbolPosition, CurrentFile); }
+
+            using (Code.Block($"Print variable (\"{variable.Name}\") (from {variable.Address}) value"))
+            {
+                int size = variable.Size;
+                for (int offset = 0; offset < size; offset++)
+                {
+                    int offsettedAddress = variable.Address + offset;
+                    Code.SetPointer(offsettedAddress);
+                    Code += ".";
+                }
+                Code.SetPointer(0);
+            }
+        }
+        void CompileRawValuePrinter(StatementWithValue value)
+        {
+            using (Code.Block($"Print {value} as raw"))
+            {
+                using (Code.Block($"Compute value"))
+                { Compile(value); }
+
+                using (Code.Block($"Print computed value"))
+                {
+                    Stack.Pop(address =>
+                    {
+                        Code.SetPointer(address);
+                        Code += ".";
+                        Code.ClearCurrent();
+                    });
+                    Code.SetPointer(0);
+                }
+            }
+        }
+
         /// <param name="callerPosition">
         /// Used for exceptions
         /// </param>
@@ -3055,13 +3036,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         {
             if (function.CompiledAttributes.HasAttribute("StandardOutput"))
             {
-                Compile(new KeywordCall(
-                    new Token(TokenType.IDENTIFIER, "out", true)
-                    {
-                        AbsolutePosition = callerPosition.GetPosition().AbsolutePosition,
-                        Position = callerPosition.GetPosition().Range,
-                    },
-                    parameters));
+                foreach (StatementWithValue parameter in parameters)
+                { CompilePrinter(parameter); }
                 return;
             }
 
@@ -3088,7 +3064,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Stack<Variable> compiledParameters = new();
             List<ConstantVariable> constantParameters = new();
 
-            this.CurrentMacro.Push(function);
+            CurrentMacro.Push(function);
+            InMacro.Push(false);
 
             for (int i = 0; i < parameters.Length; i++)
             {
@@ -3249,7 +3226,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 }
             }
 
-            this.CurrentMacro.Pop();
+            InMacro.Pop();
+            CurrentMacro.Pop();
 
             Variables.Clear();
             for (int i = 0; i < savedVariables.Length; i++)
@@ -3300,7 +3278,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Stack<Variable> compiledParameters = new();
             List<ConstantVariable> constantParameters = new();
 
-            this.CurrentMacro.Push(function);
+            CurrentMacro.Push(function);
+            InMacro.Push(false);
 
             for (int i = 0; i < parameters.Length; i++)
             {
@@ -3456,7 +3435,8 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
                 }
             }
 
-            this.CurrentMacro.Pop();
+            InMacro.Pop();
+            CurrentMacro.Pop();
 
             Variables.Clear();
             for (int i = 0; i < savedVariables.Length; i++)
@@ -3542,7 +3522,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            Output.PrintCallback? printCallback = null)
+            PrintCallback? printCallback = null)
         {
             this.Precompile(compilerResult.TopLevelStatements);
 
@@ -3606,7 +3586,7 @@ namespace ProgrammingLanguage.Brainfuck.Compiler
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
-            Output.PrintCallback? printCallback = null)
+            PrintCallback? printCallback = null)
         {
             CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(

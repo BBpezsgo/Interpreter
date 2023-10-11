@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using LanguageCore.Runtime;
 
 #nullable enable
 
-namespace ProgrammingLanguage.Errors
+namespace LanguageCore
 {
-    using System.Collections.Generic;
-    using Core;
-
     #region Exception
 
     [Serializable]
@@ -97,14 +95,14 @@ namespace ProgrammingLanguage.Errors
     [Serializable]
     public class RuntimeException : Exception
     {
-        public Bytecode.Context? Context;
+        public Context? Context;
         public Position SourcePosition;
         public FunctionInformations[]? CallStack;
 
-        internal void FeedDebugInfo(DebugInformation debugInfo)
+        public void FeedDebugInfo(DebugInformation debugInfo)
         {
             if (!Context.HasValue) return;
-            Bytecode.Context context = Context.Value;
+            Context context = Context.Value;
 
             if (!debugInfo.TryGetSourceLocation(context.CodePointer, out var sourcePosition))
             { SourcePosition = Position.UnknownPosition; }
@@ -114,25 +112,25 @@ namespace ProgrammingLanguage.Errors
             CallStack = debugInfo.GetFunctionInformations(context.RawCallStack);
         }
 
-        internal RuntimeException(string message)
+        public RuntimeException(string message)
             : base(message, Position.UnknownPosition, null) { }
-        internal RuntimeException(string message, Bytecode.Context context)
+        public RuntimeException(string message, Context context)
             : base(message, Position.UnknownPosition, null)
         { this.Context = context; }
         protected RuntimeException(SerializationInfo info, StreamingContext context)
             : base(info, context) { }
 
-        internal RuntimeException(string message, System.Exception inner, Bytecode.Context context)
+        public RuntimeException(string message, System.Exception inner, Context context)
             : this(message, inner)
         { this.Context = context; }
 
-        internal RuntimeException(string message, System.Exception inner)
+        public RuntimeException(string message, System.Exception inner)
             : base(message, inner) { }
 
         public override string ToString()
         {
             if (!Context.HasValue) return Message + " (no context)";
-            Bytecode.Context context = Context.Value;
+            Context context = Context.Value;
 
             string result = Message;
             result += $"\n Executed Instructions: {context.ExecutedInstructionCount}";

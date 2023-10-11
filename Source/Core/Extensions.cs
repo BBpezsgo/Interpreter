@@ -1,45 +1,12 @@
 ﻿using System.Collections.Generic;
-using System.Text;
-using ProgrammingLanguage.BBCode;
-using ProgrammingLanguage.BBCode.Compiler;
-using ProgrammingLanguage.Bytecode;
-using ProgrammingLanguage.Tokenizer;
+using LanguageCore.BBCode.Compiler;
+using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
-namespace ProgrammingLanguage.Core
+namespace LanguageCore
 {
     public static class Extensions
     {
-        public static int IndexOf<T>(this T[] self, T value) where T : System.IEquatable<T>
-        {
-            for (int i = 0; i < self.Length; i++)
-            {
-                if (((System.IEquatable<T>)self[i]).Equals(value))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        public static int IndexOf<T>(this IReadOnlyList<T> self, T value) where T : System.IEquatable<T>
-        {
-            for (int i = 0; i < self.Count; i++)
-            {
-                if (((System.IEquatable<T>)self[i]).Equals(value))
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        public static void Fill<T>(this IList<T> list, IEnumerable<T> elements)
-        {
-            list.Clear();
-            foreach (T element in elements)
-            { list.Add(element); }
-        }
-
         public static bool Contains(this Token[] tokens, string value)
         {
             for (int i = 0; i < tokens.Length; i++)
@@ -66,21 +33,6 @@ namespace ProgrammingLanguage.Core
             Type.CHAR => RuntimeType.CHAR,
             _ => throw new System.NotImplementedException(),
         };
-
-        public static Type[] Convert(this RuntimeType[] v)
-        {
-            Type[] result = new Type[v.Length];
-            for (int i = 0; i < result.Length; i++)
-            { result[i] = v[i].Convert(); }
-            return result;
-        }
-        public static RuntimeType[] Convert(this Type[] v)
-        {
-            RuntimeType[] result = new RuntimeType[v.Length];
-            for (int i = 0; i < result.Length; i++)
-            { result[i] = v[i].Convert(); }
-            return result;
-        }
 
         internal static bool TryGetAttribute<T0, T1, T2>(
             this Dictionary<string, AttributeValues> attributes,
@@ -226,7 +178,6 @@ namespace ProgrammingLanguage.Core
             }
             return output;
         }
-        public static bool Contains(this Range<int> self, int v) => v >= self.Start && v <= self.End;
         public static bool Contains(this Range<SinglePosition> self, SinglePosition v)
         {
             if (self.Start > v) return false;
@@ -244,12 +195,6 @@ namespace ProgrammingLanguage.Core
 
             return true;
         }
-        public static Range<int> Extend(this Range<int> self, Range<int> range) => self.Extend(range.Start, range.End);
-        public static Range<int> Extend(this Range<int> self, int start, int end) => new()
-        {
-            Start = System.Math.Min(self.Start, start),
-            End = System.Math.Max(self.End, end),
-        };
         public static Range<SinglePosition> Extend(this Range<SinglePosition> self, Range<SinglePosition> other)
         {
             Range<SinglePosition> result = new()
@@ -286,52 +231,9 @@ namespace ProgrammingLanguage.Core
             if (self.Start.Line == self.End.Line) return $"{self.Start.Line}:({self.Start.Character}-{self.End.Character})";
             return $"{self.Start.ToMinString()}-{self.End.ToMinString()}";
         }
-        public static bool IsUnset(this Range<int> self) => self.Start == 0 && self.End == 0;
         public static bool IsUnset(this Range<SinglePosition> self) => self.Start.IsUnset() && self.End.IsUnset();
         public static bool IsUnset(this SinglePosition self) => self.Line == 0 && self.Character == 0;
 
-        /*
-        [Obsolete("Don't use this")]
-        public static T[] Add<T>(this T[] self, params T[] values)
-        {
-            System.Collections.Generic.List<T> selfList = new(self);
-            selfList.AddRange(values);
-            return selfList.ToArray();
-        }
-        [Obsolete("Don't use this")]
-        public static T[] Add<T>(this T[] self, T value) => (new System.Collections.Generic.List<T>(self) { value }).ToArray();
-        */
-
         public static Position After(this BaseToken self) => new(new Range<SinglePosition>(new SinglePosition(self.Position.End.Line, self.Position.End.Character), new SinglePosition(self.Position.End.Line, self.Position.End.Character + 1)), new Range<int>(self.AbsolutePosition.End, self.AbsolutePosition.End + 1));
-
-        public static string Escape(this char v)
-        {
-            switch (v)
-            {
-                case '\"': return "\\\"";
-                case '\\': return @"\\";
-                case '\0': return @"\0";
-                case '\a': return @"\a";
-                case '\b': return @"\b";
-                case '\f': return @"\f";
-                case '\n': return @"\n";
-                case '\r': return @"\r";
-                case '\t': return @"\t";
-                case '\v': return @"\v";
-                default:
-                    if (v >= 0x20 && v <= 0x7e)
-                    { return v.ToString(); }
-                    else
-                    { return @"\u" + ((int)v).ToString("x4"); }
-            }
-        }
-        public static string Escape(this string v)
-        {
-            if (v == null) return null;
-            StringBuilder literal = new(v.Length);
-            for (int i = 0; i < v.Length; i++)
-            { literal.Append(v[i].Escape()); }
-            return literal.ToString();
-        }
     }
 }

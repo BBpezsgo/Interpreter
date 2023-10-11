@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ProgrammingLanguage.BBCode.Compiler
+namespace LanguageCore.BBCode.Compiler
 {
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.BBCode.Parser.Statement;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
+    using LanguageCore.Parser;
+    using LanguageCore.Parser.Statement;
 
     internal class ReferenceCollector : CodeGeneratorBase
     {
@@ -69,7 +67,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
             else
             {
-                type = new(newVariable.Type, FindType);
+                type = new(newVariable.Type, FindType, TryCompute);
             }
 
             return new CompiledVariable(
@@ -518,7 +516,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
                     AddCompilable(compilableGeneralFunction);
                 }
             }
-            else if (statement is BBCode.Parser.Statement.Literal)
+            else if (statement is LanguageCore.Parser.Statement.Literal)
             { }
             else if (statement is TypeCast @as)
             { AnalyzeStatement(@as.PrevStatement); }
@@ -690,9 +688,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
             }
         }
 
-        void AnalyzeFunctions(Statement[] topLevelStatements, Output.PrintCallback printCallback = null)
+        void AnalyzeFunctions(Statement[] topLevelStatements, PrintCallback printCallback = null)
         {
-            printCallback?.Invoke($"  Collect references ...", Output.LogType.Debug);
+            printCallback?.Invoke($"  Collect references ...", LogType.Debug);
 
             ResetReferences();
 
@@ -701,7 +699,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
         public static void CollectReferences(
             Compiler.Result compilerResult,
-            Output.PrintCallback printCallback = null)
+            PrintCallback printCallback = null)
         {
             ReferenceCollector referenceCollector = new()
             {

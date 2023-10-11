@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace ProgrammingLanguage.Core
+namespace LanguageCore.Runtime
 {
     public struct SourceCodeLocation
     {

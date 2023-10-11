@@ -1,10 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProgrammingLanguage.BBCode.Compiler
+namespace LanguageCore.BBCode.Compiler
 {
-    using ProgrammingLanguage.Errors;
-
     internal class UnusedFunctionManager : CodeGeneratorBase
     {
         #region Fields
@@ -52,9 +50,9 @@ namespace ProgrammingLanguage.BBCode.Compiler
         bool GetParameter(string parameterName, out CompiledParameter parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        int DoTheThing(Output.PrintCallback printCallback = null)
+        int DoTheThing(PrintCallback printCallback = null)
         {
-            printCallback?.Invoke($"  Remove unused functions ...", Output.LogType.Debug);
+            printCallback?.Invoke($"  Remove unused functions ...", LogType.Debug);
 
             int functionsRemoved = 0;
 
@@ -75,7 +73,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     string readableID = function.ReadableID();
 
-                    printCallback?.Invoke($"      Remove function {readableID}", Output.LogType.Debug);
+                    printCallback?.Invoke($"      Remove function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
 
                     newFunctions.RemoveAt(i);
@@ -99,7 +97,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     string readableID = @operator.ReadableID();
 
-                    printCallback?.Invoke($"      Remove operator {readableID}", Output.LogType.Debug);
+                    printCallback?.Invoke($"      Remove operator {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
 
                     newOperators.RemoveAt(i);
@@ -123,7 +121,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
                     string readableID = generalFunction.ReadableID();
 
-                    printCallback?.Invoke($"      Remove general function {readableID}", Output.LogType.Debug);
+                    printCallback?.Invoke($"      Remove general function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
 
                     newGeneralFunctions.RemoveAt(i);
@@ -139,7 +137,7 @@ namespace ProgrammingLanguage.BBCode.Compiler
         public static (CompiledFunction[] functions, CompiledOperator[] operators, CompiledGeneralFunction[] generalFunctions) RemoveUnusedFunctions(
             Compiler.Result compilerResult,
             int iterations,
-            Output.PrintCallback printCallback = null,
+            PrintCallback printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             UnusedFunctionManager unusedFunctionManager = new(level)
@@ -162,11 +160,11 @@ namespace ProgrammingLanguage.BBCode.Compiler
                 int functionsRemoved = unusedFunctionManager.DoTheThing(printCallback);
                 if (functionsRemoved == 0)
                 {
-                    printCallback?.Invoke($"  Deletion of unused functions is complete", Output.LogType.Debug);
+                    printCallback?.Invoke($"  Deletion of unused functions is complete", LogType.Debug);
                     break;
                 }
 
-                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", Output.LogType.Debug);
+                printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", LogType.Debug);
 
                 compilerResult.Functions = unusedFunctionManager.CompiledFunctions;
                 compilerResult.Operators = unusedFunctionManager.CompiledOperators;

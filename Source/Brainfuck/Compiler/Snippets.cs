@@ -2,7 +2,7 @@
 #nullable enable
 #pragma warning disable IDE0059 // Unnecessary assignment of a value
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
     internal static class Snippets
     {

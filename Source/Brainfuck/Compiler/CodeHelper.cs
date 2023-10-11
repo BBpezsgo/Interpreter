@@ -1,13 +1,11 @@
 ﻿
 #nullable enable
 
-using ProgrammingLanguage.Core;
-
 using System;
 using System.Diagnostics;
 using TheProgram.Brainfuck;
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
     readonly struct AutoPrintCodeString
     {
@@ -228,23 +226,23 @@ namespace ProgrammingLanguage.Brainfuck
         /// </summary>
         /// <exception cref="Errors.CompilerException"/>
         /// <exception cref="Errors.ImpossibleException"/>
-        internal void SetValue(int address, Bytecode.DataItem value)
+        internal void SetValue(int address, Runtime.DataItem value)
         {
             switch (value.Type)
             {
-                case Bytecode.RuntimeType.BYTE:
+                case Runtime.RuntimeType.BYTE:
                     SetValue(address, value.ValueByte);
                     return;
-                case Bytecode.RuntimeType.INT:
+                case Runtime.RuntimeType.INT:
                     SetValue(address, value.ValueInt);
                     return;
-                case Bytecode.RuntimeType.FLOAT:
-                    throw new Errors.NotSupportedException($"Floats not supported by brainfuck :(");
-                case Bytecode.RuntimeType.CHAR:
+                case Runtime.RuntimeType.FLOAT:
+                    throw new NotSupportedException($"Floats not supported by brainfuck :(");
+                case Runtime.RuntimeType.CHAR:
                     SetValue(address, value.ValueChar);
                     return;
                 default:
-                    throw new Errors.ImpossibleException();
+                    throw new ImpossibleException();
             }
         }
 
@@ -596,15 +594,15 @@ namespace ProgrammingLanguage.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal int Push(Bytecode.DataItem v)
+        internal int Push(Runtime.DataItem v)
         {
             return v.Type switch
             {
-                Bytecode.RuntimeType.BYTE => Push(v.ValueByte),
-                Bytecode.RuntimeType.INT => Push(v.ValueInt),
-                Bytecode.RuntimeType.FLOAT => throw new Errors.NotSupportedException("Floats are not supported by the brainfuck compiler"),
-                Bytecode.RuntimeType.CHAR => Push(v.ValueChar),
-                _ => throw new Errors.ImpossibleException(),
+                Runtime.RuntimeType.BYTE => Push(v.ValueByte),
+                Runtime.RuntimeType.INT => Push(v.ValueInt),
+                Runtime.RuntimeType.FLOAT => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
+                Runtime.RuntimeType.CHAR => Push(v.ValueChar),
+                _ => throw new ImpossibleException(),
             };
         }
 

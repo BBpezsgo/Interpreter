@@ -73,7 +73,7 @@ namespace ConsoleGUI
                                 { rect.Height = (int)Math.Round((float)currentHeight * ((float)layout.Value / 100f)); }
                                 break;
                             }
-                        default: throw new ProgrammingLanguage.Errors.ImpossibleException();
+                        default: throw new LanguageCore.ImpossibleException();
                     }
                     rect.Y = currentPosition;
                 }
@@ -128,7 +128,7 @@ namespace ConsoleGUI
                                 { rect.Width = (int)Math.Round((float)total / (float)elementCount * ((float)layout.Value / 100f)); }
                                 break;
                             }
-                        default: throw new ProgrammingLanguage.Errors.ImpossibleException();
+                        default: throw new LanguageCore.ImpossibleException();
                     }
                     rect.X = currentPosition;
                 }

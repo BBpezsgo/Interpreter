@@ -20,7 +20,7 @@
                     _ = new Debugger(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
+                    LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
                     throw new System.NotImplementedException();

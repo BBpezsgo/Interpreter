@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace ProgrammingLanguage.Output
+namespace LanguageCore
 {
     public delegate void PrintCallback(string message, LogType logType);
 
     internal static class Debug
     {
         internal static void Log(string msg) => System.Diagnostics.Debug.WriteLine(msg);
-        internal static void LogError(Errors.Exception error) => System.Diagnostics.Debug.WriteLine(error);
+        internal static void LogError(Exception error) => System.Diagnostics.Debug.WriteLine(error);
         internal static void LogError(System.Exception error) => System.Diagnostics.Debug.WriteLine(error);
         internal static void LogWarning(string msg) => System.Diagnostics.Debug.WriteLine(msg);
     }
@@ -68,17 +68,17 @@ namespace ProgrammingLanguage.Output
             LogColor(error, ConsoleColor.Red);
         }
 
-        internal static void Error(Errors.Exception error)
-        {
-            LogColor(error.ToString(), ConsoleColor.Red);
-        }
-
-        internal static void Error(Errors.Error error)
-        {
-            LogColor(error.ToString(), ConsoleColor.Red);
-        }
-
         internal static void Error(Exception error)
+        {
+            LogColor(error.ToString(), ConsoleColor.Red);
+        }
+
+        internal static void Error(Error error)
+        {
+            LogColor(error.ToString(), ConsoleColor.Red);
+        }
+
+        internal static void Error(System.Exception error)
         {
             LogColor(error.ToString(), ConsoleColor.Red);
         }
@@ -88,7 +88,7 @@ namespace ProgrammingLanguage.Output
             LogColor(warning, ConsoleColor.DarkYellow);
         }
 
-        internal static void Warning(Errors.Warning warning)
+        internal static void Warning(Warning warning)
         {
             LogColor(warning.ToString(), ConsoleColor.DarkYellow);
         }
@@ -109,14 +109,6 @@ namespace ProgrammingLanguage.Output
         {
             await Console.Error.WriteAsync(data);
         }
-    }
-
-    public static class File
-    {
-        static readonly string Path = "C:\\Users\\bazsi\\Documents\\GitHub\\InterpreterVSCodeExtension\\out.log";
-
-        public static void Write(string msg) => System.IO.File.AppendAllText(Path, msg);
-        public static void WriteLine(string msg) => Write(msg + "\r\n");
     }
 
     public enum LogType
@@ -171,7 +163,7 @@ namespace ProgrammingLanguage.Output
     }
 }
 
-namespace ProgrammingLanguage.TerminalInterface
+namespace LanguageCore.TerminalInterface
 {
     internal class TerminalInterface
     {

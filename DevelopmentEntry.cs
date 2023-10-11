@@ -18,7 +18,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test33.bbc";
+            string path = TestConstants.TestFilesPath + "test40.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -62,11 +62,11 @@ namespace TheProgram
                     _ = new Debugger(settings.Value);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    ProgrammingLanguage.Core.EasyInterpreter.Run(settings.Value);
+                    LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    ProgrammingLanguage.BBCode.EasyCompiler.Result yeah = ProgrammingLanguage.BBCode.EasyCompiler.Compile(new System.IO.FileInfo(path), new System.Collections.Generic.Dictionary<string, ProgrammingLanguage.Core.ExternalFunctionBase>(), ProgrammingLanguage.BBCode.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
-                    ProgrammingLanguage.Bytecode.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
+                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new System.IO.FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
+                    LanguageCore.Runtime.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
                     System.IO.File.WriteAllBytes(settings.Value.CompileOutput, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
                     break;
                 case ArgumentParser.RunType.Decompile:
@@ -76,14 +76,14 @@ namespace TheProgram
                     break;
                 case ArgumentParser.RunType.IL:
                     {
-                        ProgrammingLanguage.BBCode.Tokenizer tokenizer = new(ProgrammingLanguage.BBCode.TokenizerSettings.Default, null); ;
-                        ProgrammingLanguage.BBCode.Token[] tokens = tokenizer.Parse(System.IO.File.ReadAllText(settings.Value.File.FullName));
+                        LanguageCore.Tokenizing.Tokenizer tokenizer = new(LanguageCore.Tokenizing.TokenizerSettings.Default, null); ;
+                        LanguageCore.Tokenizing.Token[] tokens = tokenizer.Parse(System.IO.File.ReadAllText(settings.Value.File.FullName));
 
-                        ProgrammingLanguage.BBCode.Parser.ParserResult ast = ProgrammingLanguage.BBCode.Parser.Parser.Parse(tokens);
+                        LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        ProgrammingLanguage.BBCode.Compiler.Compiler.Result compiled = ProgrammingLanguage.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, ProgrammingLanguage.Core.ExternalFunctionBase>(), settings.Value.File, ProgrammingLanguage.BBCode.Parser.ParserSettings.Default, null, settings.Value.BasePath);
+                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, LanguageCore.Parser.ParserSettings.Default, null, settings.Value.BasePath);
 
-                        ProgrammingLanguage.IL.Compiler.CodeGenerator.Result code = ProgrammingLanguage.IL.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
+                        LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
 
                         System.Reflection.Assembly assembly = code.Assembly;
 

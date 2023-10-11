@@ -2,12 +2,10 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
-    using BBCode;
     using Compiler;
-    using Core;
-    using Errors;
+    using LanguageCore.Runtime;
 
     public class EasyCompiler
     {
@@ -22,37 +20,37 @@ namespace ProgrammingLanguage.Brainfuck
 
         Result Compile_(
             FileInfo file,
-            Output.PrintCallback printCallback
+            PrintCallback printCallback
             )
         {
             string sourceCode = File.ReadAllText(file.FullName);
 
-            Token[] tokens;
+            Tokenizing.Token[] tokens;
 
             {
-                BBCode.Tokenizer tokenizer = new(TokenizerSettings.Default, printCallback);
+                Tokenizing.Tokenizer tokenizer = new(Tokenizing.TokenizerSettings.Default, printCallback);
                 List<Warning> warnings = new();
 
                 tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
 
                 foreach (Warning warning in warnings)
-                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
             }
 
-            BBCode.Parser.ParserResult parserResult;
+            Parser.ParserResult parserResult;
 
             {
                 DateTime parseStarted = DateTime.Now;
                 if (printCallback != null)
-                { printCallback?.Invoke("Parsing ...", Output.LogType.Debug); }
+                { printCallback?.Invoke("Parsing ...", LogType.Debug); }
 
-                parserResult = BBCode.Parser.Parser.Parse(tokens);
+                parserResult = Parser.Parser.Parse(tokens);
 
                 if (parserResult.Errors.Length > 0)
-                { throw new Errors.Exception("Failed to parse", parserResult.Errors[0].ToException()); }
+                { throw new Exception("Failed to parse", parserResult.Errors[0].ToException()); }
 
                 if (printCallback != null)
-                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", Output.LogType.Debug); }
+                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
             }
 
             parserResult.SetFile(file.FullName);
@@ -64,22 +62,22 @@ namespace ProgrammingLanguage.Brainfuck
                     parserResult,
                     new Dictionary<string, ExternalFunctionBase>(),
                     file,
-                    BBCode.Parser.ParserSettings.Default,
+                    Parser.ParserSettings.Default,
                     printCallback,
                     this.BasePath ?? "");
 
                 foreach (Warning warning in compilerResult.Warnings)
-                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
 
                 if (compilerResult.Errors.Length > 0)
-                { throw new Errors.Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
+                { throw new Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
             }
 
             CodeGenerator.Result codeGeneratorResult;
 
             {
                 DateTime codeGenerationStarted = DateTime.Now;
-                printCallback?.Invoke("Generating code ...", Output.LogType.Debug);
+                printCallback?.Invoke("Generating code ...", LogType.Debug);
 
                 codeGeneratorResult = CodeGenerator.Generate(
                     compilerResult,
@@ -88,12 +86,12 @@ namespace ProgrammingLanguage.Brainfuck
                     printCallback);
 
                 foreach (Warning warning in codeGeneratorResult.Warnings)
-                { printCallback?.Invoke(warning.ToString(), Output.LogType.Warning); }
+                { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
 
                 if (codeGeneratorResult.Errors.Length > 0)
-                { throw new Errors.Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
+                { throw new Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
 
-                printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", Output.LogType.Debug);
+                printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", LogType.Debug);
             }
 
             return new Result()
@@ -106,7 +104,7 @@ namespace ProgrammingLanguage.Brainfuck
             FileInfo file,
             BBCode.Compiler.Compiler.CompilerSettings compilerSettings,
             CodeGenerator.Settings generatorSettings,
-            Output.PrintCallback printCallback = null,
+            PrintCallback printCallback = null,
             string basePath = ""
             )
         {

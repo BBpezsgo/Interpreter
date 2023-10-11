@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Linq;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
-    using ProgrammingLanguage.Errors;
-
-    internal class HEAP : IHeap
+    public class HEAP : IHeap
     {
         readonly DataItem[] heap;
 

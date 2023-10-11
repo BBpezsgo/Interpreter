@@ -2,11 +2,11 @@
 using System.IO;
 using System.Linq;
 
-namespace ProgrammingLanguage.BBCode.Analysis
+namespace LanguageCore.BBCode.Analysis
 {
     using Compiler;
-    using Core;
-    using Errors;
+    using LanguageCore.Runtime;
+    using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
 
@@ -177,7 +177,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     for (int i = 0; i < codeHeader.Usings.Count; i++)
                     {
                         var @using = codeHeader.Usings[i];
-                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + FileExtensions.Code;
+                        var usingFile = dir.FullName + "\\" + @using.PathString + "." + "bbc";
                         if (!File.Exists(usingFile)) continue;
                         if (usingFile.Replace('\\', '/') != path) continue;
                         fileReferences.Add(file_.FullName);
@@ -218,7 +218,7 @@ namespace ProgrammingLanguage.BBCode.Analysis
             for (int i = 0; i < parserResult.Usings.Length; i++)
             {
                 var usingItem = parserResult.Usings[i];
-                var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + FileExtensions.Code;
+                var usingFile = directory.FullName + "\\" + usingItem.PathString + "." + "bbc";
 
                 UsingAnalysis usingAnalysis = new()
                 {
@@ -231,12 +231,12 @@ namespace ProgrammingLanguage.BBCode.Analysis
                 if (basePath != null)
                 {
                     try
-                    { searchForThese.Add(Path.GetFullPath(basePath.Replace("/", "\\") + usingItem.PathString + "." + FileExtensions.Code, directory.FullName)); }
+                    { searchForThese.Add(Path.GetFullPath(basePath.Replace("/", "\\") + usingItem.PathString + "." + "bbc", directory.FullName)); }
                     catch (System.Exception) { }
                 }
 
                 try
-                { searchForThese.Add(Path.GetFullPath(usingItem.PathString + "." + FileExtensions.Code, directory.FullName)); }
+                { searchForThese.Add(Path.GetFullPath(usingItem.PathString + "." + "bbc", directory.FullName)); }
                 catch (System.Exception) { }
 
                 bool found = false;
@@ -333,8 +333,8 @@ namespace ProgrammingLanguage.BBCode.Analysis
                     for (int fileI = 0; fileI < files.Length; fileI++)
                     {
                         string file = files[fileI].Name;
-                        if (!file.EndsWith("." + FileExtensions.Code)) continue;
-                        file = file[..^("." + FileExtensions.Code).Length];
+                        if (!file.EndsWith("." + "bbc")) continue;
+                        file = file[..^("." + "bbc").Length];
                         int similarity = file.LevenshteinDis(usingItem.PathString);
                         if (largestSimilarityI == -1)
                         {
@@ -351,12 +351,12 @@ namespace ProgrammingLanguage.BBCode.Analysis
 
                     if (largestSimilarityI != -1)
                     {
-                        string hintedFile = files[largestSimilarityI].Name[..^("." + FileExtensions.Code).Length];
-                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + FileExtensions.Code}\" is not found in the current directory. Did you mean \"{hintedFile}\"?", new Position(usingItem.Path), path));
+                        string hintedFile = files[largestSimilarityI].Name[..^("." + "bbc").Length];
+                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + "bbc"}\" is not found in the current directory. Did you mean \"{hintedFile}\"?", new Position(usingItem.Path), path));
                     }
                     else
                     {
-                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + FileExtensions.Code}\" is not found in the current directory.", new Position(usingItem.Path), path));
+                        warnings.Add(new Warning($"File \"{usingItem.PathString + "." + "bbc"}\" is not found in the current directory.", new Position(usingItem.Path), path));
                     }
                 }
 

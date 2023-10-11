@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
-    using Core;
-
-    internal class DataStack : Stack<DataItem>
+    public class DataStack : Stack<DataItem>
     {
         public DataStack() : base() { }
 

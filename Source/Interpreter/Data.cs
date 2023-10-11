@@ -1,11 +1,9 @@
 ﻿using System;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
     using DataUtilities.ReadableFileFormat;
     using DataUtilities.Serializer;
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Errors;
 
     public enum RuntimeType : byte
     {
@@ -482,7 +480,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem((left.Value == 0f) ? 1f : 0f, leftSide.Tag); }
             }
 
-            throw new RuntimeException($"Can't do ! operation with type {leftSide.GetTypeText()}");
+            throw new RuntimeException($"Can't do ! operation with type {leftSide.Type}");
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem leftSide, DataItem rightSide)
@@ -510,7 +508,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value | right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException($"Can't do | operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
+            throw new RuntimeException($"Can't do | operation with type {leftSide.Type} and {rightSide.Type}");
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator &(DataItem leftSide, DataItem rightSide)
@@ -538,7 +536,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value & right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException($"Can't do & operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
+            throw new RuntimeException($"Can't do & operation with type {leftSide.Type} and {rightSide.Type}");
         }
         /// <exception cref="RuntimeException"/>
         public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
@@ -566,7 +564,7 @@ namespace ProgrammingLanguage.Bytecode
                 { return new DataItem(left.Value ^ right.Value, leftSide.Tag); }
             }
 
-            throw new RuntimeException($"Can't do ^ operation with type {leftSide.GetTypeText()} and {rightSide.GetTypeText()}");
+            throw new RuntimeException($"Can't do ^ operation with type {leftSide.Type} and {rightSide.Type}");
         }
 
         public readonly bool IsFalsy() => this.Type switch

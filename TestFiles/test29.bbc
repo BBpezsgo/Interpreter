@@ -2,7 +2,7 @@ using System;
 
 template<T>
 void PrintT(T v) {
-	out v;
+	Print(v);
 }
 
 PrintT(77);

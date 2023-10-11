@@ -5,19 +5,18 @@ void Half() {
 
 	while (1) {
 		i++;
-		out i;
-		out "\r\n";
+		PrintLine(i);
 
 		if (i == 50) {
-			out "a\r\n";
+			PrintLine('a');
 			return;
-			out "nope\r\n";
+			PrintLine("nope");
 		};
-		out 'b';
+		Print('b');
 	};
 
-	out "BRUH\r\n";
+	PrintLine("BRUH");
 }
 
 Half();
-out "hello\r\n";
+PrintLine("hello");

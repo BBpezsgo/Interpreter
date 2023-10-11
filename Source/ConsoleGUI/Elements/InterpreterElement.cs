@@ -3,13 +3,12 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using LanguageCore;
+using LanguageCore.Runtime;
 using Win32;
 
 namespace ConsoleGUI
 {
-    using ProgrammingLanguage.Core;
-    using ProgrammingLanguage.Output;
-
     internal sealed class InterpreterElement : WindowElement
     {
         public string File;
@@ -46,7 +45,7 @@ namespace ConsoleGUI
             HasBorder = false;
         }
 
-        public InterpreterElement(string file, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.BBCode.Parser.ParserSettings parserSettings, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()
+        public InterpreterElement(string file, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, LanguageCore.Parser.ParserSettings parserSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()
         {
             this.File = file;
             SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors, basePath);
@@ -226,8 +225,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpreter() => SetupInterpreter(ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings.Default, ProgrammingLanguage.BBCode.Parser.ParserSettings.Default, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings.Default, false, string.Empty);
-        void SetupInterpreter(ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.BBCode.Parser.ParserSettings parserSettings, ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath)
+        void SetupInterpreter() => SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings.Default, LanguageCore.Parser.ParserSettings.Default, BytecodeInterpreterSettings.Default, false, string.Empty);
+        void SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, LanguageCore.Parser.ParserSettings parserSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath)
         {
             this.InterpreterTimer = new MainThreadTimer(200);
             this.InterpreterTimer.Elapsed += () =>
@@ -249,15 +248,20 @@ namespace ConsoleGUI
             var code = System.IO.File.ReadAllText(fileInfo.FullName);
             this.Interpreter = new InterpreterDebuggabble();
 
-            Interpreter.OnOutput += (sender, message, logType) => ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
+            void PrintOutput(string message, LogType logType)
             {
-                ProgrammingLanguage.Output.LogType.System => ForegroundColor.Default,
-                ProgrammingLanguage.Output.LogType.Normal => ForegroundColor.Default,
-                ProgrammingLanguage.Output.LogType.Warning => ForegroundColor.Yellow,
-                ProgrammingLanguage.Output.LogType.Error => ForegroundColor.Red,
-                ProgrammingLanguage.Output.LogType.Debug => ForegroundColor.Gray,
-                _ => ForegroundColor.Default,
-            }));
+                ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
+                {
+                    LogType.System => ForegroundColor.Default,
+                    LogType.Normal => ForegroundColor.Default,
+                    LogType.Warning => ForegroundColor.Yellow,
+                    LogType.Error => ForegroundColor.Red,
+                    LogType.Debug => ForegroundColor.Gray,
+                    _ => ForegroundColor.Default,
+                }));
+            }
+
+            Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
             Interpreter.OnStdOut += (sender, data) => ConsoleLines.Add(new ConsoleLine(data));
             Interpreter.OnStdError += (sender, data) => ConsoleLines.Add(new ConsoleLine(data, ForegroundColor.Red));
@@ -270,12 +274,21 @@ namespace ConsoleGUI
 
             if (Interpreter.Initialize())
             {
-                Interpreter.BasePath = basePath;
-                var compiledCode = Interpreter.CompileCode(fileInfo, compilerSettings, parserSettings, handleErrors);
+                LanguageCore.BBCode.Compiler.CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
+                    fileInfo,
+                    Interpreter.GenerateExternalFunctions(),
+                    LanguageCore.Tokenizing.TokenizerSettings.Default,
+                    parserSettings,
+                    compilerSettings,
+                    handleErrors,
+                    PrintOutput,
+                    basePath
+                    );
 
-                if (compiledCode != null)
+                if (compiledCode.HasValue)
                 {
-                    Interpreter.ExecuteProgram(compiledCode, new ProgrammingLanguage.Bytecode.BytecodeInterpreterSettings()
+                    Interpreter.CompilerResult = compiledCode.Value;
+                    Interpreter.ExecuteProgram(compiledCode.Value.Code, new BytecodeInterpreterSettings()
                     {
                         InstructionLimit = interpreterSettings.InstructionLimit,
                         StackMaxSize = interpreterSettings.StackMaxSize,
@@ -290,34 +303,34 @@ namespace ConsoleGUI
             sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
-            if (this.Interpreter.Details.Interpreter == null) return;
+            if (this.Interpreter.BytecodeInterpreter == null) return;
 
             sender.DrawBuffer.ResetColor();
 
-            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            Instruction instruction = this.Interpreter.NextInstruction;
 
             List<int> loadIndicators = new();
             List<int> storeIndicators = new();
 
             if (instruction != null)
             {
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.CS_POP)
+                if (instruction.opcode == Opcode.CS_POP)
                 {
-                    loadIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length - 1);
+                    loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count - 1);
                 }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.CS_PUSH)
+                if (instruction.opcode == Opcode.CS_PUSH)
                 {
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.CallStack.Length);
+                    storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count);
                 }
             }
 
-            var callstack = this.Interpreter.Details.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.Details.Interpreter.CallStack);
+            var callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Memory.CallStack.ToArray());
 
             int i;
-            for (i = 0; i < this.Interpreter.Details.Interpreter.CallStack.Length; i++)
+            for (i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count; i++)
             {
-                int callframeInstruction = this.Interpreter.Details.Interpreter.CallStack[i];
+                int callframeInstruction = this.Interpreter.BytecodeInterpreter.Memory.CallStack[i];
                 FunctionInformations callframe = callstack[i];
 
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
@@ -404,7 +417,7 @@ namespace ConsoleGUI
                             }
 
                             string param = parameters2[j];
-                            if (ProgrammingLanguage.Constants.BuiltinTypes.Contains(param))
+                            if (LanguageCore.Constants.BuiltinTypes.Contains(param))
                             {
                                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
                             }
@@ -503,22 +516,22 @@ namespace ConsoleGUI
             sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
-            if (this.Interpreter.Details.Interpreter == null) return;
+            if (this.Interpreter.BytecodeInterpreter == null) return;
 
             DrawBuffer b = sender.DrawBuffer;
 
             b.ResetColor();
 
             b.AddText("  ");
-            b.AddText($"IsRunning: {!this.Interpreter.Details.Interpreter.IsDone}");
+            b.AddText($"IsRunning: {!this.Interpreter.BytecodeInterpreter.IsDone}");
             b.BackgroundColor = BackgroundColor.Black;
             b.FinishLine(sender.Rect.Width);
             b.ForegroundColor = ForegroundColor.Default;
 
             b.AddText("  ");
-            if (this.Interpreter.Details.Interpreter.CodePointer == this.Interpreter.Details.CompilerResult.Code.Length)
+            if (this.Interpreter.BytecodeInterpreter.CodePointer == this.Interpreter.CompilerResult.Code.Length)
             {
-                b.AddText($"State: {this.Interpreter.Details.State}");
+                b.AddText($"State: {this.Interpreter.State}");
             }
             else
             {
@@ -604,33 +617,33 @@ namespace ConsoleGUI
             sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
-            if (this.Interpreter.Details.Interpreter == null) return;
+            if (this.Interpreter.BytecodeInterpreter == null) return;
 
             DrawBuffer b = sender.DrawBuffer;
 
             b.ResetColor();
 
-            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            Instruction instruction = this.Interpreter.NextInstruction;
 
             List<int> loadIndicators = new();
             List<int> storeIndicators = new();
 
             if (instruction != null)
             {
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
-                    { storeIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
+                    { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueInt); }
                     else
                     { storeIndicators.Add(instruction.ParameterInt); }
                 }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET)
+                if (instruction.opcode == Opcode.HEAP_GET)
                 {
-                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
                     {
-                        if (this.Interpreter.Details.Interpreter.Stack[^1].Type == ProgrammingLanguage.Bytecode.RuntimeType.INT)
-                        { loadIndicators.Add(this.Interpreter.Details.Interpreter.Stack[^1].ValueInt); }
+                        if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.INT)
+                        { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueInt); }
                     }
                     else
                     { loadIndicators.Add(instruction.ParameterInt); }
@@ -638,16 +651,16 @@ namespace ConsoleGUI
             }
 
             int nextHeader = 0;
-            for (int i = 0; i < this.Interpreter.Details.Interpreter.Heap.Size; i++)
+            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
             {
-                var item = this.Interpreter.Details.Interpreter.Heap[i];
-                bool isHeader = ((nextHeader == i) && (!this.Interpreter.Details.Interpreter.Heap[i].IsNull) && (this.Interpreter.Details.Interpreter.Heap is ProgrammingLanguage.Bytecode.HEAP));
+                var item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
+                bool isHeader = ((nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is HEAP));
                 (int, bool) header = (default, default);
 
                 if (isHeader)
                 {
-                    header = ProgrammingLanguage.Bytecode.HEAP.GetHeader(item);
-                    nextHeader += header.Item1 + ProgrammingLanguage.Bytecode.HEAP.BLOCK_HEADER_SIZE;
+                    header = HEAP.GetHeader(item);
+                    nextHeader += header.Item1 + HEAP.BLOCK_HEADER_SIZE;
                 }
 
                 bool addLoadIndicator = false;
@@ -711,19 +724,19 @@ namespace ConsoleGUI
                     {
                         switch (item.Type)
                         {
-                            case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
+                            case RuntimeType.BYTE:
                                 b.ForegroundColor = ForegroundColor.Cyan;
                                 b.AddText($"{item.ValueByte}");
                                 break;
-                            case ProgrammingLanguage.Bytecode.RuntimeType.INT:
+                            case RuntimeType.INT:
                                 b.ForegroundColor = ForegroundColor.Cyan;
                                 b.AddText($"{item.ValueInt}");
                                 break;
-                            case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
+                            case RuntimeType.FLOAT:
                                 b.ForegroundColor = ForegroundColor.Cyan;
                                 b.AddText($"{item.ValueFloat}f");
                                 break;
-                            case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
+                            case RuntimeType.CHAR:
                                 b.ForegroundColor = ForegroundColor.Yellow;
                                 b.AddText($"'{item.ValueChar.Escape()}'");
                                 break;
@@ -752,22 +765,22 @@ namespace ConsoleGUI
             sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
-            if (this.Interpreter.Details.Interpreter == null) return;
+            if (this.Interpreter.BytecodeInterpreter == null) return;
 
             DrawBuffer b = sender.DrawBuffer;
 
             b.ResetColor();
 
-            ProgrammingLanguage.Bytecode.Instruction instruction = this.Interpreter.Details.NextInstruction;
+            Instruction instruction = this.Interpreter.NextInstruction;
 
             List<int> savedBasePointers = new();
 
-            int stackSize = this.Interpreter.Details.Interpreter.Stack.Count;
+            int stackSize = this.Interpreter.BytecodeInterpreter.Memory.Stack.Count;
 
             for (int j = 0; j < stackSize; j++)
             {
-                var item = this.Interpreter.Details.Interpreter.Stack[j];
-                if (item.Type != ProgrammingLanguage.Bytecode.RuntimeType.INT) continue;
+                var item = this.Interpreter.BytecodeInterpreter.Memory.Stack[j];
+                if (item.Type != RuntimeType.INT) continue;
                 if (item.Tag != "saved base pointer") continue;
                 savedBasePointers.Add(item.ValueInt);
             }
@@ -779,41 +792,41 @@ namespace ConsoleGUI
 
             if (instruction != null)
             {
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE)
+                if (instruction.opcode == Opcode.STORE_VALUE)
                 {
-                    storeIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
+                    storeIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                 }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == Opcode.STORE_VALUE ||
+                    instruction.opcode == Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == ProgrammingLanguage.Bytecode.AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
                     { loadIndicators.Add(stackSize - 2); }
                     else
                     { loadIndicators.Add(stackSize - 1); }
                 }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOAD_VALUE)
+                if (instruction.opcode == Opcode.LOAD_VALUE)
                 {
-                    loadIndicators.Add(this.Interpreter.Details.Interpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
+                    loadIndicators.Add(this.Interpreter.BytecodeInterpreter.GetAddress(instruction.Parameter.Integer ?? 0, instruction.AddressingMode));
                     storeIndicators.Add(stackSize);
                 }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.PUSH_VALUE ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.GET_BASEPOINTER ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET)
+                if (instruction.opcode == Opcode.PUSH_VALUE ||
+                    instruction.opcode == Opcode.GET_BASEPOINTER ||
+                    instruction.opcode == Opcode.HEAP_GET)
                 { storeIndicators.Add(stackSize); }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.POP_VALUE)
+                if (instruction.opcode == Opcode.POP_VALUE)
                 { loadIndicators.Add(stackSize - 1); }
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_ADD ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_DIV ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_MOD ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_MULT ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.MATH_SUB ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOGIC_AND ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOGIC_OR)
+                if (instruction.opcode == Opcode.MATH_ADD ||
+                    instruction.opcode == Opcode.MATH_DIV ||
+                    instruction.opcode == Opcode.MATH_MOD ||
+                    instruction.opcode == Opcode.MATH_MULT ||
+                    instruction.opcode == Opcode.MATH_SUB ||
+                    instruction.opcode == Opcode.LOGIC_AND ||
+                    instruction.opcode == Opcode.LOGIC_OR)
                 {
                     loadIndicators.Add(stackSize - 1);
                     storeIndicators.Add(stackSize - 2);
@@ -830,9 +843,9 @@ namespace ConsoleGUI
             int i;
             for (i = stackDrawStart; i < stackDrawEnd; i++)
             {
-                var item = this.Interpreter.Details.Interpreter.Stack[i];
+                var item = this.Interpreter.BytecodeInterpreter.Memory.Stack[i];
 
-                if (this.Interpreter.Details.Interpreter.BasePointer == i)
+                if (this.Interpreter.BytecodeInterpreter.BasePointer == i)
                 {
                     b.ForegroundColor = ForegroundColor.Blue;
                     b.AddText("►");
@@ -893,19 +906,19 @@ namespace ConsoleGUI
                 {
                     switch (item.Type)
                     {
-                        case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
+                        case RuntimeType.BYTE:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{item.ValueByte}");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.INT:
+                        case RuntimeType.INT:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{item.ValueInt}");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
+                        case RuntimeType.FLOAT:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{item.ValueFloat}f");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
+                        case RuntimeType.CHAR:
                             b.ForegroundColor = ForegroundColor.Yellow;
                             b.AddText($"'{item.ValueChar.Escape()}'");
                             break;
@@ -923,7 +936,7 @@ namespace ConsoleGUI
                     b.AddText(item.Tag);
                 }
 
-                if (this.Interpreter.Details.Interpreter.BasePointer == i && b.ForegroundColor == ForegroundColor.Gray)
+                if (this.Interpreter.BytecodeInterpreter.BasePointer == i && b.ForegroundColor == ForegroundColor.Gray)
                 {
                     b.ForegroundColor = ForegroundColor.Black;
                 }
@@ -933,9 +946,9 @@ namespace ConsoleGUI
                 b.ForegroundColor = ForegroundColor.Default;
             }
 
-            while ((basepointerShown == false && i <= this.Interpreter.Details.Interpreter.BasePointer) || loadIndicators.Count > 0 || storeIndicators.Count > 0)
+            while ((basepointerShown == false && i <= this.Interpreter.BytecodeInterpreter.BasePointer) || loadIndicators.Count > 0 || storeIndicators.Count > 0)
             {
-                if (this.Interpreter.Details.Interpreter.BasePointer == i)
+                if (this.Interpreter.BytecodeInterpreter.BasePointer == i)
                 {
                     b.ForegroundColor = ForegroundColor.Blue;
                     b.AddText("►");
@@ -993,7 +1006,7 @@ namespace ConsoleGUI
             // sender.ClearBuffer();
             sender.DrawBuffer.StepTo(0);
 
-            if (this.Interpreter.Details.Interpreter == null) return;
+            if (this.Interpreter.BytecodeInterpreter == null) return;
 
             DrawBuffer b = sender.DrawBuffer;
 
@@ -1009,10 +1022,10 @@ namespace ConsoleGUI
             }
 
             int indent = 0;
-            for (int i = 0; i < this.Interpreter.Details.Interpreter.CodePointer - 5; i++)
+            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.CodePointer - 5; i++)
             {
-                var instruction = this.Interpreter.Details.CompilerResult.Code[i];
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
+                var instruction = this.Interpreter.CompilerResult.Code[i];
+                if (instruction.opcode == Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     { indent--; }
@@ -1024,12 +1037,12 @@ namespace ConsoleGUI
             }
 
             bool IsNextInstruction = false;
-            for (int i = Math.Max(0, this.Interpreter.Details.Interpreter.CodePointer - 5); i < this.Interpreter.Details.CompilerResult.Code.Length; i++)
+            for (int i = Math.Max(0, this.Interpreter.BytecodeInterpreter.CodePointer - 5); i < this.Interpreter.CompilerResult.Code.Length; i++)
             {
-                if (Interpreter.Details.Interpreter != null) if (Interpreter.Details.Interpreter.CodePointer == i) IsNextInstruction = true;
+                if (Interpreter.BytecodeInterpreter != null) if (Interpreter.BytecodeInterpreter.CodePointer == i) IsNextInstruction = true;
 
-                var instruction = this.Interpreter.Details.CompilerResult.Code[i];
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.COMMENT)
+                var instruction = this.Interpreter.CompilerResult.Code[i];
+                if (instruction.opcode == Opcode.COMMENT)
                 {
                     if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
                     {
@@ -1062,10 +1075,10 @@ namespace ConsoleGUI
                 b.AddText($"{instruction.opcode}");
                 b.AddText($" ");
 
-                if (instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.LOAD_VALUE ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.STORE_VALUE ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_GET ||
-                    instruction.opcode == ProgrammingLanguage.Bytecode.Opcode.HEAP_SET)
+                if (instruction.opcode == Opcode.LOAD_VALUE ||
+                    instruction.opcode == Opcode.STORE_VALUE ||
+                    instruction.opcode == Opcode.HEAP_GET ||
+                    instruction.opcode == Opcode.HEAP_SET)
                 {
                     b.AddText($"{instruction.AddressingMode}");
                     b.AddText($" ");
@@ -1073,22 +1086,22 @@ namespace ConsoleGUI
 
                 if (!instruction.Parameter.IsNull) switch (instruction.Parameter.Type)
                     {
-                        case ProgrammingLanguage.Bytecode.RuntimeType.BYTE:
+                        case RuntimeType.BYTE:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{instruction.Parameter.ValueByte}");
                             b.AddText($" ");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.INT:
+                        case RuntimeType.INT:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{instruction.Parameter.ValueInt}");
                             b.AddText($" ");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.FLOAT:
+                        case RuntimeType.FLOAT:
                             b.ForegroundColor = ForegroundColor.Cyan;
                             b.AddText($"{instruction.Parameter.ValueFloat}f");
                             b.AddText($" ");
                             break;
-                        case ProgrammingLanguage.Bytecode.RuntimeType.CHAR:
+                        case RuntimeType.CHAR:
                             b.ForegroundColor = ForegroundColor.Yellow;
                             b.AddText($"'{instruction.Parameter.ValueChar.Escape()}'");
                             b.AddText($" ");

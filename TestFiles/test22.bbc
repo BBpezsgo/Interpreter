@@ -5,13 +5,13 @@ int b = 255;
 
 while (b) {
 
-	out '\t';
-	out a;
-	out '\t';
-	out b;
-	out '\t';
-	out a || b;
-	out '\n';
+	Print('\t');
+	Print(a);
+	Print('\t');
+	Print(b);
+	Print('\t');
+	Print(a || b);
+	Print('\n');
 
 	b--;
 };

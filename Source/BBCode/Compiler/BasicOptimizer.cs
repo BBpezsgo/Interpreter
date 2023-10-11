@@ -2,15 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ProgrammingLanguage.BBCode.Compiler
+namespace LanguageCore.BBCode.Compiler
 {
-    using ProgrammingLanguage.Bytecode;
+    using LanguageCore.Runtime;
 
     internal class BasicOptimizer
     {
         List<Instruction> GeneratedCode;
         IFunctionThing[] FunctionThings;
-        Action<string, Output.LogType> PrintCallback;
+        Action<string, LogType> PrintCallback;
 
         int RemoveInstruction(int index)
         {
@@ -61,13 +61,13 @@ namespace ProgrammingLanguage.BBCode.Compiler
 
             }
 
-            PrintCallback?.Invoke($"Optimalization: Removed {removedInstructions} instructions", Output.LogType.Debug);
+            PrintCallback?.Invoke($"Optimalization: Removed {removedInstructions} instructions", LogType.Debug);
         }
 
         internal static void Optimize(
             List<Instruction> code,
             IFunctionThing[] functionThings,
-            Action<string, Output.LogType> printCallback = null
+            Action<string, LogType> printCallback = null
             )
         {
             BasicOptimizer basicOptimizer = new()

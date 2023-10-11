@@ -1,12 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace ProgrammingLanguage.Core
+namespace LanguageCore.Runtime
 {
-    using System.Linq;
-    using System.Runtime.CompilerServices;
-    using ProgrammingLanguage.Bytecode;
-    using ProgrammingLanguage.Errors;
 
     [Flags]
     public enum ExternalFunctionFlags : byte
@@ -196,7 +192,7 @@ namespace ProgrammingLanguage.Core
             else
             {
                 functions[name] = function;
-                Output.Output.Warning($"External function function \"{name}\" is already defined, so I'll override it");
+                Output.Warning($"External function function \"{name}\" is already defined, so I'll override it");
             }
         }
 

@@ -1,9 +1,8 @@
 using System;
 
 void Hey(String message, int bruh) {
-	out message;
-	out "\r\n";
-	out bruh;
+	PrintLine(message);
+	Print(bruh);
 }
 
 String a = "01abc";
@@ -11,11 +10,8 @@ String b = "66";
 String c = a;
 a = "01abb";
 
-out b;
-out "\r\n";
-out a;
-out "\r\n";
-out c;
-out "\r\n";
+PrintLine(b);
+PrintLine(a);
+PrintLine(c);
 
 Hey(c, 55);

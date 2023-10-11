@@ -2,7 +2,7 @@
 using DataUtilities.ReadableFileFormat;
 using DataUtilities.Serializer;
 
-namespace ProgrammingLanguage.Bytecode
+namespace LanguageCore.Runtime
 {
     public enum AddressingMode : byte
     {
@@ -30,9 +30,9 @@ namespace ProgrammingLanguage.Bytecode
         {
             get
             {
-                if (parameter.IsNull) throw new Errors.InternalException($"Can't cast null to {nameof(Int32)}");
+                if (parameter.IsNull) throw new InternalException($"Can't cast null to {nameof(Int32)}");
                 if (parameter is DataItem dataItem && dataItem.Type == RuntimeType.INT) return dataItem.ValueInt;
-                throw new Errors.InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
+                throw new InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
             }
             set => parameter = new DataItem(value, parameter.Tag);
         }

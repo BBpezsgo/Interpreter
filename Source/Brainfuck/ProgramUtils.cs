@@ -2,9 +2,9 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using ProgrammingLanguage.Brainfuck;
-using ProgrammingLanguage.Brainfuck.Compiler;
-using ProgrammingLanguage.Core;
+using LanguageCore;
+using LanguageCore.Brainfuck;
+using LanguageCore.Brainfuck.Compiler;
 
 #nullable enable
 
@@ -30,30 +30,30 @@ namespace TheProgram.Brainfuck
     {
         public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags, CompileOptions flags = CompileOptions.None)
         {
-            void PrintCallback(string message, ProgrammingLanguage.Output.LogType level)
+            void PrintCallback(string message, LogType level)
             {
                 switch (level)
                 {
-                    case ProgrammingLanguage.Output.LogType.System:
+                    case LogType.System:
                         if (!args.LogSystem) break;
-                        ProgrammingLanguage.Output.Output.Log(message);
+                        Output.Log(message);
                         break;
-                    case ProgrammingLanguage.Output.LogType.Normal:
-                        ProgrammingLanguage.Output.Output.Log(message);
+                    case LogType.Normal:
+                        Output.Log(message);
                         break;
-                    case ProgrammingLanguage.Output.LogType.Warning:
+                    case LogType.Warning:
                         if (!args.LogWarnings) break;
-                        ProgrammingLanguage.Output.Output.Warning(message);
+                        Output.Warning(message);
                         break;
-                    case ProgrammingLanguage.Output.LogType.Error:
-                        ProgrammingLanguage.Output.Output.Error(message);
+                    case LogType.Error:
+                        Output.Error(message);
                         break;
-                    case ProgrammingLanguage.Output.LogType.Debug:
+                    case LogType.Debug:
                         if (!args.LogDebugs) break;
-                            ProgrammingLanguage.Output.Output.Debug(message);
+                        Output.Debug(message);
                         break;
                     default:
-                        ProgrammingLanguage.Output.Output.Log(message);
+                        Output.Log(message);
                         break;
                 }
             }
@@ -64,7 +64,7 @@ namespace TheProgram.Brainfuck
 
             CodeGenerator.Result code = _code.Value;
 
-            ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code.Code)
+            LanguageCore.Brainfuck.Interpreter interpreter = new(code.Code)
             {
                 DebugInfo = code.DebugInfo.ToArray(),
                 OriginalCode = code.Tokens,
@@ -163,7 +163,7 @@ namespace TheProgram.Brainfuck
 
         public static void SpeedTest(string code, int iterations)
         {
-            ProgrammingLanguage.Brainfuck.Interpreter interpreter = new(code, _ => { });
+            LanguageCore.Brainfuck.Interpreter interpreter = new(code, _ => { });
 
             int line = Console.GetCursorPosition().Top;
             Console.ResetColor();
@@ -195,9 +195,9 @@ namespace TheProgram.Brainfuck
             PrintFinal = 0b_1000,
         }
 
-        public static CodeGenerator.Result? CompilePlus(FileInfo file, CompileOptions options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+        public static CodeGenerator.Result? CompilePlus(FileInfo file, CompileOptions options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
                 => CompilePlus(file, (int)options, compilerSettings, printCallback);
-        public static CodeGenerator.Result? CompilePlus(FileInfo file, int options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings _compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+        public static CodeGenerator.Result? CompilePlus(FileInfo file, int options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings _compilerSettings, PrintCallback printCallback)
         {
             CodeGenerator.Settings compilerSettings = CodeGenerator.Settings.Default;
 
@@ -212,9 +212,9 @@ namespace TheProgram.Brainfuck
             try
             {
                 compilerResult = EasyCompiler.Compile(file, _compilerSettings, compilerSettings, printCallback).CodeGeneratorResult;
-                printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", ProgrammingLanguage.Output.LogType.Debug);
+                printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
-            catch (ProgrammingLanguage.Errors.Exception exception)
+            catch (LanguageCore.Exception exception)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());
@@ -228,7 +228,7 @@ namespace TheProgram.Brainfuck
                 if (throwErrors) throw;
                 else return null;
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());
@@ -259,7 +259,7 @@ namespace TheProgram.Brainfuck
                 Console.ResetColor();
             }
 
-            compilerResult.Code = Minifier.Minify(Utils.RemoveNoncodes(compilerResult.Code));
+            compilerResult.Code = Minifier.Minify(LanguageCore.Brainfuck.Utils.RemoveNoncodes(compilerResult.Code));
 
             if ((options & (int)CompileOptions.PrintFinal) != 0)
             {
@@ -283,7 +283,7 @@ namespace TheProgram.Brainfuck
             => Compile(code, (int)options);
         public static string Compile(string code, int options)
         {
-            string compiled = Minifier.Minify(Utils.RemoveNoncodes(code));
+            string compiled = Minifier.Minify(LanguageCore.Brainfuck.Utils.RemoveNoncodes(code));
 
             if ((options & (int)CompileOptions.PrintFinal) != 0)
             {
@@ -297,9 +297,9 @@ namespace TheProgram.Brainfuck
             return compiled;
         }
 
-        public static string? CompileFile(string file, CompileOptions options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+        public static string? CompileFile(string file, CompileOptions options, LanguageCore .BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
             => CompileFile(file, (int)options, compilerSettings, printCallback);
-        public static string? CompileFile(string file, int options, ProgrammingLanguage.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, ProgrammingLanguage.Output.PrintCallback printCallback)
+        public static string? CompileFile(string file, int options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
         {
             if (!File.Exists(file))
             {
@@ -377,7 +377,7 @@ namespace TheProgram.Brainfuck
                         {
                             if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
                         }
-                        else if (Utils.CodeCharacters.Contains(code[i]))
+                        else if (LanguageCore.Brainfuck.Utils.CodeCharacters.Contains(code[i]))
                         {
                             expectNumber = false;
                             if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
@@ -414,7 +414,7 @@ namespace TheProgram.Brainfuck
                     if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
                     break;
                 default:
-                    if (Utils.CodeCharacters.Contains(code))
+                    if (LanguageCore.Brainfuck.Utils.CodeCharacters.Contains(code))
                     { if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta; }
                     else
                     { if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray; }

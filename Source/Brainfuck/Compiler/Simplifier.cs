@@ -1,7 +1,7 @@
 ﻿
 #nullable enable
 
-namespace ProgrammingLanguage.Brainfuck
+namespace LanguageCore.Brainfuck
 {
     internal static class Simplifier
     {

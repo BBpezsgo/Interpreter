@@ -4,10 +4,10 @@ using System.IO.Compression;
 
 namespace TheProgram
 {
-    using ProgrammingLanguage.BBCode.Compiler;
-    using ProgrammingLanguage.BBCode.Parser;
-    using ProgrammingLanguage.Bytecode;
-    using ProgrammingLanguage.Output;
+    using LanguageCore;
+    using LanguageCore.BBCode.Compiler;
+    using LanguageCore.Parser;
+    using LanguageCore.Runtime;
 
     internal static class ArgumentParser
     {
@@ -290,7 +290,7 @@ namespace TheProgram
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
                         goto ArgParseDone;
                     }
-                    
+
                     if (args[i] == "-bc-instruction-limit")
                     {
                         i++;

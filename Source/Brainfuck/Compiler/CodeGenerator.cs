@@ -1584,6 +1584,11 @@ namespace LanguageCore.Brainfuck.Compiler
                     Compile(@for.Block);
                 }
 
+                using (Code.Block("Compute expression"))
+                {
+                    Compile(@for.Expression);
+                }
+
                 using (Code.Block("Compute condition again"))
                 {
                     Compile(@for.Condition);

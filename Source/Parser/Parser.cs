@@ -2083,7 +2083,7 @@ namespace LanguageCore.Parser
                     TypeInstance type = ExpectType(AllowedType.FunctionPointer);
 
                     if (type == null)
-                    { throw new SyntaxException($"Expected type as generic parameter", CurrentToken); }
+                    { return null; }
 
                     newType.GenericTypes.Add(type);
 

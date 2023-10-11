@@ -30,18 +30,18 @@ namespace LanguageCore.Brainfuck
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    internal class CompiledCode
+    public class CompiledCode
     {
         const int HALF_BYTE = byte.MaxValue / 2;
 
-        internal string Code;
+        public string Code;
 
         int indent;
         int pointer;
 
         public int Pointer => pointer;
 
-        internal CompiledCode()
+        public CompiledCode()
         {
             this.Code = "";
             this.indent = 0;
@@ -50,17 +50,17 @@ namespace LanguageCore.Brainfuck
 
         #region Comments
 
-        internal int Indent(int indent)
+        public int Indent(int indent)
         {
             this.indent += indent;
             return this.indent;
         }
-        internal void LineBreak()
+        public void LineBreak()
         {
             Code += "\r\n";
             Code += new string(' ', indent);
         }
-        internal void CommentLine(string text)
+        public void CommentLine(string text)
         {
             Code += "\r\n";
             Code += new string(' ', indent);
@@ -68,7 +68,7 @@ namespace LanguageCore.Brainfuck
             Code += "\r\n";
             Code += new string(' ', indent);
         }
-        internal void StartBlock()
+        public void StartBlock()
         {
             Code += "\r\n";
             Code += new string(' ', indent);
@@ -77,7 +77,7 @@ namespace LanguageCore.Brainfuck
             Code += "\r\n";
             Code += new string(' ', indent);
         }
-        internal void StartBlock(string label)
+        public void StartBlock(string label)
         {
             Code += "\r\n";
             Code += new string(' ', indent);
@@ -86,7 +86,7 @@ namespace LanguageCore.Brainfuck
             Code += "\r\n";
             Code += new string(' ', indent);
         }
-        internal void EndBlock()
+        public void EndBlock()
         {
             this.indent -= 2;
             Code += "\r\n";
@@ -95,12 +95,12 @@ namespace LanguageCore.Brainfuck
             Code += "\r\n";
             Code += new string(' ', indent);
         }
-        internal CodeBlock Block()
+        public CodeBlock Block()
         {
             this.StartBlock();
             return new CodeBlock(this);
         }
-        internal CodeBlock Block(string label)
+        public CodeBlock Block(string label)
         {
             this.StartBlock(label);
             return new CodeBlock(this);
@@ -112,13 +112,13 @@ namespace LanguageCore.Brainfuck
         /// <b>Requires 1 more cell to the right of the <paramref name="target"/>!</b><br/>
         /// <b>Pointer:</b> <paramref name="target"/> + 1
         /// </summary>
-        internal void CopyValue(int source, int target)
+        public void CopyValue(int source, int target)
             => CopyValueWithTemp(source, target + 1, target);
         /// <summary>
         /// <b>Requires 1 more cell to the right of the <paramref name="targets"/>!</b><br/>
         /// <b>Pointer:</b> The last target + 1 or not modified
         /// </summary>
-        internal void CopyValue(int source, params int[] targets)
+        public void CopyValue(int source, params int[] targets)
         {
             if (targets.Length == 0) return;
             for (int i = 0; i < targets.Length; i++)
@@ -128,7 +128,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="tempAddress"/>
         /// </summary>
-        internal void CopyValueWithTemp(int source, int tempAddress, int target)
+        public void CopyValueWithTemp(int source, int tempAddress, int target)
         {
             MoveValue(source, target, tempAddress);
             MoveAddValue(tempAddress, source);
@@ -136,16 +136,16 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="tempAddress"/> or not modified
         /// </summary>
-        internal void CopyValueWithTemp(int source, int tempAddress, params int[] targets)
+        public void CopyValueWithTemp(int source, int tempAddress, params int[] targets)
         {
             if (targets.Length == 0) return;
             for (int i = 0; i < targets.Length; i++)
             { CopyValueWithTemp(source, tempAddress, targets[i]); }
         }
 
-        internal void SetPointer(int address) => MovePointer(address - pointer);
+        public void SetPointer(int address) => MovePointer(address - pointer);
 
-        internal void MovePointer(int offset)
+        public void MovePointer(int offset)
         {
             if (offset < 0)
             {
@@ -170,7 +170,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Not modified
         /// </summary>
-        internal void AddValue(int value)
+        public void AddValue(int value)
         {
             if (value < 0)
             {
@@ -193,7 +193,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
-        internal void AddValue(int address, int value)
+        public void AddValue(int address, int value)
         {
             SetPointer(address);
             AddValue(value);
@@ -202,13 +202,13 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
-        internal void SetValue(int address, char value)
+        public void SetValue(int address, char value)
             => SetValue(address, CharCode.GetByte(value));
 
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
-        internal void SetValue(int address, int value)
+        public void SetValue(int address, int value)
         {
             SetPointer(address);
             ClearCurrent();
@@ -226,7 +226,7 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         /// <exception cref="Errors.CompilerException"/>
         /// <exception cref="Errors.ImpossibleException"/>
-        internal void SetValue(int address, Runtime.DataItem value)
+        public void SetValue(int address, Runtime.DataItem value)
         {
             switch (value.Type)
             {
@@ -249,7 +249,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
-        internal void ClearValue(int address)
+        public void ClearValue(int address)
         {
             SetPointer(address);
             ClearCurrent();
@@ -258,7 +258,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Last of <paramref name="addresses"/>
         /// </summary>
-        internal void ClearValue(params int[] addresses)
+        public void ClearValue(params int[] addresses)
         {
             for (int i = 0; i < addresses.Length; i++)
             { ClearValue(addresses[i]); }
@@ -267,7 +267,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="from"/>
         /// </summary>
-        internal void MoveValue(int from, params int[] to)
+        public void MoveValue(int from, params int[] to)
         {
             CommentLine($"Clear the destination ({string.Join("; ", to)}) :");
             for (int i = 0; i < to.Length; i++)
@@ -279,7 +279,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="from"/>
         /// </summary>
-        internal void MoveAddValue(int from, params int[] to)
+        public void MoveAddValue(int from, params int[] to)
         {
             this.JumpStart(from);
             this.AddValue(from, -1);
@@ -292,7 +292,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="from"/>
         /// </summary>
-        internal void MoveSubValue(int from, params int[] to)
+        public void MoveSubValue(int from, params int[] to)
         {
             this.JumpStart(from);
             this.AddValue(from, -1);
@@ -305,12 +305,12 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Not modified
         /// </summary>
-        internal void ClearCurrent()
+        public void ClearCurrent()
         {
             Code += "[-]";
         }
 
-        internal void ClearRange(int start, int size)
+        public void ClearRange(int start, int size)
         {
             for (int offset = 0; offset < size; offset++)
             { this.ClearValue(start + offset); }
@@ -320,7 +320,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> 0
         /// </summary>
-        internal void JumpStart(int conditionAddress)
+        public void JumpStart(int conditionAddress)
         {
             this.SetPointer(conditionAddress);
             this.Code += "[";
@@ -330,7 +330,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> 0
         /// </summary>
-        internal void JumpEnd(int conditionAddress, bool clearCondition = false)
+        public void JumpEnd(int conditionAddress, bool clearCondition = false)
         {
             this.SetPointer(conditionAddress);
             if (clearCondition) this.ClearCurrent();
@@ -366,7 +366,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Try not to use this</b>
         /// </summary>
-        internal void FixPointer(int pointer)
+        public void FixPointer(int pointer)
         {
             this.pointer = pointer;
         }
@@ -377,7 +377,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>POINTER MISMATCH</b>
         /// </summary>
-        internal void FindZeroRight(int step = 1)
+        public void FindZeroRight(int step = 1)
         {
             if (step == 0) throw new ArgumentException("Must be nonzero", nameof(step));
             int _step = Math.Abs(step);
@@ -389,13 +389,13 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>POINTER MISMATCH</b>
         /// </summary>
-        internal void FindZeroLeft(int step = 1)
+        public void FindZeroLeft(int step = 1)
             => FindZeroRight(-step);
 
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void CopyValueWithTempUnsafe(int source, int tempAddress, int target)
+        public void CopyValueWithTempUnsafe(int source, int tempAddress, int target)
         {
             MoveValueUnsafe(source, target, tempAddress);
             MoveAddValueUnsafe(tempAddress, source);
@@ -403,14 +403,14 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state or not modified
         /// </summary>
-        internal void CopyValueWithTempUnsafe(int source, int tempAddress, params int[] targets)
+        public void CopyValueWithTempUnsafe(int source, int tempAddress, params int[] targets)
         {
             if (targets.Length == 0) return;
             for (int i = 0; i < targets.Length; i++)
             { CopyValueWithTempUnsafe(source, tempAddress, targets[i]); }
         }
 
-        internal void MovePointerUnsafe(int offset)
+        public void MovePointerUnsafe(int offset)
         {
             if (offset < 0)
             { Code += new string('<', -offset); }
@@ -421,7 +421,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void AddValueUnsafe(int offset, int value)
+        public void AddValueUnsafe(int offset, int value)
         {
             MovePointerUnsafe(offset);
             AddValue(value);
@@ -431,13 +431,13 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void SetValueUnsafe(int address, char value)
+        public void SetValueUnsafe(int address, char value)
             => SetValueUnsafe(address, CharCode.GetByte(value));
 
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void SetValueUnsafe(int offset, int value)
+        public void SetValueUnsafe(int offset, int value)
         {
             MovePointer(offset);
 
@@ -454,7 +454,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void ClearValueUnsafe(int offset)
+        public void ClearValueUnsafe(int offset)
         {
             MovePointerUnsafe(offset);
             ClearCurrent();
@@ -464,7 +464,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void ClearValueUnsafe(params int[] addresses)
+        public void ClearValueUnsafe(params int[] addresses)
         {
             for (int i = 0; i < addresses.Length; i++)
             { ClearValueUnsafe(addresses[i]); }
@@ -473,13 +473,13 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void MoveValueUnsafe(int from, params int[] to)
+        public void MoveValueUnsafe(int from, params int[] to)
             => MoveValueUnsafe(from, true, to);
 
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void MoveValueUnsafe(int from, bool clearDestination, params int[] to)
+        public void MoveValueUnsafe(int from, bool clearDestination, params int[] to)
         {
             if (clearDestination)
             {
@@ -495,7 +495,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void MoveAddValueUnsafe(int from, params int[] to)
+        public void MoveAddValueUnsafe(int from, params int[] to)
         {
             this.JumpStartUnsafe(from);
             this.AddValueUnsafe(from, -1);
@@ -508,7 +508,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void MoveSubValueUnsafe(int from, params int[] to)
+        public void MoveSubValueUnsafe(int from, params int[] to)
         {
             this.JumpStartUnsafe(from);
             this.AddValueUnsafe(from, -1);
@@ -522,7 +522,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void JumpStartUnsafe(int conditionOffset)
+        public void JumpStartUnsafe(int conditionOffset)
         {
             this.MovePointerUnsafe(conditionOffset);
             this.Code += "[";
@@ -532,24 +532,24 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal void JumpEndUnsafe(int conditionOffset)
+        public void JumpEndUnsafe(int conditionOffset)
         {
             this.MovePointerUnsafe(conditionOffset);
             this.Code += "]";
             this.MovePointerUnsafe(-conditionOffset);
         }
 
-        internal string GetFinalCode()
+        public string GetFinalCode()
         {
             return Minifier.Minify(Utils.RemoveNoncodes(Code));
         }
     }
 
-    internal readonly struct CodeBlock : IDisposable
+    public readonly struct CodeBlock : IDisposable
     {
         readonly CompiledCode reference;
 
-        internal CodeBlock(CompiledCode reference)
+        public CodeBlock(CompiledCode reference)
         {
             this.reference = reference;
         }
@@ -560,7 +560,7 @@ namespace LanguageCore.Brainfuck
         }
     }
 
-    internal class StackCodeHelper
+    public class StackCodeHelper
     {
         readonly CompiledCode Code;
         readonly Stack<int> TheStack;
@@ -568,13 +568,13 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// Adds up all the stack element's size
         /// </summary>
-        internal int Size => TheStack.Sum();
-        internal readonly int Start;
-        internal readonly int MaxSize;
+        public int Size => TheStack.Sum();
+        public readonly int Start;
+        public readonly int MaxSize;
 
-        internal int NextAddress => Start + TheStack.Sum();
+        public int NextAddress => Start + TheStack.Sum();
 
-        internal int LastAddress
+        public int LastAddress
         {
             get
             {
@@ -583,7 +583,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        internal StackCodeHelper(CompiledCode code, int start, int size)
+        public StackCodeHelper(CompiledCode code, int start, int size)
         {
             this.Code = code;
             this.TheStack = new Stack<int>();
@@ -594,7 +594,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal int Push(Runtime.DataItem v)
+        public int Push(Runtime.DataItem v)
         {
             return v.Type switch
             {
@@ -609,7 +609,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal int Push(int v)
+        public int Push(int v)
         {
             int address = PushVirtual(1);
 
@@ -623,7 +623,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        internal int Push(char v)
+        public int Push(char v)
         {
             int address = PushVirtual(1);
 
@@ -637,7 +637,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> 0
         /// </summary>
-        internal int Push(string v)
+        public int Push(string v)
         {
             if (v is null)
             { throw new ArgumentNullException(nameof(v)); }
@@ -657,7 +657,7 @@ namespace LanguageCore.Brainfuck
             return address;
         }
 
-        internal int PushVirtual(int size)
+        public int PushVirtual(int size)
         {
             int address = NextAddress;
 
@@ -671,7 +671,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Last state or 0
         /// </summary>
-        internal int PopAndStore(int target)
+        public int PopAndStore(int target)
         {
             int size = PopVirtual();
             int address = NextAddress;
@@ -687,7 +687,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Last state or 0
         /// </summary>
-        internal int PopAndAdd(int target)
+        public int PopAndAdd(int target)
         {
             int size = PopVirtual();
             int address = NextAddress;
@@ -703,7 +703,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Not modified
         /// </summary>
-        internal int Pop(Action<int> onAddress)
+        public int Pop(Action<int> onAddress)
         {
             int size = PopVirtual();
             int address = NextAddress;
@@ -718,7 +718,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Not modified or restored to the last state
         /// </summary>
-        internal void Pop()
+        public void Pop()
         {
             int size = PopVirtual();
             int address = NextAddress;
@@ -728,15 +728,15 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        internal int PopVirtual() => TheStack.Pop();
+        public int PopVirtual() => TheStack.Pop();
     }
 
-    internal class BasicHeapCodeHelper
+    public class BasicHeapCodeHelper
     {
         CompiledCode Code;
 
-        internal readonly int Start;
-        internal readonly int Size;
+        public readonly int Start;
+        public readonly int Size;
 
         int OffsettedStart => Start + BLOCK_SIZE;
 
@@ -844,7 +844,7 @@ namespace LanguageCore.Brainfuck
             Code += "- ] +";
         }
 
-        internal void Init()
+        public void Init()
         {
             using (Code.Block("Initialize HEAP"))
             {
@@ -853,7 +853,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        internal void Destroy()
+        public void Destroy()
         {
             using (Code.Block("Destroy HEAP"))
             {
@@ -865,7 +865,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Set(int pointerAddress, int valueAddress)
+        public void Set(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -885,7 +885,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Add(int pointerAddress, int valueAddress)
+        public void Add(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -905,7 +905,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Subtract(int pointerAddress, int valueAddress)
+        public void Subtract(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -925,7 +925,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
-        internal void Get(int pointerAddress, int resultAddress)
+        public void Get(int pointerAddress, int resultAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -946,12 +946,12 @@ namespace LanguageCore.Brainfuck
         }
     }
 
-    internal class HeapCodeHelper
+    public class HeapCodeHelper
     {
         CompiledCode Code;
 
-        internal readonly int Start;
-        internal readonly int Size;
+        public readonly int Start;
+        public readonly int Size;
 
         int OffsettedStart => Start + BLOCK_SIZE;
 
@@ -1061,7 +1061,7 @@ namespace LanguageCore.Brainfuck
             Code += "- ] +";
         }
 
-        internal void Init()
+        public void Init()
         {
             using (Code.Block("Initialize HEAP"))
             {
@@ -1071,7 +1071,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        internal void Destroy()
+        public void Destroy()
         {
             using (Code.Block("Destroy HEAP"))
             {
@@ -1084,7 +1084,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Set(int pointerAddress, int valueAddress)
+        public void Set(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -1107,7 +1107,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Add(int pointerAddress, int valueAddress)
+        public void Add(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -1130,7 +1130,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Subtract(int pointerAddress, int valueAddress)
+        public void Subtract(int pointerAddress, int valueAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -1153,7 +1153,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <see cref="OffsettedStart"/>
         /// </summary>
-        internal void Free(int pointerAddress)
+        public void Free(int pointerAddress)
         {
             Code.ClearValue(OffsettedStart);
 
@@ -1175,7 +1175,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
-        internal void Allocate(int resultAddress)
+        public void Allocate(int resultAddress)
         {
             Code.SetPointer(OffsettedStart);
 
@@ -1211,7 +1211,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
-        internal void AllocateFrom(int resultAddress, int startSearchAddress)
+        public void AllocateFrom(int resultAddress, int startSearchAddress)
         {
             Code.MoveValue(startSearchAddress, OffsettedStart);
 
@@ -1251,7 +1251,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
-        internal void Get(int pointerAddress, int resultAddress)
+        public void Get(int pointerAddress, int resultAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -1274,7 +1274,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="resultAddress"/>
         /// </summary>
-        internal void GetStatus(int pointerAddress, int resultAddress)
+        public void GetStatus(int pointerAddress, int resultAddress)
         {
             Code.ClearValue(OffsettedStart, OffsettedStart + 1);
 
@@ -1294,7 +1294,7 @@ namespace LanguageCore.Brainfuck
             Code.SetPointer(resultAddress);
         }
 
-        internal void Allocate(int resultAddress, int requiredSizeAddress, int tempAddressesStart)
+        public void Allocate(int resultAddress, int requiredSizeAddress, int tempAddressesStart)
         {
             /*
 	            int result = Alloc();

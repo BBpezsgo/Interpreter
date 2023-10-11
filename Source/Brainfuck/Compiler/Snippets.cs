@@ -4,7 +4,7 @@
 
 namespace LanguageCore.Brainfuck
 {
-    internal static class Snippets
+    public static class Snippets
     {
         /// <summary>
         /// <b>Cells used:</b> <c>V Z n d 1 0 0 0</c>
@@ -476,23 +476,21 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public static void LOGIC_LT(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2)
         {
-            /*
-                temp1[>-]> [< x- temp0[-] temp1>->]<+<
-                temp0[temp1- [>-]> [< x- temp0[-]+ temp1>->]<+< temp0-]
-             */
-
             code.ClearValue(addressTemp1);
             code.ClearValue(addressTemp2);
 
             code.SetValue(addressTemp2 + 1, 1);
             code.ClearValue(addressTemp2 + 2);
 
-            code.MoveValue(addressY, addressTemp1, addressTemp2);
-
-            code.MoveValue(addressTemp1, addressY);
+            code.CopyValueWithTemp(addressY, addressTemp1, addressTemp2);
 
             code.MoveValue(addressX, addressTemp1);
             code.AddValue(1);
+
+            /*
+                addressTemp2[>-]> [< x- addressTemp1[-] addressTemp2>->]<+<
+                addressTemp1[addressTemp2- [>-]> [< x- addressTemp1[-]+ addressTemp2>->]<+< addressTemp1-]
+             */
 
             code.SetPointer(addressTemp2);
             code += "[>-]>";

@@ -1,0 +1,15 @@
+using System;
+
+int a = 3;
+int b = 6;
+
+Print(a == b);
+Print(a == b - 3);
+Print(a < b - 3);
+Print(a < b);
+Print(a <= b - 3);
+Print(a <= b);
+Print(a >= b - 3);
+Print(a >= b);
+Print(a != b - 3);
+Print(a != b);

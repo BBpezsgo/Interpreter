@@ -18,7 +18,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test40.bbc";
+            string path = TestConstants.TestFilesPath + "test-for.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -31,8 +31,8 @@ namespace TheProgram
                 //"-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
-                "-console-gui",
-                // "-brainfuck",
+                // "-console-gui",
+                "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""
@@ -72,7 +72,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory);
+                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory, Brainfuck.ProgramUtils.CompileOptions.PrintCompiled);
                     break;
                 case ArgumentParser.RunType.IL:
                     {

@@ -1150,7 +1150,7 @@ namespace ConsoleGUI
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);
 
-            if (e.IsDown == 0 && e.AsciiChar == 9)
+            if (e.IsDown == 1 && (e.AsciiChar == 9 || e.AsciiChar == 32))
             {
                 if (this.CurrentlyJumping <= 0)
                 {

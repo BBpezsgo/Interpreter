@@ -780,7 +780,7 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
         /// <exception cref="CompilerException"/>
-        /// <exception cref="Exception"/>
+        /// <exception cref="LanguageException"/>
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="System.Exception"/>
@@ -851,7 +851,7 @@ namespace LanguageCore.BBCode.Compiler
                 parserResult = Parser.Parse(tokens);
 
                 if (parserResult.Errors.Length > 0)
-                { throw new Exception("Failed to parse", parserResult.Errors[0].ToException()); }
+                { throw new LanguageException("Failed to parse", parserResult.Errors[0].ToException()); }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }

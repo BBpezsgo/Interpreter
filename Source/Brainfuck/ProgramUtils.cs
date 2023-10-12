@@ -66,7 +66,7 @@ namespace TheProgram.Brainfuck
 
             Interpreter interpreter = new(code.Code)
             {
-                DebugInfo = code.DebugInfo.ToArray(),
+                DebugInfo = code.DebugInfo,
                 OriginalCode = code.Tokens,
             };
 
@@ -78,7 +78,7 @@ namespace TheProgram.Brainfuck
                         Console.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI(false, 5);
+                        interpreter.RunWithUI(true, 5);
                         break;
                     }
                 case RunKind.SpeedTest:
@@ -214,7 +214,7 @@ namespace TheProgram.Brainfuck
                 compilerResult = EasyCompiler.Compile(file, _compilerSettings, compilerSettings, printCallback).CodeGeneratorResult;
                 printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
-            catch (LanguageCore.Exception exception)
+            catch (LanguageCore.LanguageException exception)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());

@@ -49,7 +49,7 @@ namespace LanguageCore.BBCode.Compiler
         bool GetParameter(string parameterName, out CompiledParameter parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        CompiledVariable GetVariableInfo(VariableDeclaretion newVariable)
+        CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
         {
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
@@ -78,7 +78,7 @@ namespace LanguageCore.BBCode.Compiler
                 newVariable);
         }
 
-        void AnalyzeNewVariable(VariableDeclaretion newVariable)
+        void AnalyzeNewVariable(VariableDeclaration newVariable)
         {
             this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable));
         }
@@ -88,7 +88,7 @@ namespace LanguageCore.BBCode.Compiler
             int variablesAdded = 0;
             foreach (var st in statements)
             {
-                if (st is VariableDeclaretion newVar)
+                if (st is VariableDeclaration newVar)
                 {
                     AnalyzeNewVariable(newVar);
                     variablesAdded++;
@@ -199,7 +199,7 @@ namespace LanguageCore.BBCode.Compiler
                     indexerTemplate.Function.TimesUsedTotal++;
                 }
             }
-            else if (statement is VariableDeclaretion newVariable)
+            else if (statement is VariableDeclaration newVariable)
             {
                 if (newVariable.InitialValue != null) AnalyzeStatement(newVariable.InitialValue);
             }
@@ -455,6 +455,7 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
+                /*
                 if (keywordCall.FunctionName == "out")
                 {
                     AnalyzeStatements(keywordCall.Parameters);
@@ -471,6 +472,7 @@ namespace LanguageCore.BBCode.Compiler
                     { function.TimesUsed++; }
                     function.TimesUsedTotal++;
                 }
+                */
 
             }
             else if (statement is Field field)

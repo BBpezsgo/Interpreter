@@ -261,7 +261,7 @@ namespace LanguageCore.Parser.Statement
     }
 
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
-    public class VariableDeclaretion : Statement, IDefinition
+    public class VariableDeclaration : Statement, IDefinition
     {
         public readonly TypeInstance Type;
         public readonly Token VariableName;
@@ -270,7 +270,7 @@ namespace LanguageCore.Parser.Statement
 
         public string FilePath { get; set; }
 
-        public VariableDeclaretion(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue initialValue)
+        public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue initialValue)
         {
             Type = type;
             VariableName = variableName;
@@ -1050,11 +1050,11 @@ namespace LanguageCore.Parser.Statement
     public class ForLoop : StatementWithBlock
     {
         public readonly Token Keyword;
-        public readonly VariableDeclaretion VariableDeclaration;
+        public readonly VariableDeclaration VariableDeclaration;
         public readonly StatementWithValue Condition;
         public readonly AnyAssignment Expression;
 
-        public ForLoop(Token keyword, VariableDeclaretion variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
+        public ForLoop(Token keyword, VariableDeclaration variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
             : base(block)
         {
             Keyword = keyword;
@@ -1139,12 +1139,12 @@ namespace LanguageCore.Parser.Statement
                 return new LinkedElse(elseBranch.Keyword, elseBranch.Block);
             }
 
-            throw new System.Exception();
+            throw new NotImplementedException();
         }
         public LinkedIf ToLinks()
         {
-            if (Parts.Length == 0) throw new System.Exception();
-            if (Parts[0] is not IfBranch ifBranch) throw new System.Exception();
+            if (Parts.Length == 0) throw new InternalException();
+            if (Parts[0] is not IfBranch ifBranch) throw new InternalException();
             return new LinkedIf(ifBranch.Keyword, ifBranch.Condition, ifBranch.Block)
             {
                 NextLink = ToLinks(1),

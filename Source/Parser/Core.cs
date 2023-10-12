@@ -313,7 +313,7 @@ namespace LanguageCore.Parser
                             AddStatement(st5.Expression);
                             statementCount++;
                         }
-                        else if (st is Statement.VariableDeclaretion st6)
+                        else if (st is Statement.VariableDeclaration st6)
                         {
                             if (st6.InitialValue != null) AddStatement(st6.InitialValue);
                         }

@@ -11,6 +11,11 @@ namespace LanguageCore
 
         public Stack() => stack = new List<T>();
 
+        public void Pop(int count)
+        {
+            for (int i = 0; i < count; i++)
+            { Pop(); }
+        }
         /// <summary>
         /// Gives the last item, and then remove
         /// </summary>

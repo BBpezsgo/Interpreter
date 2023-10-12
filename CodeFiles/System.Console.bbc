@@ -113,6 +113,7 @@ export void PrintLine(bool message)
 //
 
 [External("stdin")]
+[StandardInput]
 char StdIn();
 
 export char ReadKey()

@@ -171,6 +171,9 @@ namespace LanguageCore.BBCode.Compiler
         protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
 
+        protected readonly Stack<CompiledConstant> CompiledConstants;
+        protected readonly Stack<int> ConstantsStack;
+
         protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
         protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
         protected IReadOnlyList<CompliableTemplate<CompiledGeneralFunction>> CompilableGeneralFunctions => compilableGeneralFunctions;
@@ -205,6 +208,9 @@ namespace LanguageCore.BBCode.Compiler
 
             TypeArguments = new Dictionary<string, CompiledType>();
 
+            CompiledConstants = new Stack<CompiledConstant>();
+            ConstantsStack = new Stack<int>();
+
             compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
             compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
             compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
@@ -219,20 +225,70 @@ namespace LanguageCore.BBCode.Compiler
             CompiledOperators = compilerResult.Operators;
             CompiledGeneralFunctions = compilerResult.GeneralFunctions;
             CompiledEnums = compilerResult.Enums;
-
-            Errors = new List<Error>();
-            Warnings = new List<Warning>();
-
-            CurrentFile = null;
-
-            TypeArguments = new Dictionary<string, CompiledType>();
-
-            compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
-            compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
-            compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
         #region Helper Functions
+
+        protected int CompileConstants(IEnumerable<Statement> statements)
+        {
+            int count = 0;
+            foreach (Statement statement in statements)
+            {
+                if (statement is not VariableDeclaration variableDeclaration ||
+                    !variableDeclaration.Modifiers.Contains("const"))
+                { continue; }
+
+                if (variableDeclaration.InitialValue == null)
+                { throw new CompilerException($"Constant value must have initial value", variableDeclaration, variableDeclaration.FilePath); }
+                RuntimeType? expectedType = null;
+
+                if (variableDeclaration.Type != "var")
+                {
+                    CompiledType constantType = new(variableDeclaration.Type, FindType, TryCompute);
+
+                    if (!constantType.IsBuiltin)
+                    { throw new NotSupportedException($"Only builtin types supported as a constant value"); }
+
+                    expectedType = constantType.RuntimeType;
+                }
+
+                if (!TryCompute(variableDeclaration.InitialValue, expectedType, out DataItem constantValue))
+                { throw new CompilerException($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue, variableDeclaration.FilePath); }
+
+                if (GetConstant(variableDeclaration.VariableName.Content, out _))
+                { throw new CompilerException($"Constant \"{variableDeclaration.VariableName}\" already defined", variableDeclaration.VariableName, variableDeclaration.FilePath); }
+
+                CompiledConstants.Push(new CompiledConstant(variableDeclaration, constantValue));
+                count++;
+            }
+            ConstantsStack.Push(count);
+            return count;
+        }
+        protected void CleanupConstants()
+        {
+            int count = ConstantsStack.Pop();
+            CompiledConstants.Pop(count);
+        }
+
+        protected bool GetConstant(string identifier, out DataItem value)
+        {
+            bool success = false;
+            value = default;
+
+            foreach (CompiledConstant constant in CompiledConstants)
+            {
+                if (constant.Declaration.VariableName == identifier)
+                {
+                    if (success)
+                    { throw new CompilerException($"Constant \"{constant.Declaration.VariableName}\" defined more than once", constant.Declaration, constant.Declaration.FilePath); }
+
+                    value = constant.Value;
+                    success = true;
+                }
+            }
+
+            return success;
+        }
 
         protected bool StatementCanBeDeallocated(StatementWithValue statement)
             => StatementCanBeDeallocated(statement, out _);
@@ -1218,7 +1274,7 @@ namespace LanguageCore.BBCode.Compiler
             MapTypeParameters(type, type.Class.TemplateInfo.TypeParameters, typeParameters);
         }
 
-        protected CompiledVariable CompileVariable(VariableDeclaretion newVariable, int memoryOffset, bool isGlobal)
+        protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset, bool isGlobal)
         {
             if (Constants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
@@ -1487,8 +1543,8 @@ namespace LanguageCore.BBCode.Compiler
             if (identifier.Content == "nullptr")
             { return new CompiledType(Type.INT); }
 
-            if (identifier.Content == "IN")
-            { return new CompiledType(Type.CHAR); }
+            if (GetConstant(identifier.Content, out DataItem constant))
+            { return new CompiledType(constant.Type); }
 
             if (GetLocalSymbolType(identifier.Content, out CompiledType type))
             { return type; }
@@ -1715,10 +1771,10 @@ namespace LanguageCore.BBCode.Compiler
         {
             Dictionary<string, StatementWithValue> _parameters = new();
             LanguageCore.Utils.Map(macro.Parameters, parameters, _parameters);
-            if (macro.Statements.Length == 0)
+            if (macro.Block.Statements.Count == 0)
             { throw new CompilerException($"Macro \"{macro.ReadableID()}\" has no statements", macro.Block, macro.FilePath); }
-            else if (macro.Statements.Length == 1)
-            { return InlineMacro(macro.Statements[0], _parameters); }
+            else if (macro.Block.Statements.Count == 1)
+            { return InlineMacro(macro.Block.Statements[0], _parameters); }
             else
             { return InlineMacro(macro.Block, _parameters); }
         }
@@ -1949,7 +2005,10 @@ namespace LanguageCore.BBCode.Compiler
                 if (!param0Type.IsClass)
                 { throw new CompilerException($"{param0Type} is not a reference type", param0, CurrentFile); }
 
-                value = new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})");
+                if (expectedType == RuntimeType.BYTE)
+                { value = new DataItem((byte)param0Type.SizeOnHeap, $"sizeof({param0Type.Name})"); }
+                else
+                { value = new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})"); }
                 return true;
             }
 

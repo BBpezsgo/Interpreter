@@ -128,6 +128,7 @@ namespace LanguageCore.IL.Compiler
 
             if (arrayType.Class.CompiledAttributes.HasAttribute("Defines", "array"))
             {
+                throw new NotImplementedException();
                 var elementType = arrayType.TypeParameters[0];
                 return elementType.SizeOnStack;
             }
@@ -173,9 +174,6 @@ namespace LanguageCore.IL.Compiler
         };
         int GetValueSize(Identifier statement)
         {
-            if (statement.Content == "IN")
-            { return 1; }
-
             { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
         }
         int GetValueSize(ConstructorCall constructorCall)
@@ -198,6 +196,8 @@ namespace LanguageCore.IL.Compiler
 
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
+                throw new NotImplementedException();
+
                 if (constructorCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
@@ -312,10 +312,6 @@ namespace LanguageCore.IL.Compiler
 
         void CompileSetter(Identifier statement, StatementWithValue value)
         {
-            if (value is FunctionCall functionCall &&
-                functionCall.Identifier == "array")
-            { return; }
-
             throw new NotImplementedException();
         }
 
@@ -368,7 +364,7 @@ namespace LanguageCore.IL.Compiler
             { Compile(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
             { Compile(compoundAssignment); }
-            else if (statement is VariableDeclaretion variableDeclaretion)
+            else if (statement is VariableDeclaration variableDeclaretion)
             { Compile(variableDeclaretion); }
             else if (statement is TypeCast typeCast)
             { Compile(typeCast); }
@@ -442,22 +438,6 @@ namespace LanguageCore.IL.Compiler
                         throw new NotImplementedException();
                     }
 
-                case "var":
-                    {
-                        throw new NotImplementedException();
-                    }
-                case "const":
-                    return;
-
-                case "outraw":
-                    {
-                        throw new NotImplementedException();
-                    }
-                case "out":
-                    {
-                        throw new NotImplementedException();
-                    }
-
                 case "delete":
                     {
                         throw new NotImplementedException();
@@ -518,7 +498,7 @@ namespace LanguageCore.IL.Compiler
                     throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
         }
-        void Compile(VariableDeclaretion statement)
+        void Compile(VariableDeclaration statement)
         {
             if (statement.InitialValue == null) return;
 
@@ -572,6 +552,8 @@ namespace LanguageCore.IL.Compiler
 
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
+                throw new NotImplementedException();
+
                 if (constructorCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 

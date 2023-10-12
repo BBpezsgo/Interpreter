@@ -1,5 +1,4 @@
-﻿
-#nullable enable
+﻿#nullable enable
 #pragma warning disable IDE0059 // Unnecessary assignment of a value
 
 namespace LanguageCore.Brainfuck
@@ -64,19 +63,19 @@ namespace LanguageCore.Brainfuck
             code.AddValue(addressX, 1);
 
             code.SetPointer(addressY);
-            code += "[";
+            code += '[';
             code.AddValue(temp2, -1);
             code.AddValue(temp1, 1);
             code.AddValue(addressY, -1);
-            code += "]";
+            code += ']';
 
             code.MoveValue(temp1, addressY);
 
             code.SetPointer(temp2);
-            code += "[";
+            code += '[';
             code.AddValue(addressX, -1);
             code.ClearValue(temp2);
-            code += "]";
+            code += ']';
 
             code.ClearValue(temp1);
             code.ClearValue(temp2);
@@ -96,24 +95,24 @@ namespace LanguageCore.Brainfuck
         {
             // x[-y-x]
             code.SetPointer(addressX);
-            code += "[";
-            code += "-";
+            code += '[';
+            code += '-';
             code.SetPointer(addressY);
-            code += "-";
+            code += '-';
             code.SetPointer(addressX);
-            code += "]";
+            code += ']';
 
             // +y
-            code += "+";
+            code += '+';
             code.SetPointer(addressY);
 
             // [x-y[-]]
-            code += "[";
+            code += '[';
             code.SetPointer(addressX);
-            code += "-";
+            code += '-';
             code.SetPointer(addressY);
             code.ClearCurrent();
-            code += "]";
+            code += ']';
         }
 
         /// <summary>
@@ -132,35 +131,35 @@ namespace LanguageCore.Brainfuck
 
             code.SetPointer(addressX);
 
-            code += "[";
+            code += '[';
 
             code.SetPointer(addressTemp2);
-            code += "+";
+            code += '+';
             code.SetPointer(addressX);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.SetPointer(addressTemp2);
-            code += "[";
+            code += '[';
             code.SetPointer(addressY);
-            code += "[";
+            code += '[';
             code.SetPointer(addressX);
-            code += "+";
+            code += '+';
             code.SetPointer(addressTemp1);
-            code += "+";
+            code += '+';
             code.SetPointer(addressY);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
             code.SetPointer(addressTemp1);
-            code += "[";
+            code += '[';
             code.SetPointer(addressY);
-            code += "+";
+            code += '+';
             code.SetPointer(addressTemp1);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
             code.SetPointer(addressTemp2);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
         }
 
         /// <summary>
@@ -175,17 +174,17 @@ namespace LanguageCore.Brainfuck
         /// <br/>
         /// Attribution: Jeffry Johnston
         /// </summary>
-        public static void DIVIDE(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3, int addressTemp4)
+        public static void MATH_DIV(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3, int addressTemp4)
         {
             code.ClearValue(addressTemp1, addressTemp2, addressTemp3, addressTemp4);
 
             code.SetPointer(addressX);
-            code += "[";
+            code += '[';
             code.SetPointer(addressTemp1);
-            code += "+";
+            code += '+';
             code.SetPointer(addressX);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.JumpStart(addressTemp1);
 
@@ -195,48 +194,48 @@ namespace LanguageCore.Brainfuck
             code.JumpStart(addressTemp2);
 
             code.SetPointer(addressTemp3);
-            code += "+";
+            code += '+';
 
             code.SetPointer(addressTemp1);
-            code += "-";
-            code += "[";
+            code += '-';
+            code += '[';
 
             code.ClearValue(addressTemp3);
             code.SetPointer(addressTemp4);
-            code += "+";
+            code += '+';
             code.SetPointer(addressTemp1);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.MoveValue(addressTemp4, addressTemp1);
 
             code.SetPointer(addressTemp3);
-            code += "[";
+            code += '[';
 
             code.SetPointer(addressTemp2);
-            code += "-";
+            code += '-';
 
-            code += "[";
+            code += '[';
             code.SetPointer(addressX);
-            code += "-";
+            code += '-';
             code.ClearValue(addressTemp2);
             code.SetPointer(addressTemp2);
-            code += "]";
-            code += "+";
+            code += ']';
+            code += '+';
 
             code.SetPointer(addressTemp3);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.SetPointer(addressTemp2);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.SetPointer(addressX);
-            code += "+";
+            code += '+';
 
             code.SetPointer(addressTemp1);
-            code += "]";
+            code += ']';
         }
 
         /// <summary>
@@ -251,44 +250,44 @@ namespace LanguageCore.Brainfuck
         /// <br/>
         /// Attribution: chad3814
         /// </summary>
-        public static void POWER(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3)
+        public static void MATH_POW(this CompiledCode code, int addressX, int addressY, int addressTemp1, int addressTemp2, int addressTemp3)
         {
             code.ClearValue(addressTemp1);
 
             code.MoveValue(addressX, addressTemp1);
 
             code.SetPointer(addressX);
-            code += "+";
+            code += '+';
 
             code.SetPointer(addressY);
-            code += "[";
+            code += '[';
 
             code.ClearValue(addressTemp2);
 
             code.MoveValue(addressX, addressTemp3);
 
             code.SetPointer(addressTemp3);
-            code += "[";
+            code += '[';
 
             code.SetPointer(addressTemp1);
-            code += "[";
+            code += '[';
             code.SetPointer(addressX);
-            code += "+";
+            code += '+';
             code.SetPointer(addressTemp2);
-            code += "+";
+            code += '+';
             code.SetPointer(addressTemp1);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.MoveValue(addressTemp2, addressTemp1);
 
             code.SetPointer(addressTemp3);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.SetPointer(addressY);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             code.ClearValue(addressTemp1);
         }
@@ -296,7 +295,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// Pointer: <paramref name="addressX"/>
         /// </summary>
-        public static void MOD(this CompiledCode code, int addressX, int addressY, int free6CellStart)
+        public static void MATH_MOD(this CompiledCode code, int addressX, int addressY, int free6CellStart)
         {
             /*
                 # 0 >n d 0 0 0
@@ -321,17 +320,17 @@ namespace LanguageCore.Brainfuck
         /// <br/>
         /// Attribution: Softengy (talk) 15:44, 7 April 2020 (UTC)
         /// </summary>
-        public static void MULTIPLY_SELF(this CompiledCode code, int addressX, int tempAddress1, int tempAddress2)
+        public static void MATH_MUL_SELF(this CompiledCode code, int addressX, int tempAddress1, int tempAddress2)
         {
             // x[temp0+x-]
 
             code.SetPointer(addressX);
-            code += "[";
+            code += '[';
             code.SetPointer(tempAddress1);
-            code += "+";
+            code += '+';
             code.SetPointer(addressX);
-            code += "-";
-            code += "]";
+            code += '-';
+            code += ']';
 
             // temp0[-[temp1+x++temp0-]x+temp1[temp0+temp1-]temp0]
 
@@ -339,21 +338,21 @@ namespace LanguageCore.Brainfuck
             code += "[-[";
 
             code.SetPointer(tempAddress2);
-            code += "+";
+            code += '+';
             code.SetPointer(addressX);
             code += "++";
             code.SetPointer(tempAddress1);
             code += "-]";
             code.SetPointer(addressX);
-            code += "+";
+            code += '+';
             code.SetPointer(tempAddress2);
-            code += "[";
+            code += '[';
             code.SetPointer(tempAddress1);
-            code += "+";
+            code += '+';
             code.SetPointer(tempAddress2);
             code += "-]";
             code.SetPointer(tempAddress1);
-            code += "]";
+            code += ']';
         }
 
         /// <summary>
@@ -378,17 +377,17 @@ namespace LanguageCore.Brainfuck
 
             code.JumpStart(addressX);
             code.SetPointer(tempAddress);
-            code += "-";
+            code += '-';
             code.SetPointer(addressX);
             code += "-]";
 
             code.SetPointer(tempAddress);
-            code += "[";
+            code += '[';
             code.SetPointer(addressX);
-            code += "-";
+            code += '-';
             code.SetPointer(tempAddress);
-            code += "+";
-            code += "]";
+            code += '+';
+            code += ']';
         }
 
         /// <summary>
@@ -402,10 +401,10 @@ namespace LanguageCore.Brainfuck
             code.ClearValue(tempAddress);
 
             code.AddValue(addressX, -1);
-            code += "[";
+            code += '[';
             code.AddValue(tempAddress, -1);
             code.AddValue(addressX, -1);
-            code += "]";
+            code += ']';
 
             code.MoveValue(tempAddress, addressX);
 
@@ -446,18 +445,18 @@ namespace LanguageCore.Brainfuck
             code.MoveValue(addressX, tempAddress2);
 
             code.SetPointer(addressY);
-            code += "[";
+            code += '[';
             code.AddValue(tempAddress2, -1);
             code.AddValue(tempAddress1, 1);
             code.AddValue(addressY, -1);
-            code += "]";
+            code += ']';
 
             code.MoveValue(tempAddress1, addressY);
             code.SetPointer(tempAddress2);
-            code += "[";
+            code += '[';
             code.AddValue(addressX, 1);
             code.ClearValue(tempAddress2);
-            code += "]";
+            code += ']';
         }
 
         /// <summary>
@@ -506,7 +505,7 @@ namespace LanguageCore.Brainfuck
 
             code.SetPointer(addressTemp1);
 
-            code += "[";
+            code += '[';
 
             code.AddValue(addressTemp2, -1);
 
@@ -523,7 +522,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.AddValue(addressTemp1, -1);
-            code += "]";
+            code += ']';
 
             code.ClearValue(addressTemp1);
             code.ClearValue(addressTemp2);
@@ -570,7 +569,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.SetPointer(tempAddress1);
-            code += "[";
+            code += '[';
             code.AddValue(tempAddress2, -1);
             code += "[>-]>";
 
@@ -585,7 +584,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.AddValue(tempAddress1, -1);
-            code += "]";
+            code += ']';
 
             code.ClearValue(tempAddress1);
             code.ClearValue(tempAddress2);
@@ -622,7 +621,7 @@ namespace LanguageCore.Brainfuck
             c.ClearValue(addressResult);
 
             c.SetPointer(addressX);
-            c += "[";
+            c += '[';
 
             c.AddValue(tempAddress1, 1);
 
@@ -635,24 +634,24 @@ namespace LanguageCore.Brainfuck
             c.AddValue(tempAddress2, 1);
 
             c.SetPointer(addressY);
-            c += "]";
+            c += ']';
 
             c.SetPointer(tempAddress1);
             c += "[-";
             c.AddValue(addressResult, 1);
             c.SetPointer(tempAddress1);
-            c += "]";
+            c += ']';
 
             c.SetPointer(tempAddress2);
             c += "[-";
             c.AddValue(addressY, 1);
             c.SetPointer(tempAddress2);
-            c += "]";
+            c += ']';
 
             c.AddValue(addressY, -1);
             c.AddValue(addressX, -1);
 
-            c += "]";
+            c += ']';
 
             c.ClearValue(addressY);
             c.SetPointer(addressResult);
@@ -693,8 +692,8 @@ namespace LanguageCore.Brainfuck
             code.JumpStart(tempAddress2);
             code.AddValue(addressX, 1);
             code.ClearValue(tempAddress2);
-            code += "]";
-            code += "]";
+            code += ']';
+            code += ']';
         }
 
         /// <summary>
@@ -822,6 +821,14 @@ namespace LanguageCore.Brainfuck
             // code += ">>[[>>]+[<<]>>-]+[>>]<[-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]";
         }
 
+        public static void ARRAY_SET_CONST(this CompiledCode code, int arrayAddress, int index, Runtime.DataItem value)
+        {
+            index *= 2;
+            index += 3;
+            arrayAddress += index;
+            code.SetValue(arrayAddress, value);
+        }
+
         /// <summary>
         /// <b>Pointer:</b> <paramref name="arrayAddress"/>
         /// <br/>
@@ -845,7 +852,7 @@ namespace LanguageCore.Brainfuck
 
             code += ">>";
             code += "[[>>] + [<<] >> -]";
-            code += "+";
+            code += '+';
             code += "[>>] < [-] < [<<]";
             code += "> [> [>>] < +< [<<] > -]";
             code += "> [>>] << [-<<]";
@@ -894,7 +901,7 @@ namespace LanguageCore.Brainfuck
             code += ">> [[>>] + [<<] >> -] + [>>] < [< [<<] > +<"; // pointer is at y
             code.FixPointer(arrayAddress);
             code.SetPointer(resultAddress);
-            code += "+";
+            code += '+';
             code.SetPointer(arrayAddress);
             code += ">> [>>] < -] < [<<] > [> [>>] < +< [<<] > -] > [>>] << [-<<]";
             code.FixPointer(arrayAddress);
@@ -906,7 +913,7 @@ namespace LanguageCore.Brainfuck
         /// <param name="code"></param>
         /// <param name="tempAddress"></param>
         /// <param name="message"></param>
-        public static void PRINT(this CompiledCode code, int tempAddress, string message)
+        public static void OUT_STRING(this CompiledCode code, int tempAddress, string message)
         {
             code.ClearValue(tempAddress);
 
@@ -918,19 +925,19 @@ namespace LanguageCore.Brainfuck
 
                 while (prevValue > charToPrint)
                 {
-                    code += "-";
+                    code += '-';
                     prevValue--;
                 }
 
                 while (prevValue < charToPrint)
                 {
-                    code += "+";
+                    code += '+';
                     prevValue++;
                 }
 
                 prevValue = charToPrint;
 
-                code += ".";
+                code += '.';
             }
 
             code.ClearValue(tempAddress);
@@ -939,7 +946,7 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> Restored to the last state
         /// </summary>
-        public static void PRINT_UNSAFE(this CompiledCode code, int tempOffset, string message)
+        public static void OUT_STRING_UNSAFE(this CompiledCode code, int tempOffset, string message)
         {
             code.MovePointerUnsafe(tempOffset);
             code.ClearCurrent();
@@ -951,19 +958,19 @@ namespace LanguageCore.Brainfuck
 
                 while (prevValue > charToPrint)
                 {
-                    code += "-";
+                    code += '-';
                     prevValue--;
                 }
 
                 while (prevValue < charToPrint)
                 {
-                    code += "+";
+                    code += '+';
                     prevValue++;
                 }
 
                 prevValue = charToPrint;
 
-                code += ".";
+                code += '.';
             }
 
             code.ClearCurrent();

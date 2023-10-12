@@ -529,21 +529,15 @@ namespace LanguageCore.Parser
 
             CheckModifiers(modifiers, "export");
 
-            function = new(possibleNameT, modifiers)
-            {
-                Parameters = parameters.ToArray(),
-            };
-
-            List<Statement.Statement> statements = new();
+            Block block = null;
 
             if (!ExpectOperator(";"))
             {
-                statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
-                function.BracketStart = braceletStart;
-                function.BracketEnd = braceletEnd;
+                var statements = ParseFunctionBody(out var braceletStart, out var braceletEnd);
+                block = new Block(braceletStart, statements, braceletEnd);
             }
 
-            function.Statements = statements.ToArray();
+            function = new MacroDefinition(modifiers, macroKeyword, possibleNameT, parameters, block);
 
             return true;
         }
@@ -1302,7 +1296,7 @@ namespace LanguageCore.Parser
             return statements;
         }
 
-        VariableDeclaretion ExpectVariableDeclaration()
+        VariableDeclaration ExpectVariableDeclaration()
         {
             int startTokenIndex = CurrentTokenIndex;
 
@@ -1331,7 +1325,7 @@ namespace LanguageCore.Parser
                 { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType.Identifier); }
             }
 
-            return new VariableDeclaretion(modifiers.ToArray(), possibleType, possibleVariableName, initialValue);
+            return new VariableDeclaration(modifiers.ToArray(), possibleType, possibleVariableName, initialValue);
         }
 
         ForLoop ExpectForStatement()
@@ -1344,7 +1338,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("(", out Token tokenParenthesesOpen))
             { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
 
-            VariableDeclaretion variableDeclaration = ExpectVariableDeclaration();
+            VariableDeclaration variableDeclaration = ExpectVariableDeclaration();
             if (variableDeclaration == null)
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenParenthesesOpen); }
 
@@ -1463,7 +1457,7 @@ namespace LanguageCore.Parser
             statement ??= ExpectKeywordCall("break", 0);
             statement ??= ExpectKeywordCall("delete", 1);
             statement ??= ExpectKeywordCall("clone", 1);
-            statement ??= ExpectKeywordCall("out", 1, 64);
+            // statement ??= ExpectKeywordCall("out", 1, 64);
             statement ??= ExpectIfStatement();
             statement ??= ExpectVariableDeclaration();
             statement ??= ExpectAnySetter();
@@ -1746,7 +1740,7 @@ namespace LanguageCore.Parser
 
                 parameters.Add(parameter);
 
-                if (ExpectOperator(")"))
+                if (ExpectOperator(")", out bracketRight))
                 { break; }
 
                 if (!ExpectOperator(","))

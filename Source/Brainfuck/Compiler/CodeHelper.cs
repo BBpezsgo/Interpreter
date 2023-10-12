@@ -3,6 +3,7 @@
 
 using System;
 using System.Diagnostics;
+using System.Text;
 using TheProgram.Brainfuck;
 
 namespace LanguageCore.Brainfuck
@@ -34,7 +35,7 @@ namespace LanguageCore.Brainfuck
     {
         const int HALF_BYTE = byte.MaxValue / 2;
 
-        public string Code;
+        public StringBuilder Code;
 
         int indent;
         int pointer;
@@ -43,7 +44,7 @@ namespace LanguageCore.Brainfuck
 
         public CompiledCode()
         {
-            this.Code = "";
+            this.Code = new StringBuilder();
             this.indent = 0;
             this.pointer = 0;
         }
@@ -57,43 +58,35 @@ namespace LanguageCore.Brainfuck
         }
         public void LineBreak()
         {
-            Code += "\r\n";
-            Code += new string(' ', indent);
+            Code.Append("\r\n");
+            Code.Append(' ', indent);
         }
         public void CommentLine(string text)
         {
-            Code += "\r\n";
-            Code += new string(' ', indent);
-            Code += Utils.ReplaceCodes(text, '_');
-            Code += "\r\n";
-            Code += new string(' ', indent);
+            LineBreak();
+            Code.Append(Utils.ReplaceCodes(text, '_'));
+            LineBreak();
         }
         public void StartBlock()
         {
-            Code += "\r\n";
-            Code += new string(' ', indent);
-            this.Code += "{";
+            LineBreak();
+            Code.Append('{');
             this.indent += 2;
-            Code += "\r\n";
-            Code += new string(' ', indent);
+            LineBreak();
         }
         public void StartBlock(string label)
         {
-            Code += "\r\n";
-            Code += new string(' ', indent);
-            this.Code += $"{Utils.ReplaceCodes(label, '_')} {{";
+            LineBreak();
+            this.Code.Append($"{Utils.ReplaceCodes(label, '_')} {{");
             this.indent += 2;
-            Code += "\r\n";
-            Code += new string(' ', indent);
+            LineBreak();
         }
         public void EndBlock()
         {
             this.indent -= 2;
-            Code += "\r\n";
-            Code += new string(' ', indent);
-            this.Code += "}";
-            Code += "\r\n";
-            Code += new string(' ', indent);
+            LineBreak();
+            Code.Append('}');
+            LineBreak();
         }
         public CodeBlock Block()
         {
@@ -153,7 +146,7 @@ namespace LanguageCore.Brainfuck
             {
                 for (int i = 0; i < (-offset); i++)
                 {
-                    Code += "<";
+                    Code.Append('<');
                     pointer--;
                 }
                 return;
@@ -162,7 +155,7 @@ namespace LanguageCore.Brainfuck
             {
                 for (int i = 0; i < offset; i++)
                 {
-                    Code += ">";
+                    Code.Append('>');
                     pointer++;
                 }
                 return;
@@ -178,7 +171,7 @@ namespace LanguageCore.Brainfuck
             {
                 for (int i = 0; i < (-value); i++)
                 {
-                    Code += "-";
+                    Code.Append('-');
                 }
                 return;
             }
@@ -186,7 +179,7 @@ namespace LanguageCore.Brainfuck
             {
                 for (int i = 0; i < value; i++)
                 {
-                    Code += "+";
+                    Code.Append('+');
                 }
                 return;
             }
@@ -313,7 +306,7 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public void ClearCurrent()
         {
-            Code += "[-]";
+            Code.Append("[-]");
         }
 
         public void ClearRange(int start, int size)
@@ -329,7 +322,7 @@ namespace LanguageCore.Brainfuck
         public JumpBlock Jump(int conditionAddress)
         {
             this.SetPointer(conditionAddress);
-            this.Code += "[";
+            Code.Append('[');
             return new JumpBlock(this, conditionAddress);
         }
 
@@ -339,7 +332,7 @@ namespace LanguageCore.Brainfuck
         public void JumpStart(int conditionAddress)
         {
             this.SetPointer(conditionAddress);
-            this.Code += "[";
+            Code.Append('[');
             // this.SetPointer(0);
         }
 
@@ -350,20 +343,26 @@ namespace LanguageCore.Brainfuck
         {
             this.SetPointer(conditionAddress);
             if (clearCondition) this.ClearCurrent();
-            this.Code += "]";
+            Code.Append(']');
             // this.SetPointer(0);
         }
 
         public static CompiledCode operator +(CompiledCode a, string b)
         {
-            a.Code += b;
+            a.Code.Append(b);
+            return a;
+        }
+
+        public static CompiledCode operator +(CompiledCode a, char b)
+        {
+            a.Code.Append(b);
             return a;
         }
 
         public override int GetHashCode() => HashCode.Combine(Code);
         public override string ToString()
         {
-            string result = Code;
+            string result = Code.ToString();
 
             while (true)
             {
@@ -399,7 +398,7 @@ namespace LanguageCore.Brainfuck
             int _step = Math.Abs(step);
             char _code = (step < 0) ? '<' : '>';
 
-            Code += $"[{new string(_code, _step)}]";
+            Code.Append($"[{new string(_code, _step)}]");
         }
 
         /// <summary>
@@ -429,9 +428,9 @@ namespace LanguageCore.Brainfuck
         public void MovePointerUnsafe(int offset)
         {
             if (offset < 0)
-            { Code += new string('<', -offset); }
+            { Code.Append(new string('<', -offset)); }
             else if (offset > 0)
-            { Code += new string('>', offset); }
+            { Code.Append(new string('>', offset)); }
         }
 
         /// <summary>
@@ -541,7 +540,7 @@ namespace LanguageCore.Brainfuck
         public void JumpStartUnsafe(int conditionOffset)
         {
             this.MovePointerUnsafe(conditionOffset);
-            this.Code += "[";
+            this.Code.Append('[');
             this.MovePointerUnsafe(-conditionOffset);
         }
 
@@ -551,13 +550,13 @@ namespace LanguageCore.Brainfuck
         public void JumpEndUnsafe(int conditionOffset)
         {
             this.MovePointerUnsafe(conditionOffset);
-            this.Code += "]";
+            this.Code.Append(']');
             this.MovePointerUnsafe(-conditionOffset);
         }
 
         public string GetFinalCode()
         {
-            return Minifier.Minify(Utils.RemoveNoncodes(Code));
+            return Minifier.Minify(Utils.RemoveNoncodes(Code.ToString()));
         }
     }
 
@@ -590,7 +589,7 @@ namespace LanguageCore.Brainfuck
         public void Dispose()
         {
             this.Code.SetPointer(this.ConditionAddress);
-            this.Code.Code += "]";
+            this.Code.Code.Append(']');
         }
     }
 
@@ -648,7 +647,7 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(1);
 
             if (Size > MaxSize)
-            { Code.PRINT(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
 
             Code.SetValue(address, v);
             return address;
@@ -662,7 +661,7 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(1);
 
             if (Size > MaxSize)
-            { Code.PRINT(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
 
             Code.SetValue(address, v);
             return address;
@@ -680,7 +679,7 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(size);
 
             if (Size > MaxSize)
-            { Code.PRINT(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
 
             for (int i = 0; i < size; i++)
             {
@@ -696,7 +695,7 @@ namespace LanguageCore.Brainfuck
             int address = NextAddress;
 
             if (Size >= MaxSize)
-            { Code.PRINT(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
 
             TheStack.Push(size);
             return address;
@@ -802,10 +801,10 @@ namespace LanguageCore.Brainfuck
         void GoBack()
         {
             // Go back
-            Code += "[";
+            Code += '[';
             Code.ClearCurrent();
             Code.MovePointerUnsafe(-BLOCK_SIZE);
-            Code += "]";
+            Code += ']';
 
             // Fix overshoot
             Code.MovePointerUnsafe(BLOCK_SIZE);
@@ -819,11 +818,11 @@ namespace LanguageCore.Brainfuck
         void CarryBack()
         {
             // Go back
-            Code += "[";
+            Code += '[';
             Code.ClearCurrent();
             Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY - BLOCK_SIZE);
             Code.MovePointerUnsafe(-BLOCK_SIZE);
-            Code += "]";
+            Code += ']';
 
             // Fix overshoot
             Code.MovePointerUnsafe(BLOCK_SIZE);
@@ -837,7 +836,7 @@ namespace LanguageCore.Brainfuck
         void GoTo()
         {
             // Condition on carrying address
-            Code += "[";
+            Code += '[';
 
             // Copy the address and leave 1 behind
             Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
@@ -860,7 +859,7 @@ namespace LanguageCore.Brainfuck
         void CarryTo()
         {
             // Condition on carrying address
-            Code += "[";
+            Code += '[';
 
             // Copy the address and leave 1 behind
             Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
@@ -1019,10 +1018,10 @@ namespace LanguageCore.Brainfuck
         void GoBack()
         {
             // Go back
-            Code += "[";
+            Code += '[';
             Code.ClearCurrent();
             Code.MovePointerUnsafe(-BLOCK_SIZE);
-            Code += "]";
+            Code += ']';
 
             // Fix overshoot
             Code.MovePointerUnsafe(BLOCK_SIZE);
@@ -1036,11 +1035,11 @@ namespace LanguageCore.Brainfuck
         void CarryBack()
         {
             // Go back
-            Code += "[";
+            Code += '[';
             Code.ClearCurrent();
             Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, OFFSET_VALUE_CARRY - BLOCK_SIZE);
             Code.MovePointerUnsafe(-BLOCK_SIZE);
-            Code += "]";
+            Code += ']';
 
             // Fix overshoot
             Code.MovePointerUnsafe(BLOCK_SIZE);
@@ -1054,7 +1053,7 @@ namespace LanguageCore.Brainfuck
         void GoTo()
         {
             // Condition on carrying address
-            Code += "[";
+            Code += '[';
 
             // Copy the address and leave 1 behind
             Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
@@ -1077,7 +1076,7 @@ namespace LanguageCore.Brainfuck
         void CarryTo()
         {
             // Condition on carrying address
-            Code += "[";
+            Code += '[';
 
             // Copy the address and leave 1 behind
             Code.MoveValueUnsafe(OFFSET_ADDRESS_CARRY, false, BLOCK_SIZE + OFFSET_ADDRESS_CARRY);
@@ -1217,7 +1216,7 @@ namespace LanguageCore.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
+            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry
@@ -1257,7 +1256,7 @@ namespace LanguageCore.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.PRINT_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
+            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry

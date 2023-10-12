@@ -12,9 +12,9 @@ namespace LanguageCore.BBCode.Analysis
 
     public struct AnalysisResult
     {
-        public Exception TokenizerFatalError;
-        public Exception ParserFatalError;
-        public Exception CompilerFatalError;
+        public LanguageException TokenizerFatalError;
+        public LanguageException ParserFatalError;
+        public LanguageException CompilerFatalError;
 
         public Error[] TokenizerErrors;
         public Error[] ParserErrors;
@@ -33,7 +33,7 @@ namespace LanguageCore.BBCode.Analysis
         public Token[] Tokens;
         public string[] FileReferences;
 
-        public AnalysisResult SetTokenizerResult(Exception fatalError, Error[] errors)
+        public AnalysisResult SetTokenizerResult(LanguageException fatalError, Error[] errors)
         {
             this.Tokens = null;
             this.TokenizerFatalError = fatalError;
@@ -42,7 +42,7 @@ namespace LanguageCore.BBCode.Analysis
             return this;
         }
 
-        public AnalysisResult SetParserResult(Exception fatalError, Error[] errors, Warning[] warnings)
+        public AnalysisResult SetParserResult(LanguageException fatalError, Error[] errors, Warning[] warnings)
         {
             this.parserResult = null;
             this.ParserFatalError = fatalError;
@@ -52,7 +52,7 @@ namespace LanguageCore.BBCode.Analysis
             return this;
         }
 
-        public AnalysisResult SetCompilerResult(Exception fatalError, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
+        public AnalysisResult SetCompilerResult(LanguageException fatalError, Error[] errors, Warning[] warnings, Information[] informations, Hint[] hints)
         {
             this.compilerResult = null;
             this.CompilerFatalError = fatalError;
@@ -146,13 +146,13 @@ namespace LanguageCore.BBCode.Analysis
                 result.TokenizerWarnings = tokenizerWarnings.ToArray();
                 result.TokenizerInicodeChars = unicodeChars.ToArray();
             }
-            catch (Exception error)
+            catch (LanguageException error)
             {
                 result.TokenizerFatalError = error;
             }
             catch (System.Exception error)
             {
-                result.TokenizerFatalError = new Exception(error.Message, error);
+                result.TokenizerFatalError = new LanguageException(error.Message, error);
             }
             return result;
         }
@@ -271,16 +271,16 @@ namespace LanguageCore.BBCode.Analysis
 
                     List<Error> parserErrors = new();
 
-                    ParserResult? parserResult2_ = Parse(tokens, parserErrors, usingFile.Replace('\\', '/'), out Exception parserFatalError, out _);
+                    ParserResult? parserResult2_ = Parse(tokens, parserErrors, usingFile.Replace('\\', '/'), out LanguageException parserFatalError, out _);
 
                     if (parserErrors.Count > 0)
-                    { throw new Exception("Failed to parse", parserErrors[0].ToException()); }
+                    { throw new LanguageException("Failed to parse", parserErrors[0].ToException()); }
 
                     if (parserFatalError != null)
-                    { throw new Exception("Failed to parse", parserFatalError); }
+                    { throw new LanguageException("Failed to parse", parserFatalError); }
 
                     if (!parserResult2_.HasValue)
-                    { throw new Exception("Failed to parse", new System.Exception("Result is null")); }
+                    { throw new LanguageException("Failed to parse", new System.Exception("Result is null")); }
 
                     ParserResult parserResult2_v = parserResult2_.Value;
 
@@ -419,7 +419,7 @@ namespace LanguageCore.BBCode.Analysis
             };
         }
 
-        static ParserResult? Parse(Token[] tokens, List<Error> errors, string path, out Exception fatalError, out Token[] modifyedTokens)
+        static ParserResult? Parse(Token[] tokens, List<Error> errors, string path, out LanguageException fatalError, out Token[] modifyedTokens)
         {
             if (path is null)
             { throw new System.ArgumentNullException(nameof(path)); }
@@ -436,7 +436,7 @@ namespace LanguageCore.BBCode.Analysis
 
                 return result;
             }
-            catch (Exception error)
+            catch (LanguageException error)
             {
                 fatalError = error;
                 modifyedTokens = tokens;
@@ -445,7 +445,7 @@ namespace LanguageCore.BBCode.Analysis
             }
             catch (System.Exception error)
             {
-                fatalError = new Exception(error.Message, error);
+                fatalError = new LanguageException(error.Message, error);
                 modifyedTokens = tokens;
 
                 return null;
@@ -460,7 +460,7 @@ namespace LanguageCore.BBCode.Analysis
             List<Error> errors = new();
             List<Warning> warnings = new();
 
-            ParserResult? parserResult = Parse(tokens, errors, path, out Exception parserError, out var modifyedTokens);
+            ParserResult? parserResult = Parse(tokens, errors, path, out LanguageException parserError, out var modifyedTokens);
 
             if (errors.Count > 0 || parserError != null)
                 return AnalysisResult
@@ -471,7 +471,7 @@ namespace LanguageCore.BBCode.Analysis
                 return AnalysisResult
                     .Empty()
                     .SetTokenizerResult(modifyedTokens, null)
-                    .SetParserResult(new Exception("Parse failed", new System.Exception("Parser result is null")), errors.ToArray(), warnings.ToArray());
+                    .SetParserResult(new LanguageException("Parse failed", new System.Exception("Parser result is null")), errors.ToArray(), warnings.ToArray());
 
             parserResult.Value.SetFile(path);
 
@@ -500,7 +500,7 @@ namespace LanguageCore.BBCode.Analysis
                     .SetParserResult(parserResult, null, null)
                     .SetCompilerResult(compilerResult, compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
-            catch (Exception error)
+            catch (LanguageException error)
             {
                 return AnalysisResult
                    .Empty()
@@ -514,7 +514,7 @@ namespace LanguageCore.BBCode.Analysis
                    .Empty()
                    .SetTokenizerResult(tokens, null)
                    .SetParserResult(parserResult, null, null)
-                   .SetCompilerResult(new Exception(error.Message, error), compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
+                   .SetCompilerResult(new LanguageException(error.Message, error), compilerErrors.ToArray(), warnings.ToArray(), compilerInformations.ToArray(), compilerHints.ToArray());
             }
         }
     }

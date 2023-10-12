@@ -5,9 +5,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using  LanguageCore.Brainfuck.Compiler;
-using  LanguageCore.Brainfuck.Renderer;
-using  LanguageCore.Runtime;
+using LanguageCore.Brainfuck.Compiler;
+using LanguageCore.Brainfuck.Renderer;
+using LanguageCore.Runtime;
 using Win32;
 
 #nullable enable
@@ -138,7 +138,7 @@ namespace LanguageCore.Brainfuck
 
         internal bool OutOfCode => CodePointer >= Code.Length || CodePointer < 0;
 
-        internal DebugInfo[]? DebugInfo = null;
+        internal DebugInformation? DebugInfo = null;
         internal Tokenizing.Token[]? OriginalCode = null;
         bool isPaused;
 
@@ -195,7 +195,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        /// <exception cref="BrainfuckException"></exception>
+        /// <exception cref="BrainfuckRuntimeException"></exception>
         public bool Step()
         {
             if (OutOfCode) return false;
@@ -210,12 +210,12 @@ namespace LanguageCore.Brainfuck
                     goto FinishInstruction;
                 case '>':
                     if (MemoryPointer >= Memory.Length)
-                    { throw new BrainfuckException($"Memory overflow"); }
+                    { throw new BrainfuckRuntimeException($"Memory overflow", GetContext()); }
                     MemoryPointer++;
                     goto FinishInstruction;
                 case '<':
                     if (MemoryPointer <= 0)
-                    { throw new BrainfuckException($"Memory underflow"); }
+                    { throw new BrainfuckRuntimeException($"Memory underflow", GetContext()); }
                     MemoryPointer--;
                     goto FinishInstruction;
                 case '[':
@@ -229,12 +229,12 @@ namespace LanguageCore.Brainfuck
                             if (CurrentInstruction == ']')
                             {
                                 if (depth == 0) goto FinishInstruction;
-                                if (depth < 0) throw new BrainfuckException($"Wat at {CodePointer}");
+                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", GetContext());
                                 depth--;
                             }
                             else if (CurrentInstruction == '[') depth++;
                         }
-                        throw new BrainfuckException($"Unclosed bracket at {CodePointer}");
+                        throw new BrainfuckRuntimeException($"Unclosed bracket", GetContext());
                     }
                     goto FinishInstruction;
                 case ']':
@@ -248,12 +248,12 @@ namespace LanguageCore.Brainfuck
                             if (CurrentInstruction == '[')
                             {
                                 if (depth == 0) goto FinishInstruction;
-                                if (depth < 0) throw new BrainfuckException($"Wat at {CodePointer}");
+                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", GetContext());
                                 depth--;
                             }
                             else if (CurrentInstruction == ']') depth++;
                         }
-                        throw new BrainfuckException($"Unexpected closing bracket {CodePointer}");
+                        throw new BrainfuckRuntimeException($"Unexpected closing bracket", GetContext());
                     }
                     goto FinishInstruction;
                 case '.':
@@ -266,7 +266,7 @@ namespace LanguageCore.Brainfuck
                     isPaused = true;
                     goto FinishInstruction;
                 default:
-                    throw new BrainfuckException($"Unknown instruction {CurrentInstruction}");
+                    throw new BrainfuckRuntimeException($"Unknown instruction {CurrentInstruction}", GetContext());
             }
 
         FinishInstruction:
@@ -322,6 +322,15 @@ namespace LanguageCore.Brainfuck
                 DrawMemoryChars(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
+
+                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+
+                DrawOriginalCode(renderer, 0, line, width, 15);
+                height -= 15;
+                line += 15;
+
+                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+
                 DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
                 renderer.RefreshConsole();
@@ -362,6 +371,7 @@ namespace LanguageCore.Brainfuck
             Win32.Utilities.ConsoleListener.Stop();
         }
 
+        int StartToken;
         void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
@@ -375,69 +385,88 @@ namespace LanguageCore.Brainfuck
             if (DebugInfo == null) return;
             if (OriginalCode == null) return;
 
-            DebugInfo? c = null;
-            for (int i = 0; i < DebugInfo.Length; i++)
-            {
-                if (DebugInfo[i].InstructionStart >= CodePointer &&
-                    DebugInfo[i].InstructionEnd <= CodePointer)
-                {
-                    c = DebugInfo[i];
-                }
-            }
+            if (!DebugInfo.TryGetSourceLocation(CodePointer, out SourceCodeLocation sourceLocation)) return;
 
-            if (c == null) return;
-
-            int tokenI = -1;
             for (int i = 0; i < OriginalCode.Length; i++)
             {
-                if (OriginalCode[i].Position.Contains(c.Position.Start) ||
-                    OriginalCode[i].Position.Contains(c.Position.End))
+                if (OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.Start) ||
+                    OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.End))
                 {
-                    tokenI = i;
+                    StartToken = i;
                     break;
                 }
             }
 
-            if (tokenI == -1) return;
+            if (StartToken == -1)
+            { return; }
 
-            tokenI = Math.Max(0, tokenI - 30);
+            StartToken = Math.Max(0, StartToken - 30);
 
-            int startLine = OriginalCode[tokenI].Position.Start.Line;
+            int startLine = OriginalCode[StartToken].Position.Start.Line;
 
-            for (int i = tokenI; i < OriginalCode.Length; i++)
+            while (StartToken > 0 && OriginalCode[StartToken - 1].Position.Start.Line == startLine)
             {
-                int currentX = OriginalCode[i].Position.Start.Character + x;
-                int currentY = OriginalCode[i].Position.Start.Line - startLine + y;
+                StartToken--;
+            }
+
+            for (int i = StartToken; i < OriginalCode.Length; i++)
+            {
+                var token = OriginalCode[i];
+
+                int currentX = token.Position.Start.Character + x;
+                int currentY = token.Position.Start.Line - startLine + y;
 
                 if (currentY - y >= height)
-                {
-                    return;
-                }
+                { return; }
 
-                if (OriginalCode[i].Position.End.Character < width)
+                if (token.Position.End.Character >= width)
+                { continue; }
+
+                if (currentX < 0 || currentY < 0)
+                { return; }
+                if (currentX >= width || currentY >= height)
+                { return; }
+
+                string text = token.Content;
+                for (int offset = 0; offset < text.Length; offset++)
                 {
-                    string text = OriginalCode[i].Content;
+                    if (currentX + offset - 1 >= width) return;
+
+                    byte foregroundColor = token.TokenType switch
                     {
-                        if (currentX < 0 || currentY < 0) return;
-                        if (currentX >= width || currentY >= height) return;
+                        Tokenizing.TokenType.LITERAL_NUMBER => ByteColor.BrightCyan,
+                        Tokenizing.TokenType.LITERAL_HEX => ByteColor.BrightCyan,
+                        Tokenizing.TokenType.LITERAL_BIN => ByteColor.BrightCyan,
+                        Tokenizing.TokenType.LITERAL_FLOAT => ByteColor.BrightCyan,
+                        Tokenizing.TokenType.LITERAL_STRING => ByteColor.BrightYellow,
+                        Tokenizing.TokenType.LITERAL_CHAR => ByteColor.BrightYellow,
+                        Tokenizing.TokenType.COMMENT => ByteColor.Green,
+                        Tokenizing.TokenType.COMMENT_MULTILINE => ByteColor.Green,
+                        _ => ByteColor.White,
+                    };
 
-                        for (int offset = 0; offset < text.Length; offset++)
-                        {
-                            if (currentX + offset >= width) return;
+                    foregroundColor = token.AnalyzedType switch
+                    {
+                        Tokenizing.TokenAnalysedType.Attribute => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalysedType.Type => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalysedType.Struct => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalysedType.Keyword => ByteColor.White,
+                        Tokenizing.TokenAnalysedType.FunctionName => ByteColor.BrightYellow,
+                        Tokenizing.TokenAnalysedType.VariableName => ByteColor.White,
+                        Tokenizing.TokenAnalysedType.FieldName => ByteColor.White,
+                        Tokenizing.TokenAnalysedType.ParameterName => ByteColor.White,
+                        Tokenizing.TokenAnalysedType.Class => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalysedType.BuiltinType => ByteColor.BrightBlue,
+                        Tokenizing.TokenAnalysedType.Enum => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalysedType.TypeParameter => ByteColor.Yellow,
+                        _ => foregroundColor,
+                    };
 
-                            byte foregroundColor = ByteColor.White;
-                            byte backgroundColor = ByteColor.Black;
+                    byte backgroundColor = ByteColor.Black;
+                    if (sourceLocation.SourcePosition.Range.Contains(token.Position.Start))
+                    { backgroundColor = ByteColor.Gray; }
 
-                            SinglePosition singlePosition = new(OriginalCode[i].Position.Start.Line, OriginalCode[i].Position.Start.Character + offset);
-
-                            if (c.Position.Range.Contains(singlePosition))
-                            {
-                                backgroundColor = ByteColor.BrightGreen;
-                            }
-
-                            renderer[currentX + offset, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
-                        }
-                    }
+                    renderer[currentX + offset - 1, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
                 }
             }
         }
@@ -588,22 +617,13 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        internal void Reset()
+        public void Reset()
         {
             this.CodePointer = 0;
             this.MemoryPointer = 0;
             this.Memory = new Memory<Value>(1024);
         }
 
-        [Serializable]
-        public class BrainfuckException : System.Exception
-        {
-            public BrainfuckException() { }
-            public BrainfuckException(string message) : base(message) { }
-            public BrainfuckException(string message, Exception inner) : base(message, inner) { }
-            protected BrainfuckException(
-              System.Runtime.Serialization.SerializationInfo info,
-              System.Runtime.Serialization.StreamingContext context) : base(info, context) { }
-        }
+        public RuntimeContext GetContext() => new(MemoryPointer, CodePointer);
     }
 }

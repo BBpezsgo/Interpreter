@@ -714,7 +714,7 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
         /// <summary>
-        /// Returns the struct size or 1 if it is not a class
+        /// Returns the struct size or 1 if it is not a struct
         /// </summary>
         public int SizeOnStack
         {

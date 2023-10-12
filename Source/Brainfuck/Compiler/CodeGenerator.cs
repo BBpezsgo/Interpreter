@@ -33,18 +33,11 @@ namespace LanguageCore.Brainfuck.Compiler
         }
     }
 
-    public class DebugInfo
-    {
-        internal Position Position;
-        internal int InstructionStart;
-        internal int InstructionEnd;
-    }
-
     public class CodeGenerator : CodeGeneratorBase
     {
         static readonly string[] IllegalIdentifiers = new string[]
         {
-            "IN",
+
         };
 
         #region Fields
@@ -74,7 +67,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         string? VariableCanBeDiscarded = null;
 
-        readonly List<DebugInfo> DebugInfo;
+        readonly DebugInformation DebugInfo;
 
         #endregion
 
@@ -93,7 +86,7 @@ namespace LanguageCore.Brainfuck.Compiler
             this.BreakCount = new Stack<int>();
             this.BreakTagStack = new Stack<int>();
             this.InMacro = new Stack<bool>();
-            this.DebugInfo = new List<DebugInfo>();
+            this.DebugInfo = new DebugInformation();
         }
 
         public enum ValueType
@@ -111,7 +104,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             public Warning[] Warnings;
             public Error[] Errors;
-            public List<DebugInfo> DebugInfo;
+            public DebugInformation DebugInfo;
         }
 
         public struct Settings
@@ -160,6 +153,7 @@ namespace LanguageCore.Brainfuck.Compiler
             public readonly CompiledType Type;
             public readonly int Size;
             public bool IsDiscarded;
+            public bool IsInitialValueSet;
 
             public readonly bool IsInitialized => Type.SizeOnStack > 0;
 
@@ -172,6 +166,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Type = type;
                 IsDiscarded = false;
                 Size = size;
+                IsInitialValueSet = false;
             }
 
             public readonly bool IsThis(string query)
@@ -324,12 +319,12 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariables(Statement statement)
         {
-            if (statement is not VariableDeclaretion instruction)
+            if (statement is not VariableDeclaration instruction)
             { return 0; }
 
             return PrecompileVariable(instruction);
         }
-        int PrecompileVariable(VariableDeclaretion variableDeclaration)
+        int PrecompileVariable(VariableDeclaration variableDeclaration)
         {
             if (IllegalIdentifiers.Contains(variableDeclaration.VariableName.Content))
             { throw new CompilerException($"Illegal variable name \"{variableDeclaration.VariableName}\"", variableDeclaration.VariableName, CurrentFile); }
@@ -369,23 +364,49 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 CompiledType initialValueType = FindStatementType(initialValue, type);
 
-                if (!initialValueType.Equals(type))
-                { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
-
-                if (type.IsClass &&
-                    type.Class.CompiledAttributes.HasAttribute("Define", "array") &&
-                    initialValue is ConstructorCall constructorCall)
+                if (type.IsStackArray)
                 {
-                    if (constructorCall.Parameters.Length != 1)
-                    { throw new CompilerException($"Expected 1 parameters, {constructorCall.Parameters.Length} passed", constructorCall, CurrentFile); }
+                    if (type.StackArrayOf == Type.CHAR)
+                    {
+                        if (initialValue is not Literal literal)
+                        { throw new InternalException(); }
+                        if (literal.Type != LiteralType.STRING)
+                        { throw new InternalException(); }
+                        if (literal.Value.Length != type.StackArraySize)
+                        { throw new InternalException(); }
 
-                    if (!TryCompute(constructorCall.Parameters[0], null, out var arraySize))
-                    { throw new CompilerException($"Array size have to be precompiled", constructorCall.Parameters[0], CurrentFile); }
+                        int arraySize = type.StackArraySize;
 
-                    if (!DataItem.TryShrinkToByte(ref arraySize))
-                    { throw new CompilerException($"Expected byte as array size (not {arraySize.Type})", constructorCall.Parameters[0], CurrentFile); }
+                        int size = Snippets.ARRAY_SIZE(arraySize);
 
-                    int size = Snippets.ARRAY_SIZE(arraySize.ValueByte);
+                        int address = Stack.PushVirtual(size);
+                        variables.Push(new Variable(name, address, scope, true, type, size)
+                        {
+                            IsInitialValueSet = true
+                        });
+
+                        for (int i = 0; i < literal.Value.Length; i++)
+                        { Code.ARRAY_SET_CONST(address, i, new DataItem(literal.Value[i])); }
+                    }
+                    else
+                    { throw new NotImplementedException(); }
+                }
+                else
+                {
+                    if (!initialValueType.Equals(type))
+                    { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
+
+                    int address = Stack.PushVirtual(type.SizeOnStack);
+                    variables.Push(new Variable(name, address, scope, true, type, type.SizeOnStack));
+                }
+            }
+            else
+            {
+                if (type.IsStackArray)
+                {
+                    int arraySize = type.StackArraySize;
+
+                    int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
                     variables.Push(new Variable(name, address, scope, true, type, size));
@@ -395,11 +416,6 @@ namespace LanguageCore.Brainfuck.Compiler
                     int address = Stack.PushVirtual(type.SizeOnStack);
                     variables.Push(new Variable(name, address, scope, true, type, type.SizeOnStack));
                 }
-            }
-            else
-            {
-                int address = Stack.PushVirtual(type.SizeOnStack);
-                variables.Push(new Variable(name, address, scope, true, type, type.SizeOnStack));
             }
 
             return 1;
@@ -448,14 +464,11 @@ namespace LanguageCore.Brainfuck.Compiler
         {
             CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
 
+            if (arrayType.IsStackArray)
+            { return arrayType.StackArrayOf.SizeOnStack; }
+
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (arrayType.Class.CompiledAttributes.HasAttribute("Defines", "array"))
-            {
-                var elementType = arrayType.TypeParameters[0];
-                return elementType.SizeOnStack;
-            }
 
             if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
             {
@@ -498,9 +511,6 @@ namespace LanguageCore.Brainfuck.Compiler
         };
         int GetValueSize(Identifier statement)
         {
-            if (statement.Content == "IN")
-            { return 1; }
-
             if (Variables.TryFind(statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
@@ -539,6 +549,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
+                throw new NotImplementedException();
+
                 if (constructorCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
@@ -664,12 +676,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 return false;
             }
 
-            if (!variable.Type.IsClass || !variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
-            { throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile); }
-
-            address = variable.Address;
-            size = variable.Size;
-            return true;
+            throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile);
         }
 
         bool TryGetAddress(Field field, out int address, out int size)
@@ -825,10 +832,6 @@ namespace LanguageCore.Brainfuck.Compiler
 
         void CompileSetter(Identifier statement, StatementWithValue value)
         {
-            if (value is FunctionCall functionCall &&
-                functionCall.Identifier == "array")
-            { return; }
-
             if (Constants.TryFind(statement.Content, out _))
             { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
@@ -941,8 +944,53 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 int valueSize = GetValueSize(value);
 
-                if (valueSize != variable.Size)
-                { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
+                if (variable.Type.IsStackArray)
+                {
+                    if (valueSize != variable.Type.StackArraySize)
+                    { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
+
+                    if (variable.Type.StackArrayOf == Type.CHAR)
+                    {
+                        if (value is not Literal literal)
+                        { throw new InternalException(); }
+                        if (literal.Type != LiteralType.STRING)
+                        { throw new InternalException(); }
+                        if (literal.Value.Length != variable.Type.StackArraySize)
+                        { throw new InternalException(); }
+
+                        int arraySize = variable.Type.StackArraySize;
+
+                        int size = Snippets.ARRAY_SIZE(arraySize);
+
+                        int tempAddress2 = Stack.Push(0);
+                        int tempAddress3 = Stack.Push(0);
+
+                        for (int i = 0; i < literal.Value.Length; i++)
+                        {
+                            Code.SetValue(tempAddress2, i);
+                            Code.SetValue(tempAddress3, literal.Value[i]);
+                            Code.ARRAY_SET(variable.Address, tempAddress2, tempAddress3, tempAddress3 + 1);
+                        }
+
+                        Stack.Pop();
+                        Stack.Pop();
+
+                        UndiscardVariable(Variables, variable.Name);
+
+                        VariableCanBeDiscarded = null;
+
+                        return;
+                    }
+                    else
+                    {
+                        throw new NotImplementedException();
+                    }
+                }
+                else
+                {
+                    if (valueSize != variable.Size)
+                    { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
+                }
 
                 using (Code.Block($"Compute value"))
                 {
@@ -976,7 +1024,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 Code.JumpStart(checkResultAddress);
 
-                Code.PRINT(checkResultAddress, "\nOut of memory range\n");
+                Code.OUT_STRING(checkResultAddress, "\nOut of memory range\n");
 
                 Code.ClearValue(checkResultAddress);
                 Code.JumpEnd(checkResultAddress);
@@ -1052,37 +1100,35 @@ namespace LanguageCore.Brainfuck.Compiler
 
             using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
-                if (variable.Type.IsClass && variable.Type.Class.CompiledAttributes.HasAttribute("Define", "array"))
-                {
-                    CompiledType elementType = variable.Type.TypeParameters[0];
-                    CompiledType valueType = FindStatementType(value);
+                if (!variable.Type.IsStackArray)
+                { throw new NotImplementedException(); }
 
-                    if (elementType != valueType)
-                    { throw new CompilerException("Bruh", value, CurrentFile); }
+                CompiledType elementType = variable.Type.StackArrayOf;
+                CompiledType valueType = FindStatementType(value);
 
-                    int elementSize = elementType.Size;
+                if (elementType != valueType)
+                { throw new CompilerException("Bruh", value, CurrentFile); }
 
-                    if (elementSize != 1)
-                    { throw new CompilerException($"Array element size must be 1 :(", value, CurrentFile); }
+                int elementSize = elementType.Size;
 
-                    int indexAddress = Stack.NextAddress;
-                    using (Code.Block($"Compute index"))
-                    { Compile(statement.Expression); }
+                if (elementSize != 1)
+                { throw new CompilerException($"Array element size must be 1 :(", value, CurrentFile); }
 
-                    int valueAddress = Stack.NextAddress;
-                    using (Code.Block($"Compute value"))
-                    { Compile(value); }
+                int indexAddress = Stack.NextAddress;
+                using (Code.Block($"Compute index"))
+                { Compile(statement.Expression); }
 
-                    int temp0 = Stack.PushVirtual(1);
+                int valueAddress = Stack.NextAddress;
+                using (Code.Block($"Compute value"))
+                { Compile(value); }
 
-                    Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, temp0);
+                int temp0 = Stack.PushVirtual(1);
 
-                    Stack.Pop();
-                    Stack.Pop();
-                    Stack.Pop();
+                Code.ARRAY_SET(variable.Address, indexAddress, valueAddress, temp0);
 
-                    return;
-                }
+                Stack.Pop();
+                Stack.Pop();
+                Stack.Pop();
             }
         }
 
@@ -1119,7 +1165,7 @@ namespace LanguageCore.Brainfuck.Compiler
             { Compile(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
             { Compile(compoundAssignment); }
-            else if (statement is VariableDeclaretion variableDeclaration)
+            else if (statement is VariableDeclaration variableDeclaration)
             { Compile(variableDeclaration); }
             else if (statement is TypeCast typeCast)
             { Compile(typeCast); }
@@ -1144,27 +1190,25 @@ namespace LanguageCore.Brainfuck.Compiler
 
             Code.SetPointer(0);
 
+            if (InMacro.Count > 0 && InMacro.Last) return;
+
             int end = Code.GetFinalCode().Length;
-            DebugInfo.Add(new DebugInfo()
+            DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
-                InstructionStart = start,
-                InstructionEnd = end,
-                Position = statement.GetPosition(),
+                Instructions = (start, end),
+                SourcePosition = statement.GetPosition(),
             });
         }
         void Compile(IndexCall indexCall)
         {
             CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
 
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (arrayType.Class.CompiledAttributes.HasAttribute("Define", "array"))
+            if (arrayType.IsStackArray)
             {
                 if (!TryGetAddress(indexCall.PrevStatement, out int arrayAddress, out _))
                 { throw new CompilerException($"Failed to get array address", indexCall.PrevStatement, CurrentFile); }
 
-                CompiledType elementType = arrayType.TypeParameters[0];
+                CompiledType elementType = arrayType.StackArrayOf;
 
                 int elementSize = elementType.Size;
 
@@ -1183,6 +1227,9 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 return;
             }
+
+            if (!arrayType.IsClass)
+            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
 
             Compile(new FunctionCall(
                 indexCall.PrevStatement,
@@ -1637,6 +1684,8 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 case "return":
                     {
+                        statement.Identifier.AnalyzedType = TokenAnalysedType.Statement;
+
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
@@ -1670,6 +1719,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 case "break":
                     {
+                        statement.Identifier.AnalyzedType = TokenAnalysedType.Statement;
+
                         if (statement.Parameters.Length != 0)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
@@ -1688,29 +1739,33 @@ namespace LanguageCore.Brainfuck.Compiler
                         break;
                     }
 
-                case "outraw":
-                    {
-                        if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                /*
+            case "outraw":
+                {
+                    if (statement.Parameters.Length <= 0)
+                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        foreach (StatementWithValue? value in statement.Parameters)
-                        { CompileRawPrinter(value); }
+                    foreach (StatementWithValue? value in statement.Parameters)
+                    { CompileRawPrinter(value); }
 
-                        break;
-                    }
-                case "out":
-                    {
-                        if (statement.Parameters.Length <= 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                    break;
+                }
+            case "out":
+                {
+                    if (statement.Parameters.Length <= 0)
+                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required minimum 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        foreach (StatementWithValue valueToPrint in statement.Parameters)
-                        { CompilePrinter(valueToPrint); }
+                    foreach (StatementWithValue valueToPrint in statement.Parameters)
+                    { CompilePrinter(valueToPrint); }
 
-                        break;
-                    }
+                    break;
+                }
+                */
 
                 case "delete":
                     {
+                        statement.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
+
                         if (statement.Parameters.Length != 1)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
@@ -1940,12 +1995,15 @@ namespace LanguageCore.Brainfuck.Compiler
                     throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
         }
-        void Compile(VariableDeclaretion statement)
+        void Compile(VariableDeclaration statement)
         {
             if (statement.InitialValue == null) return;
 
             if (!Variables.TryFind(statement.VariableName.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
+
+            if (variable.IsInitialValueSet)
+            { return; }
 
             CompileSetter(variable, statement.InitialValue);
         }
@@ -1995,6 +2053,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+
                 string prevFile = CurrentFile;
                 CurrentFile = macro.FilePath;
 
@@ -2021,6 +2081,8 @@ namespace LanguageCore.Brainfuck.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
+            functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
 
@@ -2043,6 +2105,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (@class.CompiledAttributes.HasAttribute("Define", "array"))
             {
+                throw new NotImplementedException();
+
                 if (constructorCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
@@ -2125,15 +2189,17 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Compile(Identifier statement)
         {
+            /*
             if (statement.Content == "IN")
             {
                 int address = Stack.PushVirtual(1);
                 Code.MovePointer(address);
-                Code += ",";
+                Code += ',';
                 Code.MovePointer(0);
 
                 return;
             }
+            */
 
             if (Variables.TryFind(statement.Content, out Variable variable))
             {
@@ -2294,7 +2360,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             using (Code.Block($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                             {
-                                Code.DIVIDE(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
+                                Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
                             }
 
                             Stack.Pop();
@@ -2313,7 +2379,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             using (Code.Block($"Snippet POWER({leftAddress} {rightAddress})"))
                             {
-                                Code.POWER(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3);
+                                Code.MATH_POW(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3);
                             }
 
                             Stack.Pop();
@@ -2332,7 +2398,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
                             {
-                                Code.MOD(leftAddress, rightAddress, rightAddress + 1);
+                                Code.MATH_MOD(leftAddress, rightAddress, rightAddress + 1);
                             }
 
                             Stack.Pop();
@@ -2796,7 +2862,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 {
                     Code.SetValue(tempAddress, value.ValueChar);
                     Code.SetPointer(tempAddress);
-                    Code += ".";
+                    Code += '.';
                     Code.ClearValue(tempAddress);
                     Code.SetPointer(0);
                 }
@@ -2812,7 +2878,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.SetPointer(tempAddress);
 
                     using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                    { Code.Code += Snippets.OUT_AS_STRING; }
+                    { Code += Snippets.OUT_AS_STRING; }
                     Code.ClearValue(tempAddress);
                     Code.SetPointer(0);
                 }
@@ -2828,7 +2894,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.SetPointer(tempAddress);
 
                     using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                    { Code.Code += Snippets.OUT_AS_STRING; }
+                    { Code += Snippets.OUT_AS_STRING; }
                     Code.ClearValue(tempAddress);
                     Code.SetPointer(0);
                 }
@@ -2853,19 +2919,19 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     while (prevValue > charToPrint)
                     {
-                        Code += "-";
+                        Code += '-';
                         prevValue--;
                     }
 
                     while (prevValue < charToPrint)
                     {
-                        Code += "+";
+                        Code += '+';
                         prevValue++;
                     }
 
                     prevValue = charToPrint;
 
-                    Code += ".";
+                    Code += '.';
                 }
 
                 Code.ClearValue(address);
@@ -2897,18 +2963,18 @@ namespace LanguageCore.Brainfuck.Compiler
                 {
                     case Type.BYTE:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.INT:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.FLOAT:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
-                        { Code.Code += Snippets.OUT_AS_STRING; }
+                        { Code += Snippets.OUT_AS_STRING; }
                         break;
                     case Type.CHAR:
-                        Code.Code += ".";
+                        Code += '.';
                         break;
                     case Type.NONE:
                     case Type.VOID:
@@ -2952,7 +3018,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.ClearCurrent();
                     Code.AddValue(value.ValueByte);
 
-                    Code += ".";
+                    Code += '.';
 
                     Code.ClearCurrent();
                     Code.SetPointer(0);
@@ -2968,7 +3034,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.ClearCurrent();
                     Code.AddValue(value.ValueInt);
 
-                    Code += ".";
+                    Code += '.';
 
                     Code.ClearCurrent();
                     Code.SetPointer(0);
@@ -2984,7 +3050,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.ClearCurrent();
                     Code.AddValue(value.ValueChar);
 
-                    Code += ".";
+                    Code += '.';
 
                     Code.ClearCurrent();
                     Code.SetPointer(0);
@@ -3006,7 +3072,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 {
                     int offsettedAddress = variable.Address + offset;
                     Code.SetPointer(offsettedAddress);
-                    Code += ".";
+                    Code += '.';
                 }
                 Code.SetPointer(0);
             }
@@ -3023,7 +3089,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     Stack.Pop(address =>
                     {
                         Code.SetPointer(address);
-                        Code += ".";
+                        Code += '.';
                         Code.ClearCurrent();
                     });
                     Code.SetPointer(0);
@@ -3471,7 +3537,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedReturnCount; i++)
                 {
-                    Code += "]";
+                    Code += ']';
                     Code.LineBreak();
                 }
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -3500,7 +3566,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedBreakCount; i++)
                 {
-                    Code += "]";
+                    Code += ']';
                     Code.LineBreak();
                 }
                 Code.CommentLine($"Pointer: {Code.Pointer}");

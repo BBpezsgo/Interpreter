@@ -12,6 +12,18 @@ using LanguageCore.Tokenizing;
 namespace LanguageCore.BBCode.Compiler
 {
 
+    public class CompiledConstant
+    {
+        public readonly VariableDeclaration Declaration;
+        public readonly DataItem Value;
+
+        public CompiledConstant(VariableDeclaration declaration, DataItem value)
+        {
+            Declaration = declaration;
+            Value = value;
+        }
+    }
+
     public struct AttributeValues
     {
         public List<Literal> parameters;
@@ -161,7 +173,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             else
             {
-                throw new System.Exception($"Invalid type '{value.GetType().FullName}'");
+                throw new InternalException($"Invalid type '{value.GetType().FullName}'");
             }
         }
 
@@ -191,7 +203,7 @@ namespace LanguageCore.BBCode.Compiler
         }
     }
 
-    public class CompiledVariable : VariableDeclaretion
+    public class CompiledVariable : VariableDeclaration
     {
         public readonly new CompiledType Type;
 
@@ -200,7 +212,7 @@ namespace LanguageCore.BBCode.Compiler
         public readonly bool IsStoredInHEAP;
         public bool IsInitialized;
 
-        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, VariableDeclaretion declaration)
+        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, VariableDeclaration declaration)
             : base(declaration.Modifiers, declaration.Type, declaration.VariableName, declaration.InitialValue)
         {
             this.Type = type;

@@ -42,9 +42,14 @@ namespace LanguageCore.BBCode.Compiler
 
         #region GenerateCodeForStatement
 
-        void GenerateCodeForStatement(VariableDeclaretion newVariable)
+        void GenerateCodeForStatement(VariableDeclaration newVariable)
         {
             newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
+
+            if (newVariable.Modifiers.Contains("const")) return;
+
+            if (GetConstant(newVariable.VariableName.Content, out _))
+            { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts", newVariable.VariableName, newVariable.FilePath); }
 
             if (InMacro.Last)
             { throw new NotImplementedException(); }
@@ -281,6 +286,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
+            /*
             if (keywordCall.FunctionName == "out")
             {
                 if (keywordCall.Parameters.Length != 1)
@@ -412,6 +418,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 return;
             }
+            */
 
             throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
@@ -1101,6 +1108,12 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateCodeForStatement(Identifier variable, CompiledType expectedType = null)
         {
+            if (GetConstant(variable.Content, out DataItem constant))
+            {
+                AddInstruction(Opcode.PUSH_VALUE, constant);
+                return;
+            }
+
             if (GetParameter(variable.Content, out CompiledParameter param))
             {
                 int offset = GetBaseAddress(param);
@@ -1719,7 +1732,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (statement is LiteralList listValue)
             { GenerateCodeForStatement(listValue); }
-            else if (statement is VariableDeclaretion newVariable)
+            else if (statement is VariableDeclaration newVariable)
             { GenerateCodeForStatement(newVariable); }
             else if (statement is FunctionCall functionCall)
             { GenerateCodeForStatement(functionCall); }
@@ -1882,6 +1895,9 @@ namespace LanguageCore.BBCode.Compiler
         }
         void GenerateCodeForValueSetter(Identifier statementToSet, StatementWithValue value)
         {
+            if (GetConstant(statementToSet.Content, out _))
+            { throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, CurrentFile); }
+
             if (GetParameter(statementToSet.Content, out CompiledParameter parameter))
             {
                 CompiledType valueType = FindStatementType(value, parameter.Type);
@@ -2038,8 +2054,11 @@ namespace LanguageCore.BBCode.Compiler
             // TODO: set value by stack address
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
-        void GenerateCodeForValueSetter(VariableDeclaretion statementToSet, StatementWithValue value)
+        void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)
         {
+            if (GetConstant(statementToSet.VariableName.Content, out _))
+            { throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, statementToSet.FilePath); }
+
             if (value is LiteralList)
             { throw new NotImplementedException(); }
 
@@ -2194,6 +2213,8 @@ namespace LanguageCore.BBCode.Compiler
         {
             AddComment("Scope enter");
 
+            CompileConstants(block.Statements);
+
             CleanupStack.Push(CompileVariables(block, CurrentContext == null));
             ReturnInstructions.Push(new List<int>());
         }
@@ -2214,14 +2235,18 @@ namespace LanguageCore.BBCode.Compiler
                 ReturnInstructions.Last.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
             }
+
+            CleanupConstants();
         }
 
         #region GenerateCodeFor...
 
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        CleanupItem GenerateCodeForVariable(VariableDeclaretion newVariable, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable, bool isGlobal)
         {
+            if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
+
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
                 if (CompiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
@@ -2293,10 +2318,8 @@ namespace LanguageCore.BBCode.Compiler
         }
         CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
         {
-            if (st is VariableDeclaretion newVariable)
-            {
-                return GenerateCodeForVariable(newVariable, isGlobal);
-            }
+            if (st is VariableDeclaration newVariable)
+            { return GenerateCodeForVariable(newVariable, isGlobal); }
             return CleanupItem.Null;
         }
         CleanupItem[] GenerateCodeForVariable(Statement[] sts, bool isGlobal)
@@ -2473,6 +2496,8 @@ namespace LanguageCore.BBCode.Compiler
             InMacro.Push(false);
             ReturnInstructions.Push(new List<int>());
 
+            CompileConstants(statements);
+
             AddComment("Variables");
             CleanupStack.Push(GenerateCodeForVariable(statements, true));
 
@@ -2485,6 +2510,8 @@ namespace LanguageCore.BBCode.Compiler
             ReturnInstructions.Pop();
 
             CleanupVariables(CleanupStack.Pop());
+
+            CleanupConstants();
 
             InMacro.Pop();
             TagCount.Pop();

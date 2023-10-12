@@ -83,6 +83,7 @@ namespace LanguageCore.Parser
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
+            if (a.Kind != TypeInstanceKind.Simple) return false;
 
             return a.Identifier.Content == b;
         }
@@ -100,8 +101,16 @@ namespace LanguageCore.Parser
         }
 
         public bool Equals(TypeInstance other)
-            => other is not null &&
-            this.Identifier.Equals(other.Identifier);
+        {
+            if (other is null) return false;
+            if (!Identifier.Equals(other.Identifier)) return false;
+            if (Kind != other.Kind) return false;
+            if (GenericTypes.Count != other.GenericTypes.Count) return false;
+            for (int i = 0; i < GenericTypes.Count; i++)
+            { if (!GenericTypes[i].Equals(other.GenericTypes[i])) return false; }
+            if (this.StackArraySize is null != other.StackArraySize is null) return false;
+            return true;
+        }
 
         public override int GetHashCode() => HashCode.Combine(Identifier);
     }
@@ -348,14 +357,11 @@ namespace LanguageCore.Parser
 
     public class MacroDefinition : IExportable, IEquatable<MacroDefinition>
     {
-        public Token BracketStart;
-        public Token BracketEnd;
+        public readonly Token Keyword;
+        public readonly Token[] Parameters;
+        public readonly Token[] Modifiers;
 
-        public Token[] Parameters;
-        public Statement.Statement[] Statements;
-        public Token[] Modifiers;
-
-        public Statement.Block Block => new(BracketStart, Statements, BracketEnd);
+        public readonly Statement.Block Block;
 
         public int ParameterCount => Parameters.Length;
 
@@ -363,12 +369,13 @@ namespace LanguageCore.Parser
 
         public string FilePath { get; set; }
 
-        public MacroDefinition(Token identifier, IEnumerable<Token> modifiers)
+        public MacroDefinition(IEnumerable<Token> modifiers, Token keyword, Token identifier, IEnumerable<Token> parameters, Statement.Block block)
         {
+            Keyword = keyword;
             Identifier = identifier;
 
-            Parameters = Array.Empty<Token>();
-            Statements = Array.Empty<Statement.Statement>();
+            Parameters = parameters.ToArray();
+            Block = block;
             Modifiers = modifiers.ToArray();
         }
 
@@ -414,7 +421,7 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine(
             Parameters,
-            Statements,
+            Block,
             Modifiers,
             FilePath,
             Identifier);

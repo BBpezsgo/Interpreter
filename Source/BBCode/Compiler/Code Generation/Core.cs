@@ -156,7 +156,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (Functions[i].IsSame(compiledFunction))
                     {
                         if (offset != -1)
-                        { throw new System.Exception($"BRUH"); }
+                        { throw new InternalException($"BRUH"); }
                         offset = i;
                     }
                 }
@@ -494,11 +494,13 @@ namespace LanguageCore.BBCode.Compiler
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Cloner for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
                     }
+                    /*
                     else if (functionCall.Identifier.Content == "out")
                     {
                         if (item.GeneralFunction.InstructionOffset == -1)
                         { throw new InternalException($"Function {item.GeneralFunction.ReadableID()} does not have instruction offset", item.CurrentFile); }
                     }
+                    */
                     else
                     { throw new NotImplementedException(); }
                 }

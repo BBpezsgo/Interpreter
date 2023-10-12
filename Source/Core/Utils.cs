@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore
@@ -37,5 +38,11 @@ namespace LanguageCore
 
             return result;
         }
+    }
+
+    public static class RangeExtensions
+    {
+        public static int Sum(this Range<int> range)
+            => Math.Max(range.Start, range.End) - Math.Min(range.Start, range.End);
     }
 }

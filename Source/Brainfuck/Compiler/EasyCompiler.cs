@@ -47,7 +47,7 @@ namespace LanguageCore.Brainfuck
                 parserResult = Parser.Parser.Parse(tokens);
 
                 if (parserResult.Errors.Length > 0)
-                { throw new Exception("Failed to parse", parserResult.Errors[0].ToException()); }
+                { throw new LanguageException("Failed to parse", parserResult.Errors[0].ToException()); }
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
@@ -70,7 +70,7 @@ namespace LanguageCore.Brainfuck
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
 
                 if (compilerResult.Errors.Length > 0)
-                { throw new Exception("Failed to compile", compilerResult.Errors[0].ToException()); }
+                { throw new LanguageException("Failed to compile", compilerResult.Errors[0].ToException()); }
             }
 
             CodeGenerator.Result codeGeneratorResult;
@@ -89,7 +89,7 @@ namespace LanguageCore.Brainfuck
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
 
                 if (codeGeneratorResult.Errors.Length > 0)
-                { throw new Exception("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
+                { throw new LanguageException("Failed to compile", codeGeneratorResult.Errors[0].ToException()); }
 
                 printCallback?.Invoke($"Code generated in {(DateTime.Now - codeGenerationStarted).TotalMilliseconds} ms", LogType.Debug);
             }

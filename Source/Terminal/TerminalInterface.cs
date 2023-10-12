@@ -9,7 +9,7 @@ namespace LanguageCore
     internal static class Debug
     {
         internal static void Log(string msg) => System.Diagnostics.Debug.WriteLine(msg);
-        internal static void LogError(Exception error) => System.Diagnostics.Debug.WriteLine(error);
+        internal static void LogError(LanguageException error) => System.Diagnostics.Debug.WriteLine(error);
         internal static void LogError(System.Exception error) => System.Diagnostics.Debug.WriteLine(error);
         internal static void LogWarning(string msg) => System.Diagnostics.Debug.WriteLine(msg);
     }
@@ -68,7 +68,7 @@ namespace LanguageCore
             LogColor(error, ConsoleColor.Red);
         }
 
-        internal static void Error(Exception error)
+        internal static void Error(LanguageException error)
         {
             LogColor(error.ToString(), ConsoleColor.Red);
         }

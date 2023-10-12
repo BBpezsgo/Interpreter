@@ -9,25 +9,25 @@ namespace LanguageCore
     #region Exception
 
     [Serializable]
-    public class Exception : System.Exception
+    public class LanguageException : Exception
     {
         public Position Position => position;
         public readonly string? File;
         readonly Position position;
 
-        protected Exception(string message, Position position, string? file) : base(message)
+        protected LanguageException(string message, Position position, string? file) : base(message)
         {
             this.position = position;
             this.File = file;
         }
-        public Exception(Error error)
-            : this(error.Message, error.Position, error.File)
-        { }
+        public LanguageException(Error error) : this(error.Message, error.Position, error.File) { }
+        public LanguageException(string message, Exception inner) : base(message, inner) { }
 
-        public Exception(string message, System.Exception inner)
-            : base(message, inner) { }
-        protected Exception(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected LanguageException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+            position = (Position?)info.GetValue("position", typeof(Position)) ?? Position.UnknownPosition;
+            File = info.GetString("File");
+        }
 
         public override string ToString()
         {
@@ -46,15 +46,14 @@ namespace LanguageCore
     }
 
     [Serializable]
-    public class CompilerException : Exception
+    public class CompilerException : LanguageException
     {
         public CompilerException(string message, Position position, string file) : base(message, position, file) { }
         public CompilerException(string message, string file) : base(message, Position.UnknownPosition, file) { }
         public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
         public CompilerException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
 
-        protected CompilerException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected CompilerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     [Serializable]
@@ -65,35 +64,32 @@ namespace LanguageCore
         public NotSupportedException(string message) : base(message) { }
         public NotSupportedException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
 
-        protected NotSupportedException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected NotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <summary> Thrown by the <see cref="BBCode.Tokenizer"/> </summary>
     [Serializable]
-    public class TokenizerException : Exception
+    public class TokenizerException : LanguageException
     {
         public TokenizerException(string message, Position position) : base(message, position, null) { }
 
-        protected TokenizerException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected TokenizerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <summary> Thrown by the <see cref="BBCode.Parser.Parser"/> </summary>
     [Serializable]
-    public class SyntaxException : Exception
+    public class SyntaxException : LanguageException
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
         public SyntaxException(string message, IThingWithPosition position) : base(message, position.GetPosition(), null) { }
         public SyntaxException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
 
-        protected SyntaxException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected SyntaxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <summary> Thrown by the <see cref="Bytecode.BytecodeInterpreter"/> </summary>
     [Serializable]
-    public class RuntimeException : Exception
+    public class RuntimeException : LanguageException
     {
         public Context? Context;
         public Position SourcePosition;
@@ -112,20 +108,18 @@ namespace LanguageCore
             CallStack = debugInfo.GetFunctionInformations(context.RawCallStack);
         }
 
-        public RuntimeException(string message)
-            : base(message, Position.UnknownPosition, null) { }
-        public RuntimeException(string message, Context context)
-            : base(message, Position.UnknownPosition, null)
-        { this.Context = context; }
-        protected RuntimeException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
+        public RuntimeException(string message, Exception inner) : base(message, inner) { }
+        public RuntimeException(string message, Context context) : base(message, Position.UnknownPosition, null)
+        {
+            this.Context = context;
+        }
+        public RuntimeException(string message, Exception inner, Context context) : this(message, inner)
+        {
+            this.Context = context;
+        }
 
-        public RuntimeException(string message, System.Exception inner, Context context)
-            : this(message, inner)
-        { this.Context = context; }
-
-        public RuntimeException(string message, System.Exception inner)
-            : base(message, inner) { }
+        protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
         public override string ToString()
         {
@@ -191,6 +185,11 @@ namespace LanguageCore
 
         public UserException(string message, string value) : base(message)
         { this.Value = value; }
+
+        protected UserException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+            Value = info.GetString("Value") ?? string.Empty;
+        }
     }
 
     #endregion
@@ -198,40 +197,37 @@ namespace LanguageCore
     #region InternalException
 
     [Serializable]
-    public class ImpossibleException : System.Exception
+    public class ImpossibleException : Exception
     {
         public ImpossibleException()
             : base("This should be impossible. WTF??? Bruh. Uh nuh :) °_° AAAAAAA") { }
         public ImpossibleException(string details)
             : base($"This should be impossible. ({details}) WTF??? Bruh. Uh nuh :) °_° AAAAAAA") { }
-        protected ImpossibleException(
-          SerializationInfo info,
-          StreamingContext context) : base(info, context) { }
+        protected ImpossibleException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>
     [Serializable]
-    public class InternalException : System.Exception
+    public class InternalException : Exception
     {
         public readonly string? File;
 
-        public InternalException()
-            : base() { }
-
-        public InternalException(string message)
-            : base(message) { }
-
-        public InternalException(string message, System.Exception inner)
-            : base(message, inner) { }
-
+        public InternalException() : base() { }
+        public InternalException(string message) : base(message) { }
+        public InternalException(string message, Exception inner) : base(message, inner) { }
         public InternalException(string message, string file) : base(message)
-        { this.File = file; }
+        {
+            this.File = file;
+        }
 
-        protected InternalException(SerializationInfo info, StreamingContext context)
-            : base(info, context) { }
+        protected InternalException(SerializationInfo info, StreamingContext context) : base(info, context)
+        {
+            this.File = info.GetString("File");
+        }
     }
 
     /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>
+    [Serializable]
     public class EndlessLoopException : InternalException
     {
         public EndlessLoopException() : base("Endless loop") { }
@@ -289,7 +285,7 @@ namespace LanguageCore
         public Error(string message, IThingWithPosition position, string file)
             : base(message, position.GetPosition(), file) { }
 
-        public Exception ToException() => new(this);
+        public LanguageException ToException() => new(this);
     }
 
     public class Hint : NotExceptionBut

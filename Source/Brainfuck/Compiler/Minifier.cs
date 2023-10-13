@@ -20,6 +20,8 @@ namespace LanguageCore.Brainfuck
                 { result = result.Replace("-+", ""); }
                 else if (result.Contains("[-][-]"))
                 { result = result.Replace("[-][-]", "[-]"); }
+                else if (result.Contains("][-]"))
+                { result = result.Replace("][-]", "]"); }
                 else break;
             }
             return result;

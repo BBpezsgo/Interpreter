@@ -68,7 +68,6 @@ namespace LanguageCore.IL.Compiler
             {
                 case "const":
                     {
-
                         break;
                     }
                 default:
@@ -125,13 +124,6 @@ namespace LanguageCore.IL.Compiler
 
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (arrayType.Class.CompiledAttributes.HasAttribute("Defines", "array"))
-            {
-                throw new NotImplementedException();
-                var elementType = arrayType.TypeParameters[0];
-                return elementType.SizeOnStack;
-            }
 
             if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
             {
@@ -192,20 +184,6 @@ namespace LanguageCore.IL.Compiler
                     compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
                     constructor = compilableGeneralFunction.Function;
                 }
-            }
-
-            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
-            {
-                throw new NotImplementedException();
-
-                if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
-                var t = FindStatementType(constructorCall.Parameters[0]);
-                if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
-
-                throw new NotImplementedException();
             }
 
             if (!constructor.CanUse(CurrentFile))
@@ -459,16 +437,10 @@ namespace LanguageCore.IL.Compiler
             {
                 case "+=":
                     {
-                        if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
                         throw new NotImplementedException();
                     }
                 case "-=":
                     {
-                        if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
                         throw new NotImplementedException();
                     }
                 default:
@@ -482,16 +454,10 @@ namespace LanguageCore.IL.Compiler
             {
                 case "++":
                     {
-                        if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
                         throw new NotImplementedException();
                     }
                 case "--":
                     {
-                        if (statement.Left is not Identifier variableIdentifier)
-                        { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
-
                         throw new NotImplementedException();
                     }
                 default:
@@ -549,20 +515,6 @@ namespace LanguageCore.IL.Compiler
 
             if (!GetClass(constructorCall, out CompiledClass @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
-            {
-                throw new NotImplementedException();
-
-                if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: requied {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
-                var t = FindStatementType(constructorCall.Parameters[0]);
-                if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: requied {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
-
-                throw new NotImplementedException();
-            }
 
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
             {
@@ -676,8 +628,6 @@ namespace LanguageCore.IL.Compiler
         }
         void Compile(NewInstance newInstance)
         {
-            CompiledType instanceType = FindType(newInstance.TypeName);
-
             throw new NotImplementedException();
         }
         void Compile(Field field)

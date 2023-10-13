@@ -502,7 +502,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         static int GetValueSize(Literal statement) => statement.Type switch
         {
-            LiteralType.STRING => statement.Value.Length,
+            LiteralType.STRING => throw new NotSupportedException($"String literals not supported by brainfuck"),
             LiteralType.INT => 1,
             LiteralType.CHAR => 1,
             LiteralType.FLOAT => 1,
@@ -545,27 +545,6 @@ namespace LanguageCore.Brainfuck.Compiler
                     compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
                     constructor = compilableGeneralFunction.Function;
                 }
-            }
-
-            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
-            {
-                throw new NotImplementedException();
-
-                if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
-                var t = FindStatementType(constructorCall.Parameters[0]);
-                if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: required {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
-
-                if (!TryCompute(constructorCall.Parameters[0], null, out DataItem value))
-                { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
-
-                if (!DataItem.TryShrinkToByte(ref value))
-                { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
-
-                return Snippets.ARRAY_SIZE(value.ValueByte);
-                // return ((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack;
             }
 
             if (!constructor.CanUse(CurrentFile))
@@ -946,9 +925,6 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 if (variable.Type.IsStackArray)
                 {
-                    if (valueSize != variable.Type.StackArraySize)
-                    { throw new CompilerException($"Variable and value size mismatch ({variable.Size} != {valueSize})", value, CurrentFile); }
-
                     if (variable.Type.StackArrayOf == Type.CHAR)
                     {
                         if (value is not Literal literal)
@@ -2103,32 +2079,6 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (@class.CompiledAttributes.HasAttribute("Define", "array"))
-            {
-                throw new NotImplementedException();
-
-                if (constructorCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"array\" constructor: required {1} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
-                var t = FindStatementType(constructorCall.Parameters[0]);
-                if (t != Type.INT)
-                { throw new CompilerException($"Wrong type of parameter passed to \"array\" constructor: required {Type.INT} passed {t}", constructorCall.Parameters[0], CurrentFile); }
-
-                if (!TryCompute(constructorCall.Parameters[0], null, out DataItem value))
-                { throw new CompilerException($"This must be a constant :(", constructorCall.Parameters[0], CurrentFile); }
-
-                if (!DataItem.TryShrinkToByte(ref value))
-                { throw new CompilerException($"Something isn't right with this :(", constructorCall.Parameters[0], CurrentFile); }
-
-                CompiledType arrayElementType = new(constructorCall.TypeName.GenericTypes[0], FindType);
-                if (arrayElementType == Type.INT)
-                { Warnings.Add(new Warning($"Integers are not supported by brainfuck so I will threat this as a byte", constructorCall.TypeName.GenericTypes[0], CurrentFile)); }
-
-                Stack.PushVirtual(Snippets.ARRAY_SIZE(value.ValueByte));
-                // Stack.PushVirtual(((byte)value) * new CompiledType(constructorCall.TypeName.GenericTypes[0], FindType).SizeOnStack);
-                return;
-            }
-
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
@@ -2361,25 +2311,6 @@ namespace LanguageCore.Brainfuck.Compiler
                             using (Code.Block($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                             {
                                 Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
-                            }
-
-                            Stack.Pop();
-
-                            break;
-                        }
-                    case "^":
-                        {
-                            int leftAddress = Stack.NextAddress;
-                            using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
-
-                            int rightAddress = Stack.NextAddress;
-                            using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
-
-                            using (Code.Block($"Snippet POWER({leftAddress} {rightAddress})"))
-                            {
-                                Code.MATH_POW(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3);
                             }
 
                             Stack.Pop();

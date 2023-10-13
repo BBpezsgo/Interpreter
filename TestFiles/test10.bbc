@@ -29,7 +29,7 @@ void Start()
 
   foo.field0 = 55;
   PrintLine("foo.field0: " + foo.field0);
-  PrintLine("&foo.field0: " + &foo.field0);
+  // PrintLine("&foo.field0: " + &foo.field0);
 
   Foo foo2;
   foo2 = foo;
@@ -40,6 +40,8 @@ void Start()
 
   PrintLine("foo.field0: " + foo.field0);
   PrintLine("foo2.field0: " + foo2.field0);
+
+  delete foo2;
 }
 
 int Bar(Foo p0, Foo p1, int p2)

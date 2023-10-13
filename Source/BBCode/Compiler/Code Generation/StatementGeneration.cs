@@ -661,15 +661,21 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddComment($" Param {i}:");
 
-                bool canDeallocate = passedParameterType.InHEAP && definedParameter.Modifiers.Contains("temp");
+                bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.INT);
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
-                { canDeallocate = false; }
+                {
+                    if (explicitDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
 
                 GenerateCodeForStatement(passedParameter, definedParameterType);
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param." + definedParameter.Identifier.Content);
@@ -1116,10 +1122,11 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetParameter(variable.Content, out CompiledParameter param))
             {
-                int offset = GetBaseAddress(param);
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset);
+                ValueAddress address = GetBaseAddress(param);
 
-                if (param.IsRef)
+                AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+
+                if (address.IsReference)
                 { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME); }
 
                 return;
@@ -1127,7 +1134,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
-                if (val.IsStoredInHEAP)
+                if (val.Type.InHEAP)
                 { AddInstruction(Opcode.LOAD_VALUE, val.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, val.MemoryAddress); }
                 else
                 { LoadFromStack(val.MemoryAddress, val.Type.Size, !val.IsGlobal); }
@@ -1163,13 +1170,13 @@ namespace LanguageCore.BBCode.Compiler
             }
             if (addressGetter.PrevStatement is Field field)
             {
-                int offset = GetFieldOffset(field);
-                int pointerOffset = GetBaseAddress(field, out AddressingMode addressingMode, out bool inHeap);
+                int offset = GetDataOffset(field);
+                var pointerOffset = GetBaseAddress(field);
 
-                if (!inHeap)
+                if (!pointerOffset.InHeap)
                 { throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile); }
 
-                GenerateCodeForValueGetter(pointerOffset, addressingMode);
+                GenerateCodeForValueGetter(pointerOffset.Address, pointerOffset.AddressingMode);
                 AddInstruction(Opcode.MATH_ADD, offset);
                 return;
             }
@@ -1504,40 +1511,37 @@ namespace LanguageCore.BBCode.Compiler
 
             var type = FindStatementType(field);
 
-            if (prevType.IsClass)
-            {
-                if (!GetField(field, out var compiledField))
-                { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in class \"{prevType.Class.Name}\"", field, CurrentFile); }
+            if (!GetField(field, out var compiledField))
+            { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{prevType}\"", field, CurrentFile); }
 
-                if (CurrentContext?.Context != null)
+            if (CurrentContext?.Context != null)
+            {
+                switch (compiledField.Protection)
                 {
-                    switch (compiledField.Protection)
-                    {
-                        case Protection.Private:
-                            if (CurrentContext.Context.Name.Content != compiledField.Class.Name.Content)
-                            { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Name}\" due to it's protection level", field, CurrentFile); }
-                            break;
-                        case Protection.Public:
-                            break;
-                        default: throw new ImpossibleException();
-                    }
+                    case Protection.Private:
+                        if (CurrentContext.Context.Name.Content != compiledField.Class.Name.Content)
+                        { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Name}\" due to it's protection level", field, CurrentFile); }
+                        break;
+                    case Protection.Public:
+                        break;
+                    default: throw new ImpossibleException();
                 }
             }
 
             if (IsItInHeap(field))
             {
-                int offset = GetFieldOffset(field);
-                int pointerOffset = GetBaseAddress(field, out AddressingMode addressingMode, out _);
+                int offset = GetDataOffset(field);
+                var pointerOffset = GetBaseAddress(field);
                 for (int i = 0; i < type.SizeOnStack; i++)
                 {
                     AddComment($"{i}:");
-                    GenerateCodeForValueGetter(pointerOffset, offset + i, addressingMode);
+                    GenerateCodeForValueGetter(pointerOffset.Address, offset + i, pointerOffset.AddressingMode);
                 }
             }
             else
             {
-                int offset = GetDataAddress(field, out AddressingMode addressingMode);
-                GenerateCodeForValueGetter(offset, addressingMode);
+                var offset = GetDataAddress(field);
+                GenerateCodeForValueGetter(offset.Address, offset.AddressingMode);
             }
         }
         void GenerateCodeForStatement(IndexCall index)
@@ -1559,10 +1563,10 @@ namespace LanguageCore.BBCode.Compiler
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        int offset = GetBaseAddress(param, (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack));
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset);
+                        var offset = GetBaseAddress(param, (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack));
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
 
-                        if (param.IsRef)
+                        if (offset.IsReference)
                         { throw new NotImplementedException(); }
 
                         return;
@@ -1573,7 +1577,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (val.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        if (val.IsStoredInHEAP)
+                        if (val.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
                         LoadFromStack(val.MemoryAddress + (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack), prevType.StackArrayOf.Size, !val.IsGlobal);
@@ -1583,9 +1587,9 @@ namespace LanguageCore.BBCode.Compiler
                 }
 
                 {
-                    int address = GetDataAddress(identifier, out AddressingMode addressingMode);
-                    AddInstruction(Opcode.PUSH_VALUE, address);
-                    if (addressingMode == AddressingMode.BASEPOINTER_RELATIVE)
+                    var address = GetDataAddress(identifier);
+                    AddInstruction(Opcode.PUSH_VALUE, address.Address);
+                    if (address.BasepointerRelative)
                     {
                         AddInstruction(Opcode.GET_BASEPOINTER);
                         AddInstruction(Opcode.MATH_ADD);
@@ -1633,40 +1637,26 @@ namespace LanguageCore.BBCode.Compiler
 
             if (modifier == "ref")
             {
-                if (statement is Identifier identifier)
+                var address = GetDataAddress(statement);
+
+                if (address.InHeap)
+                { throw new CompilerException($"This value is stored in the heap", statement, CurrentFile); }
+
+                if (address.IsReference)
                 {
-                    if (GetVariable(identifier.Content, out var variable))
-                    {
-                        int address = GetDataAddress(variable, out AddressingMode addressingMode);
-                        AddInstruction(Opcode.PUSH_VALUE, address, $"(ref)");
-
-                        if (addressingMode == AddressingMode.ABSOLUTE)
-                        {
-
-                        }
-                        else if (addressingMode == AddressingMode.BASEPOINTER_RELATIVE)
-                        {
-                            AddInstruction(Opcode.GET_BASEPOINTER);
-                            AddInstruction(Opcode.MATH_ADD);
-                        }
-                        else
-                        { throw new NotImplementedException(); }
-
-                        return;
-                    }
-
-                    if (GetParameter(identifier.Content, out var parameter))
-                    {
-                        int parameterOffset = GetBaseAddress(parameter);
-                        if (parameter.IsRef)
-                        { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameterOffset, $"(ref)"); }
-                        else
-                        { AddInstruction(Opcode.PUSH_VALUE, parameterOffset, $"(ref)"); }
-                        return;
-                    }
-
-                    throw new CompilerException($"Local symbol \"{identifier.Content}\" not found");
+                    AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address, $"(ref)");
                 }
+                else
+                {
+                    AddInstruction(Opcode.PUSH_VALUE, address.Address, $"(ref)");
+
+                    if (address.BasepointerRelative)
+                    {
+                        AddInstruction(Opcode.GET_BASEPOINTER);
+                        AddInstruction(Opcode.MATH_ADD);
+                    }
+                }
+                return;
             }
 
             if (modifier == "temp")
@@ -1778,14 +1768,14 @@ namespace LanguageCore.BBCode.Compiler
             });
         }
 
-        void GenerateCodeForValueGetter(int offset, AddressingMode addressingMode)
+        void GenerateCodeForValueGetter(int address, AddressingMode addressingMode)
         {
             switch (addressingMode)
             {
                 case AddressingMode.ABSOLUTE:
                 case AddressingMode.BASEPOINTER_RELATIVE:
                 case AddressingMode.RELATIVE:
-                    AddInstruction(Opcode.LOAD_VALUE, addressingMode, offset);
+                    AddInstruction(Opcode.LOAD_VALUE, addressingMode, address);
                     break;
 
                 case AddressingMode.POP:
@@ -1793,7 +1783,7 @@ namespace LanguageCore.BBCode.Compiler
                     break;
 
                 case AddressingMode.RUNTIME:
-                    AddInstruction(Opcode.PUSH_VALUE, offset);
+                    AddInstruction(Opcode.PUSH_VALUE, address);
                     AddInstruction(Opcode.LOAD_VALUE, addressingMode);
                     break;
                 default: throw new ImpossibleException();
@@ -1909,9 +1899,9 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (parameter.IsRef)
                 {
-                    int offset = GetBaseAddress(parameter);
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset);
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME, parameter.RealIndex);
+                    var offset = GetBaseAddress(parameter);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
                 }
                 else
                 {
@@ -1958,9 +1948,9 @@ namespace LanguageCore.BBCode.Compiler
 
             if (_inHeap)
             {
-                int offset = GetFieldOffset(statementToSet);
-                int pointerOffset = GetBaseAddress(statementToSet, out AddressingMode addressingMode, out _);
-                GenerateCodeForValueSetter(pointerOffset, offset, addressingMode);
+                int offset = GetDataOffset(statementToSet);
+                var pointerOffset = GetBaseAddress(statementToSet);
+                GenerateCodeForValueSetter(pointerOffset.Address, offset, pointerOffset.AddressingMode);
 
                 if (prevType.IsClass)
                 { prevType.Class.ClearTypeArguments(); }
@@ -1969,8 +1959,8 @@ namespace LanguageCore.BBCode.Compiler
             }
             else
             {
-                int offset = GetDataAddress(statementToSet, out AddressingMode addressingMode);
-                GenerateCodeForValueSetter(offset, addressingMode);
+                var offset = GetDataAddress(statementToSet);
+                GenerateCodeForValueSetter(offset.Address, offset.AddressingMode);
 
                 if (prevType.IsClass)
                 { prevType.Class.ClearTypeArguments(); }
@@ -2005,7 +1995,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (variable.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        if (variable.IsStoredInHEAP)
+                        if (variable.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
                         StoreToStack(variable.MemoryAddress + (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack), prevType.StackArrayOf.Size, !variable.IsGlobal);
@@ -2100,7 +2090,7 @@ namespace LanguageCore.BBCode.Compiler
 
             variable.IsInitialized = true;
 
-            if (variable.IsStoredInHEAP)
+            if (variable.Type.InHEAP)
             {
                 AddInstruction(Opcode.STORE_VALUE, variable.AddressingMode(), variable.MemoryAddress);
             }

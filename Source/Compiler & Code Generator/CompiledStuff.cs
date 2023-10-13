@@ -209,16 +209,14 @@ namespace LanguageCore.BBCode.Compiler
 
         public readonly int MemoryAddress;
         public readonly bool IsGlobal;
-        public readonly bool IsStoredInHEAP;
         public bool IsInitialized;
 
-        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, bool storedInHeap, VariableDeclaration declaration)
+        public CompiledVariable(int memoryOffset, CompiledType type, bool isGlobal, VariableDeclaration declaration)
             : base(declaration.Modifiers, declaration.Type, declaration.VariableName, declaration.InitialValue)
         {
             this.Type = type;
 
             this.MemoryAddress = memoryOffset;
-            this.IsStoredInHEAP = storedInHeap;
             this.IsGlobal = isGlobal;
 
             base.FilePath = declaration.FilePath;
@@ -443,7 +441,7 @@ namespace LanguageCore.BBCode.Compiler
         readonly int currentParamsSize;
 
         public readonly int Index;
-        public int RealIndex => (-2) - (currentParamsSize + 1 - Index);
+        public int RealIndex => -(currentParamsSize + 1 + CodeGenerator.TagsBeforeBasePointer);
         public bool IsRef => Modifiers.Contains("ref");
 
         public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition)

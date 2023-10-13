@@ -544,7 +544,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (element.Identifier != functionCallStatement.FunctionName) continue;
 
-                if (!CompiledType.TryGetTypeParamaters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 // if (element.Context != null && element.Context.TemplateInfo != null)
                 // { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
@@ -575,7 +575,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.Type.Class != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
-                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out var typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
 
                 MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
 
@@ -997,7 +997,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier.Content != @operator.Operator.Content) continue;
-                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
@@ -1066,7 +1066,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (!CompiledType.TryGetTypeParamaters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -1296,7 +1296,6 @@ namespace LanguageCore.BBCode.Compiler
                 memoryOffset,
                 type,
                 isGlobal,
-                type.InHEAP,
                 newVariable);
         }
 

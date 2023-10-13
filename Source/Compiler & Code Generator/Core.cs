@@ -1089,7 +1089,7 @@ namespace LanguageCore.BBCode.Compiler
             return this.RuntimeType == other;
         }
 
-        public static bool TryGetTypeParamaters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
+        public static bool TryGetTypeParameters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
         {
             typeParameters = null;
             if (definedParameters is null || passedParameters is null) return false;
@@ -1193,6 +1193,24 @@ namespace LanguageCore.BBCode.Compiler
             if (@enum != null)
             { return @enum.CompiledAttributes.HasAttribute("Define", v); }
 
+            return false;
+        }
+
+        public bool TryGetFieldOffsets(out IReadOnlyDictionary<string, int> fieldOffsets)
+        {
+            if (@class is not null)
+            {
+                fieldOffsets = @class.FieldOffsets;
+                return true;
+            }
+
+            if (@struct is not null)
+            {
+                fieldOffsets = @struct.FieldOffsets;
+                return true;
+            }
+
+            fieldOffsets = default;
             return false;
         }
     }

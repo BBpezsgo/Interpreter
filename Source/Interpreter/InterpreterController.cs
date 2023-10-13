@@ -338,8 +338,8 @@ namespace LanguageCore.Runtime
             externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
             externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
             externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
-            externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.Year);
-            externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.Year);
+            externalFunctions.AddExternalFunction("utc-date-year", () => (int)DateTime.Now.Year);
+            externalFunctions.AddExternalFunction("local-date-year", () => (int)DateTime.Now.Year);
 
             #endregion
 

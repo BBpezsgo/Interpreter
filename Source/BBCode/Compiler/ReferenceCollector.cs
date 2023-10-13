@@ -74,7 +74,6 @@ namespace LanguageCore.BBCode.Compiler
                 -1,
                 type,
                 false,
-                type.InHEAP,
                 newVariable);
         }
 

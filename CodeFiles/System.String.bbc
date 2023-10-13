@@ -53,12 +53,12 @@ class String
     
     export String +(temp String a, int b)
     {
-        return a + b.ToString();
+        return a + temp b.ToString();
     }
     
     export String +(int a, temp String b)
     {
-        return a.ToString() + b;
+        return temp a.ToString() + b;
     }
     
     export bool ==(temp String a, temp String b)

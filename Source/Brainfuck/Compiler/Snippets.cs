@@ -976,5 +976,51 @@ namespace LanguageCore.Brainfuck
             code.ClearCurrent();
             code.MovePointerUnsafe(-tempOffset);
         }
+
+        /// <summary>
+        /// <b>Pointer:</b> <paramref name="switchAddress"/>
+        /// <br/>
+        /// <br/>
+        /// <see href="https://esolangs.org/wiki/brainfuck_algorithms#z_=_MUX(a,_x,_y)_(boolean,_logical)"/>
+        /// <br/>
+        /// Attribution: Yuval Meshorer
+        /// <para>
+        /// If <paramref name="switchAddress"/> is equal to <c>1</c>, then <paramref name="resultAddress"/> is equal to <paramref name="valueAddressB"/>. Otherwise, if <paramref name="switchAddress"/> is equal to <c>0</c>, <paramref name="resultAddress"/> will
+        /// be equal to <paramref name="valueAddressA"/>. When done, <paramref name="switchAddress"/>, <paramref name="valueAddressA"/>, and <paramref name="valueAddressB"/> will all be <c>0</c> regardless of their starting
+        /// values.
+        /// </para>
+        /// <para>
+        /// e.g:
+        /// <br/>
+        /// IN: <paramref name="valueAddressA"/> = <c>0</c>, <paramref name="valueAddressB"/> = <c>1</c>, <paramref name="switchAddress"/> = <c>1</c>
+        /// <br/>
+        /// OUT: <paramref name="valueAddressA"/> = <c>0</c>, <paramref name="valueAddressB"/> = <c>0</c>, <paramref name="switchAddress"/> = <c>0</c>, <paramref name="resultAddress"/> = <c>1</c>
+        /// </para>
+        /// </summary>
+        public static void MUX(this CompiledCode code, int switchAddress, int valueAddressA, int valueAddressB, int resultAddress)
+        {
+            // code.ClearValue(resultAddress);
+            
+            code.SetPointer(valueAddressB);
+            code += '[';
+            code.MoveValue(switchAddress, resultAddress);
+            code.AddValue(valueAddressB, -1);
+            code += ']';
+
+            code.SetPointer(valueAddressA);
+            code += '[';
+
+            code.AddValue(switchAddress, -1);
+            code += '[';
+            code.ClearCurrent();
+            code.SetValue(resultAddress, 1);
+            code.SetPointer(switchAddress);
+            code += ']';
+
+            code.AddValue(valueAddressA, -1);
+            code += ']';
+
+            code.ClearValue(switchAddress);
+        }
     }
 }

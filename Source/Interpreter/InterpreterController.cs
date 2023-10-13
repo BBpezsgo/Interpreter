@@ -321,35 +321,32 @@ namespace LanguageCore.Runtime
 
             externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char.ToString()));
 
-            externalFunctions.AddExternalFunction("sleep", (int t) => { BytecodeInterpreter.SleepTime(t, null); });
+            externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter.SleepTime(t, null));
 
             #endregion
 
             #region Math
 
-            externalFunctions.AddExternalFunction("cos", (float v) => MathF.Cos(v));
-
-            externalFunctions.AddExternalFunction("sin", (float v) => MathF.Sin(v));
+            externalFunctions.AddExternalFunction<float, float>("cos", MathF.Cos);
+            externalFunctions.AddExternalFunction<float, float>("sin", MathF.Sin);
 
             #endregion
 
             #region Enviroment
 
-            externalFunctions.AddExternalFunction("time", () =>
-            {
-                throw new NotImplementedException();
-            });
+            externalFunctions.AddExternalFunction("utc-time", () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
+            externalFunctions.AddExternalFunction("local-time", () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds);
+            externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.DayOfYear);
+            externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.DayOfYear);
+            externalFunctions.AddExternalFunction("utc-date-day", () => (int)DateTime.Now.Year);
+            externalFunctions.AddExternalFunction("local-date-day", () => (int)DateTime.Now.Year);
 
             #endregion
 
             #region Casts
 
-            externalFunctions.AddExternalFunction("float-to-int",
-                (float @float) =>
-                { return (int)@float; });
-            externalFunctions.AddExternalFunction("int-to-float",
-                (int @int) =>
-                { return (float)@int; });
+            externalFunctions.AddExternalFunction("float-to-int", (float v) => (int)v);
+            externalFunctions.AddExternalFunction("int-to-float", (int v) => (float)v);
 
             #endregion
 

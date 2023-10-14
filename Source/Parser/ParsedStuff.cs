@@ -265,7 +265,7 @@ namespace LanguageCore.Parser
         /// </summary>
         public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
 
-        public Statement.Block Block => new(BracketStart, Statements, BracketEnd);
+        public Statement.Block Block => (BracketStart is null || BracketEnd is null) ? null : new Statement.Block(BracketStart, Statements, BracketEnd);
 
         public int ParameterCount => Parameters.Length;
 

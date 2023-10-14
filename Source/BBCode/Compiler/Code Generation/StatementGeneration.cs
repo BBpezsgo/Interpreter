@@ -49,13 +49,13 @@ namespace LanguageCore.BBCode.Compiler
             if (newVariable.Modifiers.Contains("const")) return;
 
             if (GetConstant(newVariable.VariableName.Content, out _))
-            { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts", newVariable.VariableName, newVariable.FilePath); }
+            { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts with an another symbol name", newVariable.VariableName, newVariable.FilePath); }
 
             if (InMacro.Last)
             { throw new NotImplementedException(); }
 
             if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
-            { throw new CompilerException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", newVariable.VariableName, CurrentFile); }
+            { throw new InternalException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
 
             if (compiledVariable.Type.IsClass)
             { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Class; }
@@ -66,7 +66,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (newVariable.InitialValue == null) return;
 
-            AddComment($"New Variable \'{newVariable.VariableName.Content}\' {{");
+            AddComment($"New Variable \"{newVariable.VariableName.Content}\" {{");
 
             GenerateCodeForValueSetter(newVariable, newVariable.InitialValue);
 
@@ -83,12 +83,13 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (InMacro.Last)
                 {
-                    AddComment(" Return from macro:");
+                    AddComment(" Return from macro {");
 
                     if (keywordCall.Parameters.Length == 1)
                     {
                         StatementWithValue returnValue = keywordCall.Parameters[0];
-                        GenerateCodeForStatement(returnValue);
+                        GenerateCodeForValueSetter(new Identifier(Token.CreateAnonymous("@return")), returnValue);
+                        // GenerateCodeForStatement(returnValue);
                     }
 
                     AddComment("}");
@@ -161,10 +162,10 @@ namespace LanguageCore.BBCode.Compiler
                 if (keywordCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
-                StatementWithValue param0 = keywordCall.Parameters[0];
-                CompiledType param0Type = FindStatementType(param0);
+                StatementWithValue value = keywordCall.Parameters[0];
+                CompiledType valueType = FindStatementType(value);
 
-                AddInstruction(Opcode.PUSH_VALUE, param0Type.SizeOnStack, $"sizeof({param0Type.Name})");
+                AddInstruction(Opcode.PUSH_VALUE, valueType.SizeOnStack, $"sizeof({valueType.Name})");
 
                 return;
             }
@@ -174,9 +175,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (keywordCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"delete\": required {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
-                CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
+                CompiledType valueType = FindStatementType(keywordCall.Parameters[0]);
 
-                if (paramType == Type.INT)
+                if (valueType == Type.INT)
                 {
                     GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.INT));
                     AddInstruction(Opcode.HEAP_DEALLOC);
@@ -184,49 +185,50 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (paramType.IsClass)
+                if (!valueType.IsClass)
                 {
-                    if (!GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructor))
-                    {
-                        if (!GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructorTemplate))
-                        {
-                            GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.INT));
-                            AddInstruction(Opcode.HEAP_DEALLOC);
-
-                            return;
-                        }
-                        destructorTemplate = AddCompilable(destructorTemplate);
-                        destructor = destructorTemplate.Function;
-                    }
-
-                    if (!destructor.CanUse(CurrentFile))
-                    {
-                        Errors.Add(new Error($"Destructor for type '{paramType.Class.Name.Content}' function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
-                        AddComment("}");
-                        return;
-                    }
-
-                    AddComment(" Param0:");
-                    GenerateCodeForStatement(keywordCall.Parameters[0], paramType);
-                    AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
-
-                    AddComment(" .:");
-
-                    int jumpInstruction = Call(destructor.InstructionOffset);
-
-                    if (destructor.InstructionOffset == -1)
-                    { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, destructor, CurrentFile)); }
-
-                    AddComment(" Clear Param:");
-
-                    AddInstruction(Opcode.POP_VALUE);
-
-                    AddComment("}");
-
+                    Warnings.Add(new Warning($"The 'delete' keyword-function is only working on type class or int so I skip this shit", keywordCall.Parameters[0], CurrentFile));
                     return;
                 }
 
-                Warnings.Add(new Warning($"The 'delete' keyword-function is only working on type class or int so I skip this shit", keywordCall.Parameters[0], CurrentFile));
+                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructor))
+                {
+                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructorTemplate))
+                    {
+                        GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.INT));
+                        AddInstruction(Opcode.HEAP_DEALLOC);
+                        AddComment("}");
+
+                        return;
+                    }
+                    destructorTemplate = AddCompilable(destructorTemplate);
+                    destructor = destructorTemplate.Function;
+                }
+
+                if (!destructor.CanUse(CurrentFile))
+                {
+                    Errors.Add(new Error($"Destructor for type '{valueType.Class.Name.Content}' function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
+                    AddComment("}");
+                    return;
+                }
+
+                AddComment(" Param0:");
+                GenerateCodeForStatement(keywordCall.Parameters[0], valueType);
+                AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
+
+                AddComment(" .:");
+
+                int jumpInstruction = Call(destructor.InstructionOffset);
+
+                if (destructor.InstructionOffset == -1)
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedGeneralFunctionOffset(jumpInstruction, keywordCall, destructor, CurrentFile)); }
+
+                AddComment(" Clear Param0:");
+
+                AddInstruction(Opcode.POP_VALUE);
+
+                AddComment("}");
+
                 return;
             }
 
@@ -286,141 +288,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            /*
-            if (keywordCall.FunctionName == "out")
-            {
-                if (keywordCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"out\": required {1} passed {0}", keywordCall, CurrentFile); }
-
-                var outType = FindStatementType(keywordCall.Parameters[0]);
-
-                if (!GetOutputWriter(outType, out var function))
-                { throw new CompilerException($"No function found with attribute \"{"StandardOutput"}\" that satisfies keyword-call {keywordCall.ReadableID(FindStatementType)}", keywordCall, CurrentFile); }
-
-                if (function.IsExternal)
-                {
-                    if (!ExternalFunctions.TryGetValue(function.ExternalFunctionName, out ExternalFunctionBase externalFunction))
-                    {
-                        Errors.Add(new Error($"External function \"{function.ExternalFunctionName}\" not found", keywordCall.Identifier, CurrentFile));
-                        AddComment("}");
-                        return;
-                    }
-
-                    AddComment(" Function Name:");
-                    if (ExternalFunctionsCache.TryGetValue(function.ExternalFunctionName, out int cacheAddress))
-                    {
-                        if (function.ExternalFunctionName.Length == 0)
-                        { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)function.Attributes.Get("External"), function.FilePath); }
-
-                        AddComment($" Param {0}:");
-                        GenerateCodeForStatement(keywordCall.Parameters[0]);
-
-                        AddComment($" Function name string pointer (cache):");
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
-
-                        AddComment(" .:");
-                        AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
-
-                        if (function.ReturnSomething)
-                        {
-                            if (!keywordCall.SaveValue)
-                            {
-                                AddComment($" Clear Return Value:");
-                                AddInstruction(Opcode.POP_VALUE);
-                            }
-                            else
-                            {
-                                AddInstruction(Opcode.DEBUG_SET_TAG, "Return value");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        GenerateCodeForLiteralString(function.ExternalFunctionName);
-
-                        int offset = -1;
-
-                        AddComment($" Param {0}:");
-                        GenerateCodeForStatement(keywordCall.Parameters[0]);
-                        offset--;
-
-                        AddComment($" Load Function Name String Pointer:");
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
-
-                        AddComment(" .:");
-                        AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
-
-                        bool thereIsReturnValue = false;
-                        if (function.ReturnSomething)
-                        {
-                            if (!keywordCall.SaveValue)
-                            {
-                                AddComment($" Clear Return Value:");
-                                AddInstruction(Opcode.POP_VALUE);
-                            }
-                            else
-                            { thereIsReturnValue = true; }
-                        }
-
-                        AddComment(" Deallocate Function Name String:");
-
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
-                        AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-                        AddInstruction(Opcode.HEAP_DEALLOC);
-
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
-                        AddInstruction(Opcode.HEAP_DEALLOC);
-
-                        if (thereIsReturnValue)
-                        {
-                            AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, -2);
-                            AddInstruction(Opcode.DEBUG_SET_TAG, "Return value");
-                        }
-                        else
-                        {
-                            AddInstruction(Opcode.POP_VALUE);
-                        }
-                    }
-
-                    AddComment("}");
-                    return;
-                }
-
-                int returnValueSize = 0;
-                if (function.ReturnSomething)
-                {
-                    returnValueSize = GenerateInitialValue(function.Type, "returnvalue");
-                }
-
-                AddComment($" Param {0}:");
-                GenerateCodeForStatement(keywordCall.Parameters[0]);
-                AddInstruction(Opcode.DEBUG_SET_TAG, $"param.{function.Parameters[0].Identifier}");
-
-                AddComment(" .:");
-
-                int jumpInstruction = Call(function.InstructionOffset);
-
-                if (function.InstructionOffset == -1)
-                { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, new FunctionCall(null, keywordCall.Identifier, null, keywordCall.Parameters, null), function, CurrentFile)); }
-
-                AddComment(" Clear Params:");
-
-                AddInstruction(Opcode.POP_VALUE);
-
-                if (function.ReturnSomething && !keywordCall.SaveValue)
-                {
-                    AddComment(" Clear Return Value:");
-                    for (int i = 0; i < returnValueSize; i++)
-                    { AddInstruction(Opcode.POP_VALUE); }
-                }
-
-                AddComment("}");
-
-                return;
-            }
-            */
-
-            throw new CompilerException($"Unknown keyword-function \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
+            throw new CompilerException($"Unknown keyword \"{keywordCall.FunctionName}\"", keywordCall.Identifier, CurrentFile);
         }
         void GenerateCodeForStatement(FunctionCall functionCall)
         {
@@ -642,15 +510,17 @@ namespace LanguageCore.BBCode.Compiler
                 returnValueSize = GenerateInitialValue(compiledFunction.Type, "returnvalue");
             }
 
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+
             if (functionCall.PrevStatement != null)
             {
+                StatementWithValue passedParameter = functionCall.PrevStatement;
+                CompiledType passedParameterType = FindStatementType(passedParameter);
                 AddComment(" Param prev:");
-                // TODO: variable sized prev statement
                 GenerateCodeForStatement(functionCall.PrevStatement);
                 AddInstruction(Opcode.DEBUG_SET_TAG, "param.this");
+                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
             }
-
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
@@ -703,12 +573,6 @@ namespace LanguageCore.BBCode.Compiler
 
                 for (int i = 0; i < passedParameter.Size; i++)
                 { AddInstruction(Opcode.POP_VALUE); }
-            }
-
-            if (functionCall.PrevStatement != null)
-            {
-                // TODO: variable sized prev statement
-                AddInstruction(Opcode.POP_VALUE);
             }
 
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
@@ -1058,7 +922,7 @@ namespace LanguageCore.BBCode.Compiler
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture)));
                     break;
                 case LiteralType.STRING:
-                    GenerateCodeForLiteralString(literal);
+                    GenerateCodeForLiteralString(literal.Value);
                     break;
                 case LiteralType.BOOLEAN:
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem((bool.Parse(literal.Value) ? 1 : 0)));
@@ -1071,8 +935,6 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        void GenerateCodeForLiteralString(LiteralStatement literal)
-            => GenerateCodeForLiteralString(literal.Value);
         void GenerateCodeForLiteralString(string literal)
         {
             AddComment($"Create String \"{literal}\" {{");
@@ -1134,11 +996,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
-                if (val.Type.InHEAP)
-                { AddInstruction(Opcode.LOAD_VALUE, val.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, val.MemoryAddress); }
-                else
-                { LoadFromStack(val.MemoryAddress, val.Type.Size, !val.IsGlobal); }
-
+                StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
@@ -1168,18 +1026,20 @@ namespace LanguageCore.BBCode.Compiler
                 GenerateCodeForStatement(identifier);
                 return;
             }
+
             if (addressGetter.PrevStatement is Field field)
             {
                 int offset = GetDataOffset(field);
-                var pointerOffset = GetBaseAddress(field);
+                ValueAddress pointerOffset = GetBaseAddress(field);
 
                 if (!pointerOffset.InHeap)
                 { throw new CompilerException($"Field \"{field}\" is on the stack", addressGetter, CurrentFile); }
 
-                GenerateCodeForValueGetter(pointerOffset.Address, pointerOffset.AddressingMode);
+                StackLoad(pointerOffset);
                 AddInstruction(Opcode.MATH_ADD, offset);
                 return;
             }
+
             throw new NotImplementedException();
         }
         void GenerateCodeForStatement(Pointer memoryAddressFinder)
@@ -1531,17 +1391,17 @@ namespace LanguageCore.BBCode.Compiler
             if (IsItInHeap(field))
             {
                 int offset = GetDataOffset(field);
-                var pointerOffset = GetBaseAddress(field);
+                ValueAddress pointerOffset = GetBaseAddress(field);
                 for (int i = 0; i < type.SizeOnStack; i++)
                 {
                     AddComment($"{i}:");
-                    GenerateCodeForValueGetter(pointerOffset.Address, offset + i, pointerOffset.AddressingMode);
+                    HeapLoad(pointerOffset, offset + i);
                 }
             }
             else
             {
-                var offset = GetDataAddress(field);
-                GenerateCodeForValueGetter(offset.Address, offset.AddressingMode);
+                ValueAddress offset = GetDataAddress(field);
+                StackLoad(offset);
             }
         }
         void GenerateCodeForStatement(IndexCall index)
@@ -1580,7 +1440,10 @@ namespace LanguageCore.BBCode.Compiler
                         if (val.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
-                        LoadFromStack(val.MemoryAddress + (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack), prevType.StackArrayOf.Size, !val.IsGlobal);
+                        int offset = (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack);
+                        ValueAddress address = new(val);
+
+                        StackLoad(address + offset, prevType.StackArrayOf.SizeOnStack);
 
                         return;
                     }
@@ -1605,13 +1468,10 @@ namespace LanguageCore.BBCode.Compiler
                 throw new NotImplementedException();
             }
 
-            if (!prevType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
-
             if (!GetIndexGetter(prevType, out CompiledFunction indexer))
             {
                 if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for class \"{prevType.Class.Name}\" not found", index, CurrentFile); }
+                { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
                 indexer = indexerTemplate.Function;
@@ -1640,7 +1500,7 @@ namespace LanguageCore.BBCode.Compiler
                 var address = GetDataAddress(statement);
 
                 if (address.InHeap)
-                { throw new CompilerException($"This value is stored in the heap", statement, CurrentFile); }
+                { throw new CompilerException($"This value is stored in the heap and not in the stack", statement, CurrentFile); }
 
                 if (address.IsReference)
                 {
@@ -1768,66 +1628,6 @@ namespace LanguageCore.BBCode.Compiler
             });
         }
 
-        void GenerateCodeForValueGetter(int address, AddressingMode addressingMode)
-        {
-            switch (addressingMode)
-            {
-                case AddressingMode.ABSOLUTE:
-                case AddressingMode.BASEPOINTER_RELATIVE:
-                case AddressingMode.RELATIVE:
-                    AddInstruction(Opcode.LOAD_VALUE, addressingMode, address);
-                    break;
-
-                case AddressingMode.POP:
-                    AddInstruction(Opcode.LOAD_VALUE, addressingMode);
-                    break;
-
-                case AddressingMode.RUNTIME:
-                    AddInstruction(Opcode.PUSH_VALUE, address);
-                    AddInstruction(Opcode.LOAD_VALUE, addressingMode);
-                    break;
-                default: throw new ImpossibleException();
-            }
-        }
-        void GenerateCodeForValueGetter(int pointerOffset, int offset, AddressingMode addressingMode)
-        {
-            GenerateCodeForValueGetter(pointerOffset, addressingMode);
-            AddInstruction(Opcode.PUSH_VALUE, offset);
-            AddInstruction(Opcode.MATH_ADD);
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-        }
-
-        void GenerateCodeForValueSetter(int offset, AddressingMode addressingMode)
-        {
-            switch (addressingMode)
-            {
-                case AddressingMode.ABSOLUTE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, offset);
-                    break;
-                case AddressingMode.BASEPOINTER_RELATIVE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset);
-                    break;
-                case AddressingMode.RELATIVE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, offset);
-                    break;
-                case AddressingMode.POP:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.POP);
-                    break;
-                case AddressingMode.RUNTIME:
-                    AddInstruction(Opcode.PUSH_VALUE, offset);
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
-                    break;
-                default: throw new ImpossibleException();
-            }
-        }
-        void GenerateCodeForValueSetter(int pointerOffset, int offset, AddressingMode addressingMode)
-        {
-            GenerateCodeForValueGetter(pointerOffset, addressingMode);
-            AddInstruction(Opcode.PUSH_VALUE, offset);
-            AddInstruction(Opcode.MATH_ADD);
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
-        }
-
         CleanupItem[] CompileVariables(Block block, bool isGlobal, bool addComments = true)
         {
             if (addComments) AddComment("Variables {");
@@ -1946,24 +1746,21 @@ namespace LanguageCore.BBCode.Compiler
 
             bool _inHeap = IsItInHeap(statementToSet);
 
+            if (prevType.IsClass)
+            { prevType.Class.ClearTypeArguments(); }
+
             if (_inHeap)
             {
                 int offset = GetDataOffset(statementToSet);
                 var pointerOffset = GetBaseAddress(statementToSet);
-                GenerateCodeForValueSetter(pointerOffset.Address, offset, pointerOffset.AddressingMode);
-
-                if (prevType.IsClass)
-                { prevType.Class.ClearTypeArguments(); }
+                HeapStore(pointerOffset, offset);
 
                 return;
             }
             else
             {
                 var offset = GetDataAddress(statementToSet);
-                GenerateCodeForValueSetter(offset.Address, offset.AddressingMode);
-
-                if (prevType.IsClass)
-                { prevType.Class.ClearTypeArguments(); }
+                StackStore(offset);
 
                 return;
             }
@@ -1998,7 +1795,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (variable.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
-                        StoreToStack(variable.MemoryAddress + (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack), prevType.StackArrayOf.Size, !variable.IsGlobal);
+                        StackStore(variable.MemoryAddress + (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack), prevType.StackArrayOf.Size, !variable.IsGlobal);
                         return;
                     }
                 }

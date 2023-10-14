@@ -103,6 +103,29 @@ namespace LanguageCore.Tokenizing
             AnalyzedType = AnalyzedType,
         };
         public override string ToString() => Content;
+        public string ToOriginalString() => TokenType switch
+        {
+            TokenType.WHITESPACE => Content,
+            TokenType.LINEBREAK => Content,
+            TokenType.IDENTIFIER => Content,
+            TokenType.LITERAL_NUMBER => Content,
+            TokenType.LITERAL_HEX => Content,
+            TokenType.LITERAL_BIN => Content,
+            TokenType.LITERAL_STRING => $"\"{Content}\"",
+            TokenType.LITERAL_CHAR => $"\'{Content}\'",
+            TokenType.LITERAL_FLOAT => Content,
+            TokenType.STRING_UNICODE_CHARACTER => Content,
+            TokenType.CHAR_UNICODE_CHARACTER => Content,
+            TokenType.OPERATOR => Content,
+            TokenType.STRING_ESCAPE_SEQUENCE => Content,
+            TokenType.CHAR_ESCAPE_SEQUENCE => Content,
+            TokenType.POTENTIAL_FLOAT => Content,
+            TokenType.POTENTIAL_COMMENT => Content,
+            TokenType.POTENTIAL_END_MULTILINE_COMMENT => Content,
+            TokenType.COMMENT => Content,
+            TokenType.COMMENT_MULTILINE => Content,
+            _ => Content,
+        };
 
         internal string ToFullString()
         {

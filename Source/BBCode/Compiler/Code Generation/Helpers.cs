@@ -1,7 +1,5 @@
 ﻿using System;
 
-#pragma warning disable IDE0051 // Remove unused private members
-
 namespace LanguageCore.BBCode.Compiler
 {
     using System.Collections.Generic;
@@ -29,6 +27,24 @@ namespace LanguageCore.BBCode.Compiler
                 IsReference = isReference;
                 InHeap = inHeap;
             }
+
+            public ValueAddress(CompiledVariable variable)
+            {
+                Address = variable.MemoryAddress;
+                BasepointerRelative = !variable.IsGlobal;
+                IsReference = false;
+                InHeap = false;
+            }
+
+            public ValueAddress(CompiledParameter parameter, int address)
+            {
+                Address = address;
+                BasepointerRelative = true;
+                IsReference = parameter.IsRef;
+                InHeap = false;
+            }
+
+            public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
 
             public override string ToString()
             {
@@ -65,7 +81,7 @@ namespace LanguageCore.BBCode.Compiler
             if (address.Type.InHEAP)
             { AddInstruction(Opcode.HEAP_GET, AddressingMode.ABSOLUTE, address.MemoryAddress); }
             else
-            { LoadFromStack(address.MemoryAddress, address.Type.Size, !address.IsGlobal); }
+            { StackLoad(new ValueAddress(address), address.Type.SizeOnStack); }
 
             AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
 
@@ -327,7 +343,93 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        #region HEAP Helpers
+        #region Memory Helpers
+
+        void StackStore(int destination, int size, bool basepointerRelative)
+        {
+            for (int i = size - 1; i >= 0; i--)
+            {
+                AddInstruction(Opcode.STORE_VALUE, basepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE, destination + i);
+            }
+        }
+        void StackLoad(ValueAddress address, int size)
+        {
+            AddComment($"Load from stack: {{");
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            {
+                AddComment($"Element {currentOffset}:");
+                ValueAddress loadFrom = address + currentOffset;
+                StackLoad(loadFrom);
+            }
+            AddComment("}");
+        }
+
+        void StackLoad(ValueAddress address)
+        {
+            if (address.IsReference)
+            {
+                AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME);
+                throw new NotImplementedException();
+            }
+
+            if (address.InHeap)
+            {
+                throw new NotImplementedException();
+            }
+
+            switch (address.AddressingMode)
+            {
+                case AddressingMode.ABSOLUTE:
+                case AddressingMode.BASEPOINTER_RELATIVE:
+                case AddressingMode.RELATIVE:
+                    AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
+                    break;
+
+                case AddressingMode.POP:
+                    AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
+                    break;
+
+                case AddressingMode.RUNTIME:
+                    AddInstruction(Opcode.PUSH_VALUE, address.Address);
+                    AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
+                    break;
+                default: throw new ImpossibleException();
+            }
+        }
+        void StackStore(ValueAddress address)
+        {
+            if (address.IsReference)
+            {
+                throw new NotImplementedException();
+            }
+
+            if (address.InHeap)
+            {
+                throw new NotImplementedException();
+            }
+
+            switch (address.AddressingMode)
+            {
+                case AddressingMode.ABSOLUTE:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, address.Address);
+                    break;
+                case AddressingMode.BASEPOINTER_RELATIVE:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, address.Address);
+                    break;
+                case AddressingMode.RELATIVE:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, address.Address);
+                    break;
+                case AddressingMode.POP:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.POP);
+                    break;
+                case AddressingMode.RUNTIME:
+                    AddInstruction(Opcode.PUSH_VALUE, address.Address);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
+                    break;
+                default: throw new ImpossibleException();
+            }
+        }
 
         void BoxData(int to, int size)
         {
@@ -358,45 +460,19 @@ namespace LanguageCore.BBCode.Compiler
             AddComment("}");
         }
 
-        void StoreToStack(int destination, int size, bool basepointerRelative)
+        void HeapLoad(ValueAddress pointerAddress, int offset)
         {
-            for (int i = size - 1; i >= 0; i--)
-            {
-                AddInstruction(Opcode.STORE_VALUE, basepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE, destination + i);
-            }
+            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+            AddInstruction(Opcode.PUSH_VALUE, offset);
+            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
         }
-        void CopyToStack(int to, int size, bool basepointerRelative)
+        void HeapStore(ValueAddress pointerAddress, int offset)
         {
-            // TODO: Optimize this
-
-            AddComment($"Copy to stack: {{");
-            for (int currentOffset = 0; currentOffset < size; currentOffset++)
-            {
-                int currentReversedOffset = size - currentOffset - 1;
-
-                AddComment($"Element {currentOffset}:");
-
-                int loadFrom = (-currentReversedOffset) - 1;
-                int storeTo = to + currentOffset;
-
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, loadFrom);
-
-                AddInstruction(Opcode.STORE_VALUE, basepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE, storeTo);
-            }
-            AddComment("}");
-        }
-        void LoadFromStack(int from, int size, bool basepointerRelative)
-        {
-            AddComment($"Load from stack: {{");
-            for (int currentOffset = 0; currentOffset < size; currentOffset++)
-            {
-                AddComment($"Element {currentOffset}:");
-
-                int loadFrom = from + currentOffset;
-
-                AddInstruction(Opcode.LOAD_VALUE, basepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE, loadFrom);
-            }
-            AddComment("}");
+            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+            AddInstruction(Opcode.PUSH_VALUE, offset);
+            AddInstruction(Opcode.MATH_ADD);
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
 
         #endregion
@@ -423,8 +499,6 @@ namespace LanguageCore.BBCode.Compiler
 
             throw new NotImplementedException();
         }
-        static ValueAddress GetDataAddress(CompiledVariable val)
-            => new(val.MemoryAddress, !val.IsGlobal, false, false);
         ValueAddress GetDataAddress(Identifier variable)
         {
             if (GetConstant(variable.Content, out _))
@@ -437,7 +511,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
-                return new ValueAddress(val.MemoryAddress, !val.IsGlobal, false, false);
+                return new ValueAddress(val);
             }
 
             throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
@@ -531,12 +605,12 @@ namespace LanguageCore.BBCode.Compiler
         ValueAddress GetBaseAddress(CompiledParameter parameter)
         {
             int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer);
-            return new ValueAddress(address, true, parameter.IsRef, false);
+            return new ValueAddress(parameter, address);
         }
         ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
         {
             int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer);
-            return new ValueAddress(address, true, parameter.IsRef, false);
+            return new ValueAddress(parameter, address);
         }
         ValueAddress GetBaseAddress(Identifier variable)
         {
@@ -550,7 +624,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
-                return new ValueAddress(val.MemoryAddress, !val.IsGlobal, false, false);
+                return new ValueAddress(val);
             }
 
             throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);

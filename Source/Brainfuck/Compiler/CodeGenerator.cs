@@ -35,6 +35,41 @@ namespace LanguageCore.Brainfuck.Compiler
 
     public class CodeGenerator : CodeGeneratorBase
     {
+        readonly struct DebugInfoBlock : IDisposable
+        {
+            readonly int InstructionStart;
+            readonly CompiledCode Code;
+            readonly DebugInformation DebugInfo;
+            readonly Position Position;
+
+            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, Position position)
+            {
+                InstructionStart = code.GetFinalCode().Length;
+                Code = code;
+                DebugInfo = debugInfo;
+                Position = position;
+            }
+
+            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, IThingWithPosition position)
+            {
+                InstructionStart = code.GetFinalCode().Length;
+                Code = code;
+                DebugInfo = debugInfo;
+                Position = position.GetPosition();
+            }
+
+            public void Dispose()
+            {
+                int end = Code.GetFinalCode().Length;
+                if (InstructionStart == end) return;
+                DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
+                {
+                    Instructions = (InstructionStart, end),
+                    SourcePosition = Position,
+                });
+            }
+        }
+
         static readonly string[] IllegalIdentifiers = new string[]
         {
 
@@ -175,6 +210,9 @@ namespace LanguageCore.Brainfuck.Compiler
             readonly string GetDebuggerDisplay()
                 => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
         }
+
+        DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
+        DebugInfoBlock DebugBlock(Position position) => new(Code, DebugInfo, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [MaybeNullWhen(false)] out CompiledType? type)
         {
@@ -1217,7 +1255,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 },
                 indexCall.BracketRight));
         }
-        void Compile(LinkedIf @if)
+        void Compile(LinkedIf @if, bool linked = false)
         {
             using (Code.Block($"If ({@if.Condition})"))
             {
@@ -1229,7 +1267,10 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 Code.CommentLine($"Pointer: {Code.Pointer}");
 
-                Code.JumpStart(conditionAddress);
+                using (this.DebugBlock(@if.Keyword))
+                {
+                    Code.JumpStart(conditionAddress);
+                }
 
                 using (Code.Block("The if statements"))
                 {
@@ -1240,6 +1281,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 if (@if.NextLink == null)
                 {
+                    using (this.DebugBlock(@if.Block.BracketEnd))
                     using (Code.Block("Cleanup condition"))
                     {
                         Code.ClearValue(conditionAddress);
@@ -1251,48 +1293,51 @@ namespace LanguageCore.Brainfuck.Compiler
                 {
                     using (Code.Block("Else"))
                     {
-                        using (Code.Block("Finish if statement"))
+                        using (this.DebugBlock(@if.Keyword))
                         {
-                            Code.MoveValue(conditionAddress, conditionAddress + 1);
-                            Code.JumpEnd(conditionAddress);
-                            Stack.PopVirtual();
+                            using (Code.Block("Finish if statement"))
+                            {
+                                Code.MoveValue(conditionAddress, conditionAddress + 1);
+                                Code.JumpEnd(conditionAddress);
+                            }
+                            Code.MoveValue(conditionAddress + 1, conditionAddress);
                         }
 
-                        Code.MoveValue(conditionAddress + 1, conditionAddress);
-
-                        using (Code.Block($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
-                        { Code.LOGIC_NOT(conditionAddress + 1, conditionAddress + 2); }
-
-                        int elseFlagAddress = conditionAddress + 1;
-
-                        Code.CommentLine($"Pointer: {Code.Pointer}");
-
-                        Code.CommentLine($"ELSE flag is at {elseFlagAddress}");
-
-                        using (Code.Block("Set ELSE flag"))
-                        { Code.SetValue(elseFlagAddress, 1); }
-
-                        using (Code.Block("If previous \"if\" condition is true"))
+                        using (this.DebugBlock(@if.NextLink.Keyword))
                         {
-                            Code.JumpStart(conditionAddress);
+                            using (Code.Block($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
+                            { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
 
-                            using (Code.Block("Reset ELSE flag"))
-                            { Code.ClearValue(elseFlagAddress); }
+                            Code.CommentLine($"Pointer: {Code.Pointer}");
 
-                            using (Code.Block("Reset condition"))
-                            { Code.ClearValue(conditionAddress); }
+                            int elseFlagAddress = conditionAddress + 1;
 
-                            Code.JumpEnd(conditionAddress);
+                            Code.CommentLine($"ELSE flag is at {elseFlagAddress}");
+
+                            using (Code.Block("Set ELSE flag"))
+                            { Code.SetValue(elseFlagAddress, 1); }
+
+                            using (Code.Block("If previous \"if\" condition is true"))
+                            {
+                                Code.JumpStart(conditionAddress);
+
+                                using (Code.Block("Reset ELSE flag"))
+                                { Code.ClearValue(elseFlagAddress); }
+
+                                using (Code.Block("Reset condition"))
+                                { Code.ClearValue(conditionAddress); }
+
+                                Code.JumpEnd(conditionAddress);
+                            }
+
+                            Code.MoveValue(elseFlagAddress, conditionAddress);
+
+                            Code.CommentLine($"Pointer: {Code.Pointer}");
                         }
-
-                        Code.CommentLine($"Pointer: {Code.Pointer}");
 
                         using (Code.Block($"If ELSE flag set (previous \"if\" condition is false)"))
                         {
-                            Code.JumpStart(elseFlagAddress);
-
-                            using (Code.Block("Reset ELSE flag"))
-                            { Code.ClearValue(elseFlagAddress); }
+                            Code.JumpStart(conditionAddress);
 
                             if (@if.NextLink is LinkedElse elseBlock)
                             {
@@ -1302,23 +1347,30 @@ namespace LanguageCore.Brainfuck.Compiler
                             else if (@if.NextLink is LinkedIf elseIf)
                             {
                                 using (Code.Block("Block (else if)"))
-                                { Compile(elseIf); }
+                                { Compile(elseIf, true); }
                             }
                             else
-                            { throw new System.Exception(); }
+                            { throw new ImpossibleException(); }
 
                             using (Code.Block($"Reset ELSE flag"))
-                            { Code.ClearValue(elseFlagAddress); }
+                            { Code.ClearValue(conditionAddress); }
 
-                            Code.JumpEnd(elseFlagAddress);
+                            Code.JumpEnd(conditionAddress);
+                            Stack.PopVirtual();
                         }
 
                         Code.CommentLine($"Pointer: {Code.Pointer}");
                     }
                 }
 
-                ContinueReturnStatements();
-                ContinueBreakStatements();
+                if (!linked)
+                {
+                    using (this.DebugBlock(@if.Block.BracketEnd))
+                    {
+                        ContinueReturnStatements();
+                        ContinueBreakStatements();
+                    }
+                }
 
                 Code.CommentLine($"Pointer: {Code.Pointer}");
             }
@@ -1571,7 +1623,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.JumpEnd(conditionAddress);
 
                 if (Stack.LastAddress != BreakTagStack.Pop())
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
                 Stack.Pop();
 
                 Stack.Pop();
@@ -1643,7 +1695,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.JumpEnd(conditionAddress);
 
                 if (Stack.LastAddress != BreakTagStack.Pop())
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
                 Stack.Pop();
 
                 Stack.Pop();
@@ -2491,13 +2543,16 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Compile(Block block)
         {
-            VariableCleanupStack.Push(PrecompileVariables(block));
+            using (this.DebugBlock(block.BracketStart))
+            {
+                VariableCleanupStack.Push(PrecompileVariables(block));
 
-            if (ReturnTagStack.Count > 0)
-            { ReturnCount.Push(0); }
+                if (ReturnTagStack.Count > 0)
+                { ReturnCount.Push(0); }
 
-            if (BreakTagStack.Count > 0)
-            { BreakCount.Push(0); }
+                if (BreakTagStack.Count > 0)
+                { BreakCount.Push(0); }
+            }
 
             foreach (Statement statement in block.Statements)
             {
@@ -2506,13 +2561,16 @@ namespace LanguageCore.Brainfuck.Compiler
                 VariableCanBeDiscarded = null;
             }
 
-            if (ReturnTagStack.Count > 0)
-            { FinishReturnStatements(); }
+            using (this.DebugBlock(block.BracketEnd))
+            {
+                if (ReturnTagStack.Count > 0)
+                { FinishReturnStatements(); }
 
-            if (BreakTagStack.Count > 0)
-            { FinishBreakStatements(); }
+                if (BreakTagStack.Count > 0)
+                { FinishBreakStatements(); }
 
-            CleanupVariables(VariableCleanupStack.Pop());
+                CleanupVariables(VariableCleanupStack.Pop());
+            }
         }
         void Compile(AddressGetter addressGetter)
         {
@@ -3052,6 +3110,9 @@ namespace LanguageCore.Brainfuck.Compiler
             if (function.Parameters.Length != parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (required {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
 
+            if (function.Block is null)
+            { throw new CompilerException($"Function \"{function.ReadableID()}\" does not have any body definition", callerPosition, CurrentFile); }
+
             Variable? returnVariable = null;
 
             if (function.ReturnSomething)
@@ -3210,7 +3271,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
                 Stack.Pop();
             }
 
@@ -3238,7 +3299,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (BreakCount.Count > 0 ||
                 BreakTagStack.Count > 0)
-            { throw new System.Exception(); }
+            { throw new InternalException(); }
 
             BreakCount.Clear();
             for (int i = 0; i < savedBreakCount.Length; i++)
@@ -3419,7 +3480,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
                 Stack.Pop();
             }
 
@@ -3447,7 +3508,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (BreakCount.Count > 0 ||
                 BreakTagStack.Count > 0)
-            { throw new System.Exception(); }
+            { throw new InternalException(); }
 
             BreakCount.Clear();
             for (int i = 0; i < savedBreakCount.Length; i++)
@@ -3468,7 +3529,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedReturnCount; i++)
                 {
-                    Code += ']';
+                    Code.JumpEnd();
                     Code.LineBreak();
                 }
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -3497,7 +3558,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.CommentLine($"Pointer: {Code.Pointer}");
                 for (int i = 0; i < accumulatedBreakCount; i++)
                 {
-                    Code += ']';
+                    Code.JumpEnd();
                     Code.LineBreak();
                 }
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -3552,14 +3613,14 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 FinishReturnStatements();
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
                 Stack.Pop();
 
                 if (ReturnCount.Count > 0 ||
                     ReturnTagStack.Count > 0 ||
                     BreakCount.Count > 0 ||
                     BreakTagStack.Count > 0)
-                { throw new System.Exception(); }
+                { throw new InternalException(); }
             }
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
@@ -3568,6 +3629,9 @@ namespace LanguageCore.Brainfuck.Compiler
             // Heap.Destroy();
 
             Code.SetPointer(0);
+
+            if (Code.BranchDepth != 0)
+            { throw new InternalException($"Unbalanced branches", CurrentFile); }
 
             return new Result()
             {

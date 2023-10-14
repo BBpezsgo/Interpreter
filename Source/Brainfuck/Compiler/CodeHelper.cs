@@ -39,14 +39,17 @@ namespace LanguageCore.Brainfuck
 
         int indent;
         int pointer;
+        int branchDepth;
 
         public int Pointer => pointer;
+        public int BranchDepth => branchDepth;
 
         public CompiledCode()
         {
             this.Code = new StringBuilder();
             this.indent = 0;
             this.pointer = 0;
+            this.branchDepth = 0;
         }
 
         #region Comments
@@ -321,9 +324,26 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public JumpBlock Jump(int conditionAddress)
         {
-            this.SetPointer(conditionAddress);
-            Code.Append('[');
+            this.JumpStart(conditionAddress);
             return new JumpBlock(this, conditionAddress);
+        }
+
+        /// <summary>
+        /// <b>Pointer:</b> not modified
+        /// </summary>
+        public void JumpStart()
+        {
+            Code.Append('[');
+            branchDepth++;
+        }
+
+        /// <summary>
+        /// <b>Pointer:</b> not modified
+        /// </summary>
+        public void JumpEnd()
+        {
+            Code.Append(']');
+            branchDepth--;
         }
 
         /// <summary>
@@ -332,7 +352,7 @@ namespace LanguageCore.Brainfuck
         public void JumpStart(int conditionAddress)
         {
             this.SetPointer(conditionAddress);
-            Code.Append('[');
+            this.JumpStart();
             // this.SetPointer(0);
         }
 
@@ -343,7 +363,7 @@ namespace LanguageCore.Brainfuck
         {
             this.SetPointer(conditionAddress);
             if (clearCondition) this.ClearCurrent();
-            Code.Append(']');
+            this.JumpEnd();
             // this.SetPointer(0);
         }
 
@@ -588,8 +608,7 @@ namespace LanguageCore.Brainfuck
 
         public void Dispose()
         {
-            this.Code.SetPointer(this.ConditionAddress);
-            this.Code.Code.Append(']');
+            this.Code.JumpEnd(this.ConditionAddress);
         }
     }
 

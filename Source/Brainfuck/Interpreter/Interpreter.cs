@@ -419,19 +419,19 @@ namespace LanguageCore.Brainfuck
                 if (currentY - y >= height)
                 { return; }
 
-                if (token.Position.End.Character >= width)
-                { continue; }
-
                 if (currentX < 0 || currentY < 0)
                 { return; }
-                if (currentX >= width || currentY >= height)
+                if (currentY >= height)
                 { return; }
 
-                string text = token.Content;
+                string text = token.ToOriginalString();
                 for (int offset = 0; offset < text.Length; offset++)
                 {
                     if (currentX + offset - 1 >= width) return;
 
+                    byte foregroundColor = ByteColor.Silver;
+
+                    /*
                     byte foregroundColor = token.TokenType switch
                     {
                         Tokenizing.TokenType.LITERAL_NUMBER => ByteColor.BrightCyan,
@@ -461,6 +461,7 @@ namespace LanguageCore.Brainfuck
                         Tokenizing.TokenAnalysedType.TypeParameter => ByteColor.Yellow,
                         _ => foregroundColor,
                     };
+                    */
 
                     byte backgroundColor = ByteColor.Black;
                     if (sourceLocation.SourcePosition.Range.Contains(token.Position.Start))

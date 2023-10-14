@@ -78,7 +78,7 @@ namespace TheProgram.Brainfuck
                         Console.Write("Press any key to start the interpreter");
                         Console.ReadKey();
 
-                        interpreter.RunWithUI(true, 5);
+                        interpreter.RunWithUI(false, 5);
                         break;
                     }
                 case RunKind.SpeedTest:

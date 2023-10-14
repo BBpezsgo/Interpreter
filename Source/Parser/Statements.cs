@@ -154,9 +154,19 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class LinkedIf : StatementWithBlock
+    public abstract class LinkedIfThing : StatementWithBlock
     {
         public readonly Token Keyword;
+
+        public LinkedIfThing(Token keyword, Block block) : base(block)
+        {
+            Keyword = keyword;
+        }
+    }
+
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    public class LinkedIf : LinkedIfThing
+    {
         public readonly StatementWithValue Condition;
         /// <summary>
         /// Can be:
@@ -166,12 +176,10 @@ namespace LanguageCore.Parser.Statement
         /// <item><see langword="null"/></item>
         /// </list>
         /// </summary>
-        public Statement NextLink;
+        public LinkedIfThing NextLink;
 
-        public LinkedIf(Token keyword, StatementWithValue condition, Block block)
-            : base(block)
+        public LinkedIf(Token keyword, StatementWithValue condition, Block block) : base(keyword, block)
         {
-            Keyword = keyword;
             Condition = condition;
         }
 
@@ -180,16 +188,16 @@ namespace LanguageCore.Parser.Statement
 
         public override string PrettyPrint(int ident = 0)
         { throw new NotImplementedException(); }
+
+        public override string ToString() => $"{Keyword} ({Condition}) {{ ... }} {(NextLink != null ? "..." : ";")}";
+        string GetDebuggerDisplay() => ToString();
     }
 
-    public class LinkedElse : StatementWithBlock
+    public class LinkedElse : LinkedIfThing
     {
-        public readonly Token Keyword;
-
-        public LinkedElse(Token keyword, Block block)
-            : base(block)
+        public LinkedElse(Token keyword, Block block) : base(keyword, block)
         {
-            Keyword = keyword;
+
         }
 
         public override Position GetPosition()
@@ -1121,7 +1129,7 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        Statement ToLinks(int i)
+        LinkedIfThing ToLinks(int i)
         {
             if (i >= Parts.Length)
             { return null; }

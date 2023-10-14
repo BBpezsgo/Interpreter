@@ -413,18 +413,21 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (literal.Value.Length != type.StackArraySize)
                         { throw new InternalException(); }
 
-                        int arraySize = type.StackArraySize;
-
-                        int size = Snippets.ARRAY_SIZE(arraySize);
-
-                        int address = Stack.PushVirtual(size);
-                        variables.Push(new Variable(name, address, scope, true, type, size)
+                        using (DebugBlock(initialValue))
                         {
-                            IsInitialValueSet = true
-                        });
+                            int arraySize = type.StackArraySize;
 
-                        for (int i = 0; i < literal.Value.Length; i++)
-                        { Code.ARRAY_SET_CONST(address, i, new DataItem(literal.Value[i])); }
+                            int size = Snippets.ARRAY_SIZE(arraySize);
+
+                            int address = Stack.PushVirtual(size);
+                            variables.Push(new Variable(name, address, scope, true, type, size)
+                            {
+                                IsInitialValueSet = true
+                            });
+
+                            for (int i = 0; i < literal.Value.Length; i++)
+                            { Code.ARRAY_SET_CONST(address, i, new DataItem(literal.Value[i])); }
+                        }
                     }
                     else
                     { throw new NotImplementedException(); }
@@ -1263,6 +1266,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 using (Code.Block("Compute condition"))
                 { Compile(@if.Condition); }
 
+                using (this.DebugBlock(@if.Condition))
+                { Code.LOGIC_MAKE_BOOL(conditionAddress, conditionAddress + 1); }
+
                 Code.CommentLine($"Condition result at {conditionAddress}");
 
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -1282,18 +1288,20 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (@if.NextLink == null)
                 {
                     using (this.DebugBlock(@if.Block.BracketEnd))
-                    using (Code.Block("Cleanup condition"))
                     {
-                        Code.ClearValue(conditionAddress);
-                        Code.JumpEnd(conditionAddress);
-                        Stack.PopVirtual();
+                        using (Code.Block("Cleanup condition"))
+                        {
+                            Code.ClearValue(conditionAddress);
+                            Code.JumpEnd(conditionAddress);
+                            Stack.PopVirtual();
+                        }
                     }
                 }
                 else
                 {
                     using (Code.Block("Else"))
                     {
-                        using (this.DebugBlock(@if.Keyword))
+                        using (this.DebugBlock(@if.Block.BracketEnd))
                         {
                             using (Code.Block("Finish if statement"))
                             {
@@ -1305,8 +1313,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
                         using (this.DebugBlock(@if.NextLink.Keyword))
                         {
-                            using (Code.Block($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
-                            { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
+                            // using (Code.Block($"Invert condition (at {conditionAddress}) result (to {conditionAddress + 1})"))
+                            // { Code.LOGIC_NOT(conditionAddress, conditionAddress + 1); }
 
                             Code.CommentLine($"Pointer: {Code.Pointer}");
 
@@ -1365,7 +1373,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 if (!linked)
                 {
-                    using (this.DebugBlock(@if.Block.BracketEnd))
+                    using (this.DebugBlock(@if.Semicolon ?? @if.Block.Semicolon ?? @if.Block.BracketEnd))
                     {
                         ContinueReturnStatements();
                         ContinueBreakStatements();
@@ -3098,6 +3106,26 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
+            if (function.CompiledAttributes.HasAttribute("StandardInput"))
+            {
+                int address = Stack.PushVirtual(1);
+                Code.SetPointer(address);
+                if (function.Type == Type.VOID)
+                {
+                    Code += ',';
+                    Code.ClearValue(address);
+                }
+                else
+                {
+                    if (function.Type.SizeOnStack != 1)
+                    {
+                        throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    }
+                    Code += ',';
+                }
+                return;
+            }
+
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
 
@@ -3262,27 +3290,34 @@ namespace LanguageCore.Brainfuck.Compiler
                 Constants.Add(savedConstants[i]);
             }
 
-            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+            using (DebugBlock(function.Block.BracketStart))
             {
-                ReturnTagStack.Push(Stack.Push(1));
+                using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+                {
+                    ReturnTagStack.Push(Stack.Push(1));
+                }
             }
 
             Compile(function.Block);
 
+            using (DebugBlock(function.Block.BracketEnd))
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(); }
                 Stack.Pop();
             }
 
-            using (Code.Block($"Clean up macro variables ({Variables.Count})"))
+            using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
             {
-                int n = Variables.Count;
-                for (int i = 0; i < n; i++)
+                using (Code.Block($"Clean up macro variables ({Variables.Count})"))
                 {
-                    Variable variable = Variables.Pop();
-                    if (!variable.HaveToClean) continue;
-                    Stack.Pop();
+                    int n = Variables.Count;
+                    for (int i = 0; i < n; i++)
+                    {
+                        Variable variable = Variables.Pop();
+                        if (!variable.HaveToClean) continue;
+                        Stack.Pop();
+                    }
                 }
             }
 

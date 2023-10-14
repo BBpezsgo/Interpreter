@@ -2,7 +2,6 @@ int Heh(int a, int b)
 {
 	int v0 = 55;
 	int v1 = 45;
-	int i = a;
 	if (a >= b)
 	{
 		return 69;

@@ -146,6 +146,7 @@ namespace LanguageCore.Parser
         public Token Identifier;
         public TypeInstance Type;
         public Token ProtectionToken;
+        public Token Semicolon;
 
         public Position GetPosition()
             => new(Identifier, Type, ProtectionToken);

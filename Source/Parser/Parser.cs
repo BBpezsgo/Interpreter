@@ -147,7 +147,8 @@ namespace LanguageCore.Parser
 
             List<Literal> parameters = new();
             int endlessSafe = 50;
-            while (!ExpectOperator(";"))
+            Token semicolon;
+            while (!ExpectOperator(";", out semicolon))
             {
                 if (!ExpectLiteral(out var parameter))
                 { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", CurrentToken); }
@@ -155,7 +156,7 @@ namespace LanguageCore.Parser
                 parameter.ValueToken.AnalyzedType = TokenAnalysedType.HashParameter;
                 parameters.Add(parameter);
 
-                if (ExpectOperator(";"))
+                if (ExpectOperator(";", out semicolon))
                 { break; }
 
                 endlessSafe--;
@@ -163,7 +164,10 @@ namespace LanguageCore.Parser
                 { throw new EndlessLoopException(); }
             }
 
-            hashStatement = new CompileTag(hashT, hashName, parameters.ToArray());
+            hashStatement = new CompileTag(hashT, hashName, parameters.ToArray())
+            {
+                Semicolon = semicolon,
+            };
 
             return true;
         }
@@ -243,6 +247,7 @@ namespace LanguageCore.Parser
             else
             {
                 Statement.Statement statement = ExpectStatement();
+
                 if (statement == null)
                 { throw new SyntaxException($"Expected top-level statement, type, macro or function definition. Got a token {CurrentToken}", CurrentToken); }
 
@@ -250,8 +255,10 @@ namespace LanguageCore.Parser
 
                 TopLevelStatements.Add(statement);
 
-                if (!ExpectOperator(";"))
+                if (!ExpectOperator(";", out Token semicolon))
                 { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+
+                statement.Semicolon = semicolon;
             }
         }
 
@@ -772,8 +779,9 @@ namespace LanguageCore.Parser
                 else if (ExpectField(out FieldDefinition field))
                 {
                     fields.Add(field);
-                    if (!ExpectOperator(";"))
+                    if (!ExpectOperator(";", out Token semicolon))
                     { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
+                    field.Semicolon = semicolon;
                 }
                 else
                 {
@@ -852,8 +860,9 @@ namespace LanguageCore.Parser
                 { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
                 fields.Add(field);
-                if (!ExpectOperator(";"))
+                if (!ExpectOperator(";", out Token semicolon))
                 { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
+                field.Semicolon = semicolon;
 
                 endlessSafe++;
                 if (endlessSafe > 50)
@@ -1256,9 +1265,9 @@ namespace LanguageCore.Parser
 
                 statements.Add(statement);
 
-                if (!ExpectOperator(";"))
+                if (!ExpectOperator(";", out Token semicolon))
                 { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
-
+                statement.Semicolon = semicolon;
 
                 endlessSafe++;
                 if (endlessSafe > 500) throw new EndlessLoopException();
@@ -1285,9 +1294,9 @@ namespace LanguageCore.Parser
 
                 statements.Add(statement);
 
-                if (!ExpectOperator(";"))
+                if (!ExpectOperator(";", out Token semicolon))
                 { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
-
+                statement.Semicolon = semicolon;
 
                 endlessSafe++;
                 if (endlessSafe > 500) throw new EndlessLoopException();
@@ -1342,15 +1351,17 @@ namespace LanguageCore.Parser
             if (variableDeclaration == null)
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenParenthesesOpen); }
 
-            if (!ExpectOperator(";"))
+            if (!ExpectOperator(";", out Token semicolon1))
             { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
+            variableDeclaration.Semicolon = semicolon1;
 
             StatementWithValue condition = ExpectExpression();
             if (condition == null)
             { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenParenthesesOpen); }
 
-            if (!ExpectOperator(";"))
+            if (!ExpectOperator(";", out Token semicolon2))
             { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
+            condition.Semicolon = semicolon2;
 
             AnyAssignment expression = ExpectAnySetter();
             if (expression == null)

@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
+    using System.Runtime.CompilerServices;
     using ConsoleGUI;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
@@ -379,6 +380,25 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             return true;
+        }
+
+        /// <param name="position">
+        /// Used for exceptions
+        /// </param>
+        /// <exception cref="CompilerException"/>
+        protected bool TryFindReplacedType(string builtinName, out CompiledType type)
+        {
+            type = null;
+
+            string replacedName = TypeDefinitionReplacer(builtinName);
+
+            if (replacedName == null)
+            { return false; }
+
+            try { type = FindType(replacedName, null); }
+            catch (Exception) { }
+
+            return type is not null;
         }
 
         /// <param name="position">

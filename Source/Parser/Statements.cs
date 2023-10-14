@@ -88,6 +88,8 @@ namespace LanguageCore.Parser.Statement
 
     public abstract class Statement : IThingWithPosition
     {
+        public Token Semicolon;
+
         public override string ToString()
             => this.GetType().Name;
 

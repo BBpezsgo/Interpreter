@@ -1,15 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading;
 
-namespace LanguageCore.IL.Compiler
+namespace LanguageCore.ASM.Compiler
 {
     using BBCode.Compiler;
     using LanguageCore.Parser;
@@ -23,7 +15,6 @@ namespace LanguageCore.IL.Compiler
         #region Fields
 
         readonly Settings GeneratorSettings;
-        string AssemblyName = "Bruh";
 
         #endregion
 
@@ -38,7 +29,8 @@ namespace LanguageCore.IL.Compiler
 
             public Warning[] Warnings;
             public Error[] Errors;
-            public Assembly Assembly;
+
+            public string AssemblyCode;
         }
 
         public struct Settings
@@ -643,54 +635,57 @@ namespace LanguageCore.IL.Compiler
         }
         #endregion
 
-        void GenerateCodeForTopLevelStatements(Statement[] statements, TypeBuilder type)
-        {
-            MethodBuilder methodBuilder = type.DefineMethod("Main", MethodAttributes.Public | MethodAttributes.Static);
-
-
-            System.Type consoleType = System.Type.GetType("System.Console, System.Console", true);
-
-            MethodInfo methodInfo = consoleType.GetMethod(nameof(Console.WriteLine), new System.Type[]
-            {
-                typeof(string),
-            });
-
-            ILGenerator il = methodBuilder.GetILGenerator();
-
-            il.Emit(OpCodes.Ldstr, "Hello World!");
-            il.Emit(OpCodes.Call, methodInfo!);
-            il.Emit(OpCodes.Ret);
-        }
-
-        void GenerateCodeForFunction(CompiledFunction function, TypeBuilder type)
-        {
-
-        }
-
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             PrintCallback printCallback = null)
         {
-            (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, Compiler.CompileLevel.Minimal);
+            AssemblyCode builder = new();
 
-            AssemblyName assemblyName = new($"{AssemblyName}Assembly");
+            builder.WriteHeader(new AssemblyHeader()
+            {
+                MasmPath = @"C:\masm32\",
+                Libraries = new List<string>()
+                {
+                    "kernel32",
+                    "masm32",
+                },
+            });
 
-            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+            builder.AppendLine(".data");
+            builder.AppendLine("    message db \"This is your first assembly program\", 0");
+            builder.AppendLine();
+            builder.AppendLine(".code ");
+            builder.AppendLine("main:");
+            builder.AppendLine("    push OFFSET message");
+            builder.AppendLine("    call StdOut");
+            builder.AppendLine("    push 0");
+            builder.AppendLine("    call ExitProcess");
+            builder.AppendLine("end main");
 
-            ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule($"{AssemblyName}Module");
-
-            TypeBuilder typeBuilder = moduleBuilder.DefineType("Program", TypeAttributes.Public);
-
-            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements, typeBuilder);
-
-            System.Type type = typeBuilder.CreateType();
-            Assembly assembly = Assembly.GetAssembly(type!);
+            /*
+            // builder.Append("STD_OUTPUT_HANDLE   equ -11\r\nNULL                equ 0\r\n\r\nglobal WinMain\r\nextern ExitProcess, GetStdHandle, WriteConsoleA\r\n\r\nsection .data\r\nmsg                 db \"Hello World!\", 13, 10, 0\r\nmsg.len             equ $ - msg\r\n\r\nsection .bss\r\ndummy               resd 1\r\n\r\nsection .text\r\nWinMain:\r\n    push    STD_OUTPUT_HANDLE\r\n    call    GetStdHandle\r\n\r\n    push    NULL\r\n    push    dummy\r\n    push    msg.len\r\n    push    msg\r\n    push    eax\r\n    call    WriteConsoleA \r\n\r\n    push    NULL\r\n    call    ExitProcess");
+            builder.Append("NULL equ 0\r\n");
+            builder.Append("[section] .text");
+            builder.Append("\r\n");
+            builder.Append("global WinMain\r\n");
+            builder.Append("extern ExitProcess, GetStdHandle, WriteConsoleA\r\n");
+            builder.Append("\r\n");
+            builder.Append("WinMain:\r\n");
+            builder.Append("push NULL\r\n");
+            builder.Append("call ExitProcess\r\n");
+            // builder.Append("    mov rax, 60\r\n");
+            // builder.Append("    mov rdi, 69\r\n");
+            // builder.Append("    syscall\r\n");
+            builder.Append("    mov eax, 69\r\n");
+            builder.Append("    ret\r\n");
+            */
 
             return new Result()
             {
                 Tokens = compilerResult.Tokens,
-                Assembly = assembly,
+
+                AssemblyCode = builder.ToString(),
 
                 Warnings = this.Warnings.ToArray(),
                 Errors = this.Errors.ToArray(),

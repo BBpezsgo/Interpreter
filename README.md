@@ -72,69 +72,6 @@ using "../CodeFiles/System";
 PrintLine("hello, world");
 ```
 
-## Other features
-### Structs
-> ⚠ **OUTDATED**
-
-You can create a very basic struct.
-A struct can only contain fields.<br>
-Methods are currently not supported.
-```cs
-// Define the struct
-
-struct Foo
-{
-  int field1;
-  byte field2;
-}
-
-// Create an instance:
-
-Foo x = new Foo;
-```
-### Function overloading
-Yeah. It is supported.
-### Method like functions
-You can create a function that looks like a method.
-Put the `this` keyword before the first parameter and you're done.<br>
-When you call a method like the function
-do not use the first argument,
-instead, put before the function.
-```cs
-// Define the function:
-
-int Add(this int v)
-{
-  return v + 5;
-}
-
-// Call the function:
-
-13.Add();
-```
-### Events
-
-You can listen to an event with the `Catch` attribute.<br>
-Two events can be caught:<br>
-`update` and `end`.<br>
-`update` is called every tick.<br>
-`end` is called when the program finishes executing.
-```cs
-[Catch("update")]
-void Update() { }
-```
-> **NOTE:**
-> If you listen to the `update` event, the program will run until you manually close it.
-
-## `export` Keyword
-You can use the `export` keyword to specify that the following function definition can be used in other files.
-```cs
-export void Foo()
-{ }
-```
-> **NOTE:**
-> The `export` keyword is only supported on functions: all structs/classes/enums can be used in other files!
-
 ## Default external functions
 
 ### "stdin"

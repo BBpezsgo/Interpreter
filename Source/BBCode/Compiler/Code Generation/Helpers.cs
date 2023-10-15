@@ -1,10 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Collections.Generic;
-    using System.Diagnostics;
-    using System.Text;
     using LanguageCore.Runtime;
     using Parser;
     using Parser.Statement;
@@ -73,17 +73,16 @@ namespace LanguageCore.BBCode.Compiler
             { throw new CompilerException($"This should be an integer", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.PUSH_VALUE, 0, "saved code pointer");
+            AddInstruction(Opcode.PUSH_VALUE, 0);
 
             AddInstruction(Opcode.GET_BASEPOINTER);
-            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
 
             if (address.Type.InHEAP)
             { AddInstruction(Opcode.HEAP_GET, AddressingMode.ABSOLUTE, address.MemoryAddress); }
             else
             { StackLoad(new ValueAddress(address), address.Type.SizeOnStack); }
 
-            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
 
             AddInstruction(Opcode.MATH_SUB);
 
@@ -103,15 +102,14 @@ namespace LanguageCore.BBCode.Compiler
             { throw new CompilerException($"This should be an integer", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.PUSH_VALUE, 0, "saved code pointer");
+            AddInstruction(Opcode.PUSH_VALUE, 0);
 
             AddInstruction(Opcode.GET_BASEPOINTER);
-            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
 
             ValueAddress offset = GetBaseAddress(address);
             AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
 
-            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
 
             AddInstruction(Opcode.MATH_SUB);
 
@@ -131,14 +129,13 @@ namespace LanguageCore.BBCode.Compiler
             { throw new CompilerException($"This should be an integer", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.PUSH_VALUE, 0, "saved code pointer");
+            AddInstruction(Opcode.PUSH_VALUE, 0);
 
             AddInstruction(Opcode.GET_BASEPOINTER);
-            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
 
             GenerateCodeForStatement(address);
 
-            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 2, "GeneratedCode.Count + 2");
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 1);
 
             AddInstruction(Opcode.MATH_SUB);
 
@@ -155,10 +152,9 @@ namespace LanguageCore.BBCode.Compiler
         int Call(int absoluteAddress)
         {
             int returnToValueInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.PUSH_VALUE, 0, "saved code pointer");
+            AddInstruction(Opcode.PUSH_VALUE, 0);
 
             AddInstruction(Opcode.GET_BASEPOINTER);
-            AddInstruction(Opcode.DEBUG_SET_TAG, "saved base pointer");
 
             AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);
 
@@ -203,11 +199,11 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(TypeInstance type, string tag = "")
+        int GenerateInitialValue(TypeInstance type)
         {
             if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out Type builtinType))
             {
-                AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType), tag);
+                AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType));
                 return 1;
             }
 
@@ -219,14 +215,14 @@ namespace LanguageCore.BBCode.Compiler
                 foreach (FieldDefinition field in instanceType.Struct.Fields)
                 {
                     size++;
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type), $"{tag}{(string.IsNullOrWhiteSpace(tag) ? "" : ".")}{field.Identifier}");
+                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
                 }
                 return size;
             }
 
             if (instanceType.IsClass)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER, $"(pointer) {tag}");
+                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
                 return 1;
             }
 
@@ -235,13 +231,13 @@ namespace LanguageCore.BBCode.Compiler
                 if (instanceType.Enum.Members.Length == 0)
                 { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
 
-                AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].Value, tag);
+                AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].Value);
                 return 1;
             }
 
             if (instanceType.IsFunction)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER, tag);
+                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
                 return 1;
             }
 
@@ -250,22 +246,21 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(CompiledType type, string tag = "")
+        int GenerateInitialValue(CompiledType type)
         {
             if (type.IsStruct)
             {
                 int size = 0;
                 foreach (CompiledField field in type.Struct.Fields)
                 {
-                    size++;
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type), $"{tag}{(string.IsNullOrWhiteSpace(tag) ? "" : ".")}{field.Identifier}");
+                    size += GenerateInitialValue(field.Type);
                 }
                 return size;
             }
 
             if (type.IsClass)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER, $"(pointer) {tag}");
+                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
                 return 1;
             }
 
@@ -276,12 +271,12 @@ namespace LanguageCore.BBCode.Compiler
                 int size = 0;
                 for (int i = 0; i < stackSize; i++)
                 {
-                    size += GenerateInitialValue(type.StackArrayOf, $"tag[{i}]");
+                    size += GenerateInitialValue(type.StackArrayOf);
                 }
                 return size;
             }
 
-            AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type), tag);
+            AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
             return 1;
         }
         /// <exception cref="NotImplementedException"></exception>
@@ -295,7 +290,7 @@ namespace LanguageCore.BBCode.Compiler
                 foreach (CompiledField field in type.Struct.Fields)
                 {
                     size++;
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type), $"{tag}{(string.IsNullOrWhiteSpace(tag) ? "" : ".")}{field.Identifier}");
+                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
                     afterValue?.Invoke(size);
                 }
                 return size;
@@ -303,12 +298,12 @@ namespace LanguageCore.BBCode.Compiler
 
             if (type.IsClass)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER, $"(pointer) {tag}");
+                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
                 afterValue?.Invoke(0);
                 return 1;
             }
 
-            AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type), tag);
+            AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
             afterValue?.Invoke(0);
             return 1;
         }
@@ -345,11 +340,12 @@ namespace LanguageCore.BBCode.Compiler
 
         #region Memory Helpers
 
-        void StackStore(int destination, int size, bool basepointerRelative)
+        void StackStore(ValueAddress address, int size)
         {
             for (int i = size - 1; i >= 0; i--)
             {
-                AddInstruction(Opcode.STORE_VALUE, basepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE, destination + i);
+                StackStore(address + i);
+                // AddInstruction(Opcode.STORE_VALUE, address.AddressingMode, address.Address + i);
             }
         }
         void StackLoad(ValueAddress address, int size)
@@ -358,8 +354,7 @@ namespace LanguageCore.BBCode.Compiler
             for (int currentOffset = 0; currentOffset < size; currentOffset++)
             {
                 AddComment($"Element {currentOffset}:");
-                ValueAddress loadFrom = address + currentOffset;
-                StackLoad(loadFrom);
+                StackLoad(address + currentOffset);
             }
             AddComment("}");
         }

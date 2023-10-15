@@ -10,11 +10,77 @@ namespace LanguageCore.Runtime
         public Position SourcePosition;
 
         public readonly bool Contains(int instruction) =>
-            Instructions.Start >= instruction &&
-            Instructions.End <= instruction;
+            Instructions.Start <= instruction &&
+            Instructions.End >= instruction;
 
         public override readonly string ToString() => $"({Instructions} -> {SourcePosition.ToMinString()})";
         readonly string GetDebuggerDisplay() => ToString();
+    }
+
+    public enum StackElementKind
+    {
+        Internal,
+        Variable,
+        Parameter,
+    }
+
+    public enum StackElementType
+    {
+        Value,
+        HeapPointer,
+        StackPointer,
+    }
+
+    public struct StackElementInformations
+    {
+        public StackElementKind Kind;
+        public StackElementType Type;
+        public string Tag;
+
+        public int Address;
+        public bool BasepointerRelative;
+        public int Size;
+
+        public readonly Range<int> GetRange(int basepointer)
+        {
+            int itemStart = this.Address;
+            if (this.BasepointerRelative) itemStart += basepointer;
+            int itemEnd = itemStart + this.Size - 1;
+            return (itemStart, itemEnd);
+        }
+    }
+
+    public struct ScopeInformations
+    {
+        public SourceCodeLocation Location;
+        public List<StackElementInformations> Stack;
+    }
+
+    public readonly struct CollectedScopeInfo
+    {
+        public readonly StackElementInformations[] Stack;
+
+        public CollectedScopeInfo(StackElementInformations[] stack)
+        {
+            Stack = stack;
+        }
+
+        public bool TryGet(int basePointer, int stackAddress, out StackElementInformations result)
+        {
+            for (int i = 0; i < Stack.Length; i++)
+            {
+                StackElementInformations item = Stack[i];
+                Range<int> range = item.GetRange(basePointer);
+
+                if (range.Contains(stackAddress))
+                {
+                    result = item;
+                    return true;
+                }
+            }
+            result = default;
+            return false;
+        }
     }
 
     public struct FunctionInformations
@@ -25,6 +91,7 @@ namespace LanguageCore.Runtime
         public string File;
         public string ReadableIdentifier;
         public bool IsMacro;
+        public Range<int> Instructions;
 
         public override readonly string ToString()
         {
@@ -36,12 +103,33 @@ namespace LanguageCore.Runtime
     public class DebugInformation
     {
         public readonly List<SourceCodeLocation> SourceCodeLocations;
-        public readonly Dictionary<int, FunctionInformations> FunctionInformations;
+        public readonly List<FunctionInformations> FunctionInformations;
+        public readonly List<ScopeInformations> ScopeInformations;
+        public readonly Dictionary<int, List<string>> CodeComments;
 
         public DebugInformation()
         {
             SourceCodeLocations = new List<SourceCodeLocation>();
-            FunctionInformations = new Dictionary<int, FunctionInformations>();
+            FunctionInformations = new List<FunctionInformations>();
+            ScopeInformations = new List<ScopeInformations>();
+            CodeComments = new Dictionary<int, List<string>>();
+        }
+
+        public static int[] TraceBasePointers(DataItem[] stack, int basePointer)
+        {
+            List<int> result = new();
+            TraceBasePointers(result, stack, basePointer);
+            return result.ToArray();
+        }
+
+        static void TraceBasePointers(List<int> result, DataItem[] stack, int basePointer)
+        {
+            if (basePointer < 1) return;
+            DataItem item = stack[basePointer - 1];
+            if (item.Type != RuntimeType.INT) return;
+            int num = item.ValueInt;
+            result.Add(num);
+            TraceBasePointers(result, stack, num);
         }
 
         public SourceCodeLocation[] GetSourceLocations(int instruction)
@@ -80,11 +168,52 @@ namespace LanguageCore.Runtime
         {
             FunctionInformations[] result = new FunctionInformations[callstack.Length];
             for (int i = 0; i < callstack.Length; i++)
-            {
-                if (FunctionInformations.TryGetValue(callstack[i], out FunctionInformations functionInformations))
-                { result[i] = functionInformations; }
-            }
+            { result[i] = GetFunctionInformations(callstack[i]); }
             return result;
+        }
+
+        public FunctionInformations GetFunctionInformations(int codePointer)
+        {
+            for (int j = 0; j < FunctionInformations.Count; j++)
+            {
+                FunctionInformations info = FunctionInformations[j];
+
+                if (info.Instructions.Contains(codePointer))
+                { return info; }
+            }
+            return default;
+        }
+
+        public ScopeInformations[] GetScopes(int codePointer)
+        {
+            List<ScopeInformations> result = new();
+
+            for (int i = 0; i < ScopeInformations.Count; i++)
+            {
+                ScopeInformations scope = ScopeInformations[i];
+                if (!scope.Location.Contains(codePointer)) continue;
+                result.Add(scope);
+            }
+
+            return result.ToArray();
+        }
+
+        public CollectedScopeInfo GetScopeInformations(int codePointer)
+        {
+            ScopeInformations[] scopes = GetScopes(codePointer);
+            List<StackElementInformations> result = new();
+
+            for (int i = 0; i < scopes.Length; i++)
+            {
+                if (scopes[i].Stack == null) continue;
+                for (int j = 0; j < scopes[i].Stack.Count; j++)
+                {
+                    StackElementInformations item = scopes[i].Stack[j];
+                    result.Add(item);
+                }
+            }
+
+            return new CollectedScopeInfo(result.ToArray());
         }
     }
 }

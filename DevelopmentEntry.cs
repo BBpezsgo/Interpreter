@@ -3,6 +3,7 @@
 
 using System;
 using System.Diagnostics;
+using System.IO;
 
 namespace TheProgram
 {
@@ -18,7 +19,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test26.bbc";
+            string path = TestConstants.TestFilesPath + "test37.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -31,8 +32,9 @@ namespace TheProgram
                 //"-c-generate-comments false",
                 // "-no-debug-info",
                 // "-dont-optimize",
-                // "-console-gui",
-                "-brainfuck",
+                "-console-gui",
+                // "-asm",
+                // "-brainfuck",
                 "-heap 2048",
                 "-bc-instruction-limit " + int.MaxValue.ToString(),
                 $"\"{path}\""

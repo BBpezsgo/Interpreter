@@ -94,6 +94,7 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly List<Information> Informations;
         readonly DebugInformation GeneratedDebugInfo;
+        readonly Stack<ScopeInformations> CurrentScopeDebug = new();
 
         /// <summary>
         /// Used for keep track of local (after base pointer) tag count that are not variables.
@@ -172,6 +173,7 @@ namespace LanguageCore.BBCode.Compiler
                 for (int i = 0; i < code.Length; i++)
                 {
                     Instruction instruction = code[i];
+                    /*
                     if (instruction.opcode == Opcode.COMMENT)
                     {
                         if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
@@ -190,6 +192,7 @@ namespace LanguageCore.BBCode.Compiler
 
                         continue;
                     }
+                    */
 
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
                     Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
@@ -212,12 +215,6 @@ namespace LanguageCore.BBCode.Compiler
                         Console.ForegroundColor = ConsoleColor.White;
                         Console.Write($"{instruction.Parameter}");
                         Console.Write($" ");
-                    }
-
-                    if (!string.IsNullOrEmpty(instruction.tag))
-                    {
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.Write($"{instruction.tag}");
                     }
 
                     Console.Write("\n\r");
@@ -276,8 +273,8 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     AddComment($"Create string \"{function}\" {{");
 
-                    AddInstruction(Opcode.PUSH_VALUE, function.Length + 1, $"\"{function}\".Length");
-                    AddInstruction(Opcode.HEAP_ALLOC, $"(String pointer)");
+                    AddInstruction(Opcode.PUSH_VALUE, function.Length + 1);
+                    AddInstruction(Opcode.HEAP_ALLOC);
 
                     ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count);
                     offset += function.Length;

@@ -159,7 +159,7 @@ namespace LanguageCore.Runtime
                     if (returnValue is null)
                     { return DataItem.Null; }
                     else
-                    { return DataItem.GetValue(returnValue, $"{method.Name}() result"); }
+                    { return DataItem.GetValue(returnValue); }
                 }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
             }
             else
@@ -305,7 +305,7 @@ namespace LanguageCore.Runtime
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke();
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -319,7 +319,7 @@ namespace LanguageCore.Runtime
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -334,7 +334,7 @@ namespace LanguageCore.Runtime
                     GetValue<T0>(sender, args[0]),
                     GetValue<T1>(sender, args[1]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -350,7 +350,7 @@ namespace LanguageCore.Runtime
                     GetValue<T1>(sender, args[1]),
                     GetValue<T2>(sender, args[2]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -367,7 +367,7 @@ namespace LanguageCore.Runtime
                     GetValue<T2>(sender, args[2]),
                     GetValue<T3>(sender, args[3]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -385,7 +385,7 @@ namespace LanguageCore.Runtime
                     GetValue<T3>(sender, args[3]),
                     GetValue<T4>(sender, args[4]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
         /// <exception cref="NotImplementedException"/>
@@ -404,7 +404,7 @@ namespace LanguageCore.Runtime
                     GetValue<T4>(sender, args[4]),
                     GetValue<T5>(sender, args[5]));
 
-                return DataItem.GetValue(result, $"{name}() result");
+                return DataItem.GetValue(result);
             });
         }
 

@@ -34,19 +34,13 @@ namespace LanguageCore.Runtime
                 if (parameter is DataItem dataItem && dataItem.Type == RuntimeType.INT) return dataItem.ValueInt;
                 throw new InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
             }
-            set => parameter = new DataItem(value, parameter.Tag);
+            set => parameter = new DataItem(value);
         }
         public DataItem Parameter
         {
             get => parameter;
             set => parameter = value;
         }
-
-        /// <summary>
-        /// <b>Only for debugging!</b><br/>
-        /// Sets the <see cref="DataItem.Tag"/> to this<br/>
-        /// </summary>
-        public string tag = string.Empty;
 
         [Obsolete("Only for deserialization", true)]
         public Instruction()
@@ -84,21 +78,16 @@ namespace LanguageCore.Runtime
 
         public override string ToString()
         {
-            if (this.opcode == Opcode.COMMENT)
-            { return $"# {this.tag}"; }
-            else
-            {
-                string result = $"{opcode}";
+            string result = $"{opcode}";
 
-                if (opcode == Opcode.LOAD_VALUE ||
-                    opcode == Opcode.STORE_VALUE)
-                { result += " " + AddressingMode.ToString(); }
+            if (opcode == Opcode.LOAD_VALUE ||
+                opcode == Opcode.STORE_VALUE)
+            { result += " " + AddressingMode.ToString(); }
 
-                if (!this.parameter.IsNull)
-                { result += $" {{ {parameter} }}"; }
+            if (!this.parameter.IsNull)
+            { result += $" {{ {parameter} }}"; }
 
-                return result;
-            }
+            return result;
         }
 
         #region Serialize
@@ -107,7 +96,6 @@ namespace LanguageCore.Runtime
             serializer.Serialize((byte)this.opcode);
             serializer.Serialize((byte)this.AddressingMode);
             serializer.Serialize(this.parameter);
-            serializer.Serialize(this.tag);
         }
 
         public void Deserialize(Deserializer deserializer)
@@ -115,7 +103,6 @@ namespace LanguageCore.Runtime
             this.opcode = (Opcode)deserializer.DeserializeByte();
             this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
             this.parameter = deserializer.DeserializeObject<DataItem>();
-            this.tag = deserializer.DeserializeString();
         }
 
         public Value SerializeText()
@@ -125,7 +112,6 @@ namespace LanguageCore.Runtime
             result["OpCode"] = Value.Literal(opcode.ToString());
             result["AddressingMode"] = Value.Literal(AddressingMode.ToString());
             result["Parameter"] = Value.Object(parameter);
-            result["Tag"] = Value.Literal(tag);
             return result;
         }
 
@@ -134,7 +120,6 @@ namespace LanguageCore.Runtime
             opcode = data["OpCode"].Enum<Opcode>();
             AddressingMode = data["AddressingMode"].Enum<AddressingMode>();
             parameter = data["Parameter"].Object<DataItem>();
-            tag = data["Tag"].String;
         }
         #endregion
     }

@@ -1,0 +1,56 @@
+using System; 
+
+struct ThisIsStruct
+{
+	String Text;
+	ThisIsClass Other;
+	int Number;
+}
+
+class ThisIsClass
+{
+	ThisIsStruct Other;
+}
+
+
+void Print(this ThisIsStruct self)
+{
+	Print(self.Text);
+	Print(self.Number);
+}
+
+ThisIsStruct[4] structs;
+
+structs[0].Text = "Yes1";
+structs[0].Other = new ThisIsClass;
+structs[0].Number = 11;
+
+structs[1].Text = "Yes2";
+structs[1].Other = new ThisIsClass;
+structs[1].Number = 22;
+
+structs[2].Text = "Yes3";
+structs[2].Other = new ThisIsClass;
+structs[2].Number = 33;
+
+structs[3].Text = "Yes4";
+structs[3].Other = new ThisIsClass;
+structs[3].Number = 44;
+
+structs[0].Print();
+PrintLine();
+structs[1].Print();
+PrintLine();
+structs[2].Print();
+PrintLine();
+structs[3].Print();
+PrintLine();
+
+structs[1].Other.Other.Number = 7;
+PrintLine(structs[1].Other.Other.Number);
+
+structs[1].Other.Other.Text = "Bruh";
+PrintLine(structs[1].Other.Other.Text);
+
+Print(structs[1].Other.Other.Text[0]);
+PrintLine();

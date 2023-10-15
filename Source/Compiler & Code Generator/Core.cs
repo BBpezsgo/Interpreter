@@ -67,6 +67,7 @@ namespace LanguageCore.BBCode.Compiler
                     }
                 }
 
+                /*
                 if (instruction.opcode == Opcode.PUSH_VALUE && instruction.Parameter.Type == RuntimeType.INT && instruction.Parameter.Tag == "saved code pointer")
                 {
                     if (instructionIndex < index)
@@ -80,6 +81,7 @@ namespace LanguageCore.BBCode.Compiler
                         changedInstructions++;
                     }
                 }
+                */
             }
 
             for (int i = 0; i < watchTheseIndexesToo.Count; i++)

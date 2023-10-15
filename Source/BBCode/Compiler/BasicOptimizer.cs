@@ -10,7 +10,7 @@ namespace LanguageCore.BBCode.Compiler
     {
         List<Instruction> GeneratedCode;
         IFunctionThing[] FunctionThings;
-        Action<string, LogType> PrintCallback;
+        PrintCallback PrintCallback;
 
         int RemoveInstruction(int index)
         {
@@ -67,7 +67,7 @@ namespace LanguageCore.BBCode.Compiler
         internal static void Optimize(
             List<Instruction> code,
             IFunctionThing[] functionThings,
-            Action<string, LogType> printCallback = null
+            PrintCallback printCallback = null
             )
         {
             BasicOptimizer basicOptimizer = new()

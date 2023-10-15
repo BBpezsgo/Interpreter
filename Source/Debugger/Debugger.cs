@@ -144,7 +144,7 @@ namespace TheProgram
                     break;
                 case "interpreter/callstack":
                     {
-                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.Memory.CallStack.ToArray(), message);
+                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.GetContext().CallTrace, message);
                     }
                     break;
 
@@ -222,7 +222,6 @@ namespace TheProgram
     {
         public string Type { get; set; }
         public string Value { get; set; }
-        public string Tag { get; set; }
         public bool IsHeapAddress { get; set; }
 
         public Data_StackItem(DataItem data) : base(data)
@@ -238,7 +237,6 @@ namespace TheProgram
                 Type = data.Type.ToString();
                 Value = value == null ? "null" : value.ToString();
             }
-            Tag = data.Tag;
         }
     }
 
@@ -280,13 +278,11 @@ namespace TheProgram
     {
         public string Opcode { get; set; }
         public Data_StackItem Parameter { get; set; }
-        public string Tag { get; set; }
 
         public Data_Instruction(Instruction v) : base(v)
         {
             Opcode = v.opcode.ToString();
             Parameter = new Data_StackItem(v.Parameter);
-            Tag = v.tag;
         }
     }
 
@@ -322,7 +318,7 @@ namespace TheProgram
             }
 
             CodePointer = v.BytecodeInterpreter.CodePointer;
-            CallStack = v.BytecodeInterpreter.Memory.CallStack.ToArray();
+            CallStack = v.BytecodeInterpreter.GetContext().CallTrace;
         }
     }
 }

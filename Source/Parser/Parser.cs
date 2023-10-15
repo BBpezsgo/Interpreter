@@ -1858,7 +1858,7 @@ namespace LanguageCore.Parser
 
             }
 
-            TypeInstance possibleType = ExpectType(AllowedType.Implicit);
+            TypeInstance possibleType = ExpectType(AllowedType.Implicit | AllowedType.StackArrayWithLength);
             if (possibleType == null)
             { CurrentTokenIndex = startTokenIndex; return null; }
 

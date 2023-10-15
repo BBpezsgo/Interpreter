@@ -571,7 +571,7 @@ namespace LanguageCore.BBCode.Compiler
                                 externalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                                    return DataItem.GetDefaultValue(returnType, "return value");
+                                    return DataItem.GetDefaultValue(returnType);
                                 });
                             }
                         }
@@ -610,7 +610,7 @@ namespace LanguageCore.BBCode.Compiler
             { this.CompiledStructs[i] = CompileStruct(Structs[i]); }
 
             #endregion
-
+            
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)

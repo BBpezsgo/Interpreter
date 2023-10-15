@@ -307,61 +307,19 @@ namespace ConsoleGUI
 
             sender.DrawBuffer.ResetColor();
 
-            Instruction instruction = this.Interpreter.NextInstruction;
+            int[] calltraceRaw = this.Interpreter.BytecodeInterpreter.GetContext().CallTrace;
 
-            List<int> loadIndicators = new();
-            List<int> storeIndicators = new();
-
-            if (instruction != null)
-            {
-                if (instruction.opcode == Opcode.CS_POP)
-                {
-                    loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count - 1);
-                }
-
-                if (instruction.opcode == Opcode.CS_PUSH)
-                {
-                    storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count);
-                }
-            }
-
-            var callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.Memory.CallStack.ToArray());
+            FunctionInformations[] callstack = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(calltraceRaw);
 
             int i;
-            for (i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.CallStack.Count; i++)
+            for (i = 0; i < callstack.Length; i++)
             {
-                int callframeInstruction = this.Interpreter.BytecodeInterpreter.Memory.CallStack[i];
                 FunctionInformations callframe = callstack[i];
 
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
                 sender.DrawBuffer.AddText(" ");
 
-                bool addLoadIndicator = false;
-                bool addStoreIndicator = false;
-
-                for (int j = loadIndicators.Count - 1; j >= 0; j--)
-                {
-                    if (loadIndicators[j] != i) continue;
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Red;
-                    sender.DrawBuffer.AddText("○");
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    loadIndicators.RemoveAt(j);
-                    addLoadIndicator = true;
-                    break;
-                }
-
-                for (int j = storeIndicators.Count - 1; j >= 0; j--)
-                {
-                    if (storeIndicators[j] != i) continue;
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Red;
-                    sender.DrawBuffer.AddText("●");
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    storeIndicators.RemoveAt(j);
-                    addStoreIndicator = true;
-                    break;
-                }
-
-                sender.DrawBuffer.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
+                sender.DrawBuffer.AddText(new string(' ', 3 - i.ToString().Length));
 
                 sender.DrawBuffer.AddText(i.ToString());
                 sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
@@ -372,7 +330,7 @@ namespace ConsoleGUI
                 if (!callframe.IsValid)
                 {
                     sender.DrawBuffer.ForegroundColor = ForegroundColor.Cyan;
-                    sender.DrawBuffer.AddText(callframeInstruction.ToString());
+                    sender.DrawBuffer.AddText(calltraceRaw[i].ToString());
                 }
                 else
                 {
@@ -444,45 +402,91 @@ namespace ConsoleGUI
                 sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
             }
 
-            while (loadIndicators.Count > 0 || storeIndicators.Count > 0)
             {
-                sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
-                sender.DrawBuffer.AddText(" ");
+                FunctionInformations callframe = this.Interpreter.CompilerResult.DebugInfo.GetFunctionInformations(this.Interpreter.BytecodeInterpreter.CodePointer);
 
-                bool addLoadIndicator = false;
-                bool addStoreIndicator = false;
-
-                for (int j = loadIndicators.Count - 1; j >= 0; j--)
+                if (callframe.IsValid)
                 {
-                    if (loadIndicators[j] != i) continue;
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Red;
-                    sender.DrawBuffer.AddText("○");
                     sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    loadIndicators.RemoveAt(j);
-                    addLoadIndicator = true;
-                    break;
+                    sender.DrawBuffer.AddText(" ");
+
+                    sender.DrawBuffer.AddText(new string(' ', 3 - (i + 1).ToString().Length));
+
+                    sender.DrawBuffer.AddText((i + 1).ToString());
+                    sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
+
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                    sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;
+
+                    if (callframe.IsMacro)
+                    {
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
+                        sender.DrawBuffer.AddText("macro ");
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                    }
+
+                    if (callframe.ReadableIdentifier.Contains('('))
+                    {
+                        string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(')];
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Yellow;
+                        sender.DrawBuffer.AddText($"{functionName}");
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                        sender.DrawBuffer.AddChar('(');
+
+                        string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(') + 1)..callframe.ReadableIdentifier.IndexOf(')')];
+
+                        List<string> parameters2;
+                        if (!parameters.Contains(','))
+                        {
+                            parameters2 = new List<string>() { parameters };
+                        }
+                        else
+                        {
+                            parameters2 = new List<string>();
+                            string[] splitted = parameters.Split(',');
+                            for (int j = 0; j < splitted.Length; j++)
+                            { parameters2.Add(splitted[j].Trim()); }
+                        }
+
+                        for (int j = 0; j < parameters2.Count; j++)
+                        {
+                            if (j > 0)
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                                sender.DrawBuffer.AddText($", ");
+                            }
+
+                            string param = parameters2[j];
+                            if (LanguageCore.Constants.BuiltinTypes.Contains(param))
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Blue;
+                            }
+                            else
+                            {
+                                sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
+                            }
+                            sender.DrawBuffer.AddText($"{param}");
+                        }
+
+                        sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
+                        sender.DrawBuffer.AddChar(')');
+
+                        sender.DrawBuffer.ResetColor();
+                    }
+                    else
+                    {
+                        sender.DrawBuffer.AddText($"{callframe.ReadableIdentifier}");
+                    }
+
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.DarkGray;
+                    sender.DrawBuffer.AddText($" (current)");
+
+                    sender.DrawBuffer.BackgroundColor = BackgroundColor.Black;
+                    sender.DrawBuffer.FinishLine(sender.Rect.Width);
+                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Default;
                 }
-
-                for (int j = storeIndicators.Count - 1; j >= 0; j--)
-                {
-                    if (storeIndicators[j] != i) continue;
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Red;
-                    sender.DrawBuffer.AddText("●");
-                    sender.DrawBuffer.ForegroundColor = ForegroundColor.Gray;
-                    storeIndicators.RemoveAt(j);
-                    addStoreIndicator = true;
-                    break;
-                }
-
-                sender.DrawBuffer.AddText(new string(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString().Length));
-
-                sender.DrawBuffer.AddText(i.ToString());
-                sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
-
-                sender.DrawBuffer.ResetColor();
-
-                sender.DrawBuffer.FinishLine(sender.Rect.Width);
-                break;
             }
 
         }
@@ -654,7 +658,7 @@ namespace ConsoleGUI
             for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
             {
                 var item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
-                bool isHeader = ((nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is HEAP));
+                bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is not null);
                 (int, bool) header = (default, default);
 
                 if (isHeader)
@@ -717,7 +721,7 @@ namespace ConsoleGUI
                 {
                     if (item.IsNull)
                     {
-                        b.ForegroundColor = ForegroundColor.Gray;
+                        b.ForegroundColor = ForegroundColor.DarkGray;
                         b.AddText("<null>");
                     }
                     else
@@ -746,13 +750,6 @@ namespace ConsoleGUI
                                 break;
                         }
                     }
-
-                    if (!string.IsNullOrEmpty(item.Tag))
-                    {
-                        b.AddText($" ");
-                        b.ForegroundColor = ForegroundColor.Gray;
-                        b.AddText(item.Tag);
-                    }
                 }
 
                 b.BackgroundColor = BackgroundColor.Black;
@@ -771,19 +768,13 @@ namespace ConsoleGUI
 
             b.ResetColor();
 
-            Instruction instruction = this.Interpreter.NextInstruction;
+            CollectedScopeInfo stackDebugInfo = Interpreter.CompilerResult.DebugInfo.GetScopeInformations(Interpreter.BytecodeInterpreter.CodePointer);
 
-            List<int> savedBasePointers = new();
+            Instruction instruction = this.Interpreter.NextInstruction;
 
             int stackSize = this.Interpreter.BytecodeInterpreter.Memory.Stack.Count;
 
-            for (int j = 0; j < stackSize; j++)
-            {
-                var item = this.Interpreter.BytecodeInterpreter.Memory.Stack[j];
-                if (item.Type != RuntimeType.INT) continue;
-                if (item.Tag != "saved base pointer") continue;
-                savedBasePointers.Add(item.ValueInt);
-            }
+            int[] savedBasePointers = DebugInformation.TraceBasePointers(Interpreter.BytecodeInterpreter.Memory.Stack.ToArray(), Interpreter.BytecodeInterpreter.BasePointer);
 
             bool basepointerShown = false;
 
@@ -842,11 +833,8 @@ namespace ConsoleGUI
 
             stackDrawStart += notVisible;
 
-            int i;
-            for (i = stackDrawStart; i < stackDrawEnd; i++)
+            void DrawElement(int i, DataItem item)
             {
-                var item = this.Interpreter.BytecodeInterpreter.Memory.Stack[i];
-
                 if (this.Interpreter.BytecodeInterpreter.BasePointer == i)
                 {
                     b.ForegroundColor = ForegroundColor.Blue;
@@ -901,7 +889,7 @@ namespace ConsoleGUI
 
                 if (item.IsNull)
                 {
-                    b.ForegroundColor = ForegroundColor.Gray;
+                    b.ForegroundColor = ForegroundColor.DarkGray;
                     b.AddText("<null>");
                 }
                 else
@@ -930,17 +918,69 @@ namespace ConsoleGUI
                             break;
                     }
                 }
+            }
 
-                if (!string.IsNullOrEmpty(item.Tag))
+            int i;
+            for (i = stackDrawStart; i < stackDrawEnd; i++)
+            {
+                DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Stack[i];
+
+                if (stackDebugInfo.TryGet(Interpreter.BytecodeInterpreter.BasePointer, i, out StackElementInformations itemDebugInfo))
                 {
-                    b.AddText($" ");
-                    b.ForegroundColor = ForegroundColor.Gray;
-                    b.AddText(item.Tag);
+                    Range<int> range = itemDebugInfo.GetRange(Interpreter.BytecodeInterpreter.BasePointer);
+
+                    if (itemDebugInfo.Kind == StackElementKind.Variable ||
+                        itemDebugInfo.Kind == StackElementKind.Parameter)
+                    {
+                        if (range.Start == range.End)
+                        {
+                            b.ForegroundColor = ForegroundColor.Default;
+
+                            DrawElement(i, item);
+
+                            b.ForegroundColor = ForegroundColor.DarkGray;
+                            b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag}");
+                        }
+                        else if (range.Start == i)
+                        {
+                            b.ForegroundColor = ForegroundColor.DarkGray;
+                            b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag} {{");
+
+                            b.BackgroundColor = BackgroundColor.Black;
+                            b.FinishLine(sender.Rect.Width);
+                            b.ForegroundColor = ForegroundColor.Default;
+
+                            DrawElement(i, item);
+                        }
+                        else if (range.End == i)
+                        {
+                            DrawElement(i, item);
+
+                            b.BackgroundColor = BackgroundColor.Black;
+                            b.FinishLine(sender.Rect.Width);
+                            b.ForegroundColor = ForegroundColor.DarkGray;
+                            b.AddText($" }}");
+                        }
+                        else
+                        {
+                            DrawElement(i, item);
+                        }
+                    }
+                    else if (itemDebugInfo.Kind == StackElementKind.Internal)
+                    {
+                        DrawElement(i, item);
+
+                        b.ForegroundColor = ForegroundColor.DarkGray;
+                        b.AddText($" {itemDebugInfo.Tag}");
+                    }
+                    else
+                    {
+                        DrawElement(i, item);
+                    }
                 }
-
-                if (this.Interpreter.BytecodeInterpreter.BasePointer == i && b.ForegroundColor == ForegroundColor.Gray)
+                else
                 {
-                    b.ForegroundColor = ForegroundColor.Black;
+                    DrawElement(i, item);
                 }
 
                 b.BackgroundColor = BackgroundColor.Black;
@@ -1026,15 +1066,15 @@ namespace ConsoleGUI
             int indent = 0;
             for (int i = 0; i < this.Interpreter.BytecodeInterpreter.CodePointer - 5; i++)
             {
-                var instruction = this.Interpreter.CompilerResult.Code[i];
-                if (instruction.opcode == Opcode.COMMENT)
+                if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out var comments))
                 {
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
-                    { indent--; }
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
-                    { indent++; }
-
-                    continue;
+                    for (int j = 0; j < comments.Count; j++)
+                    {
+                        if (!comments[j].EndsWith("{ }") && comments[j].EndsWith("}"))
+                        { indent--; }
+                        if (!comments[j].EndsWith("{ }") && comments[j].EndsWith("{"))
+                        { indent++; }
+                    }
                 }
             }
 
@@ -1044,26 +1084,30 @@ namespace ConsoleGUI
                 if (Interpreter.BytecodeInterpreter != null) if (Interpreter.BytecodeInterpreter.CodePointer == i) IsNextInstruction = true;
 
                 var instruction = this.Interpreter.CompilerResult.Code[i];
-                if (instruction.opcode == Opcode.COMMENT)
+
+                if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out var comments))
                 {
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
+                    for (int j = 0; j < comments.Count; j++)
                     {
-                        indent--;
+                        string comment = comments[j];
+
+                        if (!comment.EndsWith("{ }") && comment.EndsWith("}"))
+                        {
+                            indent--;
+                        }
+
+                        LinePrefix();
+                        b.ForegroundColor = ForegroundColor.DarkGray;
+                        b.AddText($"{new string(' ', Math.Max(0, indent * 2))}{comment}");
+                        b.ForegroundColor = ForegroundColor.Default;
+                        b.BackgroundColor = BackgroundColor.Black;
+                        b.FinishLine(sender.Rect.Width);
+
+                        if (!comment.EndsWith("{ }") && comment.EndsWith("{"))
+                        {
+                            indent++;
+                        }
                     }
-
-                    LinePrefix((i + 1).ToString());
-                    b.ForegroundColor = ForegroundColor.Gray;
-                    b.AddText($"{new string(' ', Math.Max(0, indent * 2))}{instruction.tag}");
-                    b.ForegroundColor = ForegroundColor.Default;
-                    b.BackgroundColor = BackgroundColor.Black;
-                    b.FinishLine(sender.Rect.Width);
-
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
-                    {
-                        indent++;
-                    }
-
-                    continue;
                 }
 
                 LinePrefix((i + 1).ToString());
@@ -1115,11 +1159,13 @@ namespace ConsoleGUI
                             break;
                     }
 
+                /*
                 if (!string.IsNullOrEmpty(instruction.tag))
                 {
                     b.ForegroundColor = IsNextInstruction ? ForegroundColor.Black : ForegroundColor.Gray;
                     b.AddText($"{instruction.tag}");
                 }
+                */
 
                 b.BackgroundColor = BackgroundColor.Black;
 

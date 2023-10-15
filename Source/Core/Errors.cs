@@ -105,7 +105,7 @@ namespace LanguageCore
             else
             { SourcePosition = sourcePosition.SourcePosition; }
 
-            CallStack = debugInfo.GetFunctionInformations(context.RawCallStack);
+            CallStack = debugInfo.GetFunctionInformations(context.CallTrace);
         }
 
         public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
@@ -131,14 +131,14 @@ namespace LanguageCore
             result += $"\n Code Pointer: {context.CodePointer}";
 
             result += $"\n Call Stack:";
-            if (context.RawCallStack.Length == 0)
+            if (context.CallTrace.Length == 0)
             {
                 result += " (callstack is empty)";
             }
             else
             {
                 if (CallStack == null)
-                { result += "\n   " + string.Join("\n   ", context.RawCallStack); }
+                { result += "\n   " + string.Join("\n   ", context.CallTrace); }
                 else
                 { result += "\n   " + string.Join("\n   ", CallStack); }
             }
@@ -163,7 +163,7 @@ namespace LanguageCore
                     }
                     else
                     {
-                        result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].GetValue()} # {Context.Value.Stack[i].Tag}";
+                        result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].GetValue()}";
                     }
                 }
 

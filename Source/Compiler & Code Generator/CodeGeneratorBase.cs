@@ -2025,9 +2025,9 @@ namespace LanguageCore.BBCode.Compiler
                 { throw new CompilerException($"{param0Type} is not a reference type", param0, CurrentFile); }
 
                 if (expectedType == RuntimeType.BYTE)
-                { value = new DataItem((byte)param0Type.SizeOnHeap, $"sizeof({param0Type.Name})"); }
+                { value = new DataItem((byte)param0Type.SizeOnHeap); }
                 else
-                { value = new DataItem(param0Type.SizeOnHeap, $"sizeof({param0Type.Name})"); }
+                { value = new DataItem(param0Type.SizeOnHeap); }
                 return true;
             }
 

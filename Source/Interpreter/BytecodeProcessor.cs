@@ -40,7 +40,6 @@ namespace LanguageCore.Runtime
             switch (CurrentInstruction.opcode)
             {
                 case Opcode.UNKNOWN: throw new InternalException("Unknown instruction");
-                case Opcode.COMMENT: Step(); break;
 
                 case Opcode.EXIT: EXIT(); break;
 
@@ -84,10 +83,6 @@ namespace LanguageCore.Runtime
 
                 case Opcode.HEAP_ALLOC: HEAP_ALLOC(); break;
                 case Opcode.HEAP_DEALLOC: HEAP_DEALLOC(); break;
-
-                case Opcode.DEBUG_SET_TAG: DEBUG_SET_TAG(); break;
-                case Opcode.CS_PUSH: CS_PUSH(); break;
-                case Opcode.CS_POP: CS_POP(); break;
 
                 case Opcode.GET_BASEPOINTER: GET_BASEPOINTER(); break;
                 case Opcode.SET_BASEPOINTER: SET_BASEPOINTER(); break;
@@ -134,7 +129,7 @@ namespace LanguageCore.Runtime
 
             int block = Memory.Heap.Allocate(size);
 
-            Memory.Stack.Push(new DataItem(block, CurrentInstruction.tag));
+            Memory.Stack.Push(new DataItem(block));
 
             Step();
         }
@@ -205,30 +200,6 @@ namespace LanguageCore.Runtime
         void EXIT()
         {
             CodePointer = Memory.Code.Length;
-        }
-
-        #endregion
-
-        #region Debug Operations
-
-        void CS_PUSH()
-        {
-            Memory.CallStack.Push(CurrentInstruction.ParameterInt);
-            Step();
-        }
-
-        void CS_POP()
-        {
-            Memory.CallStack.Pop();
-            Step();
-        }
-
-        void DEBUG_SET_TAG()
-        {
-            DataItem value = Memory.Stack.Pop();
-            value.Tag = CurrentInstruction.tag;
-            Memory.Stack.Push(value);
-            Step();
         }
 
         #endregion
@@ -433,10 +404,7 @@ namespace LanguageCore.Runtime
         void PUSH_VALUE()
         {
             DataItem value = CurrentInstruction.Parameter;
-            value.Tag = CurrentInstruction.tag;
-
             Memory.Stack.Push(value);
-
             Step();
         }
 
@@ -461,7 +429,6 @@ namespace LanguageCore.Runtime
             int address = GetStackAddress();
 
             DataItem value = Memory.Stack[address];
-            value.Tag = CurrentInstruction.tag ?? value.Tag;
 
             Memory.Stack.Push(value);
 
@@ -474,7 +441,7 @@ namespace LanguageCore.Runtime
 
         void GET_BASEPOINTER()
         {
-            Memory.Stack.Push(new DataItem(BasePointer, "basepointer"));
+            Memory.Stack.Push(new DataItem(BasePointer));
             Step();
         }
 
@@ -513,34 +480,34 @@ namespace LanguageCore.Runtime
                 {
                     RuntimeType.BYTE => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((byte)value.ValueByte, value.Tag),
-                        RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue), value.Tag),
-                        RuntimeType.FLOAT => new DataItem((byte)MathF.Round(value.ValueFloat), value.Tag),
-                        RuntimeType.CHAR => new DataItem((byte)value.ValueChar, value.Tag),
+                        RuntimeType.BYTE => new DataItem((byte)value.ValueByte),
+                        RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue)),
+                        RuntimeType.FLOAT => new DataItem((byte)MathF.Round(value.ValueFloat)),
+                        RuntimeType.CHAR => new DataItem((byte)value.ValueChar),
                         _ => throw new ImpossibleException(),
                     },
                     RuntimeType.INT => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((int)value.ValueByte, value.Tag),
-                        RuntimeType.INT => new DataItem((int)value.ValueInt, value.Tag),
-                        RuntimeType.FLOAT => new DataItem((int)MathF.Round(value.ValueFloat), value.Tag),
-                        RuntimeType.CHAR => new DataItem((int)value.ValueChar, value.Tag),
+                        RuntimeType.BYTE => new DataItem((int)value.ValueByte),
+                        RuntimeType.INT => new DataItem((int)value.ValueInt),
+                        RuntimeType.FLOAT => new DataItem((int)MathF.Round(value.ValueFloat)),
+                        RuntimeType.CHAR => new DataItem((int)value.ValueChar),
                         _ => throw new ImpossibleException(),
                     },
                     RuntimeType.FLOAT => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((float)value.ValueByte, value.Tag),
-                        RuntimeType.INT => new DataItem((float)value.ValueInt, value.Tag),
-                        RuntimeType.FLOAT => new DataItem((float)MathF.Round(value.ValueFloat), value.Tag),
-                        RuntimeType.CHAR => new DataItem((float)value.ValueChar, value.Tag),
+                        RuntimeType.BYTE => new DataItem((float)value.ValueByte),
+                        RuntimeType.INT => new DataItem((float)value.ValueInt),
+                        RuntimeType.FLOAT => new DataItem((float)MathF.Round(value.ValueFloat)),
+                        RuntimeType.CHAR => new DataItem((float)value.ValueChar),
                         _ => throw new ImpossibleException(),
                     },
                     RuntimeType.CHAR => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((char)value.ValueByte, value.Tag),
-                        RuntimeType.INT => new DataItem((char)value.ValueInt, value.Tag),
-                        RuntimeType.FLOAT => new DataItem((char)MathF.Round(value.ValueFloat), value.Tag),
-                        RuntimeType.CHAR => new DataItem((char)value.ValueChar, value.Tag),
+                        RuntimeType.BYTE => new DataItem((char)value.ValueByte),
+                        RuntimeType.INT => new DataItem((char)value.ValueInt),
+                        RuntimeType.FLOAT => new DataItem((char)MathF.Round(value.ValueFloat)),
+                        RuntimeType.CHAR => new DataItem((char)value.ValueChar),
                         _ => throw new ImpossibleException(),
                     },
                     _ => throw new ImpossibleException(),
@@ -568,7 +535,7 @@ namespace LanguageCore.Runtime
 
         void OnExternalReturnValue(DataItem returnValue)
         {
-            returnValue.Tag ??= "return v";
+            // returnValue.Tag ??= "return v";
             Memory.Stack.Push(returnValue);
         }
 
@@ -600,7 +567,7 @@ namespace LanguageCore.Runtime
                 if (function.ReturnSomething)
                 {
                     DataItem returnValue = simpleFunction.Callback(this, parameters.ToArray());
-                    returnValue.Tag ??= $"{function.Name}() result";
+                    // returnValue.Tag ??= $"{function.Name}() result";
                     Memory.Stack.Push(returnValue);
                 }
                 else
@@ -622,7 +589,6 @@ namespace LanguageCore.Runtime
         public DataStack Stack;
         public HEAP Heap;
         public Instruction[] Code;
-        public Stack<int> CallStack;
 
         public Memory(int heapSize, Instruction[] code)
         {
@@ -630,8 +596,6 @@ namespace LanguageCore.Runtime
 
             Stack = new DataStack();
             Heap = new HEAP(heapSize);
-
-            CallStack = new Stack<int>();
         }
     }
 }

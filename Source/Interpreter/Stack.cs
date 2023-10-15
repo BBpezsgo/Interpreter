@@ -28,26 +28,10 @@ namespace LanguageCore.Runtime
         /// <summary>Adds an array to the end</summary>
         public override void PushRange(DataItem[] list)
         { foreach (DataItem item in list) Push(item); }
-        /// <summary>Adds a list to the end</summary>
-        public void PushRange(DataItem[] list, string tag)
-        {
-            DataItem[] newList = new DataItem[list.Length];
-            for (int i = 0; i < list.Length; i++)
-            {
-                DataItem item = list[i];
-                item.Tag = tag ?? item.Tag;
-                newList[i] = item;
-            }
-            PushRange(newList);
-        }
         /// <summary>Sets a specific item's value</summary>
-        public void Set(int index, DataItem val, bool overrideTag = false)
+        public void Set(int index, DataItem val)
         {
             DataItem item = val;
-            if (!overrideTag)
-            {
-                item.Tag = this[index].Tag;
-            }
             this[index] = item;
         }
 
@@ -57,6 +41,7 @@ namespace LanguageCore.Runtime
             for (int i = 0; i < Count; i++)
             {
                 this[i].DebugPrint();
+                /*
                 if (this[i].Tag != null)
                 {
                     Console.Write(' ');
@@ -64,6 +49,7 @@ namespace LanguageCore.Runtime
                     Console.Write(this[i].Tag);
                     Console.ResetColor();
                 }
+                */
                 Console.WriteLine();
             }
 #endif

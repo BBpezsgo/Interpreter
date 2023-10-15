@@ -154,14 +154,8 @@ namespace LanguageCore.Runtime
             get
             {
                 if (this.BytecodeInterpreter == null) return null;
-                for (int cp = this.BytecodeInterpreter.CodePointer; cp < this.CompilerResult.Code.Length; cp++)
-                {
-                    if (cp < 0 || cp >= this.CompilerResult.Code.Length) return null;
-                    Instruction result = this.CompilerResult.Code[cp];
-                    if (result.opcode == Opcode.COMMENT) continue;
-                    return result;
-                }
-                return null;
+                if (this.BytecodeInterpreter.CodePointer < 0 || this.BytecodeInterpreter.CodePointer >= this.CompilerResult.Code.Length) return null;
+                return this.CompilerResult.Code[this.BytecodeInterpreter.CodePointer];
             }
         }
 
@@ -256,7 +250,7 @@ namespace LanguageCore.Runtime
         {
             if (ReturnValueConsumer != null)
             {
-                ReturnValueConsumer.Return(new DataItem(key, "Console Input"));
+                ReturnValueConsumer.Return(new DataItem(key));
                 ReturnValueConsumer = null;
             }
 

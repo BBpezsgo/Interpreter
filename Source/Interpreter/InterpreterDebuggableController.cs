@@ -51,24 +51,7 @@ namespace LanguageCore.Runtime
         public int AbsoluteBreakpoint
         {
             get => _absoluteBreakpoint;
-            set
-            {
-                if (value == int.MinValue)
-                {
-                    _absoluteBreakpoint = int.MinValue;
-                    return;
-                }
-
-                int endlessSafe = 8;
-
-                _absoluteBreakpoint = value;
-                while (Code[_absoluteBreakpoint].opcode == Opcode.COMMENT)
-                {
-                    _absoluteBreakpoint++;
-
-                    if (endlessSafe-- < 0) throw new EndlessLoopException();
-                }
-            }
+            set => _absoluteBreakpoint = value;
         }
         public int Breakpoint
         {

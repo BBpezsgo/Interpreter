@@ -24,12 +24,12 @@ namespace LanguageCore.Runtime
 
     public struct Context
     {
-        public int[] RawCallStack;
+        public int[] CallTrace;
         public int CodePointer;
         public int ExecutedInstructionCount;
         public Instruction[] Code;
-        internal DataStack Stack;
-        internal int CodeSampleStart;
+        public DataStack Stack;
+        public int CodeSampleStart;
     }
 
     class UserInvoke
@@ -126,26 +126,54 @@ namespace LanguageCore.Runtime
             return true;
         }
 
-        internal Context GetContext() => new()
+        internal Context GetContext()
         {
-            RawCallStack = this.Memory.CallStack.ToArray(),
-            ExecutedInstructionCount = this.EndlessSafe,
-            CodePointer = this.CodePointer,
-            Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
-            Stack = this.Memory.Stack,
-            CodeSampleStart = Math.Max(this.CodePointer - 20, 0),
-        };
+            List<int> callTrace = new();
+
+            TraceCalls(callTrace, BasePointer);
+
+            int[] callTraceResult = callTrace.ToArray();
+            Array.Reverse(callTraceResult);
+
+            return new Context()
+            {
+                CallTrace = callTraceResult,
+                ExecutedInstructionCount = this.EndlessSafe,
+                CodePointer = this.CodePointer,
+                Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
+                Stack = this.Memory.Stack,
+                CodeSampleStart = Math.Max(this.CodePointer - 20, 0),
+            };
+        }
+
+        void TraceCalls(List<int> callTrace, int basePointer)
+        {
+            if (basePointer < 2) return;
+            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGenerator.SavedCodePointerOffset];
+            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGenerator.SavedBasePointerOffset];
+
+            if (!savedCodePointerD.Integer.HasValue) return;
+            if (!savedBasePointerD.Integer.HasValue) return;
+
+            int savedCodePointer = savedCodePointerD.Integer ?? 0;
+            int savedBasePointer = savedBasePointerD.Integer ?? 0;
+
+            callTrace.Add(savedCodePointer);
+
+            if (savedBasePointer == BasePointer) return;
+            TraceCalls(callTrace, savedBasePointer);
+        }
 
         #endregion
 
         void DoUserInvoke(UserInvoke userInvoke)
         {
             CodePointer = userInvoke.InstructionOffset;
-            Memory.Stack.Push(new DataItem(0, "return value"));
-            Memory.Stack.PushRange(userInvoke.Arguments, "arg");
+            Memory.Stack.Push(new DataItem(0));
+            Memory.Stack.PushRange(userInvoke.Arguments);
 
-            Memory.Stack.Push(new DataItem(0, "saved base pointer"));
-            Memory.Stack.Push(new DataItem(Memory.Code.Length, "saved code pointer"));
+            Memory.Stack.Push(new DataItem(0));
+            Memory.Stack.Push(new DataItem(Memory.Code.Length));
 
             BasePointer = Memory.Stack.Count;
         }
@@ -201,14 +229,6 @@ namespace LanguageCore.Runtime
             {
                 OnStop();
                 return false;
-            }
-
-            if (CurrentInstruction.opcode == Opcode.COMMENT)
-            {
-                int max = 10;
-                while (CurrentInstruction.opcode == Opcode.COMMENT && max-- > 0)
-                { Step(); }
-                return true;
             }
 
             EndlessSafe++;

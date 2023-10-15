@@ -3,7 +3,6 @@
     public enum Opcode : byte
     {
         UNKNOWN = 0,
-        COMMENT = 1,
 
         // === STACK OPERATIONS ===
         /// <summary>
@@ -702,29 +701,6 @@
         // === TYPE OPERATINS ===
         TYPE_GET,
         TYPE_SET,
-        // === ===
-
-        // === Debug ===
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        ///     <c>value</c><br/>
-        /// </para><br/><br/>
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     Inherits from Instruction
-        /// </para>
-        /// </summary>
-        DEBUG_SET_TAG,
-        /// <summary>
-        /// Call Stack Push
-        /// </summary>
-        CS_PUSH,
-        /// <summary>
-        /// Call Stack Pop
-        /// </summary>
-        CS_POP,
         // === ===
     }
 }

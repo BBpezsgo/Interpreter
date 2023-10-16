@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <Folder Include="Examples\" />
+    <Folder Include="out\" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

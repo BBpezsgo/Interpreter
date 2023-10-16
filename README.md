@@ -1,7 +1,15 @@
 # Interpreter
 
-![.Net v6.0](https://img.shields.io/badge/.NET-v6.0-5C2D91)
-![C# v10](https://img.shields.io/badge/C%23-v10.0-239120.svg)
+[![.Net v6.0](https://img.shields.io/badge/.NET-v6.0-5C2D91)](#)
+[![C# v10](https://img.shields.io/badge/C%23-v10.0-239120.svg)](#)
+
+## Downlaod Link
+
+[Download from Google Drive](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM))
+
+[![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)](#)
+
+## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## What is this??
 I was bored, so I googled how to make a programming language. I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great
@@ -51,17 +59,6 @@ When you've created a source file, just run it with the executable. Or run the e
 - `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!
 - `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
 - `-basepath [string]` Sets a new path where dll and bbc files will be searched for *using* statements. If it's not there, it will look for it next to the file.
-
-## Download from [Google Drive](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM)
-![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)
-
-[Download System.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.bbc)<br>
-[Download System.Net.bbc](https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/CodeFiles/System.Net.bbc)
-> Some predefined structs and functions.
-
-## [Debugger](https://github.com/BBpezsgo/InterpreterDebugger) ⚠️ Deprecated
-
-## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## Hello World:
 ```cs

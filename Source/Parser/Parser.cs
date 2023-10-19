@@ -249,7 +249,7 @@ namespace LanguageCore.Parser
                 Statement.Statement statement = ExpectStatement();
 
                 if (statement == null)
-                { throw new SyntaxException($"Expected top-level statement, type, macro or function definition. Got a token {CurrentToken}", CurrentToken); }
+                { throw new SyntaxException($"Expected top-level statement, type, macro or function definition. Got a token \"{CurrentToken}\"", CurrentToken); }
 
                 SetStatementThings(statement);
 

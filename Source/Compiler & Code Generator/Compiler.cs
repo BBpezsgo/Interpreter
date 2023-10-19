@@ -225,7 +225,7 @@ namespace LanguageCore.BBCode.Compiler
             if (Constants.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
-            @class.Name.AnalyzedType = TokenAnalysedType.Struct;
+            @class.Name.AnalyzedType = TokenAnalysedType.Class;
 
             if (CompiledClasses.ContainsKey(@class.Name.Content))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
@@ -250,6 +250,7 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             CompiledType type = new(function.Type, GetCustomType);
+            function.Type.SetAnalyzedType(type);
 
             if (attributes.TryGetAttribute("External", out string name))
             {
@@ -307,6 +308,7 @@ namespace LanguageCore.BBCode.Compiler
             Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
 
             CompiledType type = new(function.Type, GetCustomType);
+            function.Type.SetAnalyzedType(type);
 
             if (attributes.TryGetAttribute("External", out string name))
             {
@@ -615,10 +617,13 @@ namespace LanguageCore.BBCode.Compiler
             {
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)
                 {
-                    CompiledStructs[i].Fields[j] = new CompiledField(((StructDefinition)CompiledStructs[i]).Fields[j])
+                    FieldDefinition field = ((StructDefinition)CompiledStructs[i]).Fields[j];
+                    CompiledField compiledField = new(field)
                     {
-                        Type = new CompiledType(((StructDefinition)CompiledStructs[i]).Fields[j].Type, GetCustomType),
+                        Type = new CompiledType(field.Type, GetCustomType),
                     };
+                    field.Type.SetAnalyzedType(compiledField.Type);
+                    CompiledStructs[i].Fields[j] = compiledField;
                 }
             }
             for (int i = 0; i < CompiledClasses.Length; i++)
@@ -632,11 +637,14 @@ namespace LanguageCore.BBCode.Compiler
 
                 for (int j = 0; j < CompiledClasses[i].Fields.Length; j++)
                 {
-                    CompiledClasses[i].Fields[j] = new CompiledField(((ClassDefinition)CompiledClasses[i]).Fields[j])
+                    FieldDefinition field = ((ClassDefinition)CompiledClasses[i]).Fields[j];
+                    CompiledField newField = new(field)
                     {
-                        Type = new CompiledType(((ClassDefinition)CompiledClasses[i]).Fields[j].Type, GetCustomType),
+                        Type = new CompiledType(field.Type, GetCustomType),
                         Class = CompiledClasses[i],
                     };
+                    field.Type.SetAnalyzedType(newField.Type);
+                    CompiledClasses[i].Fields[j] = newField;
                 }
 
                 if (CompiledClasses[i].TemplateInfo != null)

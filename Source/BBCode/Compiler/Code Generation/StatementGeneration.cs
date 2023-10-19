@@ -41,9 +41,9 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateCodeForStatement(VariableDeclaration newVariable)
         {
-            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
-
             if (newVariable.Modifiers.Contains("const")) return;
+
+            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
 
             if (GetConstant(newVariable.VariableName.Content, out _))
             { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts with an another symbol name", newVariable.VariableName, newVariable.FilePath); }
@@ -54,12 +54,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
             { throw new InternalException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
 
-            if (compiledVariable.Type.IsClass)
-            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Class; }
-            else if (compiledVariable.Type.IsStruct)
-            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Struct; }
-            else if (compiledVariable.Type.IsEnum)
-            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.Enum; }
+            newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
             if (newVariable.InitialValue == null) return;
 
@@ -289,6 +284,8 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (functionCall.FunctionName == "sizeof")
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
+
                 if (functionCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
@@ -302,6 +299,8 @@ namespace LanguageCore.BBCode.Compiler
 
             if (functionCall.FunctionName == "Alloc")
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+
                 if (functionCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"Alloc\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
 
@@ -314,6 +313,8 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(functionCall.Identifier.Content, out CompiledVariable compiledVariable))
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
+
                 if (!compiledVariable.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
 
@@ -323,6 +324,8 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetParameter(functionCall.Identifier.Content, out CompiledParameter compiledParameter))
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.ParameterName;
+
                 if (!compiledParameter.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledParameter.Identifier.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
 
@@ -335,6 +338,8 @@ namespace LanguageCore.BBCode.Compiler
 
             if (TryGetMacro(functionCall, out MacroDefinition macro))
             {
+                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+
                 string prevFile = CurrentFile;
                 IAmInContext<CompiledClass> prevContext = CurrentContext;
 
@@ -370,6 +375,7 @@ namespace LanguageCore.BBCode.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
+            functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
 
@@ -714,6 +720,8 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetOperator(@operator, out CompiledOperator operatorDefinition))
             {
+                @operator.Operator.AnalyzedType = TokenAnalysedType.FunctionName;
+
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
                 if (!operatorDefinition.CanUse(CurrentFile))
@@ -964,6 +972,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetParameter(variable.Content, out CompiledParameter param))
             {
+                variable.Name.AnalyzedType = TokenAnalysedType.ParameterName;
                 ValueAddress address = GetBaseAddress(param);
 
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
@@ -976,18 +985,19 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable val))
             {
+                variable.Name.AnalyzedType = TokenAnalysedType.VariableName;
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
             if (GetFunction(variable.Name, expectedType, out CompiledFunction compiledFunction))
             {
+                variable.Name.AnalyzedType = TokenAnalysedType.FunctionName;
+
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, variable, compiledFunction, CurrentFile)); }
 
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset);
-
-                variable.Name.AnalyzedType = TokenAnalysedType.FunctionName;
 
                 return;
             }
@@ -1181,6 +1191,7 @@ namespace LanguageCore.BBCode.Compiler
             AddComment($"new {newObject.TypeName} {{");
 
             CompiledType instanceType = FindType(newObject.TypeName);
+            newObject.TypeName.SetAnalyzedType(instanceType);
 
             if (instanceType.IsStruct)
             {
@@ -1246,6 +1257,7 @@ namespace LanguageCore.BBCode.Compiler
             AddComment($"new {constructorCall.TypeName}(...): {{");
 
             var instanceType = FindType(constructorCall.TypeName);
+            constructorCall.TypeName.SetAnalyzedType(instanceType);
 
             if (instanceType.IsStruct)
             { throw new NotImplementedException(); }
@@ -1511,6 +1523,7 @@ namespace LanguageCore.BBCode.Compiler
         void GenerateCodeForStatement(TypeCast @as)
         {
             CompiledType targetType = new(@as.Type, FindType);
+            @as.Type.SetAnalyzedType(targetType);
 
             GenerateCodeForStatement(@as.PrevStatement, targetType);
 
@@ -2027,6 +2040,8 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
+            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
+
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
                 if (CompiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
@@ -2062,8 +2077,7 @@ namespace LanguageCore.BBCode.Compiler
 
             CompiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
 
-            if (compiledVariable.Type.IsGeneric)
-            { newVariable.Type.Identifier.AnalyzedType = TokenAnalysedType.TypeParameter; }
+            newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
             int size;
 
@@ -2388,9 +2402,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 paramIndex++;
                 CompiledType parameterType = new(parameters[i].Type, FindType);
-
-                if (parameterType.IsGeneric)
-                { parameters[i].Type.Identifier.AnalyzedType = TokenAnalysedType.TypeParameter; }
+                parameters[i].Type.SetAnalyzedType(parameterType);
 
                 this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
 

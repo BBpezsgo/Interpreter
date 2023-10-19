@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.Parser
 {
+    using LanguageCore.BBCode.Compiler;
     using LanguageCore.Tokenizing;
     using Statement;
 
@@ -113,6 +114,70 @@ namespace LanguageCore.Parser
         }
 
         public override int GetHashCode() => HashCode.Combine(Identifier);
+
+        static bool TryGetAnalyzedType(CompiledType type, out TokenAnalysedType analyzedType)
+        {
+            analyzedType = default;
+            if (type.IsClass)
+            {
+                analyzedType = TokenAnalysedType.Class;
+                return true;
+            }
+
+            if (type.IsStruct)
+            {
+                analyzedType = TokenAnalysedType.Struct;
+                return true;
+            }
+
+            if (type.IsGeneric)
+            {
+                analyzedType = TokenAnalysedType.TypeParameter;
+                return true;
+            }
+
+            if (type.IsBuiltin)
+            {
+                analyzedType = TokenAnalysedType.BuiltinType;
+                return true;
+            }
+
+            if (type.IsFunction)
+            {
+                return TryGetAnalyzedType(type.Function.ReturnType, out analyzedType);
+            }
+
+            if (type.IsEnum)
+            {
+                analyzedType = TokenAnalysedType.Enum;
+                return true;
+            }
+
+            return false;
+        }
+
+        public void SetAnalyzedType(CompiledType type)
+        {
+            if (TryGetAnalyzedType(type, out var analyzedType))
+            { this.Identifier.AnalyzedType = analyzedType; }
+
+            if (type.IsFunction &&
+                this.Kind == TypeInstanceKind.Function &&
+                this.ParameterTypes.Count == type.Function.Parameters.Length)
+            {
+                for (int i = 0; i < type.Function.Parameters.Length; i++)
+                {
+                    this.ParameterTypes[i].SetAnalyzedType(type.Function.Parameters[i]);
+                }
+            }
+
+            if (type.IsStackArray &&
+                this.Kind == TypeInstanceKind.StackArray)
+            {
+                if (TryGetAnalyzedType(type.StackArrayOf, out analyzedType))
+                { this.Identifier.AnalyzedType = analyzedType; }
+            }
+        }
     }
 }
 
@@ -160,15 +225,18 @@ namespace LanguageCore.Parser
         public bool IsExport { get; }
     }
 
-    public class EnumMemberDefinition : IHaveKey<string>
+    public class EnumMemberDefinition : IHaveKey<string>, IThingWithPosition
     {
         public Token Identifier;
         public Statement.Literal Value;
 
         public string Key => Identifier.Content;
+
+        public Position GetPosition()
+            => new(Identifier, Value);
     }
 
-    public class EnumDefinition : IDefinition, IHaveKey<string>
+    public class EnumDefinition : IDefinition, IHaveKey<string>, IThingWithPosition
     {
         public string FilePath { get; set; }
 
@@ -177,6 +245,13 @@ namespace LanguageCore.Parser
         public Token Identifier;
         public EnumMemberDefinition[] Members;
         public FunctionDefinition.Attribute[] Attributes;
+
+        public Position GetPosition()
+        {
+            Position result = new(Identifier);
+            result.Extend(Members);
+            return result;
+        }
     }
 
     public class TemplateInfo : IThingWithPosition, IEquatable<TemplateInfo>
@@ -252,7 +327,7 @@ namespace LanguageCore.Parser
         public static bool operator !=(TemplateInfo a, TemplateInfo b) => !(a == b);
     }
 
-    public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>
+    public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
     {
         public Token BracketStart;
         public Token BracketEnd;
@@ -354,6 +429,16 @@ namespace LanguageCore.Parser
             return true;
         }
         public static bool operator !=(FunctionThingDefinition a, FunctionThingDefinition b) => !(a == b);
+
+        public virtual Position GetPosition()
+        {
+            Position result = new(Identifier);
+            result.Extend(BracketStart);
+            result.Extend(BracketEnd);
+            result.Extend(Parameters);
+            result.Extend(Modifiers);
+            return result;
+        }
     }
 
     public class MacroDefinition : IExportable, IEquatable<MacroDefinition>
@@ -537,6 +622,8 @@ namespace LanguageCore.Parser
             }
             return true;
         }
+
+        public override Position GetPosition() => base.GetPosition().Extend(Type);
     }
 
     public class GeneralFunctionDefinition : FunctionThingDefinition
@@ -595,7 +682,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class ClassDefinition : IExportable, IDefinition, IHaveKey<string>
+    public class ClassDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
@@ -678,9 +765,17 @@ namespace LanguageCore.Parser
         }
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+
+        public virtual Position GetPosition()
+        {
+            Position result = new(Name);
+            result.Extend(BracketStart);
+            result.Extend(BracketEnd);
+            return result;
+        }
     }
 
-    public class StructDefinition : IExportable, IDefinition, IHaveKey<string>
+    public class StructDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
@@ -737,6 +832,14 @@ namespace LanguageCore.Parser
         }
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
+
+        public virtual Position GetPosition()
+        {
+            Position result = new(Name);
+            result.Extend(BracketStart);
+            result.Extend(BracketEnd);
+            return result;
+        }
     }
 
     public class UsingDefinition

@@ -3,9 +3,7 @@
 [![.Net v6.0](https://img.shields.io/badge/.NET-v6.0-5C2D91)](#)
 [![C# v10](https://img.shields.io/badge/C%23-v10.0-239120.svg)](#)
 
-## Downlaod Link
-
-[Download from Google Drive](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM))
+## [Download](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM))
 
 [![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)](#)
 

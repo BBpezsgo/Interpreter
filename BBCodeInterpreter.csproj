@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="C:\Users\bazsi\source\repos\Data Utilities\Data Utilities.csproj" />
+    <ProjectReference Include="C:\Users\bazsi\source\repos\Data Utilities\DataUtilities.csproj" />
     <ProjectReference Include="C:\Users\bazsi\source\repos\Win32-Stuff\Win32.csproj" />
   </ItemGroup>
 

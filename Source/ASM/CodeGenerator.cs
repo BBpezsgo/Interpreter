@@ -15,12 +15,19 @@ namespace LanguageCore.ASM.Compiler
         #region Fields
 
         readonly Settings GeneratorSettings;
+        AssemblyCode Builder;
 
         #endregion
 
         public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base()
         {
             this.GeneratorSettings = settings;
+            this.CompiledFunctions = compilerResult.Functions;
+            this.CompiledOperators = compilerResult.Operators;
+            this.CompiledClasses = compilerResult.Classes;
+            this.CompiledStructs = compilerResult.Structs;
+            this.CompiledEnums = compilerResult.Enums;
+            this.CompiledMacros = compilerResult.Macros;
         }
 
         public struct Result
@@ -465,16 +472,14 @@ namespace LanguageCore.ASM.Compiler
         }
         void Compile(FunctionCall functionCall)
         {
-            if (false &&
-                functionCall.Identifier == "Alloc" &&
+            if (functionCall.Identifier == "Alloc" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 0)
             {
                 throw new NotImplementedException();
             }
 
-            if (false &&
-                functionCall.Identifier == "AllocFrom" &&
+            if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
@@ -490,6 +495,21 @@ namespace LanguageCore.ASM.Compiler
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;
+            }
+
+            for (int i = 0; i < functionCall.Parameters.Length; i++)
+            {
+                Compile(functionCall.Parameters[i]);
+            }
+
+            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                var valueToPrint = functionCall.Parameters[0];
+                var valueToPrintType = FindStatementType(valueToPrint);
+
+                Builder.AppendCodeLine("    call StdOut");
+
+                return;
             }
 
             throw new NotImplementedException();
@@ -635,33 +655,37 @@ namespace LanguageCore.ASM.Compiler
         }
         #endregion
 
+        void GenerateCodeForTopLevelStatements(Statement[] statements)
+        {
+            Builder.AppendCodeLine("main:");
+            for (int i = 0; i < statements.Length; i++)
+            {
+                Compile(statements[i]);
+            }
+
+            Builder.AppendCodeLine("    push 0");
+            Builder.AppendCodeLine("    call ExitProcess");
+
+            Builder.AppendCodeLine("end main");
+        }
+
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             PrintCallback printCallback = null)
         {
-            AssemblyCode builder = new();
+            Builder = new AssemblyCode();
 
-            builder.WriteHeader(new AssemblyHeader()
-            {
-                MasmPath = @"C:\masm32\",
-                Libraries = new List<string>()
-                {
-                    "kernel32",
-                    "masm32",
-                },
-            });
+            GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
-            builder.AppendLine(".data");
-            builder.AppendLine("    message db \"This is your first assembly program\", 0");
-            builder.AppendLine();
-            builder.AppendLine(".code ");
-            builder.AppendLine("main:");
-            builder.AppendLine("    push OFFSET message");
-            builder.AppendLine("    call StdOut");
-            builder.AppendLine("    push 0");
-            builder.AppendLine("    call ExitProcess");
-            builder.AppendLine("end main");
+            Builder.AppendDataLine("    message db \"This is your first assembly program\", 0");
+
+            Builder.AppendCodeLine("main:");
+            Builder.AppendCodeLine("    push OFFSET message");
+            Builder.AppendCodeLine("    call StdOut");
+            Builder.AppendCodeLine("    push 0");
+            Builder.AppendCodeLine("    call ExitProcess");
+            Builder.AppendCodeLine("end main");
 
             /*
             // builder.Append("STD_OUTPUT_HANDLE   equ -11\r\nNULL                equ 0\r\n\r\nglobal WinMain\r\nextern ExitProcess, GetStdHandle, WriteConsoleA\r\n\r\nsection .data\r\nmsg                 db \"Hello World!\", 13, 10, 0\r\nmsg.len             equ $ - msg\r\n\r\nsection .bss\r\ndummy               resd 1\r\n\r\nsection .text\r\nWinMain:\r\n    push    STD_OUTPUT_HANDLE\r\n    call    GetStdHandle\r\n\r\n    push    NULL\r\n    push    dummy\r\n    push    msg.len\r\n    push    msg\r\n    push    eax\r\n    call    WriteConsoleA \r\n\r\n    push    NULL\r\n    call    ExitProcess");
@@ -685,7 +709,15 @@ namespace LanguageCore.ASM.Compiler
             {
                 Tokens = compilerResult.Tokens,
 
-                AssemblyCode = builder.ToString(),
+                AssemblyCode = Builder.Make(new AssemblyHeader()
+                {
+                    MasmPath = @"C:\masm32\",
+                    Libraries = new List<string>()
+                    {
+                        "kernel32",
+                        "masm32",
+                    },
+                }),
 
                 Warnings = this.Warnings.ToArray(),
                 Errors = this.Errors.ToArray(),

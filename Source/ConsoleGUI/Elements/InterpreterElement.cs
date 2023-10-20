@@ -33,7 +33,9 @@ namespace ConsoleGUI
 
         readonly List<ConsoleLine> ConsoleLines = new();
 
-        int ConsoleScrollOffset = 0;
+        ScrollBar ConsoleScrollBar;
+        ScrollBar HeapScrollBar ;
+
         int NextCodeJumpCount = 1;
         int CurrentlyJumping = 0;
         MainThreadTimer InterpreterTimer;
@@ -155,24 +157,12 @@ namespace ConsoleGUI
                 HasBorder = true,
                 Title = "Console",
             };
+
+            ConsoleScrollBar = new ScrollBar((parent) => (0, Math.Max(1, ConsoleLines.Count - parent.Rect.Height)), ConsolePanel);
+
             ConsolePanel.OnBeforeDraw += ConsolePanel_OnBeforeDraw;
-            ConsolePanel.OnMouseEventInvoked += (sender, e) =>
-            {
-                int a = -(ConsoleLines.Count - sender.Rect.Height);
-                int b = 3;
-                int min = Math.Min(a, b);
-                int max = Math.Max(a, b);
-                if (e.ButtonState == MouseButton.ScrollDown)
-                {
-                    ConsoleScrollOffset++;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
-                }
-                else if (e.ButtonState == MouseButton.ScrollUp)
-                {
-                    ConsoleScrollOffset--;
-                    ConsoleScrollOffset = Math.Clamp(ConsoleScrollOffset, min, max);
-                }
-            };
+            ConsolePanel.OnMouseEventInvoked += ConsoleScrollBar.FeedEvent;
+            ConsolePanel.OnKeyEventInvoked += ConsoleScrollBar.FeedEvent;
 
             var StackPanel = new InlineElement
             {
@@ -187,7 +177,12 @@ namespace ConsoleGUI
                 Title = "HEAP",
                 Layout = InlineLayout.Stretchy(150),
             };
+
+            HeapScrollBar = new ScrollBar((sender) => (0, Interpreter.BytecodeInterpreter.Memory.Heap.Size - 3), HeapPanel);
+
             HeapPanel.OnBeforeDraw += HeapElement_OnBeforeDraw;
+            HeapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
+            HeapPanel.OnKeyEventInvoked += HeapScrollBar.FeedEvent;
 
             var CallstackPanel = new InlineElement
             {
@@ -499,7 +494,7 @@ namespace ConsoleGUI
             b.ResetColor();
 
             bool lineFinished = true;
-            for (int i = Math.Max(0, ConsoleLines.Count - sender.Rect.Height + ConsoleScrollOffset); i < ConsoleLines.Count; i++)
+            for (int i = Math.Max(0, ConsoleLines.Count - sender.Rect.Height + ConsoleScrollBar.Offset); i < ConsoleLines.Count; i++)
             {
                 var line = ConsoleLines[i];
 
@@ -513,6 +508,8 @@ namespace ConsoleGUI
 
                 if (lineFinished) b.FinishLine(sender.Rect.Width);
             }
+
+            ConsoleScrollBar.Draw(b);
         }
 
         private void StateElement_OnBeforeDraw(InlineElement sender)
@@ -655,7 +652,7 @@ namespace ConsoleGUI
             }
 
             int nextHeader = 0;
-            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
+            for (int i = HeapScrollBar.Offset; i < this.Interpreter.BytecodeInterpreter.Memory.Heap.Size; i++)
             {
                 var item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
                 bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is not null);
@@ -756,6 +753,8 @@ namespace ConsoleGUI
                 b.FinishLine(sender.Rect.Width);
                 b.ForegroundColor = ForegroundColor.Default;
             }
+
+            HeapScrollBar.Draw(b);
         }
         private void StackElement_OnBeforeDraw(InlineElement sender)
         {

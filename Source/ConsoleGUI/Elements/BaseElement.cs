@@ -3,7 +3,7 @@ using Win32;
 
 namespace ConsoleGUI
 {
-    internal class Element : IElement, IElementWithEvents
+    public class Element : IElement, IElementWithEvents
     {
         public Rectangle Rect { get; set; } = Rectangle.Empty;
 

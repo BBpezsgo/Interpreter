@@ -709,6 +709,76 @@ namespace LanguageCore.BBCode.Compiler
             AddComment("}");
         }
 
+        void GenerateCodeForStatement(AnyCall anyCall)
+        {
+            if (anyCall.ToFunctionCall(out var functionCall))
+            {
+                GenerateCodeForStatement(functionCall);
+                return;
+            }
+
+            CompiledType prevType = FindStatementType(anyCall.PrevStatement);
+            if (!prevType.IsFunction)
+            { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+
+            FunctionType functionType = prevType.Function;
+
+            AddComment($"Call (dynamic) {prevType.Function} {{");
+
+            if (anyCall.Parameters.Length != functionType.Parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {anyCall.Parameters.Length}", new Position(anyCall.Parameters), CurrentFile); }
+
+            int returnValueSize = 0;
+            if (functionType.ReturnSomething)
+            {
+                returnValueSize = GenerateInitialValue(functionType.ReturnType);
+            }
+
+            /*
+             * TODO: this
+            if (anyCall.PrevStatement != null)
+            {
+                AddComment(" Param prev:");
+                GenerateCodeForStatement(functionCall.PrevStatement);
+            }
+            */
+
+            int paramsSize = 0;
+
+            for (int i = 0; i < anyCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = anyCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                CompiledType definedParameterType = functionType.Parameters[i];
+
+                if (passedParameterType != definedParameterType)
+                { throw new CompilerException($"This should be a {definedParameterType} not a {passedParameterType} (parameter {i + 1})", passedParameter, CurrentFile); }
+
+                AddComment($" Param {i}:");
+                GenerateCodeForStatement(passedParameter, definedParameterType);
+
+                paramsSize += definedParameterType.SizeOnStack;
+            }
+
+            AddComment(" .:");
+
+            CallRuntime(anyCall.PrevStatement);
+
+            AddComment(" Clear Params:");
+            for (int i = 0; i < paramsSize; i++)
+            {
+                AddInstruction(Opcode.POP_VALUE);
+            }
+
+            if (functionType.ReturnSomething && !anyCall.SaveValue)
+            {
+                AddComment(" Clear Return Value:");
+                for (int i = 0; i < returnValueSize; i++)
+                { AddInstruction(Opcode.POP_VALUE); }
+            }
+
+            AddComment("}");
+        }
         void GenerateCodeForStatement(OperatorCall @operator)
         {
             if (OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
@@ -1610,6 +1680,8 @@ namespace LanguageCore.BBCode.Compiler
             { GenerateCodeForStatement(@as); }
             else if (statement is ModifiedStatement modifiedStatement)
             { GenerateCodeForStatement(modifiedStatement); }
+            else if (statement is AnyCall anyCall)
+            { GenerateCodeForStatement(anyCall); }
             else
             { throw new InternalException($"Unimplemented statement {statement.GetType().Name}"); }
 

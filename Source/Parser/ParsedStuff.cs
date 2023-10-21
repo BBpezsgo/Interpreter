@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace LanguageCore.Parser
@@ -113,7 +114,7 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        public override int GetHashCode() => HashCode.Combine(Identifier);
+        public override int GetHashCode() => HashCode.Combine(Identifier, Kind);
 
         static bool TryGetAnalyzedType(CompiledType type, out TokenAnalysedType analyzedType)
         {
@@ -639,7 +640,7 @@ namespace LanguageCore.Parser
             if (this.Parameters.Length != other.Parameters.Length) return false;
             for (int i = 0; i < this.Parameters.Length; i++)
             {
-                if (this.Parameters[i].Type.Identifier.Content != other.Parameters[i].Type.Identifier.Content) return false;
+                if (!this.Parameters[i].Type.Equals(other.Parameters[i])) return false;
             }
             return true;
         }

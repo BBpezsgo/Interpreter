@@ -539,6 +539,19 @@ namespace LanguageCore.BBCode.Compiler
                 Warnings.Add(new Warning($"Modifiers not supported", modifiedStatement.Modifier, CurrentFile));
                 AnalyzeStatement(modifiedStatement.Statement);
             }
+            else if (statement is AnyCall anyCall)
+            {
+                if (anyCall.ToFunctionCall(out var functionCall1))
+                {
+                    AnalyzeStatement(functionCall1);
+                }
+                else
+                {
+                    AnalyzeStatement(anyCall.PrevStatement);
+                    for (int j = 0; j < anyCall.Parameters.Length; j++)
+                    { AnalyzeStatement(anyCall.Parameters[j]); }
+                }
+            }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
         }

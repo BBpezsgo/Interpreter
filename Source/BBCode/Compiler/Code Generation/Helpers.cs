@@ -126,21 +126,22 @@ namespace LanguageCore.BBCode.Compiler
 
         int CallRuntime(StatementWithValue address)
         {
-            if (FindStatementType(address) != Type.INT)
-            { throw new CompilerException($"This should be an integer", address, CurrentFile); }
+            CompiledType addressType = FindStatementType(address);
+
+            if (addressType != Type.INT && !addressType.IsFunction)
+            { throw new CompilerException($"This should be an \"int\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.PUSH_VALUE, 0);
+            AddInstruction(Opcode.PUSH_VALUE, 0); // Saved code pointer
 
-            AddInstruction(Opcode.GET_BASEPOINTER);
+            AddInstruction(Opcode.GET_BASEPOINTER); // Saved base pointer
 
             GenerateCodeForStatement(address);
 
-            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 1);
-
+            AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
             AddInstruction(Opcode.MATH_SUB);
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, -1);
 
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);

@@ -497,7 +497,25 @@ namespace LanguageCore.Brainfuck.Compiler
             if (statement is IndexCall indexCall)
             { return GetValueSize(indexCall); }
 
+            if (statement is AnyCall anyCall)
+            { return GetValueSize(anyCall); }
+
             throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, CurrentFile);
+        }
+        int GetValueSize(AnyCall anyCall)
+        {
+            if (anyCall.ToFunctionCall(out var functionCall))
+            { return GetValueSize(functionCall); }
+
+            CompiledType prevType = FindStatementType(anyCall.PrevStatement);
+
+            if (!prevType.IsFunction)
+            { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+
+            if (!prevType.Function.ReturnSomething)
+            { throw new CompilerException($"Return value \"void\" does not have a size", anyCall.PrevStatement, CurrentFile); }
+
+            return prevType.Function.ReturnType.SizeOnStack;
         }
         int GetValueSize(IndexCall indexCall)
         {
@@ -1199,6 +1217,8 @@ namespace LanguageCore.Brainfuck.Compiler
             { Compile(field); }
             else if (statement is IndexCall indexCall)
             { Compile(indexCall); }
+            else if (statement is AnyCall anyCall)
+            { Compile(anyCall); }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
 
@@ -1220,6 +1240,16 @@ namespace LanguageCore.Brainfuck.Compiler
                 Instructions = (start, end),
                 SourcePosition = statement.GetPosition(),
             });
+        }
+        void Compile(AnyCall anyCall)
+        {
+            if (anyCall.ToFunctionCall(out var functionCall))
+            {
+                Compile(functionCall);
+                return;
+            }
+
+            throw new NotSupportedException($"Function pointers not supported by brainfuck", anyCall.PrevStatement, CurrentFile);
         }
         void Compile(IndexCall indexCall)
         {

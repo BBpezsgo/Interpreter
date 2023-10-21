@@ -125,10 +125,12 @@ namespace LanguageCore.Runtime
         static void TraceBasePointers(List<int> result, DataItem[] stack, int basePointer)
         {
             if (basePointer < 1) return;
+            if (basePointer - 1 >= stack.Length) return;
             DataItem item = stack[basePointer - 1];
             if (item.Type != RuntimeType.INT) return;
             int num = item.ValueInt;
             result.Add(num);
+            if (num == basePointer) return;
             TraceBasePointers(result, stack, num);
         }
 

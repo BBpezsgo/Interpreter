@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
@@ -311,6 +312,97 @@ namespace LanguageCore.Parser.Statement
         public override IEnumerable<Statement> GetStatements()
         {
             if (InitialValue != null) yield return InitialValue;
+        }
+    }
+
+    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
+    public class AnyCall : StatementWithValue, IReadableID
+    {
+        public readonly StatementWithValue PrevStatement;
+        public readonly Token BracketLeft;
+        public readonly StatementWithValue[] Parameters;
+        public readonly Token BracketRight;
+
+        public AnyCall(StatementWithValue prevStatement, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+        {
+            PrevStatement = prevStatement;
+            BracketLeft = bracketLeft;
+            Parameters = parameters.ToArray();
+            BracketRight = bracketRight;
+        }
+
+        public override string ToString()
+        {
+            StringBuilder result = new(2);
+            if (PrevStatement != null) result.Append(PrevStatement.ToString());
+            result.Append('(');
+            for (int i = 0; i < Parameters.Length; i++)
+            {
+                if (i > 0)
+                { result.Append(", "); }
+
+                if (result.Length > 30)
+                {
+                    result.Append("...");
+                    break;
+                }
+
+                result.Append(Parameters[i].ToString());
+            }
+            result.Append(')');
+            return result.ToString();
+        }
+
+        public override string PrettyPrint(int ident = 0)
+        { throw new NotImplementedException(); }
+
+        public override Position GetPosition()
+            => new(PrevStatement, BracketLeft, BracketRight);
+
+        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        {
+            StringBuilder result = new(2);
+            result.Append('(');
+            for (int i = 0; i < this.Parameters.Length; i++)
+            {
+                if (i > 0) { result.Append(", "); }
+                result.Append(TypeSearch.Invoke(this.Parameters[i]).ToString());
+            }
+            result.Append(')');
+            return result.ToString();
+        }
+
+        public override IEnumerable<Statement> GetStatements()
+        {
+            if (PrevStatement != null) yield return PrevStatement;
+            for (int i = 0; i < Parameters.Length; i++)
+            { yield return Parameters[i]; }
+        }
+
+        public bool IsFunctionCall => PrevStatement is Identifier;
+        public bool IsMethodCall => PrevStatement is Field;
+        public bool IsFunctionOrMethodCall => IsFunctionCall || IsMethodCall;
+
+        public bool ToFunctionCall([NotNullWhen(true)] out FunctionCall? functionCall)
+        {
+            functionCall = null;
+
+            if (PrevStatement is null)
+            { return false; }
+
+            if (PrevStatement is Identifier functionIdentifier)
+            {
+                functionCall = new FunctionCall(null, functionIdentifier.Name, BracketLeft, Parameters, BracketRight);
+                return true;
+            }
+
+            if (PrevStatement is Field field)
+            {
+                functionCall = new FunctionCall(field.PrevStatement, field.FieldName, BracketLeft, Parameters, BracketRight);
+                return true;
+            }
+
+            return false;
         }
     }
 
@@ -852,6 +944,29 @@ namespace LanguageCore.Parser.Statement
                 _ => null,
             };
 
+        public int GetInt()
+        {
+            string v = Value;
+            v = v.Trim();
+            int @base = 10;
+            if (v.StartsWith("0b"))
+            {
+                v = v[2..];
+                @base = 2;
+            }
+            if (v.StartsWith("0x"))
+            {
+                v = v[2..];
+                @base = 16;
+            }
+            v = v.Replace("_", "");
+            return Convert.ToInt32(v, @base);
+        }
+        public float GetFloat()
+        {
+            return float.Parse(Value.EndsWith('f') ? Value[..^1] : Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         public override Position GetPosition()
             => ValueToken == null
                 ? ImaginaryPosition
@@ -1285,14 +1400,15 @@ namespace LanguageCore.Parser.Statement
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class IndexCall : StatementWithValue, IReadableID
     {
-        public StatementWithValue? PrevStatement;
+        public readonly StatementWithValue PrevStatement;
 
         public readonly StatementWithValue Expression;
         public readonly Token BracketLeft;
         public readonly Token BracketRight;
 
-        public IndexCall(Token bracketLeft, StatementWithValue indexStatement, Token bracketRight)
+        public IndexCall(StatementWithValue prevStatement, Token bracketLeft, StatementWithValue indexStatement, Token bracketRight)
         {
+            this.PrevStatement = prevStatement;
             this.Expression = indexStatement;
             this.BracketLeft = bracketLeft;
             this.BracketRight = bracketRight;

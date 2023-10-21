@@ -1430,6 +1430,15 @@ namespace LanguageCore.BBCode.Compiler
 
         #region FindStatementType()
 
+        protected CompiledType FindStatementType(AnyCall anyCall)
+        {
+            if (anyCall.ToFunctionCall(out var functionCall))
+            { return FindStatementType(functionCall); }
+            CompiledType prevType = FindStatementType(anyCall.PrevStatement);
+            if (!prevType.IsFunction)
+            { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+            return prevType.Function.ReturnType;
+        }
         protected CompiledType FindStatementType(KeywordCall keywordCall)
         {
             if (keywordCall.FunctionName == "return") return new CompiledType(Type.VOID);
@@ -1735,6 +1744,9 @@ namespace LanguageCore.BBCode.Compiler
             if (statement is ModifiedStatement modifiedStatement)
             { return FindStatementType(modifiedStatement, expectedType); }
 
+            if (statement is AnyCall anyCall)
+            { return FindStatementType(anyCall); }
+
             throw new CompilerException($"Statement {(statement is null ? "null" : statement.GetType().Name)} does not have a type", statement, CurrentFile);
         }
 
@@ -1791,6 +1803,8 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
+        #region InlineMacro()
+
         protected static Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
         {
             Dictionary<string, StatementWithValue> _parameters = new();
@@ -1836,8 +1850,16 @@ namespace LanguageCore.BBCode.Compiler
             StatementWithValue[] _parameters = InlineMacro(functionCall.Parameters, parameters);
             StatementWithValue? prevStatement = functionCall.PrevStatement;
             if (prevStatement != null)
-            { prevStatement = InlineMacro(prevStatement, parameters); ; }
+            { prevStatement = InlineMacro(prevStatement, parameters); }
             return new FunctionCall(prevStatement, functionCall.Identifier, functionCall.BracketLeft, _parameters, functionCall.BracketRight);
+        }
+
+        protected static AnyCall InlineMacro(AnyCall anyCall, Dictionary<string, StatementWithValue> parameters)
+        {
+            StatementWithValue[] _parameters = InlineMacro(anyCall.Parameters, parameters);
+            StatementWithValue prevStatement = anyCall.PrevStatement;
+            prevStatement = InlineMacro(prevStatement, parameters);
+            return new AnyCall(prevStatement, anyCall.BracketLeft, _parameters, anyCall.BracketRight);
         }
 
         protected static StatementWithValue[] InlineMacro(StatementWithValue[] statements, Dictionary<string, StatementWithValue> parameters)
@@ -1876,6 +1898,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (parameters.TryGetValue(identifier.Content, out StatementWithValue? inlinedStatement))
                 { return inlinedStatement; }
+                return new Identifier(identifier.Name);
             }
 
             if (statement is OperatorCall operatorCall)
@@ -1887,8 +1910,13 @@ namespace LanguageCore.BBCode.Compiler
             if (statement is FunctionCall functionCall)
             { return InlineMacro(functionCall, parameters); }
 
+            if (statement is AnyCall anyCall)
+            { return InlineMacro(anyCall, parameters); }
+
             throw new NotImplementedException();
         }
+
+        #endregion
 
         #region TryCompute()
         protected static DataItem Compute(string @operator, DataItem left, DataItem right)
@@ -2039,6 +2067,14 @@ namespace LanguageCore.BBCode.Compiler
             value = DataItem.Null;
             return false;
         }
+        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, out DataItem value)
+        {
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            { return TryCompute(functionCall, expectedType, out value); }
+
+            value = DataItem.Null;
+            return false;
+        }
         protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
         {
             value = default;
@@ -2056,6 +2092,17 @@ namespace LanguageCore.BBCode.Compiler
                 }
             }
 
+            return false;
+        }
+        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, out DataItem value)
+        {
+            if (GetConstant(identifier.Content, out DataItem constantValue))
+            {
+                value = constantValue;
+                return true;
+            }
+
+            value = default;
             return false;
         }
 
@@ -2078,6 +2125,9 @@ namespace LanguageCore.BBCode.Compiler
 
             if (statement is FunctionCall functionCall)
             { return TryCompute(functionCall, expectedType, out value); }
+
+            if (statement is AnyCall anyCall)
+            { return TryCompute(anyCall, expectedType, out value); }
 
             value = DataItem.Null;
             return false;

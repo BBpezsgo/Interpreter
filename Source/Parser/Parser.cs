@@ -549,7 +549,7 @@ namespace LanguageCore.Parser
 
             Token[] modifiers = ParseModifiers();
 
-            if (!ExpectType(AllowedType.None, out TypeInstance? possibleType))
+            if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
             { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectIdentifier(out Token? possibleNameT))
@@ -971,7 +971,7 @@ namespace LanguageCore.Parser
             return false;
         }
 
-        bool ExpectIndex([NotNullWhen(true)] out IndexCall? statement)
+        bool ExpectIndex(StatementWithValue prevStatement, [NotNullWhen(true)] out IndexCall? statement)
         {
             if (!ExpectOperator("[", out Token? bracketLeft))
             {
@@ -988,7 +988,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("]", out Token? bracketRight))
             { throw new SyntaxException("Unbalanced [", bracketLeft); }
 
-            statement = new IndexCall(bracketLeft, expression, bracketRight);
+            statement = new IndexCall(prevStatement, bracketLeft, expression, bracketRight);
             return true;
         }
 
@@ -1018,22 +1018,22 @@ namespace LanguageCore.Parser
             else if (ExpectOperator("(", out Token? braceletT))
             {
                 if (!ExpectExpression(out StatementWithValue? expression))
-                { throw new SyntaxException("Expected expression after '('", braceletT); }
+                { throw new SyntaxException("Expected expression after \"(\"", braceletT.After()); }
 
                 if (expression is OperatorCall operation)
                 { operation.InsideBracelet = true; }
 
                 if (!ExpectOperator(")"))
-                { throw new SyntaxException("Unbalanced '('", braceletT); }
+                { throw new SyntaxException("Unbalanced \"(\"", braceletT); }
 
                 statementWithValue = expression;
             }
-            else if (ExpectIdentifier("new", out Token? newIdentifier))
+            else if (ExpectIdentifier("new", out Token? keywordNew))
             {
-                newIdentifier.AnalyzedType = TokenAnalysedType.Keyword;
+                keywordNew.AnalyzedType = TokenAnalysedType.Keyword;
 
                 if (!ExpectType(AllowedType.None, out TypeInstance? instanceTypeName))
-                { throw new SyntaxException("Expected instance constructor after keyword 'new'", newIdentifier); }
+                { throw new SyntaxException("Expected instance constructor after keyword 'new'", keywordNew); }
 
                 if (ExpectOperator("(", out Token? bracketLeft))
                 {
@@ -1062,34 +1062,23 @@ namespace LanguageCore.Parser
                         { throw new EndlessLoopException(); }
                     }
 
-                    ConstructorCall newStructStatement = new(newIdentifier, instanceTypeName, bracketLeft, parameters, bracketRight);
+                    ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, bracketLeft, parameters, bracketRight);
 
                     statementWithValue = newStructStatement;
                 }
                 else
                 {
-                    statementWithValue = new NewInstance(newIdentifier, instanceTypeName);
+                    statementWithValue = new NewInstance(keywordNew, instanceTypeName);
                 }
             }
-            else if (ExpectIdentifier(out Token? variableName))
+            else if (ExpectIdentifier(out Token? simpleIdentifier))
             {
-                if (ExpectOperator("("))
-                {
-                    CurrentTokenIndex = savedToken;
-                    ExpectFunctionCall(out FunctionCall? functionCall);
-                    statementWithValue = functionCall;
-                }
-                else
-                {
-                    Identifier variableNameStatement = new(variableName);
+                Identifier identifierStatement = new(simpleIdentifier);
 
-                    if (variableName.Content == "this")
-                    { variableName.AnalyzedType = TokenAnalysedType.Keyword; }
-                    else
-                    { variableName.AnalyzedType = TokenAnalysedType.VariableName; }
+                if (simpleIdentifier.Content == "this")
+                { simpleIdentifier.AnalyzedType = TokenAnalysedType.Keyword; }
 
-                    statementWithValue = variableNameStatement;
-                }
+                statementWithValue = identifierStatement;
             }
             else if (ExpectVariableAddressGetter(out AddressGetter? memoryAddressGetter))
             {
@@ -1107,26 +1096,23 @@ namespace LanguageCore.Parser
             {
                 if (ExpectOperator(".", out var tokenDot))
                 {
-                    if (ExpectMethodCall(false, statementWithValue, out var methodCall))
-                    {
-                        statementWithValue = methodCall;
-                    }
-                    else
-                    {
-                        if (!ExpectIdentifier(out Token? fieldName))
-                        { throw new SyntaxException("Expected field or method", tokenDot); }
+                    if (!ExpectIdentifier(out Token? fieldName))
+                    { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.After()); }
 
-                        statementWithValue = new Field(statementWithValue, fieldName);
-                    }
+                    statementWithValue = new Field(statementWithValue, fieldName);
 
                     continue;
                 }
 
-                if (ExpectIndex(out var statementIndex))
+                if (ExpectIndex(statementWithValue, out var statementIndex))
                 {
-                    statementIndex.PrevStatement = statementWithValue;
                     statementWithValue = statementIndex;
+                    continue;
+                }
 
+                if (ExpectAnyCall(statementWithValue, out AnyCall? anyCall))
+                {
+                    statementWithValue = anyCall;
                     continue;
                 }
 
@@ -1267,7 +1253,7 @@ namespace LanguageCore.Parser
             else
             {
                 if (possibleType.Identifier.Content == "var")
-                { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType.Identifier); }
+                { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType); }
             }
 
             variableDeclaration = new VariableDeclaration(modifiers.ToArray(), possibleType, possibleVariableName, initialValue);
@@ -1774,6 +1760,53 @@ namespace LanguageCore.Parser
             return true;
         }
 
+        bool ExpectAnyCall(StatementWithValue prevStatement, [NotNullWhen(true)] out AnyCall? anyCall)
+        {
+            anyCall = null;
+            int startTokenIndex = CurrentTokenIndex;
+
+            if (!ExpectOperator("(", out Token? bracketLeft))
+            { CurrentTokenIndex = startTokenIndex; return false; }
+
+            bool expectParameter = false;
+            List<StatementWithValue> parameters = new();
+
+            int endlessSafe = 0;
+            Token? bracketRight;
+            while (!ExpectOperator(")", out bracketRight) || expectParameter)
+            {
+                StatementWithValue? parameter;
+
+                if (ExpectModifiedValue(out ModifiedStatement? modifiedStatement, PassedParameterModifiers))
+                {
+                    parameter = modifiedStatement;
+                }
+                else if (ExpectExpression(out StatementWithValue? simpleParameter))
+                {
+                    parameter = simpleParameter;
+                }
+                else
+                { throw new SyntaxException("Expected expression as a parameter", CurrentToken); }
+
+                parameters.Add(parameter);
+
+                if (ExpectOperator(")", out bracketRight))
+                { break; }
+
+                if (!ExpectOperator(","))
+                { throw new SyntaxException("Expected \",\" to separate parameters", parameter); }
+                else
+                { expectParameter = true; }
+
+                endlessSafe++;
+                if (endlessSafe > 100)
+                { throw new EndlessLoopException(); }
+            };
+
+            anyCall = new AnyCall(prevStatement, bracketLeft, parameters, bracketRight);
+            return true;
+        }
+
         bool ExpectKeywordCall(string name, int parameterCount, [NotNullWhen(true)] out KeywordCall? keywordCall)
             => ExpectKeywordCall(name, parameterCount, parameterCount, out keywordCall);
         bool ExpectKeywordCall(string name, int minParameterCount, int maxParameterCount, [NotNullWhen(true)] out KeywordCall? keywordCall)
@@ -2109,21 +2142,34 @@ namespace LanguageCore.Parser
 
                 while (true)
                 {
-                    if (!ExpectType(AllowedType.FunctionPointer, out var subtype))
+                    while (!ExpectOperator(")"))
                     {
-                        CurrentTokenIndex = afterIdentifier;
-                        type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
-                        return true;
-                        // throw new SyntaxException($"Expected type as function-pointer parameter type", CurrentToken);
+                        if (!ExpectType(AllowedType.FunctionPointer, out var subtype))
+                        {
+                            CurrentTokenIndex = afterIdentifier;
+                            type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
+                            return true;
+                            // throw new SyntaxException($"Expected type as function-pointer parameter type", CurrentToken);
+                        }
+
+                        newType.ParameterTypes.Add(subtype);
+
+                        if (ExpectOperator(")"))
+                        { break; }
+
+                        if (ExpectOperator(","))
+                        { continue; }
                     }
 
-                    newType.ParameterTypes.Add(subtype);
+                    if (ExpectOperator("("))
+                    {
+                        throw new NotImplementedException();
+                        // TypeInstance newSubType = new(possibleType, TypeInstanceKind.Function);
+                        // 
+                        // continue;
+                    }
 
-                    if (ExpectOperator(")"))
-                    { break; }
-
-                    if (ExpectOperator(","))
-                    { continue; }
+                    break;
                 }
             }
             else if (ExpectOperator("[", out var bracket1Left))

@@ -8,10 +8,18 @@ namespace LanguageCore.BBCode.Compiler
 
     internal class SourceCodeManager
     {
-        List<string> AlreadyCompiledCodes;
-        List<Warning> Warnings;
-        List<Error> Errors;
-        PrintCallback Print;
+        readonly List<string> AlreadyCompiledCodes;
+        readonly List<Warning> Warnings;
+        readonly List<Error> Errors;
+        PrintCallback? Print;
+
+        public SourceCodeManager()
+        {
+            AlreadyCompiledCodes = new List<string>();
+            Warnings = new List<Warning>();
+            Errors = new List<Error>();
+            Print = null;
+        }
 
         internal struct CollectedAST
         {
@@ -28,10 +36,10 @@ namespace LanguageCore.BBCode.Compiler
             internal Error[] Errors;
         }
 
-        (string, string) LoadSourceCode(
+        (string?, string?) LoadSourceCode(
             UsingDefinition @using,
             FileInfo file,
-            string basePath)
+            string? basePath)
         {
             if (@using.IsUrl)
             {
@@ -70,17 +78,17 @@ namespace LanguageCore.BBCode.Compiler
             }
             else
             {
-                string path = null;
+                string? path = null;
 
                 if (string.IsNullOrEmpty(basePath))
                 {
-                    FileInfo[] configFiles = file.Directory.GetFiles("config.json");
-                    if (configFiles.Length == 1)
+                    FileInfo[]? configFiles = file.Directory?.GetFiles("config.json");
+                    if (configFiles != null && configFiles.Length == 1)
                     {
                         System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFiles[0].FullName));
                         if (document.RootElement.TryGetProperty("base", out var v))
                         {
-                            string b = v.GetString();
+                            string? b = v.GetString();
                             if (b != null) basePath = b;
                         }
                     }
@@ -91,29 +99,28 @@ namespace LanguageCore.BBCode.Compiler
 
                 List<string> searchForThese = new();
                 try
-                { searchForThese.Add(Path.GetFullPath(basePath.Replace("/", "\\") + filename, file.Directory.FullName)); }
+                { searchForThese.Add(Path.GetFullPath((basePath?.Replace("/", "\\") ?? string.Empty) + filename, file.Directory!.FullName!)); }
                 catch (System.Exception) { }
                 try
-                { searchForThese.Add(Path.GetFullPath(filename, file.Directory.FullName)); }
+                { searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName!)); }
                 catch (System.Exception) { }
 
-                bool found = false;
                 for (int i = 0; i < searchForThese.Count; i++)
                 {
                     path = searchForThese[i];
                     if (!File.Exists(path))
-                    { continue; }
+                    { path = null; }
                     else
-                    { found = true; break; }
+                    { break; }
                 }
 
-                @using.CompiledUri = path;
-
-                if (!found)
+                if (path == null)
                 {
                     Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file.FullName));
                     return (null, path);
                 }
+
+                @using.CompiledUri = path;
 
                 if (AlreadyCompiledCodes.Contains(path))
                 {
@@ -130,11 +137,12 @@ namespace LanguageCore.BBCode.Compiler
             UsingDefinition @using,
             FileInfo file,
             ParserSettings parserSettings,
-            string basePath)
+            string? basePath)
         {
-            (string content, string path) = LoadSourceCode(@using, file, basePath);
+            (string? content, string? path) = LoadSourceCode(@using, file, basePath);
 
             if (content == null) return System.Array.Empty<CollectedAST>();
+            if (path == null) throw new InternalException($"Collected source code file does not have a path (wtf?)");
 
             List<CollectedAST> collectedASTs = new();
 
@@ -180,7 +188,7 @@ namespace LanguageCore.BBCode.Compiler
             ParserResult parserResult,
             FileInfo file,
             ParserSettings parserSettings,
-            string basePath)
+            string? basePath)
         {
             if (parserResult.Usings.Length > 0)
             { Print?.Invoke("Parse usings ...", LogType.Debug); }
@@ -207,17 +215,12 @@ namespace LanguageCore.BBCode.Compiler
             ParserResult parserResult,
             FileInfo file,
             ParserSettings parserSettings,
-            PrintCallback printCallback = null,
-            string basePath = "")
+            PrintCallback? printCallback = null,
+            string? basePath = null)
         {
             SourceCodeManager sourceCodeManager = new()
-            {
-                AlreadyCompiledCodes = new() { file.FullName },
-                Errors = new List<Error>(),
-                Warnings = new List<Warning>(),
-                Print = printCallback,
-            };
-
+            { Print = printCallback, };
+            sourceCodeManager.AlreadyCompiledCodes.Add(file.FullName);
             return sourceCodeManager.Entry(
                 parserResult,
                 file,

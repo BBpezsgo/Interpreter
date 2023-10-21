@@ -69,7 +69,7 @@ namespace LanguageCore
             if (stack is null)
             { return "null"; }
 
-            string result = "";
+            string result = string.Empty;
 
             for (int i = 0; i < stack.Count; i++)
             {
@@ -82,7 +82,7 @@ namespace LanguageCore
                     break;
                 }
 
-                result += stack[i].ToString();
+                result += stack[i]?.ToString() ?? "null";
             }
 
             return $"[ {result.Trim()} ]";

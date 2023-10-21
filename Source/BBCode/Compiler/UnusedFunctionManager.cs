@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.BBCode.Compiler
 {
@@ -26,15 +27,15 @@ namespace LanguageCore.BBCode.Compiler
             Informations = new List<Information>();
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (GetVariable(symbolName, out CompiledVariable variable))
+            if (GetVariable(symbolName, out CompiledVariable? variable))
             {
                 type = variable.Type;
                 return true;
             }
 
-            if (GetParameter(symbolName, out CompiledParameter parameter))
+            if (GetParameter(symbolName, out CompiledParameter? parameter))
             {
                 type = parameter.Type;
                 return true;
@@ -44,13 +45,13 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
             => compiledVariables.TryGetValue(variableName, out compiledVariable);
 
-        bool GetParameter(string parameterName, out CompiledParameter parameter)
+        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
-        int DoTheThing(PrintCallback printCallback = null)
+        int DoTheThing(PrintCallback? printCallback = null)
         {
             printCallback?.Invoke($"  Remove unused functions ...", LogType.Debug);
 
@@ -137,7 +138,7 @@ namespace LanguageCore.BBCode.Compiler
         public static (CompiledFunction[] functions, CompiledOperator[] operators, CompiledGeneralFunction[] generalFunctions) RemoveUnusedFunctions(
             Compiler.Result compilerResult,
             int iterations,
-            PrintCallback printCallback = null,
+            PrintCallback? printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             UnusedFunctionManager unusedFunctionManager = new(level)

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 
-#nullable enable
-
 namespace LanguageCore.Brainfuck.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
@@ -70,10 +68,7 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
-        static readonly string[] IllegalIdentifiers = new string[]
-        {
-
-        };
+        static readonly string[] IllegalIdentifiers = Array.Empty<string>();
 
         #region Fields
 
@@ -214,15 +209,15 @@ namespace LanguageCore.Brainfuck.Compiler
         DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
         DebugInfoBlock DebugBlock(Position position) => new(Code, DebugInfo, position);
 
-        protected override bool GetLocalSymbolType(string symbolName, [MaybeNullWhen(false)] out CompiledType? type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (Variables.TryFind(symbolName, out var variable))
+            if (Variables.TryFind(symbolName, out Variable variable))
             {
                 type = variable.Type;
                 return true;
             }
 
-            if (Constants.TryFind(symbolName, out var constant))
+            if (Constants.TryFind(symbolName, out ConstantVariable constant))
             {
                 type = new CompiledType(constant.Value.Type);
                 return true;
@@ -294,8 +289,9 @@ namespace LanguageCore.Brainfuck.Compiler
         }
 
         #region Precompile
-        void Precompile(Statement[] statements)
+        void Precompile(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return;
             foreach (Statement statement in statements)
             { Precompile(statement); }
         }
@@ -341,15 +337,17 @@ namespace LanguageCore.Brainfuck.Compiler
             if (IllegalIdentifiers.Contains(function.Identifier.Content))
             { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, CurrentFile); }
 
-            Precompile(function.Statements);
+            Precompile(function.Block?.Statements);
         }
         #endregion
 
         #region PrecompileVariables
         int PrecompileVariables(Block block)
-        { return PrecompileVariables(block.Statements.ToArray()); }
-        int PrecompileVariables(Statement[] statements)
+        { return PrecompileVariables(block.Statements); }
+        int PrecompileVariables(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return 0;
+
             int result = 0;
             foreach (Statement statement in statements)
             { result += PrecompileVariables(statement); }
@@ -511,7 +509,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
 
-            if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
+            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
@@ -575,7 +573,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -607,7 +605,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
             { return 1; }
 
-            if (GetFunction(functionCall, out CompiledFunction function))
+            if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 if (!function.ReturnSomething)
                 { return 0; }
@@ -654,8 +652,15 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #region TryGetAddress
 
-        bool TryGetAddress(Statement statement, out int address, out int size)
+        bool TryGetAddress(Statement? statement, out int address, out int size)
         {
+            if (statement is null)
+            {
+                address = 0;
+                size = 0;
+                return false;
+            }
+
             if (statement is IndexCall index)
             { return TryGetAddress(index, out address, out size); }
 
@@ -2091,7 +2096,7 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
 
-                string prevFile = CurrentFile;
+                string? prevFile = CurrentFile;
                 CurrentFile = macro.FilePath;
 
                 InMacro.Push(true);
@@ -2136,10 +2141,10 @@ namespace LanguageCore.Brainfuck.Compiler
 
             instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
 
-            if (!GetClass(constructorCall, out CompiledClass @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -2275,7 +2280,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block("Compute equality"))
                             {
@@ -2294,7 +2299,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
                             { Code.MoveAddValue(rightAddress, leftAddress); }
@@ -2330,7 +2335,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
                             { Code.MoveSubValue(rightAddress, leftAddress); }
@@ -2347,7 +2352,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet MULTIPLY({leftAddress} {rightAddress})"))
                             {
@@ -2366,7 +2371,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                             {
@@ -2385,7 +2390,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
                             {
@@ -2404,7 +2409,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet LT({leftAddress} {rightAddress})"))
                             {
@@ -2423,7 +2428,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet MT({leftAddress} {rightAddress})"))
                             {
@@ -2444,7 +2449,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
                             {
@@ -2464,7 +2469,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
                             {
@@ -2483,7 +2488,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet NEQ({leftAddress} {rightAddress})"))
                             {
@@ -2507,7 +2512,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
                             { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
@@ -2533,7 +2538,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right); }
+                            { Compile(statement.Right!); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
                             { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
@@ -3511,7 +3516,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 ReturnTagStack.Push(Stack.Push(1));
             }
 
-            Compile(function.Block);
+            Compile(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
 
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
@@ -3640,7 +3645,7 @@ namespace LanguageCore.Brainfuck.Compiler
             foreach (Statement statement in compilerResult.TopLevelStatements)
             { Compile(statement); }
 
-            CompiledFunction codeEntry = GetCodeEntry();
+            CompiledFunction? codeEntry = GetCodeEntry();
 
             if (codeEntry != null)
             { InlineMacro(codeEntry, Array.Empty<StatementWithValue>(), codeEntry.Identifier); }

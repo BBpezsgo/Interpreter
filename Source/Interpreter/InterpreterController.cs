@@ -123,15 +123,15 @@ namespace LanguageCore.Runtime
         public delegate void OnInputEventHandler(Interpreter sender);
         public delegate void OnExecutedEventHandler(Interpreter sender, OnExecutedEventArgs e);
 
-        public event OnOutputEventHandler OnOutput;
-        public event OnStdOutEventHandler OnStdOut;
-        public event OnStdErrorEventHandler OnStdError;
+        public event OnOutputEventHandler? OnOutput;
+        public event OnStdOutEventHandler? OnStdOut;
+        public event OnStdErrorEventHandler? OnStdError;
         /// <summary>
         /// Will be invoked when the code needs input<br/>
         /// Call <see cref="OnInput(char)"/> after this invoked
         /// </summary>
-        public event OnInputEventHandler OnNeedInput;
-        public event OnExecutedEventHandler OnExecuted;
+        public event OnInputEventHandler? OnNeedInput;
+        public event OnExecutedEventHandler? OnExecuted;
 
         public struct OnExecutedEventArgs
         {
@@ -149,7 +149,7 @@ namespace LanguageCore.Runtime
         protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
 
         public CodeGenerator.Result CompilerResult;
-        public Instruction NextInstruction
+        public Instruction? NextInstruction
         {
             get
             {
@@ -163,15 +163,21 @@ namespace LanguageCore.Runtime
 
         public bool IsExecutingCode;
 
-        public BytecodeInterpreter BytecodeInterpreter;
+        public BytecodeInterpreter? BytecodeInterpreter;
         protected TimeSpan CodeStartedTimespan;
 
         protected bool IsPaused;
-        IReturnValueConsumer ReturnValueConsumer;
+        IReturnValueConsumer? ReturnValueConsumer;
 
         protected List<Stream> Streams;
 
-        protected bool HandleErrors = true;
+        protected bool HandleErrors;
+
+        public Interpreter() : base()
+        {
+            Streams = new List<Stream>();
+            HandleErrors = true;
+        }
 
         /// <summary>
         /// It prepares the interpreter to run some code
@@ -315,7 +321,7 @@ namespace LanguageCore.Runtime
 
             externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char.ToString()));
 
-            externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter.SleepTime(t, null));
+            externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter!.SleepTime(t, null));
 
             #endregion
 
@@ -400,7 +406,7 @@ namespace LanguageCore.Runtime
                         byte[] buffer = new byte[count];
                         for (int j = 0; j < count; j++)
                         {
-                            buffer[j] = ((IHeap)BytecodeInterpreter.Memory.Heap)[j + stream.MemoryAddress].Byte ?? 0;
+                            buffer[j] = ((IHeap)BytecodeInterpreter!.Memory.Heap)[j + stream.MemoryAddress].Byte ?? 0;
                         }
 
                         stream.Flush(buffer);
@@ -462,14 +468,17 @@ namespace LanguageCore.Runtime
 
             State = InterpreterState.CodeExecuted;
 
-            for (int i = 0; i < Streams.Count; i++)
-            { Streams[i].Dispose(); }
-            Streams.Clear();
+            if (Streams != null)
+            {
+                for (int i = 0; i < Streams.Count; i++)
+                { Streams[i].Dispose(); }
+                Streams.Clear();
+            }
         }
 
         public void Update()
         {
-            if (BytecodeInterpreter != null && BytecodeInterpreter.Memory.Heap != null)
+            if (BytecodeInterpreter != null && BytecodeInterpreter.Memory.Heap != null && Streams != null)
             {
                 for (int i = 0; i < Streams.Count; i++)
                 { Streams[i].Tick(BytecodeInterpreter.Memory.Heap); }
@@ -479,7 +488,7 @@ namespace LanguageCore.Runtime
 
             try
             {
-                bool didSomething = BytecodeInterpreter.Tick();
+                bool didSomething = BytecodeInterpreter?.Tick() ?? false;
                 if (didSomething) return;
                 else OnCodeExecuted();
             }

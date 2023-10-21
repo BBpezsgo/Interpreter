@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 
+#nullable disable
+
 namespace Communicating
 {
     public class InterProcessCommunication
@@ -98,7 +100,7 @@ namespace Communicating
         static readonly char EOM = Convert.ToChar(4);
         Thread Listener;
         const int BufferSize = 1024;
-        string Incoming = "";
+        string Incoming = string.Empty;
 
         internal enum Type
         {
@@ -250,7 +252,7 @@ namespace Communicating
             if (length < 0) throw new ArgumentException($"{nameof(length)} ({length}) can't negative");
             if (length == 0)
             {
-                deleted = "";
+                deleted = string.Empty;
                 return v;
             }
 

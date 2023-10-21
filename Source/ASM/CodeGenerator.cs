@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace LanguageCore.ASM.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using BBCode.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
@@ -15,7 +16,7 @@ namespace LanguageCore.ASM.Compiler
         #region Fields
 
         readonly Settings GeneratorSettings;
-        AssemblyCode Builder;
+        readonly AssemblyCode Builder;
 
         #endregion
 
@@ -28,6 +29,7 @@ namespace LanguageCore.ASM.Compiler
             this.CompiledStructs = compilerResult.Structs;
             this.CompiledEnums = compilerResult.Enums;
             this.CompiledMacros = compilerResult.Macros;
+            this.Builder = new AssemblyCode();
         }
 
         public struct Result
@@ -45,15 +47,16 @@ namespace LanguageCore.ASM.Compiler
 
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
             type = null;
             return false;
         }
 
         #region Precompile
-        void Precompile(Statement[] statements)
+        void Precompile(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return;
             foreach (Statement statement in statements)
             { Precompile(statement); }
         }
@@ -76,7 +79,8 @@ namespace LanguageCore.ASM.Compiler
         }
         void Precompile(CompiledFunction function)
         {
-            Precompile(function.Statements);
+            if (function.Block == null) return;
+            Precompile(function.Block?.Statements);
         }
         #endregion
 
@@ -125,7 +129,7 @@ namespace LanguageCore.ASM.Compiler
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
 
-            if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
+            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
@@ -170,10 +174,10 @@ namespace LanguageCore.ASM.Compiler
         }
         int GetValueSize(ConstructorCall constructorCall)
         {
-            if (!GetClass(constructorCall, out CompiledClass @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -208,7 +212,7 @@ namespace LanguageCore.ASM.Compiler
                 ))
             { return 1; }
 
-            if (GetFunction(functionCall, out CompiledFunction function))
+            if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 if (!function.ReturnSomething)
                 { return 0; }
@@ -342,8 +346,8 @@ namespace LanguageCore.ASM.Compiler
             { Compile(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
             { Compile(compoundAssignment); }
-            else if (statement is VariableDeclaration variableDeclaretion)
-            { Compile(variableDeclaretion); }
+            else if (statement is VariableDeclaration variableDeclaration)
+            { Compile(variableDeclaration); }
             else if (statement is TypeCast typeCast)
             { Compile(typeCast); }
             else if (statement is NewInstance newInstance)
@@ -359,7 +363,7 @@ namespace LanguageCore.ASM.Compiler
 
             if (statement is FunctionCall statementWithValue &&
                 !statementWithValue.SaveValue &&
-                GetFunction(statementWithValue, out CompiledFunction _f) &&
+                GetFunction(statementWithValue, out CompiledFunction? _f) &&
                 _f.ReturnSomething)
             {
                 throw new NotImplementedException();
@@ -403,7 +407,7 @@ namespace LanguageCore.ASM.Compiler
                     {
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (requied 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         throw new NotImplementedException();
                     }
@@ -411,7 +415,7 @@ namespace LanguageCore.ASM.Compiler
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (requied 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         throw new NotImplementedException();
                     }
@@ -429,7 +433,7 @@ namespace LanguageCore.ASM.Compiler
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is requied for \'{statement.Operator}\' assignment", statement, CurrentFile));
+            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
         void Compile(CompoundAssignment statement)
         {
@@ -489,7 +493,7 @@ namespace LanguageCore.ASM.Compiler
                 throw new NotImplementedException();
             }
 
-            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
@@ -526,10 +530,10 @@ namespace LanguageCore.ASM.Compiler
 
             instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
 
-            if (!GetClass(constructorCall, out CompiledClass @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -549,7 +553,7 @@ namespace LanguageCore.ASM.Compiler
             }
 
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
             throw new NotImplementedException();
         }
@@ -672,10 +676,8 @@ namespace LanguageCore.ASM.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            PrintCallback printCallback = null)
+            PrintCallback? printCallback = null)
         {
-            Builder = new AssemblyCode();
-
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
             Builder.AppendDataLine("    message db \"This is your first assembly program\", 0");
@@ -728,14 +730,11 @@ namespace LanguageCore.ASM.Compiler
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
-            PrintCallback printCallback = null)
-        {
-            CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
-            return codeGenerator.GenerateCode(
-                compilerResult,
-                settings,
-                printCallback
-                );
-        }
+            PrintCallback? printCallback = null)
+            => new CodeGenerator(compilerResult, generatorSettings).GenerateCode(
+            compilerResult,
+            settings,
+            printCallback
+        );
     }
 }

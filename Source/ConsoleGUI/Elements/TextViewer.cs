@@ -1,26 +1,28 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using Win32;
 
 namespace ConsoleGUI
 {
     internal class TextViewer : WindowElement
     {
-        public string Text = "";
+        public string Text = string.Empty;
         int Scroll;
-        Character[] buf;
+        CharInfo[] buf;
 
         public TextViewer() : base()
         {
             ClearBuffer();
         }
 
-        new void ClearBuffer() => buf = new Character[Rect.Width * Rect.Height];
+        [MemberNotNull(nameof(buf))]
+        new void ClearBuffer() => buf = new CharInfo[Rect.Width * Rect.Height];
 
         public override void BeforeDraw()
         {
             if (buf.Length == 0) ClearBuffer();
 
-            ForegroundColor Color;
+            byte Color;
 
             int BufferIndex = 0;
 
@@ -28,7 +30,7 @@ namespace ConsoleGUI
             {
                 if (BufferIndex >= buf.Length) return false;
 
-                buf[BufferIndex].ForegroundColor = Color;
+                buf[BufferIndex].Foreground = Color;
                 buf[BufferIndex].Char = data;
 
                 BufferIndex++;
@@ -51,14 +53,14 @@ namespace ConsoleGUI
                 }
             }
 
-            Color = ForegroundColor.Default;
+            Color = ByteColor.Silver;
 
             void Line(string lineNumber, string lineText)
             {
                 AddText(new string(' ', 4 - lineNumber.Length));
-                Color = ForegroundColor.Gray;
+                Color = ByteColor.Silver;
                 AddText(lineNumber);
-                Color = ForegroundColor.Default;
+                Color = ByteColor.Silver;
                 AddSpace(5);
                 AddText(lineText);
             }
@@ -73,23 +75,23 @@ namespace ConsoleGUI
 
                 if (Lines[lineNumber].Length == 0)
                 {
-                    Line(lineNumberText, "");
+                    Line(lineNumberText, string.Empty);
                     goto Final;
                 }
 
-                int remaingSpace = Rect.Width - 7;
-                string remaingText = Lines[lineNumber];
-                while (remaingText.Length > 0)
+                int remainingSpace = Rect.Width - 7;
+                string remainingText = Lines[lineNumber];
+                while (remainingText.Length > 0)
                 {
-                    if (remaingText.Length > remaingSpace)
+                    if (remainingText.Length > remainingSpace)
                     {
-                        Line(lineNumberText, remaingText[..remaingSpace]);
-                        lineNumberText = "";
-                        remaingText = remaingText[remaingSpace..];
+                        Line(lineNumberText, remainingText[..remainingSpace]);
+                        lineNumberText = string.Empty;
+                        remainingText = remainingText[remainingSpace..];
                     }
                     else
                     {
-                        Line(lineNumberText, remaingText);
+                        Line(lineNumberText, remainingText);
                         break;
                     }
                 }
@@ -121,7 +123,7 @@ namespace ConsoleGUI
             }
         }
 
-        public override Character DrawContent(int X, int Y) => buf[X + (Y * Rect.Width)];
+        public override CharInfo DrawContent(int X, int Y) => buf[X + (Y * Rect.Width)];
 
         public override void OnMouseEvent(MouseEvent mouse)
         {

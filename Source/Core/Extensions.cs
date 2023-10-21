@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using LanguageCore.BBCode.Compiler;
 using LanguageCore.Runtime;
 using LanguageCore.Tokenizing;
@@ -37,9 +38,9 @@ namespace LanguageCore
         internal static bool TryGetAttribute<T0, T1, T2>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,
-            out T0 value0,
-            out T1 value1,
-            out T2 value2
+            [NotNullWhen(true)] out T0? value0,
+            [NotNullWhen(true)] out T1? value1,
+            [NotNullWhen(true)] out T2? value2
             )
         {
             value0 = default;
@@ -58,8 +59,8 @@ namespace LanguageCore
         internal static bool TryGetAttribute<T0, T1>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,
-            out T0 value0,
-            out T1 value1
+            [NotNullWhen(true)] out T0? value0,
+            [NotNullWhen(true)] out T1? value1
             )
         {
             value0 = default;
@@ -76,7 +77,7 @@ namespace LanguageCore
         internal static bool TryGetAttribute<T0>(
             this Dictionary<string, AttributeValues> attributes,
             string attributeName,
-            out T0 value0
+            [NotNullWhen(true)] out T0? value0
             )
         {
             value0 = default;
@@ -112,7 +113,7 @@ namespace LanguageCore
             if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
             if (values.parameters.Count != 1) return false;
 
-            if (!values.parameters[0].TryConvert(out T0 v0) ||
+            if (!values.parameters[0].TryConvert(out T0 ?v0) ||
                 !value0.Equals(v0))
             { return false; }
 
@@ -130,11 +131,11 @@ namespace LanguageCore
             if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
             if (values.parameters.Count != 2) return false;
 
-            if (!values.parameters[0].TryConvert(out T0 v0) ||
+            if (!values.parameters[0].TryConvert(out T0 ?v0) ||
                 !value0.Equals(v0))
             { return false; }
 
-            if (!values.parameters[1].TryConvert(out T1 v1) ||
+            if (!values.parameters[1].TryConvert(out T1 ?v1) ||
                 !value1.Equals(v1))
             { return false; }
 
@@ -154,15 +155,15 @@ namespace LanguageCore
             if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
             if (values.parameters.Count != 3) return false;
 
-            if (!values.parameters[0].TryConvert(out T0 v0) ||
+            if (!values.parameters[0].TryConvert(out T0? v0) ||
                 !value0.Equals(v0))
             { return false; }
 
-            if (!values.parameters[1].TryConvert(out T1 v1) ||
+            if (!values.parameters[1].TryConvert(out T1? v1) ||
                 !value1.Equals(v1))
             { return false; }
 
-            if (!values.parameters[2].TryConvert(out T2 v2) ||
+            if (!values.parameters[2].TryConvert(out T2? v2) ||
                 !value2.Equals(v2))
             { return false; }
 
@@ -171,7 +172,7 @@ namespace LanguageCore
 
         public static string Repeat(this string v, int count)
         {
-            string output = "";
+            string output = string.Empty;
             for (uint i = 0; i < count; i++)
             {
                 output += v;

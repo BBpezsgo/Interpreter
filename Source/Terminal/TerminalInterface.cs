@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 
 namespace LanguageCore
@@ -171,7 +172,7 @@ namespace LanguageCore.TerminalInterface
         int CurrentLineWidth = 0;
         bool ShouldClose = false;
 
-        bool TryGetSuggestion(out string suggestion)
+        bool TryGetSuggestion([NotNullWhen(true)] out string? suggestion)
         {
             suggestion = null;
             if (Input.Length == 0) return false;
@@ -214,7 +215,7 @@ namespace LanguageCore.TerminalInterface
                 return;
             }
 
-            string suggestion;
+            string? suggestion;
 
             ClearLastLine(CurrentLineWidth + 3);
 

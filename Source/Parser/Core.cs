@@ -273,7 +273,7 @@ namespace LanguageCore.Parser
                 Console.ForegroundColor = ConsoleColor.DarkGray;
                 Console.Write(")");
 
-                if (item.Statements.Length > 0)
+                if (item.Block != null && item.Block.Statements.Count > 0)
                 {
                     int statementCount = 0;
                     void AddStatement(Statement.Statement st)
@@ -331,7 +331,7 @@ namespace LanguageCore.Parser
                             }
                         }
                     }
-                    foreach (var st in item.Statements)
+                    foreach (var st in item.Block.Statements)
                     {
                         AddStatement(st);
                     }

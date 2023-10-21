@@ -21,7 +21,7 @@ namespace LanguageCore.Runtime
         public int ParameterCount => ParameterTypes.Length;
         public readonly bool ReturnSomething;
 
-        internal BytecodeInterpreter BytecodeInterpreter;
+        internal BytecodeInterpreter? BytecodeInterpreter;
 
         public readonly ExternalFunctionFlags Flags;
 
@@ -102,7 +102,7 @@ namespace LanguageCore.Runtime
     {
         public delegate void ReturnEvent(DataItem returnValue);
 
-        public ReturnEvent OnReturn;
+        public ReturnEvent? OnReturn;
         readonly Func<DataItem[], DataItem> callback;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
@@ -154,8 +154,8 @@ namespace LanguageCore.Runtime
             {
                 function = new((sender, parameters) =>
                 {
-                    object[] parameterValues = GetValues(parameters);
-                    object returnValue = method.Invoke(null, parameterValues);
+                    object?[] parameterValues = GetValues(parameters);
+                    object? returnValue = method.Invoke(null, parameterValues);
                     if (returnValue is null)
                     { return DataItem.Null; }
                     else
@@ -166,7 +166,7 @@ namespace LanguageCore.Runtime
             {
                 function = new((sender, parameters) =>
                 {
-                    object[] parameterValues = GetValues(parameters);
+                    object?[] parameterValues = GetValues(parameters);
                     method.Invoke(null, parameterValues);
                 }, method.Name, parameterTypes, ExternalFunctionBase.DefaultFlags);
             }
@@ -303,7 +303,7 @@ namespace LanguageCore.Runtime
             functions.AddExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
-                TResult result = callback.Invoke();
+                TResult result = callback.Invoke()!;
 
                 return DataItem.GetValue(result);
             });
@@ -317,7 +317,7 @@ namespace LanguageCore.Runtime
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
-                    GetValue<T0>(sender, args[0]));
+                    GetValue<T0>(sender, args[0]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -332,7 +332,7 @@ namespace LanguageCore.Runtime
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
-                    GetValue<T1>(sender, args[1]));
+                    GetValue<T1>(sender, args[1]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -348,7 +348,7 @@ namespace LanguageCore.Runtime
                 TResult result = callback.Invoke(
                     GetValue<T0>(sender, args[0]),
                     GetValue<T1>(sender, args[1]),
-                    GetValue<T2>(sender, args[2]));
+                    GetValue<T2>(sender, args[2]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -365,7 +365,7 @@ namespace LanguageCore.Runtime
                     GetValue<T0>(sender, args[0]),
                     GetValue<T1>(sender, args[1]),
                     GetValue<T2>(sender, args[2]),
-                    GetValue<T3>(sender, args[3]));
+                    GetValue<T3>(sender, args[3]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -383,7 +383,7 @@ namespace LanguageCore.Runtime
                     GetValue<T1>(sender, args[1]),
                     GetValue<T2>(sender, args[2]),
                     GetValue<T3>(sender, args[3]),
-                    GetValue<T4>(sender, args[4]));
+                    GetValue<T4>(sender, args[4]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -402,7 +402,7 @@ namespace LanguageCore.Runtime
                     GetValue<T2>(sender, args[2]),
                     GetValue<T3>(sender, args[3]),
                     GetValue<T4>(sender, args[4]),
-                    GetValue<T5>(sender, args[5]));
+                    GetValue<T5>(sender, args[5]))!;
 
                 return DataItem.GetValue(result);
             });
@@ -434,9 +434,9 @@ namespace LanguageCore.Runtime
             }
         }
 
-        internal static object[] GetValues(DataItem[] values)
+        internal static object?[] GetValues(DataItem[] values)
         {
-            object[] result = new object[values.Length];
+            object?[] result = new object?[values.Length];
             for (int i = 0; i < values.Length; i++)
             { result[i] = values[i].GetValue(); }
             return result;
@@ -465,7 +465,7 @@ namespace LanguageCore.Runtime
             { return (char)(data.Integer ?? 0); }
 
             if (type == typeof(string))
-            { return (string)bytecodeProcessor.Memory.Heap.GetStringByPointer(data.Integer.Value); }
+            { return (string)bytecodeProcessor.Memory.Heap.GetStringByPointer(data.Integer!.Value); }
 
             if (type == typeof(uint))
             { return (uint)(data.Integer ?? 0); }

@@ -1,23 +1,20 @@
-﻿
-#nullable enable
-
-namespace LanguageCore.Brainfuck
+﻿namespace LanguageCore.Brainfuck
 {
-    internal class Minifier
+    public class Minifier
     {
-        internal static string Minify(string code)
+        public static string Minify(string code)
         {
             string result = code;
             while (true)
             {
                 if (result.Contains("<>"))
-                { result = result.Replace("<>", ""); }
+                { result = result.Replace("<>", string.Empty); }
                 else if (result.Contains("><"))
-                { result = result.Replace("><", ""); }
+                { result = result.Replace("><", string.Empty); }
                 else if (result.Contains("+-"))
-                { result = result.Replace("+-", ""); }
+                { result = result.Replace("+-", string.Empty); }
                 else if (result.Contains("-+"))
-                { result = result.Replace("-+", ""); }
+                { result = result.Replace("-+", string.Empty); }
                 else if (result.Contains("[-][-]"))
                 { result = result.Replace("[-][-]", "[-]"); }
                 else if (result.Contains("][-]"))

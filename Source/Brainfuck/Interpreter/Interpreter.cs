@@ -10,8 +10,6 @@ using LanguageCore.Brainfuck.Renderer;
 using LanguageCore.Runtime;
 using Win32;
 
-#nullable enable
-
 namespace LanguageCore.Brainfuck
 {
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -99,7 +97,7 @@ namespace LanguageCore.Brainfuck
 
         string GetDebuggerDisplay()
         {
-            string result = "";
+            string result = string.Empty;
 
             for (int i = 0; i < Length; i++)
             {
@@ -149,7 +147,7 @@ namespace LanguageCore.Brainfuck
 
         public Interpreter(Uri url, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => new System.Net.Http.HttpClient().GetStringAsync(url).ContinueWith((code) => this.Code = ParseCode(code.Result)).Wait();
         public Interpreter(FileInfo file, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(File.ReadAllText(file.FullName), OnOutput, OnInput) { }
-        public Interpreter(string code, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => this.Code = ParseCode(code);
+        public Interpreter(string? code, Action<char>? OnOutput = null, Func<char>? OnInput = null) : this(OnOutput, OnInput) => this.Code = ParseCode(code ?? throw new ArgumentNullException(nameof(code)));
         public Interpreter(Action<char>? OnOutput = null, Func<char>? OnInput = null)
         {
             this.OnOutput = OnOutput ?? OnDefaultOutput;
@@ -163,7 +161,7 @@ namespace LanguageCore.Brainfuck
 
         static char[] ParseCode(string code)
         {
-            List<char> Code = new();
+            List<char> Code = new(code.Length);
             for (int i = 0; i < code.Length; i++)
             {
                 if (!Utils.CodeCharacters.Contains(code[i]))
@@ -288,7 +286,7 @@ namespace LanguageCore.Brainfuck
             Win32.Utilities.ConsoleListener.Start();
 
             Queue<char> inputBuffer = new();
-            string outputBuffer = "";
+            string outputBuffer = string.Empty;
 
             Win32.Utilities.ConsoleListener.KeyEvent += (e) =>
             {

@@ -1,5 +1,4 @@
-﻿#nullable enable
-#pragma warning disable IDE0059 // Unnecessary assignment of a value
+﻿#pragma warning disable IDE0059 // Unnecessary assignment of a value
 
 namespace LanguageCore.Brainfuck
 {

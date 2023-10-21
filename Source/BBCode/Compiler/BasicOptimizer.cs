@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
@@ -8,9 +7,16 @@ namespace LanguageCore.BBCode.Compiler
 
     internal class BasicOptimizer
     {
-        List<Instruction> GeneratedCode;
-        IFunctionThing[] FunctionThings;
-        PrintCallback PrintCallback;
+        readonly List<Instruction> GeneratedCode;
+        readonly IFunctionThing[] FunctionThings;
+        readonly PrintCallback? PrintCallback;
+
+        public BasicOptimizer(List<Instruction> generatedCode, IFunctionThing[] functionThings, PrintCallback? printCallback)
+        {
+            GeneratedCode = generatedCode;
+            FunctionThings = functionThings;
+            PrintCallback = printCallback;
+        }
 
         int RemoveInstruction(int index)
         {
@@ -61,22 +67,13 @@ namespace LanguageCore.BBCode.Compiler
 
             }
 
-            PrintCallback?.Invoke($"Optimalization: Removed {removedInstructions} instructions", LogType.Debug);
+            PrintCallback?.Invoke($"Optimization: Removed {removedInstructions} instructions", LogType.Debug);
         }
 
         internal static void Optimize(
             List<Instruction> code,
             IFunctionThing[] functionThings,
-            PrintCallback printCallback = null
-            )
-        {
-            BasicOptimizer basicOptimizer = new()
-            {
-                GeneratedCode = code,
-                FunctionThings = functionThings,
-                PrintCallback = printCallback,
-            };
-            basicOptimizer.Optimize();
-        }
+            PrintCallback? printCallback = null
+            ) => new BasicOptimizer(code, functionThings, printCallback).Optimize();
     }
 }

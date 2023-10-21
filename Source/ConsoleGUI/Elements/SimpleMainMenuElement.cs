@@ -7,7 +7,7 @@
         int Scroll;
 
         bool VersionDownloadDone;
-        string VersionDownloadState;
+        string? VersionDownloadState;
 
         public SimpleMainMenuElement() : base()
         {
@@ -38,8 +38,8 @@
         {
             base.BeforeDraw();
 
-            ForegroundColor ForegroundColor;
-            BackgroundColor BackgroundColor;
+            byte foregroundColor;
+            byte backgroundColor;
 
             int BufferIndex = 0;
 
@@ -47,10 +47,10 @@
             {
                 if (BufferIndex >= DrawBuffer.Length) return false;
 
-                DrawBuffer[BufferIndex] = new Character()
+                DrawBuffer[BufferIndex] = new CharInfo()
                 {
-                    ForegroundColor = ForegroundColor,
-                    BackgroundColor = BackgroundColor,
+                    Foreground = foregroundColor,
+                    Background = backgroundColor,
                     Char = data,
                 };
 
@@ -59,8 +59,9 @@
 
                 return true;
             }
-            void AddText(string text)
+            void AddText(string? text)
             {
+                if (text == null) return;
                 for (int i = 0; i < text.Length; i++)
                 {
                     if (!AddChar(text[i])) break;
@@ -80,8 +81,8 @@
                 AddChar(' ');
             }
 
-            ForegroundColor = ForegroundColor.Default;
-            BackgroundColor = BackgroundColor.Black;
+            foregroundColor = ByteColor.Silver;
+            backgroundColor = ByteColor.Black;
 
             AddText(" Current Version: ");
             AddText(TheProgram.Version.Current);
@@ -95,7 +96,7 @@
 
                 if (TheProgram.Version.HasNewVersion())
                 {
-                    AddText(" New version avaliable");
+                    AddText(" New version available");
                 }
                 else
                 {

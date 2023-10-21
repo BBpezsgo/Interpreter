@@ -72,11 +72,11 @@ namespace LanguageCore.Runtime
 
         // Tick Sleeping
         int SleepTickCounter;
-        Action SleepTickCallback;
+        Action? SleepTickCallback;
 
         // Time Sleeping
         double SleepTimeCounter;
-        Action SleepTimeCallback;
+        Action? SleepTimeCallback;
 
         // Safety
         int LastInstructionPointer = -1;
@@ -92,7 +92,7 @@ namespace LanguageCore.Runtime
 
         #region Public Methods
 
-        public void SleepTicks(int ticks, Action callback)
+        public void SleepTicks(int ticks, Action? callback)
         {
             SleepTickCounter = ticks;
             SleepTickCallback = callback;
@@ -101,7 +101,7 @@ namespace LanguageCore.Runtime
             SleepTimeCallback = null;
         }
 
-        public void SleepTime(double seconds, Action callback)
+        public void SleepTime(double seconds, Action? callback)
         {
             SleepTimeCounter = DateTime.UtcNow.TimeOfDay.TotalSeconds + seconds;
             SleepTimeCallback = callback;

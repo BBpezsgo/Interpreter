@@ -1,33 +1,57 @@
-﻿
-#nullable enable
-
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Text;
 using TheProgram.Brainfuck;
 
 namespace LanguageCore.Brainfuck
 {
-    readonly struct AutoPrintCodeString
+    public readonly struct AutoPrintCodeString
     {
-        readonly string v;
+        readonly StringBuilder v;
 
-        public AutoPrintCodeString(string v)
+        AutoPrintCodeString(StringBuilder v)
         {
             this.v = v;
         }
 
-        public static implicit operator string(AutoPrintCodeString v) => v.v;
-        public static implicit operator AutoPrintCodeString(string v) => new(v);
+        public static implicit operator StringBuilder(AutoPrintCodeString v) => v.v;
+        public static implicit operator AutoPrintCodeString(StringBuilder v) => new(v);
 
+        public static AutoPrintCodeString operator +(AutoPrintCodeString a, char b)
+        {
+            a.v.Append(b);
+            ProgramUtils.PrintCodeChar(b);
+            return a;
+        }
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, string b)
         {
-            string newString = a.v + b;
+            a.v.Append(b);
             ProgramUtils.PrintCode(b);
-            return new AutoPrintCodeString(newString);
+            return a;
         }
-        public static AutoPrintCodeString operator +(AutoPrintCodeString a, char b) => a + b.ToString();
-        public static AutoPrintCodeString operator +(AutoPrintCodeString a, AutoPrintCodeString b) => a + b.v;
+        public static AutoPrintCodeString operator +(AutoPrintCodeString a, AutoPrintCodeString b)
+        {
+            a.v.Append(b.v);
+            return a;
+        }
+
+        public void Append(string value)
+        {
+            this.v.Append(value);
+            ProgramUtils.PrintCode(value);
+        }
+
+        public void Append(char value)
+        {
+            this.v.Append(value);
+            ProgramUtils.PrintCodeChar(value);
+        }
+
+        public void Append(char value, int repeatCount)
+        {
+            this.v.Append(value, repeatCount);
+            ProgramUtils.PrintCode(new string(value, repeatCount));
+        }
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -1349,21 +1373,21 @@ namespace LanguageCore.Brainfuck
         public void Allocate(int resultAddress, int requiredSizeAddress, int tempAddressesStart)
         {
             /*
-	            int result = Alloc();
-	            int i = size;
-	            while (i) {
-		            i--;
+                int result = Alloc();
+                int i = size;
+                while (i) {
+                    i--;
 
-		            int result2 = Alloc(result);
+                    int result2 = Alloc(result);
                     int tempAddress3 = (result2 - 1 != result);
-		            if (tempAddress3) {
-			            Free(result);
-			            Free(result2);
-			            result = result2;
-			            i = size;
-		            }
-	            };
-	            return result;
+                    if (tempAddress3) {
+                        Free(result);
+                        Free(result2);
+                        result = result2;
+                        i = size;
+                    }
+                };
+                return result;
              */
 
             int intermediateResultAddress = tempAddressesStart + 1;

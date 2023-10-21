@@ -6,8 +6,6 @@ using LanguageCore;
 using LanguageCore.Brainfuck;
 using LanguageCore.Brainfuck.Compiler;
 
-#nullable enable
-
 namespace TheProgram.Brainfuck
 {
     public enum RunKind : int
@@ -336,7 +334,7 @@ namespace TheProgram.Brainfuck
             { return null; }
             string line = lines[position.Start.Line - 1];
 
-            string result = "";
+            string result = string.Empty;
 
             result += line.Replace('\t', ' ');
             result += "\r\n";

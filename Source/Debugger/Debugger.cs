@@ -5,6 +5,8 @@ using LanguageCore;
 using LanguageCore.BBCode.Compiler;
 using LanguageCore.Runtime;
 
+#nullable disable
+
 namespace TheProgram
 {
     internal class Debugger

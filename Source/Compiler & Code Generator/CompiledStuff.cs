@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 using LanguageCore.Runtime;
@@ -29,7 +28,7 @@ namespace LanguageCore.BBCode.Compiler
         public List<Literal> parameters;
         public Token Identifier;
 
-        public readonly bool TryGetValue<T>(int index, out T value)
+        public readonly bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)
         {
             value = default;
             if (parameters == null) return false;
@@ -41,7 +40,7 @@ namespace LanguageCore.BBCode.Compiler
                 Literal.Type.Float => (T)(object)parameters[index].ValueFloat,
                 Literal.Type.String => (T)(object)parameters[index].ValueString,
                 Literal.Type.Boolean => (T)(object)parameters[index].ValueBool,
-                _ => default,
+                _ => throw new ImpossibleException(),
             };
             return true;
         }
@@ -177,7 +176,7 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        public readonly bool TryConvert<T>(out T value)
+        public readonly bool TryConvert<T>([NotNullWhen(true)] out T? value)
         {
             if (!Utils.TryConvertType(typeof(T), out Type type))
             {
@@ -197,7 +196,7 @@ namespace LanguageCore.BBCode.Compiler
                 Type.Float => (T)(object)ValueFloat,
                 Type.String => (T)(object)ValueString,
                 Type.Boolean => (T)(object)ValueBool,
-                _ => default,
+                _ => throw new ImpossibleException(),
             };
             return true;
         }
@@ -228,19 +227,28 @@ namespace LanguageCore.BBCode.Compiler
     public class CompiledEnumMember : EnumMemberDefinition, IHaveKey<string>
     {
         public new DataItem Value;
+
+        public CompiledEnumMember(EnumMemberDefinition definition) : base(definition.Identifier, definition.Value)
+        { }
     }
 
     public class CompiledEnum : EnumDefinition, ITypeDefinition, IHaveKey<string>
     {
         public new CompiledEnumMember[] Members;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public CompiledEnum(EnumDefinition definition) : base(definition.Identifier, definition.Attributes, definition.Members)
+        {
+            Members = Array.Empty<CompiledEnumMember>();
+            CompiledAttributes = new Dictionary<string, AttributeValues>();
+        }
     }
 
     public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>
     {
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
-        public List<DefinitionReference> References = null;
+        public readonly List<DefinitionReference> References;
         internal IReadOnlyDictionary<string, int> FieldOffsets
         {
             get
@@ -269,15 +277,17 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
+        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
 
             base.FilePath = definition.FilePath;
-            base.BracketEnd = definition.BracketEnd;
-            base.BracketStart = definition.BracketStart;
-            base.Statements = definition.Statements;
+
+            base.Statements.Clear();
+            base.Statements.AddRange(definition.Statements);
+
+            this.References = new List<DefinitionReference>();
         }
     }
 
@@ -285,7 +295,7 @@ namespace LanguageCore.BBCode.Compiler
     {
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
-        public List<DefinitionReference> References = null;
+        public readonly List<DefinitionReference> References;
         readonly Dictionary<string, CompiledType> currentTypeArguments;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
 
@@ -349,7 +359,7 @@ namespace LanguageCore.BBCode.Compiler
 
             for (int i = 0; i < typeParameterNames.Length; i++)
             {
-                if (!typeParameters.TryGetValue(typeParameterNames[i], out CompiledType typeParameterValue))
+                if (!typeParameters.TryGetValue(typeParameterNames[i], out CompiledType? typeParameterValue))
                 { continue; }
                 currentTypeArguments[typeParameterNames[i]] = new CompiledType(typeParameterValue);
             }
@@ -360,7 +370,7 @@ namespace LanguageCore.BBCode.Compiler
         CompiledType GetType(CompiledType type, IThingWithPosition position)
         {
             if (!type.IsGeneric) return type;
-            if (!currentTypeArguments.TryGetValue(type.Name, out CompiledType result))
+            if (!currentTypeArguments.TryGetValue(type.Name, out CompiledType? result))
             { throw new CompilerException($"Type argument \"{type.Name}\" not found", position, FilePath); }
             return result;
         }
@@ -370,7 +380,7 @@ namespace LanguageCore.BBCode.Compiler
 
         };
 
-        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
+        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -378,9 +388,10 @@ namespace LanguageCore.BBCode.Compiler
             this.currentTypeArguments = new Dictionary<string, CompiledType>();
 
             base.FilePath = definition.FilePath;
-            base.BracketEnd = definition.BracketEnd;
-            base.BracketStart = definition.BracketStart;
-            base.Statements = definition.Statements;
+            base.Statements.Clear();
+            base.Statements.AddRange(definition.Statements);
+
+            this.References = new List<DefinitionReference>();
         }
 
         public bool TryGetTypeArgumentIndex(string typeArgumentName, out int index)
@@ -444,15 +455,11 @@ namespace LanguageCore.BBCode.Compiler
         public int RealIndex => -(currentParamsSize + 1 + CodeGenerator.TagsBeforeBasePointer);
         public bool IsRef => Modifiers.Contains("ref");
 
-        public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition)
+        public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition) : base(definition.Modifiers, definition.Type, definition.Identifier)
         {
             this.Index = index;
             this.currentParamsSize = currentParamsSize;
             this.Type = type;
-            this.Modifiers = definition.Modifiers;
-
-            base.Identifier = definition.Identifier;
-            base.Modifiers = definition.Modifiers;
         }
 
         public CompiledParameter(CompiledType type, ParameterDefinition definition)
@@ -479,11 +486,10 @@ namespace LanguageCore.BBCode.Compiler
         }
         public CompiledClass Class;
 
-        public CompiledField(FieldDefinition definition) : base()
+        public CompiledField(CompiledType type, CompiledClass context, FieldDefinition definition) : base(definition.Identifier, definition.Type, definition.ProtectionToken)
         {
-            base.Identifier = definition.Identifier;
-            base.Type = definition.Type;
-            base.ProtectionToken = definition.ProtectionToken;
+            Type = type;
+            Class = context;
         }
     }
 
@@ -515,36 +521,21 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         public bool IsExternal => CompiledAttributes.ContainsKey("External");
-        public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string name) ? name : string.Empty;
+        public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
 
         public string Key => this.ID();
 
-        public CompiledClass Context { get; set; }
+        public CompiledClass? Context { get; set; }
 
-        public CompiledOperator(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
-        {
-            this.Type = type;
-
-            base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
-            base.FilePath = functionDefinition.FilePath;
-        }
-        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
 
             base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
+            base.Block = functionDefinition.Block;
             base.FilePath = functionDefinition.FilePath;
         }
 
@@ -577,31 +568,28 @@ namespace LanguageCore.BBCode.Compiler
             return IsSame(other2);
         }
 
-        CompiledOperator IDuplicatable<CompiledOperator>.Duplicate() => new(this.Type, this)
+        CompiledOperator IDuplicatable<CompiledOperator>.Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
             CompiledAttributes = this.CompiledAttributes,
             Modifiers = this.Modifiers,
-            ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
         };
         public CompiledOperatorTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
         {
-            CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this)
+            CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
                 CompiledAttributes = this.CompiledAttributes,
                 Modifiers = this.Modifiers,
-                ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
                 TimesUsed = TimesUsed,
                 TimesUsedTotal = TimesUsedTotal,
-                Template = this,
             };
 
             Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
                 { throw new NotImplementedException(); }
                 result.Type = typeParameter;
             }
@@ -612,7 +600,7 @@ namespace LanguageCore.BBCode.Compiler
 
     public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicatable<CompiledFunction>
     {
-        public CompiledType[] ParameterTypes;
+        public readonly CompiledType[] ParameterTypes;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -657,32 +645,17 @@ namespace LanguageCore.BBCode.Compiler
 
         public string Key => this.ID();
 
-        public CompiledClass Context { get; set; }
+        public CompiledClass? Context { get; set; }
 
-        public CompiledFunction(CompiledType type, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
-        {
-            this.Type = type;
-
-            base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
-            base.FilePath = functionDefinition.FilePath;
-        }
-        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.TemplateInfo)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
 
             base.Attributes = functionDefinition.Attributes;
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.Type = functionDefinition.Type;
+            base.Block = functionDefinition.Block;
             base.FilePath = functionDefinition.FilePath;
         }
 
@@ -708,19 +681,18 @@ namespace LanguageCore.BBCode.Compiler
             return IsSame(other2);
         }
 
-        public CompiledFunction Duplicate() => new(this.Type, this)
+        public CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
             CompiledAttributes = this.CompiledAttributes,
             Context = this.Context,
             Modifiers = this.Modifiers,
-            ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
         };
 
         public override string ToString()
         {
-            string result = "";
+            string result = string.Empty;
             if (IsExport)
             {
                 result += "export ";
@@ -741,34 +713,27 @@ namespace LanguageCore.BBCode.Compiler
             }
             result += ')';
 
-            result += ' ';
-
-            result += '{';
-            if (this.Statements.Length > 0)
-            { result += "..."; }
-            result += '}';
+            result += Block?.ToString() ?? ";";
 
             return result;
         }
 
         public CompiledFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
         {
-            CompiledFunctionTemplateInstance result = new(Type, this)
+            CompiledFunctionTemplateInstance result = new(Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this, this)
             {
                 CompiledAttributes = this.CompiledAttributes,
                 Context = this.Context,
                 Modifiers = this.Modifiers,
-                ParameterTypes = new List<CompiledType>(this.ParameterTypes).ToArray(),
                 TimesUsed = TimesUsed,
                 TimesUsedTotal = TimesUsedTotal,
-                Template = this,
             };
 
             Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
                 { throw new NotImplementedException(); }
                 result.Type = typeParameter;
             }
@@ -795,7 +760,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             get
             {
-                if (TemplateInfo != null) return true;
+                if (TemplateInfo is not null) return true;
                 if (context != null && context.TemplateInfo != null) return true;
                 return false;
             }
@@ -803,32 +768,21 @@ namespace LanguageCore.BBCode.Compiler
 
         public CompiledType Type;
 
-        CompiledClass context;
-        public CompiledClass Context
+        CompiledClass? context;
+        public CompiledClass? Context
         {
             get => context;
             set => context = value;
         }
 
-        public CompiledGeneralFunction(CompiledType type, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
-        {
-            this.Type = type;
-
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
-            base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
-            base.FilePath = functionDefinition.FilePath;
-        }
         public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
 
-            base.BracketEnd = functionDefinition.BracketEnd;
-            base.BracketStart = functionDefinition.BracketStart;
             base.Parameters = functionDefinition.Parameters;
-            base.Statements = functionDefinition.Statements;
+            base.Block = functionDefinition.Block;
+
             base.FilePath = functionDefinition.FilePath;
         }
 
@@ -872,7 +826,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public override string ToString()
         {
-            string result = "";
+            string result = string.Empty;
             if (IsExport)
             {
                 result += "export ";
@@ -890,31 +844,25 @@ namespace LanguageCore.BBCode.Compiler
             }
             result += ')';
 
-            result += ' ';
-
-            result += '{';
-            if (this.Statements.Length > 0)
-            { result += "..."; }
-            result += '}';
+            result += Block?.ToString() ?? ";";
 
             return result;
         }
 
         public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
         {
-            CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this)
+            CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
                 Modifiers = this.Modifiers,
                 TimesUsed = this.TimesUsed,
                 TimesUsedTotal = this.TimesUsedTotal,
-                Template = this,
             };
 
             Utils.SetTypeParameters(result.ParameterTypes, typeParameters);
 
             if (result.Type.IsGeneric)
             {
-                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType typeParameter))
+                if (!typeParameters.TryGetValue(result.Type.Name, out CompiledType? typeParameter))
                 { throw new NotImplementedException(); }
                 result.Type = typeParameter;
             }
@@ -925,41 +873,35 @@ namespace LanguageCore.BBCode.Compiler
 
     public class CompiledFunctionTemplateInstance : CompiledFunction
     {
-        public CompiledFunction Template;
+        public readonly CompiledFunction Template;
 
-        public CompiledFunctionTemplateInstance(CompiledType type, FunctionDefinition functionDefinition)
-            : base(type, functionDefinition)
-        { }
-
-        public CompiledFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition)
+        public CompiledFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledFunction template, FunctionDefinition functionDefinition)
             : base(type, parameterTypes, functionDefinition)
-        { }
+        {
+            Template = template;
+        }
     }
 
     public class CompiledGeneralFunctionTemplateInstance : CompiledGeneralFunction
     {
-        public CompiledGeneralFunction Template;
+        public readonly CompiledGeneralFunction Template;
 
-        public CompiledGeneralFunctionTemplateInstance(CompiledType type, GeneralFunctionDefinition functionDefinition)
-            : base(type, functionDefinition)
-        { }
-
-        public CompiledGeneralFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition)
+        public CompiledGeneralFunctionTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledGeneralFunction template, GeneralFunctionDefinition functionDefinition)
             : base(type, parameterTypes, functionDefinition)
-        { }
+        {
+            Template = template;
+        }
     }
 
     public class CompiledOperatorTemplateInstance : CompiledOperator
     {
-        public CompiledOperator Template;
+        public readonly CompiledOperator Template;
 
-        public CompiledOperatorTemplateInstance(CompiledType type, FunctionDefinition functionDefinition)
-            : base(type, functionDefinition)
-        { }
-
-        public CompiledOperatorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition)
+        public CompiledOperatorTemplateInstance(CompiledType type, CompiledType[] parameterTypes, CompiledOperator template, FunctionDefinition functionDefinition)
             : base(type, parameterTypes, functionDefinition)
-        { }
+        {
+            Template = template;
+        }
     }
 
 }

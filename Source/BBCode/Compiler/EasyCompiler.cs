@@ -11,8 +11,8 @@ namespace LanguageCore.BBCode
 
     public class EasyCompiler
     {
-        Dictionary<string, ExternalFunctionBase> externalFunctions;
-        string BasePath;
+        Dictionary<string, ExternalFunctionBase>? externalFunctions;
+        string? BasePath;
         TokenizerSettings tokenizerSettings;
         ParserSettings parserSettings;
         Compiler.Compiler.CompilerSettings compilerSettings;
@@ -27,7 +27,7 @@ namespace LanguageCore.BBCode
 
         Result Compile_(
             FileInfo file,
-            PrintCallback printCallback
+            PrintCallback? printCallback
             )
         {
             string sourceCode = File.ReadAllText(file.FullName);
@@ -70,11 +70,11 @@ namespace LanguageCore.BBCode
             {
                 compilerResult = Compiler.Compiler.Compile(
                     parserResult,
-                    this.externalFunctions,
+                    this.externalFunctions ?? new Dictionary<string, ExternalFunctionBase>(),
                     file,
                     ParserSettings.Default,
                     printCallback,
-                    this.BasePath ?? "");
+                    this.BasePath);
 
                 foreach (Warning warning in compilerResult.Warnings)
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
@@ -133,8 +133,8 @@ namespace LanguageCore.BBCode
             ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
             bool handleErrors,
-            PrintCallback printCallback = null,
-            string basePath = "")
+            PrintCallback? printCallback = null,
+            string? basePath = null)
         {
             try
             {
@@ -160,7 +160,7 @@ namespace LanguageCore.BBCode
 
                 if (!handleErrors) throw;
             }
-            catch (System.Exception error)
+            catch (Exception error)
             {
                 printCallback?.Invoke(error.ToString(), LogType.Error);
                 Debug.LogError(error);
@@ -177,19 +177,15 @@ namespace LanguageCore.BBCode
             TokenizerSettings tokenizerSettings,
             ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
-            PrintCallback printCallback = null,
-            string basePath = ""
-            )
+            PrintCallback? printCallback = null,
+            string? basePath = null
+            ) => new EasyCompiler()
         {
-            EasyCompiler easyCompiler = new()
-            {
-                externalFunctions = externalFunctions,
-                BasePath = basePath,
-                tokenizerSettings = tokenizerSettings,
-                parserSettings = parserSettings,
-                compilerSettings = compilerSettings,
-            };
-            return easyCompiler.Compile_(file, printCallback);
-        }
+            externalFunctions = externalFunctions,
+            BasePath = basePath,
+            tokenizerSettings = tokenizerSettings,
+            parserSettings = parserSettings,
+            compilerSettings = compilerSettings,
+        }.Compile_(file, printCallback);
     }
 }

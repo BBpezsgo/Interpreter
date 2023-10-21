@@ -7,23 +7,23 @@ namespace ConsoleGUI
 {
     public class DrawBuffer
     {
-        readonly Character[] v;
+        readonly CharInfo[] v;
 
         int currentIndex;
         readonly int Width;
         readonly int Height;
-        BackgroundColor currentBgColor;
-        ForegroundColor currentFgColor;
+        byte currentBgColor;
+        byte currentFgColor;
 
         public DrawBuffer()
         {
-            this.v = System.Array.Empty<Character>();
+            this.v = Array.Empty<CharInfo>();
             this.currentIndex = 0;
         }
 
         public DrawBuffer(int width, int height)
         {
-            this.v = new Character[System.Math.Max(width * height, 0)];
+            this.v = new CharInfo[Math.Max(width * height, 0)];
             this.currentIndex = 0;
             this.Width = width;
             this.Height = height;
@@ -31,13 +31,13 @@ namespace ConsoleGUI
 
         public int Length => v.Length;
 
-        public Character this[int index]
+        public CharInfo this[int index]
         {
             get => v[index];
             set => v[index] = value;
         }
 
-        public Character this[int x, int y]
+        public CharInfo this[int x, int y]
         {
             get => this[x + (y * Width)];
             set => this[x + (y * Width)] = value;
@@ -101,7 +101,7 @@ namespace ConsoleGUI
             return newPoints.ToArray();
         }
 
-        public void DrawLine((int x, int y)[] points, BackgroundColor color)
+        public void DrawLine((int x, int y)[] points, byte color)
         {
             if (points.Length == 0) return;
 
@@ -109,7 +109,7 @@ namespace ConsoleGUI
 
             if (points.Length == 1)
             {
-                this[points[0].x, points[0].y] = Character.Solid(color);
+                this[points[0].x, points[0].y] = Brush.Solid(color);
                 return;
             }
 
@@ -124,7 +124,8 @@ namespace ConsoleGUI
                 for (int x = prevPoint.x; x <= point.x; x++)
                 {
                     for (int y = prevPoint.y; y <= point.y; y++)
-                    {;
+                    {
+                        ;
                         /*
                         char c = '█'
                         if (i + 1 < points.Length)
@@ -138,14 +139,14 @@ namespace ConsoleGUI
                         }
                         */
 
-                        this[x, y] = Character.Solid(color);
+                        this[x, y] = Brush.Solid(color);
                     }
                 }
             }
         }
-        public void DrawLine((int, int) p1, (int, int) p2, BackgroundColor color)
+        public void DrawLine((int, int) p1, (int, int) p2, byte color)
             => DrawLine(p1.Item1, p1.Item2, p2.Item1, p2.Item2, color);
-        public void DrawLine(int x1, int y1, int x2, int y2, BackgroundColor color)
+        public void DrawLine(int x1, int y1, int x2, int y2, byte color)
         {
             (int, int)? prev = (x1, y1);
             for (int x = x1; x <= x2; x++)
@@ -159,10 +160,10 @@ namespace ConsoleGUI
                         int dy = y - prev.Value.Item2;
                         for (int segment = 0; segment < LineSegments.Length; segment++)
                         {
-                            if (LineSegments[segment].Item1 == dx &&
-                                LineSegments[segment].Item2 == dy)
+                            if (LineSegments[segment].x == dx &&
+                                LineSegments[segment].y == dy)
                             {
-                                c = LineSegments[segment].Item3;
+                                c = LineSegments[segment].character;
                                 break;
                             }
                         }
@@ -173,7 +174,7 @@ namespace ConsoleGUI
                         }
                     }
 
-                    this[x, y] = new Character(c, color.ToForeground(), color);
+                    this[x, y] = new CharInfo(c, color, ByteColor.Black);
 
                     prev = (x, y);
                 }
@@ -190,12 +191,12 @@ namespace ConsoleGUI
 
         public int CurrentIndex => currentIndex;
 
-        public ForegroundColor ForegroundColor
+        public byte ForegroundColor
         {
             get => currentFgColor;
             set => currentFgColor = value;
         }
-        public BackgroundColor BackgroundColor
+        public byte BackgroundColor
         {
             get => currentBgColor;
             set => currentBgColor = value;
@@ -203,8 +204,8 @@ namespace ConsoleGUI
 
         public void ResetColor()
         {
-            this.ForegroundColor = ForegroundColor.Default;
-            this.BackgroundColor = BackgroundColor.Black;
+            this.ForegroundColor = ByteColor.Silver;
+            this.BackgroundColor = ByteColor.Black;
         }
 
         short CurrentColor
@@ -217,9 +218,7 @@ namespace ConsoleGUI
             if (currentIndex >= this.v.Length) return false;
             if (currentIndex < 0) return false;
 
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].ForegroundColor = currentFgColor;
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].BackgroundColor = currentBgColor;
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
+            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new CharInfo(v, currentFgColor, currentBgColor);
 
             currentIndex++;
             if (currentIndex >= this.v.Length) return false;
@@ -232,8 +231,8 @@ namespace ConsoleGUI
             if (i >= this.v.Length) return false;
             if (i < 0) return false;
 
-            this.v[i].ForegroundColor = currentFgColor;
-            this.v[i].BackgroundColor = currentBgColor;
+            this.v[i].Foreground = currentFgColor;
+            this.v[i].Background = currentBgColor;
             this.v[i].Char = v;
 
             return true;
@@ -244,13 +243,11 @@ namespace ConsoleGUI
             { if (!this.SetChar(v[i], i + from)) break; }
         }
 
-        public bool AddChar(char v, ForegroundColor fg, BackgroundColor bg)
+        public bool AddChar(char v, byte fg, byte bg)
         {
             if (currentIndex >= this.v.Length) return false;
 
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].ForegroundColor = fg;
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].BackgroundColor = bg;
-            this.v[System.Math.Clamp(currentIndex, 0, this.v.Length - 1)].Char = v;
+            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new CharInfo(v, fg, bg);
 
             currentIndex++;
             if (currentIndex >= this.v.Length) return false;
@@ -277,13 +274,13 @@ namespace ConsoleGUI
             this.AddChar(' ');
         }
 
-        public void Fill(BackgroundColor color)
+        public void Fill(byte color)
         {
             for (int i = 0; i < this.v.Length; i++)
             {
                 this.v[i].Char = ' ';
-                this.v[i].ForegroundColor = color.ToForeground();
-                this.v[i].BackgroundColor = color;
+                this.v[i].Foreground = color;
+                this.v[i].Background = color;
             }
             this.currentIndex = this.v.Length;
         }
@@ -313,7 +310,7 @@ namespace ConsoleGUI
 
     public interface IElementWithTitle
     {
-        public string Title { get; }
+        public string? Title { get; }
     }
 
     public interface IElement : IMainThreadThing
@@ -321,7 +318,7 @@ namespace ConsoleGUI
         Rectangle Rect { get; set; }
         void RefreshSize();
         void BeforeDraw();
-        Character DrawContent(int x, int y);
+        CharInfo DrawContent(int x, int y);
     }
 
     public interface IBorderedElement : IElement
@@ -371,7 +368,7 @@ namespace ConsoleGUI
 
     public static class Extensions
     {
-        public static Character DrawBorder(this IElement element, int x, int y)
+        public static CharInfo DrawBorder(this IElement element, int x, int y)
         {
             if (!element.Contains(x, y)) return ConsoleGUI.NullCharacter;
             Side side = element.Rect.GetSide(x, y);
@@ -434,7 +431,7 @@ namespace ConsoleGUI
             }
         }
 
-        public static Character DrawContentWithBorders(this IElement element, int x, int y)
+        public static CharInfo DrawContentWithBorders(this IElement element, int x, int y)
         {
             if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
             {
@@ -450,7 +447,7 @@ namespace ConsoleGUI
             return element.DrawContent(x, y);
         }
 
-        public static Character? DrawContent(this IElement[] elements, int x, int y)
+        public static CharInfo? DrawContent(this IElement[] elements, int x, int y)
         {
             for (int i = 0; i < elements.Length; i++)
             {
@@ -478,8 +475,8 @@ namespace ConsoleGUI
         public static T? Clamp<T>(this T[] v, int i) where T : struct => v.IsOutside(i) ? null : v[i];
 
         public static bool IsOutside(this DrawBuffer v, int i) => (i < 0) || (i >= v.Length);
-        public static Character Clamp(this DrawBuffer v, int i, Character @default) => v.IsOutside(i) ? @default : v[i];
-        public static Character? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
+        public static CharInfo Clamp(this DrawBuffer v, int i, CharInfo @default) => v.IsOutside(i) ? @default : v[i];
+        public static CharInfo? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
         internal static Side GetSide(this System.Drawing.Rectangle v, int x, int y)
         {
@@ -518,12 +515,7 @@ namespace ConsoleGUI
             return Side.None;
         }
 
-        internal static Character Details(this char v) => new()
-        {
-            Char = v,
-            ForegroundColor = ForegroundColor.Default,
-            BackgroundColor = BackgroundColor.Black,
-        };
+        internal static CharInfo Details(this char v) => new(v, ByteColor.Silver, ByteColor.Black);
     }
 
     internal static class Utils

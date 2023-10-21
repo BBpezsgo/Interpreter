@@ -5,6 +5,7 @@ using System.Text;
 
 namespace LanguageCore.BBCode.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using LanguageCore.Runtime;
     using Parser;
     using Parser.Statement;
@@ -172,15 +173,15 @@ namespace LanguageCore.BBCode.Compiler
             AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.RUNTIME);
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (GetVariable(symbolName, out CompiledVariable variable))
+            if (GetVariable(symbolName, out CompiledVariable? variable))
             {
                 type = variable.Type;
                 return true;
             }
 
-            if (GetParameter(symbolName, out CompiledParameter parameter))
+            if (GetParameter(symbolName, out CompiledParameter? parameter))
             {
                 type = parameter.Type;
                 return true;
@@ -190,10 +191,10 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
             => CompiledVariables.TryGetValue(variableName, out compiledVariable);
 
-        bool GetParameter(string parameterName, out CompiledParameter parameter)
+        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
             => CompiledParameters.TryGetValue(parameterName, out parameter);
 
         /// <exception cref="NotImplementedException"></exception>
@@ -282,7 +283,7 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(CompiledType type, Action<int> afterValue, string tag = "")
+        int GenerateInitialValue(CompiledType type, Action<int> afterValue)
         {
             if (type.IsStruct)
             {
@@ -499,12 +500,12 @@ namespace LanguageCore.BBCode.Compiler
             if (GetConstant(variable.Content, out _))
             { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
-            if (GetParameter(variable.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter? param))
             {
                 return GetBaseAddress(param);
             }
 
-            if (GetVariable(variable.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable? val))
             {
                 return new ValueAddress(val);
             }
@@ -521,7 +522,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         ValueAddress GetDataAddress(IndexCall indexCall)
         {
-            ValueAddress address = GetBaseAddress(indexCall.PrevStatement);
+            ValueAddress address = GetBaseAddress(indexCall.PrevStatement!);
             if (address.IsReference)
             { throw new NotImplementedException(); }
             int currentOffset = GetDataOffset(indexCall);
@@ -579,7 +580,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!TryCompute(indexCall.Expression, RuntimeType.INT, out DataItem index))
             { throw new CompilerException($"Can't compute the index value", indexCall.Expression, CurrentFile); }
 
-            int prevOffset = GetDataOffset(indexCall.PrevStatement);
+            int prevOffset = GetDataOffset(indexCall.PrevStatement!);
             int offset = index.ValueInt * prevType.StackArrayOf.SizeOnStack;
             return prevOffset + offset;
         }
@@ -612,12 +613,12 @@ namespace LanguageCore.BBCode.Compiler
             if (GetConstant(variable.Content, out _))
             { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
-            if (GetParameter(variable.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter? param))
             {
                 return GetBaseAddress(param);
             }
 
-            if (GetVariable(variable.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable? val))
             {
                 return new ValueAddress(val);
             }
@@ -632,14 +633,14 @@ namespace LanguageCore.BBCode.Compiler
         }
         ValueAddress GetBaseAddress(IndexCall statement)
         {
-            ValueAddress address = GetBaseAddress(statement.PrevStatement);
+            ValueAddress address = GetBaseAddress(statement.PrevStatement!);
             bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
             return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
         }
 
         bool IsItInHeap(StatementWithValue value)
         {
-            if (value is Identifier identifier)
+            if (value is Identifier)
             { return false; }
 
             if (value is Field field)
@@ -652,7 +653,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         bool IsItInHeap(IndexCall indexCall)
         {
-            return IsItInHeap(indexCall.PrevStatement) || FindStatementType(indexCall.PrevStatement).InHEAP;
+            return IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement).InHEAP;
         }
         bool IsItInHeap(Field field)
         {

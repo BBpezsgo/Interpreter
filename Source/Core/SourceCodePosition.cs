@@ -49,7 +49,7 @@ namespace LanguageCore
             AbsolutePosition = absolutePosition;
         }
 
-        public Position(params IThingWithPosition[] elements)
+        public Position(params IThingWithPosition?[] elements)
         {
             if (elements.Length == 0) throw new ArgumentException($"Array {nameof(elements)} length is 0");
 
@@ -59,11 +59,12 @@ namespace LanguageCore
 
             for (int i = 0; i < elements.Length; i++)
             {
-                if (elements[i] == null) continue;
-                if (elements[i] is Tokenizing.Token token && token.IsAnonymous) continue;
-                Start = elements[0].GetPosition().Start;
-                End = elements[0].GetPosition().End;
-                AbsolutePosition = elements[0].GetPosition().AbsolutePosition;
+                IThingWithPosition? element = elements[i];
+                if (element == null) continue;
+                if (element is Tokenizing.Token token && token.IsAnonymous) continue;
+                Start = element.GetPosition().Start;
+                End = element.GetPosition().End;
+                AbsolutePosition = element.GetPosition().AbsolutePosition;
                 break;
             }
 
@@ -120,14 +121,14 @@ namespace LanguageCore
             AbsolutePosition.Extend(start, end);
             return this;
         }
-        internal Position Extend(IThingWithPosition other)
+        internal Position Extend(IThingWithPosition? other)
         {
             if (other == null) return this;
             if (other is Tokenizing.Token token && token.IsAnonymous) return this;
             Extend(other.GetPosition());
             return this;
         }
-        internal Position Extend(params IThingWithPosition[] elements)
+        internal Position Extend(params IThingWithPosition?[]? elements)
         {
             if (elements == null) return this;
             if (elements.Length == 0) return this;
@@ -136,11 +137,11 @@ namespace LanguageCore
             { Extend(elements[i]); }
             return this;
         }
-        internal Position Extend(IEnumerable<IThingWithPosition> elements)
+        internal Position Extend(IEnumerable<IThingWithPosition?>? elements)
         {
             if (elements == null) return this;
 
-            foreach (IThingWithPosition element in elements)
+            foreach (IThingWithPosition? element in elements)
             { Extend(element); }
             return this;
         }
@@ -154,7 +155,7 @@ namespace LanguageCore
 
         public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.End.Line, this.End.Character), new SinglePosition(this.End.Line, this.End.Character + 1)), new Range<int>(this.AbsolutePosition.End, this.AbsolutePosition.End + 1));
 
-        public override bool Equals(object obj) => obj is Position position && Equals(position);
+        public override bool Equals(object? obj) => obj is Position position && Equals(position);
         public bool Equals(Position other) =>
             AbsolutePosition.Equals(other.AbsolutePosition) &&
             Start.Equals(other.Start) &&
@@ -198,7 +199,7 @@ namespace LanguageCore
         public override readonly string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
         public readonly string ToMinString() => $"{Line}:{Character}";
 
-        public override readonly bool Equals(object obj) => obj is SinglePosition position && Equals(position);
+        public override readonly bool Equals(object? obj) => obj is SinglePosition position && Equals(position);
         public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;
         public override readonly int GetHashCode() => HashCode.Combine(Line, Character);
     }

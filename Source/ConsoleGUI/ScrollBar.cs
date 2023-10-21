@@ -44,11 +44,11 @@ namespace ConsoleGUI
             {
                 if (y == scrollY)
                 {
-                    buffer[x, y] = new Character(' ', ForegroundColor.Black, BackgroundColor.White);
+                    buffer[x, y] = new CharInfo(' ', ByteColor.Black, ByteColor.White);
                 }
                 else
                 {
-                    buffer[x, y] = new Character((char)0x2592, ForegroundColor.DarkGray, BackgroundColor.Black);
+                    buffer[x, y] = new CharInfo((char)0x2592, ByteColor.Gray, ByteColor.Black);
                 }
             }
         }

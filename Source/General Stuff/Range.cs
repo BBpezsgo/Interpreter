@@ -20,7 +20,8 @@ namespace LanguageCore
             End = end;
         }
 
-        public override bool Equals(object obj) => obj is Range<T> other && Equals(other);
+        public override bool Equals(object? obj)
+            => obj is Range<T> other && Equals(other);
         public bool Equals(Range<T> other) =>
             Start.Equals(other.Start) &&
             End.Equals(other.End);

@@ -24,10 +24,10 @@ namespace LanguageCore.ASM
                     File.Delete(OutputFileObject);
                     System.Threading.Thread.Sleep(100);
                 }
-                Process process = Process.Start(new ProcessStartInfo(masm + "ml", $"/c /Zd /Fo \"{OutputFileObject}\" /coff \"{OutputFileAsm}\""));
-                process.WaitForExit();
+                Process? process = Process.Start(new ProcessStartInfo(masm + "ml", $"/c /Zd /Fo \"{OutputFileObject}\" /coff \"{OutputFileAsm}\""));
+                process?.WaitForExit();
                 Console.WriteLine();
-                Console.WriteLine($"Exit code: {process.ExitCode}");
+                Console.WriteLine($"Exit code: {process?.ExitCode}");
                 System.Threading.Thread.Sleep(200);
             }
 
@@ -38,10 +38,10 @@ namespace LanguageCore.ASM
                     File.Delete(OutputFileExe);
                     System.Threading.Thread.Sleep(100);
                 }
-                Process process = Process.Start(new ProcessStartInfo(masm + "Link", $"/SUBSYSTEM:CONSOLE /OUT:\"{OutputFileExe}\" \"{OutputFileObject}\""));
-                process.WaitForExit();
+                Process? process = Process.Start(new ProcessStartInfo(masm + "Link", $"/SUBSYSTEM:CONSOLE /OUT:\"{OutputFileExe}\" \"{OutputFileObject}\""));
+                process?.WaitForExit();
                 Console.WriteLine();
-                Console.WriteLine($"Exit code: {process.ExitCode}");
+                Console.WriteLine($"Exit code: {process?.ExitCode}");
                 System.Threading.Thread.Sleep(200);
             }
         }

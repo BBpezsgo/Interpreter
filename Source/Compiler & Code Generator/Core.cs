@@ -14,6 +14,7 @@ namespace LanguageCore
 
 namespace LanguageCore.BBCode.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
     using Parser;
@@ -97,13 +98,13 @@ namespace LanguageCore.BBCode.Compiler
             return changedInstructions;
         }
 
-        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements)
+        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> pair in elements)
             { v.Add(pair.Key, pair.Value); }
         }
 
-        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, List<TValue> values, Func<TValue, TKey> keys)
+        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, List<TValue> values, Func<TValue, TKey> keys) where TKey : notnull
         {
             foreach (TValue value in values)
             { v.Add(keys.Invoke(value), value); }
@@ -160,7 +161,7 @@ namespace LanguageCore.BBCode.Compiler
             return result;
         }
 
-        public static bool TryGetValue<T>(this IEnumerable<IHaveKey<T>> self, T key, out IHaveKey<T> value)
+        public static bool TryGetValue<T>(this IEnumerable<IHaveKey<T>> self, T key, [NotNullWhen(true)] out IHaveKey<T>? value) where T : notnull
         {
             foreach (IHaveKey<T> element in self)
             {
@@ -174,13 +175,13 @@ namespace LanguageCore.BBCode.Compiler
             value = null;
             return false;
         }
-        public static bool TryGetValue<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key, out TResult value) where TResult : IHaveKey<T>
+        public static bool TryGetValue<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key, [NotNullWhen(true)] out TResult? value) where TResult : IHaveKey<T> where T : notnull
         {
-            bool result = self.TryGetValue<T>(key, out IHaveKey<T> _value);
+            bool result = self.TryGetValue<T>(key, out IHaveKey<T>? _value);
             value = (_value == null) ? default : (TResult)_value;
             return result;
         }
-        public static bool ContainsKey<T>(this IEnumerable<IHaveKey<T>> self, T key)
+        public static bool ContainsKey<T>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
         {
             foreach (IHaveKey<T> element in self)
             {
@@ -193,7 +194,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
         /// <exception cref="KeyNotFoundException"></exception>
-        public static IHaveKey<T> Get<T>(this IEnumerable<IHaveKey<T>> self, T key)
+        public static IHaveKey<T> Get<T>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
         {
             foreach (IHaveKey<T> element in self)
             {
@@ -206,9 +207,9 @@ namespace LanguageCore.BBCode.Compiler
             throw new KeyNotFoundException($"Key {key} not found in list {self}");
         }
         /// <exception cref="KeyNotFoundException"></exception>
-        public static TResult Get<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key)
+        public static TResult Get<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
             => (TResult)self.Get<T>(key);
-        public static bool Remove<TKey>(this IList<IHaveKey<TKey>> self, TKey key)
+        public static bool Remove<TKey>(this IList<IHaveKey<TKey>> self, TKey key) where TKey : notnull
         {
             for (int i = self.Count - 1; i >= 0; i--)
             {
@@ -235,14 +236,14 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        public static Dictionary<TKey, IHaveKey<TKey>> ToDictionary<TKey>(this IEnumerable<IHaveKey<TKey>> self)
+        public static Dictionary<TKey, IHaveKey<TKey>> ToDictionary<TKey>(this IEnumerable<IHaveKey<TKey>> self) where TKey : notnull
         {
             Dictionary<TKey, IHaveKey<TKey>> result = new();
             foreach (IHaveKey<TKey> element in self)
             { result.Add(element.Key, element); }
             return result;
         }
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IHaveKey<TKey>> self)
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IHaveKey<TKey>> self) where TKey : notnull
         {
             Dictionary<TKey, TValue> result = new();
             foreach (IHaveKey<TKey> element in self)
@@ -252,7 +253,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #region KeyValuePair<TKey, TValue>
 
-        public static bool TryGetValue<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key, out TValue value)
+        public static bool TryGetValue<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key, out TValue? value) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> element in self)
             {
@@ -265,7 +266,7 @@ namespace LanguageCore.BBCode.Compiler
             value = default;
             return false;
         }
-        public static bool ContainsKey<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key)
+        public static bool ContainsKey<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> element in self)
             {
@@ -277,7 +278,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
         /// <exception cref="KeyNotFoundException"></exception>
-        public static TValue Get<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key)
+        public static TValue Get<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> element in self)
             {
@@ -290,7 +291,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         public static void Add<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key, TValue value)
             => self.Add(new KeyValuePair<TKey, TValue>(key, value));
-        public static bool Remove<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key)
+        public static bool Remove<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
         {
             for (int i = self.Count - 1; i >= 0; i--)
             {
@@ -303,7 +304,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             return false;
         }
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self)
+        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self) where TKey : notnull
         {
             Dictionary<TKey, TValue> result = new();
             foreach (KeyValuePair<TKey, TValue> element in self)
@@ -321,9 +322,9 @@ namespace LanguageCore.BBCode.Compiler
         public readonly CompiledOperator Operator;
         public readonly OperatorCall CallStatement;
 
-        internal readonly string CurrentFile;
+        internal readonly string? CurrentFile;
 
-        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall statement, CompiledOperator @operator, string file)
+        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall statement, CompiledOperator @operator, string? file)
         {
             this.CallInstructionIndex = callInstructionIndex;
 
@@ -339,14 +340,14 @@ namespace LanguageCore.BBCode.Compiler
     {
         public readonly int CallInstructionIndex;
 
-        public readonly CompiledFunction Function;
-        public readonly FunctionCall CallStatement;
-        public readonly Identifier VariableStatement;
-        public readonly IndexCall IndexStatement;
+        public readonly CompiledFunction? Function;
+        public readonly FunctionCall? CallStatement;
+        public readonly Identifier? VariableStatement;
+        public readonly IndexCall? IndexStatement;
 
-        internal readonly string CurrentFile;
+        internal readonly string? CurrentFile;
 
-        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledFunction function, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledFunction function, string? file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = functionCallStatement;
@@ -357,7 +358,7 @@ namespace LanguageCore.BBCode.Compiler
             this.CurrentFile = file;
         }
 
-        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledFunction function, string file)
+        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledFunction function, string? file)
         {
             this.CallInstructionIndex = callInstructionIndex;
             this.CallStatement = null;
@@ -380,12 +381,12 @@ namespace LanguageCore.BBCode.Compiler
     {
         public readonly int CallInstructionIndex;
 
-        public readonly Statement CallStatement;
+        public readonly Statement? CallStatement;
         public readonly CompiledGeneralFunction GeneralFunction;
 
-        internal readonly string CurrentFile;
+        internal readonly string? CurrentFile;
 
-        public UndefinedGeneralFunctionOffset(int callInstructionIndex, Statement functionCallStatement, CompiledGeneralFunction generalFunction, string file)
+        public UndefinedGeneralFunctionOffset(int callInstructionIndex, Statement? functionCallStatement, CompiledGeneralFunction generalFunction, string? file)
         {
             this.CallInstructionIndex = callInstructionIndex;
 
@@ -453,9 +454,9 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (typeParameters[i].IsGeneric)
                 {
-                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType etypeParameter))
+                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType? eTypeParameter))
                     { throw new NotImplementedException(); }
-                    typeParameters[i] = etypeParameter;
+                    typeParameters[i] = eTypeParameter;
                 }
             }
         }
@@ -464,15 +465,15 @@ namespace LanguageCore.BBCode.Compiler
     public readonly struct DefinitionReference
     {
         public readonly Range<SinglePosition> Source;
-        public readonly string SourceFile;
+        public readonly string? SourceFile;
 
-        public DefinitionReference(Range<SinglePosition> source, string sourceFile)
+        public DefinitionReference(Range<SinglePosition> source, string? sourceFile)
         {
             Source = source;
             SourceFile = sourceFile;
         }
 
-        public DefinitionReference(BaseToken source, string sourceFile)
+        public DefinitionReference(BaseToken source, string? sourceFile)
         {
             Source = source.Position;
             SourceFile = sourceFile;
@@ -553,7 +554,7 @@ namespace LanguageCore.BBCode.Compiler
             return result.ToString();
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is null) return false;
             if (obj is not FunctionType other) return false;
@@ -561,7 +562,7 @@ namespace LanguageCore.BBCode.Compiler
             return Equals(other);
         }
 
-        public bool Equals(FunctionType other)
+        public bool Equals(FunctionType? other)
         {
             if (other is null) return false;
 
@@ -572,7 +573,7 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public bool Equals(CompiledFunction other)
+        public bool Equals(CompiledFunction? other)
         {
             if (other is null) return false;
 
@@ -603,10 +604,10 @@ namespace LanguageCore.BBCode.Compiler
     {
         Type builtinType;
 
-        CompiledStruct @struct;
-        CompiledClass @class;
-        CompiledEnum @enum;
-        FunctionType function;
+        CompiledStruct? @struct;
+        CompiledClass? @class;
+        CompiledEnum? @enum;
+        FunctionType? function;
         CompiledType[] typeParameters;
 
         internal Type BuiltinType => builtinType;
@@ -624,15 +625,15 @@ namespace LanguageCore.BBCode.Compiler
             _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
         };
 
-        internal CompiledStruct Struct => @struct;
-        internal CompiledClass Class => @class;
-        internal CompiledEnum Enum => @enum;
-        internal FunctionType Function => function;
+        internal CompiledStruct Struct => @struct ?? throw new InternalException($"This isn't a struct");
+        internal CompiledClass Class => @class ?? throw new InternalException($"This isn't a class");
+        internal CompiledEnum Enum => @enum ?? throw new InternalException($"This isn't an enum");
+        internal FunctionType Function => function ?? throw new InternalException($"This isn't a function");
         internal CompiledType[] TypeParameters => typeParameters;
 
-        string genericName;
-        CompiledType stackArrayOf;
-        StatementWithValue stackArraySizeStatement;
+        string? genericName;
+        CompiledType? stackArrayOf;
+        StatementWithValue? stackArraySizeStatement;
         DataItem stackArraySize;
 
         /// <exception cref="InternalException"/>
@@ -668,12 +669,16 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
+        [MemberNotNullWhen(true, nameof(@class))]
         internal bool IsClass => @class is not null;
         /// <summary><c><see cref="Enum"/> != <see langword="null"/></c></summary>
+        [MemberNotNullWhen(true, nameof(@enum))]
         internal bool IsEnum => @enum is not null;
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
+        [MemberNotNullWhen(true, nameof(@struct))]
         internal bool IsStruct => @struct is not null;
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
+        [MemberNotNullWhen(true, nameof(function))]
         internal bool IsFunction => function is not null;
         internal bool IsBuiltin => builtinType != Type.NONE;
         internal bool CanBeBuiltin
@@ -687,7 +692,9 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
         internal bool InHEAP => IsClass;
+        [MemberNotNullWhen(true, nameof(genericName))]
         internal bool IsGeneric => !string.IsNullOrEmpty(genericName);
+        [MemberNotNullWhen(true, nameof(stackArrayOf))]
         internal bool IsStackArray => stackArrayOf is not null;
 
         public int Size
@@ -818,7 +825,7 @@ namespace LanguageCore.BBCode.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(string type, Func<string, CompiledType> typeFinder) : this()
+        public CompiledType(string type, Func<string, CompiledType>? typeFinder) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
@@ -832,7 +839,7 @@ namespace LanguageCore.BBCode.Compiler
 
         /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
-        public CompiledType(TypeInstance type, Func<string, CompiledType> typeFinder, ComputeValue constComputer = null) : this()
+        public CompiledType(TypeInstance type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
@@ -881,8 +888,8 @@ namespace LanguageCore.BBCode.Compiler
                 { throw new ArgumentNullException(nameof(constComputer)); }
 
                 stackArrayOf = new CompiledType(type.Identifier.Content, typeFinder);
-                stackArraySizeStatement = type.StackArraySize;
-                if (!constComputer.Invoke(type.StackArraySize, RuntimeType.INT, out stackArraySize))
+                stackArraySizeStatement = type.StackArraySize!;
+                if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.INT, out stackArraySize))
                 { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
 
                 return;
@@ -979,7 +986,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         string GetDebuggerDisplay() => ToString();
 
-        public static bool operator ==(CompiledType a, CompiledType b)
+        public static bool operator ==(CompiledType? a, CompiledType? b)
         {
             if (a is null && b is null) return true;
             if (a is null) return false;
@@ -987,41 +994,41 @@ namespace LanguageCore.BBCode.Compiler
 
             return a.Equals(b);
         }
-        public static bool operator !=(CompiledType a, CompiledType b) => !(a == b);
+        public static bool operator !=(CompiledType? a, CompiledType? b) => !(a == b);
 
-        public static bool operator ==(CompiledType a, RuntimeType b)
+        public static bool operator ==(CompiledType? a, RuntimeType b)
         {
             if (a is null) return false;
 
             return a.Equals(b);
         }
-        public static bool operator !=(CompiledType a, RuntimeType b) => !(a == b);
+        public static bool operator !=(CompiledType? a, RuntimeType b) => !(a == b);
 
-        public static bool operator ==(CompiledType a, Type b)
+        public static bool operator ==(CompiledType? a, Type b)
         {
             if (a is null) return false;
 
             return a.Equals(b);
         }
-        public static bool operator !=(CompiledType a, Type b) => !(a == b);
+        public static bool operator !=(CompiledType? a, Type b) => !(a == b);
 
-        public static bool operator ==(CompiledType a, TypeInstance b)
+        public static bool operator ==(CompiledType? a, TypeInstance? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
 
             return a.Equals(b);
         }
-        public static bool operator !=(CompiledType a, TypeInstance b) => !(a == b);
+        public static bool operator !=(CompiledType? a, TypeInstance? b) => !(a == b);
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is null) return false;
             if (obj is not CompiledType other) return false;
             return this.Equals(other);
         }
 
-        public bool Equals(CompiledType other)
+        public bool Equals(CompiledType? other)
         {
             if (other is null) return false;
 
@@ -1046,7 +1053,7 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public bool Equals(TypeInstance other)
+        public bool Equals(TypeInstance? other)
         {
             if (other is null) return false;
 
@@ -1091,7 +1098,7 @@ namespace LanguageCore.BBCode.Compiler
             return this.RuntimeType == other;
         }
 
-        public static bool TryGetTypeParameters(CompiledType[] definedParameters, CompiledType[] passedParameters, out Dictionary<string, CompiledType> typeParameters)
+        public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, [NotNullWhen(true)] out Dictionary<string, CompiledType>? typeParameters)
         {
             typeParameters = null;
             if (definedParameters is null || passedParameters is null) return false;
@@ -1108,7 +1115,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (defined.IsGeneric)
                 {
-                    if (typeParameters.TryGetValue(defined.Name, out CompiledType addedTypeParameter))
+                    if (typeParameters.TryGetValue(defined.Name, out CompiledType? addedTypeParameter))
                     {
                         if (addedTypeParameter != passed) return false;
                     }
@@ -1123,7 +1130,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (defined.IsClass && passed.IsClass)
                 {
                     if (defined.Class.Name.Content != passed.Class.Name.Content) return false;
-                    if (defined.Class.TemplateInfo != null && passed.Class.TemplateInfo != null)
+                    if (defined.Class.TemplateInfo is not null && passed.Class.TemplateInfo is not null)
                     {
                         if (defined.Class.TemplateInfo.TypeParameters.Length != passed.TypeParameters.Length)
                         { throw new NotImplementedException(); }
@@ -1132,7 +1139,7 @@ namespace LanguageCore.BBCode.Compiler
                             string typeParamName = defined.Class.TemplateInfo.TypeParameters[i].Content;
                             CompiledType typeParamValue = passed.TypeParameters[i];
 
-                            if (typeParameters.TryGetValue(typeParamName, out CompiledType addedTypeParameter))
+                            if (typeParameters.TryGetValue(typeParamName, out CompiledType? addedTypeParameter))
                             { if (addedTypeParameter != typeParamValue) return false; }
                             else
                             { typeParameters.Add(typeParamName, typeParamValue); }
@@ -1147,7 +1154,7 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public static bool Equals(CompiledType[] a, params CompiledType[] b)
+        public static bool Equals(CompiledType[]? a, params CompiledType[]? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
@@ -1157,7 +1164,7 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public static bool Equals(CompiledType[] a, TypeInstance[] b)
+        public static bool Equals(CompiledType[]? a, TypeInstance[]? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
@@ -1175,7 +1182,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<string, CompiledType> typeFinder)
             => CompiledType.FromArray(types.ToArray(), typeFinder);
-        public static CompiledType[] FromArray(TypeInstance[] types, Func<string, CompiledType> typeFinder)
+        public static CompiledType[] FromArray(TypeInstance[]? types, Func<string, CompiledType>? typeFinder)
         {
             if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
             CompiledType[] result = new CompiledType[types.Length];
@@ -1198,7 +1205,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        public bool TryGetFieldOffsets(out IReadOnlyDictionary<string, int> fieldOffsets)
+        public bool TryGetFieldOffsets([NotNullWhen(true)] out IReadOnlyDictionary<string, int>? fieldOffsets)
         {
             if (@class is not null)
             {
@@ -1234,6 +1241,6 @@ namespace LanguageCore.BBCode.Compiler
 
     public interface IAmInContext<T>
     {
-        public T Context { get; set; }
+        public T? Context { get; set; }
     }
 }

@@ -5,7 +5,7 @@ namespace LanguageCore
     internal class StepList<T>
     {
         int Position = 0;
-        readonly T[] Values = null;
+        readonly T[] Values;
 
         internal StepList(T[] values, int startIndex)
         {

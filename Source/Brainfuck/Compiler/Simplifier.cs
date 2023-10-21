@@ -1,5 +1,4 @@
-﻿
-#nullable enable
+﻿using System.Text;
 
 namespace LanguageCore.Brainfuck
 {
@@ -7,7 +6,7 @@ namespace LanguageCore.Brainfuck
     {
         internal static string Simplify(string code)
         {
-            string result = "";
+            StringBuilder result = new(code.Length);
 
             char multipleChar = '\0';
             int multipleCount = 0;
@@ -16,8 +15,8 @@ namespace LanguageCore.Brainfuck
                 char v = code[i];
                 if (multipleChar != '\0' && multipleChar != v)
                 {
-                    result += multipleChar;
-                    if (multipleCount != 1) result += multipleCount;
+                    result.Append(multipleChar);
+                    if (multipleCount != 1) result.Append(multipleCount);
 
                     multipleChar = '\0';
                     multipleCount = 0;
@@ -39,18 +38,18 @@ namespace LanguageCore.Brainfuck
                         }
                         break;
                     default:
-                        result += v;
+                        result.Append(v);
                         break;
                 }
             }
 
             if (multipleChar != '\0')
             {
-                result += multipleChar;
-                if (multipleCount != 1) result += multipleCount;
+                result.Append(multipleChar);
+                if (multipleCount != 1) result.Append(multipleCount);
             }
 
-            return result;
+            return result.ToString();
         }
     }
 }

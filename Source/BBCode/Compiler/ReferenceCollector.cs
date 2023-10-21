@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
 
@@ -14,7 +15,7 @@ namespace LanguageCore.BBCode.Compiler
         readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
         readonly List<CompiledParameter> parameters;
 
-        IFunctionThing CurrentFunction;
+        IFunctionThing? CurrentFunction;
 
         #endregion
 
@@ -25,15 +26,15 @@ namespace LanguageCore.BBCode.Compiler
             CurrentFunction = null;
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (GetVariable(symbolName, out CompiledVariable variable))
+            if (GetVariable(symbolName, out CompiledVariable? variable))
             {
                 type = variable.Type;
                 return true;
             }
 
-            if (GetParameter(symbolName, out CompiledParameter parameter))
+            if (GetParameter(symbolName, out CompiledParameter? parameter))
             {
                 type = parameter.Type;
                 return true;
@@ -43,10 +44,10 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        bool GetVariable(string variableName, out CompiledVariable compiledVariable)
+        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
             => compiledVariables.TryGetValue(variableName, out compiledVariable);
 
-        bool GetParameter(string parameterName, out CompiledParameter parameter)
+        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
             => parameters.TryGetValue(parameterName, out parameter);
 
         CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
@@ -59,7 +60,7 @@ namespace LanguageCore.BBCode.Compiler
             if (newVariable.Type == "var")
             {
                 if (newVariable.InitialValue == null)
-                { throw new CompilerException($"Initial value is requied for variable declaration \"var\"", newVariable, newVariable.FilePath); }
+                { throw new CompilerException($"Initial value is required for variable declaration \"var\"", newVariable, newVariable.FilePath); }
 
                 CompiledType initialValueType = FindStatementType(newVariable.InitialValue);
 
@@ -82,8 +83,10 @@ namespace LanguageCore.BBCode.Compiler
             this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable));
         }
 
-        int AnalyzeNewVariables(IEnumerable<Statement> statements)
+        int AnalyzeNewVariables(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return 0;
+
             int variablesAdded = 0;
             foreach (var st in statements)
             {
@@ -101,8 +104,10 @@ namespace LanguageCore.BBCode.Compiler
             return variablesAdded;
         }
 
-        void AnalyzeStatements(IEnumerable<Statement> statements)
+        void AnalyzeStatements(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return;
+
             int variablesAdded = AnalyzeNewVariables(statements);
 
             foreach (var st in statements)
@@ -123,7 +128,7 @@ namespace LanguageCore.BBCode.Compiler
 
             for (int i = 0; i < statements.Length; i++)
             {
-                CompiledType expectedType = null;
+                CompiledType? expectedType = null;
                 if (i < expectedTypes.Length) expectedType = expectedTypes[i];
 
                 AnalyzeStatement(statements[i], expectedType);
@@ -136,8 +141,10 @@ namespace LanguageCore.BBCode.Compiler
             { this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key); }
         }
 
-        void AnalyzeStatement(Statement statement, CompiledType expectedType = null)
+        void AnalyzeStatement(Statement? statement, CompiledType? expectedType = null)
         {
+            if (statement == null) return;
+
             if (statement is ShortOperatorCall shortOperatorCall)
             {
                 AnalyzeStatement(shortOperatorCall.ToAssignment());
@@ -174,7 +181,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!prevType.IsClass)
                 { return; }
 
-                if (GetIndexGetter(prevType, out CompiledFunction indexer))
+                if (GetIndexGetter(prevType, out CompiledFunction? indexer))
                 {
                     indexer.AddReference(index);
 
@@ -207,7 +214,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (@operator.Left != null) AnalyzeStatement(@operator.Left);
                 if (@operator.Right != null) AnalyzeStatement(@operator.Right);
 
-                if (GetOperator(@operator, out CompiledOperator operatorDefinition))
+                if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
                 {
                     operatorDefinition.AddReference(@operator);
 
@@ -239,7 +246,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!prevType.IsClass)
                     { return; }
 
-                    if (GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
+                    if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
                         indexer.AddReference(indexSetter);
 
@@ -254,7 +261,7 @@ namespace LanguageCore.BBCode.Compiler
                         indexerTemplate.OriginalFunction.AddReference(indexSetter);
                         indexerTemplate.Function.AddReference(indexSetter);
 
-                        if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
+                        if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
                         {
                             indexerTemplate.OriginalFunction.TimesUsed++;
                             indexerTemplate.Function.TimesUsed++;
@@ -280,7 +287,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!prevType.IsClass)
                     { return; }
 
-                    if (GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
+                    if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
                         indexer.AddReference(indexSetter);
 
@@ -314,7 +321,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             else if (statement is FunctionCall functionCall)
             {
-                if (TryGetFunction(functionCall.Identifier, functionCall.MethodParameters.Length, out CompiledFunction possibleFunction))
+                if (TryGetFunction(functionCall.Identifier, functionCall.MethodParameters.Length, out CompiledFunction? possibleFunction))
                 {
                     AnalyzeStatements(functionCall.Parameters, possibleFunction.ParameterTypes);
                 }
@@ -338,7 +345,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (GetVariable(functionCall.Identifier.Content, out _))
                 { return; }
 
-                if (TryGetMacro(functionCall, out MacroDefinition macro))
+                if (TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
                     var inlinedMacro = InlineMacro(macro, functionCall.Parameters);
                     if (inlinedMacro is Block block)
@@ -348,7 +355,7 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (GetFunction(functionCall, out CompiledFunction function))
+                if (GetFunction(functionCall, out CompiledFunction? function))
                 {
                     function.AddReference(functionCall);
 
@@ -494,7 +501,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!GetClass(constructorCall, out var @class))
                 { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
                 {
                     constructor.AddReference(constructorCall);
 
@@ -553,7 +560,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
-                AnalyzeStatements(function.Statements);
+                AnalyzeStatements(function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -573,7 +580,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
-                AnalyzeStatements(function.Statements);
+                AnalyzeStatements(function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -593,7 +600,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
-                AnalyzeStatements(function.Statements);
+                AnalyzeStatements(function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -616,7 +623,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
-                AnalyzeStatements(function.Function.Statements);
+                AnalyzeStatements(function.Function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -636,7 +643,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
-                AnalyzeStatements(function.Function.Statements);
+                AnalyzeStatements(function.Function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -656,7 +663,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
-                AnalyzeStatements(function.Function.Statements);
+                AnalyzeStatements(function.Function.Block?.Statements);
 
                 CurrentFunction = null;
                 CurrentFile = null;
@@ -689,7 +696,7 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        void AnalyzeFunctions(Statement[] topLevelStatements, PrintCallback printCallback = null)
+        void AnalyzeFunctions(Statement[] topLevelStatements, PrintCallback? printCallback = null)
         {
             printCallback?.Invoke($"  Collect references ...", LogType.Debug);
 
@@ -700,7 +707,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public static void CollectReferences(
             Compiler.Result compilerResult,
-            PrintCallback printCallback = null)
+            PrintCallback? printCallback = null)
         {
             ReferenceCollector referenceCollector = new()
             {

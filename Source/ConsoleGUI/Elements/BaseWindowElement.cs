@@ -22,7 +22,7 @@ namespace ConsoleGUI
             Elements.BeforeDraw();
         }
 
-        public override Character DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
+        public override CharInfo DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
         internal void OnMouseEventBase(MouseEvent mouse)
         {

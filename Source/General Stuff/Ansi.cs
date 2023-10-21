@@ -1,7 +1,4 @@
-﻿
-#nullable enable
-
-namespace LanguageCore.ANSI
+﻿namespace LanguageCore.ANSI
 {
     public readonly struct BackgroundColor
     {

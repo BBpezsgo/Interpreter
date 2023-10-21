@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
+    using System.Diagnostics.CodeAnalysis;
     using System.Runtime.CompilerServices;
     using ConsoleGUI;
     using LanguageCore.Runtime;
@@ -60,24 +61,26 @@ namespace LanguageCore.BBCode.Compiler
             {
                 for (int i = 0; i < compiledFunction.ParameterTypes.Length; i++)
                 {
-                    if (compiledFunction.ParameterTypes[i].IsGeneric)
+                    var parameterType = compiledFunction.ParameterTypes[i];
+
+                    if (parameterType.IsGeneric)
                     {
-                        if (!TypeArguments.TryGetValue(compiledFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                        if (!TypeArguments.TryGetValue(parameterType.Name, out CompiledType? bruh))
                         { throw new InternalException(); }
 
                         compiledFunction.ParameterTypes[i] = bruh;
                         continue;
                     }
 
-                    if (compiledFunction.ParameterTypes[i].IsClass && compiledFunction.ParameterTypes[i].Class.TemplateInfo != null)
+                    if (parameterType.IsClass && parameterType.Class.TemplateInfo != null)
                     {
-                        Token[] classTypeParameters = compiledFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+                        Token[] classTypeParameters = parameterType.Class.TemplateInfo.TypeParameters;
 
                         CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
 
                         foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
                         {
-                            if (compiledFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                            if (parameterType.Class.TryGetTypeArgumentIndex(item.Key, out int j))
                             { classTypeParameterValues[j] = item.Value; }
                         }
 
@@ -88,20 +91,20 @@ namespace LanguageCore.BBCode.Compiler
                             { throw new InternalException(); }
                         }
 
-                        compiledFunction.ParameterTypes[i] = new CompiledType(compiledFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                        compiledFunction.ParameterTypes[i] = new CompiledType(parameterType.Class, classTypeParameterValues);
                         continue;
                     }
                 }
 
                 if (compiledFunction.Type.IsGeneric)
                 {
-                    if (!TypeArguments.TryGetValue(compiledFunction.Type.Name, out CompiledType bruh))
+                    if (!TypeArguments.TryGetValue(compiledFunction.Type.Name, out CompiledType? bruh))
                     { throw new InternalException(); }
 
                     compiledFunction.Type = bruh;
                 }
 
-                if (compiledFunction.Context != null && compiledFunction.Context.TemplateInfo != null)
+                if (compiledFunction.Context != null && compiledFunction.Context.TemplateInfo is not null)
                 {
                     compiledFunction.Context = compiledFunction.Context.Duplicate();
                     compiledFunction.Context.AddTypeArguments(TypeArguments);
@@ -111,9 +114,11 @@ namespace LanguageCore.BBCode.Compiler
             {
                 for (int i = 0; i < compiledGeneralFunction.ParameterTypes.Length; i++)
                 {
-                    if (compiledGeneralFunction.ParameterTypes[i].IsGeneric)
+                    CompiledType parameterType = compiledGeneralFunction.ParameterTypes[i];
+
+                    if (parameterType.IsGeneric)
                     {
-                        if (!TypeArguments.TryGetValue(compiledGeneralFunction.ParameterTypes[i].Name, out CompiledType bruh))
+                        if (!TypeArguments.TryGetValue(parameterType.Name, out CompiledType? bruh))
                         { throw new InternalException(); }
 
                         compiledGeneralFunction.ParameterTypes[i] = bruh;
@@ -122,21 +127,21 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (compiledGeneralFunction.Type.IsGeneric)
                     {
-                        if (!TypeArguments.TryGetValue(compiledGeneralFunction.Type.Name, out CompiledType bruh))
+                        if (!TypeArguments.TryGetValue(compiledGeneralFunction.Type.Name, out CompiledType? bruh))
                         { throw new InternalException(); }
 
                         compiledGeneralFunction.Type = bruh;
                     }
 
-                    if (compiledGeneralFunction.ParameterTypes[i].IsClass && compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo != null)
+                    if (parameterType.IsClass && parameterType.Class.TemplateInfo != null)
                     {
-                        Token[] classTypeParameters = compiledGeneralFunction.ParameterTypes[i].Class.TemplateInfo.TypeParameters;
+                        Token[] classTypeParameters = parameterType.Class.TemplateInfo.TypeParameters;
 
                         CompiledType[] classTypeParameterValues = new CompiledType[classTypeParameters.Length];
 
                         foreach (KeyValuePair<string, CompiledType> item in this.TypeArguments)
                         {
-                            if (compiledGeneralFunction.ParameterTypes[i].Class.TryGetTypeArgumentIndex(item.Key, out int j))
+                            if (parameterType.Class.TryGetTypeArgumentIndex(item.Key, out int j))
                             { classTypeParameterValues[j] = item.Value; }
                         }
 
@@ -147,19 +152,19 @@ namespace LanguageCore.BBCode.Compiler
                             { throw new InternalException(); }
                         }
 
-                        compiledGeneralFunction.ParameterTypes[i] = new CompiledType(compiledGeneralFunction.ParameterTypes[i].Class, classTypeParameterValues);
+                        compiledGeneralFunction.ParameterTypes[i] = new CompiledType(parameterType.Class, classTypeParameterValues);
                         continue;
                     }
                 }
 
-                if (compiledGeneralFunction.Context != null && compiledGeneralFunction.Context.TemplateInfo != null)
+                if (compiledGeneralFunction.Context != null && compiledGeneralFunction.Context.TemplateInfo is not null)
                 {
                     compiledGeneralFunction.Context = compiledGeneralFunction.Context.Duplicate();
                     compiledGeneralFunction.Context.AddTypeArguments(TypeArguments);
                 }
             }
 
-            public override string ToString() => Function == null ? "null" : Function.ToString();
+            public override string ToString() => Function?.ToString() ?? "null";
         }
 
         protected delegate void BuiltinFunctionCompiler(params StatementWithValue[] parameters);
@@ -189,7 +194,7 @@ namespace LanguageCore.BBCode.Compiler
         protected readonly List<Warning> Warnings;
         protected readonly List<Hint> Hints;
 
-        protected string CurrentFile;
+        protected string? CurrentFile;
 
         protected CodeGeneratorBase()
         {
@@ -386,11 +391,11 @@ namespace LanguageCore.BBCode.Compiler
         /// Used for exceptions
         /// </param>
         /// <exception cref="CompilerException"/>
-        protected bool TryFindReplacedType(string builtinName, out CompiledType type)
+        protected bool TryFindReplacedType(string builtinName, [NotNullWhen(true)] out CompiledType? type)
         {
             type = null;
 
-            string replacedName = TypeDefinitionReplacer(builtinName);
+            string? replacedName = TypeDefinitionReplacer(builtinName);
 
             if (replacedName == null)
             { return false; }
@@ -407,7 +412,7 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         protected CompiledType FindReplacedType(string builtinName, IThingWithPosition position)
         {
-            string replacedName = TypeDefinitionReplacer(builtinName);
+            string? replacedName = TypeDefinitionReplacer(builtinName);
 
             if (replacedName == null)
             { throw new CompilerException($"Type replacer \"{builtinName}\" not found. Define a type with an attribute [Define(\"{builtinName}\")] to use it as a {builtinName}", position, CurrentFile); }
@@ -415,11 +420,11 @@ namespace LanguageCore.BBCode.Compiler
             return FindType(replacedName, position);
         }
 
-        protected string TypeDefinitionReplacer(string typeName)
+        protected string? TypeDefinitionReplacer(string? typeName)
         {
             foreach (CompiledStruct @struct in CompiledStructs)
             {
-                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -429,7 +434,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             foreach (CompiledClass @class in CompiledClasses)
             {
-                if (@class.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -439,7 +444,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             foreach (CompiledEnum @enum in CompiledEnums)
             {
-                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -450,19 +455,19 @@ namespace LanguageCore.BBCode.Compiler
             return null;
         }
 
-        protected bool GetEnum(string name, out CompiledEnum @enum)
+        protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
             => CompiledEnums.TryGetValue(name, out @enum);
 
-        protected abstract bool GetLocalSymbolType(string symbolName, out CompiledType type);
+        protected abstract bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type);
 
-        protected bool GetFunctionByPointer(FunctionType functionType, out CompiledFunction compiledFunction)
+        protected bool GetFunctionByPointer(FunctionType functionType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             bool found = false;
             compiledFunction = null;
 
             foreach (CompiledFunction function in CompiledFunctions)
             {
-                if (function == null) continue;
+                if (function is null) continue;
 
                 if (function.IsTemplate) continue;
 
@@ -477,7 +482,7 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
             {
-                if (function.Function == null) continue;
+                if (function.Function is null) continue;
 
                 if (!functionType.Equals(function.Function)) continue;
 
@@ -491,15 +496,15 @@ namespace LanguageCore.BBCode.Compiler
             return found;
         }
 
-        protected bool TryGetMacro(FunctionCall functionCallStatement, out MacroDefinition macro)
+        protected bool TryGetMacro(FunctionCall functionCallStatement, [NotNullWhen(true)] out MacroDefinition? macro)
             => TryGetMacro(functionCallStatement.Identifier.Content, functionCallStatement.MethodParameters.Length, out macro);
 
-        protected bool GetFunction(FunctionCall functionCallStatement, out CompiledFunction compiledFunction)
+        protected bool GetFunction(FunctionCall functionCallStatement, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             Token functionIdentifier = functionCallStatement.Identifier;
             StatementWithValue[] passedParameters = functionCallStatement.MethodParameters;
 
-            if (TryGetFunction(functionIdentifier, passedParameters.Length, out CompiledFunction possibleFunction))
+            if (TryGetFunction(functionIdentifier, passedParameters.Length, out CompiledFunction? possibleFunction))
             {
                 return GetFunction(functionIdentifier.Content, FindStatementTypes(passedParameters, possibleFunction.ParameterTypes), out compiledFunction);
             }
@@ -509,14 +514,14 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        protected bool GetFunction(string name, CompiledType[] parameters, out CompiledFunction compiledFunction)
+        protected bool GetFunction(string name, CompiledType[] parameters, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             bool found = false;
             compiledFunction = null;
 
             foreach (CompiledFunction function in CompiledFunctions)
             {
-                if (function == null) continue;
+                if (function is null) continue;
 
                 if (function.IsTemplate) continue;
 
@@ -533,7 +538,7 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (CompliableTemplate<CompiledFunction> function in compilableFunctions)
             {
-                if (function.Function == null) continue;
+                if (function.Function is null) continue;
 
                 if (function.Function.Identifier.Content != name) continue;
 
@@ -558,13 +563,13 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (CompiledFunction element in CompiledFunctions)
             {
-                if (element == null) continue;
+                if (element is null) continue;
 
                 if (!element.IsTemplate) continue;
 
                 if (element.Identifier != functionCallStatement.FunctionName) continue;
 
-                if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
 
                 // if (element.Context != null && element.Context.TemplateInfo != null)
                 // { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
@@ -597,7 +602,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
 
-                MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo.TypeParameters, typeParameters);
+                MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo!.TypeParameters, typeParameters);
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -610,7 +615,7 @@ namespace LanguageCore.BBCode.Compiler
             return found;
         }
 
-        protected bool GetIndexGetter(CompiledType prevType, out CompiledFunction compiledFunction)
+        protected bool GetIndexGetter(CompiledType prevType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             if (!prevType.IsClass)
             {
@@ -664,7 +669,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        protected bool GetIndexSetter(CompiledType prevType, CompiledType elementType, out CompiledFunction compiledFunction)
+        protected bool GetIndexSetter(CompiledType prevType, CompiledType elementType, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             if (!prevType.IsClass)
             {
@@ -820,7 +825,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        bool TryGetFunction(string name, out CompiledFunction compiledFunction)
+        bool TryGetFunction(string name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
 
@@ -838,10 +843,10 @@ namespace LanguageCore.BBCode.Compiler
 
             return compiledFunction is not null;
         }
-        protected bool TryGetFunction(Token name, out CompiledFunction compiledFunction)
+        protected bool TryGetFunction(Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
             => TryGetFunction(name.Content, out compiledFunction);
 
-        bool TryGetFunction(string name, int parameterCount, out CompiledFunction compiledFunction)
+        bool TryGetFunction(string name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
 
@@ -861,10 +866,10 @@ namespace LanguageCore.BBCode.Compiler
 
             return compiledFunction is not null;
         }
-        protected bool TryGetFunction(Token name, int parameterCount, out CompiledFunction compiledFunction)
+        protected bool TryGetFunction(Token name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
             => TryGetFunction(name.Content, parameterCount, out compiledFunction);
 
-        bool TryGetMacro(string name, int parameterCount, out MacroDefinition macro)
+        bool TryGetMacro(string name, int parameterCount, [NotNullWhen(true)] out MacroDefinition? macro)
         {
             macro = null;
 
@@ -884,10 +889,10 @@ namespace LanguageCore.BBCode.Compiler
 
             return macro is not null;
         }
-        protected bool TryGetMacro(Token name, int parameterCount, out MacroDefinition macro)
+        protected bool TryGetMacro(Token name, int parameterCount, [NotNullWhen(true)] out MacroDefinition? macro)
             => TryGetMacro(name.Content, parameterCount, out macro);
 
-        protected bool GetFunction(FunctionType type, out CompiledFunction compiledFunction)
+        protected bool GetFunction(FunctionType type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
 
@@ -898,16 +903,16 @@ namespace LanguageCore.BBCode.Compiler
                 if (!CompiledType.Equals(function.ParameterTypes, type.Parameters)) continue;
                 if (!function.Type.Equals(type.ReturnType)) continue;
 
-                if (compiledFunction != null)
+                if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
 
-            return compiledFunction != null;
+            return compiledFunction is not null;
         }
 
-        bool GetFunction(string name, out CompiledFunction compiledFunction)
+        bool GetFunction(string name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
 
@@ -917,16 +922,16 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (function.Identifier != name) continue;
 
-                if (compiledFunction != null)
+                if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
 
-            return compiledFunction != null;
+            return compiledFunction is not null;
         }
 
-        protected bool GetFunction(Token name, out CompiledFunction compiledFunction)
+        protected bool GetFunction(Token name, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
 
@@ -945,13 +950,13 @@ namespace LanguageCore.BBCode.Compiler
             return compiledFunction is not null;
         }
 
-        protected bool GetFunction(Token name, CompiledType type, out CompiledFunction compiledFunction)
+        protected bool GetFunction(Token name, CompiledType? type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             if (type is null || !type.IsFunction)
             { return GetFunction(name, out compiledFunction); }
             return GetFunction(name, type.Function, out compiledFunction);
         }
-        protected bool GetFunction(Token name, FunctionType type, out CompiledFunction compiledFunction)
+        protected bool GetFunction(Token name, FunctionType? type, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             if (type is null)
             { return GetFunction(name, out compiledFunction); }
@@ -983,7 +988,7 @@ namespace LanguageCore.BBCode.Compiler
             return success && compiledFunction is not null;
         }
 
-        protected bool GetOperator(OperatorCall @operator, out CompiledOperator compiledOperator)
+        protected bool GetOperator(OperatorCall @operator, [NotNullWhen(true)] out CompiledOperator? compiledOperator)
         {
             CompiledType[] parameters = FindStatementTypes(@operator.Parameters);
 
@@ -1017,7 +1022,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier.Content != @operator.Operator.Content) continue;
-                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
@@ -1030,9 +1035,9 @@ namespace LanguageCore.BBCode.Compiler
             return found;
         }
 
-        protected bool GetGeneralFunction(CompiledClass @class, string name, out CompiledGeneralFunction generalFunction)
+        protected bool GetGeneralFunction(CompiledClass @class, string name, [NotNullWhen(true)] out CompiledGeneralFunction? generalFunction)
             => GetGeneralFunction(@class, Array.Empty<CompiledType>(), name, out generalFunction);
-        protected bool GetGeneralFunction(CompiledClass @class, CompiledType[] parameters, string name, out CompiledGeneralFunction generalFunction)
+        protected bool GetGeneralFunction(CompiledClass @class, CompiledType[] parameters, string name, [NotNullWhen(true)] out CompiledGeneralFunction? generalFunction)
         {
             for (int i = 0; i < CompiledGeneralFunctions.Length; i++)
             {
@@ -1086,7 +1091,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType> typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -1098,7 +1103,7 @@ namespace LanguageCore.BBCode.Compiler
             return found;
         }
 
-        protected bool GetOutputWriter(CompiledType type, out CompiledFunction function)
+        protected bool GetOutputWriter(CompiledType type, [NotNullWhen(true)] out CompiledFunction? function)
         {
             foreach (CompiledFunction _function in CompiledFunctions)
             {
@@ -1122,7 +1127,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        protected bool GetField(Field field, out CompiledField compiledField)
+        protected bool GetField(Field field, [NotNullWhen(true)] out CompiledField? compiledField)
         {
             compiledField = null;
 
@@ -1162,13 +1167,13 @@ namespace LanguageCore.BBCode.Compiler
 
         #region GetStruct()
 
-        protected bool GetStruct(NewInstance newStructStatement, out CompiledStruct compiledStruct)
+        protected bool GetStruct(NewInstance newStructStatement, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
             => GetStruct(newStructStatement.TypeName, out compiledStruct);
 
-        protected bool GetStruct(TypeInstance type, out CompiledStruct compiledStruct)
+        protected bool GetStruct(TypeInstance type, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
             => GetStruct(type.Identifier.Content, out compiledStruct);
 
-        protected bool GetStruct(string structName, out CompiledStruct compiledStruct)
+        protected bool GetStruct(string structName, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
         {
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
@@ -1188,18 +1193,18 @@ namespace LanguageCore.BBCode.Compiler
 
         #region GetClass()
 
-        protected bool GetClass(NewInstance newClassStatement, out CompiledClass compiledClass)
+        protected bool GetClass(NewInstance newClassStatement, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(newClassStatement.TypeName, out compiledClass);
 
-        protected bool GetClass(ConstructorCall constructorCall, out CompiledClass compiledClass)
+        protected bool GetClass(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(constructorCall.TypeName, out compiledClass);
 
-        protected bool GetClass(TypeInstance type, out CompiledClass compiledClass)
+        protected bool GetClass(TypeInstance type, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(type.Identifier.Content, type.GenericTypes.Count, out compiledClass);
 
-        protected bool GetClass(string className, out CompiledClass compiledClass)
+        protected bool GetClass(string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(className, 0, out compiledClass);
-        protected bool GetClass(string className, int typeParameterCount, out CompiledClass compiledClass)
+        protected bool GetClass(string className, int typeParameterCount, [NotNullWhen(true)] out CompiledClass? compiledClass)
         {
             for (int i = 0; i < CompiledClasses.Length; i++)
             {
@@ -1225,7 +1230,7 @@ namespace LanguageCore.BBCode.Compiler
         protected CompiledType FindType(Token name) => FindType(name.Content, name);
 
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name, IThingWithPosition position) => FindType(name, position.GetPosition());
+        protected CompiledType FindType(string name, IThingWithPosition? position) => FindType(name, position?.GetPosition() ?? Position.UnknownPosition);
 
         /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
@@ -1236,14 +1241,14 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         CompiledType FindType(string name, Position position)
         {
-            if (CompiledStructs.TryGetValue(name, out CompiledStruct @struct)) return new CompiledType(@struct);
-            if (CompiledClasses.TryGetValue(name, out CompiledClass @class)) return new CompiledType(@class);
-            if (CompiledEnums.TryGetValue(name, out CompiledEnum @enum)) return new CompiledType(@enum);
+            if (CompiledStructs.TryGetValue(name, out CompiledStruct? @struct)) return new CompiledType(@struct);
+            if (CompiledClasses.TryGetValue(name, out CompiledClass? @class)) return new CompiledType(@class);
+            if (CompiledEnums.TryGetValue(name, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
-            if (TypeArguments.TryGetValue(name, out CompiledType typeArgument))
+            if (TypeArguments.TryGetValue(name, out CompiledType? typeArgument))
             { return typeArgument; }
 
-            if (GetFunction(name, out CompiledFunction function))
+            if (GetFunction(name, out CompiledFunction? function))
             { return new CompiledType(new FunctionType(function)); }
 
             throw new CompilerException($"Type \"{name}\" not found", position, CurrentFile);
@@ -1319,7 +1324,7 @@ namespace LanguageCore.BBCode.Compiler
                 newVariable);
         }
 
-        protected CompiledFunction GetCodeEntry()
+        protected CompiledFunction? GetCodeEntry()
         {
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {
@@ -1457,7 +1462,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!prevType.IsClass)
             { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
 
-            if (!GetIndexGetter(prevType, out CompiledFunction indexer))
+            if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
@@ -1476,10 +1481,10 @@ namespace LanguageCore.BBCode.Compiler
 
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
 
-            if (TryGetMacro(functionCall, out MacroDefinition macro))
+            if (TryGetMacro(functionCall, out MacroDefinition? macro))
             { return FindMacroType(macro, functionCall.Parameters); }
 
-            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out var compiledFunctionTemplate))
                 { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
@@ -1490,7 +1495,7 @@ namespace LanguageCore.BBCode.Compiler
             return compiledFunction.Type;
         }
 
-        protected CompiledType FindStatementType(OperatorCall @operator, CompiledType expectedType)
+        protected CompiledType FindStatementType(OperatorCall @operator, CompiledType? expectedType)
         {
             if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
@@ -1503,7 +1508,7 @@ namespace LanguageCore.BBCode.Compiler
             if (opcode == Opcode.UNKNOWN)
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
 
-            if (GetOperator(@operator, out CompiledOperator operatorDefinition))
+            if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
             { return operatorDefinition.Type; }
 
             CompiledType leftType = FindStatementType(@operator.Left);
@@ -1531,11 +1536,11 @@ namespace LanguageCore.BBCode.Compiler
 
             CompiledType result = new(predictedValue.Type);
 
-            if (CanConvertImplicitly(result, expectedType)) return expectedType;
+            if (expectedType is not null && CanConvertImplicitly(result, expectedType)) return expectedType;
 
             return result;
         }
-        protected CompiledType FindStatementType(LiteralStatement literal, CompiledType expectedType)
+        protected CompiledType FindStatementType(LiteralStatement literal, CompiledType? expectedType)
         {
             switch (literal.Type)
             {
@@ -1557,7 +1562,7 @@ namespace LanguageCore.BBCode.Compiler
                     throw new ImpossibleException($"Unknown literal type {literal.Type}");
             }
         }
-        protected CompiledType FindStatementType(Identifier identifier, CompiledType expectedType = null)
+        protected CompiledType FindStatementType(Identifier identifier, CompiledType? expectedType = null)
         {
             if (identifier.Content == "nullptr")
             { return new CompiledType(Type.INT); }
@@ -1565,7 +1570,7 @@ namespace LanguageCore.BBCode.Compiler
             if (GetConstant(identifier.Content, out DataItem constant))
             { return new CompiledType(constant.Type); }
 
-            if (GetLocalSymbolType(identifier.Content, out CompiledType type))
+            if (GetLocalSymbolType(identifier.Content, out CompiledType? type))
             { return type; }
 
             if (GetEnum(identifier.Content, out var @enum))
@@ -1621,7 +1626,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (definedField.Type.IsGeneric)
                     {
-                        if (this.TypeArguments.TryGetValue(definedField.Type.Name, out CompiledType typeParameter))
+                        if (this.TypeArguments.TryGetValue(definedField.Type.Name, out CompiledType? typeParameter))
                         { return typeParameter; }
 
                         if (!prevStatementType.Class.TryGetTypeArgumentIndex(definedField.Type.Name, out int j))
@@ -1639,7 +1644,7 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         if (result.TypeParameters[j].IsGeneric)
                         {
-                            if (TypeArguments.TryGetValue(result.TypeParameters[j].Name, out CompiledType genericType))
+                            if (TypeArguments.TryGetValue(result.TypeParameters[j].Name, out CompiledType? genericType))
                             {
                                 result.TypeParameters[j] = genericType;
                             }
@@ -1663,7 +1668,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (prevStatementType.IsEnum)
             {
-                if (prevStatementType.Enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember enumMember))
+                if (prevStatementType.Enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember? enumMember))
                 { return new CompiledType(enumMember.Value.Type); }
 
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
@@ -1672,7 +1677,7 @@ namespace LanguageCore.BBCode.Compiler
             throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field, CurrentFile);
         }
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
-        protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType expectedType)
+        protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType? expectedType)
         {
             if (modifiedStatement.Modifier == "ref")
             {
@@ -1687,9 +1692,9 @@ namespace LanguageCore.BBCode.Compiler
             throw new CompilerException($"Unimplemented modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
         }
 
-        protected CompiledType FindStatementType(StatementWithValue statement)
+        protected CompiledType FindStatementType(StatementWithValue? statement)
             => FindStatementType(statement, null);
-        protected CompiledType FindStatementType(StatementWithValue statement, CompiledType expectedType)
+        protected CompiledType FindStatementType(StatementWithValue? statement, CompiledType? expectedType)
         {
             if (statement is FunctionCall functionCall)
             { return FindStatementType(functionCall); }
@@ -1730,7 +1735,7 @@ namespace LanguageCore.BBCode.Compiler
             if (statement is ModifiedStatement modifiedStatement)
             { return FindStatementType(modifiedStatement, expectedType); }
 
-            throw new CompilerException($"Statement {statement.GetType().Name} does not have a type", statement, CurrentFile);
+            throw new CompilerException($"Statement {(statement is null ? "null" : statement.GetType().Name)} does not have a type", statement, CurrentFile);
         }
 
         protected CompiledType[] FindStatementTypes(StatementWithValue[] statements)
@@ -1746,7 +1751,7 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType[] result = new CompiledType[statements.Length];
             for (int i = 0; i < statements.Length; i++)
             {
-                CompiledType expectedType = null;
+                CompiledType? expectedType = null;
                 if (i < expectedTypes.Length) expectedType = expectedTypes[i];
                 result[i] = FindStatementType(statements[i], expectedType);
             }
@@ -1829,7 +1834,7 @@ namespace LanguageCore.BBCode.Compiler
         protected static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
         {
             StatementWithValue[] _parameters = InlineMacro(functionCall.Parameters, parameters);
-            StatementWithValue prevStatement = functionCall.PrevStatement;
+            StatementWithValue? prevStatement = functionCall.PrevStatement;
             if (prevStatement != null)
             { prevStatement = InlineMacro(prevStatement, parameters); ; }
             return new FunctionCall(prevStatement, functionCall.Identifier, functionCall.BracketLeft, _parameters, functionCall.BracketRight);
@@ -1865,11 +1870,11 @@ namespace LanguageCore.BBCode.Compiler
             throw new NotImplementedException();
         }
 
-        protected static StatementWithValue InlineMacro(StatementWithValue statement, Dictionary<string, StatementWithValue> parameters)
+        protected static StatementWithValue InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (statement is Identifier identifier)
             {
-                if (parameters.TryGetValue(identifier.Content, out StatementWithValue inlinedStatement))
+                if (parameters.TryGetValue(identifier.Content, out StatementWithValue? inlinedStatement))
                 { return inlinedStatement; }
             }
 
@@ -2038,7 +2043,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             value = default;
 
-            if (!TryGetMacro(functionCall, out MacroDefinition macro))
+            if (!TryGetMacro(functionCall, out MacroDefinition? macro))
             { return false; }
 
             Statement inlined = InlineMacro(macro, functionCall.Parameters);
@@ -2054,8 +2059,14 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        protected bool TryCompute(StatementWithValue statement, RuntimeType? expectedType, out DataItem value)
+        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
         {
+            if (statement is null)
+            {
+                value = DataItem.Null;
+                return false;
+            }
+
             if (statement is LiteralStatement literal)
             { return TryCompute(literal, expectedType, out value); }
 
@@ -2073,7 +2084,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         #endregion
 
-        protected bool CanConvertImplicitly(CompiledType from, CompiledType to)
+        protected bool CanConvertImplicitly(CompiledType? from, CompiledType? to)
         {
             if (from is null || to is null) return false;
 

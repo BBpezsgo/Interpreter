@@ -5,7 +5,7 @@ namespace ConsoleGUI
     internal class InlineElement : Element, IBorderedElement, IElementWithTitle, IInlineLayoutElement
     {
         public bool HasBorder { get; set; } = false;
-        public string Title { get; set; }
+        public string? Title { get; set; }
         public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();
 
         public class BeforeDrawEvent { }
@@ -13,10 +13,10 @@ namespace ConsoleGUI
         public delegate void EventHandler<T>(InlineElement sender, T e);
         public delegate void EventHandler(InlineElement sender);
 
-        public event EventHandler OnBeforeDraw;
-        public event EventHandler OnRefreshSize;
-        public event EventHandler<MouseEvent> OnMouseEventInvoked;
-        public event EventHandler<KeyEvent> OnKeyEventInvoked;
+        public event EventHandler? OnBeforeDraw;
+        public event EventHandler? OnRefreshSize;
+        public event EventHandler<MouseEvent>? OnMouseEventInvoked;
+        public event EventHandler<KeyEvent>? OnKeyEventInvoked;
 
         public override void BeforeDraw()
         {

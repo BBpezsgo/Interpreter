@@ -23,7 +23,7 @@ namespace LanguageCore.Parser
 
         public readonly List<TypeInstance> GenericTypes;
         public readonly List<TypeInstance> ParameterTypes;
-        public readonly StatementWithValue StackArraySize;
+        public readonly StatementWithValue? StackArraySize;
 
         public TypeInstance(Token identifier, TypeInstanceKind kind) : base()
         {
@@ -35,7 +35,7 @@ namespace LanguageCore.Parser
             this.StackArraySize = null;
         }
 
-        public TypeInstance(Token identifier, TypeInstanceKind kind, StatementWithValue sizeValue) : base()
+        public TypeInstance(Token identifier, TypeInstanceKind kind, StatementWithValue? sizeValue) : base()
         {
             this.Identifier = identifier;
             this.Kind = kind;
@@ -56,11 +56,11 @@ namespace LanguageCore.Parser
         }
         public Position GetPosition() => Position;
 
-        public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string> typeDefinitionReplacer)
+        public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string?>? typeDefinitionReplacer)
             => TypeInstance.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
-        public static TypeInstance CreateAnonymous(string name, Func<string, string> typeDefinitionReplacer)
+        public static TypeInstance CreateAnonymous(string name, Func<string, string?>? typeDefinitionReplacer)
         {
-            string definedType = typeDefinitionReplacer?.Invoke(name);
+            string? definedType = typeDefinitionReplacer?.Invoke(name);
             if (definedType == null)
             { return new TypeInstance(Token.CreateAnonymous(name), TypeInstanceKind.Simple); }
             else
@@ -80,7 +80,7 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public static bool operator ==(TypeInstance a, string b)
+        public static bool operator ==(TypeInstance? a, string? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
@@ -88,12 +88,12 @@ namespace LanguageCore.Parser
 
             return a.Identifier.Content == b;
         }
-        public static bool operator !=(TypeInstance a, string b) => !(a == b);
+        public static bool operator !=(TypeInstance? a, string? b) => !(a == b);
 
-        public static bool operator ==(string a, TypeInstance b) => b == a;
-        public static bool operator !=(string a, TypeInstance b) => !(b == a);
+        public static bool operator ==(string? a, TypeInstance? b) => b == a;
+        public static bool operator !=(string? a, TypeInstance? b) => !(b == a);
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(this, obj)) return true;
             if (obj is null) return false;
@@ -101,7 +101,7 @@ namespace LanguageCore.Parser
             return this.Equals(other);
         }
 
-        public bool Equals(TypeInstance other)
+        public bool Equals(TypeInstance? other)
         {
             if (other is null) return false;
             if (!Identifier.Equals(other.Identifier)) return false;
@@ -188,16 +188,23 @@ namespace LanguageCore.Parser
 
     public interface IDefinition
     {
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
     }
 
     public class ParameterDefinition : IHaveKey<string>, IThingWithPosition
     {
-        public Token Identifier;
-        public TypeInstance Type;
-        public Token[] Modifiers;
+        public readonly Token Identifier;
+        public readonly TypeInstance Type;
+        public readonly Token[] Modifiers;
 
         public string Key => Identifier.Content;
+
+        public ParameterDefinition(Token[] modifiers, TypeInstance type, Token identifier)
+        {
+            Modifiers = modifiers;
+            Type = type;
+            Identifier = identifier;
+        }
 
         public Position GetPosition()
             => new Position(Identifier, Type).Extend(Modifiers);
@@ -208,16 +215,23 @@ namespace LanguageCore.Parser
 
     public class FieldDefinition : IThingWithPosition
     {
-        public Token Identifier;
-        public TypeInstance Type;
-        public Token ProtectionToken;
-        public Token Semicolon;
+        public readonly Token Identifier;
+        public readonly TypeInstance Type;
+        public readonly Token? ProtectionToken;
+        public Token? Semicolon;
 
         public Position GetPosition()
             => new(Identifier, Type, ProtectionToken);
 
-        public override string ToString() => $"{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
-        internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken != null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
+        public FieldDefinition(Token identifier, TypeInstance type, Token? protectionToken)
+        {
+            Identifier = identifier;
+            Type = type;
+            ProtectionToken = protectionToken;
+        }
+
+        public override string ToString() => $"{(ProtectionToken is not null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
+        internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken is not null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
     }
 
     public interface IExportable
@@ -227,10 +241,16 @@ namespace LanguageCore.Parser
 
     public class EnumMemberDefinition : IHaveKey<string>, IThingWithPosition
     {
-        public Token Identifier;
-        public Statement.Literal Value;
+        public readonly Token Identifier;
+        public readonly Statement.Literal? Value;
 
         public string Key => Identifier.Content;
+
+        public EnumMemberDefinition(Token identifier, Statement.Literal? value)
+        {
+            Identifier = identifier;
+            Value = value;
+        }
 
         public Position GetPosition()
             => new(Identifier, Value);
@@ -238,13 +258,20 @@ namespace LanguageCore.Parser
 
     public class EnumDefinition : IDefinition, IHaveKey<string>, IThingWithPosition
     {
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
 
         public string Key => Identifier.Content;
 
-        public Token Identifier;
-        public EnumMemberDefinition[] Members;
-        public FunctionDefinition.Attribute[] Attributes;
+        public readonly Token Identifier;
+        public readonly EnumMemberDefinition[] Members;
+        public readonly FunctionDefinition.Attribute[] Attributes;
+
+        public EnumDefinition(Token identifier, FunctionDefinition.Attribute[] attributes, EnumMemberDefinition[] members)
+        {
+            Identifier = identifier;
+            Attributes = attributes;
+            Members = members;
+        }
 
         public Position GetPosition()
         {
@@ -302,21 +329,22 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is not TemplateInfo other) return false;
             return this.Equals(other);
         }
 
-        public bool Equals(TemplateInfo other)
+        public bool Equals(TemplateInfo? other)
         {
+            if (other is null) return false;
             if (this.TypeParameters.Length != other.TypeParameters.Length) return false;
             return true;
         }
 
         public override int GetHashCode() => TypeParameters.GetHashCode();
 
-        public static bool operator ==(TemplateInfo a, TemplateInfo b)
+        public static bool operator ==(TemplateInfo? a, TemplateInfo? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
@@ -324,24 +352,19 @@ namespace LanguageCore.Parser
             return a.Equals(b);
         }
 
-        public static bool operator !=(TemplateInfo a, TemplateInfo b) => !(a == b);
+        public static bool operator !=(TemplateInfo? a, TemplateInfo? b) => !(a == b);
     }
 
     public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
     {
-        public Token BracketStart;
-        public Token BracketEnd;
-
         public ParameterDefinition[] Parameters;
-        public Statement.Statement[] Statements;
         public Token[] Modifiers;
+        public Statement.Block? Block;
 
         /// <summary>
         /// The first parameter is labeled as 'this'
         /// </summary>
         public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
-
-        public Statement.Block Block => (BracketStart is null || BracketEnd is null) ? null : new Statement.Block(BracketStart, Statements, BracketEnd);
 
         public int ParameterCount => Parameters.Length;
 
@@ -349,26 +372,25 @@ namespace LanguageCore.Parser
 
         public bool IsMacro => Modifiers.Contains("macro");
 
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
 
 
-        public readonly TemplateInfo TemplateInfo;
+        public readonly TemplateInfo? TemplateInfo;
 
-        protected FunctionThingDefinition(Token identifier, TemplateInfo templateInfo, IEnumerable<Token> modifiers)
+        protected FunctionThingDefinition(Token identifier, TemplateInfo? templateInfo, IEnumerable<Token> modifiers)
         {
             Identifier = identifier;
             TemplateInfo = templateInfo;
 
             Parameters = Array.Empty<ParameterDefinition>();
-            Statements = Array.Empty<Statement.Statement>();
             Modifiers = modifiers.ToArray();
         }
 
-        public virtual bool IsTemplate => TemplateInfo != null;
+        public virtual bool IsTemplate => TemplateInfo is not null;
 
         public readonly Token Identifier;
 
-        public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
+        public bool CanUse(string? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
         public string ReadableID()
         {
@@ -383,13 +405,13 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is not FunctionThingDefinition other) return false;
             return Equals(other);
         }
 
-        public bool Equals(FunctionThingDefinition other)
+        public bool Equals(FunctionThingDefinition? other)
         {
             if (other is null) return false;
             if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
@@ -402,6 +424,8 @@ namespace LanguageCore.Parser
             for (int i = 0; i < this.Modifiers.Length; i++)
             { if (this.Modifiers[i].Content != other.Modifiers[i].Content) return false; }
 
+            if (this.TemplateInfo is null != other.TemplateInfo is null) return false;
+            if (this.TemplateInfo is null) return false;
             if (!this.TemplateInfo.Equals(other.TemplateInfo)) return false;
 
             return true;
@@ -409,13 +433,13 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine(
             Parameters,
-            Statements,
+            Block,
             Modifiers,
             FilePath,
             TemplateInfo,
             Identifier);
 
-        public static bool operator ==(FunctionThingDefinition a, FunctionThingDefinition b)
+        public static bool operator ==(FunctionThingDefinition? a, FunctionThingDefinition? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
@@ -428,14 +452,13 @@ namespace LanguageCore.Parser
 
             return true;
         }
-        public static bool operator !=(FunctionThingDefinition a, FunctionThingDefinition b) => !(a == b);
+        public static bool operator !=(FunctionThingDefinition? a, FunctionThingDefinition? b) => !(a == b);
 
         public virtual Position GetPosition()
         {
             Position result = new(Identifier);
-            result.Extend(BracketStart);
-            result.Extend(BracketEnd);
             result.Extend(Parameters);
+            result.Extend(Block);
             result.Extend(Modifiers);
             return result;
         }
@@ -453,7 +476,7 @@ namespace LanguageCore.Parser
 
         public bool IsExport => Modifiers.Contains("export");
 
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
 
         public MacroDefinition(IEnumerable<Token> modifiers, Token keyword, Token identifier, IEnumerable<Token> parameters, Statement.Block block)
         {
@@ -483,13 +506,13 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (obj is not MacroDefinition other) return false;
             return Equals(other);
         }
 
-        public bool Equals(MacroDefinition other)
+        public bool Equals(MacroDefinition? other)
         {
             if (other is null) return false;
             if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
@@ -539,25 +562,33 @@ namespace LanguageCore.Parser
     {
         public class Attribute : IHaveKey<string>, IThingWithPosition
         {
-            public Token Identifier;
-            public object[] Parameters;
+            public readonly Token Identifier;
+            public readonly object[] Parameters;
 
             public string Key => Identifier.Content;
 
+            public Attribute(Token identifier, object[] parameters)
+            {
+                Identifier = identifier;
+                Parameters = parameters;
+            }
+
             public Position GetPosition()
-            { return new Position(Identifier); }
+                => new(Identifier);
         }
 
         public Attribute[] Attributes;
 
-        public TypeInstance Type;
+        public readonly TypeInstance Type;
 
         public FunctionDefinition(
-            Token identifier,
             IEnumerable<Token> modifiers,
-            TemplateInfo templateInfo)
+            TypeInstance type,
+            Token identifier,
+            TemplateInfo? templateInfo)
             : base(identifier, templateInfo, modifiers)
         {
+            Type = type;
             Attributes = Array.Empty<Attribute>();
         }
 
@@ -585,12 +616,8 @@ namespace LanguageCore.Parser
             }
             result += ')';
 
-            result += ' ';
+            result += Block?.ToString() ?? ";";
 
-            result += '{';
-            if (this.Statements.Length > 0)
-            { result += "..."; }
-            result += '}';
 
             return result;
         }
@@ -603,13 +630,7 @@ namespace LanguageCore.Parser
                 parameters.Add(parameter.PrettyPrint());
             }
 
-            List<string> statements = new();
-            foreach (var statement in this.Statements)
-            {
-                statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            return $"{" ".Repeat(ident)}{this.Type.Identifier.Content} {this.Identifier}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+            throw new NotImplementedException();
         }
 
         public bool IsSame(FunctionDefinition other)
@@ -654,12 +675,7 @@ namespace LanguageCore.Parser
             }
             result += ')';
 
-            result += ' ';
-
-            result += '{';
-            if (this.Statements.Length > 0)
-            { result += "..."; }
-            result += '}';
+            result += Block?.ToString() ?? ";";
 
             return result;
         }
@@ -672,13 +688,7 @@ namespace LanguageCore.Parser
                 parameters.Add(parameter.PrettyPrint());
             }
 
-            List<string> statements = new();
-            foreach (var statement in this.Statements)
-            {
-                statements.Add($"{" ".Repeat(ident)}" + statement.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            return $"{" ".Repeat(ident)}{this.Identifier.Content}" + ($"({string.Join(", ", parameters)})") + " " + (this.Statements.Length > 0 ? $"{{\n{string.Join("\n", statements)}\n}}" : "{}");
+            throw new NotImplementedException();
         }
     }
 
@@ -686,13 +696,13 @@ namespace LanguageCore.Parser
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
-        public Token BracketStart;
-        public Token BracketEnd;
-        public List<Statement.Statement> Statements;
-        public string FilePath { get; set; }
+        public readonly Token BracketStart;
+        public readonly Token BracketEnd;
+        public readonly List<Statement.Statement> Statements;
+        public string? FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
         public Token[] Modifiers;
-        public TemplateInfo TemplateInfo;
+        public TemplateInfo? TemplateInfo;
 
         public string Key => Name.Content;
 
@@ -708,6 +718,8 @@ namespace LanguageCore.Parser
 
         public ClassDefinition(
             Token name,
+            Token bracketStart,
+            Token bracketEnd,
             IEnumerable<FunctionDefinition.Attribute> attributes,
             IEnumerable<Token> modifiers,
             IEnumerable<FieldDefinition> fields,
@@ -716,6 +728,8 @@ namespace LanguageCore.Parser
             IEnumerable<FunctionDefinition> operators)
         {
             this.Name = name;
+            this.BracketStart = bracketStart;
+            this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
             this.methods = methods.ToArray();
             this.generalMethods = generalMethods.ToArray();
@@ -730,7 +744,7 @@ namespace LanguageCore.Parser
             string result = $"class";
             result += ' ';
             result += $"{this.Name.Content}";
-            if (this.TemplateInfo != null)
+            if (this.TemplateInfo is not null)
             {
                 result += '<';
                 result += string.Join<Token>(", ", this.TemplateInfo.TypeParameters);
@@ -779,12 +793,12 @@ namespace LanguageCore.Parser
     {
         public readonly FunctionDefinition.Attribute[] Attributes;
         public readonly Token Name;
-        public Token BracketStart;
-        public Token BracketEnd;
-        public List<Statement.Statement> Statements;
-        public Token[] Modifiers;
+        public readonly Token BracketStart;
+        public readonly Token BracketEnd;
+        public readonly List<Statement.Statement> Statements;
+        public readonly Token[] Modifiers;
 
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
 
         public string Key => Name.Content;
@@ -796,12 +810,16 @@ namespace LanguageCore.Parser
 
         public StructDefinition(
             Token name,
+            Token bracketStart,
+            Token bracketEnd,
             IEnumerable<FunctionDefinition.Attribute> attributes,
             IEnumerable<FieldDefinition> fields,
             IEnumerable<KeyValuePair<string, FunctionDefinition>> methods,
             IEnumerable<Token> modifiers)
         {
             this.Name = name;
+            this.BracketStart = bracketStart;
+            this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
             this.methods = new Dictionary<string, FunctionDefinition>(methods);
             this.Attributes = attributes.ToArray();
@@ -844,10 +862,10 @@ namespace LanguageCore.Parser
 
     public class UsingDefinition
     {
-        public Token[] Path;
-        public Token Keyword;
+        public readonly Token[] Path;
+        public readonly Token Keyword;
         /// <summary> Set by the Compiler </summary>
-        public string CompiledUri;
+        public string? CompiledUri;
         /// <summary> Set by the Compiler </summary>
         public double? DownloadTime;
 
@@ -865,5 +883,15 @@ namespace LanguageCore.Parser
             }
         }
         public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
+
+        public UsingDefinition(
+            Token keyword,
+            Token[] path)
+        {
+            Path = path;
+            Keyword = keyword;
+            CompiledUri = null;
+            DownloadTime = null;
+        }
     }
 }

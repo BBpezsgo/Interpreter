@@ -32,7 +32,7 @@ namespace LanguageCore.Runtime
             bool LogWarnings = true,
             bool LogInfo = true,
             bool HandleErrors = true,
-            string basePath = ""
+            string? basePath = null
             )
         {
             if (LogDebug) Output.Debug($"Run file \"{file.FullName}\" ...");
@@ -83,18 +83,18 @@ namespace LanguageCore.Runtime
 
                 if (sender.BytecodeInterpreter == null) return;
 
-                Console.WriteLine($"");
+                Console.WriteLine();
                 Console.WriteLine($" ===== HEAP ===== ");
-                Console.WriteLine($"");
+                Console.WriteLine();
 
                 sender.BytecodeInterpreter.Memory.Heap.DebugPrint();
 
                 if (sender.BytecodeInterpreter.Memory.Stack.Count > 0 &&
                     sender.BytecodeInterpreter.Memory.Stack is DataStack dataStack)
                 {
-                    Console.WriteLine($"");
+                    Console.WriteLine();
                     Console.WriteLine($" ===== STACK ===== ");
-                    Console.WriteLine($"");
+                    Console.WriteLine();
 
                     dataStack.DebugPrint();
                 }
@@ -103,7 +103,7 @@ namespace LanguageCore.Runtime
 
             if (interpreter.Initialize())
             {
-                string dllsFolderPath = Path.Combine(file.Directory.FullName, basePath.Replace('/', '\\'));
+                string dllsFolderPath = Path.Combine(file.Directory!.FullName, basePath?.Replace('/', '\\') ?? string.Empty);
 
                 if (Directory.Exists(dllsFolderPath))
                 {

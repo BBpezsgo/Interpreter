@@ -46,7 +46,7 @@ namespace TheProgram
             {
                 Result = new();
                 State = NormalizerState.None;
-                CurrentArg = "";
+                CurrentArg = string.Empty;
             }
 
             void FinishArgument()
@@ -54,11 +54,9 @@ namespace TheProgram
                 var currentArg = CurrentArg.Trim();
 
                 State = NormalizerState.None;
-                CurrentArg = "";
+                CurrentArg = string.Empty;
 
                 if (string.IsNullOrEmpty(currentArg)) return;
-                if (currentArg == "") return;
-                if (currentArg.Length == 0) return;
 
                 Result.Add(currentArg);
             }
@@ -68,7 +66,7 @@ namespace TheProgram
             {
                 Result.Clear();
                 State = NormalizerState.None;
-                CurrentArg = "";
+                CurrentArg = string.Empty;
 
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -414,7 +412,7 @@ namespace TheProgram
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
             public readonly bool HandleErrors => !ThrowErrors;
-            public string PipeName;
+            public string? PipeName;
             public int Port;
 
             public bool LogDebugs;
@@ -423,10 +421,10 @@ namespace TheProgram
             public bool LogInfo;
 
             public RunType RunType;
-            public string CompileOutput;
+            public string? CompileOutput;
             public CompressionLevel CompressionLevel;
-            public string BasePath;
-            public string TestID;
+            public string? BasePath;
+            public string? TestID;
             public FileType CompileToFileType;
             internal bool IsTest;
 
@@ -437,7 +435,7 @@ namespace TheProgram
                 LogSystem = true,
                 LogWarnings = true,
                 LogInfo = true,
-                BasePath = "",
+                BasePath = null,
                 RunType = RunType.Normal,
                 compilerSettings = Compiler.CompilerSettings.Default,
                 parserSettings = ParserSettings.Default,

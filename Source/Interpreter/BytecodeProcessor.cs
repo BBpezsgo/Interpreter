@@ -168,14 +168,14 @@ namespace LanguageCore.Runtime
         void THROW()
         {
             int pointer = Memory.Stack.Pop().ValueInt;
-            string value = null;
+            string? value = null;
             try
             {
                 value = Memory.Heap.GetString(pointer + 1, Memory.Heap[pointer].Integer ?? 0);
                 Memory.Heap.Deallocate(pointer);
             }
-            catch (System.Exception) { }
-            throw new UserException("User Exception Thrown", value);
+            catch (Exception) { }
+            throw new UserException("User Exception Thrown", value ?? "null");
         }
 
         void JUMP_BY()
@@ -549,7 +549,7 @@ namespace LanguageCore.Runtime
 
             string functionName = Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
 
-            if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase function))
+            if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }
 
             List<DataItem> parameters = new();

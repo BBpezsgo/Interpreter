@@ -33,7 +33,7 @@ namespace LanguageCore
         }
 
         /// <exception cref="NotImplementedException"/>
-        public static void Map<TKey, TValue>(TKey[] keys, TValue[] values, Dictionary<TKey, TValue> typeParameters)
+        public static void Map<TKey, TValue>(TKey[] keys, TValue[] values, Dictionary<TKey, TValue> typeParameters) where TKey : notnull
         {
             if (keys.Length != values.Length)
             { throw new NotImplementedException($"There should be the same number of keys as values"); }

@@ -2,8 +2,6 @@
 using System.Text;
 using Win32;
 
-#nullable enable
-
 namespace LanguageCore.Brainfuck.Renderer
 {
     internal class ConsoleRenderer : IDisposable

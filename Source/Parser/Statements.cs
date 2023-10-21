@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text;
 
 namespace LanguageCore.Parser.Statement
 {
@@ -10,32 +11,30 @@ namespace LanguageCore.Parser.Statement
 
     public static class StatementFinder
     {
-        public static bool GetAllStatement(Statement st, Func<Statement, bool> callback)
+        public static bool GetAllStatement(Statement? st, Func<Statement, bool>? callback)
         {
             if (st == null) return false;
             if (callback == null) return false;
 
-            if (callback?.Invoke(st) == true) return true;
+            if (callback.Invoke(st) == true) return true;
 
-            var statements = st.GetStatements();
+            IEnumerable<Statement> statements = st.GetStatements();
             return GetAllStatement(statements, callback);
         }
-        public static bool GetAllStatement(IEnumerable<Statement> statements, Func<Statement, bool> callback)
+        public static bool GetAllStatement(IEnumerable<Statement>? statements, Func<Statement, bool>? callback)
         {
-            if (statements is null) throw new ArgumentNullException(nameof(statements));
-
+            if (statements is null) return false;
             if (callback == null) return false;
 
-            foreach (var statement in statements)
+            foreach (Statement statement in statements)
             {
                 if (GetAllStatement(statement, callback)) return true;
             }
             return false;
         }
-        public static bool GetAllStatement(Statement[] statements, Func<Statement, bool> callback)
+        public static bool GetAllStatement(Statement[]? statements, Func<Statement, bool>? callback)
         {
-            if (statements is null) throw new ArgumentNullException(nameof(statements));
-
+            if (statements is null) return false;
             if (callback == null) return false;
 
             for (int i = 0; i < statements.Length; i++)
@@ -47,7 +46,7 @@ namespace LanguageCore.Parser.Statement
             }
             return false;
         }
-        public static void GetAllStatement(ParserResult parserResult, Func<Statement, bool> callback)
+        public static void GetAllStatement(ParserResult parserResult, Func<Statement, bool>? callback)
         {
             if (callback == null) return;
 
@@ -59,25 +58,24 @@ namespace LanguageCore.Parser.Statement
 
             for (int i = 0; i < parserResult.Functions.Length; i++)
             {
-                if (parserResult.Functions[i].Statements == null) continue;
-                GetAllStatement(parserResult.Functions[i].Statements, callback);
+                GetAllStatement(parserResult.Functions[i].Block?.Statements, callback);
             }
         }
-        public static void GetAllStatement(IEnumerable<FunctionDefinition> functions, Func<Statement, bool> callback)
+        public static void GetAllStatement(IEnumerable<FunctionDefinition>? functions, Func<Statement, bool>? callback)
         {
             if (callback == null) return;
             if (functions == null) return;
 
-            foreach (var item in functions)
-            { GetAllStatement(item.Statements, callback); }
+            foreach (FunctionDefinition item in functions)
+            { GetAllStatement(item.Block?.Statements, callback); }
         }
-        public static void GetAllStatement(IEnumerable<GeneralFunctionDefinition> functions, Func<Statement, bool> callback)
+        public static void GetAllStatement(IEnumerable<GeneralFunctionDefinition>? functions, Func<Statement, bool>? callback)
         {
             if (callback == null) return;
             if (functions == null) return;
 
-            foreach (var item in functions)
-            { GetAllStatement(item.Statements, callback); }
+            foreach (GeneralFunctionDefinition item in functions)
+            { GetAllStatement(item.Block?.Statements, callback); }
         }
     }
 
@@ -88,7 +86,7 @@ namespace LanguageCore.Parser.Statement
 
     public abstract class Statement : IThingWithPosition
     {
-        public Token Semicolon;
+        public Token? Semicolon;
 
         public override string ToString()
             => this.GetType().Name;
@@ -108,7 +106,6 @@ namespace LanguageCore.Parser.Statement
     public abstract class StatementWithValue : Statement
     {
         public bool SaveValue = true;
-        public virtual object TryGetValue() => null;
     }
 
     public class Block : Statement
@@ -137,6 +134,16 @@ namespace LanguageCore.Parser.Statement
 
             result += $"{" ".Repeat(ident)}}}";
             return result;
+        }
+
+        public override string ToString()
+        {
+            StringBuilder result = new(3);
+            result.Append('{');
+            if (Statements.Count > 0) result.Append("...");
+            else result.Append(' ');
+            result.Append('}');
+            return result.ToString();
         }
 
         public override IEnumerable<Statement> GetStatements()
@@ -178,7 +185,7 @@ namespace LanguageCore.Parser.Statement
         /// <item><see langword="null"/></item>
         /// </list>
         /// </summary>
-        public LinkedIfThing NextLink;
+        public LinkedIfThing? NextLink;
 
         public LinkedIf(Token keyword, StatementWithValue condition, Block block) : base(keyword, block)
         {
@@ -216,7 +223,7 @@ namespace LanguageCore.Parser.Statement
         public readonly Token HashName;
         public readonly Literal[] Parameters;
 
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
 
         public CompileTag(Token hashToken, Token hashName, Literal[] parameters)
         {
@@ -275,12 +282,12 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly TypeInstance Type;
         public readonly Token VariableName;
-        public readonly StatementWithValue InitialValue;
+        public readonly StatementWithValue? InitialValue;
         public readonly Token[] Modifiers;
 
-        public string FilePath { get; set; }
+        public string? FilePath { get; set; }
 
-        public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue initialValue)
+        public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
         {
             Type = type;
             VariableName = variableName;
@@ -303,7 +310,7 @@ namespace LanguageCore.Parser.Statement
 
         public override IEnumerable<Statement> GetStatements()
         {
-            yield return InitialValue;
+            if (InitialValue != null) yield return InitialValue;
         }
     }
 
@@ -312,7 +319,7 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token Identifier;
         public readonly StatementWithValue[] Parameters;
-        public readonly StatementWithValue PrevStatement;
+        public readonly StatementWithValue? PrevStatement;
 
         public readonly Token BracketLeft;
         public readonly Token BracketRight;
@@ -331,7 +338,7 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        public FunctionCall(StatementWithValue prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
+        public FunctionCall(StatementWithValue? prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
             PrevStatement = prevStatement;
             Identifier = identifier;
@@ -477,15 +484,15 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token Operator;
         public readonly StatementWithValue Left;
-        public StatementWithValue Right;
+        public StatementWithValue? Right;
         public bool InsideBracelet;
 
         public StatementWithValue[] Parameters
         {
             get
             {
-                StatementWithValue left = this.Left;
-                StatementWithValue right = this.Right;
+                StatementWithValue? left = this.Left;
+                StatementWithValue? right = this.Right;
 
                 if (left is null && right is not null)
                 { return new StatementWithValue[] { right }; }
@@ -509,7 +516,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public OperatorCall(Token op, StatementWithValue left) : this(op, left, null) { }
-        public OperatorCall(Token op, StatementWithValue left, StatementWithValue right)
+        public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right)
         {
             this.Operator = op;
             this.Left = left;
@@ -573,94 +580,6 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        public override object TryGetValue()
-        {
-            switch (this.Operator.Content)
-            {
-                case "+":
-                    {
-                        if (Left == null) return null;
-                        if (Right == null) return null;
-
-                        var leftVal = Left.TryGetValue();
-                        if (leftVal == null) return null;
-
-                        var rightVal = Right.TryGetValue();
-                        if (rightVal == null) return null;
-
-                        if (leftVal is int leftInt && rightVal is int rightInt)
-                        { return leftInt + rightInt; }
-
-                        if (leftVal is float leftFloat && rightVal is float rightFloat)
-                        { return leftFloat + rightFloat; }
-
-                        if (leftVal is string leftStr && rightVal is string rightStr)
-                        { return leftStr + rightStr; }
-                    }
-
-                    return null;
-                case "-":
-                    {
-                        if (Left == null) return null;
-                        if (Right == null) return null;
-
-                        var leftVal = Left.TryGetValue();
-                        if (leftVal == null) return null;
-
-                        var rightVal = Right.TryGetValue();
-                        if (rightVal == null) return null;
-
-                        if (leftVal is int leftInt && rightVal is int rightInt)
-                        { return leftInt - rightInt; }
-
-                        if (leftVal is float leftFloat && rightVal is float rightFloat)
-                        { return leftFloat - rightFloat; }
-                    }
-
-                    return null;
-                case "*":
-                    {
-                        if (Left == null) return null;
-                        if (Right == null) return null;
-
-                        var leftVal = Left.TryGetValue();
-                        if (leftVal == null) return null;
-
-                        var rightVal = Right.TryGetValue();
-                        if (rightVal == null) return null;
-
-                        if (leftVal is int leftInt && rightVal is int rightInt)
-                        { return leftInt * rightInt; }
-
-                        if (leftVal is float leftFloat && rightVal is float rightFloat)
-                        { return leftFloat * rightFloat; }
-                    }
-
-                    return null;
-                case "/":
-                    {
-                        if (Left == null) return null;
-                        if (Right == null) return null;
-
-                        var leftVal = Left.TryGetValue();
-                        if (leftVal == null) return null;
-
-                        var rightVal = Right.TryGetValue();
-                        if (rightVal == null) return null;
-
-                        if (leftVal is int leftInt && rightVal is int rightInt)
-                        { return leftInt / rightInt; }
-
-                        if (leftVal is float leftFloat && rightVal is float rightFloat)
-                        { return leftFloat / rightFloat; }
-                    }
-
-                    return null;
-                default:
-                    return null;
-            }
-        }
-
         public override Position GetPosition()
             => new(Operator, Left, Right);
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
@@ -681,7 +600,7 @@ namespace LanguageCore.Parser.Statement
         public override IEnumerable<Statement> GetStatements()
         {
             yield return Left;
-            yield return Right;
+            if (Right != null) yield return Right;
         }
     }
 
@@ -916,7 +835,7 @@ namespace LanguageCore.Parser.Statement
             LiteralType.BOOLEAN => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             LiteralType.STRING => $"\"{Value}\"",
             LiteralType.CHAR => $"'{Value}'",
-            _ => null,
+            _ => throw new ImpossibleException(),
         };
 
         public override string PrettyPrint(int ident = 0)
@@ -924,7 +843,7 @@ namespace LanguageCore.Parser.Statement
             return $"{" ".Repeat(ident)}{Value}";
         }
 
-        public override object TryGetValue()
+        public object? TryGetValue()
             => Type switch
             {
                 LiteralType.INT => int.Parse(Value),
@@ -1131,7 +1050,7 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        LinkedIfThing ToLinks(int i)
+        LinkedIfThing? ToLinks(int i)
         {
             if (i >= Parts.Length)
             { return null; }
@@ -1366,7 +1285,7 @@ namespace LanguageCore.Parser.Statement
     [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class IndexCall : StatementWithValue, IReadableID
     {
-        public StatementWithValue PrevStatement;
+        public StatementWithValue? PrevStatement;
 
         public readonly StatementWithValue Expression;
         public readonly Token BracketLeft;
@@ -1394,7 +1313,9 @@ namespace LanguageCore.Parser.Statement
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = TypeSearch.Invoke(this.PrevStatement).Name;
+            string result = string.Empty;
+            if (PrevStatement != null) result += TypeSearch.Invoke(this.PrevStatement).Name;
+            else result += "null";
             result += "[";
             result += TypeSearch.Invoke(this.Expression).Name;
             result += "]";
@@ -1404,7 +1325,7 @@ namespace LanguageCore.Parser.Statement
 
         public override IEnumerable<Statement> GetStatements()
         {
-            yield return PrevStatement;
+            if (PrevStatement != null) yield return PrevStatement;
             yield return Expression;
         }
     }

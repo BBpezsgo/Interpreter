@@ -67,9 +67,9 @@ namespace TheProgram
                     LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new System.IO.FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
+                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
                     LanguageCore.Runtime.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
-                    System.IO.File.WriteAllBytes(settings.Value.CompileOutput, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
+                    File.WriteAllBytes(settings.Value.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
                     break;
                 case ArgumentParser.RunType.Decompile:
                     throw new NotImplementedException();
@@ -79,7 +79,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.IL:
                     {
                         LanguageCore.Tokenizing.Tokenizer tokenizer = new(LanguageCore.Tokenizing.TokenizerSettings.Default, null); ;
-                        LanguageCore.Tokenizing.Token[] tokens = tokenizer.Parse(System.IO.File.ReadAllText(settings.Value.File.FullName));
+                        LanguageCore.Tokenizing.Token[] tokens = tokenizer.Parse(File.ReadAllText(settings.Value.File.FullName));
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
@@ -108,10 +108,10 @@ namespace TheProgram
 
                         if (File.Exists(OutputFile + ".exe"))
                         {
-                            Process process = Process.Start(new ProcessStartInfo(OutputFile + ".exe"));
-                            process.WaitForExit();
+                            Process? process = Process.Start(new ProcessStartInfo(OutputFile + ".exe"));
+                            process?.WaitForExit();
                             Console.WriteLine();
-                            Console.WriteLine($"Exit code: {process.ExitCode}");
+                            Console.WriteLine($"Exit code: {process?.ExitCode}");
                         }
 
                         /*

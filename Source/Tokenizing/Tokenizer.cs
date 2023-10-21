@@ -138,9 +138,9 @@ namespace LanguageCore.Tokenizing
             Position = LanguageCore.Position.UnknownPosition.Range,
         };
 
-        public override bool Equals(object obj) => obj is Token other && Equals(other);
+        public override bool Equals(object? obj) => obj is Token other && Equals(other);
 
-        public bool Equals(Token other) =>
+        public bool Equals(Token? other) =>
             other is not null &&
             Position.Equals(other.Position) &&
             AbsolutePosition.Equals(other.AbsolutePosition) &&
@@ -150,16 +150,16 @@ namespace LanguageCore.Tokenizing
 
         public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
 
-        public static bool operator ==(Token a, string b)
+        public static bool operator ==(Token? a, string? b)
         {
             if (a is null && b is null) return true;
             if (a is null && b is not null) return false;
             if (a is not null && b is null) return false;
-            return a.Content == b;
+            return a?.Content == b;
         }
-        public static bool operator !=(Token a, string b) => !(a == b);
-        public static bool operator ==(string a, Token b) => b == a;
-        public static bool operator !=(string a, Token b) => b != a;
+        public static bool operator !=(Token? a, string? b) => !(a == b);
+        public static bool operator ==(string? a, Token? b) => b == a;
+        public static bool operator !=(string? a, Token? b) => b != a;
     }
 
     public readonly struct SimpleToken
@@ -212,7 +212,7 @@ namespace LanguageCore.Tokenizing
         readonly List<Token> Tokens;
 
         readonly TokenizerSettings Settings;
-        readonly PrintCallback Print;
+        readonly PrintCallback? Print;
 
         static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] Banned = new char[] { '\r', '\u200B' };
@@ -224,7 +224,7 @@ namespace LanguageCore.Tokenizing
         /// Tokenizer settings<br/>
         /// Use <see cref="TokenizerSettings.Default"/> if you don't know
         /// </param>
-        public Tokenizer(TokenizerSettings settings, PrintCallback printCallback = null)
+        public Tokenizer(TokenizerSettings settings, PrintCallback? printCallback = null)
         {
             CurrentToken = new()
             {
@@ -265,7 +265,7 @@ namespace LanguageCore.Tokenizing
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings)
+        public Token[] Parse(string sourceCode, List<Warning>? warnings)
             => Parse(sourceCode, warnings, null, null);
 
         /// <summary>
@@ -276,7 +276,7 @@ namespace LanguageCore.Tokenizing
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath)
+        public Token[] Parse(string sourceCode, List<Warning>? warnings, string? filePath)
             => Parse(sourceCode, warnings, filePath, null);
 
         /// <summary>
@@ -287,12 +287,12 @@ namespace LanguageCore.Tokenizing
         /// </param>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning> warnings, string filePath, List<SimpleToken> unicodeCharacters)
+        public Token[] Parse(string sourceCode, List<Warning>? warnings, string? filePath, List<SimpleToken>? unicodeCharacters)
         {
             DateTime tokenizingStarted = DateTime.Now;
             Print?.Invoke("Tokenizing ...", LogType.Debug);
 
-            string savedUnicode = null;
+            string? savedUnicode = null;
 
             for (int OffsetTotal = 0; OffsetTotal < sourceCode.Length; OffsetTotal++)
             {

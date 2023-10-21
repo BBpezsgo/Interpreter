@@ -81,7 +81,7 @@ namespace LanguageCore.Runtime
 
         public void DoUpdate()
         {
-            Instruction nextInstruction = NextInstruction;
+            Instruction? nextInstruction = NextInstruction;
             if (nextInstruction != null)
             {
                 _externalFunctionOperation =
@@ -154,7 +154,7 @@ namespace LanguageCore.Runtime
             {
                 DoUpdate();
 
-                if (BytecodeInterpreter.CodePointer == AbsoluteBreakpoint) break;
+                if (BytecodeInterpreter!.CodePointer == AbsoluteBreakpoint) break;
 
                 if (endlessSafe-- < 0) throw new EndlessLoopException();
             }

@@ -9,7 +9,7 @@ namespace LanguageCore.Brainfuck
 
     public class EasyCompiler
     {
-        string BasePath;
+        string? BasePath;
         BBCode.Compiler.Compiler.CompilerSettings compilerSettings;
         CodeGenerator.Settings generatorSettings;
 
@@ -20,7 +20,7 @@ namespace LanguageCore.Brainfuck
 
         Result Compile_(
             FileInfo file,
-            PrintCallback printCallback
+            PrintCallback? printCallback
             )
         {
             string sourceCode = File.ReadAllText(file.FullName);
@@ -64,7 +64,7 @@ namespace LanguageCore.Brainfuck
                     file,
                     Parser.ParserSettings.Default,
                     printCallback,
-                    this.BasePath ?? "");
+                    this.BasePath);
 
                 foreach (Warning warning in compilerResult.Warnings)
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
@@ -104,17 +104,13 @@ namespace LanguageCore.Brainfuck
             FileInfo file,
             BBCode.Compiler.Compiler.CompilerSettings compilerSettings,
             CodeGenerator.Settings generatorSettings,
-            PrintCallback printCallback = null,
-            string basePath = ""
-            )
+            PrintCallback? printCallback = null,
+            string? basePath = null
+            ) => new EasyCompiler()
         {
-            EasyCompiler easyCompiler = new()
-            {
-                BasePath = basePath,
-                compilerSettings = compilerSettings,
-                generatorSettings = generatorSettings,
-            };
-            return easyCompiler.Compile_(file, printCallback);
-        }
+            BasePath = basePath,
+            compilerSettings = compilerSettings,
+            generatorSettings = generatorSettings,
+        }.Compile_(file, printCallback);
     }
 }

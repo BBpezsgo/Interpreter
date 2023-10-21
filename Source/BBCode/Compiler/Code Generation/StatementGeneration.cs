@@ -51,7 +51,7 @@ namespace LanguageCore.BBCode.Compiler
             if (InMacro.Last)
             { throw new NotImplementedException(); }
 
-            if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable compiledVariable))
+            if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable? compiledVariable))
             { throw new InternalException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
 
             newVariable.Type.SetAnalyzedType(compiledVariable.Type);
@@ -311,7 +311,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (GetVariable(functionCall.Identifier.Content, out CompiledVariable compiledVariable))
+            if (GetVariable(functionCall.Identifier.Content, out CompiledVariable? compiledVariable))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
 
@@ -322,7 +322,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (GetParameter(functionCall.Identifier.Content, out CompiledParameter compiledParameter))
+            if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalysedType.ParameterName;
 
@@ -336,12 +336,12 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (TryGetMacro(functionCall, out MacroDefinition macro))
+            if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
 
-                string prevFile = CurrentFile;
-                IAmInContext<CompiledClass> prevContext = CurrentContext;
+                string? prevFile = CurrentFile;
+                IAmInContext<CompiledClass>? prevContext = CurrentContext;
 
                 CurrentFile = macro.FilePath;
                 CurrentContext = null;
@@ -366,7 +366,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
@@ -718,7 +718,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (GetOperator(@operator, out CompiledOperator operatorDefinition))
+            if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
             {
                 @operator.Operator.AnalyzedType = TokenAnalysedType.FunctionName;
 
@@ -736,7 +736,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (operatorDefinition.IsExternal)
                 {
-                    if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase externalFunction))
+                    if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
                     {
                         Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
                         AddComment("}");
@@ -890,7 +890,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (@operator.ParameterCount != 2)
                 { throw new CompilerException($"Wrong number of parameters passed to assignment operator '{@operator.Operator.Content}': required {2} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
-                GenerateCodeForValueSetter(@operator.Left, @operator.Right);
+                GenerateCodeForValueSetter(@operator.Left, @operator.Right!);
             }
             else
             { throw new CompilerException($"Unknown operator '{@operator.Operator.Content}'", @operator.Operator, CurrentFile); }
@@ -962,7 +962,7 @@ namespace LanguageCore.BBCode.Compiler
             AddComment("}");
         }
 
-        void GenerateCodeForStatement(Identifier variable, CompiledType expectedType = null)
+        void GenerateCodeForStatement(Identifier variable, CompiledType? expectedType = null)
         {
             if (GetConstant(variable.Content, out DataItem constant))
             {
@@ -970,7 +970,7 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (GetParameter(variable.Content, out CompiledParameter param))
+            if (GetParameter(variable.Content, out CompiledParameter? param))
             {
                 variable.Name.AnalyzedType = TokenAnalysedType.ParameterName;
                 ValueAddress address = GetBaseAddress(param);
@@ -983,14 +983,14 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (GetVariable(variable.Content, out CompiledVariable val))
+            if (GetVariable(variable.Content, out CompiledVariable? val))
             {
                 variable.Name.AnalyzedType = TokenAnalysedType.VariableName;
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
-            if (GetFunction(variable.Name, expectedType, out CompiledFunction compiledFunction))
+            if (GetFunction(variable.Name, expectedType, out CompiledFunction? compiledFunction))
             {
                 variable.Name.AnalyzedType = TokenAnalysedType.FunctionName;
 
@@ -1229,10 +1229,10 @@ namespace LanguageCore.BBCode.Compiler
                     CompiledField field = instanceType.Class.Fields[fieldIndex];
                     AddComment($"Create Field '{field.Identifier.Content}' ({fieldIndex}) {{");
 
-                    CompiledType fieldType = field.Type;
+                    CompiledType? fieldType = field.Type;
 
                     if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
-                    { throw new CompilerException($"Type argument \"{fieldType.Name}\" not found", field, instanceType.Class.FilePath); }
+                    { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
 
                     GenerateInitialValue(fieldType, j =>
                     {
@@ -1242,7 +1242,7 @@ namespace LanguageCore.BBCode.Compiler
                         AddInstruction(Opcode.MATH_ADD);
                         AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
                         currentOffset++;
-                    }, $"{instanceType.Class.Name.Content}.{field.Identifier.Content}");
+                    });
                     AddComment("}");
                 }
 
@@ -1270,7 +1270,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!GetClass(constructorCall, out var @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -1409,7 +1409,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (computedIndexData.ValueInt < 0 || computedIndexData.ValueInt >= prevType.StackArraySize)
                     { Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
 
-                    if (GetParameter(identifier.Content, out CompiledParameter param))
+                    if (GetParameter(identifier.Content, out CompiledParameter? param))
                     {
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
@@ -1423,7 +1423,7 @@ namespace LanguageCore.BBCode.Compiler
                         return;
                     }
 
-                    if (GetVariable(identifier.Content, out CompiledVariable val))
+                    if (GetVariable(identifier.Content, out CompiledVariable? val))
                     {
                         if (val.Type != prevType)
                         { throw new NotImplementedException(); }
@@ -1459,7 +1459,7 @@ namespace LanguageCore.BBCode.Compiler
                 throw new NotImplementedException();
             }
 
-            if (!GetIndexGetter(prevType, out CompiledFunction indexer))
+            if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
@@ -1568,7 +1568,7 @@ namespace LanguageCore.BBCode.Compiler
             OnScopeExit();
         }
 
-        void GenerateCodeForStatement(Statement statement, CompiledType expectedType = null)
+        void GenerateCodeForStatement(Statement statement, CompiledType? expectedType = null)
         {
             int startInstruction = GeneratedCode.Count;
 
@@ -1650,7 +1650,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (item.ShouldDeallocate)
                 {
                     if (item.Size != 1) throw new InternalException();
-                    GenerateDeallocator(item.Type);
+                    GenerateDeallocator(item.Type!);
                 }
                 else
                 {
@@ -1680,7 +1680,7 @@ namespace LanguageCore.BBCode.Compiler
             if (GetConstant(statementToSet.Content, out _))
             { throw new CompilerException($"Can not set constant value: it is readonly", statementToSet, CurrentFile); }
 
-            if (GetParameter(statementToSet.Content, out CompiledParameter parameter))
+            if (GetParameter(statementToSet.Content, out CompiledParameter? parameter))
             {
                 CompiledType valueType = FindStatementType(value, parameter.Type);
 
@@ -1700,7 +1700,7 @@ namespace LanguageCore.BBCode.Compiler
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
                 }
             }
-            else if (GetVariable(statementToSet.Content, out CompiledVariable variable))
+            else if (GetVariable(statementToSet.Content, out CompiledVariable? variable))
             {
                 CompiledType valueType = FindStatementType(value, variable.Type);
 
@@ -1779,7 +1779,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (GetParameter(identifier.Content, out _))
                     { throw new NotImplementedException(); }
 
-                    if (GetVariable(identifier.Content, out CompiledVariable variable))
+                    if (GetVariable(identifier.Content, out CompiledVariable? variable))
                     {
                         if (variable.Type != prevType)
                         { throw new NotImplementedException(); }
@@ -1799,7 +1799,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!prevType.IsClass)
             { throw new CompilerException($"Index setter for type \"{prevType.Name}\" not found", statementToSet, CurrentFile); }
 
-            if (!GetIndexSetter(prevType, valueType, out CompiledFunction indexer))
+            if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
             {
                 if (!GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index setter for class \"{prevType.Class.Name}\" not found", statementToSet, CurrentFile); }
@@ -2258,7 +2258,7 @@ namespace LanguageCore.BBCode.Compiler
             AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
             TagCount.Last++;
 
-            OnScopeEnter(function.Block);
+            OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
@@ -2310,8 +2310,8 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             AddComment("Statements {");
-            for (int i = 0; i < function.Statements.Length; i++)
-            { GenerateCodeForStatement(function.Statements[i]); }
+            for (int i = 0; i < function.Block.Statements.Count; i++)
+            { GenerateCodeForStatement(function.Block.Statements[i]); }
             AddComment("}");
 
             CurrentFile = null;

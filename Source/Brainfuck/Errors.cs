@@ -27,7 +27,7 @@ namespace LanguageCore.Brainfuck
 
         protected BrainfuckRuntimeException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            RuntimeContext = (RuntimeContext)info.GetValue("RuntimeContext", typeof(RuntimeContext));
+            RuntimeContext = (RuntimeContext)info.GetValue("RuntimeContext", typeof(RuntimeContext))!;
         }
     }
 }

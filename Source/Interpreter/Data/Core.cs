@@ -189,13 +189,13 @@ namespace LanguageCore.Runtime
             _ => throw new ImpossibleException(),
         };
 
-        public readonly object GetValue() => type switch
+        public readonly object? GetValue() => type switch
         {
             RuntimeType.BYTE => (object)valueByte,
             RuntimeType.INT => (object)valueInt,
             RuntimeType.FLOAT => (object)valueFloat,
             RuntimeType.CHAR => (object)valueChar,
-            RuntimeType.NULL => (object)null,
+            RuntimeType.NULL => (object?)null,
             _ => throw new ImpossibleException(),
         };
 
@@ -213,14 +213,14 @@ namespace LanguageCore.Runtime
         /// <exception cref="ImpossibleException"/>
         public readonly string GetDebuggerDisplay()
         {
-            if (IsNull) return null;
+            if (IsNull) return "null";
             return Type switch
             {
                 RuntimeType.INT => ValueInt.ToString(),
                 RuntimeType.BYTE => ValueByte.ToString(),
                 RuntimeType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
                 RuntimeType.CHAR => $"'{ValueChar.Escape()}'",
-                RuntimeType.NULL => null,
+                RuntimeType.NULL => "null",
                 _ => throw new ImpossibleException(),
             };
         }
@@ -249,7 +249,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="NotImplementedException"/>
-        public readonly override bool Equals(object obj)
+        public readonly override bool Equals(object? obj)
             => obj is DataItem value &&
             this.Type == value.Type &&
             this.Type switch

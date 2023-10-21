@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -46,15 +47,16 @@ namespace LanguageCore.IL.Compiler
 
         }
 
-        protected override bool GetLocalSymbolType(string symbolName, out CompiledType type)
+        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
             type = null;
             return false;
         }
 
         #region Precompile
-        void Precompile(Statement[] statements)
+        void Precompile(IEnumerable<Statement>? statements)
         {
+            if (statements == null) return;
             foreach (Statement statement in statements)
             { Precompile(statement); }
         }
@@ -77,7 +79,7 @@ namespace LanguageCore.IL.Compiler
         }
         void Precompile(CompiledFunction function)
         {
-            Precompile(function.Statements);
+            Precompile(function.Block?.Statements);
         }
         #endregion
 
@@ -126,7 +128,7 @@ namespace LanguageCore.IL.Compiler
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
 
-            if (!GetIndexGetter(arrayType, out CompiledFunction indexer))
+            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
                 { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
@@ -171,10 +173,10 @@ namespace LanguageCore.IL.Compiler
         }
         int GetValueSize(ConstructorCall constructorCall)
         {
-            if (!GetClass(constructorCall, out CompiledClass @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -209,7 +211,7 @@ namespace LanguageCore.IL.Compiler
                 ))
             { return 1; }
 
-            if (GetFunction(functionCall, out CompiledFunction function))
+            if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 if (!function.ReturnSomething)
                 { return 0; }
@@ -343,8 +345,8 @@ namespace LanguageCore.IL.Compiler
             { Compile(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
             { Compile(compoundAssignment); }
-            else if (statement is VariableDeclaration variableDeclaretion)
-            { Compile(variableDeclaretion); }
+            else if (statement is VariableDeclaration variableDeclaration)
+            { Compile(variableDeclaration); }
             else if (statement is TypeCast typeCast)
             { Compile(typeCast); }
             else if (statement is NewInstance newInstance)
@@ -360,7 +362,7 @@ namespace LanguageCore.IL.Compiler
 
             if (statement is FunctionCall statementWithValue &&
                 !statementWithValue.SaveValue &&
-                GetFunction(statementWithValue, out CompiledFunction _f) &&
+                GetFunction(statementWithValue, out CompiledFunction? _f) &&
                 _f.ReturnSomething)
             {
                 throw new NotImplementedException();
@@ -492,7 +494,7 @@ namespace LanguageCore.IL.Compiler
                 throw new NotImplementedException();
             }
 
-            if (!GetFunction(functionCall, out CompiledFunction compiledFunction))
+            if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
@@ -514,10 +516,10 @@ namespace LanguageCore.IL.Compiler
 
             instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
 
-            if (!GetClass(constructorCall, out CompiledClass @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -648,9 +650,9 @@ namespace LanguageCore.IL.Compiler
             MethodBuilder methodBuilder = type.DefineMethod("Main", MethodAttributes.Public | MethodAttributes.Static);
 
 
-            System.Type consoleType = System.Type.GetType("System.Console, System.Console", true);
+            System.Type? consoleType = System.Type.GetType("System.Console, System.Console", true);
 
-            MethodInfo methodInfo = consoleType.GetMethod(nameof(Console.WriteLine), new System.Type[]
+            MethodInfo? methodInfo = consoleType?.GetMethod(nameof(Console.WriteLine), new System.Type[]
             {
                 typeof(string),
             });
@@ -670,7 +672,7 @@ namespace LanguageCore.IL.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            PrintCallback printCallback = null)
+            PrintCallback? printCallback = null)
         {
             (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, Compiler.CompileLevel.Minimal);
 
@@ -684,13 +686,13 @@ namespace LanguageCore.IL.Compiler
 
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements, typeBuilder);
 
-            System.Type type = typeBuilder.CreateType();
-            Assembly assembly = Assembly.GetAssembly(type!);
+            System.Type? type = typeBuilder.CreateType();
+            Assembly? assembly = Assembly.GetAssembly(type!);
 
             return new Result()
             {
                 Tokens = compilerResult.Tokens,
-                Assembly = assembly,
+                Assembly = assembly!,
 
                 Warnings = this.Warnings.ToArray(),
                 Errors = this.Errors.ToArray(),
@@ -701,7 +703,7 @@ namespace LanguageCore.IL.Compiler
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
-            PrintCallback printCallback = null)
+            PrintCallback? printCallback = null)
         {
             CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(

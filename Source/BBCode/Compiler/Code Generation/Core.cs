@@ -17,9 +17,9 @@ namespace LanguageCore.BBCode.Compiler
 
         public readonly bool ShouldDeallocate;
 
-        public readonly CompiledType Type;
+        public readonly CompiledType? Type;
 
-        public CleanupItem(int size, bool shouldDeallocate, CompiledType type)
+        public CleanupItem(int size, bool shouldDeallocate, CompiledType? type)
         {
             Size = size;
             ShouldDeallocate = shouldDeallocate;
@@ -72,7 +72,7 @@ namespace LanguageCore.BBCode.Compiler
         readonly Dictionary<string, int> ExternalFunctionsCache;
 
         readonly Stack<CleanupItem[]> CleanupStack;
-        IAmInContext<CompiledClass> CurrentContext;
+        IAmInContext<CompiledClass>? CurrentContext;
         readonly List<CompiledParameter> CompiledParameters;
         readonly List<KeyValuePair<string, CompiledVariable>> CompiledVariables;
 
@@ -229,7 +229,7 @@ namespace LanguageCore.BBCode.Compiler
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            PrintCallback printCallback = null,
+            PrintCallback? printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
         {
             base.CompiledClasses = compilerResult.Classes;
@@ -249,7 +249,7 @@ namespace LanguageCore.BBCode.Compiler
                     level
                     );
 
-            CompiledFunction codeEntry = GetCodeEntry();
+            CompiledFunction? codeEntry = GetCodeEntry();
 
             List<string> UsedExternalFunctions = new();
 
@@ -339,9 +339,9 @@ namespace LanguageCore.BBCode.Compiler
                     GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
                 }
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Statements.Length > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
                 CurrentContext = null;
             }
 
@@ -356,9 +356,9 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentContext = function;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Statements.Length > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
                 CurrentContext = null;
             }
 
@@ -370,11 +370,11 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentContext = function;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function);
 
-                if (function.Statements.Length > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
 
                 CurrentContext = null;
             }
@@ -397,11 +397,11 @@ namespace LanguageCore.BBCode.Compiler
 
                     AddTypeArguments(function.TypeArguments);
 
-                    AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                    AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
                     GenerateCodeForFunction(function.Function);
 
-                    if (function.Function.Statements.Length > 0) AddCommentForce("}");
+                    if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
 
                     CurrentContext = null;
                     TypeArguments.Clear();
@@ -415,11 +415,11 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddTypeArguments(function.TypeArguments);
 
-                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Statements.Length > 0) AddCommentForce("}");
+                if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
 
                 CurrentContext = null;
                 TypeArguments.Clear();
@@ -432,11 +432,11 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddTypeArguments(function.TypeArguments);
 
-                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Statements.Length > 0) ? "" : " }"));
+                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Statements.Length > 0) AddCommentForce("}");
+                if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
 
                 CurrentContext = null;
                 TypeArguments.Clear();
@@ -444,7 +444,8 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (UndefinedFunctionOffset item in UndefinedFunctionOffsets)
             {
-                CompiledFunction function = item.Function;
+                CompiledFunction? function = item.Function;
+                if (function is null) throw new InternalException();
                 bool useAbsolute;
 
                 if (item.CallStatement != null)
@@ -528,16 +529,13 @@ namespace LanguageCore.BBCode.Compiler
         public static Result Generate(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
-            PrintCallback printCallback = null,
+            PrintCallback? printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
-        {
-            CodeGenerator codeGenerator = new(settings);
-            return codeGenerator.GenerateCode(
-                compilerResult,
-                settings,
-                printCallback,
-                level
-                );
-        }
+            => new CodeGenerator(settings).GenerateCode(
+            compilerResult,
+            settings,
+            printCallback,
+            level
+        );
     }
 }

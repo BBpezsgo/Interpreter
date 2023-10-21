@@ -8,7 +8,7 @@ namespace TheProgram
         internal static string Current => Convert(DateTime.Now);
         static DateTime UploadedSavedD;
 
-        internal static string UploadedSaved { get; private set; }
+        internal static string? UploadedSaved { get; private set; }
         internal static string Uploaded
         {
             get
@@ -24,7 +24,7 @@ namespace TheProgram
                 string res = result.Content.ReadAsStringAsync().Result;
 
                 System.Text.Json.JsonDocument resJson = System.Text.Json.JsonDocument.Parse(res);
-                string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString();
+                string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString()!;
                 
                 DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr);
                 UploadedSaved = Convert(lastCommitDate);
@@ -48,7 +48,7 @@ namespace TheProgram
 
                 StateCallback?.Invoke("Parse content");
                 System.Text.Json.JsonDocument resJson = System.Text.Json.JsonDocument.Parse(res);
-                string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString();
+                string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString()!;
 
                 DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr);
                 UploadedSavedD = lastCommitDate;

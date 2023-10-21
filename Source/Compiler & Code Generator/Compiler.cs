@@ -5,42 +5,13 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using Runtime;
-    using DataUtilities.Serializer;
     using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
+    using Runtime;
 
     public class Compiler
     {
-        public class CompilerResult : ISerializable<CompilerResult>
-        {
-            public Instruction[] Code { get; set; }
-
-            public CompiledFunction[] Functions { get; set; }
-            public CompiledStruct[] Structs { get; set; }
-
-            public Dictionary<string, int> Offsets { get; set; }
-            internal DebugInformation DebugInfo { get; set; }
-
-            public CompilerResult()
-            {
-
-            }
-
-            void ISerializable<CompilerResult>.Serialize(Serializer serializer)
-            {
-                serializer.Serialize(Code);
-                serializer.Serialize(Offsets);
-            }
-
-            void ISerializable<CompilerResult>.Deserialize(Deserializer deserializer)
-            {
-                this.Code = deserializer.DeserializeObjectArray<Instruction>();
-                this.Offsets = deserializer.DeserializeDictionary<string, int>();
-            }
-        }
-
         public struct CompilerSettings
         {
             public bool GenerateComments;
@@ -68,8 +39,8 @@ namespace LanguageCore.BBCode.Compiler
             All,
         }
 
-        List<Error> Errors;
-        List<Warning> Warnings;
+        readonly List<Error> Errors;
+        readonly List<Warning> Warnings;
 
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
@@ -78,18 +49,42 @@ namespace LanguageCore.BBCode.Compiler
         CompiledGeneralFunction[] CompiledGeneralFunctions;
         CompiledEnum[] CompiledEnums;
 
-        List<FunctionDefinition> Operators;
-        List<FunctionDefinition> Functions;
-        List<MacroDefinition> Macros;
-        List<StructDefinition> Structs;
-        List<ClassDefinition> Classes;
-        List<EnumDefinition> Enums;
+        readonly List<FunctionDefinition> Operators;
+        readonly List<FunctionDefinition> Functions;
+        readonly List<MacroDefinition> Macros;
+        readonly List<StructDefinition> Structs;
+        readonly List<ClassDefinition> Classes;
+        readonly List<EnumDefinition> Enums;
 
-        Stack<Token[]> GenericParameters;
+        readonly Stack<Token[]> GenericParameters;
 
-        List<CompileTag> Hashes;
+        readonly List<CompileTag> Hashes;
 
         Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+
+        public Compiler()
+        {
+            Functions = new List<FunctionDefinition>();
+            Macros = new List<MacroDefinition>();
+            Operators = new List<FunctionDefinition>();
+            Structs = new List<StructDefinition>();
+            Classes = new List<ClassDefinition>();
+            Enums = new List<EnumDefinition>();
+            Hashes = new List<CompileTag>();
+            GenericParameters = new Stack<Token[]>();
+
+            Warnings = new List<Warning>();
+            Errors = new List<Error>();
+
+            CompiledClasses = Array.Empty<CompiledClass>();
+            CompiledStructs = Array.Empty<CompiledStruct>();
+            CompiledOperators = Array.Empty<CompiledOperator>();
+            CompiledFunctions = Array.Empty<CompiledFunction>();
+            CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
+            CompiledEnums = Array.Empty<CompiledEnum>();
+
+            ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
+        }
 
         CompiledType GetCustomType(string name)
         {
@@ -112,11 +107,11 @@ namespace LanguageCore.BBCode.Compiler
             throw new InternalException($"Unknown type '{name}'");
         }
 
-        protected string TypeDefinitionReplacer(string typeName)
+        protected string? TypeDefinitionReplacer(string? typeName)
         {
             foreach (var @struct in CompiledStructs)
             {
-                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -126,7 +121,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             foreach (var @class in CompiledClasses)
             {
-                if (@class.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -136,7 +131,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             foreach (var @enum in CompiledEnums)
             {
-                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string definedType))
+                if (@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
                     if (definedType == typeName)
                     {
@@ -214,10 +209,7 @@ namespace LanguageCore.BBCode.Compiler
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@struct.Attributes);
 
-            return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct)
-            {
-                References = new List<DefinitionReference>(),
-            };
+            return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct);
         }
 
         CompiledClass CompileClass(ClassDefinition @class)
@@ -232,10 +224,7 @@ namespace LanguageCore.BBCode.Compiler
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@class.Attributes);
 
-            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class)
-            {
-                References = new List<DefinitionReference>(),
-            };
+            return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class);
         }
 
         CompiledFunction CompileFunction(FunctionDefinition function)
@@ -252,14 +241,14 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
 
-            if (attributes.TryGetAttribute("External", out string name))
+            if (attributes.TryGetAttribute("External", out string? name))
             {
                 if (ExternalFunctions.TryGetValue(name, out var externalFunction))
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException($"Wrong type definied for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
@@ -272,15 +261,14 @@ namespace LanguageCore.BBCode.Compiler
                         if (passedParameterType.IsClass && definedParameterType == Type.INT)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Requied type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type.Identifier, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type.Identifier, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
                     { GenericParameters.Pop(); }
 
-                    return new CompiledFunction(type, function)
+                    return new CompiledFunction(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
                     {
-                        ParameterTypes = externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                         CompiledAttributes = attributes,
                     };
                 }
@@ -310,29 +298,28 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
 
-            if (attributes.TryGetAttribute("External", out string name))
+            if (attributes.TryGetAttribute("External", out string? name))
             {
                 if (ExternalFunctions.TryGetValue(name, out var externalFunction))
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException($"Wrong type definied for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
                         if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Requied type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
                     }
 
-                    return new CompiledOperator(type, function)
+                    return new CompiledOperator(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
                     {
-                        ParameterTypes = externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(),
                         CompiledAttributes = attributes,
                     };
                 }
@@ -381,23 +368,18 @@ namespace LanguageCore.BBCode.Compiler
                 attributes.Add(attribute.Identifier.Content, newAttribute);
             }
 
-            CompiledEnum compiledEnum = new()
+            CompiledEnum compiledEnum = new(@enum)
             {
-                Attributes = @enum.Attributes,
                 CompiledAttributes = attributes,
                 FilePath = @enum.FilePath,
-                Identifier = @enum.Identifier,
                 Members = new CompiledEnumMember[@enum.Members.Length],
             };
 
             for (int i = 0; i < @enum.Members.Length; i++)
             {
                 EnumMemberDefinition member = @enum.Members[i];
-                CompiledEnumMember compiledMember = new()
-                {
-                    Identifier = member.Identifier,
-                };
-                switch (member.Value.Type)
+                CompiledEnumMember compiledMember = new(member);
+                switch (member.Value!.Type)
                 {
                     case LiteralType.INT:
                         compiledMember.Value = new DataItem(int.Parse(member.Value.Value));
@@ -492,8 +474,8 @@ namespace LanguageCore.BBCode.Compiler
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
-            PrintCallback printCallback,
-            string basePath)
+            PrintCallback? printCallback,
+            string? basePath)
         {
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
@@ -530,7 +512,7 @@ namespace LanguageCore.BBCode.Compiler
                     case "bf":
                         {
                             if (hash.Parameters.Length < 2)
-                            { Errors.Add(new Error($"Hash '{hash.HashName}' requies minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
+                            { Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
                             string name = hash.Parameters[0].Value;
 
                             if (externalFunctions.ContainsKey(name)) break;
@@ -612,42 +594,38 @@ namespace LanguageCore.BBCode.Compiler
             { this.CompiledStructs[i] = CompileStruct(Structs[i]); }
 
             #endregion
-            
+
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)
                 {
                     FieldDefinition field = ((StructDefinition)CompiledStructs[i]).Fields[j];
-                    CompiledField compiledField = new(field)
-                    {
-                        Type = new CompiledType(field.Type, GetCustomType),
-                    };
+#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+                    CompiledField compiledField = new(new CompiledType(field.Type, GetCustomType), null, field);
+#pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
                     field.Type.SetAnalyzedType(compiledField.Type);
                     CompiledStructs[i].Fields[j] = compiledField;
                 }
             }
             for (int i = 0; i < CompiledClasses.Length; i++)
             {
-                if (CompiledClasses[i].TemplateInfo != null)
+                CompiledClass @class = CompiledClasses[i];
+                if (@class.TemplateInfo != null)
                 {
-                    GenericParameters.Push(CompiledClasses[i].TemplateInfo.TypeParameters);
-                    foreach (Token typeParameter in CompiledClasses[i].TemplateInfo.TypeParameters)
+                    GenericParameters.Push(@class.TemplateInfo.TypeParameters);
+                    foreach (Token typeParameter in @class.TemplateInfo.TypeParameters)
                     { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
                 }
 
-                for (int j = 0; j < CompiledClasses[i].Fields.Length; j++)
+                for (int j = 0; j < @class.Fields.Length; j++)
                 {
-                    FieldDefinition field = ((ClassDefinition)CompiledClasses[i]).Fields[j];
-                    CompiledField newField = new(field)
-                    {
-                        Type = new CompiledType(field.Type, GetCustomType),
-                        Class = CompiledClasses[i],
-                    };
+                    FieldDefinition field = ((ClassDefinition)@class).Fields[j];
+                    CompiledField newField = new(new CompiledType(field.Type, GetCustomType), @class, field);
                     field.Type.SetAnalyzedType(newField.Type);
-                    CompiledClasses[i].Fields[j] = newField;
+                    @class.Fields[j] = newField;
                 }
 
-                if (CompiledClasses[i].TemplateInfo != null)
+                if (@class.TemplateInfo != null)
                 { GenericParameters.Pop(); }
             }
 
@@ -697,12 +675,12 @@ namespace LanguageCore.BBCode.Compiler
                         if (method.Identifier.Content == "destructor")
                         {
                             List<ParameterDefinition> parameters = method.Parameters.ToList();
-                            parameters.Insert(0, new ParameterDefinition()
-                            {
-                                Identifier = Token.CreateAnonymous("this"),
-                                Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
-                                Modifiers = new Token[1] { Token.CreateAnonymous("this") }
-                            });
+                            parameters.Insert(0,
+                                new ParameterDefinition(
+                                    new Token[1] { Token.CreateAnonymous("this") },
+                                    TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                    Token.CreateAnonymous("this"))
+                                );
                             method.Parameters = parameters.ToArray();
                         }
 
@@ -723,12 +701,12 @@ namespace LanguageCore.BBCode.Compiler
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
                         }
                         List<ParameterDefinition> parameters = method.Parameters.ToList();
-                        parameters.Insert(0, new ParameterDefinition()
-                        {
-                            Identifier = Token.CreateAnonymous("this"),
-                            Type = TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
-                            Modifiers = new Token[1] { Token.CreateAnonymous("this") },
-                        });
+                        parameters.Insert(0,
+                            new ParameterDefinition(
+                                new Token[1] { Token.CreateAnonymous("this") },
+                                TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                Token.CreateAnonymous("this"))
+                            );
                         method.Parameters = parameters.ToArray();
 
                         CompiledFunction methodInfo = CompileFunction(method);
@@ -797,25 +775,12 @@ namespace LanguageCore.BBCode.Compiler
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             FileInfo file,
             ParserSettings parserSettings,
-            PrintCallback printCallback = null,
-            string basePath = "")
+            PrintCallback? printCallback = null,
+            string? basePath = null)
         {
             Compiler compiler = new()
             {
-                Functions = new List<FunctionDefinition>(),
-                Macros = new List<MacroDefinition>(),
-                Operators = new List<FunctionDefinition>(),
-                Structs = new List<StructDefinition>(),
-                Classes = new List<ClassDefinition>(),
-                Enums = new List<EnumDefinition>(),
-                Hashes = new List<CompileTag>(),
-                GenericParameters = new Stack<Token[]>(),
-
                 ExternalFunctions = externalFunctions,
-
-                Warnings = new List<Warning>(),
-                Errors = new List<Error>(),
-                // PrintCallback = printCallback,
             };
             return compiler.CompileMainFile(
                 parserResult,
@@ -832,8 +797,8 @@ namespace LanguageCore.BBCode.Compiler
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
             ParserSettings parserSettings,
-            PrintCallback printCallback = null,
-            string basePath = "")
+            PrintCallback? printCallback = null,
+            string? basePath = null)
         {
             string sourceCode = File.ReadAllText(file.FullName);
 

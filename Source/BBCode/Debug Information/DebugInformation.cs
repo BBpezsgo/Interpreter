@@ -88,7 +88,7 @@ namespace LanguageCore.Runtime
         public bool IsValid;
         public Position SourcePosition;
         public string Identifier;
-        public string File;
+        public string? File;
         public string ReadableIdentifier;
         public bool IsMacro;
         public Range<int> Instructions;

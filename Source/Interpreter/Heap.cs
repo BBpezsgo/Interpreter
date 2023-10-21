@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using System.Text;
 
 namespace LanguageCore.Runtime
 {
@@ -329,16 +330,16 @@ namespace LanguageCore.Runtime
         public static string GetString(this IReadOnlyHeap heap, int start, int length)
         {
             int end = start + length;
-            string result = "";
+            StringBuilder result = new(length);
             for (int i = start; i < end; i++)
             {
                 if (heap[i].Type != RuntimeType.CHAR)
                 {
                     throw new InternalException($"Unexpected data type {heap[i].Type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
                 }
-                result += heap[i].ValueChar;
+                result.Append(heap[i].ValueChar);
             }
-            return result;
+            return result.ToString();
         }
         public static string GetStringByPointer(this IReadOnlyHeap heap, int pointer)
         {

@@ -2,8 +2,6 @@
 using System.Runtime.Serialization;
 using LanguageCore.Runtime;
 
-#nullable enable
-
 namespace LanguageCore
 {
     #region Exception
@@ -48,10 +46,10 @@ namespace LanguageCore
     [Serializable]
     public class CompilerException : LanguageException
     {
-        public CompilerException(string message, Position position, string file) : base(message, position, file) { }
-        public CompilerException(string message, string file) : base(message, Position.UnknownPosition, file) { }
+        public CompilerException(string message, Position position, string? file) : base(message, position, file) { }
+        public CompilerException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
-        public CompilerException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
+        public CompilerException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
 
         protected CompilerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -59,10 +57,10 @@ namespace LanguageCore
     [Serializable]
     public class NotSupportedException : CompilerException
     {
-        public NotSupportedException(string message, Position position, string file) : base(message, position, file) { }
-        public NotSupportedException(string message, string file) : base(message, Position.UnknownPosition, file) { }
+        public NotSupportedException(string message, Position position, string? file) : base(message, position, file) { }
+        public NotSupportedException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public NotSupportedException(string message) : base(message) { }
-        public NotSupportedException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
+        public NotSupportedException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
 
         protected NotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -81,8 +79,8 @@ namespace LanguageCore
     public class SyntaxException : LanguageException
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
-        public SyntaxException(string message, IThingWithPosition position) : base(message, position.GetPosition(), null) { }
-        public SyntaxException(string message, IThingWithPosition position, string file) : base(message, position.GetPosition(), file) { }
+        public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.GetPosition() ?? Position.UnknownPosition, null) { }
+        public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
 
         protected SyntaxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -215,7 +213,7 @@ namespace LanguageCore
         public InternalException() : base() { }
         public InternalException(string message) : base(message) { }
         public InternalException(string message, Exception inner) : base(message, inner) { }
-        public InternalException(string message, string file) : base(message)
+        public InternalException(string message, string? file) : base(message)
         {
             this.File = file;
         }
@@ -267,9 +265,9 @@ namespace LanguageCore
 
     public class Warning : NotExceptionBut
     {
-        public Warning(string message, Position position, string file)
+        public Warning(string message, Position position, string? file)
             : base(message, position, file) { }
-        public Warning(string message, IThingWithPosition? position, string file)
+        public Warning(string message, IThingWithPosition? position, string? file)
             : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
     }
 
@@ -278,29 +276,27 @@ namespace LanguageCore
     {
         public Error(string message, Position position)
             : base(message, position, null) { }
-        public Error(string message, Position position, string file)
+        public Error(string message, Position position, string? file)
             : base(message, position, file) { }
-        public Error(string message, IThingWithPosition position)
-            : base(message, position.GetPosition(), null) { }
-        public Error(string message, IThingWithPosition position, string file)
-            : base(message, position.GetPosition(), file) { }
+        public Error(string message, IThingWithPosition? position)
+            : base(message, position?.GetPosition() ?? Position.UnknownPosition, null) { }
+        public Error(string message, IThingWithPosition? position, string? file)
+            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
 
         public LanguageException ToException() => new(this);
     }
 
     public class Hint : NotExceptionBut
     {
-        public Hint(string message, IThingWithPosition position, string file)
-            : base(message, position.GetPosition(), file) { }
+        public Hint(string message, IThingWithPosition? position, string? file)
+            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
     }
 
     public class Information : NotExceptionBut
     {
-        public Information(string message, IThingWithPosition position, string file)
-            : base(message, position.GetPosition(), file) { }
+        public Information(string message, IThingWithPosition? position, string? file)
+            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
     }
 
     #endregion
 }
-
-#nullable restore

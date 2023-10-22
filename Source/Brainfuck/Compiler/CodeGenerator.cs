@@ -207,7 +207,6 @@ namespace LanguageCore.Brainfuck.Compiler
         }
 
         DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
-        DebugInfoBlock DebugBlock(Position position) => new(Code, DebugInfo, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
@@ -2169,7 +2168,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
+            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
@@ -2682,8 +2681,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (instanceType.IsStruct)
             {
-                // newInstance.TypeName = newInstance.TypeName.Struct(instanceType.Struct);
-                instanceType.Struct.References?.Add(new DefinitionReference(newInstance.TypeName.Identifier, CurrentFile));
+                instanceType.Struct.References?.Add(new DefinitionReference(newInstance.TypeName, CurrentFile));
 
                 int address = Stack.PushVirtual(instanceType.Struct.Size);
 
@@ -2970,8 +2968,6 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.SetPointer(0);
             }
         }
-        void CompileValuePrinter(StatementWithValue value)
-            => CompileValuePrinter(value, FindStatementType(value));
         void CompileValuePrinter(StatementWithValue value, CompiledType valueType)
         {
             if (valueType.SizeOnStack != 1)
@@ -3024,6 +3020,7 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
+        /*
         void CompileRawPrinter(StatementWithValue value)
         {
             if (TryCompute(value, null, out DataItem constantValue))
@@ -3128,6 +3125,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
             }
         }
+        */
 
         /// <param name="callerPosition">
         /// Used for exceptions

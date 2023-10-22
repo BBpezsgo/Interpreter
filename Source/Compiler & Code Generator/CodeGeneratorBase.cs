@@ -6,6 +6,7 @@ namespace LanguageCore.BBCode.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
     using System.Runtime.CompilerServices;
+    using System.Threading;
     using ConsoleGUI;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
@@ -1170,8 +1171,26 @@ namespace LanguageCore.BBCode.Compiler
         protected bool GetStruct(NewInstance newStructStatement, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
             => GetStruct(newStructStatement.TypeName, out compiledStruct);
 
+        protected bool GetStruct(TypeInstanceSimple type, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
+        {
+            if (type.GenericTypes is null)
+            { return GetStruct(type.Identifier.Content, out compiledStruct); }
+            else
+            {
+                compiledStruct = null;
+                return false;
+            }
+        }
+
         protected bool GetStruct(TypeInstance type, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
-            => GetStruct(type.Identifier.Content, out compiledStruct);
+        {
+            if (type is not TypeInstanceSimple typeSimple)
+            {
+                compiledStruct = null;
+                return false;
+            }
+            return GetStruct(typeSimple, out compiledStruct);
+        }
 
         protected bool GetStruct(string structName, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
         {
@@ -1199,8 +1218,23 @@ namespace LanguageCore.BBCode.Compiler
         protected bool GetClass(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(constructorCall.TypeName, out compiledClass);
 
+        protected bool GetClass(TypeInstanceSimple type, [NotNullWhen(true)] out CompiledClass? compiledClass)
+        {
+            if (type.GenericTypes is null)
+            { return GetClass(type.Identifier.Content, out compiledClass); }
+            else
+            { return GetClass(type.Identifier.Content, type.GenericTypes.Length, out compiledClass); }
+        }
+
         protected bool GetClass(TypeInstance type, [NotNullWhen(true)] out CompiledClass? compiledClass)
-            => GetClass(type.Identifier.Content, type.GenericTypes.Count, out compiledClass);
+        {
+            if (type is not TypeInstanceSimple typeSimple)
+            {
+                compiledClass = null;
+                return false;
+            }
+            return GetClass(typeSimple, out compiledClass);
+        }
 
         protected bool GetClass(string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(className, 0, out compiledClass);
@@ -1305,7 +1339,7 @@ namespace LanguageCore.BBCode.Compiler
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
 
             CompiledType type;
-            if (newVariable.Type.Identifier == "var")
+            if (newVariable.Type == "var")
             {
                 if (newVariable.InitialValue == null)
                 { throw new CompilerException($"Initial value for variable declaration with implicit type is required", newVariable, newVariable.FilePath); }
@@ -1380,16 +1414,16 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="CompilerException"></exception>
         /// <exception cref="InternalException"></exception>
         protected static DataItem GetInitialValue(TypeInstance type)
-            => type.Identifier.Content switch
+            => type.ToString() switch
             {
                 "int" => new DataItem((int)0),
                 "byte" => new DataItem((byte)0),
                 "float" => new DataItem((float)0f),
                 "char" => new DataItem((char)'\0'),
 
-                "var" => throw new CompilerException("Undefined type", type.Identifier, null),
-                "void" => throw new CompilerException("Invalid type", type.Identifier, null),
-                _ => throw new InternalException($"Initial value for type \"{type.Identifier.Content}\" is unimplemented"),
+                "var" => throw new CompilerException("Undefined type", type, null),
+                "void" => throw new CompilerException("Invalid type", type, null),
+                _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
             };
 
         /// <exception cref="NotImplementedException"></exception>

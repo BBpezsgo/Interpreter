@@ -58,6 +58,7 @@ namespace ConsoleGUI
             (1, 1, '└'),
         };
 
+        /*
         static (int x, int y)[] SimplifyLine_((int x, int y)[] line)
         {
             List<(int x, int y)> result = new();
@@ -78,6 +79,7 @@ namespace ConsoleGUI
             }
             return result.ToArray();
         }
+        */
 
         static (int x, int y)[] SimplifyLine((int x, int y)[] points)
         {
@@ -208,11 +210,6 @@ namespace ConsoleGUI
             this.BackgroundColor = ByteColor.Black;
         }
 
-        short CurrentColor
-        {
-            get => (short)((short)currentFgColor | (short)currentBgColor);
-        }
-
         public bool AddChar(char v)
         {
             if (currentIndex >= this.v.Length) return false;
@@ -285,7 +282,7 @@ namespace ConsoleGUI
             this.currentIndex = this.v.Length;
         }
 
-        internal void FillRemaing()
+        internal void FillRemaining()
         {
             for (int i = this.currentIndex; i < this.v.Length; i++)
             {

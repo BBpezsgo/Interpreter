@@ -1,6 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 
+#pragma warning disable IDE0052 // Remove unread private members
+#pragma warning disable CA1822 // Mark members as static
+#pragma warning disable IDE0051 // Remove unused private members
+#pragma warning disable IDE0060 // Remove unused parameter
+
 namespace LanguageCore.ASM.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
@@ -528,7 +533,7 @@ namespace LanguageCore.ASM.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
+            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.GetPosition().Range, CurrentFile));
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }

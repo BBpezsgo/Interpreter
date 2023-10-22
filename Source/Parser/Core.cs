@@ -76,34 +76,6 @@ namespace LanguageCore.Parser
             Tokens = tokens;
         }
 
-        /// <summary>Converts the parsed AST into text</summary>
-        public string PrettyPrint()
-        {
-            var x = "";
-
-            foreach (var @using in Usings)
-            {
-                x += "using " + @using.PathString + ";\n";
-            }
-
-            foreach (var @struct in Structs)
-            {
-                x += @struct.PrettyPrint() + "\n";
-            }
-
-            foreach (var @class in Classes)
-            {
-                x += @class.PrettyPrint() + "\n";
-            }
-
-            foreach (var function in Functions)
-            {
-                x += function.PrettyPrint() + "\n";
-            }
-
-            return x;
-        }
-
         public void WriteToConsole(string title = "PARSER INFO")
         {
             Console.WriteLine($"\n\r === {title} ===\n\r");
@@ -242,7 +214,7 @@ namespace LanguageCore.Parser
                 { Attribute(attr); }
 
                 Console.ForegroundColor = ConsoleColor.Blue;
-                if (!Constants.BuiltinTypes.Contains(item.Type.Identifier.Content))
+                if (!Constants.BuiltinTypes.Contains(item.Type.ToString()))
                 {
                     Console.ForegroundColor = ConsoleColor.Green;
                 }
@@ -264,7 +236,7 @@ namespace LanguageCore.Parser
                     Console.ForegroundColor = ConsoleColor.Blue;
                     foreach (var modifier in param.Modifiers)
                     { Console.Write($"{modifier.Content} "); }
-                    if (!Constants.BuiltinTypes.Contains(param.Type.Identifier.Content))
+                    if (!Constants.BuiltinTypes.Contains(param.Type.ToString()))
                     { Console.ForegroundColor = ConsoleColor.Green; }
                     Console.Write($"{param.Type} ");
                     Console.ForegroundColor = ConsoleColor.White;

@@ -248,7 +248,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
@@ -261,7 +261,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (passedParameterType.IsClass && definedParameterType == Type.INT)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type.Identifier, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
@@ -305,17 +305,17 @@ namespace LanguageCore.BBCode.Compiler
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.VOID))
-                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
-                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.Identifier.Content, out Type builtinType))
+                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type.Identifier, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                     }
 
                     return new CompiledOperator(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
@@ -600,9 +600,7 @@ namespace LanguageCore.BBCode.Compiler
                 for (int j = 0; j < CompiledStructs[i].Fields.Length; j++)
                 {
                     FieldDefinition field = ((StructDefinition)CompiledStructs[i]).Fields[j];
-#pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
                     CompiledField compiledField = new(new CompiledType(field.Type, GetCustomType), null, field);
-#pragma warning restore CS8625 // Cannot convert null literal to non-nullable reference type.
                     field.Type.SetAnalyzedType(compiledField.Type);
                     CompiledStructs[i].Fields[j] = compiledField;
                 }
@@ -678,7 +676,7 @@ namespace LanguageCore.BBCode.Compiler
                             parameters.Insert(0,
                                 new ParameterDefinition(
                                     new Token[1] { Token.CreateAnonymous("this") },
-                                    TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
                                     Token.CreateAnonymous("this"))
                                 );
                             method.Parameters = parameters.ToArray();
@@ -704,7 +702,7 @@ namespace LanguageCore.BBCode.Compiler
                         parameters.Insert(0,
                             new ParameterDefinition(
                                 new Token[1] { Token.CreateAnonymous("this") },
-                                TypeInstance.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
                                 Token.CreateAnonymous("this"))
                             );
                         method.Parameters = parameters.ToArray();

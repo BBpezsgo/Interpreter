@@ -1105,7 +1105,6 @@ namespace LanguageCore.BBCode.Compiler
         void GenerateCodeForStatement(Pointer memoryAddressFinder)
         {
             GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
-            // TODO: stack getter
             AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
@@ -1260,36 +1259,38 @@ namespace LanguageCore.BBCode.Compiler
         {
             AddComment($"new {newObject.TypeName} {{");
 
-            CompiledType instanceType = FindType(newObject.TypeName);
-            newObject.TypeName.SetAnalyzedType(instanceType);
+            if (newObject.TypeName is not TypeInstanceSimple newObjectType)
+            { throw new NotImplementedException(); }
+
+            CompiledType instanceType = FindType(newObjectType);
+            newObjectType.SetAnalyzedType(instanceType);
 
             if (instanceType.IsStruct)
             {
-                instanceType.Struct.References?.Add(new DefinitionReference(newObject.TypeName.Identifier, CurrentFile));
+                instanceType.Struct.References?.Add(new DefinitionReference(newObjectType, CurrentFile));
 
                 GenerateInitialValue(instanceType);
             }
             else if (instanceType.IsClass)
             {
-                instanceType.Class.References?.Add(new DefinitionReference(newObject.TypeName.Identifier, CurrentFile));
+                instanceType.Class.References?.Add(new DefinitionReference(newObjectType, CurrentFile));
 
                 if (instanceType.Class.TemplateInfo != null)
                 {
-                    if (newObject.TypeName.GenericTypes.Count == 0)
-                    { throw new CompilerException($"No type arguments specified for class instance \"{instanceType}\"", newObject.TypeName, CurrentFile); }
+                    if (newObjectType.GenericTypes is null)
+                    { throw new CompilerException($"No type arguments specified for class instance \"{instanceType}\"", newObjectType, CurrentFile); }
 
-                    if (instanceType.Class.TemplateInfo.TypeParameters.Length != newObject.TypeName.GenericTypes.Count)
-                    { throw new CompilerException($"Wrong number of type arguments specified for class instance \"{instanceType}\": require {instanceType.Class.TemplateInfo.TypeParameters.Length} specified {newObject.TypeName.GenericTypes.Count}", newObject.TypeName, CurrentFile); }
+                    if (instanceType.Class.TemplateInfo.TypeParameters.Length != newObjectType.GenericTypes.Length)
+                    { throw new CompilerException($"Wrong number of type arguments specified for class instance \"{instanceType}\": require {instanceType.Class.TemplateInfo.TypeParameters.Length} specified {newObjectType.GenericTypes.Length}", newObjectType, CurrentFile); }
+
+                    CompiledType[] genericParameters = newObjectType.GenericTypes!.Select(v => new CompiledType(v, FindType)).ToArray();
+                    instanceType.Class.AddTypeArguments(genericParameters);
                 }
                 else
                 {
-                    if (newObject.TypeName.GenericTypes.Count > 0)
-                    { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", newObject.TypeName, CurrentFile); }
+                    if (newObjectType.GenericTypes is not null)
+                    { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", newObjectType, CurrentFile); }
                 }
-
-                CompiledType[] genericParameters = newObject.TypeName.GenericTypes.Select(v => new CompiledType(v, FindType)).ToArray();
-
-                instanceType.Class.AddTypeArguments(genericParameters);
 
                 AddInstruction(Opcode.PUSH_VALUE, instanceType.Class.Size);
                 AddInstruction(Opcode.HEAP_ALLOC);
@@ -1335,7 +1336,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
+            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
 
             if (!GetClass(constructorCall, out var @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
@@ -1440,7 +1441,7 @@ namespace LanguageCore.BBCode.Compiler
                 switch (compiledField.Protection)
                 {
                     case Protection.Private:
-                        if (CurrentContext.Context.Name.Content != compiledField.Class.Name.Content)
+                        if (CurrentContext.Context.Name.Content != compiledField.Class!.Name.Content)
                         { throw new CompilerException($"Can not access field \"{compiledField.Identifier.Content}\" of class \"{compiledField.Class.Name}\" due to it's protection level", field, CurrentFile); }
                         break;
                     case Protection.Public:
@@ -1903,7 +1904,6 @@ namespace LanguageCore.BBCode.Compiler
             GenerateCodeForStatement(value);
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
-            // TODO: set value by stack address
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
         }
         void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)

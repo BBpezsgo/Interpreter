@@ -484,9 +484,9 @@ namespace LanguageCore.BBCode.Compiler
                 };
             }
         }
-        public CompiledClass Class;
+        public CompiledClass? Class;
 
-        public CompiledField(CompiledType type, CompiledClass context, FieldDefinition definition) : base(definition.Identifier, definition.Type, definition.ProtectionToken)
+        public CompiledField(CompiledType type, CompiledClass? context, FieldDefinition definition) : base(definition.Identifier, definition.Type, definition.ProtectionToken)
         {
             Type = type;
             Class = context;

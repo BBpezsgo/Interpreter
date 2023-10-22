@@ -30,74 +30,6 @@ namespace LanguageCore.BBCode.Compiler
         internal static AddressingMode AddressingMode(this CompiledVariable v)
             => v.IsGlobal ? Runtime.AddressingMode.ABSOLUTE : Runtime.AddressingMode.BASEPOINTER_RELATIVE;
 
-        internal static int RemoveInstruction(this List<Instruction> self, int index, List<int> watchTheseIndexesToo)
-        {
-            if (index < -1 || index >= self.Count) throw new IndexOutOfRangeException();
-
-            int changedInstructions = 0;
-            for (int instructionIndex = 0; instructionIndex < self.Count; instructionIndex++)
-            {
-                Instruction instruction = self[instructionIndex];
-
-                if (instruction.opcode == Opcode.JUMP_BY ||
-                    instruction.opcode == Opcode.JUMP_BY_IF_FALSE)
-                {
-                    if (instruction.Parameter.Type == RuntimeType.INT)
-                    {
-                        if (instruction.Parameter.ValueInt + instructionIndex < index && instructionIndex < index)
-                        { continue; }
-
-                        if (instruction.Parameter.ValueInt + instructionIndex > index && instructionIndex > index)
-                        { continue; }
-
-                        // TODO: Think about that safe to remove instructions in this case:
-                        if (instruction.Parameter.ValueInt + instructionIndex == index)
-                        { continue; }
-                        // { throw new Exception($"Can't remove instruction at {index} because instruction {instruction} is referencing to this position"); }
-
-                        if (instructionIndex < index)
-                        {
-                            instruction.ParameterInt--;
-                            changedInstructions++;
-                        }
-                        else if (instructionIndex > index)
-                        {
-                            instruction.ParameterInt++;
-                            changedInstructions++;
-                        }
-                    }
-                }
-
-                /*
-                if (instruction.opcode == Opcode.PUSH_VALUE && instruction.Parameter.Type == RuntimeType.INT && instruction.Parameter.Tag == "saved code pointer")
-                {
-                    if (instructionIndex < index)
-                    {
-                        // instruction.ParameterInt--;
-                        // changedInstructions++;
-                    }
-                    else if (instructionIndex > index)
-                    {
-                        instruction.ParameterInt--;
-                        changedInstructions++;
-                    }
-                }
-                */
-            }
-
-            for (int i = 0; i < watchTheseIndexesToo.Count; i++)
-            {
-                int instructionIndex = watchTheseIndexesToo[i];
-
-                if (instructionIndex > index)
-                { watchTheseIndexesToo[i] = instructionIndex - 1; }
-            }
-
-            self.RemoveAt(index);
-
-            return changedInstructions;
-        }
-
         internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> pair in elements)
@@ -473,9 +405,9 @@ namespace LanguageCore.BBCode.Compiler
             SourceFile = sourceFile;
         }
 
-        public DefinitionReference(BaseToken source, string? sourceFile)
+        public DefinitionReference(IThingWithPosition source, string? sourceFile)
         {
-            Source = source.Position;
+            Source = source.GetPosition().Range;
             SourceFile = sourceFile;
         }
     }
@@ -843,8 +775,34 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            if (type.Kind == TypeInstanceKind.Simple &&
-                Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            if (type is TypeInstanceSimple simpleType)
+            {
+                Set(new CompiledType(simpleType, typeFinder, constComputer));
+                return;
+            }
+
+            if (type is TypeInstanceFunction functionType)
+            {
+                Set(new CompiledType(functionType, typeFinder, constComputer));
+                return;
+            }
+
+            if (type is TypeInstanceStackArray stackArrayType)
+            {
+                Set(new CompiledType(stackArrayType, typeFinder, constComputer));
+                return;
+            }
+
+            throw new ImpossibleException();
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        public CompiledType(TypeInstanceSimple type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
             if (type.Identifier.Content == "func")
@@ -853,7 +811,8 @@ namespace LanguageCore.BBCode.Compiler
 
                 CompiledType funcRet;
                 CompiledType[] funcParams;
-                if (type.GenericTypes.Count == 0)
+
+                if (type.GenericTypes == null || type.GenericTypes.Length == 0)
                 {
                     funcRet = new(Type.VOID);
                     funcParams = Array.Empty<CompiledType>();
@@ -861,8 +820,8 @@ namespace LanguageCore.BBCode.Compiler
                 else
                 {
                     funcRet = new(type.GenericTypes[0], typeFinder);
-                    funcParams = new CompiledType[type.GenericTypes.Count - 1];
-                    for (int i = 1; i < type.GenericTypes.Count; i++)
+                    funcParams = new CompiledType[type.GenericTypes.Length - 1];
+                    for (int i = 1; i < type.GenericTypes.Length; i++)
                     {
                         TypeInstance genericType = type.GenericTypes[i];
                         funcParams[i - 1] = new CompiledType(genericType, typeFinder);
@@ -872,34 +831,39 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (type.Kind == TypeInstanceKind.Function)
-            {
-                if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
-
-                CompiledType funcRet = new(type.Identifier.Content, typeFinder);
-                CompiledType[] funcParams = CompiledType.FromArray(type.ParameterTypes, typeFinder);
-                function = new FunctionType(funcRet, funcParams);
-                return;
-            }
-
-            if (type.Kind == TypeInstanceKind.StackArray)
-            {
-                if (constComputer == null)
-                { throw new ArgumentNullException(nameof(constComputer)); }
-
-                stackArrayOf = new CompiledType(type.Identifier.Content, typeFinder);
-                stackArraySizeStatement = type.StackArraySize!;
-                if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.INT, out stackArraySize))
-                { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
-
-                return;
-            }
-
-            if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
+            if (typeFinder == null) throw new InternalException($"Can't parse \"{type}\" to \"{nameof(CompiledType)}\"");
 
             Set(typeFinder.Invoke(type.Identifier.Content));
 
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        public CompiledType(TypeInstanceFunction type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
+            CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
+
+            function = new FunctionType(returnType, parameterTypes);
+        }
+
+        /// <exception cref="ArgumentNullException"/>
+        /// <exception cref="InternalException"/>
+        public CompiledType(TypeInstanceStackArray type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
+        {
+            if (type is null) throw new ArgumentNullException(nameof(type));
+
+            if (constComputer == null)
+            { throw new ArgumentNullException(nameof(constComputer)); }
+
+            stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
+            stackArraySizeStatement = type.StackArraySize!;
+
+            if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.INT, out stackArraySize))
+            { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -1057,24 +1021,56 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (other is null) return false;
 
-            if (!CompiledType.Equals(this.typeParameters, other.GenericTypes)) return false;
+            if (IsFunction)
+            {
+                if (other is not TypeInstanceFunction otherFunction) return false;
+                if (!Function.ReturnType.Equals(otherFunction.FunctionReturnType)) return false;
+                if (!CompiledType.Equals(Function.Parameters, otherFunction.FunctionParameterTypes)) return false;
+                return true;
+            }
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(other.Identifier.Content, out var type))
+            if (IsStackArray)
+            {
+                if (other is not TypeInstanceStackArray otherStackArray) return false;
+                if (!stackArrayOf.Equals(otherStackArray.StackArrayOf)) return false;
+                return true;
+            }
+
+            if (other is not TypeInstanceSimple otherSimple)
+            { return false; }
+
+            if (IsGeneric)
+            {
+                if (!CompiledType.Equals((CompiledType?[]?)this.typeParameters, (TypeInstance?[]?)otherSimple.GenericTypes)) return false;
+            }
+
+            if (Constants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out var type))
             { return type == this.builtinType; }
 
-            if (this.@struct != null && this.@struct.Name.Content == other.Identifier.Content)
+            if (this.@struct != null && this.@struct.Name.Content == otherSimple.Identifier.Content)
             { return true; }
 
-            if (this.@class != null && this.@class.Name.Content == other.Identifier.Content)
+            if (this.@class != null && this.@class.Name.Content == otherSimple.Identifier.Content)
             { return true; }
 
-            if (this.@enum != null && this.@enum.Identifier.Content == other.Identifier.Content)
+            if (this.@enum != null && this.@enum.Identifier.Content == otherSimple.Identifier.Content)
             { return true; }
-
-            if (this.IsStackArray && other.StackArraySize != null)
-            { return Name == other.Identifier; }
 
             return false;
+        }
+        public static bool Equals(CompiledType?[]? typesA, TypeInstance?[]? typesB)
+        {
+            if (typesA is null && typesB is null) return true;
+            if (typesA is null || typesB is null) return false;
+
+            if (typesA.Length != typesB.Length) return false;
+            for (int i = 0; i < typesA.Length; i++)
+            {
+                CompiledType? typeA = typesA[i];
+                TypeInstance? typeB = typesB[i];
+                if (!(typeA?.Equals(typeB) ?? typeB is null)) return false;
+            }
+            return true;
         }
 
         public bool Equals(Type other)
@@ -1161,16 +1157,6 @@ namespace LanguageCore.BBCode.Compiler
             if (a.Length != b.Length) return false;
             for (int i = 0; i < a.Length; i++)
             { if (!a[i].Equals(b[i])) return false; }
-            return true;
-        }
-
-        public static bool Equals(CompiledType[]? a, TypeInstance[]? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-            if (a.Length != b.Length) return false;
-            for (int i = 0; i < a.Length; i++)
-            { if (a[i] != b[i]) return false; }
             return true;
         }
 

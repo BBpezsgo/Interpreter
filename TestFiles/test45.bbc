@@ -11,7 +11,7 @@ void() Print0B() {
     return Print0C;
 }
 
-func<func<void> > Print0A() {
+void()() Print0A() {
     return Print0B;
 }
 
@@ -23,7 +23,7 @@ void(char) Print1B() {
     return Print1C;
 }
 
-func<func<void, char> > Print1A() {
+void(char)() Print1A() {
     return Print1B;
 }
 

@@ -1,14 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Threading;
+
+#pragma warning disable CA1822 // Mark members as static
+#pragma warning disable IDE0060 // Remove unused parameter
 
 namespace LanguageCore.IL.Compiler
 {
@@ -24,7 +21,7 @@ namespace LanguageCore.IL.Compiler
         #region Fields
 
         readonly Settings GeneratorSettings;
-        string AssemblyName = "Bruh";
+        readonly string AssemblyName = "Bruh";
 
         #endregion
 
@@ -514,7 +511,7 @@ namespace LanguageCore.IL.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName.Identifier, CurrentFile));
+            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }

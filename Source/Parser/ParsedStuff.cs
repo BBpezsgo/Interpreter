@@ -7,185 +7,6 @@ namespace LanguageCore.Parser
 {
     using LanguageCore.BBCode.Compiler;
     using LanguageCore.Tokenizing;
-    using Statement;
-
-    public enum TypeInstanceKind
-    {
-        Simple,
-        Template,
-        Function,
-        StackArray,
-    }
-
-    public class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
-    {
-        public readonly Token Identifier;
-        public readonly TypeInstanceKind Kind;
-
-        public readonly List<TypeInstance> GenericTypes;
-        public readonly List<TypeInstance> ParameterTypes;
-        public readonly StatementWithValue? StackArraySize;
-
-        public TypeInstance(Token identifier, TypeInstanceKind kind) : base()
-        {
-            this.Identifier = identifier;
-            this.Kind = kind;
-
-            this.GenericTypes = new List<TypeInstance>();
-            this.ParameterTypes = new List<TypeInstance>();
-            this.StackArraySize = null;
-        }
-
-        public TypeInstance(Token identifier, TypeInstanceKind kind, StatementWithValue? sizeValue) : base()
-        {
-            this.Identifier = identifier;
-            this.Kind = kind;
-
-            this.GenericTypes = new List<TypeInstance>();
-            this.ParameterTypes = new List<TypeInstance>();
-            this.StackArraySize = sizeValue;
-        }
-
-        public Position Position
-        {
-            get
-            {
-                Position result = Identifier.GetPosition();
-                result.Extend(GenericTypes);
-                return result;
-            }
-        }
-        public Position GetPosition() => Position;
-
-        public static TypeInstance CreateAnonymous(LiteralType literalType, Func<string, string?>? typeDefinitionReplacer)
-            => TypeInstance.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
-        public static TypeInstance CreateAnonymous(string name, Func<string, string?>? typeDefinitionReplacer)
-        {
-            string? definedType = typeDefinitionReplacer?.Invoke(name);
-            if (definedType == null)
-            { return new TypeInstance(Token.CreateAnonymous(name), TypeInstanceKind.Simple); }
-            else
-            { return new TypeInstance(Token.CreateAnonymous(definedType), TypeInstanceKind.Simple); }
-        }
-
-        public override string ToString()
-        {
-            string result = this.Identifier.Content;
-
-            if (GenericTypes != null && GenericTypes.Count > 0)
-            { result += $"<{string.Join(", ", GenericTypes)}>"; }
-
-            if (StackArraySize != null)
-            { result += $"[{StackArraySize}]"; }
-
-            return result;
-        }
-
-        public static bool operator ==(TypeInstance? a, string? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-            if (a.Kind != TypeInstanceKind.Simple) return false;
-
-            return a.Identifier.Content == b;
-        }
-        public static bool operator !=(TypeInstance? a, string? b) => !(a == b);
-
-        public static bool operator ==(string? a, TypeInstance? b) => b == a;
-        public static bool operator !=(string? a, TypeInstance? b) => !(b == a);
-
-        public override bool Equals(object? obj)
-        {
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj is null) return false;
-            if (obj is not TypeInstance other) return false;
-            return this.Equals(other);
-        }
-
-        public bool Equals(TypeInstance? other)
-        {
-            if (other is null) return false;
-            if (!Identifier.Equals(other.Identifier)) return false;
-            if (Kind != other.Kind) return false;
-            if (GenericTypes.Count != other.GenericTypes.Count) return false;
-            for (int i = 0; i < GenericTypes.Count; i++)
-            { if (!GenericTypes[i].Equals(other.GenericTypes[i])) return false; }
-            if (this.StackArraySize is null != other.StackArraySize is null) return false;
-            return true;
-        }
-
-        public override int GetHashCode() => HashCode.Combine(Identifier, Kind);
-
-        static bool TryGetAnalyzedType(CompiledType type, out TokenAnalysedType analyzedType)
-        {
-            analyzedType = default;
-            if (type.IsClass)
-            {
-                analyzedType = TokenAnalysedType.Class;
-                return true;
-            }
-
-            if (type.IsStruct)
-            {
-                analyzedType = TokenAnalysedType.Struct;
-                return true;
-            }
-
-            if (type.IsGeneric)
-            {
-                analyzedType = TokenAnalysedType.TypeParameter;
-                return true;
-            }
-
-            if (type.IsBuiltin)
-            {
-                analyzedType = TokenAnalysedType.BuiltinType;
-                return true;
-            }
-
-            if (type.IsFunction)
-            {
-                return TryGetAnalyzedType(type.Function.ReturnType, out analyzedType);
-            }
-
-            if (type.IsEnum)
-            {
-                analyzedType = TokenAnalysedType.Enum;
-                return true;
-            }
-
-            return false;
-        }
-
-        public void SetAnalyzedType(CompiledType type)
-        {
-            if (TryGetAnalyzedType(type, out var analyzedType))
-            { this.Identifier.AnalyzedType = analyzedType; }
-
-            if (type.IsFunction &&
-                this.Kind == TypeInstanceKind.Function &&
-                this.ParameterTypes.Count == type.Function.Parameters.Length)
-            {
-                for (int i = 0; i < type.Function.Parameters.Length; i++)
-                {
-                    this.ParameterTypes[i].SetAnalyzedType(type.Function.Parameters[i]);
-                }
-            }
-
-            if (type.IsStackArray &&
-                this.Kind == TypeInstanceKind.StackArray)
-            {
-                if (TryGetAnalyzedType(type.StackArrayOf, out analyzedType))
-                { this.Identifier.AnalyzedType = analyzedType; }
-            }
-        }
-    }
-}
-
-namespace LanguageCore.Parser
-{
-    using LanguageCore.BBCode.Compiler;
-    using LanguageCore.Tokenizing;
 
     public interface IDefinition
     {
@@ -211,7 +32,6 @@ namespace LanguageCore.Parser
             => new Position(Identifier, Type).Extend(Modifiers);
 
         public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
-        internal string PrettyPrint() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
     }
 
     public class FieldDefinition : IThingWithPosition
@@ -232,7 +52,6 @@ namespace LanguageCore.Parser
         }
 
         public override string ToString() => $"{(ProtectionToken is not null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
-        internal string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}{(ProtectionToken is not null ? ProtectionToken.Content + " " : "")}{Type} {Identifier}";
     }
 
     public interface IExportable
@@ -623,17 +442,6 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var parameter in this.Parameters)
-            {
-                parameters.Add(parameter.PrettyPrint());
-            }
-
-            throw new NotImplementedException();
-        }
-
         public bool IsSame(FunctionDefinition other)
         {
             if (this.Identifier.Content != other.Identifier.Content) return false;
@@ -679,17 +487,6 @@ namespace LanguageCore.Parser
             result += Block?.ToString() ?? ";";
 
             return result;
-        }
-
-        public string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var parameter in this.Parameters)
-            {
-                parameters.Add(parameter.PrettyPrint());
-            }
-
-            throw new NotImplementedException();
         }
     }
 
@@ -756,29 +553,6 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public string PrettyPrint(int ident = 0)
-        {
-            List<string> fields = new();
-            foreach (var field in this.Fields)
-            {
-                fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            List<string> methods = new();
-
-            foreach (var generalMethod in this.generalMethods)
-            {
-                methods.Add($"{" ".Repeat(ident)}" + generalMethod.PrettyPrint((ident == 0) ? 2 : ident));
-            }
-
-            foreach (var method in this.methods)
-            {
-                methods.Add($"{" ".Repeat(ident)}" + method.PrettyPrint((ident == 0) ? 2 : ident));
-            }
-
-            return $"{" ".Repeat(ident)}class {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
-        }
-
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
 
         public virtual Position GetPosition()
@@ -831,23 +605,6 @@ namespace LanguageCore.Parser
         public override string ToString()
         {
             return $"struct {this.Name.Content} " + "{...}";
-        }
-
-        public string PrettyPrint(int ident = 0)
-        {
-            List<string> fields = new();
-            foreach (var field in this.Fields)
-            {
-                fields.Add($"{" ".Repeat(ident)}" + field.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            List<string> methods = new();
-            foreach (var method in this.methods)
-            {
-                methods.Add($"{" ".Repeat(ident)}" + method.Value.PrettyPrint((ident == 0) ? 2 : ident) + ";");
-            }
-
-            return $"{" ".Repeat(ident)}struct {this.Name.Content} " + $"{{\n{string.Join("\n", fields)}\n\n{string.Join("\n", methods)}\n{" ".Repeat(ident)}}}";
         }
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;

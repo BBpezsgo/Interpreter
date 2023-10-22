@@ -1185,7 +1185,7 @@ namespace ConsoleGUI
                 b.SetText(t, sender.Rect.Right - (2 + t.Length));
             }
 
-            b.FillRemaing();
+            b.FillRemaining();
         }
 
         public override void OnMouseEvent(MouseEvent e)

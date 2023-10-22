@@ -203,47 +203,62 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="InternalException"></exception>
         int GenerateInitialValue(TypeInstance type)
         {
-            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out Type builtinType))
+            if (type is TypeInstanceFunction)
             {
-                AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType));
-                return 1;
+                throw new NotImplementedException();
             }
 
-            CompiledType instanceType = FindType(type);
-
-            if (instanceType.IsStruct)
+            if (type is TypeInstanceStackArray)
             {
-                int size = 0;
-                foreach (FieldDefinition field in instanceType.Struct.Fields)
+                throw new NotImplementedException();
+            }
+
+            if (type is TypeInstanceSimple simpleType)
+            {
+                if (Constants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
                 {
-                    size++;
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
+                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType));
+                    return 1;
                 }
-                return size;
+
+                CompiledType instanceType = FindType(simpleType);
+
+                if (instanceType.IsStruct)
+                {
+                    int size = 0;
+                    foreach (FieldDefinition field in instanceType.Struct.Fields)
+                    {
+                        size++;
+                        AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
+                    }
+                    return size;
+                }
+
+                if (instanceType.IsClass)
+                {
+                    AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                    return 1;
+                }
+
+                if (instanceType.IsEnum)
+                {
+                    if (instanceType.Enum.Members.Length == 0)
+                    { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
+
+                    AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].Value);
+                    return 1;
+                }
+
+                if (instanceType.IsFunction)
+                {
+                    AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                    return 1;
+                }
+
+                throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", simpleType, CurrentFile);
             }
 
-            if (instanceType.IsClass)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
-                return 1;
-            }
-
-            if (instanceType.IsEnum)
-            {
-                if (instanceType.Enum.Members.Length == 0)
-                { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
-
-                AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].Value);
-                return 1;
-            }
-
-            if (instanceType.IsFunction)
-            {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
-                return 1;
-            }
-
-            throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", type.Identifier, CurrentFile);
+            throw new ImpossibleException();
         }
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
@@ -9,6 +8,11 @@ namespace LanguageCore.Parser.Statement
 {
     using LanguageCore.BBCode.Compiler;
     using LanguageCore.Tokenizing;
+
+    struct Stringify
+    {
+        public const int CozyLength = 30;
+    }
 
     public static class StatementFinder
     {
@@ -90,9 +94,8 @@ namespace LanguageCore.Parser.Statement
         public Token? Semicolon;
 
         public override string ToString()
-            => this.GetType().Name;
+            => $"{GetType().Name}{Semicolon}";
 
-        public abstract string PrettyPrint(int ident = 0);
         public abstract Position GetPosition();
 
         public virtual IEnumerable<Statement> GetStatements()
@@ -126,23 +129,16 @@ namespace LanguageCore.Parser.Statement
         public override Position GetPosition()
             => new(BracketStart, BracketEnd);
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            string result = "{\n";
-
-            foreach (Statement statement in Statements)
-            { result += $"{" ".Repeat(ident)}{statement.PrettyPrint(ident)};\n"; }
-
-            result += $"{" ".Repeat(ident)}}}";
-            return result;
-        }
-
         public override string ToString()
         {
             StringBuilder result = new(3);
             result.Append('{');
-            if (Statements.Count > 0) result.Append("...");
-            else result.Append(' ');
+
+            if (Statements.Count > 0)
+            { result.Append("..."); }
+            else
+            { result.Append(' '); }
+
             result.Append('}');
             return result.ToString();
         }
@@ -174,7 +170,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class LinkedIf : LinkedIfThing
     {
         public readonly StatementWithValue Condition;
@@ -196,11 +191,8 @@ namespace LanguageCore.Parser.Statement
         public override Position GetPosition()
             => new(Keyword, Condition, Block);
 
-        public override string PrettyPrint(int ident = 0)
-        { throw new NotImplementedException(); }
-
-        public override string ToString() => $"{Keyword} ({Condition}) {{ ... }} {(NextLink != null ? "..." : ";")}";
-        string GetDebuggerDisplay() => ToString();
+        public override string ToString()
+            => $"{Keyword} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
     }
 
     public class LinkedElse : LinkedIfThing
@@ -212,12 +204,8 @@ namespace LanguageCore.Parser.Statement
 
         public override Position GetPosition()
             => new(Keyword, Block);
-
-        public override string PrettyPrint(int ident = 0)
-        { throw new NotImplementedException(); }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class CompileTag : Statement, IDefinition
     {
         public readonly Token HashToken;
@@ -234,20 +222,12 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{HashToken}{HashName}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{HashToken}{HashName} ...";
-        }
+            => $"{HashToken}{HashName}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
 
         public override Position GetPosition()
             => new Position(HashToken, HashName).Extend(Parameters);
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class LiteralList : StatementWithValue
     {
         public readonly Token BracketLeft;
@@ -263,11 +243,6 @@ namespace LanguageCore.Parser.Statement
             Values = values;
         }
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}[{string.Join(", ", Values.ToList())}]";
-        }
-
         public override Position GetPosition()
             => new(BracketLeft, BracketRight);
 
@@ -276,9 +251,33 @@ namespace LanguageCore.Parser.Statement
             for (int i = 0; i < Values.Length; i++)
             { yield return Values[i]; }
         }
+
+        public override string ToString()
+        {
+            StringBuilder result = new(3);
+            result.Append('[');
+            if (Values.Length == 0)
+            {
+                result.Append(' ');
+            }
+            else
+            {
+                for (int i = 0; i < Values.Length; i++)
+                {
+                    if (i > 0)
+                    { result.Append(", "); }
+                    if (result.Length >= Stringify.CozyLength)
+                    { result.Append("..."); break; }
+
+                    result.Append(Values[i].ToString());
+                }
+            }
+            result.Append(']');
+            if (Semicolon != null) result.Append(Semicolon.ToString());
+            return result.ToString();
+        }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class VariableDeclaration : Statement, IDefinition
     {
         public readonly TypeInstance Type;
@@ -297,17 +296,10 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : "")}".Trim();
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? $" = {InitialValue.PrettyPrint()}" : "")}";
-        }
+            => $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
         public override Position GetPosition()
-            => new(Type, VariableName, InitialValue);
+            => new Position(Type, VariableName, InitialValue).Extend(Modifiers);
 
         public override IEnumerable<Statement> GetStatements()
         {
@@ -315,7 +307,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class AnyCall : StatementWithValue, IReadableID
     {
         public readonly StatementWithValue PrevStatement;
@@ -341,20 +332,15 @@ namespace LanguageCore.Parser.Statement
                 if (i > 0)
                 { result.Append(", "); }
 
-                if (result.Length > 30)
-                {
-                    result.Append("...");
-                    break;
-                }
+                if (result.Length >= Stringify.CozyLength)
+                { result.Append("..."); break; }
 
                 result.Append(Parameters[i].ToString());
             }
             result.Append(')');
+            if (Semicolon != null) result.Append(Semicolon.ToString());
             return result.ToString();
         }
-
-        public override string PrettyPrint(int ident = 0)
-        { throw new NotImplementedException(); }
 
         public override Position GetPosition()
             => new(PrevStatement, BracketLeft, BracketRight);
@@ -406,7 +392,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class FunctionCall : StatementWithValue, IReadableID
     {
         public readonly Token Identifier;
@@ -459,16 +444,6 @@ namespace LanguageCore.Parser.Statement
             return result;
         }
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var arg in this.Parameters)
-            {
-                parameters.Add(arg.PrettyPrint());
-            }
-            return $"{" ".Repeat(ident)}{FunctionName}({(string.Join(", ", parameters))})";
-        }
-
         public override Position GetPosition()
             => new Position(BracketLeft, BracketRight, Identifier).Extend(MethodParameters);
 
@@ -499,7 +474,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class KeywordCall : StatementWithValue, IReadableID
     {
         public readonly Token Identifier;
@@ -515,34 +489,26 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            string result = "";
-            result += FunctionName;
-            result += " ";
+            StringBuilder result = new(1);
+            result.Append(FunctionName);
 
-            string paramsString = "";
-            for (int i = 0; i < Parameters.Length; i++)
+            if (Parameters.Length > 0)
             {
-                if (i > 0) paramsString += ", ";
-                paramsString += Parameters[i].ToString();
-                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
+                result.Append(' ');
+                for (int i = 0; i < Parameters.Length; i++)
                 {
-                    paramsString += ", ...";
-                    break;
+                    if (i > 0)
+                    { result.Append(", "); }
+                    if (result.Length >= Stringify.CozyLength)
+                    { result.Append("..."); break; }
+
+                    result.Append(Parameters[i].ToString());
                 }
             }
-            result += paramsString;
 
-            return result;
-        }
+            if (Semicolon != null) result.Append(Semicolon.ToString());
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var arg in this.Parameters)
-            {
-                parameters.Add(arg.PrettyPrint());
-            }
-            return $"{" ".Repeat(ident)}{FunctionName} {string.Join(" ", parameters)}";
+            return result.ToString();
         }
 
         public override Position GetPosition()
@@ -571,7 +537,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class OperatorCall : StatementWithValue, IReadableID
     {
         public readonly Token Operator;
@@ -617,76 +582,55 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            string result = "";
+            StringBuilder result = new(3);
+
+            if (InsideBracelet) result.Append('(');
+
             if (Left != null)
             {
-                if (Left.ToString().Length <= 50)
-                { result += Left.ToString(); }
+                if (Left.ToString().Length < Stringify.CozyLength)
+                { result.Append(Left.ToString()); }
                 else
-                { result += "..."; }
+                { result.Append("..."); }
 
-                result += $" {Operator}";
+                result.Append(' ');
+                result.Append(Operator.ToString());
+                result.Append(' ');
 
                 if (Right != null)
                 {
-                    if (Right.ToString().Length <= 50)
-                    { result += " " + Right.ToString(); }
+                    if (Right.ToString().Length < Stringify.CozyLength)
+                    { result.Append(Right.ToString()); }
                     else
-                    { result += " ..."; }
+                    { result.Append("..."); }
                 }
             }
             else
-            { result = $"{Operator}"; }
+            { result.Append(Operator.ToString()); }
 
-            if (InsideBracelet)
-            { return $"({result})"; }
-            else
-            { return result; }
-        }
+            if (InsideBracelet) result.Append(')');
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            string v;
-            if (Left != null)
-            {
-                if (Right != null)
-                {
-                    v = $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
-                }
-                else
-                {
-                    v = $"{Left.PrettyPrint()} {Operator}";
-                }
-            }
-            else
-            {
-                v = $"{Operator}";
-            }
-            if (InsideBracelet)
-            {
-                return $"{" ".Repeat(ident)}({v})";
-            }
-            else
-            {
-                return $"{" ".Repeat(ident)}({v})";
-            }
+            if (Semicolon != null) result.Append(Semicolon.ToString());
+
+            return result.ToString();
         }
 
         public override Position GetPosition()
             => new(Operator, Left, Right);
+
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = this.Operator.Content;
-            result += "(";
+            StringBuilder result = new(this.Operator.Content);
+            result.Append('(');
             for (int i = 0; i < this.Parameters.Length; i++)
             {
-                if (i > 0) { result += ", "; }
+                if (i > 0) { result.Append(", "); }
 
-                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+                result.Append(TypeSearch.Invoke(this.Parameters[i]).ToString());
             }
-            result += ")";
+            result.Append(')');
 
-            return result;
+            return result.ToString();
         }
 
         public override IEnumerable<Statement> GetStatements()
@@ -696,7 +640,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ShortOperatorCall : AnyAssignment, IReadableID
     {
         public readonly Token Operator;
@@ -713,35 +656,23 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            string result = "";
+            StringBuilder result = new();
             if (Left != null)
             {
-                if (Left.ToString().Length <= 50)
-                { result += Left.ToString(); }
+                if (Left.ToString().Length <= Stringify.CozyLength)
+                { result.Append(Left.ToString()); }
                 else
-                { result += "..."; }
+                { result.Append("..."); }
 
-                result += $" {Operator}";
+                result.Append(' ');
+                result.Append(Operator.ToString());
+
             }
             else
-            { result = $"{Operator}"; }
+            { result.Append(Operator.ToString()); }
 
-            return result;
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            string v;
-            if (Left != null)
-            {
-                v = $"{Left.PrettyPrint()} {Operator}";
-            }
-            else
-            {
-                v = $"{Operator}";
-            }
-
-            return $"{" ".Repeat(ident)}({v})";
+            if (Semicolon != null) result.Append(Semicolon.ToString());
+            return result.ToString();
         }
 
         public override Position GetPosition()
@@ -807,7 +738,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Assignment : AnyAssignment
     {
         /// <summary>
@@ -824,9 +754,8 @@ namespace LanguageCore.Parser.Statement
             this.Right = right;
         }
 
-        public override string ToString() => $"... {Operator} ...";
-
-        public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
+        public override string ToString()
+            => $"... {Operator} ...{Semicolon}";
 
         public override Position GetPosition()
             => new(Operator, Left, Right);
@@ -840,7 +769,6 @@ namespace LanguageCore.Parser.Statement
         public override Assignment ToAssignment() => this;
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class CompoundAssignment : AnyAssignment
     {
         /// This should always starts with "="
@@ -855,9 +783,7 @@ namespace LanguageCore.Parser.Statement
             this.Right = right;
         }
 
-        public override string ToString() => $"... {Operator} ...";
-
-        public override string PrettyPrint(int ident = 0) => $"{Left.PrettyPrint()} {Operator} {Right.PrettyPrint()}";
+        public override string ToString() => $"... {Operator} ...{Semicolon}";
 
         public override Position GetPosition()
             => new(Operator, Left, Right);
@@ -884,7 +810,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Literal : StatementWithValue
     {
         public readonly LiteralType Type;
@@ -930,11 +855,6 @@ namespace LanguageCore.Parser.Statement
             _ => throw new ImpossibleException(),
         };
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{Value}";
-        }
-
         public object? TryGetValue()
             => Type switch
             {
@@ -973,7 +893,6 @@ namespace LanguageCore.Parser.Statement
                 : new Position(ValueToken);
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Identifier : StatementWithValue
     {
         public readonly Token Name;
@@ -984,16 +903,13 @@ namespace LanguageCore.Parser.Statement
             Name = identifier;
         }
 
-        public override string ToString() => Name.Content;
-
-        public override string PrettyPrint(int ident = 0)
-            => $"{" ".Repeat(ident)}{Name.Content}";
+        public override string ToString()
+            => Name.Content;
 
         public override Position GetPosition()
             => new(Name);
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class AddressGetter : StatementWithValue
     {
         public readonly Token OperatorToken;
@@ -1006,14 +922,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{OperatorToken.Content}{PrevStatement}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
-        }
+            => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
         public override Position GetPosition()
             => new(OperatorToken, PrevStatement);
@@ -1024,7 +933,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Pointer : StatementWithValue
     {
         public readonly Token OperatorToken;
@@ -1037,14 +945,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{OperatorToken.Content}{PrevStatement}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{" ".Repeat(ident)}{OperatorToken.Content}{PrevStatement.PrettyPrint(0)}";
-        }
+            => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
         public override Position GetPosition()
             => new(OperatorToken, PrevStatement);
@@ -1055,7 +956,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class WhileLoop : StatementWithBlock
     {
         public readonly Token Keyword;
@@ -1069,16 +969,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"while (...) {{...}};";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = $"{" ".Repeat(ident)}while ({Condition.PrettyPrint()})";
-            x += Block.PrettyPrint();
-            return x;
-        }
+            => $"{Keyword} ({Condition}) {Block}{Semicolon}";
 
         public override Position GetPosition()
             => new(Keyword, Block);
@@ -1090,7 +981,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ForLoop : StatementWithBlock
     {
         public readonly Token Keyword;
@@ -1108,16 +998,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"for (...) {{...}};";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = $"{" ".Repeat(ident)}for ({VariableDeclaration.PrettyPrint()}; {Condition.PrettyPrint()}; {Expression.PrettyPrint()})";
-            x += Block.PrettyPrint();
-            return x;
-        }
+            => $"{Keyword} (...) {Block}{Semicolon}";
 
         public override Position GetPosition()
             => new(Keyword, Block);
@@ -1138,20 +1019,6 @@ namespace LanguageCore.Parser.Statement
         public IfContainer(IEnumerable<BaseBranch> parts)
         {
             Parts = parts.ToArray();
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = "";
-            foreach (var part in Parts)
-            {
-                x += $"{part.PrettyPrint(ident)}\n";
-            }
-            if (x.EndsWith("\n", StringComparison.InvariantCulture))
-            {
-                x = x[..^1];
-            }
-            return x;
         }
 
         public override Position GetPosition()
@@ -1196,7 +1063,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public abstract class BaseBranch : StatementWithBlock
     {
         public readonly Token Keyword;
@@ -1217,14 +1083,10 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{Keyword} {((Type != IfPart.Else) ? "(...)" : "")} {{...}}";
-        }
+            => $"{Keyword}{((Type != IfPart.Else) ? " (...)" : "")} {Block}{Semicolon}";
 
         public override Position GetPosition()
             => new(Keyword, Block);
-
-        public abstract override string PrettyPrint(int ident = 0);
 
         public override IEnumerable<Statement> GetStatements()
         {
@@ -1240,13 +1102,6 @@ namespace LanguageCore.Parser.Statement
             : base(keyword, IfPart.If, block)
         {
             this.Condition = condition;
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = $"{" ".Repeat(ident)}if ({Condition.PrettyPrint()})";
-            x += Block.PrettyPrint();
-            return x;
         }
 
         public override IEnumerable<Statement> GetStatements()
@@ -1266,13 +1121,6 @@ namespace LanguageCore.Parser.Statement
             this.Condition = condition;
         }
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = $"{" ".Repeat(ident)}elseif ({Condition.PrettyPrint()})";
-            x += Block.PrettyPrint();
-            return x;
-        }
-
         public override IEnumerable<Statement> GetStatements()
         {
             yield return Condition;
@@ -1286,20 +1134,12 @@ namespace LanguageCore.Parser.Statement
             : base(keyword, IfPart.Else, block)
         { }
 
-        public override string PrettyPrint(int ident = 0)
-        {
-            var x = $"{" ".Repeat(ident)}{Keyword}";
-            x += Block.PrettyPrint();
-            return x;
-        }
-
         public override IEnumerable<Statement> GetStatements()
         {
             yield return Block;
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class NewInstance : StatementWithValue
     {
         public readonly Token Keyword;
@@ -1311,13 +1151,12 @@ namespace LanguageCore.Parser.Statement
             TypeName = typeName;
         }
 
-        public override string ToString() => $"new {TypeName}";
-        public override string PrettyPrint(int ident = 0) => $"{" ".Repeat(ident)}new {TypeName}";
+        public override string ToString()
+            => $"{Keyword} {TypeName}{Semicolon}";
         public override Position GetPosition()
             => new(Keyword, TypeName);
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ConstructorCall : StatementWithValue, IReadableID
     {
         public readonly Token Keyword;
@@ -1339,35 +1178,30 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            string result = "new ";
-            result += TypeName.ToString();
-            result += "(";
+            StringBuilder result = new();
 
-            string paramsString = "";
+            result.Append(Keyword.ToString());
+
+            result.Append(' ');
+
+            result.Append(TypeName.ToString());
+            result.Append('(');
+
             for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) paramsString += ", ";
-                paramsString += Parameters[i].ToString();
-                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
-                {
-                    paramsString += ", ...";
-                    break;
-                }
-            }
-            result += paramsString;
+                if (i > 0)
+                { result.Append(", "); }
+                if (result.Length >= Stringify.CozyLength)
+                { result.Append("..."); break; }
 
-            result += ")";
-            return result;
-        }
-        public override string PrettyPrint(int ident = 0)
-        {
-            List<string> parameters = new();
-            foreach (var arg in this.Parameters)
-            {
-                parameters.Add(arg.PrettyPrint());
+                result.Append(Parameters[i].ToString());
             }
 
-            return $"{" ".Repeat(ident)}new {TypeName}({(string.Join(", ", parameters))})";
+            result.Append(')');
+
+            if (Semicolon != null) result.Append(Semicolon.ToString());
+
+            return result.ToString();
         }
         public override Position GetPosition()
             => new Position(Keyword, TypeName, BracketLeft, BracketRight).Extend(Parameters);
@@ -1397,7 +1231,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class IndexCall : StatementWithValue, IReadableID
     {
         public readonly StatementWithValue PrevStatement;
@@ -1415,28 +1248,25 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{PrevStatement}[{Expression.PrettyPrint()}]";
-        }
+            => $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}{Semicolon}";
 
         public override Position GetPosition()
             => new(PrevStatement, Expression);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = string.Empty;
-            if (PrevStatement != null) result += TypeSearch.Invoke(this.PrevStatement).Name;
-            else result += "null";
-            result += "[";
-            result += TypeSearch.Invoke(this.Expression).Name;
-            result += "]";
+            StringBuilder result = new(2);
 
-            return result;
+            if (PrevStatement != null)
+            { result.Append(TypeSearch.Invoke(this.PrevStatement).ToString()); }
+            else
+            { result.Append('?'); }
+
+            result.Append(BracketLeft.ToString());
+            result.Append(TypeSearch.Invoke(this.Expression).ToString());
+            result.Append(BracketRight.ToString());
+
+            return result.ToString();
         }
 
         public override IEnumerable<Statement> GetStatements()
@@ -1446,7 +1276,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class Field : StatementWithValue
     {
         public readonly Token FieldName;
@@ -1459,14 +1288,7 @@ namespace LanguageCore.Parser.Statement
         }
 
         public override string ToString()
-        {
-            return $"{PrevStatement}.{FieldName}";
-        }
-
-        public override string PrettyPrint(int ident = 0)
-        {
-            return $"{PrevStatement.PrettyPrint()}.{FieldName}";
-        }
+            => $"{PrevStatement}.{FieldName}{Semicolon}";
 
         public override Position GetPosition()
             => new(PrevStatement, FieldName);
@@ -1477,7 +1299,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class TypeCast : StatementWithValue
     {
         public readonly StatementWithValue PrevStatement;
@@ -1491,8 +1312,8 @@ namespace LanguageCore.Parser.Statement
             this.Type = type;
         }
 
-        public override string ToString() => $"{PrevStatement} as {Type}";
-        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{PrevStatement} as {Type}";
+        public override string ToString()
+            => $"{PrevStatement} {Keyword} {Type}{Semicolon}";
 
         public override Position GetPosition()
             => new(PrevStatement, Keyword, Type);
@@ -1503,7 +1324,6 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    [DebuggerDisplay("{" + nameof(ToString) + "(),nq}")]
     public class ModifiedStatement : StatementWithValue
     {
         public readonly StatementWithValue Statement;
@@ -1515,8 +1335,8 @@ namespace LanguageCore.Parser.Statement
             this.Modifier = modifier;
         }
 
-        public override string ToString() => $"{Modifier} {Statement}";
-        public override string PrettyPrint(int ident = 0) => $"{new string(' ', ident)}{Modifier} {Statement}";
+        public override string ToString()
+            => $"{Modifier} {Statement}{Semicolon}";
 
         public override Position GetPosition()
             => new(Modifier, Statement);

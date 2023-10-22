@@ -994,8 +994,6 @@ namespace LanguageCore.Parser
 
         bool ExpectOneValue([NotNullWhen(true)] out StatementWithValue? statementWithValue)
         {
-            int savedToken = CurrentTokenIndex;
-
             statementWithValue = null;
 
             {
@@ -1252,7 +1250,7 @@ namespace LanguageCore.Parser
             }
             else
             {
-                if (possibleType.Identifier.Content == "var")
+                if (possibleType == "var")
                 { throw new SyntaxException("Initial value for variable declaration with implicit type is required", possibleType); }
             }
 
@@ -1455,6 +1453,7 @@ namespace LanguageCore.Parser
             return false;
         }
 
+        /*
         bool ExpectMethodCall(bool expectDot, StatementWithValue prevStatement, [NotNullWhen(true)] out FunctionCall? methodCall)
         {
             int startTokenIndex = CurrentTokenIndex;
@@ -1480,7 +1479,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            possibleFunctionName.AnalyzedType = TokenAnalysedType.FunctionName;
+            possibleFunctionName.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             bool expectParameter = false;
 
@@ -1511,6 +1510,7 @@ namespace LanguageCore.Parser
 
             return true;
         }
+        */
 
         bool ExpectExpression([NotNullWhen(true)] out StatementWithValue? result)
         {
@@ -1705,6 +1705,7 @@ namespace LanguageCore.Parser
             throw new InternalException($"Precedence for operator \"{@operator}\" not found");
         }
 
+        /*
         bool ExpectFunctionCall([NotNullWhen(true)] out FunctionCall? functionCall)
         {
             functionCall = null;
@@ -1719,7 +1720,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("(", out Token? bracketLeft))
             { CurrentTokenIndex = startTokenIndex; return false; }
 
-            possibleFunctionName.AnalyzedType = TokenAnalysedType.BuiltinType;
+            possibleFunctionName.AnalyzedType = TokenAnalyzedType.BuiltinType;
 
             bool expectParameter = false;
             List<StatementWithValue> parameters = new();
@@ -1759,6 +1760,7 @@ namespace LanguageCore.Parser
             functionCall = new FunctionCall(null, possibleFunctionName, bracketLeft, parameters, bracketRight);
             return true;
         }
+        */
 
         bool ExpectAnyCall(StatementWithValue prevStatement, [NotNullWhen(true)] out AnyCall? anyCall)
         {
@@ -2076,6 +2078,7 @@ namespace LanguageCore.Parser
             { return false; }
 
             possibleType.AnalyzedType = TokenAnalysedType.Keyword;
+            type = new TypeInstanceSimple(possibleType);
 
             if (possibleType.Content == "any")
             {
@@ -2088,7 +2091,6 @@ namespace LanguageCore.Parser
                 if (ExpectOperator(new string[] { "<", "(", "[" }, out Token? illegalT))
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
-                type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
                 return true;
             }
 
@@ -2103,56 +2105,55 @@ namespace LanguageCore.Parser
                 if (ExpectOperator(new string[] { "<", "(", "[" }, out Token? illegalT))
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
-                type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
                 return true;
             }
 
-            TypeInstance newType;
-
             int afterIdentifier = CurrentTokenIndex;
 
-            if (ExpectOperator("<"))
+            while (true)
             {
-                newType = new TypeInstance(possibleType, TypeInstanceKind.Template);
-
-                while (true)
+                if (ExpectOperator("<"))
                 {
-                    if (!ExpectType(AllowedType.FunctionPointer, out var typeParameter))
-                    { return false; }
+                    if (type is not TypeInstanceSimple)
+                    { throw new NotImplementedException(); }
 
-                    newType.GenericTypes.Add(typeParameter);
+                    List<TypeInstance> genericTypes = new();
 
-                    if (ExpectOperator(">"))
-                    { break; }
+                    while (true)
+                    {
+                        if (!ExpectType(AllowedType.FunctionPointer, out var typeParameter))
+                        { return false; }
 
-                    if (ExpectOperator(","))
-                    { continue; }
-                }
-            }
-            else if (ExpectOperator("("))
-            {
-                if ((flags & AllowedType.FunctionPointer) == 0)
-                {
-                    CurrentTokenIndex = afterIdentifier;
-                    type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
+                        genericTypes.Add(typeParameter);
+
+                        if (ExpectOperator(">"))
+                        { break; }
+
+                        if (ExpectOperator(","))
+                        { continue; }
+                    }
+
+                    type = new TypeInstanceSimple(possibleType, genericTypes);
                     return true;
                 }
-
-                newType = new TypeInstance(possibleType, TypeInstanceKind.Function);
-
-                while (true)
+                else if (ExpectOperator("("))
                 {
+                    if (!flags.HasFlag(AllowedType.FunctionPointer))
+                    {
+                        CurrentTokenIndex = afterIdentifier;
+                        return true;
+                    }
+
+                    List<TypeInstance> parameterTypes = new();
                     while (!ExpectOperator(")"))
                     {
                         if (!ExpectType(AllowedType.FunctionPointer, out var subtype))
                         {
                             CurrentTokenIndex = afterIdentifier;
-                            type = new TypeInstance(possibleType, TypeInstanceKind.Simple);
                             return true;
-                            // throw new SyntaxException($"Expected type as function-pointer parameter type", CurrentToken);
                         }
 
-                        newType.ParameterTypes.Add(subtype);
+                        parameterTypes.Add(subtype);
 
                         if (ExpectOperator(")"))
                         { break; }
@@ -2161,48 +2162,31 @@ namespace LanguageCore.Parser
                         { continue; }
                     }
 
-                    if (ExpectOperator("("))
-                    {
-                        throw new NotImplementedException();
-                        // TypeInstance newSubType = new(possibleType, TypeInstanceKind.Function);
-                        // 
-                        // continue;
-                    }
-
-                    break;
+                    type = new TypeInstanceFunction(type, parameterTypes);
                 }
-            }
-            else if (ExpectOperator("[", out var bracket1Left))
-            {
-                if (!flags.HasFlag(AllowedType.StackArrayWithLength) &&
-                    !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { return false; }
+                else if (ExpectOperator("[", out var bracket1Left))
+                {
+                    if (!flags.HasFlag(AllowedType.StackArrayWithLength) &&
+                        !flags.HasFlag(AllowedType.StackArrayWithoutLength))
+                    { return false; }
 
-                ExpectOneValue(out StatementWithValue? sizeValue);
+                    ExpectOneValue(out StatementWithValue? sizeValue);
 
-                if (sizeValue == null && !flags.HasFlag(AllowedType.StackArrayWithoutLength))
-                { throw new SyntaxException($"Expected value as array size", bracket1Left); }
+                    if (sizeValue == null && !flags.HasFlag(AllowedType.StackArrayWithoutLength))
+                    { throw new SyntaxException($"Expected value as array size", bracket1Left); }
 
-                if (sizeValue != null && !flags.HasFlag(AllowedType.StackArrayWithLength))
-                { throw new SyntaxException($"Expected value as array size", bracket1Left); }
+                    if (sizeValue != null && !flags.HasFlag(AllowedType.StackArrayWithLength))
+                    { throw new SyntaxException($"Expected value as array size", bracket1Left); }
 
-                if (!ExpectOperator("]"))
-                { return false; }
+                    if (!ExpectOperator("]"))
+                    { return false; }
 
-                newType = new TypeInstance(possibleType, TypeInstanceKind.StackArray, sizeValue);
-            }
-            else
-            {
-                newType = new TypeInstance(possibleType, TypeInstanceKind.Simple);
+                    type = new TypeInstanceStackArray(type, sizeValue);
+                }
+                else
+                { break; }
             }
 
-            if (Constants.BuiltinTypes.Contains(possibleType.Content))
-            { newType.Identifier.AnalyzedType = TokenAnalysedType.BuiltinType; }
-
-            if (ExpectOperator("["))
-            { return false; }
-
-            type = newType;
             return true;
         }
 

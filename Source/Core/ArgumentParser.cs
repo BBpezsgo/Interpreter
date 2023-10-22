@@ -2,8 +2,12 @@
 using System.Collections.Generic;
 using System.IO.Compression;
 
+#pragma warning disable IDE0059 // Unnecessary assignment of a value
+#pragma warning disable IDE0018 // Inline variable declaration
+
 namespace TheProgram
 {
+    using System.Diagnostics.CodeAnalysis;
     using LanguageCore;
     using LanguageCore.BBCode.Compiler;
     using LanguageCore.Parser;
@@ -101,11 +105,53 @@ namespace TheProgram
             }
         }
 
-        /// <summary>
-        /// Parses the passed arguments
-        /// </summary>
-        /// <param name="args">The passed arguments</param>
-        /// <exception cref="ArgumentException"></exception>
+        static bool ExpectArg(string[] args, ref int i, [NotNullWhen(true)] out string? result, params string[] name)
+        {
+            result = null;
+
+            if (i >= args.Length - 1)
+            { return false; }
+
+            for (int j = 0; j < name.Length; j++)
+            {
+                if (args[i] == name[j])
+                {
+                    result = args[i];
+                    i++;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        static bool ExpectParam(string[] args, ref int i, out int param)
+        {
+            param = default;
+
+            if (i >= args.Length - 1)
+            { return false; }
+
+            if (!int.TryParse(args[i], out int @int))
+            { return false; }
+
+            i++;
+            param = @int;
+            return true;
+        }
+
+        static bool ExpectParam(string[] args, ref int i, [NotNullWhen(true)] out string? param)
+        {
+            param = default;
+
+            if (i >= args.Length - 1)
+            { return false; }
+
+            param = args[i];
+            i++;
+            return true;
+        }
+
         static Settings ParseArgs(string[] args)
         {
             Settings result = Settings.Default();
@@ -115,69 +161,65 @@ namespace TheProgram
                 int i = 0;
                 while (i < args.Length - 1)
                 {
-                    if (args[i] == "-heap")
+                    string? arg;
+
+                    if (ExpectArg(args, ref i, out arg, "--heap-size", "-hs"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.HeapSize))
-                        { throw new ArgumentException("Expected number value after argument '-heap'"); }
-                        goto ArgParseDone;
+                        if (!ExpectParam(args, ref i, out result.bytecodeInterpreterSettings.HeapSize))
+                        { throw new ArgumentException($"Expected number value after argument \"{arg}\""); }
+
+                        continue;
                     }
 
-                    if (args[i] == "-bf-no-cache")
+                    if (ExpectArg(args, ref i, out arg, "--brainfuck", "-bf"))
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
-                        result.compilerSettings.ExternalFunctionsCache = false;
-                        goto ArgParseDone;
-                    }
+                        if (result.RunType != RunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}"); }
 
-                    if (args[i] == "-brainfuck")
-                    {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}");
                         result.RunType = RunType.Brainfuck;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-asm")
+                    if (ExpectArg(args, ref i, out arg, "--asm"))
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ASM}");
+                        if (result.RunType != RunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ASM}"); }
+
                         result.RunType = RunType.ASM;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-il")
+                    if (ExpectArg(args, ref i, out arg, "--il"))
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}");
-                        result.RunType = RunType.IL;
+                        if (result.RunType != RunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}"); }
 
-                        i++;
-                        if (i >= args.Length - 1)
+                        if (!ExpectParam(args, ref i, out result.CompileOutput))
                         { throw new ArgumentException("Expected string value after argument '-il'"); }
 
-                        result.CompileOutput = args[i];
-
-                        goto ArgParseDone;
+                        result.RunType = RunType.IL;
+                        continue;
                     }
 
-                    if (args[i] == "-debug")
+                    if (ExpectArg(args, ref i, out arg, "--debug"))
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}");
+                        if (result.RunType != RunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}"); }
+
                         result.RunType = RunType.Debugger;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-console-gui")
+                    if (ExpectArg(args, ref i, out arg, "--console-gui", "-cg"))
                     {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ConsoleGUI}");
+                        if (result.RunType != RunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ConsoleGUI}"); }
+
                         result.RunType = RunType.ConsoleGUI;
-                        goto ArgParseDone;
+                        continue;
                     }
 
+                    /*
                     if (args[i] == "-decompile")
                     {
                         if (result.RunType != RunType.Normal) throw new ArgumentException(
@@ -200,18 +242,17 @@ namespace TheProgram
 
                         goto ArgParseDone;
                     }
+                    */
 
-                    if (args[i] == "-basepath")
+                    if (ExpectArg(args, ref i, out arg, "--basepath", "-bp"))
                     {
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-basepath'"); }
+                        if (!ExpectParam(args, ref i, out result.BasePath))
+                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
-                        result.BasePath = args[i];
-
-                        goto ArgParseDone;
+                        continue;
                     }
 
+                    /*
                     if (args[i] == "-compression")
                     {
                         if (result.RunType != RunType.Normal && result.RunType != RunType.Compile)
@@ -239,163 +280,124 @@ namespace TheProgram
                     {
                         goto ArgParseDone;
                     }
+                    */
 
-                    if (args[i] == "-throw-errors")
+                    if (ExpectArg(args, ref i, out arg, "--throw-errors", "-te"))
                     {
                         result.ThrowErrors = true;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-hide-debug")
+                    if (ExpectArg(args, ref i, out arg, "--hide-debug", "-hd"))
                     {
                         result.LogDebugs = false;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-hide-system")
+                    if (ExpectArg(args, ref i, out arg, "--hide-system", "-hs"))
                     {
                         result.LogSystem = false;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-hide-warning")
+                    if (ExpectArg(args, ref i, out arg, "--hide-warning", "--hide-warnings", "-hw"))
                     {
                         result.LogWarnings = false;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-hide-info")
+                    if (ExpectArg(args, ref i, out arg, "--hide-info", "-hi"))
                     {
                         result.LogInfo = false;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-dont-optimize")
+                    if (ExpectArg(args, ref i, out arg, "--dont-optimize", "-do"))
                     {
                         result.compilerSettings.DontOptimize = true;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-c-generate-comments")
-                    {
-                        i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.compilerSettings.GenerateComments))
-                        { throw new ArgumentException("Expected bool value after argument '-c-generate-comments'"); }
-                        goto ArgParseDone;
-                    }
-
-                    if (args[i] == "-no-debug-info")
+                    if (ExpectArg(args, ref i, out arg, "--no-debug-info", "-ndi"))
                     {
                         result.compilerSettings.GenerateDebugInstructions = false;
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-c-remove-unused-functions")
+                    if (ExpectArg(args, ref i, out arg, "--remove-unused-functions", "-ruf"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !byte.TryParse(args[i], out result.compilerSettings.RemoveUnusedFunctionsMaxIterations))
+                        if (!ExpectParam(args, ref i, out result.compilerSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
-                        goto ArgParseDone;
+
+                        continue;
                     }
 
-                    if (args[i] == "-bc-instruction-limit")
+                    if (ExpectArg(args, ref i, out arg, "--stack-size", "-ss"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.InstructionLimit))
-                        { throw new ArgumentException("Expected int value after argument '-bc-instruction-limit'"); }
-                        goto ArgParseDone;
+                        if (!ExpectParam(args, ref i, out result.bytecodeInterpreterSettings.StackMaxSize))
+                        { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
+
+                        continue;
                     }
 
-                    if (args[i] == "-bc-stack-size")
+                    if (ExpectArg(args, ref i, out arg, "--print-instructions", "-pi"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.bytecodeInterpreterSettings.StackMaxSize))
-                        { throw new ArgumentException("Expected int value after argument '-bc-stack-size'"); }
-                        goto ArgParseDone;
+                        result.compilerSettings.PrintInstructions = true;
+                        continue;
                     }
 
-                    if (args[i] == "-c-print-instructions")
+                    if (ExpectArg(args, ref i, out arg, "--print-info", "-pn"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.compilerSettings.PrintInstructions))
-                        { throw new ArgumentException("Expected bool value after argument '-c-print-instructions'"); }
-                        goto ArgParseDone;
+                        result.parserSettings.PrintInfo = true;
+                        continue;
                     }
 
-                    if (args[i] == "-p-print-info")
+                    if (ExpectArg(args, ref i, out arg, "--pipe", "-pp"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !bool.TryParse(args[i], out result.parserSettings.PrintInfo))
-                        { throw new ArgumentException("Expected bool value after argument '-p-print-info'"); }
-                        goto ArgParseDone;
+                        if (!ExpectParam(args, ref i, out result.PipeName))
+                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
+
+                        continue;
                     }
 
-                    if (args[i] == "-test")
+                    if (ExpectArg(args, ref i, out arg, "--port", "-pr"))
                     {
-                        result.IsTest = true;
-                        goto ArgParseDone;
+                        if (!ExpectParam(args, ref i, out result.Port))
+                        { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
+
+                        continue;
                     }
 
-                    if (args[i] == "-pipe")
+                    if (ExpectArg(args, ref i, out arg, "--test-id", "-ti"))
                     {
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-pipe'"); }
+                        if (!ExpectParam(args, ref i, out result.TestID))
+                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
-                        result.PipeName = args[i];
-
-                        goto ArgParseDone;
+                        continue;
                     }
 
-                    if (args[i] == "-port")
+                    if (ExpectArg(args, ref i, out arg, "--compiler-type", "-ct"))
                     {
-                        i++;
-                        if (i >= args.Length - 1 || !int.TryParse(args[i], out result.Port))
-                        { throw new ArgumentException("Expected int value after argument '-pipe'"); }
-                        goto ArgParseDone;
-                    }
+                        if (!ExpectParam(args, ref i, out string? compileType))
+                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
-                    if (args[i] == "-test-id")
-                    {
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-test-id'"); }
-                        result.TestID = args[i];
-                        goto ArgParseDone;
-                    }
-
-                    if (args[i] == "-compiler-type")
-                    {
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-compiler-type'"); }
-                        switch (args[i])
+                        result.CompileToFileType = compileType switch
                         {
-                            case "binary":
-                                result.CompileToFileType = FileType.Binary;
-                                break;
-                            case "readable":
-                                result.CompileToFileType = FileType.Readable;
-                                break;
-                            default:
-                                { throw new ArgumentException($"Unknown compiler type '{args[i]}'. Possible values: 'binary', 'readable'"); }
-                        }
-                        goto ArgParseDone;
+                            "binary" => FileType.Binary,
+                            "readable" => FileType.Readable,
+                            _ => throw new ArgumentException($"Unknown compiler type \"{compileType}\". Possible values: \"binary\", \"readable\""),
+                        };
+                        continue;
                     }
 
-                    throw new ArgumentException($"Unknown argument '{args[i]}'");
-
-                ArgParseDone:
-                    i++;
+                    throw new ArgumentException($"Unknown argument \"{args[i]}\"");
                 }
             }
 
-            if (!System.IO.File.Exists(args[^1]))
-            {
-                throw new ArgumentException($"File '{args[^1]}' not found!");
-            }
-
-            result.File = new System.IO.FileInfo(args[^1]);
+            string file = args[^1];
+            if (!System.IO.File.Exists(file))
+            { throw new ArgumentException($"File \"{file}\" not found"); }
+            result.File = new System.IO.FileInfo(file);
 
             return result;
         }

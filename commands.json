@@ -9,6 +9,11 @@
       "fileName": "cmd.exe",
       "workingDirectory": ".",
       "arguments": "/c zip.bat"
+    },
+    "publish-win64": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c publish-win64.bat"
     }
   }
 }

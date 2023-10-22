@@ -15,7 +15,7 @@ namespace LanguageCore.BBCode.Compiler
         public struct CompilerSettings
         {
             public bool GenerateComments;
-            public byte RemoveUnusedFunctionsMaxIterations;
+            public int RemoveUnusedFunctionsMaxIterations;
             public bool PrintInstructions;
             public bool DontOptimize;
             public bool GenerateDebugInstructions;

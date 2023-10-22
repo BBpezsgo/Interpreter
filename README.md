@@ -22,41 +22,33 @@ This program parses the given source code, creates a list of instructions and ex
 When you've created a source file, just run it with the executable. Or run the exe file with an argument where you specify the path to the source code.<br>
 ### Arguments:
 
+`BBCodeInterpreter.exe [arguments...] <source path>`
+
 **Logging:**
-- `-hide-debug` Hides the debug logs
-- `-hide-system` Hides the system logs
+- `--hide-debug|-hd` Hides debug logs
+- `--hide-info|-hi` Hides information logs
+- `--hide-system|-hs` Hides system logs
+- `--hide-warning|-hw` Hides warning logs
 
 **Parser:**
-- `-p-print-info [bool]` Prints the parser info
+- `--print-info|-pn` Prints the parser info
 
 **Code Generator:**
-- `-c-generate-comments [bool]` Generates comment instructions
-- `-c-remove-unused-functions [byte]` Remove unused instructions iterations
-- `-c-print-instructions [bool]` Prints the generated instructions
-- `-dont-optimize` Disables basic code optimization
-- `-no-debug-info` I forgot what it does
-- `-bf-no-cache` Disables the external function name cache. With this option enabled, every time you perform an external call, the function name is generated on the heap
+- `--remove-unused-functions|-ruf <iterations>` Remove unused instructions iterations
+- `--print-instructions|-pi` Prints the generated instructions
 
 **Interpreter:**
-- `-bc-clock [int]` Sets the interpreter *clock cycles/update*
-- `-bc-instruction-limit [int]` Sets the interpreter *instruction limit*
-- `-bc-stack-size [int]` Sets the interpreter *stack size*
-- `-heap [int]` Sets the heap size
+- `--stack-size|-ss <size>` Sets the interpreter *stack size*
+- `--heap-size|-hs <size>` Sets the heap size
 
 **Modes:**
 > Use only one of these!
-- `-test` ⚠️ Deprecated! Executes a test file.
-- `-decompile` ⚠️ Deprecated! Executes a binary file.
-- `-compile [string]` ⚠️ Deprecated! Compiles and writes the code to the given path
-- `-console-gui`
-- `-debug` ⚠️ Deprecated!
-- `-il` ⚠️ Do not use this!
-- `-brainfuck` Compiles and executes the code with a brainfuck interpreter
+- `--console-gui|-cg` I use this mode for debugging
+- `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter
 
 **Other:**
-- `-compression none|fastest|optimal|smallest` Specifies the compression level. Only valid if you use the `-compile` argument!
-- `-throw-errors` Causes the program to crash on any syntax, parser, runtime, or internal exception.
-- `-basepath [string]` Sets a new path where dll and bbc files will be searched for *using* statements. If it's not there, it will look for it next to the file.
+- `--throw-errors|-te` Causes the program to crash on any syntax, parser, runtime, or internal exception.
+- `--basepath|-bp <base folder path>` Sets a new path where dll and bbc files will be searched for *using* statements. If it's not there, it will look for it next to the file.
 
 ## Hello World:
 ```cs

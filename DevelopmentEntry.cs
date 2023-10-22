@@ -23,20 +23,19 @@ namespace TheProgram
 
             if (args.Length == 0) args = new string[]
             {
-                // "-throw-errors",
-                "-basepath \"../CodeFiles/\"",
-                // "-c-print-instructions true",
-                // "-c-remove-unused-functions 5",
-                // "-hide-debug",
-                "-hide-system",
-                //"-c-generate-comments false",
-                // "-no-debug-info",
-                // "-dont-optimize",
-                "-console-gui",
-                // "-asm",
-                // "-brainfuck",
-                "-heap 2048",
-                "-bc-instruction-limit " + int.MaxValue.ToString(),
+                // "--throw-errors",
+                "--basepath \"../CodeFiles/\"",
+                // "--print-instructions true",
+                // "--remove-unused-functions 5",
+                // "--hide-debug",
+                "--hide-system",
+                //"--generate-comments false",
+                // "--no-debug-info",
+                // "--dont-optimize",
+                "--console-gui",
+                // "--asm",
+                // "--brainfuck",
+                "--heap-size 2048",
                 $"\"{path}\""
             };
 #endif

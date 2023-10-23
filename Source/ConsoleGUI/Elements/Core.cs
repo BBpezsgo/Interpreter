@@ -10,8 +10,8 @@ namespace ConsoleGUI
         readonly CharInfo[] v;
 
         int currentIndex;
-        readonly int Width;
-        readonly int Height;
+        public readonly int Width;
+        public readonly int Height;
         byte currentBgColor;
         byte currentFgColor;
 

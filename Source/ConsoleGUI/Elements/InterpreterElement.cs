@@ -16,24 +16,24 @@ namespace ConsoleGUI
         public string File;
         InterpreterDebuggabble Interpreter;
 
-        struct ConsoleLine
+        readonly struct ConsoleText
         {
-            internal string Data;
-            internal byte Color;
+            public readonly string Text;
+            public readonly byte Color;
 
-            public ConsoleLine(string data, byte color)
+            public ConsoleText(string text, byte color)
             {
-                Data = data;
+                Text = text;
                 Color = color;
             }
-            public ConsoleLine(string data)
+            public ConsoleText(string text)
             {
-                Data = data;
+                Text = text;
                 Color = ByteColor.Silver;
             }
         }
 
-        readonly List<ConsoleLine> ConsoleLines;
+        readonly List<ConsoleText> ConsoleTexts;
 
         ScrollBar ConsoleScrollBar;
         ScrollBar HeapScrollBar;
@@ -47,7 +47,7 @@ namespace ConsoleGUI
             ClearBuffer();
             InitElements();
             HasBorder = false;
-            ConsoleLines = new List<ConsoleLine>();
+            ConsoleTexts = new List<ConsoleText>();
 
             NextCodeJumpCount = 1;
             CurrentlyJumping = 0;
@@ -164,7 +164,22 @@ namespace ConsoleGUI
                 Title = "Console",
             };
 
-            ConsoleScrollBar = new ScrollBar((parent) => (0, Math.Max(1, ConsoleLines.Count - parent.Rect.Height)), ConsolePanel);
+            ConsoleScrollBar = new ScrollBar((parent) =>
+            {
+                int totalLines = 0;
+                for (int i = 0; i < ConsoleTexts.Count; i++)
+                {
+                    string[] lines = ConsoleTexts[i].Text.Split('\n');
+                    totalLines += lines.Length - 1;
+
+                    for (int j = 0; j < lines.Length; j++)
+                    {
+                        if (lines[j].Length >= parent.DrawBuffer.Width) totalLines++;
+                    }
+                }
+
+                return (0, Math.Max(1, totalLines));
+            }, ConsolePanel);
 
             ConsolePanel.OnBeforeDraw += ConsolePanel_OnBeforeDraw;
             ConsolePanel.OnMouseEventInvoked += ConsoleScrollBar.FeedEvent;
@@ -251,7 +266,7 @@ namespace ConsoleGUI
 
             void PrintOutput(string message, LogType logType)
             {
-                ConsoleLines.Add(new ConsoleLine(message + "\n", logType switch
+                ConsoleTexts.Add(new ConsoleText(message + "\n", logType switch
                 {
                     LogType.System => ByteColor.Silver,
                     LogType.Normal => ByteColor.Silver,
@@ -264,8 +279,8 @@ namespace ConsoleGUI
 
             Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
-            Interpreter.OnStdOut += (sender, data) => ConsoleLines.Add(new ConsoleLine(data));
-            Interpreter.OnStdError += (sender, data) => ConsoleLines.Add(new ConsoleLine(data, ByteColor.BrightRed));
+            Interpreter.OnStdOut += (sender, data) => ConsoleTexts.Add(new ConsoleText(data));
+            Interpreter.OnStdError += (sender, data) => ConsoleTexts.Add(new ConsoleText(data, ByteColor.BrightRed));
 
             Interpreter.OnNeedInput += (sender) =>
             {
@@ -499,20 +514,31 @@ namespace ConsoleGUI
 
             b.ResetColor();
 
-            bool lineFinished = true;
-            for (int i = Math.Max(0, ConsoleLines.Count - sender.Rect.Height + ConsoleScrollBar.Offset); i < ConsoleLines.Count; i++)
+            int start = Math.Max(0, ConsoleScrollBar.Offset);
+
+            int line = 0;
+            for (int i = 0; i < ConsoleTexts.Count; i++)
             {
-                var line = ConsoleLines[i];
+                ConsoleText consoleText = ConsoleTexts[i];
+                string text = consoleText.Text;
 
-                if (lineFinished) b.AddChar(' ');
-                b.ForegroundColor = line.Color;
-                b.AddText(line.Data.TrimEnd());
-                b.ForegroundColor = ByteColor.Silver;
-                b.BackgroundColor = ByteColor.Black;
+                string[] lines = text.Split('\n');
 
-                lineFinished = line.Data.EndsWith('\n');
+                line += lines.Length - 1;
 
-                if (lineFinished) b.FinishLine(sender.Rect.Width);
+                if (line < start) continue;
+
+                b.ForegroundColor = consoleText.Color;
+
+                for (int j = 0; j < lines.Length; j++)
+                {
+                    if (lines[j] == string.Empty) continue;
+
+                    var line_ = lines[j];
+                    b.AddText(line_.TrimEnd());
+                    if (j < lines.Length - 1)
+                    { b.FinishLine(sender.Rect.Width); }
+                }
             }
 
             ConsoleScrollBar.Draw(b);
@@ -603,13 +629,13 @@ namespace ConsoleGUI
             {
                 b.BackgroundColor = ByteColor.White;
                 b.ForegroundColor = ByteColor.Black;
-                b.AddText($"EXTERN F.");
+                b.AddText($"EXTERNAL");
                 b.BackgroundColor = ByteColor.Black;
                 b.ForegroundColor = ByteColor.Silver;
             }
             else
             {
-                b.AddText($"EXTERN F.");
+                b.AddText($"EXTERNAL");
             }
 
             b.AddText("  ");
@@ -1179,7 +1205,7 @@ namespace ConsoleGUI
             }
 
             {
-                string t = CurrentlyJumping == 0 ? $" Next Jump Count: {NextCodeJumpCount} " : $" Jumping: {CurrentlyJumping} ";
+                string t = CurrentlyJumping == 0 ? $" Jump Count: {NextCodeJumpCount} " : $" Jumping: {CurrentlyJumping} ";
                 b.ForegroundColor = ByteColor.Black;
                 b.BackgroundColor = ByteColor.White;
                 b.SetText(t, sender.Rect.Right - (2 + t.Length));

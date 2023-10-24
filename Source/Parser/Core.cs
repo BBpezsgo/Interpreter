@@ -28,16 +28,6 @@ namespace LanguageCore.Parser
         };
     }
 
-    public struct ParserSettings
-    {
-        public bool PrintInfo;
-
-        public static ParserSettings Default => new()
-        {
-            PrintInfo = false,
-        };
-    }
-
     public struct UsingAnalysis
     {
         public string Path;
@@ -361,7 +351,7 @@ namespace LanguageCore.Parser
             });
         }
 
-        public void CheckFilePaths(System.Action<string> NotSetCallback)
+        public void CheckFilePaths(Action<string> NotSetCallback)
         {
             for (int i = 0; i < this.Functions.Length; i++)
             {
@@ -393,6 +383,12 @@ namespace LanguageCore.Parser
                 { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
                 return false;
             });
+        }
+
+        public void ThrowErrors()
+        {
+            if (Errors.Length == 0) return;
+            throw new LanguageException(Errors[0]);
         }
     }
 

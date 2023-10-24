@@ -14,7 +14,6 @@ namespace LanguageCore.BBCode
         Dictionary<string, ExternalFunctionBase>? externalFunctions;
         string? BasePath;
         TokenizerSettings tokenizerSettings;
-        ParserSettings parserSettings;
         Compiler.Compiler.CompilerSettings compilerSettings;
 
         public struct Result
@@ -27,21 +26,25 @@ namespace LanguageCore.BBCode
 
         Result Compile_(
             FileInfo file,
-            PrintCallback? printCallback
-            )
+            PrintCallback? printCallback)
         {
             string sourceCode = File.ReadAllText(file.FullName);
 
             Token[] tokens;
 
             {
-                Tokenizer tokenizer = new(tokenizerSettings, printCallback);
-                List<Warning> warnings = new();
+                DateTime parseStarted = DateTime.Now;
+                if (printCallback != null)
+                { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
 
-                tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
+                TokenizerResult tokenizerResult = Tokenizer.Tokenize(sourceCode, tokenizerSettings, file.FullName);
+                tokens = tokenizerResult.Tokens;
 
-                foreach (Warning warning in warnings)
+                foreach (Warning warning in tokenizerResult.Warnings)
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
+
+                if (printCallback != null)
+                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
             }
 
             ParserResult parserResult;
@@ -52,15 +55,10 @@ namespace LanguageCore.BBCode
                 { printCallback?.Invoke("Parsing ...", LogType.Debug); }
 
                 parserResult = Parser.Parse(tokens);
-
-                if (parserResult.Errors.Length > 0)
-                { throw new LanguageException("Failed to parse", parserResult.Errors[0].ToException()); }
+                parserResult.ThrowErrors();
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
-
-                if (parserSettings.PrintInfo)
-                { parserResult.WriteToConsole(); }
             }
 
             parserResult.SetFile(file.FullName);
@@ -72,7 +70,6 @@ namespace LanguageCore.BBCode
                     parserResult,
                     this.externalFunctions ?? new Dictionary<string, ExternalFunctionBase>(),
                     file,
-                    ParserSettings.Default,
                     printCallback,
                     this.BasePath);
 
@@ -130,7 +127,6 @@ namespace LanguageCore.BBCode
             FileInfo file,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
-            ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
             bool handleErrors,
             PrintCallback? printCallback = null,
@@ -142,7 +138,6 @@ namespace LanguageCore.BBCode
                     file,
                     externalFunctions,
                     tokenizerSettings,
-                    parserSettings,
                     compilerSettings,
                     printCallback,
                     basePath
@@ -175,7 +170,6 @@ namespace LanguageCore.BBCode
             FileInfo file,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
-            ParserSettings parserSettings,
             Compiler.Compiler.CompilerSettings compilerSettings,
             PrintCallback? printCallback = null,
             string? basePath = null
@@ -184,7 +178,6 @@ namespace LanguageCore.BBCode
             externalFunctions = externalFunctions,
             BasePath = basePath,
             tokenizerSettings = tokenizerSettings,
-            parserSettings = parserSettings,
             compilerSettings = compilerSettings,
         }.Compile_(file, printCallback);
     }

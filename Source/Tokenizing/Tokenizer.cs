@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.ExceptionServices;
 using System.Text;
 
 namespace LanguageCore.Tokenizing
@@ -36,7 +35,7 @@ namespace LanguageCore.Tokenizing
         COMMENT_MULTILINE,
     }
 
-    public enum TokenAnalysedType
+    public enum TokenAnalyzedType
     {
         None,
         Attribute,
@@ -78,9 +77,9 @@ namespace LanguageCore.Tokenizing
         };
     }
 
-    public class Token : BaseToken, IEquatable<Token>
+    public class Token : BaseToken, IEquatable<Token>, IEquatable<string>
     {
-        public TokenAnalysedType AnalyzedType;
+        public TokenAnalyzedType AnalyzedType;
 
         public readonly TokenType TokenType;
         public readonly bool IsAnonymous;
@@ -90,7 +89,7 @@ namespace LanguageCore.Tokenizing
         public Token(TokenType type, string content, bool isAnonymous)
         {
             TokenType = type;
-            AnalyzedType = TokenAnalysedType.None;
+            AnalyzedType = TokenAnalyzedType.None;
             Content = content;
             IsAnonymous = isAnonymous;
         }
@@ -127,11 +126,6 @@ namespace LanguageCore.Tokenizing
             _ => Content,
         };
 
-        internal string ToFullString()
-        {
-            return $"Token:{TokenType} {{ \"{Content}\" {Position} {AnalyzedType} }}";
-        }
-
         public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new(type, content, true)
         {
             AbsolutePosition = LanguageCore.Position.UnknownPosition.AbsolutePosition,
@@ -139,7 +133,6 @@ namespace LanguageCore.Tokenizing
         };
 
         public override bool Equals(object? obj) => obj is Token other && Equals(other);
-
         public bool Equals(Token? other) =>
             other is not null &&
             Position.Equals(other.Position) &&
@@ -147,8 +140,11 @@ namespace LanguageCore.Tokenizing
             TokenType == other.TokenType &&
             Content == other.Content &&
             IsAnonymous == other.IsAnonymous;
+        public bool Equals(string? other) =>
+            other is not null &&
+            Content == other;
 
-        public override int GetHashCode() => HashCode.Combine(Position, AbsolutePosition, TokenType, Content);
+        public override int GetHashCode() => HashCode.Combine(AbsolutePosition, TokenType, Content);
 
         public static bool operator ==(Token? a, string? b)
         {
@@ -162,7 +158,7 @@ namespace LanguageCore.Tokenizing
         public static bool operator !=(string? a, Token? b) => b != a;
     }
 
-    public readonly struct SimpleToken
+    public readonly struct SimpleToken : IThingWithPosition
     {
         public readonly string Content;
         public readonly Range<SinglePosition> Position;
@@ -200,31 +196,46 @@ namespace LanguageCore.Tokenizing
         };
     }
 
-    /// <summary>
-    /// The tokenizer for the BBCode language
-    /// </summary>
+    public readonly struct TokenizerResult
+    {
+        public readonly Warning[] Warnings;
+
+        public readonly Token[] Tokens;
+        public readonly SimpleToken[] UnicodeCharacterTokens;
+
+        public TokenizerResult(Token[] tokens, SimpleToken[] unicodeCharacterTokens, Warning[] warnings)
+        {
+            Tokens = tokens;
+            UnicodeCharacterTokens = unicodeCharacterTokens;
+            Warnings = warnings;
+        }
+
+        public static implicit operator Token[](TokenizerResult result) => result.Tokens;
+    }
+
     public class Tokenizer
     {
-        readonly PreparationToken CurrentToken;
-        int CurrentColumn;
-        int CurrentLine;
-
-        readonly List<Token> Tokens;
-
-        readonly TokenizerSettings Settings;
-        readonly PrintCallback? Print;
-
         static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] Banned = new char[] { '\r', '\u200B' };
         static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
         static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
         static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
 
-        /// <param name="settings">
-        /// Tokenizer settings<br/>
-        /// Use <see cref="TokenizerSettings.Default"/> if you don't know
-        /// </param>
-        public Tokenizer(TokenizerSettings settings, PrintCallback? printCallback = null)
+        readonly PreparationToken CurrentToken;
+        int CurrentColumn;
+        int CurrentLine;
+
+        readonly string Text;
+        readonly string? File;
+
+        readonly List<Token> Tokens;
+        readonly List<SimpleToken> UnicodeCharacters;
+
+        readonly List<Warning> Warnings;
+
+        readonly TokenizerSettings Settings;
+
+        Tokenizer(TokenizerSettings settings, string text, string? file)
         {
             CurrentToken = new()
             {
@@ -239,64 +250,30 @@ namespace LanguageCore.Tokenizing
             CurrentLine = 1;
 
             Tokens = new();
+            UnicodeCharacters = new();
 
-            this.Settings = settings;
-            this.Print = printCallback;
+            Warnings = new();
+
+            Settings = settings;
+            Text = text;
+            File = file;
         }
 
-        Position GetCurrentPosition(int OffsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(OffsetTotal, OffsetTotal + 1));
+        public static TokenizerResult Tokenize(string sourceCode, string? filePath = null)
+            => new Tokenizer(TokenizerSettings.Default, sourceCode, filePath).TokenizeInternal();
 
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
+        public static TokenizerResult Tokenize(string sourceCode, TokenizerSettings settings, string? filePath = null)
+            => new Tokenizer(settings, sourceCode, filePath).TokenizeInternal();
+
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode)
-            => Parse(sourceCode, null, null, null);
-
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning>? warnings)
-            => Parse(sourceCode, warnings, null, null);
-
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning>? warnings, string? filePath)
-            => Parse(sourceCode, warnings, filePath, null);
-
-        /// <summary>
-        /// Convert source code into tokens
-        /// </summary>
-        /// <param name="sourceCode">
-        /// The source code
-        /// </param>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public Token[] Parse(string sourceCode, List<Warning>? warnings, string? filePath, List<SimpleToken>? unicodeCharacters)
+        TokenizerResult TokenizeInternal()
         {
-            DateTime tokenizingStarted = DateTime.Now;
-            Print?.Invoke("Tokenizing ...", LogType.Debug);
-
             string? savedUnicode = null;
 
-            for (int OffsetTotal = 0; OffsetTotal < sourceCode.Length; OffsetTotal++)
+            for (int OffsetTotal = 0; OffsetTotal < Text.Length; OffsetTotal++)
             {
-                char currChar = sourceCode[OffsetTotal];
+                char currChar = Text[OffsetTotal];
 
                 CurrentColumn++;
                 if (currChar == '\n')
@@ -314,16 +291,16 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
                 }
 
-                if (currChar > byte.MaxValue && warnings != null)
+                if (currChar > byte.MaxValue)
                 {
                     RefreshTokenPosition(OffsetTotal);
                     if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
                     {
-                        warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.After(), filePath));
+                        Warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.After(), File));
                     }
                     else
                     {
-                        warnings.Add(new Warning($"Don't use special characters.", CurrentToken.After(), filePath));
+                        Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.After(), File));
                     }
                 }
 
@@ -333,7 +310,7 @@ namespace LanguageCore.Tokenizing
                     if (savedUnicode.Length == 4)
                     {
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        unicodeCharacters?.Add(new SimpleToken(
+                        UnicodeCharacters.Add(new SimpleToken(
                                 unicodeChar,
                                 new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
                                 new Range<int>(OffsetTotal - 6, OffsetTotal)
@@ -358,7 +335,7 @@ namespace LanguageCore.Tokenizing
                     if (savedUnicode.Length == 4)
                     {
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        unicodeCharacters?.Add(new SimpleToken(
+                        UnicodeCharacters.Add(new SimpleToken(
                             unicodeChar,
                             new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
                             new Range<int>(OffsetTotal - 6, OffsetTotal)
@@ -717,16 +694,16 @@ namespace LanguageCore.Tokenizing
                 }
             }
 
-            EndToken(sourceCode.Length);
-
-            Print?.Invoke($"Tokenized in {(DateTime.Now - tokenizingStarted).TotalMilliseconds} ms", LogType.Debug);
+            EndToken(Text.Length);
 
             CheckTokens(Tokens.ToArray());
 
-            return NormalizeTokens(Tokens, Settings).ToArray();
+            return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToArray(), UnicodeCharacters.ToArray(), Warnings.ToArray());
         }
 
-        /// <exception cref="TokenizerException"></exception>
+        Position GetCurrentPosition(int OffsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(OffsetTotal, OffsetTotal + 1));
+
+        /// <exception cref="TokenizerException"/>
         static void CheckTokens(Token[] tokens)
         {
             for (int i = 0; i < tokens.Length; i++)

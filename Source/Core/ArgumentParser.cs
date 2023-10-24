@@ -346,12 +346,6 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--print-info", "-pn"))
-                    {
-                        result.parserSettings.PrintInfo = true;
-                        continue;
-                    }
-
                     if (ExpectArg(args, ref i, out arg, "--pipe", "-pp"))
                     {
                         if (!ExpectParam(args, ref i, out result.PipeName))
@@ -409,7 +403,6 @@ namespace TheProgram
         {
             public System.IO.FileInfo File;
 
-            public ParserSettings parserSettings;
             public Compiler.CompilerSettings compilerSettings;
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
@@ -440,7 +433,6 @@ namespace TheProgram
                 BasePath = null,
                 RunType = RunType.Normal,
                 compilerSettings = Compiler.CompilerSettings.Default,
-                parserSettings = ParserSettings.Default,
                 bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
                 CompileOutput = null,
                 CompressionLevel = CompressionLevel.Optimal,

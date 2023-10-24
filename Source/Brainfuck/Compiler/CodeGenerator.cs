@@ -1754,7 +1754,7 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 case "return":
                     {
-                        statement.Identifier.AnalyzedType = TokenAnalysedType.Statement;
+                        statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
@@ -1789,7 +1789,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 case "break":
                     {
-                        statement.Identifier.AnalyzedType = TokenAnalysedType.Statement;
+                        statement.Identifier.AnalyzedType = TokenAnalyzedType.Statement;
 
                         if (statement.Parameters.Length != 0)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
@@ -1834,7 +1834,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 case "delete":
                     {
-                        statement.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
+                        statement.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
                         if (statement.Parameters.Length != 1)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
@@ -2123,7 +2123,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 string? prevFile = CurrentFile;
                 CurrentFile = macro.FilePath;
@@ -2151,7 +2151,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
-            functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }

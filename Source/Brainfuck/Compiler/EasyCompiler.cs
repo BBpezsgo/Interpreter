@@ -28,13 +28,18 @@ namespace LanguageCore.Brainfuck
             Tokenizing.Token[] tokens;
 
             {
-                Tokenizing.Tokenizer tokenizer = new(Tokenizing.TokenizerSettings.Default, printCallback);
-                List<Warning> warnings = new();
+                DateTime tokenizeStarted = DateTime.Now;
+                if (printCallback != null)
+                { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
 
-                tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
+                Tokenizing.TokenizerResult tokenizerResult = Tokenizing.Tokenizer.Tokenize(sourceCode, file.FullName);
+                tokens = tokenizerResult.Tokens;
 
-                foreach (Warning warning in warnings)
+                foreach (Warning warning in tokenizerResult.Warnings)
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
+   
+                if (printCallback != null)
+                { printCallback?.Invoke($"Tokenized in {(DateTime.Now - tokenizeStarted).TotalMilliseconds} ms", LogType.Debug); }
             }
 
             Parser.ParserResult parserResult;
@@ -62,7 +67,6 @@ namespace LanguageCore.Brainfuck
                     parserResult,
                     new Dictionary<string, ExternalFunctionBase>(),
                     file,
-                    Parser.ParserSettings.Default,
                     printCallback,
                     this.BasePath);
 

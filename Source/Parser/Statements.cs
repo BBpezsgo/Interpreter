@@ -378,13 +378,21 @@ namespace LanguageCore.Parser.Statement
 
             if (PrevStatement is Identifier functionIdentifier)
             {
-                functionCall = new FunctionCall(null, functionIdentifier.Name, BracketLeft, Parameters, BracketRight);
+                functionCall = new FunctionCall(null, functionIdentifier.Name, BracketLeft, Parameters, BracketRight)
+                {
+                    Semicolon = Semicolon,
+                    SaveValue = SaveValue,
+                };
                 return true;
             }
 
             if (PrevStatement is Field field)
             {
-                functionCall = new FunctionCall(field.PrevStatement, field.FieldName, BracketLeft, Parameters, BracketRight);
+                functionCall = new FunctionCall(field.PrevStatement, field.FieldName, BracketLeft, Parameters, BracketRight)
+                {
+                    Semicolon = Semicolon,
+                    SaveValue = SaveValue,
+                };
                 return true;
             }
 

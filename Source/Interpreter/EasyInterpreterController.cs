@@ -11,7 +11,7 @@ namespace LanguageCore.Runtime
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.parserSettings, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.BasePath);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.BasePath);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -24,7 +24,6 @@ namespace LanguageCore.Runtime
         /// </param>
         public static void Run(
             FileInfo file,
-            LanguageCore.Parser.ParserSettings parserSettings,
             Compiler.CompilerSettings compilerSettings,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
             bool LogDebug = true,
@@ -122,7 +121,6 @@ namespace LanguageCore.Runtime
                     file,
                     interpreter.GenerateExternalFunctions(),
                     Tokenizing.TokenizerSettings.Default,
-                    parserSettings,
                     compilerSettings,
                     HandleErrors,
                     PrintOutput,

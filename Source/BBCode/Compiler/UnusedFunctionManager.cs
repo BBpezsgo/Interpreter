@@ -166,10 +166,6 @@ namespace LanguageCore.BBCode.Compiler
                 }
 
                 printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", LogType.Debug);
-
-                compilerResult.Functions = unusedFunctionManager.CompiledFunctions;
-                compilerResult.Operators = unusedFunctionManager.CompiledOperators;
-                compilerResult.GeneralFunctions = unusedFunctionManager.CompiledGeneralFunctions;
             }
 
             return (unusedFunctionManager.CompiledFunctions, unusedFunctionManager.CompiledOperators, unusedFunctionManager.CompiledGeneralFunctions);

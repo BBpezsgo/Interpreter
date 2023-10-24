@@ -139,12 +139,12 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("#", out var hashT))
             { return false; }
 
-            hashT.AnalyzedType = TokenAnalysedType.Hash;
+            hashT.AnalyzedType = TokenAnalyzedType.Hash;
 
             if (!ExpectIdentifier(out var hashName))
             { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", hashT); }
 
-            hashName.AnalyzedType = TokenAnalysedType.Hash;
+            hashName.AnalyzedType = TokenAnalyzedType.Hash;
 
             List<Literal> parameters = new();
             int endlessSafe = 50;
@@ -154,7 +154,7 @@ namespace LanguageCore.Parser
                 if (!ExpectLiteral(out var parameter))
                 { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", CurrentToken); }
 
-                parameter.ValueToken.AnalyzedType = TokenAnalysedType.HashParameter;
+                parameter.ValueToken.AnalyzedType = TokenAnalyzedType.HashParameter;
                 parameters.Add(parameter);
 
                 if (ExpectOperator(";", out semicolon))
@@ -181,7 +181,7 @@ namespace LanguageCore.Parser
 
             if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"using\"", keyword.After());
 
-            keyword.AnalyzedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<Token> tokens = new();
             if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
@@ -227,10 +227,15 @@ namespace LanguageCore.Parser
 
         void ParseCodeHeader()
         {
-            while (ExpectHash(out var hash))
-            { Hashes.Add(hash); }
-            while (ExpectUsing(out var usingNamespace))
-            { Usings.Add(usingNamespace); }
+            while (true)
+            {
+                if (ExpectHash(out var hashStatement))
+                { Hashes.Add(hashStatement); }
+                else if (ExpectUsing(out var usingDefinition))
+                { Usings.Add(usingDefinition); }
+                else
+                { break; }
+            }
         }
 
         void ParseCodeBlock()
@@ -286,7 +291,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier("enum", out Token? keyword))
             { CurrentTokenIndex = parseStart; return false; }
 
-            keyword.AnalyzedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectIdentifier(out Token? identifier))
             { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.After()); }
@@ -294,7 +299,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("{"))
             { throw new SyntaxException($"Expected '{{' after enum identifier", identifier.After()); }
 
-            identifier.AnalyzedType = TokenAnalysedType.Enum;
+            identifier.AnalyzedType = TokenAnalyzedType.Enum;
 
             List<EnumMemberDefinition> members = new();
 
@@ -303,7 +308,7 @@ namespace LanguageCore.Parser
                 if (!ExpectIdentifier(out Token? enumMemberIdentifier))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                enumMemberIdentifier.AnalyzedType = TokenAnalysedType.EnumMember;
+                enumMemberIdentifier.AnalyzedType = TokenAnalyzedType.EnumMember;
 
                 Literal? enumMemberValue = null;
 
@@ -365,7 +370,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleName.AnalyzedType = TokenAnalysedType.FunctionName;
+            possibleName.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -381,7 +386,7 @@ namespace LanguageCore.Parser
                 if (!ExpectIdentifier(out Token? possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new(parameterModifiers, possibleParameterType, possibleParameterNameT);
                 parameters.Add(parameterDefinition);
@@ -486,7 +491,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
+            possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             List<Token> parameters = new();
 
@@ -498,7 +503,7 @@ namespace LanguageCore.Parser
                 if (!ExpectIdentifier(out Token? possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalyzedType.VariableName;
                 parameters.Add(possibleParameterNameT);
 
                 if (ExpectOperator(")", out bracketRight))
@@ -558,7 +563,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
+            possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -574,7 +579,7 @@ namespace LanguageCore.Parser
                 if (!ExpectIdentifier(out Token? possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new(parameterModifiers, possibleParameterType, possibleParameterNameT);
                 parameters.Add(parameterDefinition);
@@ -619,7 +624,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("("))
             { CurrentTokenIndex = parseStart; return false; }
 
-            possibleNameT.AnalyzedType = TokenAnalysedType.FunctionName;
+            possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             List<ParameterDefinition> parameters = new();
 
@@ -635,7 +640,7 @@ namespace LanguageCore.Parser
                 if (!ExpectIdentifier(out Token? possibleParameterNameT))
                 { throw new SyntaxException("Expected a parameter name", CurrentToken); }
 
-                possibleParameterNameT.AnalyzedType = TokenAnalysedType.VariableName;
+                possibleParameterNameT.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 ParameterDefinition parameterDefinition = new(parameterModifiers, possibleParameterType, possibleParameterNameT);
                 parameters.Add(parameterDefinition);
@@ -706,8 +711,8 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("{", out var braceletStart))
             { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
 
-            possibleClassName.AnalyzedType = TokenAnalysedType.Class;
-            keyword.AnalyzedType = TokenAnalysedType.Keyword;
+            possibleClassName.AnalyzedType = TokenAnalyzedType.Class;
+            keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<FieldDefinition> fields = new();
             List<FunctionDefinition> methods = new();
@@ -798,7 +803,7 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("{", out var braceletStart))
             { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
 
-            keyword.AnalyzedType = TokenAnalysedType.Keyword;
+            keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<FieldDefinition> fields = new();
             Dictionary<string, FunctionDefinition> methods = new();
@@ -950,7 +955,7 @@ namespace LanguageCore.Parser
             {
                 Literal literal = new(LiteralType.BOOLEAN, tTrue.Content, tTrue);
 
-                tTrue.AnalyzedType = TokenAnalysedType.Keyword;
+                tTrue.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 statement = literal;
                 return true;
@@ -959,7 +964,7 @@ namespace LanguageCore.Parser
             {
                 Literal literal = new(LiteralType.BOOLEAN, tFalse.Content, tFalse);
 
-                tFalse.AnalyzedType = TokenAnalysedType.Keyword;
+                tFalse.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 statement = literal;
                 return true;
@@ -1028,7 +1033,7 @@ namespace LanguageCore.Parser
             }
             else if (ExpectIdentifier("new", out Token? keywordNew))
             {
-                keywordNew.AnalyzedType = TokenAnalysedType.Keyword;
+                keywordNew.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 if (!ExpectType(AllowedType.None, out TypeInstance? instanceTypeName))
                 { throw new SyntaxException("Expected instance constructor after keyword 'new'", keywordNew); }
@@ -1074,7 +1079,7 @@ namespace LanguageCore.Parser
                 Identifier identifierStatement = new(simpleIdentifier);
 
                 if (simpleIdentifier.Content == "this")
-                { simpleIdentifier.AnalyzedType = TokenAnalysedType.Keyword; }
+                { simpleIdentifier.AnalyzedType = TokenAnalyzedType.Keyword; }
 
                 statementWithValue = identifierStatement;
             }
@@ -1239,7 +1244,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(out Token? possibleVariableName))
             { CurrentTokenIndex = startTokenIndex; return false; }
 
-            possibleVariableName.AnalyzedType = TokenAnalysedType.VariableName;
+            possibleVariableName.AnalyzedType = TokenAnalyzedType.VariableName;
 
             StatementWithValue? initialValue = null;
 
@@ -1263,7 +1268,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier("for", out Token? tokenFor))
             { forLoop = null; return false; }
 
-            tokenFor.AnalyzedType = TokenAnalysedType.Statement;
+            tokenFor.AnalyzedType = TokenAnalyzedType.Statement;
 
             if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
             { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
@@ -1300,7 +1305,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier("while", out Token? tokenWhile))
             { whileLoop = null; return false; }
 
-            tokenWhile.AnalyzedType = TokenAnalysedType.Statement;
+            tokenWhile.AnalyzedType = TokenAnalyzedType.Statement;
 
             if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
             { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
@@ -1352,7 +1357,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(ifSegmentName, out Token? tokenIf))
             { baseBranch = null; return false; }
 
-            tokenIf.AnalyzedType = TokenAnalysedType.Statement;
+            tokenIf.AnalyzedType = TokenAnalyzedType.Statement;
 
             StatementWithValue? condition = null;
 
@@ -1657,7 +1662,7 @@ namespace LanguageCore.Parser
                 return ExpectOneValue(out oneValue);
             }
 
-            modifier.AnalyzedType = TokenAnalysedType.Keyword;
+            modifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectOneValue(out StatementWithValue? value))
             { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
@@ -1674,7 +1679,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            modifier.AnalyzedType = TokenAnalysedType.Keyword;
+            modifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectOneValue(out StatementWithValue? value))
             { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
@@ -1822,7 +1827,7 @@ namespace LanguageCore.Parser
             if (possibleFunctionName.Content != name)
             { CurrentTokenIndex = startTokenIndex; return false; }
 
-            possibleFunctionName.AnalyzedType = TokenAnalysedType.Statement;
+            possibleFunctionName.AnalyzedType = TokenAnalyzedType.Statement;
 
             List<StatementWithValue> parameters = new();
 
@@ -1860,7 +1865,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(out Token? attributeT))
             { CurrentTokenIndex = parseStart; return false; }
 
-            attributeT.AnalyzedType = TokenAnalysedType.Attribute;
+            attributeT.AnalyzedType = TokenAnalyzedType.Attribute;
 
             List<object> parameters = new();
             if (ExpectOperator("(", out var t3))
@@ -1908,7 +1913,7 @@ namespace LanguageCore.Parser
             if (ExpectOperator("("))
             { CurrentTokenIndex = startTokenIndex; return false; }
 
-            possibleVariableName.AnalyzedType = TokenAnalysedType.None;
+            possibleVariableName.AnalyzedType = TokenAnalyzedType.None;
 
             field = new(possibleVariableName, possibleType, protectionToken);
 
@@ -1961,7 +1966,7 @@ namespace LanguageCore.Parser
             {
                 if (ExpectIdentifier(out Token? modifier, ParameterModifiers))
                 {
-                    modifier.AnalyzedType = TokenAnalysedType.Keyword;
+                    modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                     modifiers.Add(modifier);
 
                     if (modifier == "this" && parameterIndex != 0)
@@ -1986,7 +1991,7 @@ namespace LanguageCore.Parser
             {
                 if (ExpectIdentifier(out Token? modifier, Modifiers))
                 {
-                    modifier.AnalyzedType = TokenAnalysedType.Keyword;
+                    modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                     modifiers.Add(modifier);
                 }
                 else
@@ -2077,7 +2082,7 @@ namespace LanguageCore.Parser
             if (possibleType == "macro")
             { return false; }
 
-            possibleType.AnalyzedType = TokenAnalysedType.Keyword;
+            possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
             type = new TypeInstanceSimple(possibleType);
 
             if (possibleType.Content == "any")

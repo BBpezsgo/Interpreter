@@ -1,0 +1,24 @@
+using System; 
+
+void YeahE() {
+	Print('E');
+}
+
+void YeahY() {
+	Print('Y');
+}
+
+macro Bruh2() {
+	return YeahY;
+}
+
+macro Bruh(what) {
+	if (what) {
+		return YeahE;
+	} else {
+		return Bruh2();
+	};
+}
+
+int a = 0;
+Bruh(a)();

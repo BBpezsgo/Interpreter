@@ -807,7 +807,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (type.Identifier.Content == "func")
             {
-                type.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
+                type.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 CompiledType funcRet;
                 CompiledType[] funcParams;

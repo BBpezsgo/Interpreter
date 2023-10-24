@@ -1807,48 +1807,97 @@ namespace LanguageCore.BBCode.Compiler
         protected CompiledType FindMacroType(MacroDefinition macro, params StatementWithValue[] parameters)
         {
             Statement inlinedMacro = InlineMacro(macro, parameters);
+
+            if (inlinedMacro is StatementWithValue statementWithValue)
+            { return FindStatementType(statementWithValue); }
+
             List<CompiledType> result = new();
             StatementFinder.GetAllStatement(inlinedMacro, (statement) =>
             {
                 if (statement is KeywordCall keywordCall &&
-                    keywordCall.Identifier == "return" &&
-                    keywordCall.Parameters.Length > 0)
+                    keywordCall.Identifier == "return")
                 {
-                    if (keywordCall.Parameters.Length > 0)
-                    { result.Add(FindStatementType(keywordCall.Parameters[0])); }
-                    else
+                    if (keywordCall.Parameters.Length == 0)
                     { result.Add(new CompiledType(Type.VOID)); }
+                    else
+                    { result.Add(FindStatementType(keywordCall.Parameters[0])); }
                 }
                 return false;
             });
+
             if (result.Count == 0)
             { return new CompiledType(Type.VOID); }
 
-            CompiledType result2 = result[0];
             for (int i = 1; i < result.Count; i++)
             {
-                if (result[i] != result2)
-                {
-                    throw new CompilerException($"Macro \"{macro.ReadableID()}\" returns more than one type of value", macro.Block, macro.FilePath);
-                }
+                if (!result[i].Equals(result[0]))
+                { throw new CompilerException($"Macro \"{macro.ReadableID()}\" returns more than one type of value", macro.Block, macro.FilePath); }
             }
-            return result2;
+
+            return result[0];
         }
 
         #endregion
 
         #region InlineMacro()
 
-        protected static Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
+        protected bool TryInlineMacro(StatementWithValue statement, [NotNullWhen(true)] out Statement? inlined)
+        {
+            if (statement is AnyCall anyCall)
+            { return TryInlineMacro(anyCall, out inlined); }
+
+            inlined = null;
+            return false;
+        }
+        protected bool TryInlineMacro(AnyCall anyCall, [NotNullWhen(true)] out Statement? inlined)
+        {
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            { return TryInlineMacro(functionCall, out inlined); }
+
+            inlined = null;
+            return false;
+        }
+        protected bool TryInlineMacro(FunctionCall functionCall, [NotNullWhen(true)] out Statement? inlined)
+        {
+            if (TryGetMacro(functionCall, out MacroDefinition? macro))
+            {
+                inlined = InlineMacro(macro, functionCall.MethodParameters);
+                return true;
+            }
+
+            inlined = null;
+            return false;
+        }
+
+        protected Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
         {
             Dictionary<string, StatementWithValue> _parameters = new();
             LanguageCore.Utils.Map(macro.Parameters, parameters, _parameters);
+
+            return InlineMacro(macro, _parameters);
+        }
+
+        protected Statement InlineMacro(MacroDefinition macro, Dictionary<string, StatementWithValue> parameters)
+        {
+            Statement result;
+
             if (macro.Block.Statements.Count == 0)
             { throw new CompilerException($"Macro \"{macro.ReadableID()}\" has no statements", macro.Block, macro.FilePath); }
             else if (macro.Block.Statements.Count == 1)
-            { return InlineMacro(macro.Block.Statements[0], _parameters); }
+            { result = InlineMacro(macro.Block.Statements[0], parameters); }
             else
-            { return InlineMacro(macro.Block, _parameters); }
+            { result = InlineMacro(macro.Block, parameters); }
+
+            result = Collapse(result, parameters);
+
+            if (result is KeywordCall keywordCall &&
+                keywordCall.Identifier == "return" &&
+                keywordCall.Parameters.Length == 1)
+            {
+                result = keywordCall.Parameters[0];
+            }
+
+            return result;
         }
 
         protected static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
@@ -1923,7 +1972,7 @@ namespace LanguageCore.BBCode.Compiler
             if (statement is StatementWithValue statementWithValue)
             { return InlineMacro(statementWithValue, parameters); }
 
-            throw new NotImplementedException();
+            return statement;
         }
 
         protected static StatementWithValue InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters)
@@ -2117,14 +2166,9 @@ namespace LanguageCore.BBCode.Compiler
             { return false; }
 
             Statement inlined = InlineMacro(macro, functionCall.Parameters);
-            if (inlined is KeywordCall keywordCall &&
-                keywordCall.Identifier == "return")
-            {
-                if (keywordCall.Parameters.Length > 0)
-                {
-                    return TryCompute(keywordCall.Parameters[0], expectedType, out value);
-                }
-            }
+
+            if (inlined is StatementWithValue statementWithValue)
+            { return TryCompute(statementWithValue, expectedType, out value); }
 
             return false;
         }
@@ -2163,9 +2207,221 @@ namespace LanguageCore.BBCode.Compiler
             if (statement is AnyCall anyCall)
             { return TryCompute(anyCall, expectedType, out value); }
 
+            if (statement is Identifier identifier)
+            { return TryCompute(identifier, expectedType, out value); }
+
             value = DataItem.Null;
             return false;
         }
+        #endregion
+
+        #region Collapse()
+
+        protected Statement Collapse(Statement statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement is VariableDeclaration newVariable)
+            { return Collapse(newVariable, parameters); }
+            else if (statement is Block block)
+            { return Collapse(block, parameters); }
+            else if (statement is AnyAssignment setter)
+            { return Collapse(setter.ToAssignment(), parameters); }
+            else if (statement is WhileLoop whileLoop)
+            { return Collapse(whileLoop, parameters); }
+            else if (statement is ForLoop forLoop)
+            { return Collapse(forLoop, parameters); }
+            else if (statement is IfContainer @if)
+            { return Collapse(@if, parameters); }
+            else if (statement is StatementWithValue statementWithValue)
+            { return Collapse(statementWithValue, parameters); }
+            else
+            { throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible"); }
+        }
+
+        protected StatementWithValue Collapse(StatementWithValue statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement is FunctionCall functionCall)
+            { return Collapse(functionCall, parameters); }
+            else if (statement is KeywordCall keywordCall)
+            { return Collapse(keywordCall, parameters); }
+            else if (statement is OperatorCall @operator)
+            { return Collapse(@operator, parameters); }
+            else if (statement is LiteralStatement literal)
+            { return Collapse(literal, parameters); }
+            else if (statement is Identifier variable)
+            { return Collapse(variable, parameters); }
+            else if (statement is AddressGetter memoryAddressGetter)
+            { return Collapse(memoryAddressGetter, parameters); }
+            else if (statement is Pointer memoryAddressFinder)
+            { return Collapse(memoryAddressFinder, parameters); }
+            else if (statement is NewInstance newStruct)
+            { return Collapse(newStruct, parameters); }
+            else if (statement is ConstructorCall constructorCall)
+            { return Collapse(constructorCall, parameters); }
+            else if (statement is IndexCall indexStatement)
+            { return Collapse(indexStatement, parameters); }
+            else if (statement is Field field)
+            { return Collapse(field, parameters); }
+            else if (statement is TypeCast @as)
+            { return Collapse(@as, parameters); }
+            else if (statement is ModifiedStatement modifiedStatement)
+            { return Collapse(modifiedStatement, parameters); }
+            else if (statement is AnyCall anyCall)
+            { return Collapse(anyCall, parameters); }
+            else
+            { throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible"); }
+        }
+
+        protected Statement Collapse(Block block, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (block.Statements.Count == 1)
+            { return Collapse(block.Statements[0], parameters); }
+
+            List<Statement> newStatements = new();
+
+            foreach (Statement statement in block.Statements)
+            { newStatements.Add(Collapse(statement, parameters)); }
+
+            return new Block(block.BracketStart, newStatements, block.BracketEnd)
+            {
+                Semicolon = block.Semicolon,
+            };
+        }
+        protected VariableDeclaration Collapse(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected StatementWithValue Collapse(FunctionCall statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (TryGetMacro(statement, out MacroDefinition? macro))
+            {
+                Statement inlined = InlineMacro(macro, parameters);
+
+                if (inlined is StatementWithValue statementWithValue)
+                { return statementWithValue; }
+                else
+                { throw new NotImplementedException(); }
+            }
+            return statement;
+        }
+        protected KeywordCall Collapse(KeywordCall statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            List<StatementWithValue> newParameters = new();
+            foreach (StatementWithValue parameter in statement.Parameters)
+            { newParameters.Add(Collapse(parameter, parameters)); }
+
+            return new KeywordCall(statement.Identifier, newParameters)
+            {
+                Semicolon = statement.Semicolon,
+                SaveValue = statement.SaveValue,
+            };
+        }
+        protected OperatorCall Collapse(OperatorCall statement, Dictionary<string, StatementWithValue> parameters)
+        { return statement; }
+        protected AnyAssignment Collapse(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected LiteralStatement Collapse(LiteralStatement statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (parameters.TryGetValue(statement.Content, out var parameter))
+            { return parameter; }
+            return statement;
+        }
+        protected AddressGetter Collapse(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected Pointer Collapse(Pointer statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected ForLoop Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected Statement Collapse(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            bool prevIsCollapsed = false;
+            List<BaseBranch> branches = new();
+            foreach (BaseBranch part in statement.Parts)
+            {
+                if (part is IfBranch ifBranch)
+                {
+                    StatementWithValue condition = ifBranch.Condition;
+                    condition = Collapse(condition, parameters);
+                    if (TryCompute(condition, null, out DataItem conditionValue))
+                    {
+                        if (conditionValue.Boolean)
+                        {
+                            Statement result = ifBranch.Block;
+                            result = Collapse(result, parameters);
+                            return result;
+                        }
+
+                        prevIsCollapsed = true;
+                    }
+                    else { prevIsCollapsed = false; }
+
+                    branches.Add(new IfBranch(ifBranch.Keyword, condition, ifBranch.Block)
+                    { Semicolon = ifBranch.Semicolon });
+                    continue;
+                }
+                else if (part is ElseIfBranch elseIfBranch)
+                {
+                    StatementWithValue condition = elseIfBranch.Condition;
+                    condition = Collapse(condition, parameters);
+                    if (prevIsCollapsed && TryCompute(condition, null, out DataItem conditionValue))
+                    {
+                        if (conditionValue.Boolean)
+                        {
+                            Statement result = elseIfBranch.Block;
+                            result = Collapse(result, parameters);
+                            return result;
+                        }
+
+                        prevIsCollapsed = true;
+                    }
+                    else { prevIsCollapsed = false; }
+
+                    branches.Add(new ElseIfBranch(elseIfBranch.Keyword, condition, elseIfBranch.Block)
+                    { Semicolon = elseIfBranch.Semicolon });
+                    continue;
+                }
+                else if (part is ElseBranch elseBranch)
+                {
+                    if (prevIsCollapsed)
+                    {
+                        Statement result = elseBranch.Block;
+                        result = Collapse(result, parameters);
+                        return result;
+                    }
+
+                    branches.Add(new ElseBranch(elseBranch.Keyword, elseBranch.Block)
+                    { Semicolon = elseBranch.Semicolon });
+                    continue;
+                }
+                else
+                {
+                    throw new NotImplementedException();
+                }
+            }
+
+            return new IfContainer(branches) { Semicolon = statement.Semicolon };
+        }
+        protected NewInstance Collapse(NewInstance statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected ConstructorCall Collapse(ConstructorCall statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected Field Collapse(Field statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected TypeCast Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
+        { throw new NotImplementedException(); }
+        protected StatementWithValue Collapse(AnyCall statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            if (statement.ToFunctionCall(out FunctionCall? functionCall))
+            { return Collapse(functionCall, parameters); }
+
+            throw new NotImplementedException();
+        }
+
         #endregion
 
         protected bool CanConvertImplicitly(CompiledType? from, CompiledType? to)

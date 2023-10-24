@@ -60,9 +60,11 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly List<CompileTag> Hashes;
 
-        Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        readonly string? BasePath;
+        readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        readonly PrintCallback? PrintCallback;
 
-        public Compiler()
+        Compiler(Dictionary<string, ExternalFunctionBase> externalFunctions, PrintCallback? printCallback, string? basePath)
         {
             Functions = new List<FunctionDefinition>();
             Macros = new List<MacroDefinition>();
@@ -83,7 +85,9 @@ namespace LanguageCore.BBCode.Compiler
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
-            ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
+            ExternalFunctions = externalFunctions;
+            BasePath = basePath;
+            PrintCallback = printCallback;
         }
 
         CompiledType GetCustomType(string name)
@@ -94,7 +98,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     if (GenericParameters[i][j].Content == name)
                     {
-                        GenericParameters[i][j].AnalyzedType = TokenAnalysedType.TypeParameter;
+                        GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
                         return CompiledType.CreateGeneric(GenericParameters[i][j].Content);
                     }
                 }
@@ -142,24 +146,42 @@ namespace LanguageCore.BBCode.Compiler
             return null;
         }
 
-        public struct Result
+        public readonly struct Result
         {
-            public CompiledFunction[] Functions;
-            public MacroDefinition[] Macros;
-            public CompiledGeneralFunction[] GeneralFunctions;
-            public CompiledOperator[] Operators;
+            public readonly CompiledFunction[] Functions;
+            public readonly MacroDefinition[] Macros;
+            public readonly CompiledGeneralFunction[] GeneralFunctions;
+            public readonly CompiledOperator[] Operators;
 
-            public Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+            public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
 
-            public CompiledStruct[] Structs;
-            public CompiledClass[] Classes;
-            public CompileTag[] Hashes;
-            public CompiledEnum[] Enums;
+            public readonly CompiledStruct[] Structs;
+            public readonly CompiledClass[] Classes;
+            public readonly CompileTag[] Hashes;
+            public readonly CompiledEnum[] Enums;
 
-            public Error[] Errors;
-            public Warning[] Warnings;
-            public Statement[] TopLevelStatements;
-            public Token[] Tokens;
+            public readonly Error[] Errors;
+            public readonly Warning[] Warnings;
+            public readonly Statement[] TopLevelStatements;
+            public readonly Token[] Tokens;
+
+            public Result(Compiler compiler, ParserResult parserResult)
+            {
+                Functions = compiler.CompiledFunctions;
+                Macros = compiler.Macros.ToArray();
+                Operators = compiler.CompiledOperators;
+                GeneralFunctions = compiler.CompiledGeneralFunctions;
+                ExternalFunctions = compiler.ExternalFunctions;
+                Classes = compiler.CompiledClasses;
+                Structs = compiler.CompiledStructs;
+                Enums = compiler.CompiledEnums;
+                Hashes = compiler.Hashes.ToArray();
+                TopLevelStatements = parserResult.TopLevelStatements;
+                Tokens = parserResult.Tokens;
+
+                Errors = compiler.Errors.ToArray();
+                Warnings = compiler.Warnings.ToArray();
+            }
         }
 
         static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
@@ -170,7 +192,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 FunctionDefinition.Attribute attribute = attributes[i];
 
-                attribute.Identifier.AnalyzedType = TokenAnalysedType.Attribute;
+                attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 {
@@ -202,7 +224,7 @@ namespace LanguageCore.BBCode.Compiler
             if (Constants.Keywords.Contains(@struct.Name.Content))
             { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
 
-            @struct.Name.AnalyzedType = TokenAnalysedType.Struct;
+            @struct.Name.AnalyzedType = TokenAnalyzedType.Struct;
 
             if (CompiledStructs.ContainsKey(@struct.Name.Content))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
@@ -217,7 +239,7 @@ namespace LanguageCore.BBCode.Compiler
             if (Constants.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
-            @class.Name.AnalyzedType = TokenAnalysedType.Class;
+            @class.Name.AnalyzedType = TokenAnalyzedType.Class;
 
             if (CompiledClasses.ContainsKey(@class.Name.Content))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
@@ -235,7 +257,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 GenericParameters.Push(function.TemplateInfo.TypeParameters);
                 foreach (Token typeParameter in function.TemplateInfo.TypeParameters)
-                { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
+                { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
             }
 
             CompiledType type = new(function.Type, GetCustomType);
@@ -352,7 +374,7 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (var attribute in @enum.Attributes)
             {
-                attribute.Identifier.AnalyzedType = TokenAnalysedType.Attribute;
+                attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
 
                 AttributeValues newAttribute = new()
                 { parameters = new() };
@@ -469,13 +491,7 @@ namespace LanguageCore.BBCode.Compiler
             Hashes.AddRange(collectedAST.ParserResult.Hashes);
         }
 
-        Result CompileMainFile(
-            ParserResult parserResult,
-            Dictionary<string, ExternalFunctionBase> externalFunctions,
-            FileInfo file,
-            ParserSettings parserSettings,
-            PrintCallback? printCallback,
-            string? basePath)
+        Result CompileMainFile(ParserResult parserResult, FileInfo? file)
         {
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
@@ -485,7 +501,7 @@ namespace LanguageCore.BBCode.Compiler
             SourceCodeManager.Result collectorResult;
             if (file != null)
             {
-                collectorResult = SourceCodeManager.Collect(parserResult, file, parserSettings, printCallback, basePath);
+                collectorResult = SourceCodeManager.Collect(parserResult, file, PrintCallback, BasePath);
             }
             else
             {
@@ -515,7 +531,7 @@ namespace LanguageCore.BBCode.Compiler
                             { Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
                             string name = hash.Parameters[0].Value;
 
-                            if (externalFunctions.ContainsKey(name)) break;
+                            if (ExternalFunctions.ContainsKey(name)) break;
 
                             string[] bfParams = new string[hash.Parameters.Length - 1];
                             for (int i = 1; i < hash.Parameters.Length; i++)
@@ -545,14 +561,14 @@ namespace LanguageCore.BBCode.Compiler
 
                             if (parameterTypes[0] == Type.VOID)
                             {
-                                externalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                                ExternalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                 });
                             }
                             else
                             {
-                                externalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                                ExternalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                     return DataItem.GetDefaultValue(returnType);
@@ -612,7 +628,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     GenericParameters.Push(@class.TemplateInfo.TypeParameters);
                     foreach (Token typeParameter in @class.TemplateInfo.TypeParameters)
-                    { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
+                    { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                 }
 
                 for (int j = 0; j < @class.Fields.Length; j++)
@@ -659,7 +675,7 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         GenericParameters.Push(compiledClass.TemplateInfo.TypeParameters);
                         foreach (Token typeParameter in compiledClass.TemplateInfo.TypeParameters)
-                        { typeParameter.AnalyzedType = TokenAnalysedType.TypeParameter; }
+                        { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                     }
 
                     foreach (var method in compiledClass.GeneralMethods)
@@ -736,23 +752,7 @@ namespace LanguageCore.BBCode.Compiler
 
             #endregion
 
-            return new Result()
-            {
-                Functions = this.CompiledFunctions,
-                Macros = this.Macros.ToArray(),
-                Operators = this.CompiledOperators,
-                GeneralFunctions = this.CompiledGeneralFunctions,
-                ExternalFunctions = externalFunctions,
-                Classes = this.CompiledClasses,
-                Structs = this.CompiledStructs,
-                Enums = this.CompiledEnums,
-                Hashes = this.Hashes.ToArray(),
-                TopLevelStatements = parserResult.TopLevelStatements,
-                Tokens = parserResult.Tokens,
-
-                Errors = this.Errors.ToArray(),
-                Warnings = this.Warnings.ToArray(),
-            };
+            return new Result(this, parserResult);
         }
 
         /// <summary>
@@ -771,30 +771,15 @@ namespace LanguageCore.BBCode.Compiler
         public static Result Compile(
             ParserResult parserResult,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
-            FileInfo file,
-            ParserSettings parserSettings,
+            FileInfo? file,
             PrintCallback? printCallback = null,
             string? basePath = null)
-        {
-            Compiler compiler = new()
-            {
-                ExternalFunctions = externalFunctions,
-            };
-            return compiler.CompileMainFile(
-                parserResult,
-                externalFunctions,
-                file,
-                parserSettings,
-                printCallback,
-                basePath
-                );
-        }
+            => new Compiler(externalFunctions, printCallback, basePath).CompileMainFile(parserResult, file);
 
         public static Result Compile(
             FileInfo file,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
-            ParserSettings parserSettings,
             PrintCallback? printCallback = null,
             string? basePath = null)
         {
@@ -803,13 +788,18 @@ namespace LanguageCore.BBCode.Compiler
             Token[] tokens;
 
             {
-                Tokenizer tokenizer = new(tokenizerSettings, printCallback);
-                List<Warning> warnings = new();
+                DateTime tokenizeStarted = DateTime.Now;
+                if (printCallback != null)
+                { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
 
-                tokens = tokenizer.Parse(sourceCode, warnings, file.FullName);
+                TokenizerResult tokenizerResult = Tokenizer.Tokenize(sourceCode, tokenizerSettings, file.FullName);
+                tokens = tokenizerResult.Tokens;
 
-                foreach (Warning warning in warnings)
+                foreach (Warning warning in tokenizerResult.Warnings)
                 { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
+
+                if (printCallback != null)
+                { printCallback?.Invoke($"Tokenized in {(DateTime.Now - tokenizeStarted).TotalMilliseconds} ms", LogType.Debug); }
             }
 
             ParserResult parserResult;
@@ -826,14 +816,11 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (printCallback != null)
                 { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
-
-                if (parserSettings.PrintInfo)
-                { parserResult.WriteToConsole(); }
             }
 
             parserResult.SetFile(file.FullName);
 
-            return Compile(parserResult, externalFunctions, file, parserSettings, printCallback, basePath);
+            return Compile(parserResult, externalFunctions, file, printCallback, basePath);
         }
     }
 }

@@ -19,7 +19,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test45.bbc";
+            string path = TestConstants.TestFilesPath + "test20.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -54,7 +54,7 @@ namespace TheProgram
                 case ArgumentParser.RunType.ConsoleGUI:
                     ConsoleGUI.ConsoleGUI gui = new()
                     {
-                        FilledElement = new ConsoleGUI.InterpreterElement(path, settings.Value.compilerSettings, settings.Value.parserSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors, settings.Value.BasePath)
+                        FilledElement = new ConsoleGUI.InterpreterElement(path, settings.Value.compilerSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors, settings.Value.BasePath)
                     };
                     while (!gui.Destroyed)
                     { gui.Tick(); }
@@ -66,7 +66,7 @@ namespace TheProgram
                     LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
                     break;
                 case ArgumentParser.RunType.Compile:
-                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.parserSettings, settings.Value.compilerSettings, null, settings.Value.BasePath);
+                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.compilerSettings, null, settings.Value.BasePath);
                     LanguageCore.Runtime.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
                     File.WriteAllBytes(settings.Value.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
                     break;
@@ -77,12 +77,11 @@ namespace TheProgram
                     break;
                 case ArgumentParser.RunType.IL:
                     {
-                        LanguageCore.Tokenizing.Tokenizer tokenizer = new(LanguageCore.Tokenizing.TokenizerSettings.Default, null); ;
-                        LanguageCore.Tokenizing.Token[] tokens = tokenizer.Parse(File.ReadAllText(settings.Value.File.FullName));
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.Value.File.FullName), settings.Value.File.FullName);
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, LanguageCore.Parser.ParserSettings.Default, null, settings.Value.BasePath);
+                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, null, settings.Value.BasePath);
 
                         LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
 
@@ -92,12 +91,11 @@ namespace TheProgram
                     }
                 case ArgumentParser.RunType.ASM:
                     {
-                        LanguageCore.Tokenizing.Tokenizer tokenizer = new(LanguageCore.Tokenizing.TokenizerSettings.Default, null); ;
-                        LanguageCore.Tokenizing.Token[] tokens = tokenizer.Parse(System.IO.File.ReadAllText(settings.Value.File.FullName));
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.Value.File.FullName), settings.Value.File.FullName);
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, LanguageCore.Parser.ParserSettings.Default, null, settings.Value.BasePath);
+                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, null, settings.Value.BasePath);
 
                         LanguageCore.ASM.Compiler.CodeGenerator.Result code = LanguageCore.ASM.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
 

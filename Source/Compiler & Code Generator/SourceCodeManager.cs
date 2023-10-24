@@ -136,7 +136,6 @@ namespace LanguageCore.BBCode.Compiler
         CollectedAST[] ProcessFile(
             UsingDefinition @using,
             FileInfo file,
-            ParserSettings parserSettings,
             string? basePath)
         {
             (string? content, string? path) = LoadSourceCode(@using, file, basePath);
@@ -150,13 +149,13 @@ namespace LanguageCore.BBCode.Compiler
             ParserResult parserResult2;
             {
 
-                Tokenizer tokenizer = new(TokenizerSettings.Default);
-                Token[] tokens = tokenizer.Parse(content, Warnings);
+                TokenizerResult tokenizerResult = Tokenizer.Tokenize(content, file.FullName);
+                Warnings.AddRange(tokenizerResult.Warnings);
 
                 System.DateTime parseStarted = System.DateTime.Now;
                 Print?.Invoke("  Parsing ...", LogType.Debug);
 
-                parserResult2 = Parser.Parse(tokens);
+                parserResult2 = Parser.Parse(tokenizerResult.Tokens);
 
                 if (parserResult2.Errors.Length > 0)
                 { throw new LanguageException("Failed to parse", parserResult2.Errors[0].ToException()); }
@@ -173,12 +172,9 @@ namespace LanguageCore.BBCode.Compiler
                 UsingDefinition = @using,
             });
 
-            if (parserSettings.PrintInfo)
-            { parserResult2.WriteToConsole($"PARSER INFO FOR '{@using.PathString}'"); }
-
             foreach (UsingDefinition using_ in parserResult2.Usings)
             {
-                collectedASTs.AddRange(ProcessFile(using_, file, parserSettings, basePath));
+                collectedASTs.AddRange(ProcessFile(using_, file, basePath));
             }
 
             return collectedASTs.ToArray();
@@ -187,7 +183,6 @@ namespace LanguageCore.BBCode.Compiler
         Result Entry(
             ParserResult parserResult,
             FileInfo file,
-            ParserSettings parserSettings,
             string? basePath)
         {
             if (parserResult.Usings.Length > 0)
@@ -197,7 +192,7 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (UsingDefinition usingItem in parserResult.Usings)
             {
-                collectedASTs.AddRange(ProcessFile(usingItem, file, parserSettings, basePath));
+                collectedASTs.AddRange(ProcessFile(usingItem, file, basePath));
                 if (Errors.Count > 0)
                 { throw new System.Exception($"Failed to compile file {usingItem.PathString}", Errors[0].ToException()); }
             }
@@ -214,7 +209,6 @@ namespace LanguageCore.BBCode.Compiler
         internal static Result Collect(
             ParserResult parserResult,
             FileInfo file,
-            ParserSettings parserSettings,
             PrintCallback? printCallback = null,
             string? basePath = null)
         {
@@ -224,7 +218,6 @@ namespace LanguageCore.BBCode.Compiler
             return sourceCodeManager.Entry(
                 parserResult,
                 file,
-                parserSettings,
                 basePath
                 );
         }

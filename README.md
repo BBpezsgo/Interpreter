@@ -26,9 +26,6 @@ showing how to make a parser and a compiler. I basically copied the code with mi
 - `--hide-system|-hs` Hides system logs
 - `--hide-warning|-hw` Hides warning logs
 
-**Parser:**
-- `--print-info|-pn` Prints the parser info
-
 **Code Generator:**
 - `--remove-unused-functions|-ruf <iterations>` Remove unused instructions iterations
 - `--print-instructions|-pi` Prints the generated instructions

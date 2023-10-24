@@ -53,10 +53,10 @@ namespace ConsoleGUI
             CurrentlyJumping = 0;
         }
 
-        public InterpreterElement(string file, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, LanguageCore.Parser.ParserSettings parserSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()
+        public InterpreterElement(string file, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()
         {
             this.File = file;
-            SetupInterpreter(compilerSettings, parserSettings, interpreterSettings, handleErrors, basePath);
+            SetupInterpreter(compilerSettings, interpreterSettings, handleErrors, basePath);
         }
 
         public InterpreterElement(string file) : this()
@@ -241,8 +241,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpreter() => SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings.Default, LanguageCore.Parser.ParserSettings.Default, BytecodeInterpreterSettings.Default, false, string.Empty);
-        void SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, LanguageCore.Parser.ParserSettings parserSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath)
+        void SetupInterpreter() => SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings.Default, BytecodeInterpreterSettings.Default, false, string.Empty);
+        void SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath)
         {
             this.InterpreterTimer = new MainThreadTimer(200);
             this.InterpreterTimer.Elapsed += () =>
@@ -294,7 +294,6 @@ namespace ConsoleGUI
                     fileInfo,
                     Interpreter.GenerateExternalFunctions(),
                     LanguageCore.Tokenizing.TokenizerSettings.Default,
-                    parserSettings,
                     compilerSettings,
                     handleErrors,
                     PrintOutput,
@@ -524,21 +523,20 @@ namespace ConsoleGUI
 
                 string[] lines = text.Split('\n');
 
-                line += lines.Length - 1;
-
-                if (line < start) continue;
-
                 b.ForegroundColor = consoleText.Color;
 
                 for (int j = 0; j < lines.Length; j++)
                 {
-                    if (lines[j] == string.Empty) continue;
+                    if (line + j < start) continue;
+                    if (j == lines.Length - 1 && lines[j] == string.Empty) continue;
 
                     var line_ = lines[j];
                     b.AddText(line_.TrimEnd());
                     if (j < lines.Length - 1)
                     { b.FinishLine(sender.Rect.Width); }
                 }
+
+                line += lines.Length - 1;
             }
 
             ConsoleScrollBar.Draw(b);

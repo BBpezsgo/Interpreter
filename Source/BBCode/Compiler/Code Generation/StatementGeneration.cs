@@ -43,7 +43,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (newVariable.Modifiers.Contains("const")) return;
 
-            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
+            newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
 
             if (GetConstant(newVariable.VariableName.Content, out _))
             { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts with an another symbol name", newVariable.VariableName, newVariable.FilePath); }
@@ -74,19 +74,7 @@ namespace LanguageCore.BBCode.Compiler
                 { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {keywordCall.Parameters.Length}", keywordCall, CurrentFile); }
 
                 if (InMacro.Last)
-                {
-                    AddComment(" Return from macro {");
-
-                    if (keywordCall.Parameters.Length == 1)
-                    {
-                        StatementWithValue returnValue = keywordCall.Parameters[0];
-                        GenerateCodeForValueSetter(new Identifier(Token.CreateAnonymous("@return")), returnValue);
-                        // GenerateCodeForStatement(returnValue);
-                    }
-
-                    AddComment("}");
-                    return;
-                }
+                { throw new NotImplementedException(); }
 
                 if (keywordCall.Parameters.Length == 1)
                 {
@@ -284,7 +272,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (functionCall.FunctionName == "sizeof")
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.Keyword;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 if (functionCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
@@ -299,7 +287,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (functionCall.FunctionName == "Alloc")
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (functionCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"Alloc\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
@@ -313,7 +301,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(functionCall.Identifier.Content, out CompiledVariable? compiledVariable))
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 if (!compiledVariable.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledVariable.VariableName.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
@@ -324,7 +312,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetParameter(functionCall.Identifier.Content, out CompiledParameter? compiledParameter))
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.ParameterName;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.ParameterName;
 
                 if (!compiledParameter.Type.IsFunction)
                 { throw new CompilerException($"Variable \"{compiledParameter.Identifier.Content}\" is not a function", functionCall.Identifier, CurrentFile); }
@@ -338,7 +326,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {
-                functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 string? prevFile = CurrentFile;
                 IAmInContext<CompiledClass>? prevContext = CurrentContext;
@@ -375,7 +363,7 @@ namespace LanguageCore.BBCode.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
-            functionCall.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
 
@@ -582,7 +570,7 @@ namespace LanguageCore.BBCode.Compiler
 
             AddComment($"Call {compiledVariable.Type.Function} {{");
 
-            functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
+            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -648,7 +636,7 @@ namespace LanguageCore.BBCode.Compiler
 
             AddComment($"Call {compiledParameter.Type.Function} {{");
 
-            functionCall.Identifier.AnalyzedType = TokenAnalysedType.VariableName;
+            functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
             if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
@@ -711,7 +699,7 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateCodeForStatement(AnyCall anyCall)
         {
-            if (anyCall.ToFunctionCall(out var functionCall))
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
             {
                 GenerateCodeForStatement(functionCall);
                 return;
@@ -720,6 +708,20 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType prevType = FindStatementType(anyCall.PrevStatement);
             if (!prevType.IsFunction)
             { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+
+            if (TryInlineMacro(anyCall.PrevStatement, out Statement? inlined))
+            {
+                if (inlined is Identifier identifier)
+                {
+                    functionCall = new FunctionCall(null, identifier.Name, anyCall.BracketLeft, anyCall.Parameters, anyCall.BracketRight)
+                    {
+                        SaveValue = anyCall.SaveValue,
+                        Semicolon = anyCall.Semicolon,
+                    };
+                    GenerateCodeForStatement(functionCall);
+                    return;
+                }
+            }
 
             FunctionType functionType = prevType.Function;
 
@@ -733,15 +735,6 @@ namespace LanguageCore.BBCode.Compiler
             {
                 returnValueSize = GenerateInitialValue(functionType.ReturnType);
             }
-
-            /*
-             * TODO: this
-            if (anyCall.PrevStatement != null)
-            {
-                AddComment(" Param prev:");
-                GenerateCodeForStatement(functionCall.PrevStatement);
-            }
-            */
 
             int paramsSize = 0;
 
@@ -790,7 +783,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
             {
-                @operator.Operator.AnalyzedType = TokenAnalysedType.FunctionName;
+                @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
@@ -1042,7 +1035,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetParameter(variable.Content, out CompiledParameter? param))
             {
-                variable.Name.AnalyzedType = TokenAnalysedType.ParameterName;
+                variable.Name.AnalyzedType = TokenAnalyzedType.ParameterName;
                 ValueAddress address = GetBaseAddress(param);
 
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
@@ -1055,14 +1048,14 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetVariable(variable.Content, out CompiledVariable? val))
             {
-                variable.Name.AnalyzedType = TokenAnalysedType.VariableName;
+                variable.Name.AnalyzedType = TokenAnalyzedType.VariableName;
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
             if (GetFunction(variable.Name, expectedType, out CompiledFunction? compiledFunction))
             {
-                variable.Name.AnalyzedType = TokenAnalysedType.FunctionName;
+                variable.Name.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(GeneratedCode.Count, variable, compiledFunction, CurrentFile)); }
@@ -1413,7 +1406,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         void GenerateCodeForStatement(Field field)
         {
-            field.FieldName.AnalyzedType = TokenAnalysedType.FieldName;
+            field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
 
             var prevType = FindStatementType(field.PrevStatement);
 
@@ -1790,7 +1783,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)
         {
-            statementToSet.FieldName.AnalyzedType = TokenAnalysedType.FieldName;
+            statementToSet.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
 
             CompiledType valueType = FindStatementType(value);
 
@@ -1916,9 +1909,6 @@ namespace LanguageCore.BBCode.Compiler
 
             if (!GetVariable(statementToSet.VariableName.Content, out var variable))
             { throw new CompilerException($"Variable \"{statementToSet.VariableName.Content}\" not found", statementToSet.VariableName, CurrentFile); }
-
-            if (variable.IsInitialized)
-            { return; }
 
             CompiledType valueType = FindStatementType(value);
 
@@ -2053,6 +2043,10 @@ namespace LanguageCore.BBCode.Compiler
             InMacro.Push(true);
             if (inlinedMacro is Block block)
             { GenerateCodeForStatement(block); }
+            else if (inlinedMacro is KeywordCall keywordCall &&
+                keywordCall.Identifier == "return" &&
+                keywordCall.Parameters.Length == 1)
+            { GenerateCodeForStatement(keywordCall.Parameters[0]); }
             else
             { GenerateCodeForStatement(inlinedMacro); }
             InMacro.Pop();
@@ -2112,7 +2106,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
-            newVariable.VariableName.AnalyzedType = TokenAnalysedType.VariableName;
+            newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
 
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
@@ -2302,7 +2296,7 @@ namespace LanguageCore.BBCode.Compiler
             if (Constants.Keywords.Contains(function.Identifier.Content))
             { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
-            function.Identifier.AnalyzedType = TokenAnalysedType.FunctionName;
+            function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             if (function is FunctionDefinition functionDefinition)
             {

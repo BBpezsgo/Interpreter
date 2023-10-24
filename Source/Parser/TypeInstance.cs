@@ -39,30 +39,30 @@ namespace LanguageCore.Parser
         public abstract override int GetHashCode();
         public abstract override string ToString();
 
-        protected static bool TryGetAnalyzedType(CompiledType type, out TokenAnalysedType analyzedType)
+        protected static bool TryGetAnalyzedType(CompiledType type, out TokenAnalyzedType analyzedType)
         {
             analyzedType = default;
             if (type.IsClass)
             {
-                analyzedType = TokenAnalysedType.Class;
+                analyzedType = TokenAnalyzedType.Class;
                 return true;
             }
 
             if (type.IsStruct)
             {
-                analyzedType = TokenAnalysedType.Struct;
+                analyzedType = TokenAnalyzedType.Struct;
                 return true;
             }
 
             if (type.IsGeneric)
             {
-                analyzedType = TokenAnalysedType.TypeParameter;
+                analyzedType = TokenAnalyzedType.TypeParameter;
                 return true;
             }
 
             if (type.IsBuiltin)
             {
-                analyzedType = TokenAnalysedType.BuiltinType;
+                analyzedType = TokenAnalyzedType.BuiltinType;
                 return true;
             }
 
@@ -73,7 +73,7 @@ namespace LanguageCore.Parser
 
             if (type.IsEnum)
             {
-                analyzedType = TokenAnalysedType.Enum;
+                analyzedType = TokenAnalyzedType.Enum;
                 return true;
             }
 
@@ -210,7 +210,7 @@ namespace LanguageCore.Parser
 
         public override void SetAnalyzedType(CompiledType type)
         {
-            if (TryGetAnalyzedType(type, out TokenAnalysedType analyzedType))
+            if (TryGetAnalyzedType(type, out TokenAnalyzedType analyzedType))
             { this.Identifier.AnalyzedType = analyzedType; }
         }
 

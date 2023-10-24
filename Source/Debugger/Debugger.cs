@@ -56,7 +56,6 @@ namespace TheProgram
                 settings.File,
                 Interpreter.GenerateExternalFunctions(),
                 LanguageCore.Tokenizing.TokenizerSettings.Default,
-                settings.parserSettings,
                 settings.compilerSettings,
                 settings.HandleErrors,
                 (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))),

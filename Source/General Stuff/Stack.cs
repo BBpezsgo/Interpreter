@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 
 namespace LanguageCore
 {
@@ -69,23 +70,27 @@ namespace LanguageCore
             if (stack is null)
             { return "null"; }
 
-            string result = string.Empty;
+            StringBuilder result = new(3 + stack.Count * 3);
+
+            result.Append('{');
 
             for (int i = 0; i < stack.Count; i++)
             {
                 if (i > 0)
-                { result += ", "; }
+                { result.Append(", "); }
 
                 if (result.Length > 30)
                 {
-                    result += "...";
+                    result.Append("...");
                     break;
                 }
 
-                result += stack[i]?.ToString() ?? "null";
+                result.Append(stack[i]?.ToString() ?? "null");
             }
 
-            return $"[ {result.Trim()} ]";
+            result.Append('}');
+
+            return result.ToString();
         }
     }
 

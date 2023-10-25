@@ -398,8 +398,8 @@ namespace LanguageCore.Brainfuck
             code.JumpStart(tempAddress2);
             code.AddValue(addressX, 1);
             code.ClearValue(tempAddress2);
-            code += ']';
-            code += ']';
+            code.JumpEnd();
+            code.JumpEnd();
         }
 
         /// <summary>

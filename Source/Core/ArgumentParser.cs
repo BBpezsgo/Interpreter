@@ -21,7 +21,6 @@ namespace TheProgram
             Debugger,
             Compile,
             Decompile,
-            ConsoleGUI,
             Brainfuck,
             IL,
             ASM,
@@ -154,7 +153,7 @@ namespace TheProgram
 
         static Settings ParseArgs(string[] args)
         {
-            Settings result = Settings.Default();
+            Settings result = Settings.Default;
 
             if (args.Length > 1)
             {
@@ -212,10 +211,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--console-gui", "-cg"))
                     {
-                        if (result.RunType != RunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ConsoleGUI}"); }
-
-                        result.RunType = RunType.ConsoleGUI;
+                        result.ConsoleGUI = true;
                         continue;
                     }
 
@@ -421,9 +417,11 @@ namespace TheProgram
             public string? BasePath;
             public string? TestID;
             public FileType CompileToFileType;
-            internal bool IsTest;
+            public bool IsTest;
 
-            public static Settings Default() => new()
+            public bool ConsoleGUI;
+
+            public static Settings Default => new()
             {
                 ThrowErrors = false,
                 LogDebugs = true,
@@ -441,14 +439,24 @@ namespace TheProgram
                 TestID = null,
                 CompileToFileType = FileType.Binary,
                 IsTest = false,
+                ConsoleGUI = false,
             };
         }
 
-        /// <summary>
-        /// Normalizes, parses and compiles the passed arguments
-        /// </summary>
-        /// <param name="args">The passed arguments</param>
-        /// <returns><seealso cref="Settings"/>, or <c>null</c> on error</returns>
+        public static bool Parse(out Settings settings, params string[] args)
+        {
+            settings = Settings.Default;
+            Settings? _settings = ArgumentParser.Parse(args);
+            if (_settings.HasValue)
+            {
+                settings = _settings.Value;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
         public static Settings? Parse(params string[] args)
         {
             if (args.Length == 0)

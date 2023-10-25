@@ -89,6 +89,7 @@ namespace LanguageCore.Brainfuck.Compiler
         readonly Stack<int> BreakTagStack;
         readonly Stack<bool> InMacro;
 
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         int Optimizations;
 
         readonly Stack<FunctionThingDefinition> CurrentMacro;
@@ -707,7 +708,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 address = variable.Address;
 
                 if (size != 1)
-                { throw new NotSupportedException($"Only elements of size 1 are supported by brainfuck", index, CurrentFile); }
+                { throw new NotSupportedException($"In stack array only elements of size 1 are supported by brainfuck", index, CurrentFile); }
 
                 if (TryCompute(index.Expression, RuntimeType.INT, out DataItem indexValue))
                 {
@@ -1117,9 +1118,6 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
 
                 int variableSize = Stack.Size - stackSize;
-
-                if (variableSize != 1)
-                { throw new CompilerException($"Value size can be only 1 (not {variableSize})", value, CurrentFile); }
 
                 using (Code.Block($"Store computed value (from {Stack.LastAddress}) to {address}"))
                 { Stack.PopAndStore(address); }

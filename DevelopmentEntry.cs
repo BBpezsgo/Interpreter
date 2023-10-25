@@ -7,19 +7,19 @@ using System.IO;
 
 namespace TheProgram
 {
-    internal static class DevelopmentEntry
+    public static class DevelopmentEntry
     {
 #if (!DEBUG || !ENABLE_DEBUG) && !RELEASE_TEST
-        internal static bool Start() => false;
+        public static bool Start() => false;
 #else
-        internal static bool Start()
+        public static bool Start()
         {
             string[] args = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test20.bbc";
+            string path = TestConstants.TestFilesPath + "test33.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -34,7 +34,7 @@ namespace TheProgram
                 // "--dont-optimize",
                 "--console-gui",
                 // "--asm",
-                // "--brainfuck",
+                "--brainfuck",
                 "--heap-size 2048",
                 $"\"{path}\""
             };
@@ -46,44 +46,52 @@ namespace TheProgram
             };
 #endif
 
-            var settings = ArgumentParser.Parse(args);
-            if (!settings.HasValue) return true;
+            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args)) return true;
 
-            switch (settings.Value.RunType)
+            switch (settings.RunType)
             {
-                case ArgumentParser.RunType.ConsoleGUI:
-                    ConsoleGUI.ConsoleGUI gui = new()
-                    {
-                        FilledElement = new ConsoleGUI.InterpreterElement(path, settings.Value.compilerSettings, settings.Value.bytecodeInterpreterSettings, settings.Value.HandleErrors, settings.Value.BasePath)
-                    };
-                    while (!gui.Destroyed)
-                    { gui.Tick(); }
-                    return true;
                 case ArgumentParser.RunType.Debugger:
-                    _ = new Debugger(settings.Value);
+                    _ = new Debugger(settings);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
+                    if (settings.ConsoleGUI)
+                    {
+                        ConsoleGUI.ConsoleGUI gui = new()
+                        {
+                            FilledElement = new ConsoleGUI.InterpreterElement(path, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.HandleErrors, settings.BasePath)
+                        };
+                        while (!gui.Destroyed)
+                        { gui.Tick(); }
+                    }
+                    else
+                    {
+                        LanguageCore.Runtime.EasyInterpreter.Run(settings);
+                    }
                     break;
                 case ArgumentParser.RunType.Compile:
-                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.Value.compilerSettings, null, settings.Value.BasePath);
+                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(new FileInfo(path), new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, settings.compilerSettings, null, settings.BasePath);
                     LanguageCore.Runtime.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
-                    File.WriteAllBytes(settings.Value.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
+                    File.WriteAllBytes(settings.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
                     break;
-                case ArgumentParser.RunType.Decompile:
-                    throw new NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.PrintMemory, Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized);
-                    break;
+                    {
+                        const Brainfuck.PrintFlags PrintFlags = Brainfuck.PrintFlags.PrintMemory;
+                        const Brainfuck.ProgramUtils.CompileOptions CompileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized;
+                        if (settings.ConsoleGUI)
+                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, PrintFlags, CompileOptions); }
+                        else
+                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, PrintFlags, CompileOptions); }
+                        break;
+                    }
                 case ArgumentParser.RunType.IL:
                     {
-                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.Value.File.FullName), settings.Value.File.FullName);
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.File.FullName), settings.File.FullName);
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, null, settings.Value.BasePath);
+                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.File, null, settings.BasePath);
 
-                        LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
+                        LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, settings.compilerSettings, default, null);
 
                         System.Reflection.Assembly assembly = code.Assembly;
 
@@ -91,13 +99,13 @@ namespace TheProgram
                     }
                 case ArgumentParser.RunType.ASM:
                     {
-                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.Value.File.FullName), settings.Value.File.FullName);
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.File.FullName), settings.File.FullName);
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.Value.File, null, settings.Value.BasePath);
+                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), settings.File, null, settings.BasePath);
 
-                        LanguageCore.ASM.Compiler.CodeGenerator.Result code = LanguageCore.ASM.Compiler.CodeGenerator.Generate(compiled, settings.Value.compilerSettings, default, null);
+                        LanguageCore.ASM.Compiler.CodeGenerator.Result code = LanguageCore.ASM.Compiler.CodeGenerator.Generate(compiled, settings.compilerSettings, default, null);
 
                         const string OutputFile = @"C:\Users\bazsi\Desktop\ehs";
 
@@ -135,6 +143,7 @@ namespace TheProgram
 
                         break;
                     }
+                default: throw new NotImplementedException();
             }
 
             return true;

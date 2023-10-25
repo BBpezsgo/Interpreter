@@ -6,32 +6,38 @@
         {
             if (args.Length == 0 && DevelopmentEntry.Start()) return;
 
-            ArgumentParser.Settings? settings = ArgumentParser.Parse(args);
-            if (!settings.HasValue) throw new System.Exception($"Invalid arguments");
+            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args)) throw new System.Exception($"Invalid arguments");
 
-            switch (settings.Value.RunType)
+            switch (settings.RunType)
             {
-                case ArgumentParser.RunType.ConsoleGUI:
-                    System.Console.ForegroundColor = System.ConsoleColor.Red;
-                    System.Console.WriteLine($"{settings.Value.RunType} mode is only available during development!");
-                    System.Console.ResetColor();
-                    return;
                 case ArgumentParser.RunType.Debugger:
-                    _ = new Debugger(settings.Value);
+                    _ = new Debugger(settings);
                     break;
                 case ArgumentParser.RunType.Normal:
-                    LanguageCore.Runtime.EasyInterpreter.Run(settings.Value);
+                    if (settings.ConsoleGUI)
+                    {
+                        ConsoleGUI.ConsoleGUI gui = new()
+                        {
+                            FilledElement = new ConsoleGUI.InterpreterElement(settings.File.FullName, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.HandleErrors, settings.BasePath)
+                        };
+                        while (!gui.Destroyed)
+                        { gui.Tick(); }
+                    }
+                    else
+                    {
+                        LanguageCore.Runtime.EasyInterpreter.Run(settings);
+                    }
                     break;
-                case ArgumentParser.RunType.Compile:
-                    throw new System.NotImplementedException();
-                case ArgumentParser.RunType.Decompile:
-                    throw new System.NotImplementedException();
                 case ArgumentParser.RunType.Brainfuck:
-                    Brainfuck.ProgramUtils.Run(settings.Value, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None);
+                    if (settings.ConsoleGUI)
+                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.None); }
+                    else
+                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None); }
                     break;
+                default: throw new System.NotImplementedException();
             }
 
-            if (!settings.Value.IsTest)
+            if (!settings.IsTest)
             {
                 System.Console.WriteLine();
                 System.Console.WriteLine();

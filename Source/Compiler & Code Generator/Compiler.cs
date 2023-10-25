@@ -64,6 +64,12 @@ namespace LanguageCore.BBCode.Compiler
         readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
         readonly PrintCallback? PrintCallback;
 
+        readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
+        {
+            { "alloc", (new CompiledType(Type.INT), new CompiledType[] { new CompiledType(Type.INT) }) },
+            { "free", (new CompiledType(Type.VOID), new CompiledType[] { new CompiledType(Type.INT) }) },
+        };
+
         Compiler(Dictionary<string, ExternalFunctionBase> externalFunctions, PrintCallback? printCallback, string? basePath)
         {
             Functions = new List<FunctionDefinition>();
@@ -263,9 +269,11 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
 
-            if (attributes.TryGetAttribute("External", out string? name))
+            if (attributes.TryGetAttribute("External", out string? externalName))
             {
-                if (ExternalFunctions.TryGetValue(name, out var externalFunction))
+                if (!ExternalFunctions.TryGetValue(externalName, out var externalFunction))
+                { Errors.Add(new Error($"External function \"{externalName}\" not found", function, function.FilePath)); }
+                else
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
@@ -294,8 +302,34 @@ namespace LanguageCore.BBCode.Compiler
                         CompiledAttributes = attributes,
                     };
                 }
+            }
 
-                Errors.Add(new Error("External function '" + name + "' not found", Position.UnknownPosition, function.FilePath));
+            if (attributes.TryGetAttribute("Builtin", out string? builtinName))
+            {
+                if (!BuiltinFunctions.TryGetValue(builtinName, out var builtinFunction))
+                { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", function, function.FilePath)); }
+                else
+                {
+                    if (builtinFunction.Parameters.Length != function.Parameters.Length)
+                    { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.FilePath); }
+
+                    if (builtinFunction.ReturnValue != type)
+                    { throw new CompilerException($"Wrong type defined for function \"{builtinName}\"", function.Type, function.FilePath); }
+
+                    for (int i = 0; i < builtinFunction.Parameters.Length; i++)
+                    {
+                        CompiledType definedParameterType = builtinFunction.Parameters[i];
+                        CompiledType passedParameterType = new(function.Parameters[i].Type, GetCustomType);
+
+                        if (passedParameterType == definedParameterType)
+                        { continue; }
+
+                        if (passedParameterType.IsClass && definedParameterType == Type.INT)
+                        { continue; }
+
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                    }
+                }
             }
 
             CompiledFunction result = new(

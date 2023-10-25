@@ -997,7 +997,7 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        bool ExpectOneValue([NotNullWhen(true)] out StatementWithValue? statementWithValue)
+        bool ExpectOneValue([NotNullWhen(true)] out StatementWithValue? statementWithValue, bool allowAsStatement = true)
         {
             statementWithValue = null;
 
@@ -1122,6 +1122,7 @@ namespace LanguageCore.Parser
                 break;
             }
 
+            if (allowAsStatement)
             {
                 if (ExpectIdentifier("as", out Token? keyword))
                 {
@@ -1143,7 +1144,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            if (!ExpectOneValue(out StatementWithValue? prevStatement))
+            if (!ExpectOneValue(out StatementWithValue? prevStatement, false))
             {
                 statement = null;
                 return false;
@@ -1161,7 +1162,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            if (!ExpectOneValue(out StatementWithValue? prevStatement))
+            if (!ExpectOneValue(out StatementWithValue? prevStatement, false))
             {
                 statement = null;
                 return false;

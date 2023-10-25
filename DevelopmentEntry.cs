@@ -19,7 +19,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test33.bbc";
+            string path = TestConstants.TestFilesPath + "test42.bbc";
 
             if (args.Length == 0) args = new string[]
             {
@@ -32,9 +32,9 @@ namespace TheProgram
                 //"--generate-comments false",
                 // "--no-debug-info",
                 // "--dont-optimize",
-                "--console-gui",
+                // "--console-gui",
                 // "--asm",
-                "--brainfuck",
+                // "--brainfuck",
                 "--heap-size 2048",
                 $"\"{path}\""
             };
@@ -75,12 +75,18 @@ namespace TheProgram
                     break;
                 case ArgumentParser.RunType.Brainfuck:
                     {
-                        const Brainfuck.PrintFlags PrintFlags = Brainfuck.PrintFlags.PrintMemory;
-                        const Brainfuck.ProgramUtils.CompileOptions CompileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized;
-                        if (settings.ConsoleGUI)
-                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, PrintFlags, CompileOptions); }
+                        Brainfuck.PrintFlags printFlags = Brainfuck.PrintFlags.PrintMemory;
+
+                        Brainfuck.ProgramUtils.CompileOptions compileOptions;
+                        if (settings.compilerSettings.PrintInstructions)
+                        { compileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized; }
                         else
-                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, PrintFlags, CompileOptions); }
+                        { compileOptions = Brainfuck.ProgramUtils.CompileOptions.None; }
+
+                        if (settings.ConsoleGUI)
+                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, printFlags, compileOptions); }
+                        else
+                        { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, printFlags, compileOptions); }
                         break;
                     }
                 case ArgumentParser.RunType.IL:

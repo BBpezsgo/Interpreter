@@ -627,19 +627,33 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
+        [MemberNotNullWhen(true, nameof(ExternalFunctionName))]
         public bool IsExternal => CompiledAttributes.ContainsKey("External");
-        public string ExternalFunctionName
+        public string? ExternalFunctionName
         {
             get
             {
                 if (CompiledAttributes.TryGetValue("External", out var attributeValues))
                 {
                     if (attributeValues.TryGetValue(0, out string name))
-                    {
-                        return name;
-                    }
+                    { return name; }
                 }
-                return string.Empty;
+                return null;
+            }
+        }
+
+        [MemberNotNullWhen(true, nameof(BuiltinFunctionName))]
+        public bool IsBuiltin => CompiledAttributes.ContainsKey("Builtin");
+        public string? BuiltinFunctionName
+        {
+            get
+            {
+                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
+                {
+                    if (attributeValues.TryGetValue(0, out string name))
+                    { return name; }
+                }
+                return null;
             }
         }
 

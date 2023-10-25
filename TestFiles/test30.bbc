@@ -1,3 +1,5 @@
+using System.Memory;
+
 macro Macro(p0, p1)
 {
 	return p0 + p1;

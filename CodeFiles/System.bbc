@@ -5,6 +5,7 @@
 
 using System.Console;
 using System.String;
+using System.Memory;
 
 [Define("boolean")]
 enum bool

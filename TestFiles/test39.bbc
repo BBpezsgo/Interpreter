@@ -1,94 +1,24 @@
 using System;
+using System.Memory;
 
-void GetHeader(int ptr, ref int size, ref int allocated) {
+void PrintHeader(int ptr) {
 	int value = (*ptr) as int;
 	if (value >= 127) {
 		value -= 127;
-
-		size = value;
-		allocated = 1;
+        
+        Print("Header at ");
+        Print(ptr);
+        Print(": ");
+        Print("size = ");
+        Print(value);
+        PrintLine(", allocated = true");
 	} else {
-		size = value;
-		allocated = 0;
-	};
-}
-
-void SetHeader(int ptr, int size, int allocated) {
-	int value = size;
-	if (allocated) {
-		value += 127;
-	};
-	*ptr = value;
-}
-
-void FixSize(ref int size) {
-    if (size == 0) {
-        size++;
-    };
-}
-
-int Allocate(int sizeNeed)
-{
-    FixSize(ref sizeNeed);
-
-    int headerPointer = 0;
-    while (1)
-    {
-        int blockSize;
-        int blockUsed;
-        GetHeader(headerPointer, ref blockSize, ref blockUsed);
-        int dataPointer = headerPointer + 1;
-
-        if (blockUsed == 0)
-        {
-            // If the block's size is perfect
-            if (blockSize == sizeNeed)
-            {
-                // Update the current block's header
-                SetHeader(headerPointer, sizeNeed, 1);
-
-                return dataPointer;
-            };
-
-            // If the block's size is larger than needed
-            if (blockSize > sizeNeed)
-            {
-                // Update the current block's header
-                SetHeader(headerPointer, sizeNeed, 1);
-
-                int nextHeaderPointer = dataPointer + sizeNeed;
-
-                // If the next block is exists
-                // if (1)
-                // {
-                    // Calculate remaining size
-                    int _remainingSize = blockSize - sizeNeed - 1;
-
-                    // If a larger block is allocated than needed
-                    if (_remainingSize >= 0)
-                    {
-                        // Update the next block's header
-                        SetHeader(nextHeaderPointer, _remainingSize, 0);
-                    };
-                // };
-
-                return dataPointer;
-            };
-        };
-
-        headerPointer += blockSize + 1;
-    };
-}
-
-void Dealloc(int ptr) {
-	int position = ptr;
-	int size = (*(ptr - 1)) as int;
-	*(ptr - 1) = 0;
-
-	while (size) {
-		*position = 0;
-		size--;
-		position++;
+        Print("Header at ");
+        Print(ptr);
+        Print(": ");
+        Print("size = ");
+        Print(value);
+        PrintLine(", allocated = false");
 	};
 }
 
@@ -97,10 +27,22 @@ void Dealloc(int ptr) {
 int ptr1 = Allocate(1);
 *ptr1 = 55;
 
-// int ptr2 = Allocate(1);
-// *ptr2 = 33;
+int ptr2 = Allocate(1);
+*ptr2 = 33;
 
 PrintLine(ptr1);
-// PrintLine(ptr2);
+PrintLine(ptr2);
 
-// Dealloc(ptr1);
+PrintLine(*ptr1 as int);
+PrintLine(*ptr2 as int);
+
+Dealloc(ptr1);
+
+ptr1 = Allocate(1);
+*ptr1 = 35;
+
+PrintLine(ptr1);
+PrintLine(ptr2);
+
+PrintLine(*ptr1 as int);
+PrintLine(*ptr2 as int);

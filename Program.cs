@@ -29,10 +29,17 @@
                     }
                     break;
                 case ArgumentParser.RunType.Brainfuck:
-                    if (settings.ConsoleGUI)
-                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.None); }
+
+                    Brainfuck.ProgramUtils.CompileOptions compileOptions;
+                    if (settings.compilerSettings.PrintInstructions)
+                    { compileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized; }
                     else
-                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None); }
+                    { compileOptions = Brainfuck.ProgramUtils.CompileOptions.None; }
+
+                    if (settings.ConsoleGUI)
+                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.None, compileOptions); }
+                    else
+                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None, compileOptions); }
                     break;
                 default: throw new System.NotImplementedException();
             }

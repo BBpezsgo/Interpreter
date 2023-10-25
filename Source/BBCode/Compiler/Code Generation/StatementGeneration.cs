@@ -285,20 +285,6 @@ namespace LanguageCore.BBCode.Compiler
                 return;
             }
 
-            if (functionCall.FunctionName == "Alloc")
-            {
-                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-
-                if (functionCall.Parameters.Length != 1)
-                { throw new CompilerException($"Wrong number of parameters passed to \"Alloc\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
-
-                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
-
-                AddInstruction(Opcode.HEAP_ALLOC);
-
-                return;
-            }
-
             if (GetVariable(functionCall.Identifier.Content, out CompiledVariable? compiledVariable))
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
@@ -383,6 +369,13 @@ namespace LanguageCore.BBCode.Compiler
 
             if (compiledFunction.IsMacro)
             { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
+
+            if (compiledFunction.BuiltinFunctionName == "alloc")
+            {
+                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
+                AddInstruction(Opcode.HEAP_ALLOC);
+                return;
+            }
 
             AddComment($"Call {compiledFunction.ReadableID()} {{");
 

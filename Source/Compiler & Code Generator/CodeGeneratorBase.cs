@@ -869,6 +869,25 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected bool TryGetFunction(Token name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
             => TryGetFunction(name.Content, parameterCount, out compiledFunction);
+      
+        protected bool TryGetBuiltinFunction(string builtinName, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
+        {
+            compiledFunction = null;
+
+            for (int i = 0; i < this.CompiledFunctions.Length; i++)
+            {
+                CompiledFunction function = this.CompiledFunctions[i];
+
+                if (function.BuiltinFunctionName != builtinName) continue;
+
+                if (compiledFunction is not null)
+                { return false; }
+
+                compiledFunction = function;
+            }
+
+            return compiledFunction is not null;
+        }
 
         bool TryGetMacro(string name, int parameterCount, [NotNullWhen(true)] out MacroDefinition? macro)
         {
@@ -1516,12 +1535,6 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected CompiledType FindStatementType(FunctionCall functionCall)
         {
-            if (functionCall.FunctionName == "Dealloc") return new CompiledType(Type.VOID);
-
-            if (functionCall.FunctionName == "Alloc") return new CompiledType(Type.INT);
-
-            if (functionCall.FunctionName == "AllocFrom") return new CompiledType(Type.INT);
-
             if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))

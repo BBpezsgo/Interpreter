@@ -336,9 +336,6 @@ namespace LanguageCore.BBCode.Compiler
                 if (functionCall.FunctionName == "sizeof")
                 { return; }
 
-                if (functionCall.FunctionName == "Alloc")
-                { return; }
-
                 if (GetParameter(functionCall.Identifier.Content, out _))
                 { return; }
 
@@ -400,6 +397,19 @@ namespace LanguageCore.BBCode.Compiler
                     { return; }
 
                     var paramType = FindStatementType(keywordCall.Parameters[0]);
+
+                    if (paramType == Type.INT)
+                    {
+                        if (TryGetBuiltinFunction("free", out CompiledFunction? function))
+                        {
+                            function.AddReference(keywordCall);
+
+                            if (CurrentFunction == null || !function.IsSame(CurrentFunction))
+                            { function.TimesUsed++; }
+                            function.TimesUsedTotal++;
+                        }
+                        return;
+                    }
 
                     if (!paramType.IsClass)
                     { return; }

@@ -613,16 +613,6 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int GetValueSize(FunctionCall functionCall)
         {
-            if (functionCall.Identifier == "Alloc" &&
-                functionCall.IsMethodCall == false &&
-                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
-            { return 1; }
-
-            if (functionCall.Identifier == "AllocFrom" &&
-                functionCall.IsMethodCall == false &&
-                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
-            { return 1; }
-
             if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 if (!function.ReturnSomething)
@@ -1137,11 +1127,38 @@ namespace LanguageCore.Brainfuck.Compiler
 
             using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
+                CompiledType valueType = FindStatementType(value);
+
                 if (!variable.Type.IsStackArray)
-                { throw new NotImplementedException(); }
+                {
+                    if (!variable.Type.IsClass)
+                    { throw new CompilerException($"Index setter for type \"{variable.Type.Name}\" not found", statement, CurrentFile); }
+
+                    if (!GetIndexSetter(variable.Type, valueType, out CompiledFunction? indexer))
+                    {
+                        if (!GetIndexSetterTemplate(variable.Type, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
+                        { throw new CompilerException($"Index setter for class \"{variable.Type.Class.Name}\" not found", statement, CurrentFile); }
+
+                        indexerTemplate = AddCompilable(indexerTemplate);
+                        indexer = indexerTemplate.Function;
+                    }
+
+                    Compile(new FunctionCall(
+                            _variableIdentifier,
+                            Token.CreateAnonymous(FunctionNames.IndexerSet),
+                            statement.BracketLeft,
+                            new StatementWithValue[]
+                            {
+                                statement.Expression,
+                                value,
+                            },
+                            statement.BracketRight
+                        ));
+
+                    return;
+                }
 
                 CompiledType elementType = variable.Type.StackArrayOf;
-                CompiledType valueType = FindStatementType(value);
 
                 if (elementType != valueType)
                 { throw new CompilerException("Bruh", value, CurrentFile); }
@@ -1149,7 +1166,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 int elementSize = elementType.Size;
 
                 if (elementSize != 1)
-                { throw new CompilerException($"Array element size must be 1 :(", value, CurrentFile); }
+                { throw new NotSupportedException($"Array element size must be 1 :(", value, CurrentFile); }
 
                 int indexAddress = Stack.NextAddress;
                 using (Code.Block($"Compute index"))
@@ -1864,13 +1881,10 @@ namespace LanguageCore.Brainfuck.Compiler
 
                         if (deletableType.BuiltinType == Type.INT)
                         {
-                            int pointerAddress = Stack.NextAddress;
-                            Compile(deletable);
+                            if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
+                            { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
 
-                            Heap.Set(pointerAddress, 0);
-                            // Heap.Free(pointerAddress);
-
-                            Stack.Pop();
+                            InlineMacro(function, statement.Parameters, statement);
                             return;
                         }
 
@@ -2077,18 +2091,8 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Compile(FunctionCall functionCall)
         {
-            if (functionCall.Identifier == "Alloc" &&
-                functionCall.IsMethodCall == false &&
-                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
-            { throw new NotSupportedException($"Heap is not supported :(", functionCall, CurrentFile); }
-
-            if (functionCall.Identifier == "AllocFrom" &&
-                functionCall.IsMethodCall == false &&
-                CompiledType.Equals(FindStatementTypes(functionCall.Parameters), new CompiledType(RuntimeType.INT)))
-            { throw new NotSupportedException($"Heap is not supported :(", functionCall, CurrentFile); }
-
             /*
-            if (functionCall.Identifier == "Alloc" &&
+            if (false &&functionCall.Identifier == "Alloc" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 0)
             {
@@ -2098,7 +2102,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            if (functionCall.Identifier == "AllocFrom" &&
+            if (false &&functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
@@ -2118,6 +2122,22 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
             */
+
+            if (functionCall.FunctionName == "sizeof")
+            {
+                functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
+
+                if (functionCall.Parameters.Length != 1)
+                { throw new CompilerException($"Wrong number of parameters passed to \"sizeof\": required {1} passed {functionCall.Parameters.Length}", functionCall, CurrentFile); }
+
+                StatementWithValue param0 = functionCall.Parameters[0];
+                CompiledType param0Type = FindStatementType(param0);
+
+                if (functionCall.SaveValue)
+                { Stack.Push(param0Type.SizeOnStack); }
+
+                return;
+            }
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             {

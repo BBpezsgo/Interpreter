@@ -1,3 +1,5 @@
+using System.Memory;
+
 int Heh(int a, int b)
 {
 	int v0 = 55;

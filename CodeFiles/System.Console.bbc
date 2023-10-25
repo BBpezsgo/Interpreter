@@ -6,6 +6,7 @@
 #bf "console-clear" "void";
 
 using System.String;
+using System.Memory;
 
 [External("console-set")]
 export void Set(char data, int x, int y);

@@ -162,6 +162,12 @@ namespace TheProgram
                 {
                     string? arg;
 
+                    if (ExpectArg(args, ref i, out arg, "--pause-end", "-pe"))
+                    {
+                        result.PauseAtEnd = true;
+                        continue;
+                    }
+
                     if (ExpectArg(args, ref i, out arg, "--heap-size", "-hs"))
                     {
                         if (!ExpectParam(args, ref i, out result.bytecodeInterpreterSettings.HeapSize))
@@ -421,6 +427,8 @@ namespace TheProgram
 
             public bool ConsoleGUI;
 
+            public bool PauseAtEnd;
+
             public static Settings Default => new()
             {
                 ThrowErrors = false,
@@ -440,6 +448,7 @@ namespace TheProgram
                 CompileToFileType = FileType.Binary,
                 IsTest = false,
                 ConsoleGUI = false,
+                PauseAtEnd = false,
             };
         }
 

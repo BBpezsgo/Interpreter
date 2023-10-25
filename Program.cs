@@ -4,7 +4,7 @@
     {
         public static void Main(string[] args)
         {
-            if (args.Length == 0 && DevelopmentEntry.Start()) return;
+            if (DevelopmentEntry.Start(args)) return;
 
             if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args)) throw new System.Exception($"Invalid arguments");
 
@@ -44,7 +44,7 @@
                 default: throw new System.NotImplementedException();
             }
 
-            if (!settings.IsTest)
+            if (!settings.IsTest || settings.PauseAtEnd)
             {
                 System.Console.WriteLine();
                 System.Console.WriteLine();

@@ -10,18 +10,18 @@ namespace TheProgram
     public static class DevelopmentEntry
     {
 #if (!DEBUG || !ENABLE_DEBUG) && !RELEASE_TEST
-        public static bool Start() => false;
+        public static bool Start(string[] args) => false;
 #else
-        public static bool Start()
+        public static bool Start(string[] args)
         {
-            string[] args = Array.Empty<string>();
+            string[] generatedArgs = Array.Empty<string>();
 
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
             string path = TestConstants.TestFilesPath + "test42.bbc";
 
-            if (args.Length == 0) args = new string[]
+            generatedArgs = new string[]
             {
                 // "--throw-errors",
                 "--basepath \"../CodeFiles/\"",
@@ -40,13 +40,17 @@ namespace TheProgram
             };
 #endif
 #if RELEASE_TEST
-            if (args.Length == 0) args = new string[]
+            generatedArgs = new string[]
             {
                 "\"D:\\Program Files\\BBCodeProject\\BBCode\\TestFiles\\helloworld.bbc\""
             };
 #endif
 
-            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args)) return true;
+            string[] concatenatedArgs = new string[args.Length + generatedArgs.Length];
+            args.CopyTo(concatenatedArgs, 0);
+            generatedArgs.CopyTo(concatenatedArgs, args.Length);
+
+            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, concatenatedArgs)) return true;
 
             switch (settings.RunType)
             {
@@ -150,6 +154,14 @@ namespace TheProgram
                         break;
                     }
                 default: throw new NotImplementedException();
+            }
+
+            if (settings.PauseAtEnd)
+            {
+                System.Console.WriteLine();
+                System.Console.WriteLine();
+                System.Console.WriteLine("Press any key to exit");
+                System.Console.ReadKey();
             }
 
             return true;

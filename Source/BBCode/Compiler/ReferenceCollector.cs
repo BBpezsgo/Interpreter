@@ -636,7 +636,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 CompliableTemplate<CompiledFunction> function = this.CompilableFunctions[i];
 
-                AddTypeArguments(function.TypeArguments);
+                SetTypeArguments(function.TypeArguments);
 
                 parameters.Clear();
                 for (int j = 0; j < function.Function.Parameters.Length; j++)
@@ -658,7 +658,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 CompliableTemplate<CompiledOperator> function = this.CompilableOperators[i];
 
-                AddTypeArguments(function.TypeArguments);
+                SetTypeArguments(function.TypeArguments);
 
                 parameters.Clear();
                 foreach (ParameterDefinition parameter in function.Function.Parameters)
@@ -678,7 +678,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 CompliableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
 
-                AddTypeArguments(function.TypeArguments);
+                SetTypeArguments(function.TypeArguments);
 
                 parameters.Clear();
                 foreach (ParameterDefinition parameter in function.Function.Parameters)

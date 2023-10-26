@@ -775,6 +775,9 @@ namespace LanguageCore.Brainfuck.Compiler
             if (statement is Field field)
             { return TryGetRuntimeAddress(field, out pointerAddress, out size); }
 
+            if (statement is ConstructorCall)
+            { pointerAddress = default; size = default; return false; }
+
             throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
         }
 
@@ -1860,7 +1863,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (deletableType.IsClass)
                         {
                             if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
-                            { throw new CompilerException($"Failed to get address", deletable, CurrentFile); }
+                            { throw new CompilerException($"Failed to get address of statement \"{deletable}\"", deletable, CurrentFile); }
 
                             int _pointerAddress = Stack.PushVirtual(1);
 
@@ -1884,14 +1887,16 @@ namespace LanguageCore.Brainfuck.Compiler
                             if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
                             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
 
-                            InlineMacro(function, statement.Parameters, statement);
+                            InlineMacro(function, statement.Parameters, null, statement);
                             return;
                         }
 
                         throw new CompilerException($"Bruh. This probably not stored in heap...", deletable, CurrentFile);
                     }
 
-                default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
+                case "throw": throw new NotSupportedException($"Exceptions not supported by brainfuck");
+
+                default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
         }
         void Compile(Assignment statement)
@@ -2161,12 +2166,15 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
+            TypeArguments typeArguments = new();
+
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;
+                typeArguments = compilableFunction.TypeArguments;
             }
 
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -2174,7 +2182,9 @@ namespace LanguageCore.Brainfuck.Compiler
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
 
-            InlineMacro(compiledFunction, functionCall.MethodParameters, functionCall);
+            typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
+
+            InlineMacro(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
         }
         void Compile(ConstructorCall constructorCall)
         {
@@ -2213,7 +2223,13 @@ namespace LanguageCore.Brainfuck.Compiler
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
             { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
-            InlineMacro(constructor, constructorCall.Parameters, constructorCall);
+            TypeArguments typeArguments = new();
+            if (@class.TemplateInfo != null &&
+                constructorCall.TypeName is TypeInstanceSimple instanceTypeSimple &&
+                instanceTypeSimple.GenericTypes != null)
+            { typeArguments = @class.TemplateInfo.ToDictionary(CompiledType.FromArray(instanceTypeSimple.GenericTypes, FindType)); }
+
+            InlineMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
         }
         void Compile(Literal statement)
         {
@@ -2802,6 +2818,14 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void Compile(Field field)
         {
+            CompiledType prevType = FindStatementType(field.PrevStatement);
+
+            if (prevType.IsStackArray && field.FieldName == "Length")
+            {
+                Stack.Push(prevType.StackArraySize);
+                return;
+            }
+
             if (TryGetAddress(field, out int address, out int size))
             {
                 using (Code.Block($"Load field {field} (from {address})"))
@@ -3148,7 +3172,7 @@ namespace LanguageCore.Brainfuck.Compiler
         /// <param name="callerPosition">
         /// Used for exceptions
         /// </param>
-        void InlineMacro(CompiledFunction function, StatementWithValue[] parameters, IThingWithPosition callerPosition)
+        void InlineMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
             if (function.CompiledAttributes.HasAttribute("StandardOutput"))
             {
@@ -3278,7 +3302,12 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, FindType), value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, (typeName) =>
+                    {
+                        if (typeArguments != null && typeArguments.TryGetValue(typeName, out var type))
+                        { return type; }
+                        return FindType(typeName, defined.Type);
+                    }), value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
@@ -3300,7 +3329,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
             }
 
-
+            TypeArguments? savedTypeArguments = null;
+            if (typeArguments != null)
+            { SetTypeArguments(typeArguments, out savedTypeArguments); }
 
             int[] savedBreakTagStack = new int[BreakTagStack.Count];
             for (int i = 0; i < BreakTagStack.Count; i++)
@@ -3394,12 +3425,15 @@ namespace LanguageCore.Brainfuck.Compiler
             BreakTagStack.Clear();
             for (int i = 0; i < savedBreakTagStack.Length; i++)
             { BreakTagStack.Push(savedBreakTagStack[i]); }
+
+            if (savedTypeArguments != null)
+            { SetTypeArguments(savedTypeArguments); }
         }
 
         /// <param name="callerPosition">
         /// Used for exceptions
         /// </param>
-        void InlineMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, IThingWithPosition callerPosition)
+        void InlineMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
@@ -3493,7 +3527,12 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, FindType), value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, (typeName) =>
+                    {
+                        if (typeArguments != null && typeArguments.TryGetValue(typeName, out var type))
+                        { return type; }
+                        return FindType(typeName, defined.Type);
+                    }), value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
@@ -3516,7 +3555,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
             }
 
-
+            TypeArguments? savedTypeArguments = null;
+            if (typeArguments != null)
+            { SetTypeArguments(typeArguments, out savedTypeArguments); }
 
             int[] savedBreakTagStack = new int[BreakTagStack.Count];
             for (int i = 0; i < BreakTagStack.Count; i++)
@@ -3603,6 +3644,9 @@ namespace LanguageCore.Brainfuck.Compiler
             BreakTagStack.Clear();
             for (int i = 0; i < savedBreakTagStack.Length; i++)
             { BreakTagStack.Push(savedBreakTagStack[i]); }
+
+            if (savedTypeArguments != null)
+            { SetTypeArguments(savedTypeArguments); }
         }
 
         void FinishReturnStatements()
@@ -3694,7 +3738,7 @@ namespace LanguageCore.Brainfuck.Compiler
             CompiledFunction? codeEntry = GetCodeEntry();
 
             if (codeEntry != null)
-            { InlineMacro(codeEntry, Array.Empty<StatementWithValue>(), codeEntry.Identifier); }
+            { InlineMacro(codeEntry, Array.Empty<StatementWithValue>(), null, codeEntry.Identifier); }
 
             {
                 FinishReturnStatements();

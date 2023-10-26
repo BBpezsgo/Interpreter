@@ -214,8 +214,6 @@ namespace LanguageCore.Parser
             { this.Identifier.AnalyzedType = analyzedType; }
         }
 
-        public static TypeInstanceSimple CreateAnonymous(LiteralType literalType, Func<string, string?>? typeDefinitionReplacer)
-            => TypeInstanceSimple.CreateAnonymous(literalType.ToStringRepresentation(), typeDefinitionReplacer);
         public static TypeInstanceSimple CreateAnonymous(string name, Func<string, string?>? typeDefinitionReplacer)
         {
             string? definedType = typeDefinitionReplacer?.Invoke(name);
@@ -223,6 +221,37 @@ namespace LanguageCore.Parser
             { return new TypeInstanceSimple(Token.CreateAnonymous(name), null); }
             else
             { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), null); }
+        }
+
+        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<TypeInstance>? genericTypes, Func<string, string?>? typeDefinitionReplacer)
+        {
+            string? definedType = typeDefinitionReplacer?.Invoke(name);
+            if (definedType == null)
+            { return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypes); }
+            else
+            { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), genericTypes); }
+        }
+
+        public static TypeInstanceSimple CreateAnonymous(string name, IEnumerable<Token>? genericTypes, Func<string, string?>? typeDefinitionReplacer)
+        {
+            TypeInstance[]? genericTypesConverted;
+            if (genericTypes == null)
+            { genericTypesConverted = null; }
+            else
+            {
+                Token[] genericTypesA = genericTypes.ToArray();
+                genericTypesConverted = new TypeInstance[genericTypesA.Length];
+                for (int i = 0; i < genericTypesA.Length; i++)
+                {
+                    genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content, typeDefinitionReplacer);
+                }
+            }
+
+            string? definedType = typeDefinitionReplacer?.Invoke(name);
+            if (definedType == null)
+            { return new TypeInstanceSimple(Token.CreateAnonymous(name), genericTypesConverted); }
+            else
+            { return new TypeInstanceSimple(Token.CreateAnonymous(definedType), genericTypesConverted); }
         }
 
         public override string ToString()

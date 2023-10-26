@@ -726,7 +726,7 @@ namespace LanguageCore.BBCode.Compiler
                             parameters.Insert(0,
                                 new ParameterDefinition(
                                     new Token[1] { Token.CreateAnonymous("this") },
-                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                    TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                     Token.CreateAnonymous("this"))
                                 );
                             method.Parameters = parameters.ToArray();
@@ -752,7 +752,7 @@ namespace LanguageCore.BBCode.Compiler
                         parameters.Insert(0,
                             new ParameterDefinition(
                                 new Token[1] { Token.CreateAnonymous("this") },
-                                TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, TypeDefinitionReplacer),
+                                TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                 Token.CreateAnonymous("this"))
                             );
                         method.Parameters = parameters.ToArray();

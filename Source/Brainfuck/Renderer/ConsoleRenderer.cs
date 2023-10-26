@@ -71,6 +71,21 @@ namespace LanguageCore.Brainfuck.Renderer
             }
         }
 
+        public void DrawText(ref int x, int y, string text, byte foregroundColor = ByteColor.White, byte backgroundColor = ByteColor.Black)
+        {
+            if (x < 0 || y < 0) return;
+            if (x >= width || y >= height) return;
+
+            int added = 0;
+            for (int offset = 0; offset < text.Length; offset++)
+            {
+                if (x + offset >= width) break;
+                this[x + offset, y] = new CharInfo(text[offset], foregroundColor, backgroundColor);
+                added++;
+            }
+            x += added;
+        }
+
         public void Dispose()
         {
             ConsoleHandleW?.Dispose();

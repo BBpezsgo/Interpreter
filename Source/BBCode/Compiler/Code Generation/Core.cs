@@ -395,7 +395,7 @@ namespace LanguageCore.BBCode.Compiler
                         GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
                     }
 
-                    AddTypeArguments(function.TypeArguments);
+                    SetTypeArguments(function.TypeArguments);
 
                     AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
@@ -413,7 +413,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentContext = function.Function;
                 function.Function.InstructionOffset = GeneratedCode.Count;
 
-                AddTypeArguments(function.TypeArguments);
+                SetTypeArguments(function.TypeArguments);
 
                 AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 
@@ -430,7 +430,7 @@ namespace LanguageCore.BBCode.Compiler
                 CurrentContext = function.Function;
                 function.Function.InstructionOffset = GeneratedCode.Count;
 
-                AddTypeArguments(function.TypeArguments);
+                SetTypeArguments(function.TypeArguments);
 
                 AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
 

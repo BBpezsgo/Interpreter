@@ -145,7 +145,7 @@ namespace LanguageCore.BBCode.Compiler
                 StatementWithValue value = keywordCall.Parameters[0];
                 CompiledType valueType = FindStatementType(value);
 
-                AddInstruction(Opcode.PUSH_VALUE, valueType.SizeOnStack);
+                AddInstruction(Opcode.PUSH_VALUE, valueType.Size);
 
                 return;
             }
@@ -280,7 +280,7 @@ namespace LanguageCore.BBCode.Compiler
                 StatementWithValue param0 = functionCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
-                AddInstruction(Opcode.PUSH_VALUE, param0Type.SizeOnStack);
+                AddInstruction(Opcode.PUSH_VALUE, param0Type.Size);
 
                 return;
             }

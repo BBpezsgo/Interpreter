@@ -15,6 +15,7 @@ namespace LanguageCore
 namespace LanguageCore.BBCode.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
+    using System.Net.Http.Headers;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
     using Parser;
@@ -391,6 +392,24 @@ namespace LanguageCore.BBCode.Compiler
                     typeParameters[i] = eTypeParameter;
                 }
             }
+        }
+
+        public static Dictionary<TKey, TValue> ConcatDictionary<TKey, TValue>(params IReadOnlyDictionary<TKey, TValue>?[] v) where TKey : notnull
+        {
+            Dictionary<TKey, TValue> result = new();
+            for (int i = 0; i < v.Length; i++)
+            {
+                IReadOnlyDictionary<TKey, TValue>? dict = v[i];
+                if (dict == null) continue;
+                foreach (KeyValuePair<TKey, TValue> pair in dict)
+                {
+                    if (result.ContainsKey(pair.Key))
+                    { result[pair.Key] = pair.Value; }
+                    else
+                    { result.Add(pair.Key, pair.Value); }
+                }
+            }
+            return result;
         }
     }
 

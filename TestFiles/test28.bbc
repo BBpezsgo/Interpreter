@@ -44,22 +44,3 @@ void TestClass() {
 
 	// delete player;
 }
-
-int Test(int size) {
-	int result = Alloc(1);
-	int i = size;
-	while (i) {
-		i--;
-
-		int result2 = AllocFrom(result);
-		if (result2 - 1 != result) {
-			delete result;
-			delete result2;
-			result = result2;
-			i = size;
-		};
-	};
-	return result;
-}
-
-Test(3);

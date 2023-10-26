@@ -363,8 +363,16 @@ namespace LanguageCore.BBCode.Compiler
             return compilable;
         }
 
-        protected void AddTypeArguments(Dictionary<string, CompiledType> typeArguments)
+        protected void SetTypeArguments(Dictionary<string, CompiledType> typeArguments)
         {
+            TypeArguments.Clear();
+            foreach (KeyValuePair<string, CompiledType> typeArgument in typeArguments)
+            { TypeArguments.Add(typeArgument.Key, typeArgument.Value); }
+        }
+
+        protected void SetTypeArguments(Dictionary<string, CompiledType> typeArguments, out Dictionary<string, CompiledType> replaced)
+        {
+            replaced = new Dictionary<string, CompiledType>(TypeArguments);
             TypeArguments.Clear();
             foreach (KeyValuePair<string, CompiledType> typeArgument in typeArguments)
             { TypeArguments.Add(typeArgument.Key, typeArgument.Value); }
@@ -869,7 +877,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected bool TryGetFunction(Token name, int parameterCount, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
             => TryGetFunction(name.Content, parameterCount, out compiledFunction);
-      
+
         protected bool TryGetBuiltinFunction(string builtinName, [NotNullWhen(true)] out CompiledFunction? compiledFunction)
         {
             compiledFunction = null;
@@ -2112,17 +2120,13 @@ namespace LanguageCore.BBCode.Compiler
             {
                 case LiteralType.INT:
                     value = new DataItem(int.Parse(literal.Value));
-                    if (expectedType.HasValue &&
-                        expectedType.Value == RuntimeType.BYTE &&
-                        value.ValueInt >= byte.MinValue && value.ValueInt <= byte.MaxValue)
-                    { value = new DataItem((byte)value.ValueInt); }
-                    return true;
+                    break;
                 case LiteralType.FLOAT:
                     value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value));
-                    return true;
+                    break;
                 case LiteralType.BOOLEAN:
                     value = new DataItem(bool.Parse(literal.Value));
-                    return true;
+                    break;
                 case LiteralType.CHAR:
                     if (literal.Value.Length != 1)
                     {
@@ -2130,12 +2134,14 @@ namespace LanguageCore.BBCode.Compiler
                         return false;
                     }
                     value = new DataItem(literal.Value[0]);
-                    return true;
+                    break;
                 case LiteralType.STRING:
                 default:
                     value = DataItem.Null;
                     return false;
             }
+            Convert(ref value, expectedType);
+            return true;
         }
         protected bool TryCompute(KeywordCall keywordCall, RuntimeType? expectedType, out DataItem value)
         {
@@ -2150,13 +2156,8 @@ namespace LanguageCore.BBCode.Compiler
                 StatementWithValue param0 = keywordCall.Parameters[0];
                 CompiledType param0Type = FindStatementType(param0);
 
-                if (!param0Type.IsClass)
-                { throw new CompilerException($"{param0Type} is not a reference type", param0, CurrentFile); }
-
-                if (expectedType == RuntimeType.BYTE)
-                { value = new DataItem((byte)param0Type.SizeOnHeap); }
-                else
-                { value = new DataItem(param0Type.SizeOnHeap); }
+                value = new DataItem(param0Type.Size);
+                Convert(ref value, expectedType);
                 return true;
             }
 
@@ -2173,7 +2174,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
         {
-            value = default;
+            value = DataItem.Null;
 
             if (!TryGetMacro(functionCall, out MacroDefinition? macro))
             { return false; }
@@ -2190,10 +2191,25 @@ namespace LanguageCore.BBCode.Compiler
             if (GetConstant(identifier.Content, out DataItem constantValue))
             {
                 value = constantValue;
+                Convert(ref value, expectedType);
                 return true;
             }
 
-            value = default;
+            value = DataItem.Null;
+            return false;
+        }
+        protected bool TryCompute(Field field, RuntimeType? expectedType, out DataItem value)
+        {
+            CompiledType prevType = FindStatementType(field.PrevStatement);
+
+            if (prevType.IsStackArray && field.FieldName == "Length")
+            {
+                value = new DataItem(prevType.StackArraySize);
+                Convert(ref value, expectedType);
+                return true;
+            }
+
+            value = DataItem.Null;
             return false;
         }
 
@@ -2227,6 +2243,129 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
         #endregion
+
+        protected static bool Convert(ref DataItem value, RuntimeType? type)
+        {
+            if (!type.HasValue) return false;
+            return Convert(ref value, type.Value);
+        }
+        protected static bool Convert(ref DataItem value, RuntimeType type)
+        {
+            DataItem input = value;
+            bool result = Convert(in input, type, out DataItem output);
+            value = output;
+            return result;
+        }
+
+        protected static bool Convert(in DataItem input, RuntimeType? type, out DataItem value)
+        {
+            value = input;
+
+            if (type == null)
+            { return false; }
+
+            return Convert(in input, type.Value, out value);
+        }
+        protected static bool Convert(in DataItem input, RuntimeType type, out DataItem value)
+        {
+            switch (type)
+            {
+                case RuntimeType.BYTE:
+                    switch (input.Type)
+                    {
+                        case RuntimeType.BYTE:
+                            value = input;
+                            return true;
+                        case RuntimeType.INT:
+                            if (input.ValueInt >= byte.MinValue && input.ValueInt <= byte.MaxValue)
+                            {
+                                value = new DataItem((byte)input.ValueInt);
+                                return true;
+                            }
+                            value = input;
+                            return false;
+                        case RuntimeType.FLOAT:
+                            value = input;
+                            return false;
+                        case RuntimeType.CHAR:
+                            if (input.ValueChar >= byte.MinValue && input.ValueChar <= byte.MaxValue)
+                            {
+                                value = new DataItem((byte)input.ValueChar);
+                                return true;
+                            }
+                            value = input;
+                            return false;
+                        default:
+                            value = input;
+                            return false;
+                    }
+                case RuntimeType.INT:
+                    switch (input.Type)
+                    {
+                        case RuntimeType.BYTE:
+                            value = new DataItem((int)input.ValueByte);
+                            return true;
+                        case RuntimeType.INT:
+                            value = input;
+                            return true;
+                        case RuntimeType.FLOAT:
+                            value = input;
+                            return false;
+                        case RuntimeType.CHAR:
+                            value = new DataItem((int)input.ValueChar);
+                            return true;
+                        default:
+                            value = input;
+                            return false;
+                    }
+                case RuntimeType.FLOAT:
+                    switch (input.Type)
+                    {
+                        case RuntimeType.BYTE:
+                            value = new DataItem((float)input.ValueByte);
+                            return true;
+                        case RuntimeType.INT:
+                            value = new DataItem((float)input.ValueInt);
+                            return true;
+                        case RuntimeType.FLOAT:
+                            value = input;
+                            return true;
+                        case RuntimeType.CHAR:
+                            value = new DataItem((float)input.ValueChar);
+                            return true;
+                        default:
+                            value = input;
+                            return false;
+                    }
+                case RuntimeType.CHAR:
+                    switch (input.Type)
+                    {
+                        case RuntimeType.BYTE:
+                            value = new DataItem((char)input.ValueByte);
+                            return true;
+                        case RuntimeType.INT:
+                            if (input.ValueInt >= char.MinValue && input.ValueInt <= char.MaxValue)
+                            {
+                                value = new DataItem((char)input.ValueInt);
+                                return true;
+                            }
+                            value = input;
+                            return false;
+                        case RuntimeType.FLOAT:
+                            value = input;
+                            return false;
+                        case RuntimeType.CHAR:
+                            value = input;
+                            return true;
+                        default:
+                            value = input;
+                            return false;
+                    }
+                default:
+                    value = input;
+                    return false;
+            }
+        }
 
         #region Collapse()
 
@@ -2327,11 +2466,20 @@ namespace LanguageCore.BBCode.Compiler
             };
         }
         protected OperatorCall Collapse(OperatorCall statement, Dictionary<string, StatementWithValue> parameters)
-        { return statement; }
+        {
+            StatementWithValue left = Collapse(statement.Left, parameters);
+            StatementWithValue? right = statement.Right is not null ? Collapse(statement.Right, parameters) : null;
+            return new OperatorCall(statement.Operator, left, right)
+            {
+                Semicolon = statement.Semicolon,
+                InsideBracelet = statement.InsideBracelet,
+                SaveValue = statement.SaveValue,
+            };
+        }
         protected AnyAssignment Collapse(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected LiteralStatement Collapse(LiteralStatement statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        { return statement; }
         protected StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (parameters.TryGetValue(statement.Content, out var parameter))

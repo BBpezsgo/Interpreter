@@ -1280,6 +1280,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddInstruction(Opcode.PUSH_VALUE, instanceType.Class.Size);
                 AddInstruction(Opcode.HEAP_ALLOC);
+
                 int currentOffset = 0;
                 for (int fieldIndex = 0; fieldIndex < instanceType.Class.Fields.Length; fieldIndex++)
                 {

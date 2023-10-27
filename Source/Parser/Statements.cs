@@ -836,6 +836,8 @@ namespace LanguageCore.Parser.Statement
             ValueToken = valueToken;
         }
 
+        public static Literal CreateAnonymous(LiteralType type, string value, IThingWithPosition position)
+            => Literal.CreateAnonymous(type, value, position.GetPosition());
         public static Literal CreateAnonymous(LiteralType type, string value, Position position)
         {
             TokenType tokenType = type switch

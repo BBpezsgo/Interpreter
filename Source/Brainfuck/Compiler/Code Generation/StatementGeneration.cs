@@ -13,334 +13,8 @@ namespace LanguageCore.Brainfuck.Compiler
     using LanguageCore.Tokenizing;
     using Literal = LanguageCore.Parser.Statement.Literal;
 
-    readonly struct CleanupItem
+    public partial class CodeGenerator : CodeGeneratorBase
     {
-        /// <summary>
-        /// The actual data size on the stack
-        /// </summary>
-        internal readonly int Size;
-        /// <summary>
-        /// The element count
-        /// </summary>
-        internal readonly int Count;
-
-        public CleanupItem(int size, int count)
-        {
-            Size = size;
-            Count = count;
-        }
-    }
-
-    public class CodeGenerator : CodeGeneratorBase
-    {
-        readonly struct DebugInfoBlock : IDisposable
-        {
-            readonly int InstructionStart;
-            readonly CompiledCode Code;
-            readonly DebugInformation DebugInfo;
-            readonly Position Position;
-
-            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, Position position)
-            {
-                InstructionStart = code.GetFinalCode().Length;
-                Code = code;
-                DebugInfo = debugInfo;
-                Position = position;
-            }
-
-            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, IThingWithPosition position)
-            {
-                InstructionStart = code.GetFinalCode().Length;
-                Code = code;
-                DebugInfo = debugInfo;
-                Position = position.GetPosition();
-            }
-
-            public void Dispose()
-            {
-                int end = Code.GetFinalCode().Length;
-                if (InstructionStart == end) return;
-                DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
-                {
-                    Instructions = (InstructionStart, end),
-                    SourcePosition = Position,
-                });
-            }
-        }
-
-        static readonly string[] IllegalIdentifiers = Array.Empty<string>();
-
-        #region Fields
-
-        CompiledCode Code;
-
-        readonly Stack<Variable> Variables;
-        readonly List<ConstantVariable> Constants;
-
-        readonly StackCodeHelper Stack;
-        readonly BasicHeapCodeHelper Heap;
-
-        readonly Stack<int> VariableCleanupStack;
-        readonly Stack<int> ReturnCount;
-        readonly Stack<int> BreakCount;
-        /// <summary> Contains the "return tag" address </summary>
-        readonly Stack<int> ReturnTagStack;
-        /// <summary> Contains the "break tag" address </summary>
-        readonly Stack<int> BreakTagStack;
-        readonly Stack<bool> InMacro;
-
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        int Optimizations;
-
-        readonly Stack<FunctionThingDefinition> CurrentMacro;
-
-        readonly Settings GeneratorSettings;
-
-        string? VariableCanBeDiscarded = null;
-
-        readonly DebugInformation DebugInfo;
-
-        #endregion
-
-        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base(compilerResult)
-        {
-            this.Variables = new Stack<Variable>();
-            this.Code = new CompiledCode();
-            this.Stack = new StackCodeHelper(this.Code, settings.StackStart, settings.StackSize);
-            this.Heap = new BasicHeapCodeHelper(this.Code, settings.HeapStart, settings.HeapSize);
-            this.CurrentMacro = new Stack<FunctionThingDefinition>();
-            this.VariableCleanupStack = new Stack<int>();
-            this.Constants = new List<ConstantVariable>();
-            this.GeneratorSettings = settings;
-            this.ReturnCount = new Stack<int>();
-            this.ReturnTagStack = new Stack<int>();
-            this.BreakCount = new Stack<int>();
-            this.BreakTagStack = new Stack<int>();
-            this.InMacro = new Stack<bool>();
-            this.DebugInfo = new DebugInformation();
-        }
-
-        public enum ValueType
-        {
-            Byte,
-            Char,
-            String,
-        }
-
-        public struct Result
-        {
-            public string Code;
-            public int Optimizations;
-            public Token[] Tokens;
-
-            public Warning[] Warnings;
-            public Error[] Errors;
-            public DebugInformation DebugInfo;
-        }
-
-        public struct Settings
-        {
-            public bool ClearGlobalVariablesBeforeExit;
-            public int StackStart;
-            public int StackSize;
-            public int HeapStart;
-            public int HeapSize;
-
-            public static Settings Default => new()
-            {
-                ClearGlobalVariablesBeforeExit = true,
-                StackStart = 0,
-                StackSize = 32,
-                HeapStart = 32,
-                HeapSize = 8,
-            };
-        }
-
-        [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        readonly struct ConstantVariable : ISearchable<string>
-        {
-            internal readonly string Name;
-            internal readonly DataItem Value;
-
-            public ConstantVariable(string name, DataItem value)
-            {
-                Name = name;
-                Value = value;
-            }
-
-            public bool IsThis(string query) => query == Name;
-
-            string GetDebuggerDisplay()
-                => $"{Name}: {Value}";
-        }
-
-        [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        struct Variable : ISearchable<string>
-        {
-            public readonly string Name;
-            public readonly int Address;
-            public readonly FunctionThingDefinition? Scope;
-            public readonly bool HaveToClean;
-            public readonly CompiledType Type;
-            public readonly int Size;
-            public bool IsDiscarded;
-            public bool IsInitialValueSet;
-
-            public readonly bool IsInitialized => Type.SizeOnStack > 0;
-
-            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, CompiledType type, int size)
-            {
-                Name = name;
-                Address = address;
-                Scope = scope;
-                HaveToClean = haveToClean;
-                Type = type;
-                IsDiscarded = false;
-                Size = size;
-                IsInitialValueSet = false;
-            }
-
-            public readonly bool IsThis(string query)
-                => query == Name;
-
-            readonly string GetDebuggerDisplay()
-                => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
-        }
-
-        DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
-
-        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
-        {
-            if (Variables.TryFind(symbolName, out Variable variable))
-            {
-                type = variable.Type;
-                return true;
-            }
-
-            if (Constants.TryFind(symbolName, out ConstantVariable constant))
-            {
-                type = new CompiledType(constant.Value.Type);
-                return true;
-            }
-
-            type = null;
-            return false;
-        }
-
-        static void DiscardVariable(Stack<Variable> variables, string name)
-        {
-            for (int i = 0; i < variables.Count; i++)
-            {
-                if (variables[i].Name != name) continue;
-                Variable v = variables[i];
-                v.IsDiscarded = true;
-                variables[i] = v;
-                return;
-            }
-        }
-        static void UndiscardVariable(Stack<Variable> variables, string name)
-        {
-            for (int i = 0; i < variables.Count; i++)
-            {
-                if (variables[i].Name != name) continue;
-                Variable v = variables[i];
-                v.IsDiscarded = false;
-                variables[i] = v;
-                return;
-            }
-        }
-
-        void CleanupVariables(int n)
-        {
-            if (n == 0) return;
-            using (Code.Block($"Clean up variables ({n})"))
-            {
-                for (int i = 0; i < n; i++)
-                {
-                    Variables.Pop();
-                    Stack.Pop();
-                }
-            }
-        }
-
-        bool SafeToDiscardVariable(Statement statement, Variable variable)
-        {
-            int usages = 0;
-
-            var statements = statement.GetStatements();
-            foreach (var _statement in statements)
-            {
-                if (_statement == null) continue;
-
-                if (_statement is Identifier identifier &&
-                    Variables.TryFind(identifier.Content, out var _variable) &&
-                    _variable.Name == variable.Name
-                    )
-                {
-                    usages++;
-                    if (usages > 1)
-                    { return false; }
-                }
-
-                if (!SafeToDiscardVariable(_statement, variable))
-                { return false; }
-            }
-            return usages <= 1;
-        }
-
-        #region Precompile
-        void Precompile(IEnumerable<Statement>? statements)
-        {
-            if (statements == null) return;
-            foreach (Statement statement in statements)
-            { Precompile(statement); }
-        }
-        void Precompile(Statement statement)
-        {
-            if (statement is KeywordCall instruction)
-            { Precompile(instruction); }
-        }
-        void Precompile(KeywordCall instruction)
-        {
-            switch (instruction.Identifier.Content)
-            {
-                case "const":
-                    {
-                        if (instruction.Parameters.Length != 2)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"const\" (required 2, passed {instruction.Parameters.Length})", instruction, CurrentFile); }
-
-                        if (instruction.Parameters[0] is not Identifier constIdentifier)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {0} (required identifier)", instruction.Parameters[0], CurrentFile); }
-
-                        if (IllegalIdentifiers.Contains(constIdentifier.Content))
-                        { throw new CompilerException($"Illegal constant name \"{constIdentifier}\"", constIdentifier, CurrentFile); }
-
-                        if (instruction.Parameters[1] is not StatementWithValue constValue)
-                        { throw new CompilerException($"Wrong kind of parameter passed to \"const\" at index {1} (required a value)", instruction.Parameters[1], CurrentFile); }
-
-                        if (Constants.TryFind(constIdentifier.Content, out _))
-                        { throw new CompilerException($"Constant \"{constIdentifier.Content}\" already defined", instruction.Parameters[0], CurrentFile); }
-
-                        if (!TryCompute(constValue, null, out DataItem value))
-                        { throw new CompilerException($"Constant must have a constant value", constValue, CurrentFile); }
-
-                        Constants.Add(new ConstantVariable(constIdentifier.Content, value));
-
-                        break;
-                    }
-                default:
-                    break;
-            }
-        }
-        void Precompile(CompiledFunction function)
-        {
-            if (IllegalIdentifiers.Contains(function.Identifier.Content))
-            { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, CurrentFile); }
-
-            Precompile(function.Block?.Statements);
-        }
-        #endregion
-
         #region PrecompileVariables
         int PrecompileVariables(Block block)
         { return PrecompileVariables(block.Statements); }
@@ -366,9 +40,6 @@ namespace LanguageCore.Brainfuck.Compiler
             { throw new CompilerException($"Illegal variable name \"{variableDeclaration.VariableName}\"", variableDeclaration.VariableName, CurrentFile); }
 
             if (Variables.TryFind(variableDeclaration.VariableName.Content, out _))
-            { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
-
-            if (Constants.TryFind(variableDeclaration.VariableName.Content, out _))
             { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
             CompiledType type;
@@ -461,404 +132,34 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         #endregion
 
-        #region GetValueSize
-        int GetValueSize(StatementWithValue statement)
-        {
-            if (statement is Literal literal)
-            { return GetValueSize(literal); }
+        #region GenerateCodeForSetter()
 
-            if (statement is Identifier variable)
-            { return GetValueSize(variable); }
-
-            if (statement is OperatorCall expression)
-            { return GetValueSize(expression); }
-
-            if (statement is AddressGetter addressGetter)
-            { return GetValueSize(addressGetter); }
-
-            if (statement is Pointer pointer)
-            { return GetValueSize(pointer); }
-
-            if (statement is FunctionCall functionCall)
-            { return GetValueSize(functionCall); }
-
-            if (statement is TypeCast typeCast)
-            { return GetValueSize(typeCast); }
-
-            if (statement is NewInstance newInstance)
-            { return GetValueSize(newInstance); }
-
-            if (statement is Field field)
-            { return GetValueSize(field); }
-
-            if (statement is ConstructorCall constructorCall)
-            { return GetValueSize(constructorCall); }
-
-            if (statement is IndexCall indexCall)
-            { return GetValueSize(indexCall); }
-
-            if (statement is AnyCall anyCall)
-            { return GetValueSize(anyCall); }
-
-            throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, CurrentFile);
-        }
-        int GetValueSize(AnyCall anyCall)
-        {
-            if (anyCall.ToFunctionCall(out var functionCall))
-            { return GetValueSize(functionCall); }
-
-            CompiledType prevType = FindStatementType(anyCall.PrevStatement);
-
-            if (!prevType.IsFunction)
-            { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
-
-            if (!prevType.Function.ReturnSomething)
-            { throw new CompilerException($"Return value \"void\" does not have a size", anyCall.PrevStatement, CurrentFile); }
-
-            return prevType.Function.ReturnType.SizeOnStack;
-        }
-        int GetValueSize(IndexCall indexCall)
-        {
-            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
-
-            if (arrayType.IsStackArray)
-            { return arrayType.StackArrayOf.SizeOnStack; }
-
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
-            {
-                if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
-
-                indexerTemplate = AddCompilable(indexerTemplate);
-                indexer = indexerTemplate.Function;
-            }
-
-            return indexer.Type.SizeOnStack;
-        }
-        int GetValueSize(Field field)
-        {
-            CompiledType type = FindStatementType(field);
-            return type.Size;
-        }
-        int GetValueSize(NewInstance newInstance)
-        {
-            if (GetStruct(newInstance, out var @struct))
-            {
-                return @struct.Size;
-            }
-
-            if (GetClass(newInstance, out _))
-            {
-                return 1;
-            }
-
-            throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
-        }
-        static int GetValueSize(Literal statement) => statement.Type switch
-        {
-            LiteralType.STRING => throw new NotSupportedException($"String literals not supported by brainfuck"),
-            LiteralType.INT => 1,
-            LiteralType.CHAR => 1,
-            LiteralType.FLOAT => 1,
-            LiteralType.BOOLEAN => 1,
-            _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
-        };
-        int GetValueSize(Identifier statement)
-        {
-            if (Variables.TryFind(statement.Content, out Variable variable))
-            {
-                if (!variable.IsInitialized)
-                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
-
-                return variable.Size;
-            }
-            else if (Constants.TryFind(statement.Content, out _))
-            {
-                return 1;
-            }
-            else if (TryGetFunction(statement.Name, out _))
-            {
-                throw new NotSupportedException($"Function pointers not supported by the brainfuck compiler", statement, CurrentFile);
-            }
-            else
-            { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
-        }
-        int GetValueSize(ConstructorCall constructorCall)
-        {
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
-            {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
-                {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
-                }
-                else
-                {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
-                }
-            }
-
-            if (!constructor.CanUse(CurrentFile))
-            {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
-            }
-
-            return 1;
-        }
-        int GetValueSize(FunctionCall functionCall)
-        {
-            if (GetFunction(functionCall, out CompiledFunction? function))
-            {
-                if (!function.ReturnSomething)
-                { return 0; }
-
-                return function.Type.Size;
-            }
-
-            if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            {
-                if (!compilableFunction.Function.ReturnSomething)
-                { return 0; }
-
-                return compilableFunction.Function.Type.Size;
-            }
-
-            throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
-        }
-        int GetValueSize(OperatorCall statement) => statement.Operator.Content switch
-        {
-            "==" => 1,
-            "+" => 1,
-            "-" => 1,
-            "*" => 1,
-            "/" => 1,
-            "^" => 1,
-            "%" => 1,
-            "<" => 1,
-            ">" => 1,
-            "<=" => 1,
-            ">=" => 1,
-            "&" => 1,
-            "|" => 1,
-            "&&" => 1,
-            "||" => 1,
-            "!=" => 1,
-            "<<" => 1,
-            ">>" => 1,
-            _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-        };
-        static int GetValueSize(AddressGetter _) => 1;
-        static int GetValueSize(Pointer _) => 1;
-        int GetValueSize(TypeCast typeCast) => GetValueSize(typeCast.PrevStatement);
-        #endregion
-
-        #region TryGetAddress
-
-        bool TryGetAddress(Statement? statement, out int address, out int size)
-        {
-            if (statement is null)
-            {
-                address = 0;
-                size = 0;
-                return false;
-            }
-
-            if (statement is IndexCall index)
-            { return TryGetAddress(index, out address, out size); }
-
-            if (statement is Pointer pointer)
-            { return TryGetAddress(pointer, out address, out size); }
-
-            if (statement is Identifier identifier)
-            { return TryGetAddress(identifier, out address, out size); }
-
-            if (statement is Field field)
-            { return TryGetAddress(field, out address, out size); }
-
-            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
-        }
-
-        bool TryGetAddress(IndexCall index, out int address, out int size)
-        {
-            if (index.PrevStatement is not Identifier arrayIdentifier)
-            { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
-
-            if (!Variables.TryFind(arrayIdentifier.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
-
-            if (variable.Type.IsStackArray)
-            {
-                size = variable.Type.StackArrayOf.SizeOnStack;
-                address = variable.Address;
-
-                if (size != 1)
-                { throw new NotSupportedException($"In stack array only elements of size 1 are supported by brainfuck", index, CurrentFile); }
-
-                if (TryCompute(index.Expression, RuntimeType.INT, out DataItem indexValue))
-                {
-                    address = variable.Address + (indexValue.ValueInt * 2 * variable.Type.StackArrayOf.SizeOnStack);
-                    return true;
-                }
-
-                return false;
-            }
-
-            throw new CompilerException($"Variable is not an array", arrayIdentifier, CurrentFile);
-        }
-
-        bool TryGetAddress(Field field, out int address, out int size)
-        {
-            var type = FindStatementType(field.PrevStatement);
-
-            if (type.IsStruct)
-            {
-                if (!TryGetAddress(field.PrevStatement, out int prevAddress, out _))
-                {
-                    address = default;
-                    size = default;
-                    return false;
-                }
-
-                var fieldType = FindStatementType(field);
-
-                var @struct = type.Struct;
-
-                address = @struct.FieldOffsets[field.FieldName.Content] + prevAddress;
-                size = fieldType.Size;
-                return true;
-            }
-
-            address = default;
-            size = default;
-            return false;
-        }
-
-        bool TryGetAddress(Pointer pointer, out int address, out int size)
-        {
-            if (!TryCompute(pointer.PrevStatement, null, out var addressToSet))
-            { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
-
-            if (!DataItem.TryShrinkToByte(ref addressToSet))
-            { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
-
-            address = addressToSet.ValueByte;
-            size = 1;
-
-            return true;
-        }
-
-        bool TryGetAddress(Identifier identifier, out int address, out int size)
-        {
-            if (!Variables.TryFind(identifier.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
-
-            address = variable.Address;
-            size = variable.Size;
-            return true;
-        }
-
-        #endregion
-
-        #region TryGetRuntimeAddress
-
-        bool TryGetRuntimeAddress(Statement statement, out int pointerAddress, out int size)
-        {
-            if (statement is Identifier identifier)
-            { return TryGetRuntimeAddress(identifier, out pointerAddress, out size); }
-
-            if (statement is Field field)
-            { return TryGetRuntimeAddress(field, out pointerAddress, out size); }
-
-            if (statement is ConstructorCall)
-            { pointerAddress = default; size = default; return false; }
-
-            throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile);
-        }
-
-        bool TryGetRuntimeAddress(Field field, out int pointerAddress, out int size)
-        {
-            CompiledType type = FindStatementType(field.PrevStatement);
-
-            if (!type.IsClass)
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            if (!TryGetRuntimeAddress(field.PrevStatement, out pointerAddress, out _))
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            CompiledType fieldType = FindStatementType(field);
-            size = fieldType.SizeOnStack;
-
-            int fieldOffset = type.Class.FieldOffsets[field.FieldName.Content];
-
-            Code.AddValue(pointerAddress, fieldOffset);
-
-            return true;
-        }
-
-        bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
-        {
-            if (!Variables.TryFind(identifier.Content, out Variable variable))
-            { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
-
-            if (!variable.Type.IsClass)
-            {
-                pointerAddress = default;
-                size = default;
-                return false;
-            }
-
-            pointerAddress = Stack.PushVirtual(1);
-            size = variable.Type.Class.Size;
-
-            Code.CopyValue(variable.Address, pointerAddress);
-
-            return true;
-        }
-
-        #endregion
-
-        #region CompileSetter
-
-        void CompileSetter(Statement statement, StatementWithValue value)
+        void GenerateCodeForSetter(Statement statement, StatementWithValue value)
         {
             if (statement is Identifier variableIdentifier)
             {
-                CompileSetter(variableIdentifier, value);
+                GenerateCodeForSetter(variableIdentifier, value);
 
                 return;
             }
 
             if (statement is Pointer pointerToSet)
             {
-                CompileSetter(pointerToSet, value);
+                GenerateCodeForSetter(pointerToSet, value);
 
                 return;
             }
 
             if (statement is IndexCall index)
             {
-                CompileSetter(index, value);
+                GenerateCodeForSetter(index, value);
 
                 return;
             }
 
             if (statement is Field field)
             {
-                CompileSetter(field, value);
+                GenerateCodeForSetter(field, value);
 
                 return;
             }
@@ -866,9 +167,9 @@ namespace LanguageCore.Brainfuck.Compiler
             throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
         }
 
-        void CompileSetter(Identifier statement, StatementWithValue value)
+        void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
         {
-            if (Constants.TryFind(statement.Content, out _))
+            if (GetConstant(statement.Content, out _))
             { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
             if (!Variables.TryFind(statement.Content, out Variable variable))
@@ -877,7 +178,7 @@ namespace LanguageCore.Brainfuck.Compiler
             CompileSetter(variable, value);
         }
 
-        void CompileSetter(Field field, StatementWithValue value)
+        void GenerateCodeForSetter(Field field, StatementWithValue value)
         {
             if (TryGetRuntimeAddress(field, out int pointerAddress, out int size))
             {
@@ -885,7 +186,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 { throw new CompilerException($"Field and value size mismatch", value, CurrentFile); }
 
                 int valueAddress = Stack.NextAddress;
-                Compile(value);
+                GenerateCodeForStatement(value);
 
                 int _pointerAddress = Stack.PushVirtual(1);
                 Code.CopyValue(pointerAddress, _pointerAddress);
@@ -1027,7 +328,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block($"Compute value"))
                 {
-                    Compile(value);
+                    GenerateCodeForStatement(value);
                 }
 
                 using (Code.Block($"Store computed value (from {Stack.LastAddress}) to {variable.Address}"))
@@ -1039,10 +340,10 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
-        void CompileSetter(Pointer statement, StatementWithValue value)
+        void GenerateCodeForSetter(Pointer statement, StatementWithValue value)
         {
             int pointerAddress = Stack.NextAddress;
-            Compile(statement.PrevStatement);
+            GenerateCodeForStatement(statement.PrevStatement);
 
             {
                 int checkResultAddress = Stack.PushVirtual(1);
@@ -1069,7 +370,7 @@ namespace LanguageCore.Brainfuck.Compiler
             { throw new CompilerException($"size 1 bruh allowed on heap thingy", value, CurrentFile); }
 
             int valueAddress = Stack.NextAddress;
-            Compile(value);
+            GenerateCodeForStatement(value);
 
             Heap.Set(pointerAddress, valueAddress);
 
@@ -1107,7 +408,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block($"Compute value"))
                 {
-                    Compile(value);
+                    GenerateCodeForStatement(value);
                 }
 
                 int variableSize = Stack.Size - stackSize;
@@ -1117,7 +418,7 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
-        void CompileSetter(IndexCall statement, StatementWithValue value)
+        void GenerateCodeForSetter(IndexCall statement, StatementWithValue value)
         {
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
@@ -1146,7 +447,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         indexer = indexerTemplate.Function;
                     }
 
-                    Compile(new FunctionCall(
+                    GenerateCodeForStatement(new FunctionCall(
                             _variableIdentifier,
                             Token.CreateAnonymous(FunctionNames.IndexerSet),
                             statement.BracketLeft,
@@ -1173,11 +474,11 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 int indexAddress = Stack.NextAddress;
                 using (Code.Block($"Compute index"))
-                { Compile(statement.Expression); }
+                { GenerateCodeForStatement(statement.Expression); }
 
                 int valueAddress = Stack.NextAddress;
                 using (Code.Block($"Compute value"))
-                { Compile(value); }
+                { GenerateCodeForStatement(value); }
 
                 int temp0 = Stack.PushVirtual(1);
 
@@ -1191,53 +492,53 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        #region Compile
-        void Compile(Statement statement)
+        #region GenerateCodeForStatement()
+        void GenerateCodeForStatement(Statement statement)
         {
             int start = Code.GetFinalCode().Length;
 
             if (statement is KeywordCall instructionStatement)
-            { Compile(instructionStatement); }
+            { GenerateCodeForStatement(instructionStatement); }
             else if (statement is FunctionCall functionCall)
-            { Compile(functionCall); }
+            { GenerateCodeForStatement(functionCall); }
             else if (statement is IfContainer @if)
-            { Compile(@if.ToLinks()); }
+            { GenerateCodeForStatement(@if.ToLinks()); }
             else if (statement is WhileLoop @while)
-            { Compile(@while); }
+            { GenerateCodeForStatement(@while); }
             else if (statement is ForLoop @for)
-            { Compile(@for); }
+            { GenerateCodeForStatement(@for); }
             else if (statement is Literal literal)
-            { Compile(literal); }
+            { GenerateCodeForStatement(literal); }
             else if (statement is Identifier variable)
-            { Compile(variable); }
+            { GenerateCodeForStatement(variable); }
             else if (statement is OperatorCall expression)
-            { Compile(expression); }
+            { GenerateCodeForStatement(expression); }
             else if (statement is AddressGetter addressGetter)
-            { Compile(addressGetter); }
+            { GenerateCodeForStatement(addressGetter); }
             else if (statement is Pointer pointer)
-            { Compile(pointer); }
+            { GenerateCodeForStatement(pointer); }
             else if (statement is Assignment assignment)
-            { Compile(assignment); }
+            { GenerateCodeForStatement(assignment); }
             else if (statement is ShortOperatorCall shortOperatorCall)
-            { Compile(shortOperatorCall); }
+            { GenerateCodeForStatement(shortOperatorCall); }
             else if (statement is CompoundAssignment compoundAssignment)
-            { Compile(compoundAssignment); }
+            { GenerateCodeForStatement(compoundAssignment); }
             else if (statement is VariableDeclaration variableDeclaration)
-            { Compile(variableDeclaration); }
+            { GenerateCodeForStatement(variableDeclaration); }
             else if (statement is TypeCast typeCast)
-            { Compile(typeCast); }
+            { GenerateCodeForStatement(typeCast); }
             else if (statement is NewInstance newInstance)
-            { Compile(newInstance); }
+            { GenerateCodeForStatement(newInstance); }
             else if (statement is ConstructorCall constructorCall)
-            { Compile(constructorCall); }
+            { GenerateCodeForStatement(constructorCall); }
             else if (statement is Field field)
-            { Compile(field); }
+            { GenerateCodeForStatement(field); }
             else if (statement is IndexCall indexCall)
-            { Compile(indexCall); }
+            { GenerateCodeForStatement(indexCall); }
             else if (statement is AnyCall anyCall)
-            { Compile(anyCall); }
+            { GenerateCodeForStatement(anyCall); }
             else
-            { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
+            { throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile); }
 
             if (statement is FunctionCall statementWithValue &&
                 !statementWithValue.SaveValue &&
@@ -1258,17 +559,17 @@ namespace LanguageCore.Brainfuck.Compiler
                 SourcePosition = statement.GetPosition(),
             });
         }
-        void Compile(AnyCall anyCall)
+        void GenerateCodeForStatement(AnyCall anyCall)
         {
             if (anyCall.ToFunctionCall(out var functionCall))
             {
-                Compile(functionCall);
+                GenerateCodeForStatement(functionCall);
                 return;
             }
 
             throw new NotSupportedException($"Function pointers not supported by brainfuck", anyCall.PrevStatement, CurrentFile);
         }
-        void Compile(IndexCall indexCall)
+        void GenerateCodeForStatement(IndexCall indexCall)
         {
             CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
 
@@ -1288,7 +589,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 int indexAddress = Stack.NextAddress;
                 using (Code.Block($"Compute index"))
-                { Compile(indexCall.Expression); }
+                { GenerateCodeForStatement(indexCall.Expression); }
 
                 Code.ARRAY_GET(arrayAddress, indexAddress, resultAddress);
 
@@ -1300,7 +601,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!arrayType.IsClass)
             { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
 
-            Compile(new FunctionCall(
+            GenerateCodeForStatement(new FunctionCall(
                 indexCall.PrevStatement,
                 Token.CreateAnonymous(FunctionNames.IndexerGet),
                 indexCall.BracketLeft,
@@ -1310,13 +611,13 @@ namespace LanguageCore.Brainfuck.Compiler
                 },
                 indexCall.BracketRight));
         }
-        void Compile(LinkedIf @if, bool linked = false)
+        void GenerateCodeForStatement(LinkedIf @if, bool linked = false)
         {
             using (Code.Block($"If ({@if.Condition})"))
             {
                 int conditionAddress = Stack.NextAddress;
                 using (Code.Block("Compute condition"))
-                { Compile(@if.Condition); }
+                { GenerateCodeForStatement(@if.Condition); }
 
                 using (this.DebugBlock(@if.Condition))
                 { Code.LOGIC_MAKE_BOOL(conditionAddress, conditionAddress + 1); }
@@ -1407,7 +708,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             else if (@if.NextLink is LinkedIf elseIf)
                             {
                                 using (Code.Block("Block (else if)"))
-                                { Compile(elseIf, true); }
+                                { GenerateCodeForStatement(elseIf, true); }
                             }
                             else
                             { throw new ImpossibleException(); }
@@ -1630,13 +931,13 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
         */
-        void Compile(WhileLoop @while)
+        void GenerateCodeForStatement(WhileLoop @while)
         {
             using (Code.Block($"While ({@while.Condition})"))
             {
                 int conditionAddress = Stack.NextAddress;
                 using (Code.Block("Compute condition"))
-                { Compile(@while.Condition); }
+                { GenerateCodeForStatement(@while.Condition); }
 
                 Code.CommentLine($"Condition result at {conditionAddress}");
 
@@ -1651,7 +952,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block("Compute condition again"))
                 {
-                    Compile(@while.Condition);
+                    GenerateCodeForStatement(@while.Condition);
                     Stack.PopAndStore(conditionAddress);
                 }
 
@@ -1692,18 +993,18 @@ namespace LanguageCore.Brainfuck.Compiler
                 ContinueBreakStatements();
             }
         }
-        void Compile(ForLoop @for)
+        void GenerateCodeForStatement(ForLoop @for)
         {
             using (Code.Block($"For"))
             {
                 VariableCleanupStack.Push(PrecompileVariable(@for.VariableDeclaration));
 
                 using (Code.Block("Variable Declaration"))
-                { Compile(@for.VariableDeclaration); }
+                { GenerateCodeForStatement(@for.VariableDeclaration); }
 
                 int conditionAddress = Stack.NextAddress;
                 using (Code.Block("Compute condition"))
-                { Compile(@for.Condition); }
+                { GenerateCodeForStatement(@for.Condition); }
 
                 Code.CommentLine($"Condition result at {conditionAddress}");
 
@@ -1718,12 +1019,12 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block("Compute expression"))
                 {
-                    Compile(@for.Expression);
+                    GenerateCodeForStatement(@for.Expression);
                 }
 
                 using (Code.Block("Compute condition again"))
                 {
-                    Compile(@for.Condition);
+                    GenerateCodeForStatement(@for.Condition);
                     Stack.PopAndStore(conditionAddress);
                 }
 
@@ -1766,7 +1067,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 ContinueBreakStatements();
             }
         }
-        void Compile(KeywordCall statement)
+        void GenerateCodeForStatement(KeywordCall statement)
         {
             switch (statement.Identifier.Content.ToLower())
             {
@@ -1887,7 +1188,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
                             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
 
-                            InlineMacro(function, statement.Parameters, null, statement);
+                            GenerateCodeForMacro(function, statement.Parameters, null, statement);
                             return;
                         }
 
@@ -1899,14 +1200,14 @@ namespace LanguageCore.Brainfuck.Compiler
                 default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
         }
-        void Compile(Assignment statement)
+        void GenerateCodeForStatement(Assignment statement)
         {
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
+            GenerateCodeForSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
-        void Compile(CompoundAssignment statement)
+        void GenerateCodeForStatement(CompoundAssignment statement)
         {
             switch (statement.Operator.Content)
             {
@@ -1957,7 +1258,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             using (Code.Block($"Compute value"))
                             {
-                                Compile(statement.Right);
+                                GenerateCodeForStatement(statement.Right);
                             }
 
                             using (Code.Block($"Set computed value to {variable.Address}"))
@@ -2015,7 +1316,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             using (Code.Block($"Compute value"))
                             {
-                                Compile(statement.Right);
+                                GenerateCodeForStatement(statement.Right);
                             }
 
                             using (Code.Block($"Set computed value to {variable.Address}"))
@@ -2027,12 +1328,12 @@ namespace LanguageCore.Brainfuck.Compiler
                         return;
                     }
                 default:
-                    Compile(statement.ToAssignment());
+                    GenerateCodeForStatement(statement.ToAssignment());
                     break;
                     //throw new CompilerException($"Unknown compound assignment operator \'{statement.Operator}\'", statement.Operator);
             }
         }
-        void Compile(ShortOperatorCall statement)
+        void GenerateCodeForStatement(ShortOperatorCall statement)
         {
             switch (statement.Operator.Content)
             {
@@ -2082,7 +1383,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
         }
-        void Compile(VariableDeclaration statement)
+        void GenerateCodeForStatement(VariableDeclaration statement)
         {
             if (statement.InitialValue == null) return;
 
@@ -2094,7 +1395,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             CompileSetter(variable, statement.InitialValue);
         }
-        void Compile(FunctionCall functionCall)
+        void GenerateCodeForStatement(FunctionCall functionCall)
         {
             /*
             if (false &&functionCall.Identifier == "Alloc" &&
@@ -2158,7 +1459,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (inlinedMacro is Block inlinedMacroBlock)
                 { Compile(inlinedMacroBlock); }
                 else
-                { Compile(inlinedMacro); }
+                { GenerateCodeForStatement(inlinedMacro); }
 
                 InMacro.Pop();
 
@@ -2184,9 +1485,9 @@ namespace LanguageCore.Brainfuck.Compiler
 
             typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
 
-            InlineMacro(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
+            GenerateCodeForMacro(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
         }
-        void Compile(ConstructorCall constructorCall)
+        void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
             var instanceType = FindType(constructorCall.TypeName);
 
@@ -2229,9 +1530,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 instanceTypeSimple.GenericTypes != null)
             { typeArguments = @class.TemplateInfo.ToDictionary(CompiledType.FromArray(instanceTypeSimple.GenericTypes, FindType)); }
 
-            InlineMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
+            GenerateCodeForMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
         }
-        void Compile(Literal statement)
+        void GenerateCodeForStatement(Literal statement)
         {
             using (Code.Block($"Set {statement} to address {Stack.NextAddress}"))
             {
@@ -2258,14 +1559,18 @@ namespace LanguageCore.Brainfuck.Compiler
                     case LiteralType.FLOAT:
                         throw new NotSupportedException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
                     case LiteralType.STRING:
-                        throw new NotSupportedException($"String literals not supported by the brainfuck compiler", statement, CurrentFile);
+                        {
+                            // throw new NotSupportedException($"String literals not supported by the brainfuck compiler", statement, CurrentFile);
+                            GenerateCodeForLiteralString(statement);
+                            break;
+                        }
 
                     default:
                         throw new CompilerException($"Unknown literal type {statement.Type}", statement, CurrentFile);
                 }
             }
         }
-        void Compile(Identifier statement)
+        void GenerateCodeForStatement(Identifier statement)
         {
             /*
             if (statement.Content == "IN")
@@ -2317,11 +1622,11 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            if (Constants.TryFind(statement.Content, out ConstantVariable constant))
+            if (GetConstant(statement.Content, out DataItem constant))
             {
-                using (Code.Block($"Load constant {variable.Name} (with value {constant.Value})"))
+                using (Code.Block($"Load constant {statement.Content} (with value {constant})"))
                 {
-                    Stack.Push(constant.Value);
+                    Stack.Push(constant);
                 }
 
                 return;
@@ -2329,7 +1634,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile);
         }
-        void Compile(OperatorCall statement)
+        void GenerateCodeForStatement(OperatorCall statement)
         {
             using (Code.Block($"Expression {statement.Left} {statement.Operator} {statement.Right}"))
             {
@@ -2339,11 +1644,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block("Compute equality"))
                             {
@@ -2358,11 +1663,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Move & add right-side (from {rightAddress}) to left-side (to {leftAddress})"))
                             { Code.MoveAddValue(rightAddress, leftAddress); }
@@ -2394,11 +1699,11 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Move & sub right-side (from {rightAddress}) from left-side (to {leftAddress})"))
                             { Code.MoveSubValue(rightAddress, leftAddress); }
@@ -2411,11 +1716,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet MULTIPLY({leftAddress} {rightAddress})"))
                             {
@@ -2430,11 +1735,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet DIVIDE({leftAddress} {rightAddress})"))
                             {
@@ -2449,11 +1754,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet MOD({leftAddress} {rightAddress})"))
                             {
@@ -2468,11 +1773,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet LT({leftAddress} {rightAddress})"))
                             {
@@ -2487,11 +1792,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet MT({leftAddress} {rightAddress})"))
                             {
@@ -2508,11 +1813,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
                             {
@@ -2528,11 +1833,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet LTEQ({leftAddress} {rightAddress})"))
                             {
@@ -2547,11 +1852,11 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet NEQ({leftAddress} {rightAddress})"))
                             {
@@ -2566,7 +1871,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int tempLeftAddress = Stack.PushVirtual(1);
                             Code.CopyValue(leftAddress, tempLeftAddress);
@@ -2575,7 +1880,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
                             { Code.LOGIC_AND(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2); }
@@ -2591,7 +1896,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             int leftAddress = Stack.NextAddress;
                             using (Code.Block("Compute left-side value"))
-                            { Compile(statement.Left); }
+                            { GenerateCodeForStatement(statement.Left); }
 
                             int tempLeftAddress = Stack.PushVirtual(1);
                             Code.CopyValue(leftAddress, tempLeftAddress);
@@ -2601,7 +1906,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             int rightAddress = Stack.NextAddress;
                             using (Code.Block("Compute right-side value"))
-                            { Compile(statement.Right!); }
+                            { GenerateCodeForStatement(statement.Right!); }
 
                             using (Code.Block($"Snippet AND({leftAddress} {rightAddress})"))
                             { Code.LOGIC_OR(leftAddress, rightAddress, rightAddress + 1); }
@@ -2633,7 +1938,7 @@ namespace LanguageCore.Brainfuck.Compiler
             foreach (Statement statement in block.Statements)
             {
                 VariableCanBeDiscarded = null;
-                Compile(statement);
+                GenerateCodeForStatement(statement);
                 VariableCanBeDiscarded = null;
             }
 
@@ -2648,7 +1953,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 CleanupVariables(VariableCleanupStack.Pop());
             }
         }
-        void Compile(AddressGetter addressGetter)
+        void GenerateCodeForStatement(AddressGetter addressGetter)
         {
             throw new NotImplementedException();
 
@@ -2673,10 +1978,10 @@ namespace LanguageCore.Brainfuck.Compiler
             throw new CompilerException($"Invalid statement ({addressGetter.Statement.GetType().Name}) passed to address getter", addressGetter.Statement);
             */
         }
-        void Compile(Pointer pointer)
+        void GenerateCodeForStatement(Pointer pointer)
         {
             int pointerAddress = Stack.NextAddress;
-            Compile(pointer.PrevStatement);
+            GenerateCodeForStatement(pointer.PrevStatement);
 
             Heap.Get(pointerAddress, pointerAddress);
 
@@ -2709,13 +2014,16 @@ namespace LanguageCore.Brainfuck.Compiler
             throw new NotSupportedException($"Runtime pointer address not supported", pointer.Statement);
             */
         }
-        void Compile(NewInstance newInstance)
+        void GenerateCodeForStatement(NewInstance newInstance)
         {
-            CompiledType instanceType = FindType(newInstance.TypeName);
+            if (newInstance.TypeName is not TypeInstanceSimple instanceTypeSimple)
+            { throw new NotImplementedException(); }
+
+            CompiledType instanceType = FindType(instanceTypeSimple);
 
             if (instanceType.IsStruct)
             {
-                instanceType.Struct.References?.Add(new DefinitionReference(newInstance.TypeName, CurrentFile));
+                instanceType.Struct.References?.Add(new DefinitionReference(instanceTypeSimple, CurrentFile));
 
                 int address = Stack.PushVirtual(instanceType.Struct.Size);
 
@@ -2752,7 +2060,58 @@ namespace LanguageCore.Brainfuck.Compiler
             }
             else if (instanceType.IsClass)
             {
-                throw new NotSupportedException($"Not supported :(", newInstance, CurrentFile);
+                instanceType.Class.References?.Add(new DefinitionReference(instanceTypeSimple, CurrentFile));
+
+                if (instanceType.Class.TemplateInfo != null)
+                {
+                    if (instanceTypeSimple.GenericTypes is null)
+                    { throw new CompilerException($"No type arguments specified for class instance \"{instanceType}\"", instanceTypeSimple, CurrentFile); }
+
+                    if (instanceType.Class.TemplateInfo.TypeParameters.Length != instanceTypeSimple.GenericTypes.Length)
+                    { throw new CompilerException($"Wrong number of type arguments specified for class instance \"{instanceType}\": require {instanceType.Class.TemplateInfo.TypeParameters.Length} specified {instanceTypeSimple.GenericTypes.Length}", instanceTypeSimple, CurrentFile); }
+
+                    CompiledType[] genericParameters = instanceTypeSimple.GenericTypes!.Select(v => new CompiledType(v, FindType)).ToArray();
+                    instanceType.Class.AddTypeArguments(genericParameters);
+                }
+                else
+                {
+                    if (instanceTypeSimple.GenericTypes is not null)
+                    { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", instanceTypeSimple, CurrentFile); }
+                }
+
+                int pointerAddress = Stack.NextAddress;
+                Allocate(instanceType.Class.Size, newInstance);
+
+                /*
+                int currentOffset = 0;
+                for (int fieldIndex = 0; fieldIndex < instanceType.Class.Fields.Length; fieldIndex++)
+                {
+                    CompiledField field = instanceType.Class.Fields[fieldIndex];
+                    CompiledType? fieldType = field.Type;
+                    if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
+                    { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
+
+                    using (Code.Block($"Create Field '{field.Identifier.Content}' ({fieldIndex})"))
+                    {
+                        GenerateInitialValue(fieldType, j =>
+                        {
+                            AddComment($"Save Chunk {j}:");
+                            AddInstruction(Opcode.PUSH_VALUE, currentOffset);
+                            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -3);
+                            AddInstruction(Opcode.MATH_ADD);
+                            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                            currentOffset++;
+                        });
+                    }
+                }
+                */
+
+                instanceType.Class.ClearTypeArguments();
+                // throw new NotSupportedException($"Not supported :(", newInstance, CurrentFile);
+
+                if (!newInstance.SaveValue)
+                { Stack.Pop(); }
+
                 /*
                 newInstance.TypeName = newInstance.TypeName.Class(@class);
                 @class.References?.Add(new DefinitionReference(newInstance.TypeName, CurrentFile));
@@ -2816,7 +2175,7 @@ namespace LanguageCore.Brainfuck.Compiler
             else
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", newInstance.TypeName, CurrentFile); }
         }
-        void Compile(Field field)
+        void GenerateCodeForStatement(Field field)
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
@@ -2898,19 +2257,21 @@ namespace LanguageCore.Brainfuck.Compiler
             else
             { throw new CompilerException($"Failed to get field memory address", field, CurrentFile); }
         }
-        void Compile(TypeCast typeCast)
+        void GenerateCodeForStatement(TypeCast typeCast)
         {
             Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
-            Compile(typeCast.PrevStatement);
+            GenerateCodeForStatement(typeCast.PrevStatement);
         }
         #endregion
 
-        void CompilePrinter(StatementWithValue value)
+        #region GenerateCodeForPrinter()
+
+        void GenerateCodeForPrinter(StatementWithValue value)
         {
             if (TryCompute(value, null, out DataItem constantToPrint))
             {
-                CompilePrinter(constantToPrint);
+                GenerateCodeForPrinter(constantToPrint);
                 return;
             }
 
@@ -2919,13 +2280,13 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (value is Literal literal && isString)
             {
-                CompilePrinter(literal.Value);
+                GenerateCodeForPrinter(literal.Value);
                 return;
             }
 
-            CompileValuePrinter(value, valueType);
+            GenerateCodeForValuePrinter(value, valueType);
         }
-        void CompilePrinter(DataItem value)
+        void GenerateCodeForPrinter(DataItem value)
         {
             if (value.Type == RuntimeType.CHAR)
             {
@@ -2975,7 +2336,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             throw new NotImplementedException($"Unimplemented constant value type \"{value.Type}\"");
         }
-        void CompilePrinter(string value)
+        void GenerateCodeForPrinter(string value)
         {
             using (Code.Block($"Print string value \"{value}\""))
             {
@@ -3010,7 +2371,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.SetPointer(0);
             }
         }
-        void CompileValuePrinter(StatementWithValue value, CompiledType valueType)
+        void GenerateCodeForValuePrinter(StatementWithValue value, CompiledType valueType)
         {
             if (valueType.SizeOnStack != 1)
             { throw new NotSupportedException($"Only value of size 1 (not {valueType.SizeOnStack}) supported by the output printer in brainfuck", value, CurrentFile); }
@@ -3023,7 +2384,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 int address = Stack.NextAddress;
 
                 using (Code.Block($"Compute value"))
-                { Compile(value); }
+                { GenerateCodeForStatement(value); }
 
                 Code.CommentLine($"Computed value is on {address}");
 
@@ -3061,6 +2422,21 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.SetPointer(0);
             }
         }
+
+        bool CanGenerateCodeForPrinter(StatementWithValue value)
+        {
+            if (TryCompute(value, null, out _)) return true;
+
+            CompiledType valueType = FindStatementType(value);
+            bool isString = valueType.IsReplacedType("string");
+
+            if (value is Literal && isString) return true;
+
+            return CanGenerateCodeForValuePrinter(valueType);
+        }
+        static bool CanGenerateCodeForValuePrinter(CompiledType valueType) =>
+            valueType.SizeOnStack == 1 &&
+            valueType.IsBuiltin;
 
         /*
         void CompileRawPrinter(StatementWithValue value)
@@ -3169,16 +2545,85 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         */
 
+        #endregion
+
+        void Allocate(int size, IThingWithPosition position)
+        {
+            if (!TryGetBuiltinFunction("alloc", out CompiledFunction? allocator))
+            { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
+
+            int pointerAddress = Stack.NextAddress;
+            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.INT, size.ToString(), position) }, null, position);
+        }
+
+        int GenerateCodeForLiteralString(Literal literal)
+            => GenerateCodeForLiteralString(literal.Value, literal);
+        int GenerateCodeForLiteralString(string literal, IThingWithPosition position)
+        {
+            using (Code.Block($"Create String \"{literal}\""))
+            {
+                int pointerAddress = Stack.NextAddress;
+                using (Code.Block("Allocate String object {"))
+                { Allocate(1 + literal.Length, position); }
+
+                using (Code.Block("Set String.length {"))
+                {
+                    int valueAddress = Stack.Push(literal.Length);
+                    int pointerAddressCopy = valueAddress + 1;
+
+                    Code.CopyValue(pointerAddress, pointerAddressCopy);
+
+                    Heap.Set(pointerAddressCopy, valueAddress);
+
+                    Stack.Pop();
+                }
+
+                using (Code.Block("Set string data {"))
+                {
+                    for (int i = 0; i < literal.Length; i++)
+                    {
+                        // Prepare value
+                        int valueAddress = Stack.Push(literal[i]);
+                        int pointerAddressCopy = valueAddress + 1;
+
+                        // Calculate pointer
+                        Code.CopyValue(pointerAddress, pointerAddressCopy);
+                        Code.AddValue(pointerAddressCopy, 1 + i);
+
+                        // Set value
+                        Heap.Set(pointerAddressCopy, valueAddress);
+
+                        Stack.Pop();
+                    }
+                }
+                return pointerAddress;
+            }
+        }
+
         /// <param name="callerPosition">
         /// Used for exceptions
         /// </param>
-        void InlineMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
             if (function.CompiledAttributes.HasAttribute("StandardOutput"))
             {
+                bool canPrint = true;
+
                 foreach (StatementWithValue parameter in parameters)
-                { CompilePrinter(parameter); }
-                return;
+                {
+                    if (!CanGenerateCodeForPrinter(parameter))
+                    {
+                        canPrint = false;
+                        break;
+                    }
+                }
+
+                if (canPrint)
+                {
+                    foreach (StatementWithValue parameter in parameters)
+                    { GenerateCodeForPrinter(parameter); }
+                    return;
+                }
             }
 
             if (function.CompiledAttributes.HasAttribute("StandardInput"))
@@ -3225,7 +2670,7 @@ namespace LanguageCore.Brainfuck.Compiler
             }
 
             Stack<Variable> compiledParameters = new();
-            List<ConstantVariable> constantParameters = new();
+            List<CompiledConstant> constantParameters = new();
 
             CurrentMacro.Push(function);
             InMacro.Push(false);
@@ -3281,7 +2726,7 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                                constantParameters.Add(new ConstantVariable(defined.Identifier.Content, constValue));
+                                constantParameters.Add(new CompiledParameterConstant(defined, constValue));
                                 continue;
                             }
                         case "temp":
@@ -3318,7 +2763,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
-                        Compile(value);
+                        GenerateCodeForStatement(value);
 
                         using (Code.Block($"STORE LAST TO {variable.Address}"))
                         { Stack.PopAndStore(variable.Address); }
@@ -3357,19 +2802,17 @@ namespace LanguageCore.Brainfuck.Compiler
 
 
 
-            ConstantVariable[] savedConstants = new ConstantVariable[Constants.Count];
-            for (int i = 0; i < Constants.Count; i++)
-            { savedConstants[i] = Constants[i]; }
-            Constants.Clear();
+            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
+            CompiledConstants.Clear();
 
             for (int i = 0; i < constantParameters.Count; i++)
-            { Constants.Add(constantParameters[i]); }
+            { CompiledConstants.Push(constantParameters[i]); }
 
             for (int i = 0; i < savedConstants.Length; i++)
             {
-                if (Constants.TryFind(savedConstants[i].Name, out _))
+                if (GetConstant(savedConstants[i].Identifier, out _))
                 { continue; }
-                Constants.Add(savedConstants[i]);
+                CompiledConstants.Push(savedConstants[i]);
             }
 
             using (DebugBlock(function.Block.BracketStart))
@@ -3410,9 +2853,9 @@ namespace LanguageCore.Brainfuck.Compiler
             for (int i = 0; i < savedVariables.Length; i++)
             { Variables.Push(savedVariables[i]); }
 
-            Constants.Clear();
+            CompiledConstants.Clear();
             for (int i = 0; i < savedConstants.Length; i++)
-            { Constants.Add(savedConstants[i]); }
+            { CompiledConstants.Push(savedConstants[i]); }
 
             if (BreakCount.Count > 0 ||
                 BreakTagStack.Count > 0)
@@ -3433,7 +2876,7 @@ namespace LanguageCore.Brainfuck.Compiler
         /// <param name="callerPosition">
         /// Used for exceptions
         /// </param>
-        void InlineMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
             // if (!function.Modifiers.Contains("macro"))
             // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
@@ -3456,7 +2899,7 @@ namespace LanguageCore.Brainfuck.Compiler
             }
 
             Stack<Variable> compiledParameters = new();
-            List<ConstantVariable> constantParameters = new();
+            List<CompiledConstant> constantParameters = new();
 
             CurrentMacro.Push(function);
             InMacro.Push(false);
@@ -3512,7 +2955,7 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (!TryCompute(valueStatement, null, out DataItem value))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                                constantParameters.Add(new ConstantVariable(defined.Identifier.Content, value));
+                                constantParameters.Add(new CompiledParameterConstant(defined, value));
                                 break;
                             }
                         default:
@@ -3543,7 +2986,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
-                        Compile(value);
+                        GenerateCodeForStatement(value);
 
                         using (Code.Block($"STORE LAST TO {variable.Address}"))
                         { Stack.PopAndStore(variable.Address); }
@@ -3583,19 +3026,17 @@ namespace LanguageCore.Brainfuck.Compiler
 
 
 
-            ConstantVariable[] savedConstants = new ConstantVariable[Constants.Count];
-            for (int i = 0; i < Constants.Count; i++)
-            { savedConstants[i] = Constants[i]; }
-            Constants.Clear();
+            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
+            CompiledConstants.Clear();
 
             for (int i = 0; i < constantParameters.Count; i++)
-            { Constants.Add(constantParameters[i]); }
+            { CompiledConstants.Push(constantParameters[i]); }
 
             for (int i = 0; i < savedConstants.Length; i++)
             {
-                if (Constants.TryFind(savedConstants[i].Name, out _))
+                if (GetConstant(savedConstants[i].Identifier, out _))
                 { continue; }
-                Constants.Add(savedConstants[i]);
+                CompiledConstants.Push(savedConstants[i]);
             }
 
             using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
@@ -3629,9 +3070,9 @@ namespace LanguageCore.Brainfuck.Compiler
             for (int i = 0; i < savedVariables.Length; i++)
             { Variables.Push(savedVariables[i]); }
 
-            Constants.Clear();
+            CompiledConstants.Clear();
             for (int i = 0; i < savedConstants.Length; i++)
-            { Constants.Add(savedConstants[i]); }
+            { CompiledConstants.Push(savedConstants[i]); }
 
             if (BreakCount.Count > 0 ||
                 BreakTagStack.Count > 0)
@@ -3707,86 +3148,6 @@ namespace LanguageCore.Brainfuck.Compiler
                     BreakCount[^1]++;
                 }
             }
-        }
-
-        Result GenerateCode(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
-            PrintCallback? printCallback = null)
-        {
-            this.Precompile(compilerResult.TopLevelStatements);
-
-            foreach (CompiledFunction? function in CompiledFunctions)
-            { Precompile(function); }
-
-            if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-            { VariableCleanupStack.Push(PrecompileVariables(compilerResult.TopLevelStatements)); }
-            else
-            { PrecompileVariables(compilerResult.TopLevelStatements); }
-
-            // Heap.Init();
-
-            using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
-            {
-                ReturnCount.Push(0);
-                ReturnTagStack.Push(Stack.Push(1));
-            }
-
-            foreach (Statement statement in compilerResult.TopLevelStatements)
-            { Compile(statement); }
-
-            CompiledFunction? codeEntry = GetCodeEntry();
-
-            if (codeEntry != null)
-            { InlineMacro(codeEntry, Array.Empty<StatementWithValue>(), null, codeEntry.Identifier); }
-
-            {
-                FinishReturnStatements();
-                if (ReturnTagStack.Pop() != Stack.LastAddress)
-                { throw new InternalException(); }
-                Stack.Pop();
-
-                if (ReturnCount.Count > 0 ||
-                    ReturnTagStack.Count > 0 ||
-                    BreakCount.Count > 0 ||
-                    BreakTagStack.Count > 0)
-                { throw new InternalException(); }
-            }
-
-            if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
-            { CleanupVariables(VariableCleanupStack.Pop()); }
-
-            // Heap.Destroy();
-
-            Code.SetPointer(0);
-
-            if (Code.BranchDepth != 0)
-            { throw new InternalException($"Unbalanced branches", CurrentFile); }
-
-            return new Result()
-            {
-                Code = Code.ToString(),
-                Optimizations = Optimizations,
-                DebugInfo = DebugInfo,
-                Tokens = compilerResult.Tokens,
-
-                Warnings = this.Warnings.ToArray(),
-                Errors = this.Errors.ToArray(),
-            };
-        }
-
-        public static Result Generate(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
-            Settings generatorSettings,
-            PrintCallback? printCallback = null)
-        {
-            CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
-            return codeGenerator.GenerateCode(
-                compilerResult,
-                settings,
-                printCallback
-                );
         }
     }
 }

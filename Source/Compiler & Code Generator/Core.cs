@@ -654,7 +654,18 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
-                if (IsClass) return @class.Size;
+                if (IsClass)
+                {
+                    TypeArguments saved = new(@class.CurrentTypeArguments);
+
+                    @class.SetTypeArguments(typeParameters);
+
+                    int size = @class.Size;
+
+                    @class.SetTypeArguments(saved);
+
+                    return size;
+                }
                 if (IsEnum) return 1;
                 if (IsFunction) return 1;
                 if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).Integer ?? throw new InternalException(); ;
@@ -1214,7 +1225,14 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (@class is not null)
             {
+                TypeArguments saved = new(@class.CurrentTypeArguments);
+
+                @class.SetTypeArguments(typeParameters);
+
                 fieldOffsets = @class.FieldOffsets;
+
+                @class.SetTypeArguments(saved);
+
                 return true;
             }
 

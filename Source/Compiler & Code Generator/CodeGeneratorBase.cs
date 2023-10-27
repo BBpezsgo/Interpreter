@@ -265,7 +265,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (GetConstant(variableDeclaration.VariableName.Content, out _))
                 { throw new CompilerException($"Constant \"{variableDeclaration.VariableName}\" already defined", variableDeclaration.VariableName, variableDeclaration.FilePath); }
 
-                CompiledConstants.Push(new CompiledConstant(variableDeclaration, constantValue));
+                CompiledConstants.Push(new CompiledVariableConstant(variableDeclaration, constantValue));
                 count++;
             }
             ConstantsStack.Push(count);
@@ -284,10 +284,10 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (CompiledConstant constant in CompiledConstants)
             {
-                if (constant.Declaration.VariableName == identifier)
+                if (constant.Identifier == identifier)
                 {
                     if (success)
-                    { throw new CompilerException($"Constant \"{constant.Declaration.VariableName}\" defined more than once", constant.Declaration, constant.Declaration.FilePath); }
+                    { throw new CompilerException($"Constant \"{constant.Identifier}\" defined more than once", constant, constant.FilePath); }
 
                     value = constant.Value;
                     success = true;

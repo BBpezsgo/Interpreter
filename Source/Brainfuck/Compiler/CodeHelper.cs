@@ -60,6 +60,7 @@ namespace LanguageCore.Brainfuck
         const int HALF_BYTE = byte.MaxValue / 2;
 
         public StringBuilder Code;
+        StringBuilder CachedFinalCode;
 
         int indent;
         int pointer;
@@ -71,6 +72,7 @@ namespace LanguageCore.Brainfuck
         public CompiledCode()
         {
             this.Code = new StringBuilder();
+            this.CachedFinalCode = new StringBuilder();
             this.indent = 0;
             this.pointer = 0;
             this.branchDepth = 0;
@@ -174,6 +176,7 @@ namespace LanguageCore.Brainfuck
                 for (int i = 0; i < (-offset); i++)
                 {
                     Code.Append('<');
+                    CachedFinalCode.Append('<');
                     pointer--;
                 }
                 return;
@@ -183,6 +186,7 @@ namespace LanguageCore.Brainfuck
                 for (int i = 0; i < offset; i++)
                 {
                     Code.Append('>');
+                    CachedFinalCode.Append('>');
                     pointer++;
                 }
                 return;
@@ -199,6 +203,7 @@ namespace LanguageCore.Brainfuck
                 for (int i = 0; i < (-value); i++)
                 {
                     Code.Append('-');
+                    CachedFinalCode.Append('-');
                 }
                 return;
             }
@@ -207,6 +212,7 @@ namespace LanguageCore.Brainfuck
                 for (int i = 0; i < value; i++)
                 {
                     Code.Append('+');
+                    CachedFinalCode.Append('+');
                 }
                 return;
             }
@@ -334,6 +340,7 @@ namespace LanguageCore.Brainfuck
         public void ClearCurrent()
         {
             Code.Append("[-]");
+            CachedFinalCode.Append("[-]");
         }
 
         public void ClearRange(int start, int size)
@@ -358,6 +365,7 @@ namespace LanguageCore.Brainfuck
         public void JumpStart()
         {
             Code.Append('[');
+            CachedFinalCode.Append("[");
             branchDepth++;
         }
 
@@ -367,6 +375,7 @@ namespace LanguageCore.Brainfuck
         public void JumpEnd()
         {
             Code.Append(']');
+            CachedFinalCode.Append("]");
             branchDepth--;
         }
 
@@ -394,12 +403,14 @@ namespace LanguageCore.Brainfuck
         public static CompiledCode operator +(CompiledCode a, string b)
         {
             a.Code.Append(b);
+            a.CachedFinalCode.Append(b);
             return a;
         }
 
         public static CompiledCode operator +(CompiledCode a, char b)
         {
             a.Code.Append(b);
+            a.CachedFinalCode.Append(b);
             return a;
         }
 
@@ -442,7 +453,10 @@ namespace LanguageCore.Brainfuck
             int _step = Math.Abs(step);
             char _code = (step < 0) ? '<' : '>';
 
-            Code.Append($"[{new string(_code, _step)}]");
+            string snippet = $"[{new string(_code, _step)}]";
+
+            Code.Append(snippet);
+            CachedFinalCode.Append(snippet);
         }
 
         /// <summary>
@@ -472,9 +486,15 @@ namespace LanguageCore.Brainfuck
         public void MovePointerUnsafe(int offset)
         {
             if (offset < 0)
-            { Code.Append(new string('<', -offset)); }
+            {
+                Code.Append(new string('<', -offset));
+                CachedFinalCode.Append(new string('<', -offset));
+            }
             else if (offset > 0)
-            { Code.Append(new string('>', offset)); }
+            {
+                Code.Append(new string('>', offset));
+                CachedFinalCode.Append(new string('>', offset));
+            }
         }
 
         /// <summary>
@@ -585,6 +605,7 @@ namespace LanguageCore.Brainfuck
         {
             this.MovePointerUnsafe(conditionOffset);
             this.Code.Append('[');
+            this.CachedFinalCode.Append('[');
             this.MovePointerUnsafe(-conditionOffset);
         }
 
@@ -595,12 +616,15 @@ namespace LanguageCore.Brainfuck
         {
             this.MovePointerUnsafe(conditionOffset);
             this.Code.Append(']');
+            this.CachedFinalCode.Append(']');
             this.MovePointerUnsafe(-conditionOffset);
         }
 
         public string GetFinalCode()
         {
-            return Minifier.Minify(Utils.RemoveNoncodes(Code.ToString()));
+            string result = Minifier.Minify(Utils.RemoveNoncodes(CachedFinalCode.ToString()));
+            CachedFinalCode = new StringBuilder(result);
+            return result;
         }
     }
 

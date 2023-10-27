@@ -11,16 +11,47 @@ using LanguageCore.Tokenizing;
 namespace LanguageCore.BBCode.Compiler
 {
 
-    public class CompiledConstant
+    public abstract class CompiledConstant : ISearchable<string>, IThingWithPosition
     {
-        public readonly VariableDeclaration Declaration;
         public readonly DataItem Value;
+        public abstract string Identifier { get; }
+        public abstract string? FilePath { get; }
 
-        public CompiledConstant(VariableDeclaration declaration, DataItem value)
+        public CompiledConstant(DataItem value)
         {
-            Declaration = declaration;
             Value = value;
         }
+
+        public bool IsThis(string query) => string.Equals(Identifier, query);
+        public abstract Position GetPosition();
+    }
+
+    public class CompiledVariableConstant : CompiledConstant
+    {
+        public readonly VariableDeclaration Declaration;
+        public override string Identifier => Declaration.VariableName.Content;
+        public override string? FilePath => Declaration.FilePath;
+
+        public CompiledVariableConstant(VariableDeclaration declaration, DataItem value) : base(value)
+        {
+            Declaration = declaration;
+        }
+
+        public override Position GetPosition() => Declaration.GetPosition();
+    }
+
+    public class CompiledParameterConstant : CompiledConstant
+    {
+        public readonly ParameterDefinition Declaration;
+        public override string Identifier => Declaration.Identifier.Content;
+        public override string? FilePath => null;
+
+        public CompiledParameterConstant(ParameterDefinition declaration, DataItem value) : base(value)
+        {
+            Declaration = declaration;
+        }
+
+        public override Position GetPosition() => Declaration.GetPosition();
     }
 
     public struct AttributeValues
@@ -323,6 +354,26 @@ namespace LanguageCore.BBCode.Compiler
                 return size;
             }
         }
+        public int SizeWithTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
+        {
+            int size = 0;
+            foreach (CompiledField field in Fields)
+            { size += GetType(field.Type, field, typeParameters).SizeOnStack; }
+            return size;
+        }
+
+        public void SetTypeArguments(IEnumerable<CompiledType> typeParameters)
+             => SetTypeArguments(typeParameters.ToArray());
+        public void SetTypeArguments(CompiledType[] typeParameters)
+        {
+            currentTypeArguments.Clear();
+            AddTypeArguments(typeParameters);
+        }
+        internal void SetTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
+        {
+            currentTypeArguments.Clear();
+            AddTypeArguments(typeParameters);
+        }
 
         public void AddTypeArguments(IEnumerable<CompiledType> typeParameters)
              => AddTypeArguments(typeParameters.ToArray());
@@ -350,7 +401,7 @@ namespace LanguageCore.BBCode.Compiler
                 currentTypeArguments[key] = new CompiledType(value);
             }
         }
-        internal void AddTypeArguments(Dictionary<string, CompiledType> typeParameters)
+        internal void AddTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
         {
             if (TemplateInfo == null)
             { return; }
@@ -371,6 +422,14 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (!type.IsGeneric) return type;
             if (!currentTypeArguments.TryGetValue(type.Name, out CompiledType? result))
+            { throw new CompilerException($"Type argument \"{type.Name}\" not found", position, FilePath); }
+            return result;
+        }
+        CompiledType GetType(CompiledType type, IThingWithPosition position, IReadOnlyDictionary<string, CompiledType> typeParameters)
+        {
+            if (!type.IsGeneric) return type;
+            if (!typeParameters.TryGetValue(type.Name, out CompiledType? result) &&
+                !currentTypeArguments.TryGetValue(type.Name, out result))
             { throw new CompilerException($"Type argument \"{type.Name}\" not found", position, FilePath); }
             return result;
         }

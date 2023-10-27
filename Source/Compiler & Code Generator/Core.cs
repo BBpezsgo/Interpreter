@@ -4,14 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace LanguageCore
-{
-    public static partial class Utils
-    {
-        public const int NULL_POINTER = int.MinValue / 2;
-    }
-}
-
 namespace LanguageCore.BBCode.Compiler
 {
     using System.Diagnostics.CodeAnalysis;

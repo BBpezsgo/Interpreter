@@ -19,7 +19,7 @@ namespace TheProgram
 #if DEBUG && ENABLE_DEBUG
 
             //string path = TestConstants.ExampleFilesPath + "hello-world.bbc";
-            string path = TestConstants.TestFilesPath + "test36.bbc";
+            string path = TestConstants.TestFilesPath + "test47.bbc";
 
             generatedArgs = new string[]
             {
@@ -34,7 +34,8 @@ namespace TheProgram
                 // "--dont-optimize",
                 "--console-gui",
                 // "--asm",
-                "--brainfuck",
+                // "--brainfuck",
+                "--no-nullcheck",
                 "--heap-size 2048",
                 $"\"{path}\""
             };

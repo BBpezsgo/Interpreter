@@ -1464,7 +1464,7 @@ namespace LanguageCore.BBCode.Compiler
             { throw new NotImplementedException($"Initial value for structs is not implemented"); }
 
             if (type.IsClass)
-            { return new DataItem(LanguageCore.Utils.NULL_POINTER); }
+            { return new DataItem(0); }
 
             if (type.IsEnum)
             {

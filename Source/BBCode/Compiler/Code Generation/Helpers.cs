@@ -236,7 +236,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (instanceType.IsClass)
                 {
-                    AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                    AddInstruction(Opcode.PUSH_VALUE, 0);
                     return 1;
                 }
 
@@ -251,7 +251,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (instanceType.IsFunction)
                 {
-                    AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                    AddInstruction(Opcode.PUSH_VALUE, 0);
                     return 1;
                 }
 
@@ -277,7 +277,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (type.IsClass)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                AddInstruction(Opcode.PUSH_VALUE, 0);
                 return 1;
             }
 
@@ -315,7 +315,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (type.IsClass)
             {
-                AddInstruction(Opcode.PUSH_VALUE, LanguageCore.Utils.NULL_POINTER);
+                AddInstruction(Opcode.PUSH_VALUE, 0);
                 afterValue?.Invoke(0);
                 return 1;
             }
@@ -462,6 +462,7 @@ namespace LanguageCore.BBCode.Compiler
         void UnboxData(int from, int size)
         {
             AddComment($"Unbox: {{");
+
             for (int currentOffset = 0; currentOffset < size; currentOffset++)
             {
                 AddComment($"Element {currentOffset}:");
@@ -472,9 +473,27 @@ namespace LanguageCore.BBCode.Compiler
             AddComment("}");
         }
 
+        void CheckPointerNull(bool preservePointer = true, string exceptionMessage = "null pointer")
+        {
+            if (!CheckNullPointers) return;
+            AddComment($"Check for pointer zero {{");
+            if (preservePointer)
+            { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1); }
+            AddInstruction(Opcode.LOGIC_NOT);
+            int jumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JUMP_BY_IF_FALSE);
+            GenerateCodeForLiteralString(exceptionMessage);
+            AddInstruction(Opcode.THROW);
+            GeneratedCode[jumpInstruction].ParameterInt = GeneratedCode.Count - jumpInstruction;
+            AddComment($"}}");
+        }
+
         void HeapLoad(ValueAddress pointerAddress, int offset)
         {
             StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+
+            CheckPointerNull();
+
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
             AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
@@ -482,6 +501,9 @@ namespace LanguageCore.BBCode.Compiler
         void HeapStore(ValueAddress pointerAddress, int offset)
         {
             StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+
+            CheckPointerNull();
+
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
             AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);

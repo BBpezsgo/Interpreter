@@ -496,7 +496,7 @@ namespace LanguageCore.Runtime
             {
                 error.FeedDebugInfo(CompilerResult.DebugInfo);
 
-                OnOutput?.Invoke(this, "User Exception: " + error.Value.ToString() + "\r\n" + error.ToString(), LogType.Error);
+                OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
                 var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));

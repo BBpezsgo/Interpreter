@@ -76,13 +76,13 @@ namespace LanguageCore.Runtime
         {
             get
             {
-                if (i < 0) throw new RuntimeException($"Null pointer!");
+                if (i < 0) throw new RuntimeException($"Pointer points ouf of memory bounds");
                 if (i >= heap.Length) throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
                 return heap[i];
             }
             set
             {
-                if (i < 0) throw new RuntimeException($"Null pointer!");
+                if (i < 0) throw new RuntimeException($"Pointer points ouf of memory bounds");
                 if (i >= heap.Length) return; // throw new RuntimeException($"Pointer points ouf of memory bounds. Possibly out of HEAP memory.");
                 heap[i] = value;
             }

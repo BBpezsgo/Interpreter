@@ -179,15 +179,11 @@ namespace LanguageCore
     [Serializable]
     public class UserException : RuntimeException
     {
-        public readonly string Value;
-
-        public UserException(string message, string value) : base(message)
-        { this.Value = value; }
+        public UserException(string message) : base(message)
+        { }
 
         protected UserException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-            Value = info.GetString("Value") ?? string.Empty;
-        }
+        { }
     }
 
     #endregion

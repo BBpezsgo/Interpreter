@@ -398,6 +398,8 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         AddComment(" Param prev:");
                         GenerateCodeForStatement(functionCall.PrevStatement);
+                        if (FindStatementType(functionCall.PrevStatement).InHEAP)
+                        { CheckPointerNull(); }
                     }
                     for (int i = 0; i < functionCall.Parameters.Length; i++)
                     {

@@ -20,6 +20,7 @@ namespace LanguageCore.BBCode.Compiler
             public bool DontOptimize;
             public bool GenerateDebugInstructions;
             public bool ExternalFunctionsCache;
+            public bool CheckNullPointers;
 
             public static CompilerSettings Default => new()
             {
@@ -29,6 +30,7 @@ namespace LanguageCore.BBCode.Compiler
                 DontOptimize = false,
                 GenerateDebugInstructions = true,
                 ExternalFunctionsCache = true,
+                CheckNullPointers = true,
             };
         }
 

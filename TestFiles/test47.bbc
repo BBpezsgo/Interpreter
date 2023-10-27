@@ -1,0 +1,10 @@
+using System; 
+
+class ThisClass
+{
+	int Bruh1;
+	int Bruh2;
+}
+
+ThisClass thisClass;
+int bruh1 = thisClass.Bruh1;

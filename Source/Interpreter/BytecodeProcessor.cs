@@ -175,7 +175,7 @@ namespace LanguageCore.Runtime
                 Memory.Heap.Deallocate(pointer);
             }
             catch (Exception) { }
-            throw new UserException("User Exception Thrown", value ?? "null");
+            throw new UserException(value ?? "null");
         }
 
         void JUMP_BY()

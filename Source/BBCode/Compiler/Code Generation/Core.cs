@@ -87,9 +87,11 @@ namespace LanguageCore.BBCode.Compiler
         readonly List<UndefinedGeneralFunctionOffset> UndefinedGeneralFunctionOffsets;
 
         readonly bool OptimizeCode;
-        readonly bool AddCommentsToCode = true;
+        readonly bool CheckNullPointers;
+        readonly bool AddCommentsToCode;
         readonly bool TrimUnreachableCode = true;
-        readonly bool GenerateDebugInstructions = true;
+        readonly bool GenerateDebugInstructions;
+
         bool CanReturn;
 
         readonly List<Information> Informations;
@@ -112,6 +114,7 @@ namespace LanguageCore.BBCode.Compiler
             this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
             this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
             this.AddCommentsToCode = settings.GenerateComments;
+            this.CheckNullPointers = settings.CheckNullPointers;
             this.GeneratedCode = new List<Instruction>();
             this.ExternalFunctionsCache = new Dictionary<string, int>();
             this.OptimizeCode = !settings.DontOptimize;

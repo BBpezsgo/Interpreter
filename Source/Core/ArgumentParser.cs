@@ -162,6 +162,12 @@ namespace TheProgram
                 {
                     string? arg;
 
+                    if (ExpectArg(args, ref i, out arg, "--no-nullcheck", "-nn"))
+                    {
+                        result.compilerSettings.CheckNullPointers = false;
+                        continue;
+                    }
+
                     if (ExpectArg(args, ref i, out arg, "--pause-end", "-pe"))
                     {
                         result.PauseAtEnd = true;

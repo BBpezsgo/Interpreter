@@ -212,7 +212,7 @@ namespace TheProgram.Brainfuck
                 compilerResult = EasyCompiler.Compile(file, _compilerSettings, compilerSettings, printCallback).CodeGeneratorResult;
                 printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
-            catch (LanguageCore.LanguageException exception)
+            catch (LanguageException exception)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());
@@ -226,7 +226,7 @@ namespace TheProgram.Brainfuck
                 if (throwErrors) throw;
                 else return null;
             }
-            catch (System.Exception exception)
+            catch (Exception exception)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());
@@ -327,6 +327,7 @@ namespace TheProgram.Brainfuck
         public static string? GetArrows(Position position, string text)
         {
             if (position.AbsolutePosition == new Range<int>(0, 0)) return null;
+            if (position == Position.UnknownPosition) return null;
             if (position.Start.Line != position.End.Line)
             { return null; }
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');

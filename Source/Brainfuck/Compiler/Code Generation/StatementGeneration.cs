@@ -537,6 +537,8 @@ namespace LanguageCore.Brainfuck.Compiler
             { GenerateCodeForStatement(indexCall); }
             else if (statement is AnyCall anyCall)
             { GenerateCodeForStatement(anyCall); }
+            else if (statement is ModifiedStatement modifiedStatement)
+            { GenerateCodeForStatement(modifiedStatement); }
             else
             { throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile); }
 
@@ -558,6 +560,24 @@ namespace LanguageCore.Brainfuck.Compiler
                 Instructions = (start, end),
                 SourcePosition = statement.GetPosition(),
             });
+        }
+        void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
+        {
+            StatementWithValue statement = modifiedStatement.Statement;
+            Token modifier = modifiedStatement.Modifier;
+
+            if (modifier == "ref")
+            {
+                throw new NotImplementedException();
+            }
+
+            if (modifier == "temp")
+            {
+                GenerateCodeForStatement(statement);
+                return;
+            }
+
+            throw new NotImplementedException();
         }
         void GenerateCodeForStatement(AnyCall anyCall)
         {
@@ -1918,6 +1938,76 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             break;
                         }
+                    case "<<":
+                        {
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block("Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
+
+                            int rightAddress = Stack.NextAddress;
+                            if (TryCompute(statement.Right, null, out var rightConst) && rightConst.Integer.HasValue)
+                            {
+                                Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
+                            }
+                            else
+                            {
+                                using (Code.Block("Compute right-side value"))
+                                { GenerateCodeForStatement(statement.Right!); }
+
+                                int valueTwoAddress = Stack.Push(2);
+
+                                Code.MATH_POW(valueTwoAddress, rightAddress, valueTwoAddress + 1, valueTwoAddress + 2, valueTwoAddress + 3);
+
+                                Stack.PopAndStore(rightAddress);
+                            }
+
+                            using (Code.Jump(rightAddress))
+                            {
+                                using (Code.Block($"Snippet BITSHIFT_LEFT({leftAddress} {rightAddress})"))
+                                {
+                                    Code.MULTIPLY(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2);
+                                }
+                            }
+
+                            Stack.Pop();
+
+                            break;
+                        }
+                    case ">>":
+                        {
+                            int leftAddress = Stack.NextAddress;
+                            using (Code.Block("Compute left-side value"))
+                            { GenerateCodeForStatement(statement.Left); }
+
+                            int rightAddress = Stack.NextAddress;
+                            if (TryCompute(statement.Right, null, out var rightConst) && rightConst.Integer.HasValue)
+                            {
+                                Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
+                            }
+                            else
+                            {
+                                using (Code.Block("Compute right-side value"))
+                                { GenerateCodeForStatement(statement.Right!); }
+
+                                int valueTwoAddress = Stack.Push(2);
+
+                                Code.MATH_POW(valueTwoAddress, rightAddress, valueTwoAddress + 1, valueTwoAddress + 2, valueTwoAddress + 3);
+
+                                Stack.PopAndStore(rightAddress);
+                            }
+
+                            using (Code.Jump(rightAddress))
+                            {
+                                using (Code.Block($"Snippet BITSHIFT_LEFT({leftAddress} {rightAddress})"))
+                                {
+                                    Code.MATH_DIV(leftAddress, rightAddress, rightAddress + 1, rightAddress + 2, rightAddress + 3, rightAddress + 4);
+                                }
+                            }
+
+                            Stack.Pop();
+
+                            break;
+                        }
                     default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile);
                 }
             }
@@ -1955,28 +2045,18 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(AddressGetter addressGetter)
         {
-            throw new NotImplementedException();
-
-            /*
-            if (addressGetter.Statement is Identifier identifier)
+            if (addressGetter.PrevStatement is Identifier identifier)
             {
-                if (!Variables.TryFind(identifier.Value.Content, out Variable variable))
-                { throw new CompilerException($"Variable \"{identifier}\" not found", identifier); }
+                CompiledType type = FindStatementType(identifier);
 
-                if (variable.IsDiscarded)
-                { throw new CompilerException($"Variable \"{variable.Name}\" is discarded", identifier); }
+                if (!type.InHEAP)
+                { throw new CompilerException($"Type {type} isn't stored in the heap", addressGetter, CurrentFile); }
 
-                using (Code.Block($"Load variable address {variable.Name} ({variable.Address})"))
-                {
-                    int resultAddress = this.Stack.PushVirtual(1);
-                    Code.SetValue(resultAddress, variable.Address);
-                }
-
+                GenerateCodeForStatement(identifier);
                 return;
             }
 
-            throw new CompilerException($"Invalid statement ({addressGetter.Statement.GetType().Name}) passed to address getter", addressGetter.Statement);
-            */
+            throw new NotImplementedException();
         }
         void GenerateCodeForStatement(Pointer pointer)
         {

@@ -250,7 +250,7 @@ namespace LanguageCore.Runtime
                 error.Context = GetContext();
                 throw;
             }
-            catch (System.Exception error)
+            catch (Exception error)
             {
                 throw new RuntimeException(error.Message, error, GetContext());
             }

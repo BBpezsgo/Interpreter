@@ -319,34 +319,42 @@ namespace LanguageCore.Parser
 
             for (int i = 0; i < this.Functions.Length; i++)
             { this.Functions[i].FilePath = path; }
+
             for (int i = 0; i < this.Enums.Length; i++)
             { this.Enums[i].FilePath = path; }
+
+            for (int i = 0; i < this.Macros.Length; i++)
+            { this.Macros[i].FilePath = path; }
+
             for (int i = 0; i < this.Structs.Length; i++)
             {
                 this.Structs[i].FilePath = path;
-                for (int j = 0; j < this.Structs[i].Methods.Count; j++)
-                {
-                    this.Structs[i].Methods.ElementAt(j).Value.FilePath = path;
-                }
+
+                foreach (KeyValuePair<string, FunctionDefinition> method in this.Structs[i].Methods)
+                { method.Value.FilePath = path; }
             }
+
             for (int i = 0; i < this.Classes.Length; i++)
             {
                 this.Classes[i].FilePath = path;
+
                 for (int j = 0; j < this.Classes[i].Methods.Count; j++)
-                {
-                    this.Classes[i].Methods[j].FilePath = path;
-                }
+                { this.Classes[i].Methods[j].FilePath = path; }
+
+                for (int j = 0; j < this.Classes[i].Operators.Count; j++)
+                { this.Classes[i].Operators[j].FilePath = path; }
+
                 for (int j = 0; j < this.Classes[i].GeneralMethods.Count; j++)
-                {
-                    this.Classes[i].GeneralMethods[j].FilePath = path;
-                }
+                { this.Classes[i].GeneralMethods[j].FilePath = path; }
             }
+
             for (int i = 0; i < this.Hashes.Length; i++)
             { this.Hashes[i].FilePath = path; }
+
             Statement.StatementFinder.GetAllStatement(this, statement =>
             {
-                if (statement is not IDefinition def) return false;
-                def.FilePath = path;
+                if (statement is IDefinition def)
+                { def.FilePath = path; }
                 return false;
             });
         }

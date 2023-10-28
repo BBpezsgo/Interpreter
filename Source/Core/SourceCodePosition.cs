@@ -153,6 +153,20 @@ namespace LanguageCore
             return $"{Start.ToMinString()}-{End.ToMinString()}";
         }
 
+        public readonly string? ToCoolString(string prefix = "", string postfix = "")
+        {
+            if (Start.Line == -1)
+            { return null; }
+
+            if (this == Position.UnknownPosition)
+            { return null; }
+
+            if (Start.Character == -1)
+            { return $"{prefix}line {Start.Character}{postfix}"; }
+
+            return $"{prefix}line {Start.Line} and column {Start.Character}{postfix}";
+        }
+
         public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.End.Line, this.End.Character), new SinglePosition(this.End.Line, this.End.Character + 1)), new Range<int>(this.AbsolutePosition.End, this.AbsolutePosition.End + 1));
 
         public override bool Equals(object? obj) => obj is Position position && Equals(position);

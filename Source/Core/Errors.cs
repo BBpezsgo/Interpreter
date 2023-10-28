@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using System.Text;
 using LanguageCore.Runtime;
 
 namespace LanguageCore
@@ -9,13 +10,12 @@ namespace LanguageCore
     [Serializable]
     public class LanguageException : Exception
     {
-        public Position Position => position;
+        public readonly Position Position;
         public readonly string? File;
-        readonly Position position;
 
         protected LanguageException(string message, Position position, string? file) : base(message)
         {
-            this.position = position;
+            this.Position = position;
             this.File = file;
         }
         public LanguageException(Error error) : this(error.Message, error.Position, error.File) { }
@@ -23,23 +23,23 @@ namespace LanguageCore
 
         protected LanguageException(SerializationInfo info, StreamingContext context) : base(info, context)
         {
-            position = (Position?)info.GetValue("position", typeof(Position)) ?? Position.UnknownPosition;
+            Position = (Position?)info.GetValue("position", typeof(Position)) ?? Position.UnknownPosition;
             File = info.GetString("File");
         }
 
         public override string ToString()
         {
-            if (Position.Start.Line == -1)
-            {
-                return Message;
-            }
+            StringBuilder result = new(Message);
 
-            if (Position.Start.Character == -1)
-            {
-                return $"{Message} (at line {Position.Start.Character}) {InnerException}";
-            }
+            result.Append(Position.ToCoolString(" (at ", ")") ?? string.Empty);
 
-            return $"{Message} (at line {Position.Start.Line} and column {Position.Start.Character}) {InnerException}";
+            if (File != null)
+            { result.Append($" (in {File})"); }
+
+            if (InnerException != null)
+            { result.Append($" {InnerException}"); }
+
+            return result.ToString();
         }
     }
 
@@ -91,19 +91,25 @@ namespace LanguageCore
     {
         public Context? Context;
         public Position SourcePosition;
+        public string? SourceFile;
         public FunctionInformations[]? CallStack;
+        public FunctionInformations? CurrentFrame;
 
         public void FeedDebugInfo(DebugInformation debugInfo)
         {
             if (!Context.HasValue) return;
             Context context = Context.Value;
 
-            if (!debugInfo.TryGetSourceLocation(context.CodePointer, out var sourcePosition))
+            if (!debugInfo.TryGetSourceLocation(context.CodePointer, out SourceCodeLocation sourcePosition))
             { SourcePosition = Position.UnknownPosition; }
             else
             { SourcePosition = sourcePosition.SourcePosition; }
 
+            CurrentFrame = debugInfo.GetFunctionInformations(context.CodePointer);
+
             CallStack = debugInfo.GetFunctionInformations(context.CallTrace);
+
+            SourceFile = CallStack.Length > 0 ? CallStack[^1].File : null;
         }
 
         public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
@@ -124,55 +130,56 @@ namespace LanguageCore
             if (!Context.HasValue) return Message + " (no context)";
             Context context = Context.Value;
 
-            string result = Message;
-            result += $"\n Executed Instructions: {context.ExecutedInstructionCount}";
-            result += $"\n Code Pointer: {context.CodePointer}";
+            StringBuilder result = new(Message);
 
-            result += $"\n Call Stack:";
+            result.Append(SourcePosition.ToCoolString(" (at ", ")") ?? string.Empty);
+
+            if (SourceFile != null)
+            { result.Append($" (in {SourceFile})"); }
+
+            result.Append(Environment.NewLine);
+            result.Append($"Executed Instructions: {context.ExecutedInstructionCount}");
+
+            result.Append(Environment.NewLine);
+            result.Append($"Code Pointer: {context.CodePointer}");
+
+            result.Append(Environment.NewLine);
+            result.Append("Call Stack:");
             if (context.CallTrace.Length == 0)
-            {
-                result += " (callstack is empty)";
-            }
+            { result.Append(" (CallTrace is empty)"); }
             else
             {
                 if (CallStack == null)
-                { result += "\n   " + string.Join("\n   ", context.CallTrace); }
+                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", context.CallTrace)}"); }
                 else
-                { result += "\n   " + string.Join("\n   ", CallStack); }
+                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", CallStack)}"); }
             }
 
-            if (SourcePosition != Position.UnknownPosition)
+            if (CurrentFrame.HasValue)
+            { result.Append($"{Environment.NewLine}\t {CurrentFrame.Value.ToString()} (current)"); }
+
+            result.Append(Environment.NewLine);
+            result.Append("System Stack Trace:");
+            if (StackTrace == null) { result.Append(" (StackTrace is null)"); }
+            else if (StackTrace.Length == 0) { result.Append(" (StackTrace is empty)"); }
+            else { result.Append("\n  " + string.Join("\n  ", StackTrace)); }
+
+            result.Append(Environment.NewLine);
+            result.Append("Stack:");
+            for (int i = 0; i < context.Stack.Count; i++)
             {
-                result += $"\n Position: {SourcePosition.ToMinString()}";
-            }
-            result += $"\n System Stack Trace:";
-            if (StackTrace == null) { result += " (stacktrace is null)"; }
-            else if (StackTrace.Length == 0) { result += " (stacktrace is empty)"; }
-            else { result += "\n  " + string.Join("\n  ", StackTrace); }
-
-            if (Context.HasValue)
-            {
-                result += $"\n Stack:";
-                for (int i = 0; i < Context.Value.Stack.Count; i++)
-                {
-                    if (Context.Value.Stack[i].IsNull)
-                    {
-                        result += $"\n{i}\t null";
-                    }
-                    else
-                    {
-                        result += $"\n{i}\t {Context.Value.Stack[i].Type} {Context.Value.Stack[i].GetValue()}";
-                    }
-                }
-
-                result += $"\n Code:";
-                for (int offset = 0; offset < Context.Value.Code.Length; offset++)
-                {
-                    result += $"\n{offset + Context.Value.CodeSampleStart}\t {Context.Value.Code[offset]}";
-                }
+                if (context.Stack[i].IsNull)
+                { result.Append($"{Environment.NewLine}{i}\t null"); }
+                else
+                { result.Append($"{Environment.NewLine}{i}\t {context.Stack[i].Type} {context.Stack[i].GetValue()}"); }
             }
 
-            return result;
+            result.Append(Environment.NewLine);
+            result.Append("Code:");
+            for (int offset = 0; offset < context.Code.Length; offset++)
+            { result.Append($"{Environment.NewLine}{offset + context.CodeSampleStart}\t {context.Code[offset]}"); }
+
+            return result.ToString();
         }
     }
 
@@ -184,6 +191,32 @@ namespace LanguageCore
 
         protected UserException(SerializationInfo info, StreamingContext context) : base(info, context)
         { }
+
+        public override string ToString()
+        {
+            if (!Context.HasValue) return Message + " (no context)";
+            Context context = Context.Value;
+
+            StringBuilder result = new(Message);
+
+            result.Append(SourcePosition.ToCoolString(" (at ", ")") ?? string.Empty);
+
+            if (SourceFile != null)
+            { result.Append($" (in {SourceFile})"); }
+
+            if (context.CallTrace.Length != 0)
+            {
+                if (CallStack == null)
+                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", context.CallTrace)}"); }
+                else
+                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", CallStack)}"); }
+            }
+
+            if (CurrentFrame.HasValue)
+            { result.Append($"{Environment.NewLine}\t {CurrentFrame.Value.ToString()} (current)"); }
+
+            return result.ToString();
+        }
     }
 
     #endregion
@@ -233,29 +266,34 @@ namespace LanguageCore
 
     public class NotExceptionBut
     {
-        public virtual Position Position => position;
         public readonly string Message;
+        public readonly Position Position;
         public readonly string? File;
-
-        readonly Position position;
 
         protected NotExceptionBut(string message, Position position) : this(message, position, null)
         { }
         protected NotExceptionBut(string message, Position position, string? file)
         {
             this.Message = message;
-            this.position = position;
+            this.Position = position;
             this.File = file;
         }
 
         public override string ToString()
         {
-            if (position.Start.Line == -1)
-            { return Message; }
-            else if (position.Start.Character == -1)
-            { return $"{Message} (at line {position.Start.Line})"; }
+            StringBuilder result = new(Message);
+
+            if (Position.Start.Line == -1)
+            { }
+            else if (Position.Start.Character == -1)
+            { result.Append($" (at line {Position.Start.Character})"); }
             else
-            { return $"{Message} (at line {position.Start.Line} and column {position.Start.Character})"; }
+            { result.Append($" (at line {Position.Start.Line} and column {Position.Start.Character})"); }
+
+            if (File != null)
+            { result.Append($" (in {File})"); }
+
+            return result.ToString();
         }
     }
 
@@ -264,7 +302,7 @@ namespace LanguageCore
         public Warning(string message, Position position, string? file)
             : base(message, position, file) { }
         public Warning(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     /// <summary> It's an exception, but not. </summary>
@@ -275,9 +313,9 @@ namespace LanguageCore
         public Error(string message, Position position, string? file)
             : base(message, position, file) { }
         public Error(string message, IThingWithPosition? position)
-            : base(message, position?.GetPosition() ?? Position.UnknownPosition, null) { }
+            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, null) { }
         public Error(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
 
         public LanguageException ToException() => new(this);
     }
@@ -285,13 +323,13 @@ namespace LanguageCore
     public class Hint : NotExceptionBut
     {
         public Hint(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     public class Information : NotExceptionBut
     {
         public Information(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     #endregion

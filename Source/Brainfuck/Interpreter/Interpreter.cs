@@ -5,8 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using LanguageCore.Brainfuck.Compiler;
-using LanguageCore.Brainfuck.Renderer;
 using LanguageCore.Runtime;
 using Win32;
 
@@ -283,11 +281,15 @@ namespace LanguageCore.Brainfuck
             int width = Console.WindowWidth;
             int height = Console.WindowHeight;
 
-            using ConsoleRenderer renderer = new(width, height);
+            using Win32.Utilities.ConsoleRenderer renderer = new(null, width, height);
             Win32.Utilities.ConsoleListener.Start();
+            GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
+
+            Win32.Utilities.ConsoleListener.KeyEvent += Win32.Utilities.Keyboard.Feed;
+            Win32.Utilities.ConsoleListener.MouseEvent += Win32.Utilities.Mouse.Feed;
 
             Win32.Utilities.ConsoleListener.KeyEvent += (e) =>
             {
@@ -322,17 +324,17 @@ namespace LanguageCore.Brainfuck
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
 
-                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOriginalCode(renderer, 0, line, width, 15);
                 height -= 15;
                 line += 15;
 
-                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
-                renderer.RefreshConsole();
+                renderer.Render();
             }
 
             Draw();
@@ -371,7 +373,7 @@ namespace LanguageCore.Brainfuck
         }
 
         int StartToken;
-        void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
+        void DrawOriginalCode(Win32.Utilities.ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
             {
@@ -446,18 +448,18 @@ namespace LanguageCore.Brainfuck
 
                     foregroundColor = token.AnalyzedType switch
                     {
-                        Tokenizing.TokenAnalysedType.Attribute => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Type => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Struct => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Keyword => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.FunctionName => ByteColor.BrightYellow,
-                        Tokenizing.TokenAnalysedType.VariableName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.FieldName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.ParameterName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.Class => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.BuiltinType => ByteColor.BrightBlue,
-                        Tokenizing.TokenAnalysedType.Enum => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.TypeParameter => ByteColor.Yellow,
+                        Tokenizing.TokenAnalyzedType.Attribute => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Type => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Struct => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Keyword => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.FunctionName => ByteColor.BrightYellow,
+                        Tokenizing.TokenAnalyzedType.VariableName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.FieldName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.ParameterName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.Class => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.BuiltinType => ByteColor.BrightBlue,
+                        Tokenizing.TokenAnalyzedType.Enum => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.TypeParameter => ByteColor.Yellow,
                         _ => foregroundColor,
                     };
                     */
@@ -471,7 +473,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawCode(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawCode(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -497,7 +499,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryChars(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryChars(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -514,7 +516,7 @@ namespace LanguageCore.Brainfuck
                 };
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
-                renderer.DrawText(x, y, textToPrint, ByteColor.Silver);
+                GUI.Label(x, y, textToPrint, ByteColor.Silver);
                 x += textToPrint.Length;
 
                 if (x >= width)
@@ -528,18 +530,18 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryRaw(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryRaw(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
                 string textToPrint = Memory[m].V.ToString().PadRight(4, ' ');
 
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, textToPrint, ByteColor.BrightRed); }
+                { GUI.Label(x, y, textToPrint, ByteColor.BrightRed); }
                 else if (Memory[m].V == 0)
-                { renderer.DrawText(x, y, textToPrint, ByteColor.Silver); }
+                { GUI.Label(x, y, textToPrint, ByteColor.Silver); }
                 else
-                { renderer.DrawText(x, y, textToPrint, ByteColor.White); }
+                { GUI.Label(x, y, textToPrint, ByteColor.White); }
 
                 x += textToPrint.Length;
 
@@ -554,14 +556,14 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryPointer(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryPointer(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, "^   ", ByteColor.BrightRed); }
+                { GUI.Label(x, y, "^   ", ByteColor.BrightRed); }
                 else
-                { renderer.DrawText(x, y, "    ", ByteColor.White); }
+                { GUI.Label(x, y, "    ", ByteColor.White); }
 
                 x += 4;
 
@@ -576,7 +578,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawOutput(ConsoleRenderer renderer, string text, int x, int y, int width, int height)
+        void DrawOutput(Win32.Utilities.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
         {
             int _x = x;
             int _y = y;
@@ -802,8 +804,9 @@ namespace LanguageCore.Brainfuck
             int width = Console.WindowWidth;
             int height = Console.WindowHeight;
 
-            using ConsoleRenderer renderer = new(width, height);
+            using Win32.Utilities.ConsoleRenderer renderer = new(null, width, height);
             Win32.Utilities.ConsoleListener.Start();
+            GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
@@ -841,17 +844,17 @@ namespace LanguageCore.Brainfuck
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
 
-                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOriginalCode(renderer, 0, line, width, 15);
                 height -= 15;
                 line += 15;
 
-                renderer.DrawText(0, line++, new string('─', width), ByteColor.Gray);
+                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
-                renderer.RefreshConsole();
+                renderer.Render();
             }
 
             Draw();
@@ -890,7 +893,7 @@ namespace LanguageCore.Brainfuck
         }
 
         int StartToken;
-        void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
+        void DrawOriginalCode(Win32.Utilities.ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
             {
@@ -965,18 +968,18 @@ namespace LanguageCore.Brainfuck
 
                     foregroundColor = token.AnalyzedType switch
                     {
-                        Tokenizing.TokenAnalysedType.Attribute => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Type => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Struct => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.Keyword => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.FunctionName => ByteColor.BrightYellow,
-                        Tokenizing.TokenAnalysedType.VariableName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.FieldName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.ParameterName => ByteColor.White,
-                        Tokenizing.TokenAnalysedType.Class => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.BuiltinType => ByteColor.BrightBlue,
-                        Tokenizing.TokenAnalysedType.Enum => ByteColor.BrightGreen,
-                        Tokenizing.TokenAnalysedType.TypeParameter => ByteColor.Yellow,
+                        Tokenizing.TokenAnalyzedType.Attribute => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Type => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Struct => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Keyword => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.FunctionName => ByteColor.BrightYellow,
+                        Tokenizing.TokenAnalyzedType.VariableName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.FieldName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.ParameterName => ByteColor.White,
+                        Tokenizing.TokenAnalyzedType.Class => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.BuiltinType => ByteColor.BrightBlue,
+                        Tokenizing.TokenAnalyzedType.Enum => ByteColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.TypeParameter => ByteColor.Yellow,
                         _ => foregroundColor,
                     };
                     */
@@ -990,7 +993,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawCode(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawCode(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -1030,7 +1033,7 @@ namespace LanguageCore.Brainfuck
 
                 if (Code[i].Count != 1)
                 {
-                    renderer.DrawText(ref x, y, Code[i].Count.ToString(), ByteColor.BrightYellow, bg);
+                    GUI.Label(ref x, y, Code[i].Count.ToString(), CharInfoAttribute.Make(bg, ByteColor.BrightYellow));
                     if (x >= width) return;
                 }
             }
@@ -1042,7 +1045,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryChars(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryChars(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -1059,7 +1062,7 @@ namespace LanguageCore.Brainfuck
                 };
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
-                renderer.DrawText(x, y, textToPrint, ByteColor.Silver);
+                GUI.Label(x, y, textToPrint, ByteColor.Silver);
                 x += textToPrint.Length;
 
                 if (x >= width)
@@ -1073,18 +1076,18 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryRaw(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryRaw(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
                 string textToPrint = Memory[m].V.ToString().PadRight(4, ' ');
 
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, textToPrint, ByteColor.BrightRed); }
+                { GUI.Label(x, y, textToPrint, ByteColor.BrightRed); }
                 else if (Memory[m].V == 0)
-                { renderer.DrawText(x, y, textToPrint, ByteColor.Silver); }
+                { GUI.Label(x, y, textToPrint, ByteColor.Silver); }
                 else
-                { renderer.DrawText(x, y, textToPrint, ByteColor.White); }
+                { GUI.Label(x, y, textToPrint, ByteColor.White); }
 
                 x += textToPrint.Length;
 
@@ -1099,14 +1102,14 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryPointer(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryPointer(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
                 if (MemoryPointer == m)
-                { renderer.DrawText(x, y, "^   ", ByteColor.BrightRed); }
+                { GUI.Label(x, y, "^   ", ByteColor.BrightRed); }
                 else
-                { renderer.DrawText(x, y, "    ", ByteColor.White); }
+                { GUI.Label(x, y, "    ", ByteColor.White); }
 
                 x += 4;
 
@@ -1121,7 +1124,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawOutput(ConsoleRenderer renderer, string text, int x, int y, int width, int height)
+        void DrawOutput(Win32.Utilities.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
         {
             int _x = x;
             int _y = y;

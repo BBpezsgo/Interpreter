@@ -142,10 +142,10 @@ class LinkedList
 
     export int Length() {
         int n = 1;
-        if (this.Root >= 0)
+        if (this.Root)
         {
             LinkedNode<T> current = this.Root;
-            while (current.Next >= 0) {
+            while (current.Next) {
                 n++;
                 current = current.Next;
             };
@@ -158,10 +158,10 @@ class LinkedList
     }
 
     export void Add(T value) {
-        if (this.Root >= 0)
+        if (this.Root)
         {
             LinkedNode<T> current = this.Root;
-            while (current.Next >= 0) {
+            while (current.Next) {
                 current = current.Next;
             };
             current.Next = new LinkedNode<T>(value);
@@ -174,13 +174,13 @@ class LinkedList
     
     export String ToString()
     {
-        if (this.Root >= 0)
+        if (this.Root)
         {
             LinkedNode<T> current = this.Root;
             
             String result = current.Value.ToString();
 
-            while (current.Next >= 0) {
+            while (current.Next) {
                 current = current.Next;
 
                 result = result + ", " + current.Value.ToString();

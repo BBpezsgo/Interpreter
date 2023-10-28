@@ -142,7 +142,7 @@ namespace LanguageCore.Parser
             hashT.AnalyzedType = TokenAnalyzedType.Hash;
 
             if (!ExpectIdentifier(out var hashName))
-            { throw new SyntaxException($"Expected identifier after '#' , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", hashT); }
+            { throw new SyntaxException($"Expected identifier after \"#\" , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", hashT); }
 
             hashName.AnalyzedType = TokenAnalyzedType.Hash;
 
@@ -152,7 +152,7 @@ namespace LanguageCore.Parser
             while (!ExpectOperator(";", out semicolon))
             {
                 if (!ExpectLiteral(out var parameter))
-                { throw new SyntaxException($"Expected hash literal parameter or ';' , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", CurrentToken); }
+                { throw new SyntaxException($"Expected hash literal parameter or \";\" , got {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", CurrentToken); }
 
                 parameter.ValueToken.AnalyzedType = TokenAnalyzedType.HashParameter;
                 parameters.Add(parameter);
@@ -208,17 +208,17 @@ namespace LanguageCore.Parser
             {
                 if (!ExpectOperator(";"))
                 {
-                    throw new SyntaxException("Expected library name after 'using'", keyword);
+                    throw new SyntaxException("Expected library name after \"using\"", keyword);
                 }
                 else
                 {
-                    Errors.Add(new Error("Expected library name after 'using'", keyword));
+                    Errors.Add(new Error("Expected library name after \"using\"", keyword));
                 }
                 return false;
             }
 
             if (!ExpectOperator(";"))
-            { throw new SyntaxException("Expected ';' at end of statement (after 'using')", keyword.After()); }
+            { throw new SyntaxException("Expected \";\" at end of statement (after \"using\")", keyword.After()); }
 
             usingDefinition = new UsingDefinition(keyword, tokens.ToArray());
 
@@ -254,8 +254,14 @@ namespace LanguageCore.Parser
 
                 TopLevelStatements.Add(statement);
 
-                if (!ExpectOperator(";", out Token? semicolon))
-                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                Token? semicolon;
+                if (NeedSemicolon(statement))
+                {
+                    if (!ExpectOperator(";", out semicolon))
+                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                }
+                else
+                { ExpectOperator(";", out semicolon); }
 
                 statement.Semicolon = semicolon;
             }
@@ -268,25 +274,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             enumDefinition = null;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error($"Attribute \"{attr}\" already applied", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             if (!ExpectIdentifier("enum", out Token? keyword))
             { CurrentTokenIndex = parseStart; return false; }
@@ -297,7 +285,7 @@ namespace LanguageCore.Parser
             { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.After()); }
 
             if (!ExpectOperator("{"))
-            { throw new SyntaxException($"Expected '{{' after enum identifier", identifier.After()); }
+            { throw new SyntaxException($"Expected \"{{\" after enum identifier", identifier.After()); }
 
             identifier.AnalyzedType = TokenAnalyzedType.Enum;
 
@@ -326,10 +314,10 @@ namespace LanguageCore.Parser
                 if (ExpectOperator(","))
                 { continue; }
 
-                throw new SyntaxException("Expected ',' or '}'", CurrentToken);
+                throw new SyntaxException("Expected \",\" or \"}\"", CurrentToken);
             }
 
-            enumDefinition = new(identifier, attributes.ToArray(), members.ToArray());
+            enumDefinition = new(identifier, attributes, members.ToArray());
 
             return true;
         }
@@ -339,25 +327,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             function = null;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 
@@ -395,7 +365,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                { throw new SyntaxException("Expected \",\" or \")\"", CurrentToken); }
                 else
                 { expectParameter = true; }
             }
@@ -404,14 +374,14 @@ namespace LanguageCore.Parser
 
             function = new(modifiers, possibleType, possibleName, null)
             {
-                Attributes = attributes.ToArray(),
+                Attributes = attributes,
                 Parameters = parameters.ToArray(),
             };
 
             Block? block = null;
 
             if (!ExpectOperator(";") && !ExpectBlock(out block))
-            { throw new NotImplementedException(); }
+            { throw new SyntaxException($"Expected \";\" or block", CurrentToken); }
 
             function.Block = block;
 
@@ -427,7 +397,7 @@ namespace LanguageCore.Parser
             }
 
             if (!ExpectOperator("<", out Token? leftP))
-            { throw new SyntaxException($"Expected '<' after keyword \"{keyword}\"", keyword.After()); }
+            { throw new SyntaxException($"Expected \"<\" after keyword \"{keyword}\"", keyword.After()); }
 
             List<Token> parameters = new();
 
@@ -437,7 +407,7 @@ namespace LanguageCore.Parser
             while (!ExpectOperator(">", out rightP) || expectParameter)
             {
                 if (!ExpectIdentifier(out Token? parameter))
-                { throw new SyntaxException("Expected identifier or '>'", CurrentToken); }
+                { throw new SyntaxException("Expected identifier or \">\"", CurrentToken); }
 
                 parameters.Add(parameter);
 
@@ -445,7 +415,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' or '>'", CurrentToken); }
+                { throw new SyntaxException("Expected \",\" or \">\"", CurrentToken); }
                 else
                 { expectParameter = true; }
             }
@@ -460,25 +430,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             macro = null;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the macro", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 
@@ -510,7 +462,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                { throw new SyntaxException("Expected \",\" or \")\"", CurrentToken); }
                 else
                 { expectParameter = true; }
             }
@@ -530,25 +482,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             function = null;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the function", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
@@ -588,7 +522,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                { throw new SyntaxException("Expected \",\" or \")\"", CurrentToken); }
                 else
                 { expectParameter = true; }
             }
@@ -597,14 +531,14 @@ namespace LanguageCore.Parser
 
             function = new(modifiers, possibleType, possibleNameT, templateInfo)
             {
-                Attributes = attributes.ToArray(),
+                Attributes = attributes,
                 Parameters = parameters.ToArray(),
             };
 
             Block? block = null;
 
             if (!ExpectOperator(";") && !ExpectBlock(out block))
-            { throw new NotImplementedException(); }
+            { throw new SyntaxException($"Expected \";\" or block", CurrentToken); }
 
             function.Block = block;
 
@@ -649,7 +583,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' or ')'", CurrentToken); }
+                { throw new SyntaxException("Expected \",\" or \")\"", CurrentToken); }
                 else
                 { expectParameter = true; }
             }
@@ -661,13 +595,8 @@ namespace LanguageCore.Parser
                 Parameters = parameters.ToArray(),
             };
 
-            if (ExpectOperator(";", out var tIdk))
-            { throw new SyntaxException($"Body is required for general function definition", tIdk); }
-
-            Block? block = null;
-
-            if (!ExpectOperator(";") && !ExpectBlock(out block))
-            { throw new NotImplementedException(); }
+            if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out Block? block))
+            { throw new SyntaxException($"Body is required for general function definition", semicolon ?? CurrentToken); }
 
             function.Block = block;
 
@@ -678,25 +607,7 @@ namespace LanguageCore.Parser
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the class", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
@@ -706,10 +617,10 @@ namespace LanguageCore.Parser
             { CurrentTokenIndex = startTokenIndex; return false; }
 
             if (!ExpectIdentifier(out Token? possibleClassName))
-            { throw new SyntaxException("Expected class identifier after keyword 'class'", keyword); }
+            { throw new SyntaxException("Expected class identifier after keyword \"class\"", keyword); }
 
             if (!ExpectOperator("{", out var braceletStart))
-            { throw new SyntaxException("Expected '{' after class identifier", possibleClassName); }
+            { throw new SyntaxException("Expected \"{\" after class identifier", possibleClassName); }
 
             possibleClassName.AnalyzedType = TokenAnalyzedType.Class;
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -738,9 +649,8 @@ namespace LanguageCore.Parser
                 else if (ExpectField(out FieldDefinition? field))
                 {
                     fields.Add(field);
-                    if (!ExpectOperator(";", out Token? semicolon))
-                    { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
-                    field.Semicolon = semicolon;
+                    if (ExpectOperator(";", out Token? semicolon))
+                    { field.Semicolon = semicolon; }
                 }
                 else
                 {
@@ -772,25 +682,7 @@ namespace LanguageCore.Parser
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out var attr))
-            {
-                bool alreadyHave = false;
-                foreach (var attribute in attributes)
-                {
-                    if (attribute.Identifier == attr.Identifier)
-                    {
-                        alreadyHave = true;
-                        break;
-                    }
-                }
-                if (!alreadyHave)
-                {
-                    attributes.Add(attr);
-                }
-                else
-                { Errors.Add(new Error("Attribute '" + attr + "' already applied to the struct", attr.Identifier)); }
-            }
+            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 
@@ -798,10 +690,10 @@ namespace LanguageCore.Parser
             { CurrentTokenIndex = startTokenIndex; return false; }
 
             if (!ExpectIdentifier(out Token? possibleStructName))
-            { throw new SyntaxException("Expected struct identifier after keyword 'struct'", keyword); }
+            { throw new SyntaxException("Expected struct identifier after keyword \"struct\"", keyword); }
 
             if (!ExpectOperator("{", out var braceletStart))
-            { throw new SyntaxException("Expected '{' after struct identifier", possibleStructName); }
+            { throw new SyntaxException("Expected \"{\" after struct identifier", possibleStructName); }
 
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -816,9 +708,8 @@ namespace LanguageCore.Parser
                 { throw new SyntaxException($"Expected field definition", CurrentToken); }
 
                 fields.Add(field);
-                if (!ExpectOperator(";", out Token? semicolon))
-                { Errors.Add(new Error("Expected ';' at end of statement (after field definition)", field.Identifier.After())); }
-                field.Semicolon = semicolon;
+                if (ExpectOperator(";", out Token? semicolon))
+                { field.Semicolon = semicolon; }
 
                 endlessSafe++;
                 if (endlessSafe > 50)
@@ -862,14 +753,14 @@ namespace LanguageCore.Parser
                     if (!ExpectOperator(","))
                     {
                         if (!ExpectOperator("]", out bracketRight))
-                        { throw new SyntaxException("Unbalanced '['", bracketLeft); }
+                        { throw new SyntaxException("Unbalanced \"[\"", bracketLeft); }
                         break;
                     }
                 }
                 else
                 {
                     if (!ExpectOperator("]", out bracketRight))
-                    { throw new SyntaxException("Unbalanced '['", bracketLeft); }
+                    { throw new SyntaxException("Unbalanced \"[\"", bracketLeft); }
                     break;
                 }
 
@@ -1036,7 +927,7 @@ namespace LanguageCore.Parser
                 keywordNew.AnalyzedType = TokenAnalyzedType.Keyword;
 
                 if (!ExpectType(AllowedType.None, out TypeInstance? instanceTypeName))
-                { throw new SyntaxException("Expected instance constructor after keyword 'new'", keywordNew); }
+                { throw new SyntaxException("Expected instance constructor after keyword \"new\"", keywordNew); }
 
                 if (ExpectOperator("(", out Token? bracketLeft))
                 {
@@ -1056,7 +947,7 @@ namespace LanguageCore.Parser
                         { break; }
 
                         if (!ExpectOperator(","))
-                        { throw new SyntaxException("Expected ',' to separate parameters", parameter); }
+                        { throw new SyntaxException("Expected \",\" to separate parameters", parameter); }
                         else
                         { expectParameter = true; }
 
@@ -1127,7 +1018,7 @@ namespace LanguageCore.Parser
                 if (ExpectIdentifier("as", out Token? keyword))
                 {
                     if (!ExpectType(AllowedType.None, out TypeInstance? type))
-                    { throw new SyntaxException($"Expected type after 'as' keyword", keyword.After()); }
+                    { throw new SyntaxException($"Expected type after \"as\" keyword", keyword.After()); }
 
                     statementWithValue = new TypeCast(statementWithValue, keyword, type);
                 }
@@ -1218,8 +1109,15 @@ namespace LanguageCore.Parser
 
                 statements.Add(statement);
 
-                if (!ExpectOperator(";", out Token? semicolon))
-                { Errors.Add(new Error($"Expected ';' at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                Token? semicolon;
+                if (NeedSemicolon(statement))
+                {
+                    if (!ExpectOperator(";", out semicolon))
+                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                }
+                else
+                { ExpectOperator(";", out semicolon); }
+
                 statement.Semicolon = semicolon;
 
                 endlessSafe++;
@@ -1252,7 +1150,7 @@ namespace LanguageCore.Parser
             if (ExpectOperator("=", out Token? eqOperatorToken))
             {
                 if (!ExpectExpression(out initialValue))
-                { throw new SyntaxException("Expected initial value after '=' in variable declaration", eqOperatorToken); }
+                { throw new SyntaxException("Expected initial value after \"=\" in variable declaration", eqOperatorToken); }
             }
             else
             {
@@ -1272,27 +1170,27 @@ namespace LanguageCore.Parser
             tokenFor.AnalyzedType = TokenAnalyzedType.Statement;
 
             if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
-            { throw new SyntaxException("Expected '(' after \"for\" statement", tokenFor.After()); }
+            { throw new SyntaxException("Expected \"(\" after \"for\" statement", tokenFor.After()); }
 
             if (!ExpectVariableDeclaration(out VariableDeclaration? variableDeclaration))
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";", out Token? semicolon1))
-            { throw new SyntaxException("Expected ';' after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
+            { throw new SyntaxException("Expected \";\" after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
             variableDeclaration.Semicolon = semicolon1;
 
             if (!ExpectExpression(out StatementWithValue? condition))
             { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";", out Token? semicolon2))
-            { throw new SyntaxException($"Expected ';' after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
+            { throw new SyntaxException($"Expected \";\" after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
             condition.Semicolon = semicolon2;
 
             if (!ExpectAnySetter(out AnyAssignment? expression))
             { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenParenthesesOpen); }
 
             if (!ExpectOperator(")", out Token? tokenParenthesesClosed))
-            { throw new SyntaxException($"Expected ')' after \"for\" condition, got {CurrentToken}", condition.GetPosition().After()); }
+            { throw new SyntaxException($"Expected \")\" after \"for\" condition, got {CurrentToken}", condition.GetPosition().After()); }
 
             if (!ExpectBlock(out Block? block))
             { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenParenthesesClosed.After()); }
@@ -1309,13 +1207,13 @@ namespace LanguageCore.Parser
             tokenWhile.AnalyzedType = TokenAnalyzedType.Statement;
 
             if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
-            { throw new SyntaxException("Expected '(' after \"while\" statement", tokenWhile); }
+            { throw new SyntaxException("Expected \"(\" after \"while\" statement", tokenWhile); }
 
             if (!ExpectExpression(out StatementWithValue? condition))
             { throw new SyntaxException("Expected condition after \"while\" statement", tokenParenthesesOpen); }
 
             if (!ExpectOperator(")", out Token? tokenParenthesesClose))
-            { throw new SyntaxException("Expected ')' after \"while\" condition", condition); }
+            { throw new SyntaxException("Expected \")\" after \"while\" condition", condition); }
 
             if (!ExpectBlock(out Block? block))
             { throw new SyntaxException("Expected block", tokenParenthesesClose.After()); }
@@ -1365,13 +1263,13 @@ namespace LanguageCore.Parser
             if (needParameters)
             {
                 if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
-                { throw new SyntaxException("Expected '(' after \"" + ifSegmentName + "\" statement", tokenIf); }
+                { throw new SyntaxException("Expected \"(\" after \"" + ifSegmentName + "\" statement", tokenIf); }
 
                 if (!ExpectExpression(out condition))
                 { throw new SyntaxException("Expected condition after \"" + ifSegmentName + "\" statement", tokenParenthesesOpen); }
 
                 if (!ExpectOperator(")"))
-                { throw new SyntaxException("Expected ')' after \"" + ifSegmentName + "\" condition", condition); }
+                { throw new SyntaxException("Expected \")\" after \"" + ifSegmentName + "\" condition", condition); }
             }
 
             if (!ExpectBlock(out Block? block))
@@ -1503,7 +1401,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException($"Expected ',' to separate parameters, got {CurrentToken}", parameter); }
+                { throw new SyntaxException($"Expected \",\" to separate parameters, got {CurrentToken}", parameter); }
                 else
                 { expectParameter = true; }
 
@@ -1754,7 +1652,7 @@ namespace LanguageCore.Parser
                 { break; }
 
                 if (!ExpectOperator(","))
-                { throw new SyntaxException("Expected ',' to separate parameters", parameter); }
+                { throw new SyntaxException("Expected \",\" to separate parameters", parameter); }
                 else
                 { expectParameter = true; }
 
@@ -1892,6 +1790,29 @@ namespace LanguageCore.Parser
 
             attribute = new FunctionDefinition.Attribute(attributeT, parameters.ToArray());
             return true;
+        }
+        FunctionDefinition.Attribute[] ExpectAttributes()
+        {
+            List<FunctionDefinition.Attribute> attributes = new();
+            while (ExpectAttribute(out FunctionDefinition.Attribute? attr))
+            {
+                bool alreadyHave = false;
+                foreach (FunctionDefinition.Attribute attribute in attributes)
+                {
+                    if (attribute.Identifier == attr.Identifier)
+                    {
+                        alreadyHave = true;
+                        break;
+                    }
+                }
+                if (!alreadyHave)
+                {
+                    attributes.Add(attr);
+                }
+                else
+                { Errors.Add(new Error($"Attribute \"{attr}\" already defined", attr.Identifier)); }
+            }
+            return attributes.ToArray();
         }
 
         bool ExpectField([NotNullWhen(true)] out FieldDefinition? field)
@@ -2192,6 +2113,28 @@ namespace LanguageCore.Parser
                 else
                 { break; }
             }
+
+            return true;
+        }
+
+        static bool NeedSemicolon(Statement.Statement? statement)
+        {
+            if (statement == null) return false;
+
+            if (statement is ForLoop)
+            { return false; }
+
+            if (statement is WhileLoop)
+            { return false; }
+
+            if (statement is Block)
+            { return false; }
+
+            if (statement is IfContainer)
+            { return false; }
+
+            if (statement is BaseBranch)
+            { return false; }
 
             return true;
         }

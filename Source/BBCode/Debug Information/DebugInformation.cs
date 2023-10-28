@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Diagnostics;
+using System.Text;
 
 namespace LanguageCore.Runtime
 {
@@ -96,7 +97,14 @@ namespace LanguageCore.Runtime
         public override readonly string ToString()
         {
             if (!IsValid) return "<unknown>";
-            return $"{ReadableIdentifier}";
+            StringBuilder result = new();
+
+            if (IsMacro)
+            { result.Append("macro "); }
+
+            result.Append(ReadableIdentifier);
+
+            return result.ToString();
         }
     }
 

@@ -1,0 +1,11 @@
+using System; 
+
+class Yeah
+{
+  int a;
+  int b;
+}
+
+Yeah yeah = new Yeah;
+yeah.b = 2;
+Print(yeah.b);

@@ -373,7 +373,7 @@ namespace LanguageCore.BBCode.Compiler
             return false;
         }
 
-        public static void SetTypeParameters(CompiledType[] typeParameters, Dictionary<string, CompiledType> typeValues)
+        public static void SetTypeParameters(CompiledType[] typeParameters, TypeArguments typeValues)
         {
             for (int i = 0; i < typeParameters.Length; i++)
             {
@@ -487,11 +487,14 @@ namespace LanguageCore.BBCode.Compiler
             StringBuilder result = new();
             result.Append(ReturnType?.ToString() ?? "null");
             result.Append('(');
-            if (Parameters != null) for (int i = 0; i < Parameters.Length; i++)
+            if (Parameters != null)
+            {
+                for (int i = 0; i < Parameters.Length; i++)
                 {
                     if (i > 0) result.Append(", ");
                     result.Append(Parameters[i]?.ToString() ?? "null");
                 }
+            }
             result.Append(')');
 
             return result.ToString();
@@ -959,7 +962,28 @@ namespace LanguageCore.BBCode.Compiler
         public override string ToString()
         {
             if (IsStackArray)
-            { return $"{Name}[{stackArraySize}]"; }
+            {
+                if (TypeParameters.Length > 0) throw new InternalException();
+                return $"{StackArrayOf}[{stackArraySize}]";
+            }
+
+            if (IsEnum)
+            {
+                if (TypeParameters.Length > 0) throw new InternalException();
+                return Enum.Identifier.Content;
+            }
+
+            if (IsFunction)
+            {
+                if (TypeParameters.Length > 0) throw new InternalException();
+                return Function.ToString();
+            }
+
+            if (IsBuiltin)
+            {
+                if (TypeParameters.Length > 0) throw new InternalException();
+                return BuiltinType.ToString();
+            }
 
             string result = Name;
 
@@ -975,27 +999,16 @@ namespace LanguageCore.BBCode.Compiler
         public static bool operator ==(CompiledType? a, CompiledType? b)
         {
             if (a is null && b is null) return true;
-            if (a is null) return false;
-            if (b is null) return false;
+            if (a is null || b is null) return false;
 
             return a.Equals(b);
         }
         public static bool operator !=(CompiledType? a, CompiledType? b) => !(a == b);
 
-        public static bool operator ==(CompiledType? a, RuntimeType b)
-        {
-            if (a is null) return false;
-
-            return a.Equals(b);
-        }
+        public static bool operator ==(CompiledType? a, RuntimeType b) => a is not null && a.Equals(b);
         public static bool operator !=(CompiledType? a, RuntimeType b) => !(a == b);
 
-        public static bool operator ==(CompiledType? a, Type b)
-        {
-            if (a is null) return false;
-
-            return a.Equals(b);
-        }
+        public static bool operator ==(CompiledType? a, Type b) => a is not null && a.Equals(b);
         public static bool operator !=(CompiledType? a, Type b) => !(a == b);
 
         public static bool operator ==(CompiledType? a, TypeInstance? b)
@@ -1007,24 +1020,21 @@ namespace LanguageCore.BBCode.Compiler
         }
         public static bool operator !=(CompiledType? a, TypeInstance? b) => !(a == b);
 
-        public override bool Equals(object? obj)
-        {
-            if (obj is null) return false;
-            if (obj is not CompiledType other) return false;
-            return this.Equals(other);
-        }
+        public override bool Equals(object? obj) =>
+            obj is not null &&
+            obj is CompiledType other &&
+            this.Equals(other);
 
         public bool Equals(CompiledType? other)
         {
             if (other is null) return false;
-
-            if (this.genericName != other.genericName) return false;
 
             if (this.IsBuiltin != other.IsBuiltin) return false;
             if (this.IsClass != other.IsClass) return false;
             if (this.IsStruct != other.IsStruct) return false;
             if (this.IsFunction != other.IsFunction) return false;
             if (this.IsStackArray != other.IsStackArray) return false;
+            if (this.IsGeneric != other.IsGeneric) return false;
 
             if (!CompiledType.Equals(this.typeParameters, other.typeParameters)) return false;
 
@@ -1033,10 +1043,11 @@ namespace LanguageCore.BBCode.Compiler
             if (this.IsEnum && other.IsEnum) return this.@enum.Identifier.Content == other.@enum.Identifier.Content;
             if (this.IsFunction && other.IsFunction) return this.@function == other.@function;
             if (this.IsStackArray && other.IsStackArray) return this.stackArrayOf == other.stackArrayOf;
+            if (this.IsGeneric && other.IsGeneric) return this.genericName == other.genericName;
 
             if (this.IsBuiltin && other.IsBuiltin) return this.builtinType == other.builtinType;
 
-            return true;
+            throw new NotImplementedException();
         }
 
         public bool Equals(TypeInstance? other)
@@ -1095,11 +1106,7 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public bool Equals(Type other)
-        {
-            if (!this.IsBuiltin) return false;
-            return this.BuiltinType == other;
-        }
+        public bool Equals(Type other) => IsBuiltin && BuiltinType == other;
 
         public bool Equals(RuntimeType other)
         {
@@ -1116,13 +1123,13 @@ namespace LanguageCore.BBCode.Compiler
             return this.RuntimeType == other;
         }
 
-        public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, [NotNullWhen(true)] out Dictionary<string, CompiledType>? typeParameters)
+        public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, [NotNullWhen(true)] out TypeArguments? typeParameters)
         {
             typeParameters = null;
             if (definedParameters is null || passedParameters is null) return false;
             if (definedParameters.Length != passedParameters.Length) return false;
 
-            typeParameters = new Dictionary<string, CompiledType>();
+            typeParameters = new TypeArguments();
 
             for (int i = 0; i < definedParameters.Length; i++)
             {
@@ -1182,11 +1189,21 @@ namespace LanguageCore.BBCode.Compiler
             return true;
         }
 
-        public override int GetHashCode() => HashCode.Combine(builtinType, @struct, @class);
+        public override int GetHashCode()
+        {
+            if (IsBuiltin) return HashCode.Combine((byte)0, builtinType);
+            if (IsEnum) return HashCode.Combine((byte)1, Enum);
+            if (IsClass) return HashCode.Combine((byte)2, Class);
+            if (IsStruct) return HashCode.Combine((byte)3, Struct);
+            if (IsStackArray) return HashCode.Combine((byte)4, StackArrayOf, StackArraySize);
+            if (IsFunction) return HashCode.Combine((byte)5, function);
+            throw new NotImplementedException();
+        }
 
-        public static CompiledType CreateGeneric(string content)
-            => new()
-            { genericName = content, };
+        public static CompiledType CreateGeneric(string content) => new()
+        {
+            genericName = content,
+        };
 
         public static CompiledType[] FromArray(IEnumerable<TypeInstance> types, Func<string, CompiledType> typeFinder)
             => CompiledType.FromArray(types.ToArray(), typeFinder);
@@ -1236,6 +1253,40 @@ namespace LanguageCore.BBCode.Compiler
 
             fieldOffsets = default;
             return false;
+        }
+
+        public bool AllGenericsDefined()
+        {
+            if (IsGeneric) return false;
+
+            if (this.IsBuiltin) return true;
+
+            if (this.IsEnum) return true;
+
+            if (this.IsStackArray)
+            { return this.StackArrayOf.AllGenericsDefined(); }
+
+            if (this.IsFunction)
+            {
+                for (int i = 0; i < this.Function.Parameters.Length; i++)
+                {
+                    if (!this.function.Parameters[i].AllGenericsDefined())
+                    { return false; }
+                }
+                return this.Function.ReturnType.AllGenericsDefined();
+            }
+
+            if (this.IsStruct)
+            { return true; }
+
+            if (this.IsClass)
+            {
+                if (this.Class.TemplateInfo == null)
+                { return true; }
+                return this.TypeParameters.Length > 0;
+            }
+
+            throw new NotImplementedException();
         }
     }
 

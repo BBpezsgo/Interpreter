@@ -36,9 +36,6 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariable(VariableDeclaration variableDeclaration)
         {
-            if (IllegalIdentifiers.Contains(variableDeclaration.VariableName.Content))
-            { throw new CompilerException($"Illegal variable name \"{variableDeclaration.VariableName}\"", variableDeclaration.VariableName, CurrentFile); }
-
             if (Variables.TryFind(variableDeclaration.VariableName.Content, out _))
             { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
@@ -2627,13 +2624,14 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        void Allocate(int size, IThingWithPosition position)
+        int Allocate(int size, IThingWithPosition position)
         {
             if (!TryGetBuiltinFunction("alloc", out CompiledFunction? allocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.INT, size.ToString(), position) }, null, position);
+            return pointerAddress;
         }
 
         int GenerateCodeForLiteralString(Literal literal)
@@ -2763,12 +2761,8 @@ namespace LanguageCore.Brainfuck.Compiler
                 CompiledType passedType = FindStatementType(passed);
                 CompiledType definedType = function.ParameterTypes[i];
 
-                if (passedType != definedType &&
-                    !definedType.IsGeneric)
+                if (passedType != definedType)
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
-
-                if (IllegalIdentifiers.Contains(defined.Identifier.Content))
-                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, CurrentFile); }
 
                 if (compiledParameters.TryFind(defined.Identifier.Content, out _))
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
@@ -2793,8 +2787,7 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
-                                if (v.Type != definedType &&
-                                    !definedType.IsGeneric)
+                                if (v.Type != definedType)
                                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                                 compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
@@ -2827,18 +2820,12 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, (typeName) =>
-                    {
-                        if (typeArguments != null && typeArguments.TryGetValue(typeName, out var type))
-                        { return type; }
-                        return FindType(typeName, defined.Type);
-                    }), value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                    if (variable.Type != definedType &&
-                        !definedType.IsGeneric)
+                    if (variable.Type != definedType)
                     { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
@@ -2992,12 +2979,8 @@ namespace LanguageCore.Brainfuck.Compiler
                 CompiledType passedType = FindStatementType(passed);
                 CompiledType definedType = function.ParameterTypes[i];
 
-                if (passedType != definedType &&
-                    !definedType.IsGeneric)
+                if (passedType != definedType)
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
-
-                if (IllegalIdentifiers.Contains(defined.Identifier.Content))
-                { throw new CompilerException($"Illegal parameter name \"{defined}\"", defined.Identifier, CurrentFile); }
 
                 if (compiledParameters.TryFind(defined.Identifier.Content, out _))
                 { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
@@ -3022,8 +3005,7 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
-                                if (v.Type != definedType &&
-                                    !definedType.IsGeneric)
+                                if (v.Type != definedType)
                                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                                 compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
@@ -3050,18 +3032,12 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, new CompiledType(defined.Type, (typeName) =>
-                    {
-                        if (typeArguments != null && typeArguments.TryGetValue(typeName, out var type))
-                        { return type; }
-                        return FindType(typeName, defined.Type);
-                    }), value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
 
                     if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                    if (variable.Type != definedType &&
-                        !definedType.IsGeneric)
+                    if (variable.Type != definedType)
                     { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
@@ -3074,7 +3050,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
                 else
                 {
-                    throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
+                    throw new NotImplementedException($"Statement \"{passed.GetType().Name}\" does not return a value");
                 }
             }
 

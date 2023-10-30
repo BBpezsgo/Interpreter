@@ -30,9 +30,9 @@ namespace LanguageCore.BBCode.Compiler
         {
             internal readonly T OriginalFunction;
             internal readonly T Function;
-            internal readonly Dictionary<string, CompiledType> TypeArguments;
+            internal readonly TypeArguments TypeArguments;
 
-            public CompliableTemplate(T function, Dictionary<string, CompiledType> typeArguments)
+            public CompliableTemplate(T function, TypeArguments typeArguments)
             {
                 OriginalFunction = function;
                 Function = function.Duplicate();
@@ -189,7 +189,7 @@ namespace LanguageCore.BBCode.Compiler
         readonly List<CompliableTemplate<CompiledOperator>> compilableOperators = new();
         readonly List<CompliableTemplate<CompiledGeneralFunction>> compilableGeneralFunctions = new();
 
-        protected readonly Dictionary<string, CompiledType> TypeArguments;
+        protected readonly TypeArguments TypeArguments;
 
         protected readonly List<Error> Errors;
         protected readonly List<Warning> Warnings;
@@ -213,7 +213,7 @@ namespace LanguageCore.BBCode.Compiler
 
             CurrentFile = null;
 
-            TypeArguments = new Dictionary<string, CompiledType>();
+            TypeArguments = new TypeArguments();
 
             CompiledConstants = new Stack<CompiledConstant>();
             ConstantsStack = new Stack<int>();
@@ -363,16 +363,16 @@ namespace LanguageCore.BBCode.Compiler
             return compilable;
         }
 
-        protected void SetTypeArguments(Dictionary<string, CompiledType> typeArguments)
+        protected void SetTypeArguments(TypeArguments typeArguments)
         {
             TypeArguments.Clear();
             foreach (KeyValuePair<string, CompiledType> typeArgument in typeArguments)
             { TypeArguments.Add(typeArgument.Key, typeArgument.Value); }
         }
 
-        protected void SetTypeArguments(Dictionary<string, CompiledType> typeArguments, out Dictionary<string, CompiledType> replaced)
+        protected void SetTypeArguments(TypeArguments typeArguments, out TypeArguments replaced)
         {
-            replaced = new Dictionary<string, CompiledType>(TypeArguments);
+            replaced = new TypeArguments(TypeArguments);
             TypeArguments.Clear();
             foreach (KeyValuePair<string, CompiledType> typeArgument in typeArguments)
             { TypeArguments.Add(typeArgument.Key, typeArgument.Value); }
@@ -578,7 +578,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (element.Identifier != functionCallStatement.FunctionName) continue;
 
-                if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
                 // if (element.Context != null && element.Context.TemplateInfo != null)
                 // { CollectTypeParameters(FindStatementType(functionCallStatement.PrevStatement), element.Context.TemplateInfo.TypeParameters, typeParameters); }
@@ -774,7 +774,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.ReturnSomething)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
-                Dictionary<string, CompiledType> typeParameters = new(context.CurrentTypeArguments);
+                TypeArguments typeParameters = new(context.CurrentTypeArguments);
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
                 context.ClearTypeArguments();
@@ -822,7 +822,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ReturnSomething)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
-                Dictionary<string, CompiledType> typeParameters = new(context.CurrentTypeArguments);
+                TypeArguments typeParameters = new(context.CurrentTypeArguments);
 
                 compiledFunction = new CompliableTemplate<CompiledFunction>(function, typeParameters);
                 context.ClearTypeArguments();
@@ -1050,7 +1050,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier.Content != @operator.Operator.Content) continue;
-                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
                 if (found)
                 { throw new CompilerException($"Duplicated operator definitions: {compiledOperator} and {function} are the same", function.Identifier, function.FilePath); }
@@ -1119,7 +1119,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
                 if (function.Type.Class != @class) continue;
-                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out Dictionary<string, CompiledType>? typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -1296,9 +1296,7 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
 
-        /// <param name="position">
-        /// Used for exceptions
-        /// </param>
+        /// <param name="position">Used for exceptions</param>
         /// <exception cref="CompilerException"/>
         CompiledType FindType(string name, Position position)
         {
@@ -1325,14 +1323,14 @@ namespace LanguageCore.BBCode.Compiler
         /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        void MapTypeParameters(TypeInstance type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+        void MapTypeParameters(TypeInstance type, Token[] typeParameterNames, TypeArguments typeParameters)
             => MapTypeParameters(new CompiledType(type, FindType), typeParameterNames, typeParameters);
 
         /// <summary>
         /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        static void MapTypeParameters(CompiledType type, Token[] typeParameterNames, Dictionary<string, CompiledType> typeParameters)
+        static void MapTypeParameters(CompiledType type, Token[] typeParameterNames, TypeArguments typeParameters)
         {
             if (type.TypeParameters.Length != typeParameterNames.Length)
             { throw new NotImplementedException($"There should be the same number of type parameter values as type parameter names"); }
@@ -1349,7 +1347,7 @@ namespace LanguageCore.BBCode.Compiler
         /// </para>
         /// </summary>
         /// <exception cref="NotImplementedException"/>
-        static void MapTypeParameters(CompiledType type, Dictionary<string, CompiledType> typeParameters)
+        static void MapTypeParameters(CompiledType type, TypeArguments typeParameters)
         {
             if (!type.IsClass)
             { return; }
@@ -1377,6 +1375,9 @@ namespace LanguageCore.BBCode.Compiler
             {
                 type = new CompiledType(newVariable.Type, FindType, TryCompute);
             }
+
+            if (!type.AllGenericsDefined())
+            { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.VariableName}\" type \"{type}\"", newVariable.FilePath); }
 
             return new CompiledVariable(
                 memoryOffset,

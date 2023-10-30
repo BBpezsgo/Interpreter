@@ -68,8 +68,6 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
-        static readonly string[] IllegalIdentifiers = Array.Empty<string>();
-
         #region Fields
 
         CompiledCode Code;
@@ -664,12 +662,6 @@ namespace LanguageCore.Brainfuck.Compiler
             Compiler.CompilerSettings settings,
             PrintCallback? printCallback = null)
         {
-            foreach (CompiledFunction? function in CompiledFunctions)
-            {
-                if (IllegalIdentifiers.Contains(function.Identifier.Content))
-                { throw new CompilerException($"Illegal function name \"{function.Identifier}\"", function.Identifier, CurrentFile); }
-            }
-
             int constantCount = CompileConstants(compilerResult.TopLevelStatements);
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)

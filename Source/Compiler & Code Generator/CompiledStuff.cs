@@ -327,7 +327,7 @@ namespace LanguageCore.BBCode.Compiler
         public new readonly CompiledField[] Fields;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
         public readonly List<DefinitionReference> References;
-        readonly Dictionary<string, CompiledType> currentTypeArguments;
+        readonly TypeArguments currentTypeArguments;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
 
         public IReadOnlyDictionary<string, int> FieldOffsets
@@ -444,7 +444,7 @@ namespace LanguageCore.BBCode.Compiler
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
             this.TemplateInfo = definition.TemplateInfo;
-            this.currentTypeArguments = new Dictionary<string, CompiledType>();
+            this.currentTypeArguments = new TypeArguments();
 
             base.FilePath = definition.FilePath;
             base.Statements.Clear();
@@ -634,7 +634,7 @@ namespace LanguageCore.BBCode.Compiler
             TimesUsed = TimesUsed,
             TimesUsedTotal = TimesUsedTotal,
         };
-        public CompiledOperatorTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        public CompiledOperatorTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
         {
             CompiledOperatorTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
@@ -791,7 +791,7 @@ namespace LanguageCore.BBCode.Compiler
             return result;
         }
 
-        public CompiledFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        public CompiledFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
         {
             CompiledFunctionTemplateInstance result = new(Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this, this)
             {
@@ -922,7 +922,7 @@ namespace LanguageCore.BBCode.Compiler
             return result;
         }
 
-        public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(Dictionary<string, CompiledType> typeParameters)
+        public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)
         {
             CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this, this)
             {

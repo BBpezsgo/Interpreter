@@ -552,9 +552,11 @@ namespace LanguageCore.Runtime
             if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }
 
+            int parameterCount = CurrentInstruction.ParameterInt;
+
             List<DataItem> parameters = new();
-            for (int i = 0; i < CurrentInstruction.ParameterInt; i++)
-            { parameters.Add(Memory.Stack.Pop()); }
+            for (int i = 1; i <= CurrentInstruction.ParameterInt; i++)
+            { parameters.Add(Memory.Stack[^i]); }
             parameters.Reverse();
 
             if (function is ExternalFunctionManaged managedFunction)

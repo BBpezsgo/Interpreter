@@ -597,14 +597,14 @@ namespace LanguageCore.BBCode.Compiler
 
                             if (parameterTypes[0] == Type.VOID)
                             {
-                                ExternalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                                ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                 });
                             }
                             else
                             {
-                                ExternalFunctions.AddExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                                ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
                                     Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                     return DataItem.GetDefaultValue(returnType);

@@ -353,140 +353,9 @@ namespace LanguageCore.BBCode.Compiler
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
 
-        void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
+
+        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
-            if (!compiledFunction.CanUse(CurrentFile))
-            {
-                Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
-                return;
-            }
-
-            if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
-
-            if (functionCall.IsMethodCall != compiledFunction.IsMethod)
-            { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
-
-            if (compiledFunction.IsMacro)
-            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
-
-            if (compiledFunction.BuiltinFunctionName == "alloc")
-            {
-                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
-                AddInstruction(Opcode.HEAP_ALLOC);
-                return;
-            }
-
-            AddComment($"Call {compiledFunction.ReadableID()} {{");
-
-            if (compiledFunction.IsExternal)
-            {
-                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out var externalFunction))
-                {
-                    Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
-                    AddComment("}");
-                    return;
-                }
-
-                AddComment(" Function Name:");
-                if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
-                {
-                    if (compiledFunction.ExternalFunctionName.Length == 0)
-                    { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
-
-                    if (functionCall.PrevStatement != null)
-                    {
-                        AddComment(" Param prev:");
-                        GenerateCodeForStatement(functionCall.PrevStatement);
-                        if (FindStatementType(functionCall.PrevStatement).InHEAP)
-                        { CheckPointerNull(); }
-                    }
-                    for (int i = 0; i < functionCall.Parameters.Length; i++)
-                    {
-                        AddComment($" Param {i}:");
-                        GenerateCodeForStatement(functionCall.Parameters[i]);
-                    }
-
-                    AddComment($" Function name string pointer (cache):");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
-
-                    AddComment(" .:");
-                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
-
-                    if (compiledFunction.ReturnSomething)
-                    {
-                        if (!functionCall.SaveValue)
-                        {
-                            AddComment($" Clear Return Value:");
-                            AddInstruction(Opcode.POP_VALUE);
-                        }
-                    }
-                }
-                else
-                {
-                    GenerateCodeForLiteralString(compiledFunction.ExternalFunctionName);
-
-                    int offset = -1;
-                    if (functionCall.PrevStatement != null)
-                    {
-                        AddComment(" Param prev:");
-                        GenerateCodeForStatement(functionCall.PrevStatement);
-                        offset--;
-                    }
-                    for (int i = 0; i < functionCall.Parameters.Length; i++)
-                    {
-                        AddComment($" Param {i}:");
-                        GenerateCodeForStatement(functionCall.Parameters[i]);
-                        offset--;
-                    }
-
-                    AddComment($" Load Function Name String Pointer:");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
-
-                    AddComment(" .:");
-                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
-
-                    bool thereIsReturnValue = false;
-                    if (compiledFunction.ReturnSomething)
-                    {
-                        if (!functionCall.SaveValue)
-                        {
-                            AddComment($" Clear Return Value:");
-                            AddInstruction(Opcode.POP_VALUE);
-                        }
-                        else
-                        { thereIsReturnValue = true; }
-                    }
-
-                    AddComment(" Deallocate Function Name String:");
-
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
-                    AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
-                    AddInstruction(Opcode.HEAP_DEALLOC);
-
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
-                    AddInstruction(Opcode.HEAP_DEALLOC);
-
-                    if (thereIsReturnValue)
-                    {
-                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, -2);
-                    }
-                    else
-                    {
-                        AddInstruction(Opcode.POP_VALUE);
-                    }
-                }
-
-                AddComment("}");
-                return;
-            }
-
-            int returnValueSize = 0;
-            if (compiledFunction.ReturnSomething)
-            {
-                returnValueSize = GenerateInitialValue(compiledFunction.Type);
-            }
-
             Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
 
             if (functionCall.PrevStatement != null)
@@ -528,13 +397,48 @@ namespace LanguageCore.BBCode.Compiler
                 parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
             }
 
-            AddComment(" .:");
+            return parameterCleanup;
+        }
 
-            int jumpInstruction = Call(compiledFunction.InstructionOffset);
+        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+        {
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
 
-            if (compiledFunction.InstructionOffset == -1)
-            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, compiledFunction, CurrentFile)); }
+            for (int i = 0; i < functionCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = functionCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
+                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
+                AddComment($" Param {i}:");
+
+                bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.INT);
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                }
+                else
+                {
+                    if (explicitDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
+
+                GenerateCodeForStatement(passedParameter, definedParameterType);
+
+                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+            }
+
+            return parameterCleanup;
+        }
+
+        void GenerateCodeForParameterCleanup(Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup)
+        {
             AddComment(" Clear Params:");
             while (parameterCleanup.Count > 0)
             {
@@ -549,6 +453,146 @@ namespace LanguageCore.BBCode.Compiler
                 for (int i = 0; i < passedParameter.Size; i++)
                 { AddInstruction(Opcode.POP_VALUE); }
             }
+        }
+
+        void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
+        {
+            if (!compiledFunction.CanUse(CurrentFile))
+            {
+                Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                return;
+            }
+
+            if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+
+            if (functionCall.IsMethodCall != compiledFunction.IsMethod)
+            { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+
+            if (compiledFunction.IsMacro)
+            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
+
+            if (compiledFunction.BuiltinFunctionName == "alloc")
+            {
+                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
+                AddInstruction(Opcode.HEAP_ALLOC);
+                return;
+            }
+
+            AddComment($"Call {compiledFunction.ReadableID()} {{");
+
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+
+            int returnValueSize = 0;
+            if (compiledFunction.ReturnSomething)
+            {
+                AddComment($"Initial return value {{");
+                returnValueSize = GenerateInitialValue(compiledFunction.Type);
+                AddComment($"}}");
+            }
+
+            if (compiledFunction.IsExternal)
+            {
+                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out var externalFunction))
+                {
+                    Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
+                    AddComment("}");
+                    return;
+                }
+
+                AddComment(" Function Name:");
+                if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
+                {
+                    if (compiledFunction.ExternalFunctionName.Length == 0)
+                    { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
+
+                    int returnValueOffset = -2;
+
+                    parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
+                    for (int i = 0; i < parameterCleanup.Count; i++)
+                    { returnValueOffset -= parameterCleanup[i].Size; }
+
+                    AddComment($" Function name string pointer (cache):");
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
+
+                    AddComment(" .:");
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+
+                    if (compiledFunction.ReturnSomething)
+                    {
+                        if (functionCall.SaveValue)
+                        {
+                            AddComment($" Store return value:");
+                            for (int i = 0; i < returnValueSize; i++)
+                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, returnValueOffset); }
+                        }
+                        else
+                        {
+                            AddComment($" Clear return value:");
+                            for (int i = 0; i < returnValueSize; i++)
+                            { AddInstruction(Opcode.POP_VALUE); }
+                        }
+                    }
+
+                    GenerateCodeForParameterCleanup(parameterCleanup);
+                }
+                else
+                {
+                    GenerateCodeForLiteralString(compiledFunction.ExternalFunctionName);
+
+                    int functionNameOffset = -1;
+                    int returnValueOffset = -3;
+
+                    parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
+                    for (int i = 0; i < parameterCleanup.Count; i++)
+                    {
+                        functionNameOffset -= parameterCleanup[i].Size;
+                        returnValueOffset -= parameterCleanup[i].Size;
+                    }
+
+                    AddComment($" Load Function Name String Pointer:");
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, functionNameOffset);
+
+                    AddComment(" .:");
+                    AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+
+                    if (compiledFunction.ReturnSomething)
+                    {
+                        if (functionCall.SaveValue)
+                        {
+                            AddComment($" Store return value:");
+                            for (int i = 0; i < returnValueSize; i++)
+                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, returnValueOffset); }
+                        }
+                        else
+                        {
+                            AddComment($" Clear return value:");
+                            for (int i = 0; i < returnValueSize; i++)
+                            { AddInstruction(Opcode.POP_VALUE); }
+                        }
+                    }
+
+                    GenerateCodeForParameterCleanup(parameterCleanup);
+
+                    AddComment(" Deallocate Function Name String:");
+
+                    AddInstruction(Opcode.HEAP_DEALLOC);
+                }
+
+                AddComment("}");
+                return;
+            }
+
+            parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
+
+            AddComment(" .:");
+
+            int jumpInstruction = Call(compiledFunction.InstructionOffset);
+
+            if (compiledFunction.InstructionOffset == -1)
+            { UndefinedFunctionOffsets.Add(new UndefinedFunctionOffset(jumpInstruction, functionCall, compiledFunction, CurrentFile)); }
+
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
             {
@@ -782,6 +826,8 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
+                Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+
                 if (!operatorDefinition.CanUse(CurrentFile))
                 {
                     Errors.Add(new Error($"The {operatorDefinition.ReadableID()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
@@ -808,18 +854,18 @@ namespace LanguageCore.BBCode.Compiler
                     { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
 
                     int offset = -1;
-                    for (int i = 0; i < @operator.Parameters.Length; i++)
-                    {
-                        AddComment($" Param {i}:");
-                        GenerateCodeForStatement(@operator.Parameters[i]);
-                        offset--;
-                    }
+
+                    parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
+                    for (int i = 0; i < parameterCleanup.Count; i++)
+                    { offset -= parameterCleanup[i].Size; }
 
                     AddComment($" Function name string pointer:");
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
 
                     AddComment(" .:");
                     AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
+
+                    GenerateCodeForParameterCleanup(parameterCleanup);
 
                     bool thereIsReturnValue = false;
                     if (!@operator.SaveValue)
@@ -854,34 +900,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 int returnValueSize = GenerateInitialValue(operatorDefinition.Type);
 
-                Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
-
-                for (int i = 0; i < @operator.Parameters.Length; i++)
-                {
-                    StatementWithValue passedParameter = @operator.Parameters[i];
-                    CompiledType passedParameterType = FindStatementType(passedParameter);
-                    ParameterDefinition definedParameter = operatorDefinition.Parameters[i];
-                    CompiledType definedParameterType = operatorDefinition.ParameterTypes[i];
-
-                    if (passedParameterType != definedParameterType)
-                    { }
-
-                    AddComment($" Param {i}:");
-
-                    bool canDeallocate = passedParameterType.InHEAP && definedParameter.Modifiers.Contains("temp");
-
-                    if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
-                    {
-                        if (explicitDeallocate && !canDeallocate)
-                        { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
-                    }
-                    else
-                    { canDeallocate = false; }
-
-                    GenerateCodeForStatement(passedParameter, definedParameterType);
-
-                    parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
-                }
+                parameterCleanup = GenerateCodeForParameterPassing(@operator, operatorDefinition);
 
                 AddComment(" .:");
 
@@ -890,20 +909,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (operatorDefinition.InstructionOffset == -1)
                 { UndefinedOperatorFunctionOffsets.Add(new UndefinedOperatorFunctionOffset(jumpInstruction, @operator, operatorDefinition, CurrentFile)); }
 
-                AddComment(" Clear Params:");
-                while (parameterCleanup.Count > 0)
-                {
-                    var passedParameter = parameterCleanup.Pop();
-
-                    if (passedParameter.CanDeallocate && passedParameter.Size == 1)
-                    {
-                        GenerateDeallocator(passedParameter.Type);
-                        continue;
-                    }
-
-                    for (int i = 0; i < passedParameter.Size; i++)
-                    { AddInstruction(Opcode.POP_VALUE); }
-                }
+                GenerateCodeForParameterCleanup(parameterCleanup);
 
                 if (!@operator.SaveValue)
                 {
@@ -1987,9 +1993,12 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateDeallocator(CompiledType deallocateableType)
         {
+            AddComment($"Deallocate \"{deallocateableType}\" {{");
+
             if (deallocateableType == Type.INT)
             {
                 AddInstruction(Opcode.HEAP_DEALLOC);
+                AddComment("}");
                 return;
             }
 
@@ -2000,6 +2009,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, FunctionNames.Destructor, out var destructorTemplate))
                     {
                         AddInstruction(Opcode.HEAP_DEALLOC);
+                        AddComment("}");
                         return;
                     }
                     destructorTemplate = AddCompilable(destructorTemplate);
@@ -2027,11 +2037,11 @@ namespace LanguageCore.BBCode.Compiler
                 AddInstruction(Opcode.POP_VALUE);
 
                 AddComment("}");
-
                 return;
             }
 
             AddInstruction(Opcode.HEAP_DEALLOC);
+            AddComment("}");
         }
 
         void GenerateCodeForInlinedMacro(Statement inlinedMacro)

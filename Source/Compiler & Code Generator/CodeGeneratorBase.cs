@@ -1620,7 +1620,10 @@ namespace LanguageCore.BBCode.Compiler
                 case LiteralType.BOOLEAN:
                     return FindReplacedType("boolean", literal);
                 case LiteralType.STRING:
-                    return FindReplacedType("string", literal);
+                    CompiledType stringType = FindReplacedType("string", literal);
+                    if (stringType.IsClass && expectedType == Type.INT)
+                    { return expectedType; }
+                    return stringType;
                 case LiteralType.CHAR:
                     return new CompiledType(Type.CHAR);
                 default:
@@ -2586,7 +2589,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        protected bool CanConvertImplicitly(CompiledType? from, CompiledType? to)
+        protected static bool CanConvertImplicitly(CompiledType? from, CompiledType? to)
         {
             if (from is null || to is null) return false;
 
@@ -2594,6 +2597,27 @@ namespace LanguageCore.BBCode.Compiler
                 to.IsEnum &&
                 to.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
             { return true; }
+
+            return false;
+        }
+
+        protected static bool TryConvertType(ref CompiledType? type, CompiledType? targetType)
+        {
+            if (type is null || targetType is null) return false;
+
+            if (type == Type.INT &&
+                targetType.IsEnum &&
+                targetType.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
+            {
+                type = targetType;
+                return true;
+            }
+
+            if (type.IsClass && targetType == Type.INT)
+            {
+                type = targetType;
+                return true;
+            }
 
             return false;
         }

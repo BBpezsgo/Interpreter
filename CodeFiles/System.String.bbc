@@ -95,11 +95,6 @@ class String
         { throw "Index out of range exception"; };
         *((&this) + sizeof(String) + index) = element;
     }
-
-    export destructor()
-    {
-        delete &this;
-    }
 }
 
 export void CopyString(temp String from, String to)

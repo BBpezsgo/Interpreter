@@ -1,0 +1,10 @@
+using System;
+
+[External("MessageBox")]
+int MessageBox(
+           int hWnd,
+           temp String lbText,
+           temp String lpCaption,
+           int uType);
+
+int ah = MessageBox(0, temp "Text", temp "Caption", 0);

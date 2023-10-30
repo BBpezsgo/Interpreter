@@ -135,7 +135,7 @@ namespace LanguageCore.Runtime
         public void Return(DataItem returnValue);
     }
 
-    public static class ExternalFunctionGenerator
+    unsafe public static class ExternalFunctionGenerator
     {
         #region AddExternalFunction()
 
@@ -178,9 +178,9 @@ namespace LanguageCore.Runtime
         public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionManaged(callback, name, parameterTypes, flags));
 
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
-        public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
 
         static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
@@ -200,7 +200,7 @@ namespace LanguageCore.Runtime
         {
             var types = Array.Empty<BBCode.Compiler.Type>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke();
@@ -211,7 +211,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -223,7 +223,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -236,7 +236,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -250,7 +250,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -265,7 +265,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3, T4>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -281,7 +281,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 callback?.Invoke(
@@ -300,7 +300,7 @@ namespace LanguageCore.Runtime
         {
             var types = Array.Empty<BBCode.Compiler.Type>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke()!;
@@ -313,7 +313,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -327,7 +327,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -342,7 +342,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -358,7 +358,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -375,7 +375,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3, T4>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -393,7 +393,7 @@ namespace LanguageCore.Runtime
         {
             var types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
-            functions.AddExternalFunction(name, types, (sender, args) =>
+            functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
                 CheckParameters(name, types, args);
                 TResult result = callback.Invoke(
@@ -469,6 +469,15 @@ namespace LanguageCore.Runtime
 
             if (type == typeof(uint))
             { return (uint)(data.Integer ?? 0); }
+
+            if (type == typeof(IntPtr))
+            {
+                int? integer = data.Integer;
+                if (integer.HasValue)
+                {
+                    return (IntPtr)integer;
+                }
+            }
 
             throw new NotImplementedException($"Type conversion for type {type} not implemented");
         }
@@ -556,6 +565,12 @@ namespace LanguageCore.Runtime
             { return BBCode.Compiler.Type.INT; }
 
             if (type_ == typeof(uint))
+            { return BBCode.Compiler.Type.INT; }
+
+            if (type_ == typeof(IntPtr))
+            { return BBCode.Compiler.Type.INT; }
+
+            if (type_ == typeof(UIntPtr))
             { return BBCode.Compiler.Type.INT; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");

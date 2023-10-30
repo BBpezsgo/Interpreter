@@ -682,7 +682,7 @@ namespace ConsoleGUI
             }
 
             int nextHeader = 0;
-            for (int i = HeapScrollBar.Offset; i < this.Interpreter.BytecodeInterpreter.Memory.Heap!.Size; i++)
+            for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap!.Size; i++)
             {
                 var item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
                 bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is not null);
@@ -693,6 +693,8 @@ namespace ConsoleGUI
                     header = HEAP.GetHeader(item);
                     nextHeader += header.Item1 + HEAP.BLOCK_HEADER_SIZE;
                 }
+
+                if (i < HeapScrollBar.Offset) continue;
 
                 bool addLoadIndicator = false;
                 bool addStoreIndicator = false;

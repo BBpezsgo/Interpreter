@@ -311,7 +311,7 @@ namespace LanguageCore.Tokenizing
                     }
                     else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
                     {
-                        throw new TokenizerException("Invalid hex digit in unicode character: '" + currChar + "' inside literal string", GetCurrentPosition(OffsetTotal));
+                        throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(OffsetTotal));
                     }
                     else
                     {
@@ -338,7 +338,7 @@ namespace LanguageCore.Tokenizing
                     }
                     else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
                     {
-                        throw new TokenizerException("Invalid hex digit in unicode character: '" + currChar + "' inside literal char", GetCurrentPosition(OffsetTotal));
+                        throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(OffsetTotal));
                     }
                     else
                     {
@@ -363,7 +363,7 @@ namespace LanguageCore.Tokenizing
                         '\\' => "\\",
                         '"' => "\"",
                         '0' => "\0",
-                        _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in string.", GetCurrentPosition(OffsetTotal)),
+                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(OffsetTotal)),
                     });
                     CurrentToken.TokenType = TokenType.LITERAL_STRING;
                     continue;
@@ -384,7 +384,7 @@ namespace LanguageCore.Tokenizing
                         '\\' => "\\",
                         '\'' => "\'",
                         '0' => "\0",
-                        _ => throw new TokenizerException("Unknown escape sequence: \\" + currChar + " in char.", GetCurrentPosition(OffsetTotal)),
+                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(OffsetTotal)),
                     });
                     CurrentToken.TokenType = TokenType.LITERAL_CHAR;
                     continue;
@@ -462,21 +462,21 @@ namespace LanguageCore.Tokenizing
                 else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
                     if (CurrentToken.ToString().Contains(currChar))
-                    { throw new TokenizerException($"Invalid float literal format", CurrentToken.Position); }
+                    { throw new TokenizerException($"Am I stupid or is this not a float number?", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
                 else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken.Position); }
+                    { throw new TokenizerException($"Am I stupid or is this not a hex number?", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_HEX;
                 }
                 else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken.Position); }
+                    { throw new TokenizerException($"Am I stupid or is this not a binary number?", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_BIN;
                 }
@@ -501,7 +501,7 @@ namespace LanguageCore.Tokenizing
                         if (currChar != '0' && currChar != '1')
                         {
                             RefreshTokenPosition(OffsetTotal);
-                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", CurrentToken.Position.After());
+                            throw new TokenizerException($"This isn't a binary digit am i right? \'{currChar}\'", CurrentToken.Position.After());
                         }
                     }
 
@@ -663,7 +663,7 @@ namespace LanguageCore.Tokenizing
                     if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
                     {
                         RefreshTokenPosition(OffsetTotal);
-                        throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.Position.After());
+                        throw new TokenizerException($"This isn't a hex digit am i right? \'{currChar}\'", CurrentToken.Position.After());
                     }
                     CurrentToken.Content.Append(currChar);
                 }
@@ -722,7 +722,7 @@ namespace LanguageCore.Tokenizing
                         {
                             if (token.Content.Length != 1)
                             {
-                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token.Position);
+                                throw new TokenizerException($"I think there are more characters than there should be ({token.Content.Length})", token.Position);
                             }
                         }
                         break;

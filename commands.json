@@ -14,6 +14,16 @@
       "fileName": "cmd.exe",
       "workingDirectory": ".",
       "arguments": "/c publish-win64.bat"
+    },
+    "publish-win64-aot": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c publish-win64-aot.bat"
+    },
+    "post-build": {
+      "fileName": "cmd.exe",
+      "workingDirectory": ".",
+      "arguments": "/c post-build.bat"
     }
   }
 }

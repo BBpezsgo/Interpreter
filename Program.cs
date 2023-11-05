@@ -6,12 +6,17 @@
         {
             if (DevelopmentEntry.Start(args)) return;
 
-            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args)) throw new System.Exception($"Invalid arguments");
+            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args))
+            { return; }
 
             switch (settings.RunType)
             {
                 case ArgumentParser.RunType.Debugger:
+#if AOT
+                    LanguageCore.Output.LogError($"System.Text.Json isn't avaliable in AOT mode");
+#else
                     _ = new Debugger(settings);
+#endif
                     break;
                 case ArgumentParser.RunType.Normal:
                     if (settings.ConsoleGUI)

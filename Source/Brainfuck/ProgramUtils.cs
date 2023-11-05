@@ -271,7 +271,7 @@ namespace TheProgram.Brainfuck
 
             if ((options & (int)CompileOptions.WriteToFile) != 0)
             {
-                string compiledFilePath = Path.Combine(Path.GetDirectoryName(file.FullName) ?? TestConstants.TestFilesPath, Path.GetFileNameWithoutExtension(file.FullName) + ".bf");
+                string compiledFilePath = Path.Combine(Path.GetDirectoryName(file.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{file.FullName}\""), Path.GetFileNameWithoutExtension(file.FullName) + ".bf");
                 File.WriteAllText(compiledFilePath, compilerResult.Code);
             }
 

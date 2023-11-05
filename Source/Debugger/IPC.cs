@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -10,12 +11,14 @@ using System.Threading;
 
 namespace Communicating
 {
+    [RequiresDynamicCode("Uses System.Text.Json.JsonSerializer")]
+    [RequiresUnreferencedCode("Uses System.Text.Json.JsonSerializer")]
     public class InterProcessCommunication
     {
         readonly List<IPCMessage<object>> OutgoingMessages = new();
 
-        public delegate void OnRecivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
-        public event OnRecivedEventHandler OnRecived;
+        public delegate void OnReceivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
+        public event OnReceivedEventHandler OnReceived;
 
         readonly Interface @interface;
         internal Interface.Type CommunicationType => @interface.CommunicationType;
@@ -34,11 +37,11 @@ namespace Communicating
 
         public void Start()
         {
-            this.@interface.OnRecived += OnRecive;
+            this.@interface.OnReceived += OnReceive;
             this.@interface.Start();
         }
 
-        private void OnRecive(string data)
+        private void OnReceive(string data)
         {
             var message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
 
@@ -53,7 +56,7 @@ namespace Communicating
                 return;
             }
 
-            OnRecived?.Invoke(this, message);
+            OnReceived?.Invoke(this, message);
         }
 
         public void Reply<T>(string messageType, T messageData, string replyToId)
@@ -94,8 +97,8 @@ namespace Communicating
 
     public class Interface
     {
-        internal delegate void OnRecivedEventHandler(string message);
-        internal event OnRecivedEventHandler OnRecived;
+        internal delegate void OnReceivedEventHandler(string message);
+        internal event OnReceivedEventHandler OnReceived;
 
         static readonly char EOM = Convert.ToChar(4);
         Thread Listener;
@@ -163,7 +166,7 @@ namespace Communicating
                         byte[] payload = new byte[length];
                         Buffer.BlockCopy(buffer, 0, payload, 0, length);
                         string data = inEncoding.GetString(payload).Trim();
-                        OnDataRecived(data);
+                        OnDataReceived(data);
 
                         while (Outgoing.Count > 0)
                         {
@@ -193,7 +196,7 @@ namespace Communicating
             @in?.Dispose();
         }
 
-        void OnDataRecived(string data)
+        void OnDataReceived(string data)
         {
             Incoming += data;
 
@@ -213,11 +216,13 @@ namespace Communicating
                     continue;
                 }
                 Log($" << {message}");
-                OnRecived?.Invoke(message);
+                OnReceived?.Invoke(message);
             }
         }
     }
 
+    [RequiresDynamicCode("Uses System.Text.Json.JsonSerializer")]
+    [RequiresUnreferencedCode("Uses System.Text.Json.JsonSerializer")]
     public class IPCMessage<T>
     {
         [JsonInclude, JsonPropertyName("type")]

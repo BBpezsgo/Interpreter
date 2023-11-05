@@ -104,6 +104,9 @@ namespace LanguageCore.Runtime
             {
                 string dllsFolderPath = Path.Combine(file.Directory!.FullName, basePath?.Replace('/', '\\') ?? string.Empty);
 
+#if AOT
+                Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+#else
                 if (Directory.Exists(dllsFolderPath))
                 {
                     DirectoryInfo dllsFolder = new(dllsFolderPath);
@@ -116,8 +119,9 @@ namespace LanguageCore.Runtime
                 {
                     Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
                 }
+#endif
 
-                CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
+                CodeGenerator.Result? compiledCode = BBCode.EasyCompiler.Compile(
                     file,
                     interpreter.GenerateExternalFunctions(),
                     Tokenizing.TokenizerSettings.Default,

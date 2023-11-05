@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if !AOT
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -16,6 +17,7 @@ namespace LanguageCore.IL.Compiler
     using Literal = Parser.Statement.Literal;
     using Pointer = Parser.Statement.Pointer;
 
+    [RequiresDynamicCode("Generating IL code")]
     public class CodeGenerator : CodeGeneratorBase
     {
         #region Fields
@@ -49,6 +51,7 @@ namespace LanguageCore.IL.Compiler
             type = null;
             return false;
         }
+
 
         #region Precompile
         void Precompile(IEnumerable<Statement>? statements)
@@ -711,3 +714,4 @@ namespace LanguageCore.IL.Compiler
         }
     }
 }
+#endif

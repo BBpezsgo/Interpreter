@@ -1,6 +1,10 @@
 ﻿#define ENABLE_DEBUG
 #define RELEASE_TEST_
 
+#if AOT
+#undef ENABLE_DEBUG
+#endif
+
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -35,6 +39,7 @@ namespace TheProgram
                 $"\"{path}\""
             };
 #endif
+
 #if RELEASE_TEST
             generatedArgs = new string[]
             {
@@ -51,7 +56,11 @@ namespace TheProgram
             switch (settings.RunType)
             {
                 case ArgumentParser.RunType.Debugger:
+#if AOT
+                    LanguageCore.Output.LogError($"System.Text.Json isn't avaliable in AOT mode");
+#else
                     _ = new Debugger(settings);
+#endif
                     break;
                 case ArgumentParser.RunType.Normal:
                     if (settings.ConsoleGUI)
@@ -91,6 +100,9 @@ namespace TheProgram
                     }
                 case ArgumentParser.RunType.IL:
                     {
+#if AOT
+                        throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't avaliable");
+#else
                         LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(settings.File.FullName), settings.File.FullName);
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
@@ -100,8 +112,8 @@ namespace TheProgram
                         LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, settings.compilerSettings, default, null);
 
                         System.Reflection.Assembly assembly = code.Assembly;
-
                         break;
+#endif
                     }
                 case ArgumentParser.RunType.ASM:
                     {

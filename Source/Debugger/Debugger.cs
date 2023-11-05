@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Communicating;
 using LanguageCore;
@@ -9,6 +10,8 @@ using LanguageCore.Runtime;
 
 namespace TheProgram
 {
+    [RequiresDynamicCode("Uses System.Text.Json.JsonSerializer")]
+    [RequiresUnreferencedCode("Uses System.Text.Json.JsonSerializer")]
     internal class Debugger
     {
         readonly InterProcessCommunication Ipc;
@@ -31,7 +34,7 @@ namespace TheProgram
         internal Debugger(ArgumentParser.Settings settings_)
         {
             Ipc = new InterProcessCommunication();
-            Ipc.OnRecived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
+            Ipc.OnReceived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
 
             ArgumentParser.Settings settings = ModifySettings(settings_);
             SourceCode = File.ReadAllText(settings.File.FullName);

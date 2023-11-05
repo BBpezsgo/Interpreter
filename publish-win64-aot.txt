@@ -1,0 +1,12 @@
+MSBuild version 17.7.3+4fca21998 for .NET
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+C:\Program Files\dotnet\sdk\7.0.403\Microsoft.Common.CurrentVersion.targets(870,5): warning MSB3539: The value of the property "BaseIntermediateOutputPath" was modified after it was used by MSBuild which can lead to unexpected build results. Tools such as NuGet will write outputs to the path specified by the "MSBuildProjectExtensionsPath" instead. To set this property, you must do so before Microsoft.Common.props is imported, for example by using Directory.Build.props.  For more information, please visit https://go.microsoft.com/fwlink/?linkid=869650 [C:\Users\bazsi\source\repos\DataUtilities\DataUtilities.csproj]
+  DataUtilities -> C:\Users\bazsi\source\repos\DataUtilities\Build~\bin\Release\net7.0\DataUtilities.dll
+  Win32 -> C:\Users\bazsi\source\repos\Win32-Stuff\bin\Release\net7.0\Win32.dll
+  BBCodeInterpreter -> D:\Program Files\BBCodeProject\BBCode\bin\Release\net7.0\win-x64\BBCodeInterpreter.dll
+  == Post-build started ==
+    D:\Program Files\BBCodeProject\BBCode\bin\ --> C:\Users\bazsi\Documents\GitHub\InterpreterVSCodeExtension\interpreter\
+  
+  == Post-build done ==
+  BBCodeInterpreter -> D:\Program Files\BBCodeProject\BBCode\bin\Release\net7.0\win-x64\publish\

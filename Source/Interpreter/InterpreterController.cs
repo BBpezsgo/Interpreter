@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using LanguageCore.BBCode.Compiler;
 
@@ -263,8 +264,12 @@ namespace LanguageCore.Runtime
             IsPaused = false;
         }
 
+        [RequiresUnreferencedCode("Importing DLL-s")]
         public void LoadDLL(string path)
         {
+#if AOT
+            OnOutput?.Invoke(this, $"Skipping loading DLL \"{path}\" because the compiler compiled in AOT mode", LogType.Warning);
+#else
             OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", LogType.Debug);
             System.Reflection.Assembly dll = System.Reflection.Assembly.LoadFile(path);
             System.Type[] exportedTypes = dll.GetExportedTypes();
@@ -282,6 +287,7 @@ namespace LanguageCore.Runtime
             }
 
             OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", LogType.Debug);
+#endif
         }
 
         public Dictionary<string, ExternalFunctionBase> GenerateExternalFunctions()

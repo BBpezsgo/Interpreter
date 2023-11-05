@@ -515,7 +515,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 address = variable.Address;
 
                 if (size != 1)
-                { throw new NotSupportedException($"In stack array only elements of size 1 are supported by brainfuck", index, CurrentFile); }
+                { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index, CurrentFile); }
 
                 if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem indexValue))
                 {

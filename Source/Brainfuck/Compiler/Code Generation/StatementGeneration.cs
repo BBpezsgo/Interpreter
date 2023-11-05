@@ -467,7 +467,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 int elementSize = elementType.Size;
 
                 if (elementSize != 1)
-                { throw new NotSupportedException($"Array element size must be 1 :(", value, CurrentFile); }
+                { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value, CurrentFile); }
 
                 int indexAddress = Stack.NextAddress;
                 using (Code.Block($"Compute index"))
@@ -1181,7 +1181,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (deletableType.IsClass)
                         {
                             if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
-                            { throw new CompilerException($"Failed to get address of statement \"{deletable}\"", deletable, CurrentFile); }
+                            { throw new CompilerException($"I tried to get the address of \"{deletable}\" but I failed", deletable, CurrentFile); }
 
                             int _pointerAddress = Stack.PushVirtual(1);
 
@@ -1212,7 +1212,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         throw new CompilerException($"Bruh. This probably not stored in heap...", deletable, CurrentFile);
                     }
 
-                case "throw": throw new NotSupportedException($"Exceptions not supported by brainfuck");
+                case "throw": throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)");
 
                 default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
@@ -1993,7 +1993,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             break;
                         }
-                    default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile);
+                    default: throw new CompilerException($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement.Operator, CurrentFile);
                 }
             }
         }

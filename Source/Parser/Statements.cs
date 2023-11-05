@@ -96,7 +96,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{GetType().Name}{Semicolon}";
 
-        public abstract Position GetPosition();
+        public abstract Position Position { get; }
 
         public virtual IEnumerable<Statement> GetStatements()
         { yield break; }
@@ -126,7 +126,7 @@ namespace LanguageCore.Parser.Statement
             this.BracketEnd = bracketEnd;
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(BracketStart, BracketEnd);
 
         public override string ToString()
@@ -188,7 +188,7 @@ namespace LanguageCore.Parser.Statement
             Condition = condition;
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, Condition, Block);
 
         public override string ToString()
@@ -202,7 +202,7 @@ namespace LanguageCore.Parser.Statement
 
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, Block);
     }
 
@@ -224,8 +224,8 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{HashToken}{HashName}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
 
-        public override Position GetPosition()
-            => new Position(HashToken, HashName).Extend(Parameters);
+        public override Position Position
+            => new Position(HashToken, HashName).Union(Parameters);
     }
 
     public class LiteralList : StatementWithValue
@@ -243,7 +243,7 @@ namespace LanguageCore.Parser.Statement
             Values = values;
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(BracketLeft, BracketRight);
 
         public override IEnumerable<Statement> GetStatements()
@@ -298,8 +298,8 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
-        public override Position GetPosition()
-            => new Position(Type, VariableName, InitialValue).Extend(Modifiers);
+        public override Position Position
+            => new Position(Type, VariableName, InitialValue).Union(Modifiers);
 
         public override IEnumerable<Statement> GetStatements()
         {
@@ -342,7 +342,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(PrevStatement, BracketLeft, BracketRight);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
@@ -452,8 +452,8 @@ namespace LanguageCore.Parser.Statement
             return result;
         }
 
-        public override Position GetPosition()
-            => new Position(BracketLeft, BracketRight, Identifier).Extend(MethodParameters);
+        public override Position Position
+            => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
@@ -519,8 +519,8 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position GetPosition()
-            => new Position(Identifier).Extend(Parameters);
+        public override Position Position
+            => new Position(Identifier).Union(Parameters);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
@@ -623,7 +623,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Operator, Left, Right);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
@@ -683,7 +683,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Operator, Left);
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
@@ -711,32 +711,24 @@ namespace LanguageCore.Parser.Statement
             {
                 case "++":
                     {
-                        Literal one = Literal.CreateAnonymous(LiteralType.INT, "1", Operator.GetPosition());
+                        Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
                         one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.OPERATOR), Left, one);
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.OPERATOR, Operator.Position), Left, one);
 
-                        Token assignmentToken = new(TokenType.OPERATOR, "=", true)
-                        {
-                            AbsolutePosition = Operator.AbsolutePosition,
-                            Position = Operator.Position,
-                        };
+                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position);
 
                         return new Assignment(assignmentToken, Left, operatorCall);
                     }
 
                 case "--":
                     {
-                        Literal one = Literal.CreateAnonymous(LiteralType.INT, "1", Operator.GetPosition());
+                        Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
                         one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.OPERATOR), Left, one);
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.OPERATOR, Operator.Position), Left, one);
 
-                        Token assignmentToken = new(TokenType.OPERATOR, "=", true)
-                        {
-                            AbsolutePosition = Operator.AbsolutePosition,
-                            Position = Operator.Position,
-                        };
+                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position);
 
                         return new Assignment(assignmentToken, Left, operatorCall);
                     }
@@ -765,7 +757,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"... {Operator} ...{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Operator, Left, Right);
 
         public override IEnumerable<Statement> GetStatements()
@@ -793,7 +785,7 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => $"... {Operator} ...{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Operator, Left, Right);
 
         public override IEnumerable<Statement> GetStatements()
@@ -804,17 +796,8 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            OperatorCall statementToAssign = new(new Token(TokenType.OPERATOR, Operator.Content.Replace("=", ""), true)
-            {
-                AbsolutePosition = Operator.AbsolutePosition,
-                Position = Operator.Position,
-            }, Left, Right);
-
-            return new Assignment(new Token(TokenType.OPERATOR, "=", true)
-            {
-                AbsolutePosition = Operator.AbsolutePosition,
-                Position = Operator.Position,
-            }, Left, statementToAssign);
+            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", ""), TokenType.OPERATOR, Operator.Position), Left, Right);
+            return new Assignment(Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position), Left, statementToAssign);
         }
     }
 
@@ -837,16 +820,16 @@ namespace LanguageCore.Parser.Statement
         }
 
         public static Literal CreateAnonymous(LiteralType type, string value, IThingWithPosition position)
-            => Literal.CreateAnonymous(type, value, position.GetPosition());
+            => Literal.CreateAnonymous(type, value, position.Position);
         public static Literal CreateAnonymous(LiteralType type, string value, Position position)
         {
             TokenType tokenType = type switch
             {
-                LiteralType.INT => TokenType.LITERAL_NUMBER,
-                LiteralType.FLOAT => TokenType.LITERAL_FLOAT,
-                LiteralType.BOOLEAN => TokenType.IDENTIFIER,
-                LiteralType.STRING => TokenType.LITERAL_STRING,
-                LiteralType.CHAR => TokenType.LITERAL_CHAR,
+                LiteralType.Integer => TokenType.LITERAL_NUMBER,
+                LiteralType.Float => TokenType.LITERAL_FLOAT,
+                LiteralType.Boolean => TokenType.IDENTIFIER,
+                LiteralType.String => TokenType.LITERAL_STRING,
+                LiteralType.Char => TokenType.LITERAL_CHAR,
                 _ => TokenType.IDENTIFIER,
             };
             return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
@@ -857,20 +840,20 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => Type switch
         {
-            LiteralType.INT => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            LiteralType.FLOAT => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            LiteralType.BOOLEAN => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            LiteralType.STRING => $"\"{Value}\"",
-            LiteralType.CHAR => $"'{Value}'",
+            LiteralType.Integer => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.Float => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.Boolean => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            LiteralType.String => $"\"{Value}\"",
+            LiteralType.Char => $"'{Value}'",
             _ => throw new ImpossibleException(),
         };
 
         public object? TryGetValue()
             => Type switch
             {
-                LiteralType.INT => int.Parse(Value),
-                LiteralType.FLOAT => float.Parse(Value),
-                LiteralType.BOOLEAN => bool.Parse(Value),
+                LiteralType.Integer => int.Parse(Value),
+                LiteralType.Float => float.Parse(Value),
+                LiteralType.Boolean => bool.Parse(Value),
                 _ => null,
             };
 
@@ -897,7 +880,7 @@ namespace LanguageCore.Parser.Statement
             return float.Parse(Value.EndsWith('f') ? Value[..^1] : Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => ValueToken == null
                 ? ImaginaryPosition
                 : new Position(ValueToken);
@@ -916,7 +899,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => Name.Content;
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Name);
     }
 
@@ -934,7 +917,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(OperatorToken, PrevStatement);
 
         public override IEnumerable<Statement> GetStatements()
@@ -957,7 +940,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(OperatorToken, PrevStatement);
 
         public override IEnumerable<Statement> GetStatements()
@@ -981,7 +964,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} ({Condition}) {Block}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, Block);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1010,7 +993,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} (...) {Block}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, Block);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1031,7 +1014,7 @@ namespace LanguageCore.Parser.Statement
             Parts = parts.ToArray();
         }
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Parts);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1095,7 +1078,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword}{((Type != IfPart.Else) ? " (...)" : "")} {Block}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, Block);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1163,7 +1146,7 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
             => $"{Keyword} {TypeName}{Semicolon}";
-        public override Position GetPosition()
+        public override Position Position
             => new(Keyword, TypeName);
     }
 
@@ -1213,8 +1196,8 @@ namespace LanguageCore.Parser.Statement
 
             return result.ToString();
         }
-        public override Position GetPosition()
-            => new Position(Keyword, TypeName, BracketLeft, BracketRight).Extend(Parameters);
+        public override Position Position
+            => new Position(Keyword, TypeName, BracketLeft, BracketRight).Union(Parameters);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
@@ -1260,7 +1243,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(PrevStatement, Expression);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
@@ -1300,7 +1283,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement}.{FieldName}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(PrevStatement, FieldName);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1325,7 +1308,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement} {Keyword} {Type}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(PrevStatement, Keyword, Type);
 
         public override IEnumerable<Statement> GetStatements()
@@ -1348,7 +1331,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Modifier} {Statement}{Semicolon}";
 
-        public override Position GetPosition()
+        public override Position Position
             => new(Modifier, Statement);
 
         public override IEnumerable<Statement> GetStatements()

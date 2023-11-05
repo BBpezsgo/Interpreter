@@ -157,9 +157,9 @@ namespace LanguageCore.BBCode.Compiler
 
                 CompiledType valueType = FindStatementType(keywordCall.Parameters[0]);
 
-                if (valueType == Type.INT)
+                if (valueType == Type.Integer)
                 {
-                    GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.INT));
+                    GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                     AddInstruction(Opcode.HEAP_DEALLOC);
 
                     return;
@@ -175,7 +175,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructorTemplate))
                     {
-                        GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.INT));
+                        GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                         AddInstruction(Opcode.HEAP_DEALLOC);
                         AddComment("}");
 
@@ -327,7 +327,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     IsValid = true,
                     IsMacro = true,
-                    SourcePosition = macro.Identifier.GetPosition(),
+                    SourcePosition = macro.Identifier.Position,
                     Identifier = macro.Identifier.Content,
                     File = macro.FilePath,
                     ReadableIdentifier = macro.ReadableID(),
@@ -378,7 +378,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.INT);
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -415,7 +415,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
-                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.INT);
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
 
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
@@ -474,7 +474,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (compiledFunction.BuiltinFunctionName == "alloc")
             {
-                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.INT));
+                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.Integer));
                 AddInstruction(Opcode.HEAP_ALLOC);
                 return;
             }
@@ -504,7 +504,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (ExternalFunctionsCache.TryGetValue(compiledFunction.ExternalFunctionName, out int cacheAddress))
                 {
                     if (compiledFunction.ExternalFunctionName.Length == 0)
-                    { throw new CompilerException($"External function with length of zero", (FunctionDefinition.Attribute)compiledFunction.Attributes.Get("External"), compiledFunction.FilePath); }
+                    { throw new CompilerException($"External function with length of zero", compiledFunction.GetAttribute("External"), compiledFunction.FilePath); }
 
                     int returnValueOffset = -2;
 
@@ -967,19 +967,19 @@ namespace LanguageCore.BBCode.Compiler
         {
             switch (literal.Type)
             {
-                case LiteralType.INT:
+                case LiteralType.Integer:
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(int.Parse(literal.Value)));
                     break;
-                case LiteralType.FLOAT:
+                case LiteralType.Float:
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture)));
                     break;
-                case LiteralType.STRING:
+                case LiteralType.String:
                     GenerateCodeForLiteralString(literal.Value);
                     break;
-                case LiteralType.BOOLEAN:
+                case LiteralType.Boolean:
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem((bool.Parse(literal.Value) ? 1 : 0)));
                     break;
-                case LiteralType.CHAR:
+                case LiteralType.Char:
                     if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.Value[0]));
                     break;
@@ -1410,11 +1410,13 @@ namespace LanguageCore.BBCode.Compiler
         {
             field.FieldName.AnalyzedType = TokenAnalyzedType.FieldName;
 
-            var prevType = FindStatementType(field.PrevStatement);
+            CompiledType prevType = FindStatementType(field.PrevStatement);
 
             if (prevType.IsEnum)
             {
-                AddInstruction(Opcode.PUSH_VALUE, prevType.Enum.Members.Get<string, CompiledEnumMember>(field.FieldName.Content).Value);
+                if (!prevType.Enum.GetValue(field.FieldName.Content, out DataItem enumValue))
+                { throw new CompilerException($"I didn't find anything like \"{field.FieldName.Content}\" in the enum {prevType.Enum.Identifier}", field.FieldName, CurrentFile); }
+                AddInstruction(Opcode.PUSH_VALUE, enumValue);
                 return;
             }
 
@@ -1470,9 +1472,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (index.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", index.PrevStatement, CurrentFile); }
 
-                if (TryCompute(index.Expression, RuntimeType.INT, out DataItem computedIndexData))
+                if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
                 {
-                    if (computedIndexData.ValueInt < 0 || computedIndexData.ValueInt >= prevType.StackArraySize)
+                    if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
                     { Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
 
                     if (GetParameter(identifier.Content, out CompiledParameter? param))
@@ -1480,7 +1482,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        var offset = GetBaseAddress(param, (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack));
+                        var offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack));
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
 
                         if (offset.IsReference)
@@ -1497,7 +1499,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (val.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
-                        int offset = (computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack);
+                        int offset = (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack);
                         ValueAddress address = new(val);
 
                         StackLoad(address + offset, prevType.StackArrayOf.SizeOnStack);
@@ -1684,7 +1686,7 @@ namespace LanguageCore.BBCode.Compiler
             GeneratedDebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
                 Instructions = (startInstruction, GeneratedCode.Count - 1),
-                SourcePosition = statement.GetPosition(),
+                SourcePosition = statement.Position,
             });
         }
 
@@ -1837,9 +1839,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (statementToSet.PrevStatement is not Identifier identifier)
                 { throw new NotSupportedException($"Only variables/parameters supported by now", statementToSet.PrevStatement, CurrentFile); }
 
-                if (TryCompute(statementToSet.Expression, RuntimeType.INT, out DataItem computedIndexData))
+                if (TryCompute(statementToSet.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
                 {
-                    if (computedIndexData.ValueInt < 0 || computedIndexData.ValueInt >= prevType.StackArraySize)
+                    if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
                     { Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
 
                     GenerateCodeForStatement(value);
@@ -1855,7 +1857,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (variable.Type.InHEAP)
                         { throw new NotImplementedException(); }
 
-                        int offset = computedIndexData.ValueInt * prevType.StackArrayOf.SizeOnStack;
+                        int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
                         StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.Size);
                         return;
                     }
@@ -1923,11 +1925,11 @@ namespace LanguageCore.BBCode.Compiler
             }
             else if (variable.Type.IsStackArray)
             {
-                if (variable.Type.StackArrayOf != Type.CHAR)
+                if (variable.Type.StackArrayOf != Type.Char)
                 { throw new InternalException(); }
                 if (value is not LiteralStatement literal)
                 { throw new InternalException(); }
-                if (literal.Type != LiteralType.STRING)
+                if (literal.Type != LiteralType.String)
                 { throw new InternalException(); }
                 if (literal.Value.Length != variable.Type.StackArraySize)
                 { throw new InternalException(); }
@@ -1946,7 +1948,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (variable.Type.InHEAP)
             {
-                AddInstruction(Opcode.STORE_VALUE, variable.AddressingMode(), variable.MemoryAddress);
+                AddInstruction(Opcode.STORE_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
             }
             else
             {
@@ -1972,14 +1974,14 @@ namespace LanguageCore.BBCode.Compiler
             if (valueType.IsEnum)
             { if (CodeGeneratorBase.SameType(valueType.Enum, destination)) return; }
 
-            if (destination.IsBuiltin && destination.BuiltinType == Type.BYTE &&
+            if (destination.IsBuiltin && destination.BuiltinType == Type.Byte &&
                 TryCompute(value, null, out DataItem yeah) &&
-                yeah.Type == RuntimeType.INT)
+                yeah.Type == RuntimeType.SInt32)
             { return; }
 
-            if (value is LiteralStatement literal && literal.Type == LiteralType.STRING)
+            if (value is LiteralStatement literal && literal.Type == LiteralType.String)
             {
-                if (destination.IsStackArray && destination.StackArrayOf == Type.CHAR)
+                if (destination.IsStackArray && destination.StackArrayOf == Type.Char)
                 {
                     string literalValue = literal.Value;
                     if (literalValue.Length != destination.StackArraySize)
@@ -1995,7 +1997,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             AddComment($"Deallocate \"{deallocateableType}\" {{");
 
-            if (deallocateableType == Type.INT)
+            if (deallocateableType == Type.Integer)
             {
                 AddInstruction(Opcode.HEAP_DEALLOC);
                 AddComment("}");
@@ -2067,7 +2069,7 @@ namespace LanguageCore.BBCode.Compiler
                 Location = new SourceCodeLocation()
                 {
                     Instructions = (GeneratedCode.Count, GeneratedCode.Count),
-                    SourcePosition = block.GetPosition(),
+                    SourcePosition = block.Position,
                 },
                 Stack = new List<StackElementInformations>(),
             });
@@ -2168,9 +2170,9 @@ namespace LanguageCore.BBCode.Compiler
                 AddComment("}");
             }
             else if (compiledVariable.Type.IsStackArray &&
-                compiledVariable.Type.StackArrayOf == Type.CHAR &&
+                compiledVariable.Type.StackArrayOf == Type.Char &&
                 newVariable.InitialValue is LiteralStatement literalStatement &&
-                literalStatement.Type == LiteralType.STRING &&
+                literalStatement.Type == LiteralType.String &&
                 literalStatement.Value.Length == compiledVariable.Type.StackArraySize)
             {
                 size = literalStatement.Value.Length;
@@ -2402,7 +2404,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 IsValid = true,
                 IsMacro = false,
-                SourcePosition = function.Identifier.GetPosition(),
+                SourcePosition = function.Identifier.Position,
                 Identifier = function.Identifier.Content,
                 File = function.FilePath,
                 ReadableIdentifier = function.ReadableID(),

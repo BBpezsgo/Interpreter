@@ -1,20 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Text;
 
 namespace LanguageCore
 {
     public static partial class GeneralExtensions
     {
-        public static Range<int> Extend(this Range<int> self, Range<int> range) => self.Extend(range.Start, range.End);
-        public static Range<int> Extend(this Range<int> self, int start, int end) => new()
-        {
-            Start = Math.Min(self.Start, start),
-            End = Math.Max(self.End, end),
-        };
-        public static bool Contains(this Range<int> self, int v) => v >= self.Start && v <= self.End;
-        public static bool IsUnset(this Range<int> self) => self.Start == 0 && self.End == 0;
         public static string Escape(this char v)
         {
             switch (v)
@@ -44,111 +36,38 @@ namespace LanguageCore
             return literal.ToString();
         }
 
-        public static int Sum(this IEnumerable<int> v)
+        public static T Sum<T>(this IEnumerable<T> list) where T : INumber<T>
         {
-            int result = 0;
-            foreach (int item in v)
-            {
-                result += item;
-            }
+            T result = T.Zero;
+            foreach (T item in list)
+            { result += item; }
             return result;
         }
     }
 
-    public static class SearchExtensions
+    public static class RangeExtensions
     {
-        public static TElement? Find<TElement, TQuery>(this TElement[] list, TQuery query) where TElement : ISearchable<TQuery>
+        public static Range<T> Union<T>(this ref Range<T> self, Range<T> range)
+            where T : IEquatable<T>, INumber<T>
+            => new(T.Min(self.Start, range.Start), T.Max(self.End, range.End));
+
+        public static Range<T> Union<T>(this ref Range<T> self, T start, T end)
+            where T : IEquatable<T>, INumber<T>
+            => new(T.Min(self.Start, start), T.Max(self.End, end));
+
+        public static T Size<T>(this Range<T> range) where T : INumber<T>
+            => T.Max(range.Start, range.End) - T.Min(range.Start, range.End);
+
+        public static bool Contains<TRange, TValue>(this Range<TRange> range, TValue value)
+            where TRange : IEquatable<TRange>, IComparisonOperators<TRange, TValue, bool>
+            => range.Start >= value && range.End <= value;
+
+        public static bool Overlaps<T>(this Range<T> a, Range<T> b)
+            where T : IEquatable<T>, IComparisonOperators<T, T, bool>
         {
-            for (int i = 0; i < list.Length; i++)
-            { if (list[i].IsThis(query)) return list[i]; }
-            return default;
+            T maxStart = (a.Start > b.Start) ? a.Start : b.Start;
+            T minEnd = (a.End < b.End) ? a.End : b.End;
+            return maxStart <= minEnd;
         }
-
-        public static TElement? Find<TElement, TQuery>(this IEnumerable<TElement> list, TQuery query) where TElement : ISearchable<TQuery>
-        {
-            foreach (TElement v in list)
-            { if (v.IsThis(query)) return v; }
-            return default;
-        }
-
-        public static TElement? Find<TElement, TQuery>(this List<TElement> list, TQuery query) where TElement : ISearchable<TQuery>
-        {
-            for (int i = 0; i < list.Count; i++)
-            { if (list[i].IsThis(query)) return list[i]; }
-            return default;
-        }
-
-        public static TElement? Find<TElement, TQuery>(this Stack<TElement> list, TQuery query) where TElement : ISearchable<TQuery>
-        {
-            for (int i = 0; i < list.Count; i++)
-            { if (list[i].IsThis(query)) return list[i]; }
-            return default;
-        }
-
-
-        public static bool TryFind<TElement, TQuery>(this TElement[] list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
-        {
-            for (int i = 0; i < list.Length; i++)
-            {
-                if (list[i].IsThis(query))
-                {
-                    result = list[i];
-                    return true;
-                }
-            }
-
-            result = default;
-            return false;
-        }
-
-        public static bool TryFind<TElement, TQuery>(this IEnumerable<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
-        {
-            foreach (TElement v in list)
-            {
-                if (v.IsThis(query))
-                {
-                    result = v;
-                    return true;
-                }
-            }
-
-            result = default;
-            return false;
-        }
-
-        public static bool TryFind<TElement, TQuery>(this List<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
-        {
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (list[i].IsThis(query))
-                {
-                    result = list[i];
-                    return true;
-                }
-            }
-
-            result = default;
-            return false;
-        }
-
-        public static bool TryFind<TElement, TQuery>(this Stack<TElement> list, TQuery query, [MaybeNullWhen(false)] out TElement? result) where TElement : ISearchable<TQuery>
-        {
-            for (int i = 0; i < list.Count; i++)
-            {
-                if (list[i].IsThis(query))
-                {
-                    result = list[i];
-                    return true;
-                }
-            }
-
-            result = default;
-            return false;
-        }
-    }
-
-    public interface ISearchable<T>
-    {
-        public bool IsThis(T query);
     }
 }

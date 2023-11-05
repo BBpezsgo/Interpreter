@@ -297,7 +297,7 @@ namespace LanguageCore.Runtime
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
             AddressingMode.RELATIVE => Memory.Stack.Count + offset,
             AddressingMode.POP => Memory.Stack.Count - 1,
-            AddressingMode.RUNTIME => Memory.Stack.Last.ValueInt,
+            AddressingMode.RUNTIME => Memory.Stack.Last.ValueSInt32,
             _ => offset,
         };
     }

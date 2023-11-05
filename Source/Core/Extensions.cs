@@ -20,18 +20,18 @@ namespace LanguageCore
 
         public static Type Convert(this RuntimeType v) => v switch
         {
-            RuntimeType.BYTE => Type.BYTE,
-            RuntimeType.INT => Type.INT,
-            RuntimeType.FLOAT => Type.FLOAT,
-            RuntimeType.CHAR => Type.CHAR,
+            RuntimeType.UInt8 => Type.Byte,
+            RuntimeType.SInt32 => Type.Integer,
+            RuntimeType.Single => Type.Float,
+            RuntimeType.UInt16 => Type.Char,
             _ => throw new System.NotImplementedException(),
         };
         public static RuntimeType Convert(this Type v) => v switch
         {
-            Type.BYTE => RuntimeType.BYTE,
-            Type.INT => RuntimeType.INT,
-            Type.FLOAT => RuntimeType.FLOAT,
-            Type.CHAR => RuntimeType.CHAR,
+            Type.Byte => RuntimeType.UInt8,
+            Type.Integer => RuntimeType.SInt32,
+            Type.Float => RuntimeType.Single,
+            Type.Char => RuntimeType.UInt16,
             _ => throw new System.NotImplementedException(),
         };
 
@@ -170,15 +170,6 @@ namespace LanguageCore
             return true;
         }
 
-        public static string Repeat(this string v, int count)
-        {
-            string output = string.Empty;
-            for (uint i = 0; i < count; i++)
-            {
-                output += v;
-            }
-            return output;
-        }
         public static bool Contains(this Range<SinglePosition> self, SinglePosition v)
         {
             if (self.Start > v) return false;
@@ -186,16 +177,7 @@ namespace LanguageCore
 
             return true;
         }
-        public static bool Contains(this Range<SinglePosition> self, int Line, int Column)
-        {
-            if (self.Start.Line > Line) return false;
-            if (self.Start.Character > Column) return false;
 
-            if (self.End.Line < Line) return false;
-            if (self.End.Character < Column) return false;
-
-            return true;
-        }
         public static Range<SinglePosition> Extend(this Range<SinglePosition> self, Range<SinglePosition> other)
         {
             Range<SinglePosition> result = new()
@@ -226,15 +208,5 @@ namespace LanguageCore
 
             return result;
         }
-        public static string ToMinString(this Range<SinglePosition> self)
-        {
-            if (self.Start == self.End) return self.Start.ToMinString();
-            if (self.Start.Line == self.End.Line) return $"{self.Start.Line}:({self.Start.Character}-{self.End.Character})";
-            return $"{self.Start.ToMinString()}-{self.End.ToMinString()}";
-        }
-        public static bool IsUnset(this Range<SinglePosition> self) => self.Start.IsUnset() && self.End.IsUnset();
-        public static bool IsUnset(this SinglePosition self) => self.Line == 0 && self.Character == 0;
-
-        public static Position After(this BaseToken self) => new(new Range<SinglePosition>(new SinglePosition(self.Position.End.Line, self.Position.End.Character), new SinglePosition(self.Position.End.Line, self.Position.End.Character + 1)), new Range<int>(self.AbsolutePosition.End, self.AbsolutePosition.End + 1));
     }
 }

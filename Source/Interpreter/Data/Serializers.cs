@@ -10,19 +10,19 @@ namespace LanguageCore.Runtime
             serializer.Serialize((byte)type);
             switch (type)
             {
-                case RuntimeType.BYTE:
-                    serializer.Serialize(valueByte);
+                case RuntimeType.UInt8:
+                    serializer.Serialize(valueUInt8);
                     break;
-                case RuntimeType.INT:
-                    serializer.Serialize(valueInt);
+                case RuntimeType.SInt32:
+                    serializer.Serialize(valueSInt32);
                     break;
-                case RuntimeType.FLOAT:
-                    serializer.Serialize(valueFloat);
+                case RuntimeType.Single:
+                    serializer.Serialize(valueSingle);
                     break;
-                case RuntimeType.CHAR:
-                    serializer.Serialize(valueChar);
+                case RuntimeType.UInt16:
+                    serializer.Serialize(valueUInt16);
                     break;
-                case RuntimeType.NULL:
+                case RuntimeType.Null:
                     break;
                 default: throw new ImpossibleException();
             }
@@ -33,19 +33,19 @@ namespace LanguageCore.Runtime
             type = (RuntimeType)deserializer.DeserializeByte();
             switch (type)
             {
-                case RuntimeType.BYTE:
-                    valueByte = deserializer.DeserializeByte();
+                case RuntimeType.UInt8:
+                    valueUInt8 = deserializer.DeserializeByte();
                     break;
-                case RuntimeType.INT:
-                    valueInt = deserializer.DeserializeInt32();
+                case RuntimeType.SInt32:
+                    valueSInt32 = deserializer.DeserializeInt32();
                     break;
-                case RuntimeType.FLOAT:
-                    valueFloat = deserializer.DeserializeFloat();
+                case RuntimeType.Single:
+                    valueSingle = deserializer.DeserializeFloat();
                     break;
-                case RuntimeType.CHAR:
-                    valueChar = deserializer.DeserializeChar();
+                case RuntimeType.UInt16:
+                    valueUInt16 = deserializer.DeserializeChar();
                     break;
-                case RuntimeType.NULL:
+                case RuntimeType.Null:
                     break;
                 default: throw new ImpossibleException();
             }
@@ -58,11 +58,11 @@ namespace LanguageCore.Runtime
             result["Type"] = Value.Literal(type.ToString());
             result["Value"] = type switch
             {
-                RuntimeType.BYTE => Value.Literal(valueByte),
-                RuntimeType.INT => Value.Literal(valueInt),
-                RuntimeType.FLOAT => Value.Literal(valueFloat),
-                RuntimeType.CHAR => Value.Literal(valueChar),
-                RuntimeType.NULL => "null",
+                RuntimeType.UInt8 => Value.Literal(valueUInt8),
+                RuntimeType.SInt32 => Value.Literal(valueSInt32),
+                RuntimeType.Single => Value.Literal(valueSingle),
+                RuntimeType.UInt16 => Value.Literal(valueUInt16),
+                RuntimeType.Null => "null",
                 _ => throw new ImpossibleException(),
             };
 
@@ -76,19 +76,19 @@ namespace LanguageCore.Runtime
 
             switch (type)
             {
-                case RuntimeType.BYTE:
-                    valueByte = (byte)(data["Value"].Int ?? 0);
+                case RuntimeType.UInt8:
+                    valueUInt8 = (byte)(data["Value"].Int ?? 0);
                     break;
-                case RuntimeType.INT:
-                    valueInt = data["Value"].Int ?? 0;
+                case RuntimeType.SInt32:
+                    valueSInt32 = data["Value"].Int ?? 0;
                     break;
-                case RuntimeType.FLOAT:
-                    valueFloat = data["Value"].Float ?? 0f;
+                case RuntimeType.Single:
+                    valueSingle = data["Value"].Float ?? 0f;
                     break;
-                case RuntimeType.CHAR:
-                    valueChar = (char)(data["Value"].Int ?? 0);
+                case RuntimeType.UInt16:
+                    valueUInt16 = (char)(data["Value"].Int ?? 0);
                     break;
-                case RuntimeType.NULL:
+                case RuntimeType.Null:
                     break;
                 default: throw new ImpossibleException();
             }

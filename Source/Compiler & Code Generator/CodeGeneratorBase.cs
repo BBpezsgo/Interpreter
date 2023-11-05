@@ -1,18 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
-    using System.Runtime.CompilerServices;
-    using System.Threading;
     using ConsoleGUI;
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
-
+    using Runtime;
+    using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
 
     public readonly struct FunctionNames
@@ -465,7 +462,22 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-            => CompiledEnums.TryGetValue(name, out @enum);
+            => CodeGeneratorBase.GetEnum(CompiledEnums, name, out @enum);
+        public static bool GetEnum(CompiledEnum?[] enums, string name, [NotNullWhen(true)] out CompiledEnum? @enum)
+        {
+            for (int i = 0; i < enums.Length; i++)
+            {
+                CompiledEnum? @enum_ = enums[i];
+                if (@enum_ == null) continue;
+                if (@enum_.Identifier.Content == name)
+                {
+                    @enum = @enum_;
+                    return true;
+                }
+            }
+            @enum = null;
+            return false;
+        }
 
         protected abstract bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type);
 
@@ -644,7 +656,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length != 2)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
@@ -664,7 +676,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length != 2)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
@@ -704,7 +716,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length > 3)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
@@ -730,7 +742,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length > 3)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
@@ -768,7 +780,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length != 2)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
@@ -816,7 +828,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.ParameterTypes.Length > 3)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
-                if (function.ParameterTypes[1] != Type.INT)
+                if (function.ParameterTypes[1] != Type.Integer)
                 { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
@@ -1225,12 +1237,29 @@ namespace LanguageCore.BBCode.Compiler
             {
                 var @struct = CompiledStructs[i];
 
-                if (@struct.Name != structName) continue;
+                if (@struct.Name.Content != structName) continue;
 
                 compiledStruct = @struct;
                 return true;
             }
 
+            compiledStruct = null;
+            return false;
+        }
+
+        public static bool GetStruct(CompiledStruct?[] structs, string structName, [NotNullWhen(true)] out CompiledStruct? compiledStruct)
+        {
+            for (int i = 0; i < structs.Length; i++)
+            {
+                CompiledStruct? @struct = structs[i];
+                if (@struct == null) continue;
+
+                if (@struct.Name.Content == structName)
+                {
+                    compiledStruct = @struct;
+                    return true;
+                }
+            }
             compiledStruct = null;
             return false;
         }
@@ -1264,14 +1293,20 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         protected bool GetClass(string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
-            => GetClass(className, 0, out compiledClass);
+            => CodeGeneratorBase.GetClass(CompiledClasses, className, 0, out compiledClass);
         protected bool GetClass(string className, int typeParameterCount, [NotNullWhen(true)] out CompiledClass? compiledClass)
-        {
-            for (int i = 0; i < CompiledClasses.Length; i++)
-            {
-                var @class = CompiledClasses[i];
+            => CodeGeneratorBase.GetClass(CompiledClasses, className, typeParameterCount, out compiledClass);
 
-                if (@class.Name != className) continue;
+        public static bool GetClass(CompiledClass?[] classes, string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
+            => GetClass(classes, className, 0, out compiledClass);
+        public static bool GetClass(CompiledClass?[] classes, string className, int typeParameterCount, [NotNullWhen(true)] out CompiledClass? compiledClass)
+        {
+            for (int i = 0; i < classes.Length; i++)
+            {
+                CompiledClass? @class = classes[i];
+                if (@class == null) continue;
+
+                if (@class.Name.Content != className) continue;
                 if (typeParameterCount > 0 && @class.TemplateInfo != null)
                 { if (@class.TemplateInfo.TypeParameters.Length != typeParameterCount) continue; }
 
@@ -1291,7 +1326,7 @@ namespace LanguageCore.BBCode.Compiler
         protected CompiledType FindType(Token name) => FindType(name.Content, name);
 
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name, IThingWithPosition? position) => FindType(name, position?.GetPosition() ?? Position.UnknownPosition);
+        protected CompiledType FindType(string name, IThingWithPosition? position) => FindType(name, position?.Position ?? Position.UnknownPosition);
 
         /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
@@ -1300,9 +1335,9 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="CompilerException"/>
         CompiledType FindType(string name, Position position)
         {
-            if (CompiledStructs.TryGetValue(name, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (CompiledClasses.TryGetValue(name, out CompiledClass? @class)) return new CompiledType(@class);
-            if (CompiledEnums.TryGetValue(name, out CompiledEnum? @enum)) return new CompiledType(@enum);
+            if (GetStruct(name, out CompiledStruct? @struct)) return new CompiledType(@struct);
+            if (GetClass(name, out CompiledClass? @class)) return new CompiledType(@class);
+            if (GetEnum(name, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
             if (TypeArguments.TryGetValue(name, out CompiledType? typeArgument))
             { return typeArgument; }
@@ -1414,10 +1449,10 @@ namespace LanguageCore.BBCode.Compiler
         protected static DataItem GetInitialValue(Type type)
             => type switch
             {
-                Type.BYTE => new DataItem((byte)0),
-                Type.INT => new DataItem((int)0),
-                Type.FLOAT => new DataItem((float)0f),
-                Type.CHAR => new DataItem((char)'\0'),
+                Type.Byte => new DataItem((byte)0),
+                Type.Integer => new DataItem((int)0),
+                Type.Float => new DataItem((float)0f),
+                Type.Char => new DataItem((char)'\0'),
 
                 _ => throw new InternalException($"Initial value for type \"{type}\" is unimplemented"),
             };
@@ -1503,15 +1538,15 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected CompiledType FindStatementType(KeywordCall keywordCall)
         {
-            if (keywordCall.FunctionName == "return") return new CompiledType(Type.VOID);
+            if (keywordCall.FunctionName == "return") return new CompiledType(Type.Void);
 
-            if (keywordCall.FunctionName == "throw") return new CompiledType(Type.VOID);
+            if (keywordCall.FunctionName == "throw") return new CompiledType(Type.Void);
 
-            if (keywordCall.FunctionName == "break") return new CompiledType(Type.VOID);
+            if (keywordCall.FunctionName == "break") return new CompiledType(Type.Void);
 
-            if (keywordCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
+            if (keywordCall.FunctionName == "sizeof") return new CompiledType(Type.Integer);
 
-            if (keywordCall.FunctionName == "delete") return new CompiledType(Type.VOID);
+            if (keywordCall.FunctionName == "delete") return new CompiledType(Type.Void);
 
             if (keywordCall.FunctionName == "clone")
             {
@@ -1544,7 +1579,7 @@ namespace LanguageCore.BBCode.Compiler
         }
         protected CompiledType FindStatementType(FunctionCall functionCall)
         {
-            if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.INT);
+            if (functionCall.FunctionName == "sizeof") return new CompiledType(Type.Integer);
 
             if (TryGetMacro(functionCall, out MacroDefinition? macro))
             { return FindMacroType(macro, functionCall.Parameters); }
@@ -1582,7 +1617,7 @@ namespace LanguageCore.BBCode.Compiler
 
             CompiledType rightType = FindStatementType(@operator.Right);
 
-            if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType.BuiltinType == Type.VOID || rightType.BuiltinType == Type.VOID)
+            if (!leftType.CanBeBuiltin || !rightType.CanBeBuiltin || leftType.BuiltinType == Type.Void || rightType.BuiltinType == Type.Void)
             { throw new CompilerException($"Unknown operator {leftType} {@operator.Operator.Content} {rightType}", @operator.Operator, CurrentFile); }
 
             if ((expectedType is not null && expectedType.IsBuiltin) ?
@@ -1609,23 +1644,23 @@ namespace LanguageCore.BBCode.Compiler
         {
             switch (literal.Type)
             {
-                case LiteralType.INT:
-                    if (expectedType == Type.BYTE &&
+                case LiteralType.Integer:
+                    if (expectedType == Type.Byte &&
                         int.TryParse(literal.Value, out int value) &&
                         value >= byte.MinValue && value <= byte.MaxValue)
-                    { return new CompiledType(Type.BYTE); }
-                    return new CompiledType(Type.INT);
-                case LiteralType.FLOAT:
-                    return new CompiledType(Type.FLOAT);
-                case LiteralType.BOOLEAN:
+                    { return new CompiledType(Type.Byte); }
+                    return new CompiledType(Type.Integer);
+                case LiteralType.Float:
+                    return new CompiledType(Type.Float);
+                case LiteralType.Boolean:
                     return FindReplacedType("boolean", literal);
-                case LiteralType.STRING:
+                case LiteralType.String:
                     CompiledType stringType = FindReplacedType("string", literal);
-                    if (stringType.IsClass && expectedType == Type.INT)
+                    if (stringType.IsClass && expectedType == Type.Integer)
                     { return expectedType; }
                     return stringType;
-                case LiteralType.CHAR:
-                    return new CompiledType(Type.CHAR);
+                case LiteralType.Char:
+                    return new CompiledType(Type.Char);
                 default:
                     throw new ImpossibleException($"Unknown literal type {literal.Type}");
             }
@@ -1633,7 +1668,7 @@ namespace LanguageCore.BBCode.Compiler
         protected CompiledType FindStatementType(Identifier identifier, CompiledType? expectedType = null)
         {
             if (identifier.Content == "nullptr")
-            { return new CompiledType(Type.INT); }
+            { return new CompiledType(Type.Integer); }
 
             if (GetConstant(identifier.Content, out DataItem constant))
             { return new CompiledType(constant.Type); }
@@ -1654,8 +1689,8 @@ namespace LanguageCore.BBCode.Compiler
 
             throw new CompilerException($"Symbol \"{identifier.Content}\" not found", identifier, CurrentFile);
         }
-        protected static CompiledType FindStatementType(AddressGetter _) => new(Type.INT);
-        protected static CompiledType FindStatementType(Pointer _) => new(Type.UNKNOWN);
+        protected static CompiledType FindStatementType(AddressGetter _) => new(Type.Integer);
+        protected static CompiledType FindStatementType(Pointer _) => new(Type.Unknown);
         protected CompiledType FindStatementType(NewInstance newInstance) => new(newInstance.TypeName, FindType);
         protected CompiledType FindStatementType(ConstructorCall constructorCall) => new(constructorCall.TypeName, FindType);
         protected CompiledType FindStatementType(Field field)
@@ -1664,7 +1699,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (prevStatementType.IsStackArray && field.FieldName == "Length")
             {
-                return new CompiledType(Type.INT);
+                return new CompiledType(Type.Integer);
             }
 
             if (prevStatementType.IsStruct)
@@ -1736,8 +1771,11 @@ namespace LanguageCore.BBCode.Compiler
 
             if (prevStatementType.IsEnum)
             {
-                if (prevStatementType.Enum.Members.TryGetValue(field.FieldName.Content, out CompiledEnumMember? enumMember))
-                { return new CompiledType(enumMember.Value.Type); }
+                foreach (CompiledEnumMember enumMember in prevStatementType.Enum.Members)
+                {
+                    if (enumMember.Identifier.Content == field.FieldName.Content)
+                    { return new CompiledType(enumMember.Value.Type); }
+                }
 
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
@@ -1843,7 +1881,7 @@ namespace LanguageCore.BBCode.Compiler
                     keywordCall.Identifier == "return")
                 {
                     if (keywordCall.Parameters.Length == 0)
-                    { result.Add(new CompiledType(Type.VOID)); }
+                    { result.Add(new CompiledType(Type.Void)); }
                     else
                     { result.Add(FindStatementType(keywordCall.Parameters[0])); }
                 }
@@ -1851,7 +1889,7 @@ namespace LanguageCore.BBCode.Compiler
             });
 
             if (result.Count == 0)
-            { return new CompiledType(Type.VOID); }
+            { return new CompiledType(Type.Void); }
 
             for (int i = 1; i < result.Count; i++)
             {
@@ -2122,16 +2160,16 @@ namespace LanguageCore.BBCode.Compiler
         {
             switch (literal.Type)
             {
-                case LiteralType.INT:
+                case LiteralType.Integer:
                     value = new DataItem(int.Parse(literal.Value));
                     break;
-                case LiteralType.FLOAT:
+                case LiteralType.Float:
                     value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value));
                     break;
-                case LiteralType.BOOLEAN:
+                case LiteralType.Boolean:
                     value = new DataItem(bool.Parse(literal.Value));
                     break;
-                case LiteralType.CHAR:
+                case LiteralType.Char:
                     if (literal.Value.Length != 1)
                     {
                         value = DataItem.Null;
@@ -2139,7 +2177,7 @@ namespace LanguageCore.BBCode.Compiler
                     }
                     value = new DataItem(literal.Value[0]);
                     break;
-                case LiteralType.STRING:
+                case LiteralType.String:
                 default:
                     value = DataItem.Null;
                     return false;
@@ -2274,27 +2312,27 @@ namespace LanguageCore.BBCode.Compiler
         {
             switch (type)
             {
-                case RuntimeType.BYTE:
+                case RuntimeType.UInt8:
                     switch (input.Type)
                     {
-                        case RuntimeType.BYTE:
+                        case RuntimeType.UInt8:
                             value = input;
                             return true;
-                        case RuntimeType.INT:
-                            if (input.ValueInt >= byte.MinValue && input.ValueInt <= byte.MaxValue)
+                        case RuntimeType.SInt32:
+                            if (input.ValueSInt32 >= byte.MinValue && input.ValueSInt32 <= byte.MaxValue)
                             {
-                                value = new DataItem((byte)input.ValueInt);
+                                value = new DataItem((byte)input.ValueSInt32);
                                 return true;
                             }
                             value = input;
                             return false;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             value = input;
                             return false;
-                        case RuntimeType.CHAR:
-                            if (input.ValueChar >= byte.MinValue && input.ValueChar <= byte.MaxValue)
+                        case RuntimeType.UInt16:
+                            if (input.ValueUInt16 >= byte.MinValue && input.ValueUInt16 <= byte.MaxValue)
                             {
-                                value = new DataItem((byte)input.ValueChar);
+                                value = new DataItem((byte)input.ValueUInt16);
                                 return true;
                             }
                             value = input;
@@ -2303,62 +2341,62 @@ namespace LanguageCore.BBCode.Compiler
                             value = input;
                             return false;
                     }
-                case RuntimeType.INT:
+                case RuntimeType.SInt32:
                     switch (input.Type)
                     {
-                        case RuntimeType.BYTE:
-                            value = new DataItem((int)input.ValueByte);
+                        case RuntimeType.UInt8:
+                            value = new DataItem((int)input.ValueUInt8);
                             return true;
-                        case RuntimeType.INT:
+                        case RuntimeType.SInt32:
                             value = input;
                             return true;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             value = input;
                             return false;
-                        case RuntimeType.CHAR:
-                            value = new DataItem((int)input.ValueChar);
+                        case RuntimeType.UInt16:
+                            value = new DataItem((int)input.ValueUInt16);
                             return true;
                         default:
                             value = input;
                             return false;
                     }
-                case RuntimeType.FLOAT:
+                case RuntimeType.Single:
                     switch (input.Type)
                     {
-                        case RuntimeType.BYTE:
-                            value = new DataItem((float)input.ValueByte);
+                        case RuntimeType.UInt8:
+                            value = new DataItem((float)input.ValueUInt8);
                             return true;
-                        case RuntimeType.INT:
-                            value = new DataItem((float)input.ValueInt);
+                        case RuntimeType.SInt32:
+                            value = new DataItem((float)input.ValueSInt32);
                             return true;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             value = input;
                             return true;
-                        case RuntimeType.CHAR:
-                            value = new DataItem((float)input.ValueChar);
+                        case RuntimeType.UInt16:
+                            value = new DataItem((float)input.ValueUInt16);
                             return true;
                         default:
                             value = input;
                             return false;
                     }
-                case RuntimeType.CHAR:
+                case RuntimeType.UInt16:
                     switch (input.Type)
                     {
-                        case RuntimeType.BYTE:
-                            value = new DataItem((char)input.ValueByte);
+                        case RuntimeType.UInt8:
+                            value = new DataItem((char)input.ValueUInt8);
                             return true;
-                        case RuntimeType.INT:
-                            if (input.ValueInt >= char.MinValue && input.ValueInt <= char.MaxValue)
+                        case RuntimeType.SInt32:
+                            if (input.ValueSInt32 >= char.MinValue && input.ValueSInt32 <= char.MaxValue)
                             {
-                                value = new DataItem((char)input.ValueInt);
+                                value = new DataItem((char)input.ValueSInt32);
                                 return true;
                             }
                             value = input;
                             return false;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             value = input;
                             return false;
-                        case RuntimeType.CHAR:
+                        case RuntimeType.UInt16:
                             value = input;
                             return true;
                         default:
@@ -2593,7 +2631,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (from is null || to is null) return false;
 
-            if (from == Type.INT &&
+            if (from == Type.Integer &&
                 to.IsEnum &&
                 to.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
             { return true; }
@@ -2605,7 +2643,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (type is null || targetType is null) return false;
 
-            if (type == Type.INT &&
+            if (type == Type.Integer &&
                 targetType.IsEnum &&
                 targetType.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
             {
@@ -2613,7 +2651,7 @@ namespace LanguageCore.BBCode.Compiler
                 return true;
             }
 
-            if (type.IsClass && targetType == Type.INT)
+            if (type.IsClass && targetType == Type.Integer)
             {
                 type = targetType;
                 return true;

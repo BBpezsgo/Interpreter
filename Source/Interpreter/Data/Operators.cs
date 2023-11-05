@@ -5,7 +5,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -41,7 +41,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -78,7 +78,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftLeft(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -106,7 +106,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem BitshiftRight(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -135,7 +135,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator *(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -171,7 +171,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator /(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -207,7 +207,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator %(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -329,7 +329,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -357,7 +357,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator &(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;
@@ -385,7 +385,7 @@
         /// <exception cref="RuntimeException"/>
         public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.BYTE && rightSide.Type == RuntimeType.BYTE)
+            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
             {
                 byte? left = leftSide.Byte;
                 byte? right = rightSide.Byte;

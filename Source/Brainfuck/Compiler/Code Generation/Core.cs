@@ -33,6 +33,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
     public partial class CodeGenerator : CodeGeneratorBase
     {
+        const string ReturnVariableName = "@return";
+
         readonly struct DebugInfoBlock : IDisposable
         {
             readonly int InstructionStart;
@@ -53,7 +55,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 InstructionStart = code.GetFinalCode().Length;
                 Code = code;
                 DebugInfo = debugInfo;
-                Position = position.GetPosition();
+                Position = position.Position;
             }
 
             public void Dispose()
@@ -153,25 +155,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        readonly struct ConstantVariable : ISearchable<string>
-        {
-            internal readonly string Name;
-            internal readonly DataItem Value;
-
-            public ConstantVariable(string name, DataItem value)
-            {
-                Name = name;
-                Value = value;
-            }
-
-            public bool IsThis(string query) => query == Name;
-
-            string GetDebuggerDisplay()
-                => $"{Name}: {Value}";
-        }
-
-        [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        struct Variable : ISearchable<string>
+        struct Variable
         {
             public readonly string Name;
             public readonly int Address;
@@ -196,18 +180,14 @@ namespace LanguageCore.Brainfuck.Compiler
                 IsInitialValueSet = false;
             }
 
-            public readonly bool IsThis(string query)
-                => query == Name;
-
-            readonly string GetDebuggerDisplay()
-                => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
+            readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
         }
 
         DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (Variables.TryFind(symbolName, out Variable variable))
+            if (CodeGenerator.GetVariable(Variables, symbolName, out Variable variable))
             {
                 type = variable.Type;
                 return true;
@@ -220,6 +200,20 @@ namespace LanguageCore.Brainfuck.Compiler
             }
 
             type = null;
+            return false;
+        }
+
+        static bool GetVariable(IEnumerable<Variable> variables, string name, out Variable variable)
+        {
+            foreach (Variable variable_ in variables)
+            {
+                if (variable_.Name == name)
+                {
+                    variable = variable_;
+                    return true;
+                }
+            }
+            variable = default;
             return false;
         }
 
@@ -269,7 +263,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (_statement == null) continue;
 
                 if (_statement is Identifier identifier &&
-                    Variables.TryFind(identifier.Content, out var _variable) &&
+                    CodeGenerator.GetVariable(Variables, identifier.Content, out Variable _variable) &&
                     _variable.Name == variable.Name
                     )
                 {
@@ -382,16 +376,16 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         static int GetValueSize(Literal statement) => statement.Type switch
         {
-            LiteralType.STRING => 1, // throw new NotSupportedException($"String literals not supported by brainfuck"),
-            LiteralType.INT => 1,
-            LiteralType.CHAR => 1,
-            LiteralType.FLOAT => 1,
-            LiteralType.BOOLEAN => 1,
+            LiteralType.String => 1, // throw new NotSupportedException($"String literals not supported by brainfuck"),
+            LiteralType.Integer => 1,
+            LiteralType.Char => 1,
+            LiteralType.Float => 1,
+            LiteralType.Boolean => 1,
             _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
         };
         int GetValueSize(Identifier statement)
         {
-            if (Variables.TryFind(statement.Content, out Variable variable))
+            if (CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -512,7 +506,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (index.PrevStatement is not Identifier arrayIdentifier)
             { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
-            if (!Variables.TryFind(arrayIdentifier.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, arrayIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
             if (variable.Type.IsStackArray)
@@ -523,9 +517,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (size != 1)
                 { throw new NotSupportedException($"In stack array only elements of size 1 are supported by brainfuck", index, CurrentFile); }
 
-                if (TryCompute(index.Expression, RuntimeType.INT, out DataItem indexValue))
+                if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem indexValue))
                 {
-                    address = variable.Address + (indexValue.ValueInt * 2 * variable.Type.StackArrayOf.SizeOnStack);
+                    address = variable.Address + (indexValue.ValueSInt32 * 2 * variable.Type.StackArrayOf.SizeOnStack);
                     return true;
                 }
 
@@ -570,7 +564,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!DataItem.TryShrinkToByte(ref addressToSet))
             { throw new CompilerException($"Address value must be a byte (not {addressToSet.Type})", pointer.PrevStatement, CurrentFile); }
 
-            address = addressToSet.ValueByte;
+            address = addressToSet.ValueUInt8;
             size = 1;
 
             return true;
@@ -578,7 +572,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         bool TryGetAddress(Identifier identifier, out int address, out int size)
         {
-            if (!Variables.TryFind(identifier.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             address = variable.Address;
@@ -637,7 +631,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
         {
-            if (!Variables.TryFind(identifier.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             if (!variable.Type.IsClass)

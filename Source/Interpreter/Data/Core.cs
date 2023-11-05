@@ -5,11 +5,11 @@ namespace LanguageCore.Runtime
 {
     public enum RuntimeType : byte
     {
-        NULL,
-        BYTE,
-        INT,
-        FLOAT,
-        CHAR,
+        Null,
+        UInt8,
+        SInt32,
+        Single,
+        UInt16,
     }
 
     [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
@@ -26,13 +26,13 @@ namespace LanguageCore.Runtime
         #region Value Fields
 
         [FieldOffset(1)]
-        byte valueByte;
+        byte valueUInt8;
         [FieldOffset(1)]
-        int valueInt;
+        int valueSInt32;
         [FieldOffset(1)]
-        float valueFloat;
+        float valueSingle;
         [FieldOffset(1)]
-        char valueChar;
+        char valueUInt16;
 
         #endregion
 
@@ -40,77 +40,77 @@ namespace LanguageCore.Runtime
         {
             get
             {
-                if (valueByte != 0) return false;
-                if (valueInt != 0) return false;
-                if (valueFloat != 0) return false;
-                if (valueChar != 0) return false;
-                return type == RuntimeType.NULL;
+                if (valueUInt8 != 0) return false;
+                if (valueSInt32 != 0) return false;
+                if (valueSingle != 0) return false;
+                if (valueUInt16 != 0) return false;
+                return type == RuntimeType.Null;
             }
         }
 
         #region Value Properties
 
         /// <exception cref="RuntimeException"/>
-        public byte ValueByte
+        public byte ValueUInt8
         {
             readonly get
             {
-                if (Type == RuntimeType.BYTE)
-                { return valueByte; }
+                if (Type == RuntimeType.UInt8)
+                { return valueUInt8; }
 
                 throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to byte");
             }
             set
             {
-                valueByte = value;
+                valueUInt8 = value;
             }
         }
         /// <exception cref="RuntimeException"/>
-        public int ValueInt
+        public int ValueSInt32
         {
             readonly get
             {
-                if (Type == RuntimeType.INT)
-                { return valueInt; }
+                if (Type == RuntimeType.SInt32)
+                { return valueSInt32; }
 
                 throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to integer");
             }
             set
             {
-                valueInt = value;
+                valueSInt32 = value;
             }
         }
         /// <exception cref="RuntimeException"/>
-        public float ValueFloat
+        public float ValueSingle
         {
             readonly get
             {
-                if (Type == RuntimeType.FLOAT)
-                { return valueFloat; }
+                if (Type == RuntimeType.Single)
+                { return valueSingle; }
 
                 throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to float");
             }
             set
             {
-                valueFloat = value;
+                valueSingle = value;
             }
         }
         /// <exception cref="RuntimeException"/>
-        public char ValueChar
+        public char ValueUInt16
         {
             readonly get
             {
-                if (Type == RuntimeType.CHAR)
-                { return valueChar; }
+                if (Type == RuntimeType.UInt16)
+                { return valueUInt16; }
 
-                if (Type == RuntimeType.INT)
-                { return (char)valueInt; }
+                if (Type == RuntimeType.SInt32)
+                { return (char)valueSInt32; }
 
                 throw new RuntimeException($"Can't cast {Type.ToString().ToLower()} to char");
             }
             set
             {
-                valueChar = value;
+                valueUInt16 = value;
             }
         }
 
@@ -122,22 +122,22 @@ namespace LanguageCore.Runtime
         {
             this.type = type;
 
-            this.valueInt = default;
-            this.valueByte = default;
-            this.valueFloat = default;
-            this.valueChar = default;
+            this.valueSInt32 = default;
+            this.valueUInt8 = default;
+            this.valueSingle = default;
+            this.valueUInt16 = default;
 
             // this.Tag = tag;
         }
 
-        public DataItem(int value) : this(RuntimeType.INT)
-        { this.valueInt = value; }
-        public DataItem(byte value) : this(RuntimeType.BYTE)
-        { this.valueByte = value; }
-        public DataItem(float value) : this(RuntimeType.FLOAT)
-        { this.valueFloat = value; }
-        public DataItem(char value) : this(RuntimeType.CHAR)
-        { this.valueChar = value; }
+        public DataItem(int value) : this(RuntimeType.SInt32)
+        { this.valueSInt32 = value; }
+        public DataItem(byte value) : this(RuntimeType.UInt8)
+        { this.valueUInt8 = value; }
+        public DataItem(float value) : this(RuntimeType.Single)
+        { this.valueSingle = value; }
+        public DataItem(char value) : this(RuntimeType.UInt16)
+        { this.valueUInt16 = value; }
         public DataItem(bool value) : this(value ? 1 : 0)
         { }
 
@@ -146,21 +146,21 @@ namespace LanguageCore.Runtime
         /// <exception cref="ImpossibleException"></exception>
         public readonly bool Boolean => this.Type switch
         {
-            RuntimeType.BYTE => this.valueByte != 0,
-            RuntimeType.INT => this.valueInt != 0,
-            RuntimeType.FLOAT => this.valueFloat != 0f,
-            RuntimeType.CHAR => this.valueChar != 0,
-            RuntimeType.NULL => false,
+            RuntimeType.UInt8 => this.valueUInt8 != 0,
+            RuntimeType.SInt32 => this.valueSInt32 != 0,
+            RuntimeType.Single => this.valueSingle != 0f,
+            RuntimeType.UInt16 => this.valueUInt16 != 0,
+            RuntimeType.Null => false,
             _ => throw new ImpossibleException(),
         };
         /// <exception cref="ImpossibleException"></exception>
         public readonly int? Integer => Type switch
         {
-            RuntimeType.BYTE => this.ValueByte,
-            RuntimeType.INT => this.ValueInt,
-            RuntimeType.CHAR => this.ValueChar,
-            RuntimeType.FLOAT => null,
-            RuntimeType.NULL => null,
+            RuntimeType.UInt8 => this.ValueUInt8,
+            RuntimeType.SInt32 => this.ValueSInt32,
+            RuntimeType.UInt16 => this.ValueUInt16,
+            RuntimeType.Single => null,
+            RuntimeType.Null => null,
             _ => throw new ImpossibleException(),
         };
         public readonly byte? Byte
@@ -181,32 +181,32 @@ namespace LanguageCore.Runtime
         /// <exception cref="ImpossibleException"></exception>
         public readonly float Float => Type switch
         {
-            RuntimeType.BYTE => this.ValueByte,
-            RuntimeType.INT => this.ValueInt,
-            RuntimeType.FLOAT => this.ValueFloat,
-            RuntimeType.CHAR => this.ValueChar,
-            RuntimeType.NULL => 0f,
+            RuntimeType.UInt8 => this.ValueUInt8,
+            RuntimeType.SInt32 => this.ValueSInt32,
+            RuntimeType.Single => this.ValueSingle,
+            RuntimeType.UInt16 => this.ValueUInt16,
+            RuntimeType.Null => 0f,
             _ => throw new ImpossibleException(),
         };
 
         public readonly object? GetValue() => type switch
         {
-            RuntimeType.BYTE => (object)valueByte,
-            RuntimeType.INT => (object)valueInt,
-            RuntimeType.FLOAT => (object)valueFloat,
-            RuntimeType.CHAR => (object)valueChar,
-            RuntimeType.NULL => (object?)null,
+            RuntimeType.UInt8 => (object)valueUInt8,
+            RuntimeType.SInt32 => (object)valueSInt32,
+            RuntimeType.Single => (object)valueSingle,
+            RuntimeType.UInt16 => (object)valueUInt16,
+            RuntimeType.Null => (object?)null,
             _ => throw new ImpossibleException(),
         };
 
         /// <exception cref="ImpossibleException"/>
         public readonly override string ToString() => this.IsNull ? "null" : Type switch
         {
-            RuntimeType.INT => ValueInt.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.BYTE => ValueByte.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.FLOAT => ValueFloat.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.CHAR => ValueChar.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.NULL => "null",
+            RuntimeType.SInt32 => ValueSInt32.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.UInt8 => ValueUInt8.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.Single => ValueSingle.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.UInt16 => ValueUInt16.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.Null => "null",
             _ => throw new ImpossibleException(),
         };
 
@@ -216,11 +216,11 @@ namespace LanguageCore.Runtime
             if (IsNull) return "null";
             return Type switch
             {
-                RuntimeType.INT => ValueInt.ToString(),
-                RuntimeType.BYTE => ValueByte.ToString(),
-                RuntimeType.FLOAT => ValueFloat.ToString().Replace(',', '.') + "f",
-                RuntimeType.CHAR => $"'{ValueChar.Escape()}'",
-                RuntimeType.NULL => "null",
+                RuntimeType.SInt32 => ValueSInt32.ToString(),
+                RuntimeType.UInt8 => ValueUInt8.ToString(),
+                RuntimeType.Single => ValueSingle.ToString().Replace(',', '.') + "f",
+                RuntimeType.UInt16 => $"'{ValueUInt16.Escape()}'",
+                RuntimeType.Null => "null",
                 _ => throw new ImpossibleException(),
             };
         }
@@ -231,17 +231,17 @@ namespace LanguageCore.Runtime
             hash.Add(Type);
             switch (Type)
             {
-                case RuntimeType.BYTE:
-                    hash.Add(valueByte);
+                case RuntimeType.UInt8:
+                    hash.Add(valueUInt8);
                     break;
-                case RuntimeType.INT:
-                    hash.Add(valueInt);
+                case RuntimeType.SInt32:
+                    hash.Add(valueSInt32);
                     break;
-                case RuntimeType.FLOAT:
-                    hash.Add(valueFloat);
+                case RuntimeType.Single:
+                    hash.Add(valueSingle);
                     break;
-                case RuntimeType.CHAR:
-                    hash.Add(valueChar);
+                case RuntimeType.UInt16:
+                    hash.Add(valueUInt16);
                     break;
                 default: throw new ImpossibleException();
             }
@@ -254,11 +254,11 @@ namespace LanguageCore.Runtime
             this.Type == value.Type &&
             this.Type switch
             {
-                RuntimeType.BYTE => valueByte == value.valueByte,
-                RuntimeType.INT => valueInt == value.valueInt,
-                RuntimeType.FLOAT => valueFloat == value.valueFloat,
-                RuntimeType.CHAR => valueChar == value.valueChar,
-                RuntimeType.NULL => false,
+                RuntimeType.UInt8 => valueUInt8 == value.valueUInt8,
+                RuntimeType.SInt32 => valueSInt32 == value.valueSInt32,
+                RuntimeType.Single => valueSingle == value.valueSingle,
+                RuntimeType.UInt16 => valueUInt16 == value.valueUInt16,
+                RuntimeType.Null => false,
                 _ => throw new ImpossibleException(),
             };
 
@@ -277,21 +277,21 @@ namespace LanguageCore.Runtime
             {
                 switch (Type)
                 {
-                    case RuntimeType.BYTE:
+                    case RuntimeType.UInt8:
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueByte.ToString(ci));
+                        Console.Write(this.valueUInt8.ToString(ci));
                         break;
-                    case RuntimeType.INT:
+                    case RuntimeType.SInt32:
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueInt.ToString(ci));
+                        Console.Write(this.valueSInt32.ToString(ci));
                         break;
-                    case RuntimeType.FLOAT:
+                    case RuntimeType.Single:
                         Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(this.valueFloat.ToString(ci));
+                        Console.Write(this.valueSingle.ToString(ci));
                         break;
-                    case RuntimeType.CHAR:
+                    case RuntimeType.UInt16:
                         Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.Write("'" + this.valueChar.ToString(ci) + "'");
+                        Console.Write("'" + this.valueUInt16.ToString(ci) + "'");
                         break;
                     default: throw new ImpossibleException();
                 }
@@ -357,10 +357,10 @@ namespace LanguageCore.Runtime
         public static DataItem GetDefaultValue(RuntimeType type)
             => type switch
             {
-                RuntimeType.BYTE => new DataItem((byte)0),
-                RuntimeType.INT => new DataItem((int)0),
-                RuntimeType.FLOAT => new DataItem((float)0f),
-                RuntimeType.CHAR => new DataItem((char)'\0'),
+                RuntimeType.UInt8 => new DataItem((byte)0),
+                RuntimeType.SInt32 => new DataItem((int)0),
+                RuntimeType.Single => new DataItem((float)0f),
+                RuntimeType.UInt16 => new DataItem((char)'\0'),
                 _ => DataItem.Null,
             };
 
@@ -368,13 +368,13 @@ namespace LanguageCore.Runtime
         public static DataItem GetDefaultValue(BBCode.Compiler.Type type)
             => type switch
             {
-                BBCode.Compiler.Type.BYTE => new DataItem((byte)0),
-                BBCode.Compiler.Type.INT => new DataItem((int)0),
-                BBCode.Compiler.Type.FLOAT => new DataItem((float)0f),
-                BBCode.Compiler.Type.CHAR => new DataItem((char)'\0'),
-                BBCode.Compiler.Type.NONE => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                BBCode.Compiler.Type.VOID => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                BBCode.Compiler.Type.UNKNOWN => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                BBCode.Compiler.Type.Byte => new DataItem((byte)0),
+                BBCode.Compiler.Type.Integer => new DataItem((int)0),
+                BBCode.Compiler.Type.Float => new DataItem((float)0f),
+                BBCode.Compiler.Type.Char => new DataItem((char)'\0'),
+                BBCode.Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                BBCode.Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                BBCode.Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
                 _ => DataItem.Null,
             };
 
@@ -382,16 +382,16 @@ namespace LanguageCore.Runtime
         {
             switch (value.type)
             {
-                case RuntimeType.BYTE:
+                case RuntimeType.UInt8:
                     result = value;
                     return true;
-                case RuntimeType.INT:
-                    if (value.valueInt < byte.MinValue || value.valueInt > byte.MaxValue)
+                case RuntimeType.SInt32:
+                    if (value.valueSInt32 < byte.MinValue || value.valueSInt32 > byte.MaxValue)
                     {
                         result = default;
                         return false;
                     }
-                    result = new DataItem((byte)value.valueInt);
+                    result = new DataItem((byte)value.valueSInt32);
                     return true;
                 default:
                     result = default;
@@ -403,14 +403,14 @@ namespace LanguageCore.Runtime
         {
             switch (value.type)
             {
-                case RuntimeType.BYTE:
+                case RuntimeType.UInt8:
                     return true;
-                case RuntimeType.INT:
-                    if (value.valueInt < byte.MinValue || value.valueInt > byte.MaxValue)
+                case RuntimeType.SInt32:
+                    if (value.valueSInt32 < byte.MinValue || value.valueSInt32 > byte.MaxValue)
                     {
                         return false;
                     }
-                    value = new DataItem((byte)value.valueInt);
+                    value = new DataItem((byte)value.valueSInt32);
                     return true;
                 default:
                     return false;

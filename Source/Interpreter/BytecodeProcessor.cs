@@ -100,7 +100,7 @@ namespace LanguageCore.Runtime
         int GetStackAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
-            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueSInt32,
 
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + CurrentInstruction.ParameterInt,
             AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
@@ -113,7 +113,7 @@ namespace LanguageCore.Runtime
         int GetAddress() => CurrentInstruction.AddressingMode switch
         {
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
-            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+            AddressingMode.RUNTIME => Memory.Stack.Pop().ValueSInt32,
 
             _ => throw new InternalException($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
         };
@@ -167,7 +167,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="UserException"/>
         void THROW()
         {
-            int pointer = Memory.Stack.Pop().ValueInt;
+            int pointer = Memory.Stack.Pop().ValueSInt32;
             string? value = null;
             try
             {
@@ -419,7 +419,7 @@ namespace LanguageCore.Runtime
             int address = GetStackAddress();
             var value = Memory.Stack.Pop();
 
-            Memory.Stack.Set(address, value);
+            Memory.Stack[address] = value;
 
             Step();
         }
@@ -449,7 +449,7 @@ namespace LanguageCore.Runtime
         {
             BasePointer = CurrentInstruction.AddressingMode switch
             {
-                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueSInt32,
                 AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
                 AddressingMode.RELATIVE => Memory.Stack.Count + CurrentInstruction.ParameterInt,
                 _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_BASEPOINTER}"),
@@ -462,7 +462,7 @@ namespace LanguageCore.Runtime
         {
             CodePointer = CurrentInstruction.AddressingMode switch
             {
-                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueInt,
+                AddressingMode.RUNTIME => Memory.Stack.Pop().ValueSInt32,
                 AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
                 _ => throw new RuntimeException($"Invalid {nameof(AddressingMode)} {CurrentInstruction.AddressingMode} for instruction {Opcode.SET_CODEPOINTER}"),
             };
@@ -478,36 +478,36 @@ namespace LanguageCore.Runtime
             {
                 newValue = targetType switch
                 {
-                    RuntimeType.BYTE => value.Type switch
+                    RuntimeType.UInt8 => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((byte)value.ValueByte),
-                        RuntimeType.INT => new DataItem((byte)(value.ValueInt % byte.MaxValue)),
-                        RuntimeType.FLOAT => new DataItem((byte)MathF.Round(value.ValueFloat)),
-                        RuntimeType.CHAR => new DataItem((byte)value.ValueChar),
+                        RuntimeType.UInt8 => new DataItem((byte)value.ValueUInt8),
+                        RuntimeType.SInt32 => new DataItem((byte)(value.ValueSInt32 % byte.MaxValue)),
+                        RuntimeType.Single => new DataItem((byte)MathF.Round(value.ValueSingle)),
+                        RuntimeType.UInt16 => new DataItem((byte)value.ValueUInt16),
                         _ => throw new ImpossibleException(),
                     },
-                    RuntimeType.INT => value.Type switch
+                    RuntimeType.SInt32 => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((int)value.ValueByte),
-                        RuntimeType.INT => new DataItem((int)value.ValueInt),
-                        RuntimeType.FLOAT => new DataItem((int)MathF.Round(value.ValueFloat)),
-                        RuntimeType.CHAR => new DataItem((int)value.ValueChar),
+                        RuntimeType.UInt8 => new DataItem((int)value.ValueUInt8),
+                        RuntimeType.SInt32 => new DataItem((int)value.ValueSInt32),
+                        RuntimeType.Single => new DataItem((int)MathF.Round(value.ValueSingle)),
+                        RuntimeType.UInt16 => new DataItem((int)value.ValueUInt16),
                         _ => throw new ImpossibleException(),
                     },
-                    RuntimeType.FLOAT => value.Type switch
+                    RuntimeType.Single => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((float)value.ValueByte),
-                        RuntimeType.INT => new DataItem((float)value.ValueInt),
-                        RuntimeType.FLOAT => new DataItem((float)MathF.Round(value.ValueFloat)),
-                        RuntimeType.CHAR => new DataItem((float)value.ValueChar),
+                        RuntimeType.UInt8 => new DataItem((float)value.ValueUInt8),
+                        RuntimeType.SInt32 => new DataItem((float)value.ValueSInt32),
+                        RuntimeType.Single => new DataItem((float)MathF.Round(value.ValueSingle)),
+                        RuntimeType.UInt16 => new DataItem((float)value.ValueUInt16),
                         _ => throw new ImpossibleException(),
                     },
-                    RuntimeType.CHAR => value.Type switch
+                    RuntimeType.UInt16 => value.Type switch
                     {
-                        RuntimeType.BYTE => new DataItem((char)value.ValueByte),
-                        RuntimeType.INT => new DataItem((char)value.ValueInt),
-                        RuntimeType.FLOAT => new DataItem((char)MathF.Round(value.ValueFloat)),
-                        RuntimeType.CHAR => new DataItem((char)value.ValueChar),
+                        RuntimeType.UInt8 => new DataItem((char)value.ValueUInt8),
+                        RuntimeType.SInt32 => new DataItem((char)value.ValueSInt32),
+                        RuntimeType.Single => new DataItem((char)MathF.Round(value.ValueSingle)),
+                        RuntimeType.UInt16 => new DataItem((char)value.ValueUInt16),
                         _ => throw new ImpossibleException(),
                     },
                     _ => throw new ImpossibleException(),
@@ -544,10 +544,10 @@ namespace LanguageCore.Runtime
         void CALL_EXTERNAL()
         {
             DataItem functionNameDataItem = Memory.Stack.Pop();
-            if (functionNameDataItem.Type != RuntimeType.INT)
+            if (functionNameDataItem.Type != RuntimeType.SInt32)
             { throw new InternalException($"Instruction CALL_EXTERNAL need a String pointer (int) DataItem parameter from the stack, received {functionNameDataItem.Type} {functionNameDataItem}"); }
 
-            string functionName = Memory.Heap.GetString(functionNameDataItem.ValueInt + 1, Memory.Heap[functionNameDataItem.ValueInt].ValueInt);
+            string functionName = Memory.Heap.GetString(functionNameDataItem.ValueSInt32 + 1, Memory.Heap[functionNameDataItem.ValueSInt32].ValueSInt32);
 
             if (!ExternalFunctions.TryGetValue(functionName, out ExternalFunctionBase? function))
             { throw new RuntimeException($"Undefined function \"{functionName}\""); }

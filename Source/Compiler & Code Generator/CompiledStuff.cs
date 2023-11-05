@@ -11,7 +11,7 @@ using LanguageCore.Tokenizing;
 namespace LanguageCore.BBCode.Compiler
 {
 
-    public abstract class CompiledConstant : ISearchable<string>, IThingWithPosition
+    public abstract class CompiledConstant : IThingWithPosition
     {
         public readonly DataItem Value;
         public abstract string Identifier { get; }
@@ -22,8 +22,7 @@ namespace LanguageCore.BBCode.Compiler
             Value = value;
         }
 
-        public bool IsThis(string query) => string.Equals(Identifier, query);
-        public abstract Position GetPosition();
+        public abstract Position Position { get; }
     }
 
     public class CompiledVariableConstant : CompiledConstant
@@ -37,7 +36,7 @@ namespace LanguageCore.BBCode.Compiler
             Declaration = declaration;
         }
 
-        public override Position GetPosition() => Declaration.GetPosition();
+        public override Position Position => Declaration.Position;
     }
 
     public class CompiledParameterConstant : CompiledConstant
@@ -51,7 +50,7 @@ namespace LanguageCore.BBCode.Compiler
             Declaration = declaration;
         }
 
-        public override Position GetPosition() => Declaration.GetPosition();
+        public override Position Position => Declaration.Position;
     }
 
     public struct AttributeValues
@@ -267,6 +266,34 @@ namespace LanguageCore.BBCode.Compiler
     {
         public new CompiledEnumMember[] Members;
         internal Dictionary<string, AttributeValues> CompiledAttributes;
+
+        public bool GetValue(string identifier, out DataItem memberValue)
+        {
+            if (GetMember(identifier, out CompiledEnumMember? member))
+            {
+                memberValue = member.Value;
+                return true;
+            }
+            else
+            {
+
+                memberValue = default;
+                return false;
+            }
+        }
+        public bool GetMember(string identifier, [NotNullWhen(true)] out CompiledEnumMember? member)
+        {
+            for (int i = 0; i < Members.Length; i++)
+            {
+                if (Members[i].Identifier.Content == identifier)
+                {
+                    member = Members[i];
+                    return true;
+                }
+            }
+            member = null;
+            return false;
+        }
 
         public CompiledEnum(EnumDefinition definition) : base(definition.Identifier, definition.Attributes, definition.Members)
         {
@@ -552,14 +579,14 @@ namespace LanguageCore.BBCode.Compiler
         }
     }
 
-    public class CompiledOperator : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicatable<CompiledOperator>
+    public class CompiledOperator : FunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicatable<CompiledOperator>
     {
         public CompiledType[] ParameterTypes;
 
         public int TimesUsed;
         public int TimesUsedTotal;
 
-        public int InstructionOffset { get; set; } = -1;
+        public int InstructionOffset = -1;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
@@ -581,8 +608,6 @@ namespace LanguageCore.BBCode.Compiler
 
         public bool IsExternal => CompiledAttributes.ContainsKey("External");
         public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
-
-        public string Key => this.ID();
 
         public CompiledClass? Context { get; set; }
 
@@ -611,21 +636,7 @@ namespace LanguageCore.BBCode.Compiler
 
             return true;
         }
-
-        public bool IsSame((string name, CompiledType[] parameters) other)
-        {
-            if (this.Identifier.Content != other.name) return false;
-            if (this.ParameterTypes.Length != other.parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
-            return true;
-        }
-
-        public bool IsSame(IFunctionThing other)
-        {
-            if (other is not CompiledOperator other2) return false;
-            return IsSame(other2);
-        }
+        public bool IsSame(ICanBeSame? other) => other is CompiledOperator other2 && IsSame(other2);
 
         CompiledOperator IDuplicatable<CompiledOperator>.Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
@@ -657,16 +668,16 @@ namespace LanguageCore.BBCode.Compiler
         }
     }
 
-    public class CompiledFunction : FunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicatable<CompiledFunction>
+    public class CompiledFunction : FunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicatable<CompiledFunction>
     {
         public readonly CompiledType[] ParameterTypes;
 
         public int TimesUsed;
         public int TimesUsedTotal;
 
-        public int InstructionOffset { get; set; } = -1;
+        public int InstructionOffset = -1;
 
-        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
+        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
 
         public Dictionary<string, AttributeValues> CompiledAttributes;
 
@@ -716,8 +727,6 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        public string Key => this.ID();
-
         public CompiledClass? Context { get; set; }
 
         public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.TemplateInfo)
@@ -747,12 +756,7 @@ namespace LanguageCore.BBCode.Compiler
 
             return true;
         }
-
-        public bool IsSame(IFunctionThing other)
-        {
-            if (other is not CompiledFunction other2) return false;
-            return IsSame(other2);
-        }
+        public bool IsSame(ICanBeSame? other) => other is CompiledFunction other2 && IsSame(other2);
 
         public CompiledFunction Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
@@ -815,16 +819,16 @@ namespace LanguageCore.BBCode.Compiler
         }
     }
 
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, IFunctionThing, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicatable<CompiledGeneralFunction>
+    public class CompiledGeneralFunction : GeneralFunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicatable<CompiledGeneralFunction>
     {
         public CompiledType[] ParameterTypes;
 
         public int TimesUsed;
         public int TimesUsedTotal;
 
-        public int InstructionOffset { get; set; } = -1;
+        public int InstructionOffset = -1;
 
-        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.VOID;
+        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
 
         public IReadOnlyList<Statement> References => references;
         readonly List<Statement> references = new();
@@ -873,21 +877,7 @@ namespace LanguageCore.BBCode.Compiler
 
             return true;
         }
-
-        public bool IsSame((string name, CompiledType[] parameters) other)
-        {
-            if (this.Identifier.Content == other.name) return false;
-            if (this.ParameterTypes.Length != other.parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            { if (this.ParameterTypes[i] != other.parameters[i]) return false; }
-            return true;
-        }
-
-        public bool IsSame(IFunctionThing other)
-        {
-            if (other is not CompiledGeneralFunction other2) return false;
-            return IsSame(other2);
-        }
+        public bool IsSame(ICanBeSame? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
 
         public CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
         {

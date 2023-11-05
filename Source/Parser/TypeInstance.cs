@@ -11,7 +11,7 @@ namespace LanguageCore.Parser
 
     public abstract class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
     {
-        public abstract Position GetPosition();
+        public abstract Position Position { get; }
 
         public static bool operator ==(TypeInstance? a, string? b)
         {
@@ -107,7 +107,7 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine((byte)1, StackArrayOf, StackArraySize);
 
-        public override Position GetPosition() => new(StackArrayOf, StackArraySize);
+        public override Position Position => new(StackArrayOf, StackArraySize);
 
         public override void SetAnalyzedType(CompiledType type)
         {
@@ -146,11 +146,14 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine((byte)2, FunctionReturnType, FunctionParameterTypes);
 
-        public override Position GetPosition()
+        public override Position Position
         {
-            Position result = new(FunctionReturnType);
-            result.Extend(FunctionParameterTypes);
-            return result;
+            get
+            {
+                Position result = new(FunctionReturnType);
+                result.Union(FunctionParameterTypes);
+                return result;
+            }
         }
 
         public override void SetAnalyzedType(CompiledType type)
@@ -201,11 +204,14 @@ namespace LanguageCore.Parser
 
         public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, GenericTypes);
 
-        public override Position GetPosition()
+        public override Position Position
         {
-            Position result = new(Identifier);
-            result.Extend(GenericTypes);
-            return result;
+            get
+            {
+                Position result = new(Identifier);
+                result.Union(GenericTypes);
+                return result;
+            }
         }
 
         public override void SetAnalyzedType(CompiledType type)

@@ -476,7 +476,7 @@ namespace TheProgram
         {
             if (args.Length == 0)
             {
-                Output.Error("No arguments passed!");
+                Output.LogError("No arguments passed!");
                 return null;
             }
 
@@ -492,7 +492,7 @@ namespace TheProgram
             }
             catch (ArgumentException error)
             {
-                Output.Error(error.Message);
+                Output.LogError(error.Message);
                 PrintArgs(normalizedArgs);
                 return null;
             }

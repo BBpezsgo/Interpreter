@@ -179,7 +179,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier("using", out var keyword))
             { return false; }
 
-            if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"using\"", keyword.After());
+            if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"using\"", keyword.Position.After());
 
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -218,7 +218,7 @@ namespace LanguageCore.Parser
             }
 
             if (!ExpectOperator(";"))
-            { throw new SyntaxException("Expected \";\" at end of statement (after \"using\")", keyword.After()); }
+            { throw new SyntaxException("Expected \";\" at end of statement (after \"using\")", keyword.Position.After()); }
 
             usingDefinition = new UsingDefinition(keyword, tokens.ToArray());
 
@@ -258,7 +258,7 @@ namespace LanguageCore.Parser
                 if (NeedSemicolon(statement))
                 {
                     if (!ExpectOperator(";", out semicolon))
-                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.Position.After())); }
                 }
                 else
                 { ExpectOperator(";", out semicolon); }
@@ -282,10 +282,10 @@ namespace LanguageCore.Parser
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectIdentifier(out Token? identifier))
-            { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.After()); }
+            { throw new SyntaxException($"Expected identifier token after keyword \"{keyword}\"", keyword.Position.After()); }
 
             if (!ExpectOperator("{"))
-            { throw new SyntaxException($"Expected \"{{\" after enum identifier", identifier.After()); }
+            { throw new SyntaxException($"Expected \"{{\" after enum identifier", identifier.Position.After()); }
 
             identifier.AnalyzedType = TokenAnalyzedType.Enum;
 
@@ -303,7 +303,7 @@ namespace LanguageCore.Parser
                 if (ExpectOperator("=", out Token? assignOperator))
                 {
                     if (!ExpectLiteral(out enumMemberValue))
-                    { throw new SyntaxException($"Expected literal after enum member assignment", assignOperator.After()); }
+                    { throw new SyntaxException($"Expected literal after enum member assignment", assignOperator.Position.After()); }
                 }
 
                 members.Add(new EnumMemberDefinition(enumMemberIdentifier, enumMemberValue));
@@ -397,7 +397,7 @@ namespace LanguageCore.Parser
             }
 
             if (!ExpectOperator("<", out Token? leftP))
-            { throw new SyntaxException($"Expected \"<\" after keyword \"{keyword}\"", keyword.After()); }
+            { throw new SyntaxException($"Expected \"<\" after keyword \"{keyword}\"", keyword.Position.After()); }
 
             List<Token> parameters = new();
 
@@ -470,7 +470,7 @@ namespace LanguageCore.Parser
             CheckModifiers(modifiers, "export");
 
             if (!ExpectBlock(out Block? block))
-            { throw new SyntaxException($"Expected block", bracketRight?.After() ?? Position.UnknownPosition); }
+            { throw new SyntaxException($"Expected block", bracketRight?.Position.After() ?? Position.UnknownPosition); }
 
             macro = new MacroDefinition(modifiers, macroKeyword, possibleNameT, parameters, block);
 
@@ -782,7 +782,7 @@ namespace LanguageCore.Parser
             {
                 v = v.Replace("_", "");
 
-                Literal literal = new(LiteralType.FLOAT, v, CurrentToken);
+                Literal literal = new(LiteralType.Float, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -793,7 +793,7 @@ namespace LanguageCore.Parser
             {
                 v = v.Replace("_", "");
 
-                Literal literal = new(LiteralType.INT, v, CurrentToken);
+                Literal literal = new(LiteralType.Integer, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -805,7 +805,7 @@ namespace LanguageCore.Parser
                 v = v[2..];
                 v = v.Replace("_", "");
 
-                Literal literal = new(LiteralType.INT, Convert.ToInt32(v, 16).ToString(), CurrentToken);
+                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -817,7 +817,7 @@ namespace LanguageCore.Parser
                 v = v[2..];
                 v = v.Replace("_", "");
 
-                Literal literal = new(LiteralType.INT, Convert.ToInt32(v, 2).ToString(), CurrentToken);
+                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -826,7 +826,7 @@ namespace LanguageCore.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
             {
-                Literal literal = new(LiteralType.STRING, v, CurrentToken);
+                Literal literal = new(LiteralType.String, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -835,7 +835,7 @@ namespace LanguageCore.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
             {
-                Literal literal = new(LiteralType.CHAR, v, CurrentToken);
+                Literal literal = new(LiteralType.Char, v, CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -844,7 +844,7 @@ namespace LanguageCore.Parser
             }
             else if (ExpectIdentifier("true", out var tTrue))
             {
-                Literal literal = new(LiteralType.BOOLEAN, tTrue.Content, tTrue);
+                Literal literal = new(LiteralType.Boolean, tTrue.Content, tTrue);
 
                 tTrue.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -853,7 +853,7 @@ namespace LanguageCore.Parser
             }
             else if (ExpectIdentifier("false", out var tFalse))
             {
-                Literal literal = new(LiteralType.BOOLEAN, tFalse.Content, tFalse);
+                Literal literal = new(LiteralType.Boolean, tFalse.Content, tFalse);
 
                 tFalse.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -912,7 +912,7 @@ namespace LanguageCore.Parser
             else if (ExpectOperator("(", out Token? braceletT))
             {
                 if (!ExpectExpression(out StatementWithValue? expression))
-                { throw new SyntaxException("Expected expression after \"(\"", braceletT.After()); }
+                { throw new SyntaxException("Expected expression after \"(\"", braceletT.Position.After()); }
 
                 if (expression is OperatorCall operation)
                 { operation.InsideBracelet = true; }
@@ -991,7 +991,7 @@ namespace LanguageCore.Parser
                 if (ExpectOperator(".", out var tokenDot))
                 {
                     if (!ExpectIdentifier(out Token? fieldName))
-                    { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.After()); }
+                    { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.Position.After()); }
 
                     statementWithValue = new Field(statementWithValue, fieldName);
 
@@ -1018,7 +1018,7 @@ namespace LanguageCore.Parser
                 if (ExpectIdentifier("as", out Token? keyword))
                 {
                     if (!ExpectType(AllowedType.None, out TypeInstance? type))
-                    { throw new SyntaxException($"Expected type after \"as\" keyword", keyword.After()); }
+                    { throw new SyntaxException($"Expected type after \"as\" keyword", keyword.Position.After()); }
 
                     statementWithValue = new TypeCast(statementWithValue, keyword, type);
                 }
@@ -1113,7 +1113,7 @@ namespace LanguageCore.Parser
                 if (NeedSemicolon(statement))
                 {
                     if (!ExpectOperator(";", out semicolon))
-                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.GetPosition().After())); }
+                    { Errors.Add(new Error($"Expected \";\" at end of statement (after {statement.GetType().Name})", statement.Position.After())); }
                 }
                 else
                 { ExpectOperator(";", out semicolon); }
@@ -1170,30 +1170,30 @@ namespace LanguageCore.Parser
             tokenFor.AnalyzedType = TokenAnalyzedType.Statement;
 
             if (!ExpectOperator("(", out Token? tokenParenthesesOpen))
-            { throw new SyntaxException("Expected \"(\" after \"for\" statement", tokenFor.After()); }
+            { throw new SyntaxException("Expected \"(\" after \"for\" statement", tokenFor.Position.After()); }
 
             if (!ExpectVariableDeclaration(out VariableDeclaration? variableDeclaration))
             { throw new SyntaxException("Expected variable declaration after \"for\" statement", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";", out Token? semicolon1))
-            { throw new SyntaxException("Expected \";\" after \"for\" variable declaration", variableDeclaration.GetPosition().After()); }
+            { throw new SyntaxException("Expected \";\" after \"for\" variable declaration", variableDeclaration.Position.After()); }
             variableDeclaration.Semicolon = semicolon1;
 
             if (!ExpectExpression(out StatementWithValue? condition))
             { throw new SyntaxException("Expected condition after \"for\" variable declaration", tokenParenthesesOpen); }
 
             if (!ExpectOperator(";", out Token? semicolon2))
-            { throw new SyntaxException($"Expected \";\" after \"for\" condition, got {CurrentToken}", variableDeclaration.GetPosition().After()); }
+            { throw new SyntaxException($"Expected \";\" after \"for\" condition, got {CurrentToken}", variableDeclaration.Position.After()); }
             condition.Semicolon = semicolon2;
 
             if (!ExpectAnySetter(out AnyAssignment? expression))
             { throw new SyntaxException($"Expected setter after \"for\" condition, got {CurrentToken}", tokenParenthesesOpen); }
 
             if (!ExpectOperator(")", out Token? tokenParenthesesClosed))
-            { throw new SyntaxException($"Expected \")\" after \"for\" condition, got {CurrentToken}", condition.GetPosition().After()); }
+            { throw new SyntaxException($"Expected \")\" after \"for\" condition, got {CurrentToken}", condition.Position.After()); }
 
             if (!ExpectBlock(out Block? block))
-            { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenParenthesesClosed.After()); }
+            { throw new SyntaxException($"Expected block, got {CurrentToken}", tokenParenthesesClosed.Position.After()); }
 
             forLoop = new ForLoop(tokenFor, variableDeclaration, condition, expression, block);
             return true;
@@ -1216,7 +1216,7 @@ namespace LanguageCore.Parser
             { throw new SyntaxException("Expected \")\" after \"while\" condition", condition); }
 
             if (!ExpectBlock(out Block? block))
-            { throw new SyntaxException("Expected block", tokenParenthesesClose.After()); }
+            { throw new SyntaxException("Expected block", tokenParenthesesClose.Position.After()); }
 
             whileLoop = new WhileLoop(tokenWhile, condition, block);
             return true;
@@ -1273,7 +1273,7 @@ namespace LanguageCore.Parser
             }
 
             if (!ExpectBlock(out Block? block))
-            { throw new SyntaxException("Expected block", tokenIf.After()); }
+            { throw new SyntaxException("Expected block", tokenIf.Position.After()); }
 
             baseBranch = ifSegmentType switch
             {
@@ -1564,7 +1564,7 @@ namespace LanguageCore.Parser
             modifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectOneValue(out StatementWithValue? value))
-            { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
+            { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After()); }
 
             oneValue = new ModifiedStatement(modifier, value);
             return true;
@@ -1581,7 +1581,7 @@ namespace LanguageCore.Parser
             modifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
             if (!ExpectOneValue(out StatementWithValue? value))
-            { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.After()); }
+            { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After()); }
 
             modifiedStatement = new ModifiedStatement(modifier, value);
             return true;

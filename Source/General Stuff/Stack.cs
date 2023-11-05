@@ -6,69 +6,79 @@ using System.Text;
 namespace LanguageCore
 {
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class Stack<T> : IReadOnlyStack<T>
+    public class Stack<T> : IReadOnlyStack<T>, ICollection<T>
     {
         readonly List<T> stack;
+
+        public int Count => this.stack.Count;
+
+        public T Last
+        {
+            get => this.stack[^1];
+            set => this.stack[^1] = value;
+        }
+
+        public bool IsReadOnly => false;
+
+        public T this[int i]
+        {
+            get => this.stack[i];
+            set => this.stack[i] = value;
+        }
+        public T this[System.Index i]
+        {
+            get => this.stack[i];
+            set => this.stack[i] = value;
+        }
 
         public Stack() => stack = new List<T>();
 
         public void Pop(int count)
         {
             for (int i = 0; i < count; i++)
-            { Pop(); }
+            {
+                stack.RemoveAt(stack.Count - 1);
+            }
         }
-        /// <summary>
-        /// Gives the last item, and then remove
-        /// </summary>
-        /// <returns>The last item</returns>
+
+        public virtual void Push(T item) => stack.Add(item);
         public virtual T Pop()
         {
-            T val = this.stack[^1];
-            this.stack.RemoveAt(this.stack.Count - 1);
+            T val = stack[^1];
+            stack.RemoveAt(stack.Count - 1);
             return val;
         }
-        /// <returns>Adds a new item to the end</returns>
-        public virtual void Push(T value) => this.stack.Add(value);
-        /// <summary>Removes a specific item</summary>
-        public virtual void RemoveAt(int index) => this.stack.RemoveAt(index);
-        /// <returns>The number of items</returns>
-        public virtual int Count => this.stack.Count;
-        /// <summary>Adds a list to the end</summary>
-        public virtual void PushRange(List<T> list) => PushRange(list.ToArray());
-        /// <summary>Adds an array to the end</summary>
-        public virtual void PushRange(T[] list)
-        { foreach (T item in list) Push(item); }
 
-        /// <returns>The last item</returns>
-        public virtual T Last
+        public void Add(T item) => Push(item);
+
+        public void RemoveAt(int index) => stack.RemoveAt(index);
+
+        public void PushRange(IEnumerable<T> list)
         {
-            get => this.stack[^1];
-            set => this.stack[^1] = value;
+            foreach (T item in list)
+            { Push(item); }
+        }
+        public void PushRange(List<T> list) => PushRange(list.ToArray());
+        public void PushRange(T[] list)
+        {
+            for (int i = 0; i < list.Length; i++)
+            { Push(list[i]); }
         }
 
-        public virtual T[] ToArray() => this.stack.ToArray();
+        public T[] ToArray() => stack.ToArray();
 
-        public virtual T this[int i]
-        {
-            get => this.stack[i];
-            set => this.stack[i] = value;
-        }
+        public void Clear() => stack.Clear();
 
-        public virtual T this[System.Index i]
-        {
-            get => this.stack[i];
-            set => this.stack[i] = value;
-        }
+        public IEnumerator<T> GetEnumerator() => stack.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => stack.GetEnumerator();
 
-        public virtual void Clear() => this.stack.Clear();
-
-        public IEnumerator<T> GetEnumerator() => this.stack.GetEnumerator();
-        IEnumerator IEnumerable.GetEnumerator() => this.stack.GetEnumerator();
-
-        private string GetDebuggerDisplay()
+        string GetDebuggerDisplay()
         {
             if (stack is null)
             { return "null"; }
+
+            if (stack.Count == 0)
+            { return "{ }"; }
 
             StringBuilder result = new(3 + stack.Count * 3);
 
@@ -92,6 +102,12 @@ namespace LanguageCore
 
             return result.ToString();
         }
+
+        public bool Contains(T item) => stack.Contains(item);
+
+        public void CopyTo(T[] array, int arrayIndex) => stack.CopyTo(array, arrayIndex);
+
+        public bool Remove(T item) => stack.Remove(item);
     }
 
     public interface IReadOnlyStack<T> : IReadOnlyCollection<T>, IReadOnlyList<T>
@@ -99,5 +115,7 @@ namespace LanguageCore
         public T Last { get; }
 
         public T[] ToArray();
+
+        public bool Contains(T item);
     }
 }

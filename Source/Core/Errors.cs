@@ -49,7 +49,7 @@ namespace LanguageCore
         public CompilerException(string message, Position position, string? file) : base(message, position, file) { }
         public CompilerException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
-        public CompilerException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+        public CompilerException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 
         protected CompilerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -60,7 +60,7 @@ namespace LanguageCore
         public NotSupportedException(string message, Position position, string? file) : base(message, position, file) { }
         public NotSupportedException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public NotSupportedException(string message) : base(message) { }
-        public NotSupportedException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+        public NotSupportedException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 
         protected NotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -79,8 +79,8 @@ namespace LanguageCore
     public class SyntaxException : LanguageException
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
-        public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.GetPosition() ?? Position.UnknownPosition, null) { }
-        public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.GetPosition() ?? Position.UnknownPosition, file) { }
+        public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
+        public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 
         protected SyntaxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
@@ -283,12 +283,12 @@ namespace LanguageCore
         {
             StringBuilder result = new(Message);
 
-            if (Position.Start.Line == -1)
+            if (Position.Range.Start.Line == -1)
             { }
-            else if (Position.Start.Character == -1)
-            { result.Append($" (at line {Position.Start.Character})"); }
+            else if (Position.Range.Start.Character == -1)
+            { result.Append($" (at line {Position.Range.Start.Character})"); }
             else
-            { result.Append($" (at line {Position.Start.Line} and column {Position.Start.Character})"); }
+            { result.Append($" (at line {Position.Range.Start.Line} and column {Position.Range.Start.Character})"); }
 
             if (File != null)
             { result.Append($" (in {File})"); }
@@ -302,7 +302,7 @@ namespace LanguageCore
         public Warning(string message, Position position, string? file)
             : base(message, position, file) { }
         public Warning(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     /// <summary> It's an exception, but not. </summary>
@@ -313,9 +313,9 @@ namespace LanguageCore
         public Error(string message, Position position, string? file)
             : base(message, position, file) { }
         public Error(string message, IThingWithPosition? position)
-            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, null) { }
+            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, null) { }
         public Error(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
 
         public LanguageException ToException() => new(this);
     }
@@ -323,13 +323,13 @@ namespace LanguageCore
     public class Hint : NotExceptionBut
     {
         public Hint(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     public class Information : NotExceptionBut
     {
         public Information(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.GetPosition() ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
     }
 
     #endregion

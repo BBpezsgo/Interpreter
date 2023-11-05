@@ -77,8 +77,10 @@ namespace LanguageCore.Tokenizing
         };
     }
 
-    public class Token : BaseToken, IEquatable<Token>, IEquatable<string>
+    public class Token : BaseToken, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
     {
+        readonly Position position;
+
         public TokenAnalyzedType AnalyzedType;
 
         public readonly TokenType TokenType;
@@ -86,21 +88,17 @@ namespace LanguageCore.Tokenizing
 
         public readonly string Content;
 
-        public Token(TokenType type, string content, bool isAnonymous)
+        public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
         {
             TokenType = type;
             AnalyzedType = TokenAnalyzedType.None;
             Content = content;
             IsAnonymous = isAnonymous;
+            this.position = position;
         }
 
-        public Token Clone() => new(TokenType, Content, IsAnonymous)
-        {
-            Position = Position,
-            AbsolutePosition = AbsolutePosition,
+        public override Position Position => position;
 
-            AnalyzedType = AnalyzedType,
-        };
         public override string ToString() => Content;
         public string ToOriginalString() => TokenType switch
         {
@@ -126,17 +124,16 @@ namespace LanguageCore.Tokenizing
             _ => Content,
         };
 
-        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER) => new(type, content, true)
-        {
-            AbsolutePosition = LanguageCore.Position.UnknownPosition.AbsolutePosition,
-            Position = LanguageCore.Position.UnknownPosition.Range,
-        };
+        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER)
+            => new(type, content, true, Position.UnknownPosition);
+
+        public static Token CreateAnonymous(string content, TokenType type, Position position)
+            => new(type, content, true, position);
 
         public override bool Equals(object? obj) => obj is Token other && Equals(other);
         public bool Equals(Token? other) =>
             other is not null &&
             Position.Equals(other.Position) &&
-            AbsolutePosition.Equals(other.AbsolutePosition) &&
             TokenType == other.TokenType &&
             Content == other.Content &&
             IsAnonymous == other.IsAnonymous;
@@ -144,7 +141,10 @@ namespace LanguageCore.Tokenizing
             other is not null &&
             Content == other;
 
-        public override int GetHashCode() => HashCode.Combine(AbsolutePosition, TokenType, Content);
+        public override int GetHashCode() => HashCode.Combine(Position, TokenType, Content);
+
+        public Token Duplicate() => new(TokenType, new string(Content), IsAnonymous, Position)
+        { AnalyzedType = AnalyzedType };
 
         public static bool operator ==(Token? a, string? b)
         {
@@ -161,39 +161,35 @@ namespace LanguageCore.Tokenizing
     public readonly struct SimpleToken : IThingWithPosition
     {
         public readonly string Content;
-        public readonly Range<SinglePosition> Position;
-        public readonly Range<int> AbsolutePosition;
 
-        public SimpleToken(string content, Range<SinglePosition> position, Range<int> absolutePosition)
+        public SimpleToken(string content, Position position)
         {
             Content = content;
             Position = position;
-            AbsolutePosition = absolutePosition;
         }
 
         public override string ToString() => Content;
-        public Position GetPosition() => new(Position.Start.Line, Position.Start.Character, AbsolutePosition);
+        public readonly Position Position { get; }
     }
 
     class PreparationToken : BaseToken
     {
+        public Position position;
         public TokenType TokenType;
-
         public readonly StringBuilder Content;
 
-        public PreparationToken()
+        public PreparationToken(Position position) : base()
         {
+            this.position = position;
             TokenType = TokenType.WHITESPACE;
             Content = new StringBuilder();
         }
 
+        public override Position Position => position;
+
         public override string ToString() => Content.ToString();
 
-        public Token Instantiate() => new(TokenType, Content.ToString(), false)
-        {
-            AbsolutePosition = AbsolutePosition,
-            Position = Position,
-        };
+        public Token Instantiate() => new(TokenType, Content.ToString(), false, Position);
     }
 
     public readonly struct TokenizerResult
@@ -237,15 +233,7 @@ namespace LanguageCore.Tokenizing
 
         Tokenizer(TokenizerSettings settings, string text, string? file)
         {
-            CurrentToken = new()
-            {
-                Position = new Range<SinglePosition>()
-                {
-                    Start = new SinglePosition(0, 0),
-                    End = new SinglePosition(0, 0),
-                },
-                AbsolutePosition = new Range<int>(0, 0),
-            };
+            CurrentToken = new(new Position(Range<SinglePosition>.Default, Range<int>.Default));
             CurrentColumn = 0;
             CurrentLine = 1;
 
@@ -296,11 +284,11 @@ namespace LanguageCore.Tokenizing
                     RefreshTokenPosition(OffsetTotal);
                     if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
                     {
-                        Warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.After(), File));
+                        Warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.Position.After(), File));
                     }
                     else
                     {
-                        Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.After(), File));
+                        Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.Position.After(), File));
                     }
                 }
 
@@ -312,8 +300,10 @@ namespace LanguageCore.Tokenizing
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
                         UnicodeCharacters.Add(new SimpleToken(
                                 unicodeChar,
-                                new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
-                                new Range<int>(OffsetTotal - 6, OffsetTotal)
+                                new Position(
+                                    new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                                    new Range<int>(OffsetTotal - 6, OffsetTotal)
+                                )
                             ));
                         CurrentToken.Content.Append(unicodeChar);
                         CurrentToken.TokenType = TokenType.LITERAL_STRING;
@@ -337,8 +327,10 @@ namespace LanguageCore.Tokenizing
                         string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
                         UnicodeCharacters.Add(new SimpleToken(
                             unicodeChar,
-                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
-                            new Range<int>(OffsetTotal - 6, OffsetTotal)
+                            new Position(
+                                new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                                new Range<int>(OffsetTotal - 6, OffsetTotal)
+                            )
                         ));
                         CurrentToken.Content.Append(unicodeChar);
                         CurrentToken.TokenType = TokenType.LITERAL_CHAR;
@@ -470,21 +462,21 @@ namespace LanguageCore.Tokenizing
                 else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
                 {
                     if (CurrentToken.ToString().Contains(currChar))
-                    { throw new TokenizerException($"Invalid float literal format", CurrentToken.GetPosition()); }
+                    { throw new TokenizerException($"Invalid float literal format", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
                 }
                 else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken.GetPosition()); }
+                    { throw new TokenizerException($"Invalid hex number literal format", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_HEX;
                 }
                 else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
                 {
                     if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken.GetPosition()); }
+                    { throw new TokenizerException($"Invalid bin number literal format", CurrentToken.Position); }
                     CurrentToken.Content.Append(currChar);
                     CurrentToken.TokenType = TokenType.LITERAL_BIN;
                 }
@@ -509,7 +501,7 @@ namespace LanguageCore.Tokenizing
                         if (currChar != '0' && currChar != '1')
                         {
                             RefreshTokenPosition(OffsetTotal);
-                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", CurrentToken.After());
+                            throw new TokenizerException($"Invalid bin digit \'{currChar}\'", CurrentToken.Position.After());
                         }
                     }
 
@@ -671,7 +663,7 @@ namespace LanguageCore.Tokenizing
                     if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
                     {
                         RefreshTokenPosition(OffsetTotal);
-                        throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.After());
+                        throw new TokenizerException($"Invalid hex digit \'{currChar}\'", CurrentToken.Position.After());
                     }
                     CurrentToken.Content.Append(currChar);
                 }
@@ -730,7 +722,7 @@ namespace LanguageCore.Tokenizing
                         {
                             if (token.Content.Length != 1)
                             {
-                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token.GetPosition());
+                                throw new TokenizerException($"Literal char should only contain one character. You specified {token.Content.Length}.", token.Position);
                             }
                         }
                         break;
@@ -764,16 +756,16 @@ namespace LanguageCore.Tokenizing
 
         void RefreshTokenPosition(int OffsetTotal)
         {
-            CurrentToken.Position.End.Character = CurrentColumn;
-            CurrentToken.Position.End.Line = CurrentLine;
-            CurrentToken.AbsolutePosition.End = OffsetTotal;
+            CurrentToken.position.Range.End.Character = CurrentColumn;
+            CurrentToken.position.Range.End.Line = CurrentLine;
+            CurrentToken.position.AbsoluteRange.End = OffsetTotal;
         }
 
         void EndToken(int OffsetTotal)
         {
-            CurrentToken.Position.End.Character = CurrentColumn;
-            CurrentToken.Position.End.Line = CurrentLine;
-            CurrentToken.AbsolutePosition.End = OffsetTotal;
+            CurrentToken.position.Range.End.Character = CurrentColumn;
+            CurrentToken.position.Range.End.Line = CurrentLine;
+            CurrentToken.position.AbsoluteRange.End = OffsetTotal;
 
             // Skip comments if they should be ignored
             if (!Settings.TokenizeComments &&
@@ -796,20 +788,20 @@ namespace LanguageCore.Tokenizing
             {
                 if (CurrentToken.ToString().EndsWith('.'))
                 {
-                    CurrentToken.Position.End.Character--;
-                    CurrentToken.Position.End.Line--;
-                    CurrentToken.AbsolutePosition.End--;
+                    CurrentToken.position.Range.End.Character--;
+                    CurrentToken.position.Range.End.Line--;
+                    CurrentToken.position.AbsoluteRange.End--;
                     CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
                     CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
                     Tokens.Add(CurrentToken.Instantiate());
 
-                    CurrentToken.Position.Start.Character = CurrentToken.Position.End.Character + 1;
-                    CurrentToken.Position.Start.Line = CurrentToken.Position.End.Line + 1;
-                    CurrentToken.AbsolutePosition.Start = CurrentToken.AbsolutePosition.End + 1;
+                    CurrentToken.position.Range.Start.Character = CurrentToken.position.Range.End.Character + 1;
+                    CurrentToken.position.Range.Start.Line = CurrentToken.position.Range.End.Line + 1;
+                    CurrentToken.position.AbsoluteRange.Start = CurrentToken.position.AbsoluteRange.End + 1;
 
-                    CurrentToken.Position.End.Character++;
-                    CurrentToken.Position.End.Line++;
-                    CurrentToken.AbsolutePosition.End++;
+                    CurrentToken.position.Range.End.Character++;
+                    CurrentToken.position.Range.End.Line++;
+                    CurrentToken.position.AbsoluteRange.End++;
                     CurrentToken.TokenType = TokenType.OPERATOR;
                     CurrentToken.Content.Clear();
                     CurrentToken.Content.Append('.');
@@ -833,9 +825,9 @@ namespace LanguageCore.Tokenizing
         Finish:
             CurrentToken.TokenType = TokenType.WHITESPACE;
             CurrentToken.Content.Clear();
-            CurrentToken.Position.Start.Line = CurrentLine;
-            CurrentToken.Position.Start.Character = CurrentColumn;
-            CurrentToken.AbsolutePosition.Start = OffsetTotal;
+            CurrentToken.position.Range.Start.Line = CurrentLine;
+            CurrentToken.position.Range.Start.Character = CurrentColumn;
+            CurrentToken.position.AbsoluteRange.Start = OffsetTotal;
         }
 
         static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
@@ -859,11 +851,8 @@ namespace LanguageCore.Tokenizing
                     result[^1] = new Token(
                         lastToken.TokenType,
                         lastToken.Content + token.Content,
-                        lastToken.IsAnonymous)
-                    {
-                        Position = lastToken.Position,
-                        AbsolutePosition = lastToken.AbsolutePosition,
-                    };
+                        lastToken.IsAnonymous,
+                        lastToken.Position);
                     continue;
                 }
 
@@ -872,11 +861,8 @@ namespace LanguageCore.Tokenizing
                     result[^1] = new Token(
                         lastToken.TokenType,
                         lastToken.Content + token.Content,
-                        lastToken.IsAnonymous)
-                    {
-                        Position = lastToken.Position,
-                        AbsolutePosition = lastToken.AbsolutePosition,
-                    };
+                        lastToken.IsAnonymous,
+                        lastToken.Position);
                     continue;
                 }
 

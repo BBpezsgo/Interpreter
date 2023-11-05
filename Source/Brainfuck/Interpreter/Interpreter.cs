@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using LanguageCore.Runtime;
 using Win32;
+using Win32.LowLevel;
 
 namespace LanguageCore.Brainfuck
 {
@@ -281,17 +282,17 @@ namespace LanguageCore.Brainfuck
             int width = Console.WindowWidth;
             int height = Console.WindowHeight;
 
-            using Win32.Utilities.ConsoleRenderer renderer = new(null, width, height);
-            Win32.Utilities.ConsoleListener.Start();
+            using Win32.ConsoleRenderer renderer = new(null, width, height);
+            Win32.ConsoleListener.Start();
             GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
 
-            Win32.Utilities.ConsoleListener.KeyEvent += Win32.Utilities.Keyboard.Feed;
-            Win32.Utilities.ConsoleListener.MouseEvent += Win32.Utilities.Mouse.Feed;
+            Win32.ConsoleListener.KeyEvent += Win32.Keyboard.Feed;
+            Win32.ConsoleListener.MouseEvent += Win32.Mouse.Feed;
 
-            Win32.Utilities.ConsoleListener.KeyEvent += (e) =>
+            Win32.ConsoleListener.KeyEvent += (e) =>
             {
                 if (e.IsDown != 0)
                 { inputBuffer.Enqueue(e.UnicodeChar); }
@@ -369,11 +370,11 @@ namespace LanguageCore.Brainfuck
 
             Draw();
 
-            Win32.Utilities.ConsoleListener.Stop();
+            Win32.ConsoleListener.Stop();
         }
 
         int StartToken;
-        void DrawOriginalCode(Win32.Utilities.ConsoleRenderer renderer, int x, int y, int width, int height)
+        void DrawOriginalCode(Win32.ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
             {
@@ -390,8 +391,8 @@ namespace LanguageCore.Brainfuck
 
             for (int i = 0; i < OriginalCode.Length; i++)
             {
-                if (OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.Start) ||
-                    OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.End))
+                if (OriginalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.Start) ||
+                    OriginalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.End))
                 {
                     StartToken = i;
                     break;
@@ -403,9 +404,9 @@ namespace LanguageCore.Brainfuck
 
             StartToken = Math.Max(0, StartToken - 30);
 
-            int startLine = OriginalCode[StartToken].Position.Start.Line;
+            int startLine = OriginalCode[StartToken].Position.Range.Start.Line;
 
-            while (StartToken > 0 && OriginalCode[StartToken - 1].Position.Start.Line == startLine)
+            while (StartToken > 0 && OriginalCode[StartToken - 1].Position.Range.Start.Line == startLine)
             {
                 StartToken--;
             }
@@ -414,8 +415,8 @@ namespace LanguageCore.Brainfuck
             {
                 var token = OriginalCode[i];
 
-                int currentX = token.Position.Start.Character + x;
-                int currentY = token.Position.Start.Line - startLine + y;
+                int currentX = token.Position.Range.Start.Character + x;
+                int currentY = token.Position.Range.Start.Line - startLine + y;
 
                 if (currentY - y >= height)
                 { return; }
@@ -465,7 +466,7 @@ namespace LanguageCore.Brainfuck
                     */
 
                     byte backgroundColor = ByteColor.Black;
-                    if (sourceLocation.SourcePosition.Range.Contains(token.Position.Start))
+                    if (sourceLocation.SourcePosition.Range.Contains(token.Position.Range.Start))
                     { backgroundColor = ByteColor.Gray; }
 
                     renderer[currentX + offset - 1, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
@@ -473,7 +474,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawCode(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawCode(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -499,7 +500,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryChars(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryChars(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -530,7 +531,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryRaw(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryRaw(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
@@ -556,7 +557,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryPointer(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryPointer(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
@@ -578,7 +579,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawOutput(Win32.Utilities.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
+        void DrawOutput(Win32.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
         {
             int _x = x;
             int _y = y;
@@ -804,14 +805,14 @@ namespace LanguageCore.Brainfuck
             int width = Console.WindowWidth;
             int height = Console.WindowHeight;
 
-            using Win32.Utilities.ConsoleRenderer renderer = new(null, width, height);
-            Win32.Utilities.ConsoleListener.Start();
+            using Win32.ConsoleRenderer renderer = new(null, width, height);
+            Win32.ConsoleListener.Start();
             GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
 
-            Win32.Utilities.ConsoleListener.KeyEvent += (e) =>
+            Win32.ConsoleListener.KeyEvent += (e) =>
             {
                 if (e.IsDown != 0)
                 { inputBuffer.Enqueue(e.UnicodeChar); }
@@ -889,11 +890,11 @@ namespace LanguageCore.Brainfuck
 
             Draw();
 
-            Win32.Utilities.ConsoleListener.Stop();
+            Win32.ConsoleListener.Stop();
         }
 
         int StartToken;
-        void DrawOriginalCode(Win32.Utilities.ConsoleRenderer renderer, int x, int y, int width, int height)
+        void DrawOriginalCode(Win32.ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
             {
@@ -910,8 +911,8 @@ namespace LanguageCore.Brainfuck
 
             for (int i = 0; i < OriginalCode.Length; i++)
             {
-                if (OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.Start) ||
-                    OriginalCode[i].Position.Contains(sourceLocation.SourcePosition.End))
+                if (OriginalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.Start) ||
+                    OriginalCode[i].Position.Range.Contains(sourceLocation.SourcePosition.Range.End))
                 {
                     StartToken = i;
                     break;
@@ -923,9 +924,9 @@ namespace LanguageCore.Brainfuck
 
             StartToken = Math.Max(0, StartToken - 30);
 
-            int startLine = OriginalCode[StartToken].Position.Start.Line;
+            int startLine = OriginalCode[StartToken].Position.Range.Start.Line;
 
-            while (StartToken > 0 && OriginalCode[StartToken - 1].Position.Start.Line == startLine)
+            while (StartToken > 0 && OriginalCode[StartToken - 1].Position.Range.Start.Line == startLine)
             {
                 StartToken--;
             }
@@ -934,8 +935,8 @@ namespace LanguageCore.Brainfuck
             {
                 var token = OriginalCode[i];
 
-                int currentX = token.Position.Start.Character + x;
-                int currentY = token.Position.Start.Line - startLine + y;
+                int currentX = token.Position.Range.Start.Character + x;
+                int currentY = token.Position.Range.Start.Line - startLine + y;
 
                 if (currentY - y >= height)
                 { return; }
@@ -985,7 +986,7 @@ namespace LanguageCore.Brainfuck
                     */
 
                     byte backgroundColor = ByteColor.Black;
-                    if (sourceLocation.SourcePosition.Range.Contains(token.Position.Start))
+                    if (sourceLocation.SourcePosition.Range.Contains(token.Position.Range.Start))
                     { backgroundColor = ByteColor.Gray; }
 
                     renderer[currentX + offset - 1, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
@@ -993,7 +994,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawCode(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawCode(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -1045,7 +1046,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryChars(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryChars(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
             {
@@ -1076,7 +1077,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryRaw(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryRaw(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
@@ -1102,7 +1103,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawMemoryPointer(Win32.Utilities.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
+        void DrawMemoryPointer(Win32.ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
             {
@@ -1124,7 +1125,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
-        void DrawOutput(Win32.Utilities.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
+        void DrawOutput(Win32.ConsoleRenderer renderer, string text, int x, int y, int width, int height)
         {
             int _x = x;
             int _y = y;

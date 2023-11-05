@@ -664,7 +664,7 @@ namespace ConsoleGUI
                 if (instruction.opcode == Opcode.HEAP_SET)
                 {
                     if (instruction.AddressingMode == AddressingMode.RUNTIME)
-                    { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueInt); }
+                    { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
                     else
                     { storeIndicators.Add(instruction.ParameterInt); }
                 }
@@ -673,8 +673,8 @@ namespace ConsoleGUI
                 {
                     if (instruction.AddressingMode == AddressingMode.RUNTIME)
                     {
-                        if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.INT)
-                        { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueInt); }
+                        if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.SInt32)
+                        { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
                     }
                     else
                     { loadIndicators.Add(instruction.ParameterInt); }
@@ -757,21 +757,21 @@ namespace ConsoleGUI
                     {
                         switch (item.Type)
                         {
-                            case RuntimeType.BYTE:
+                            case RuntimeType.UInt8:
                                 b.ForegroundColor = ByteColor.BrightCyan;
-                                b.AddText($"{item.ValueByte}");
+                                b.AddText($"{item.ValueUInt8}");
                                 break;
-                            case RuntimeType.INT:
+                            case RuntimeType.SInt32:
                                 b.ForegroundColor = ByteColor.BrightCyan;
-                                b.AddText($"{item.ValueInt}");
+                                b.AddText($"{item.ValueSInt32}");
                                 break;
-                            case RuntimeType.FLOAT:
+                            case RuntimeType.Single:
                                 b.ForegroundColor = ByteColor.BrightCyan;
-                                b.AddText($"{item.ValueFloat}f");
+                                b.AddText($"{item.ValueSingle}f");
                                 break;
-                            case RuntimeType.CHAR:
+                            case RuntimeType.UInt16:
                                 b.ForegroundColor = ByteColor.BrightYellow;
-                                b.AddText($"'{item.ValueChar.Escape()}'");
+                                b.AddText($"'{item.ValueUInt16.Escape()}'");
                                 break;
                             default:
                                 b.ForegroundColor = ByteColor.Silver;
@@ -927,21 +927,21 @@ namespace ConsoleGUI
                 {
                     switch (item.Type)
                     {
-                        case RuntimeType.BYTE:
+                        case RuntimeType.UInt8:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{item.ValueByte}");
+                            b.AddText($"{item.ValueUInt8}");
                             break;
-                        case RuntimeType.INT:
+                        case RuntimeType.SInt32:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{item.ValueInt}");
+                            b.AddText($"{item.ValueSInt32}");
                             break;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{item.ValueFloat}f");
+                            b.AddText($"{item.ValueSingle}f");
                             break;
-                        case RuntimeType.CHAR:
+                        case RuntimeType.UInt16:
                             b.ForegroundColor = ByteColor.BrightYellow;
-                            b.AddText($"'{item.ValueChar.Escape()}'");
+                            b.AddText($"'{item.ValueUInt16.Escape()}'");
                             break;
                         default:
                             b.ForegroundColor = ByteColor.Silver;
@@ -1163,24 +1163,24 @@ namespace ConsoleGUI
 
                 if (!instruction.Parameter.IsNull) switch (instruction.Parameter.Type)
                     {
-                        case RuntimeType.BYTE:
+                        case RuntimeType.UInt8:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{instruction.Parameter.ValueByte}");
+                            b.AddText($"{instruction.Parameter.ValueUInt8}");
                             b.AddText($" ");
                             break;
-                        case RuntimeType.INT:
+                        case RuntimeType.SInt32:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{instruction.Parameter.ValueInt}");
+                            b.AddText($"{instruction.Parameter.ValueSInt32}");
                             b.AddText($" ");
                             break;
-                        case RuntimeType.FLOAT:
+                        case RuntimeType.Single:
                             b.ForegroundColor = ByteColor.BrightCyan;
-                            b.AddText($"{instruction.Parameter.ValueFloat}f");
+                            b.AddText($"{instruction.Parameter.ValueSingle}f");
                             b.AddText($" ");
                             break;
-                        case RuntimeType.CHAR:
+                        case RuntimeType.UInt16:
                             b.ForegroundColor = ByteColor.BrightYellow;
-                            b.AddText($"'{instruction.Parameter.ValueChar.Escape()}'");
+                            b.AddText($"'{instruction.Parameter.ValueUInt16.Escape()}'");
                             b.AddText($" ");
                             break;
                         default:

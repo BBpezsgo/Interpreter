@@ -453,7 +453,7 @@ namespace LanguageCore.Runtime
 
             #region Win32
 
-            externalFunctions.AddExternalFunction<IntPtr, string, string, uint, Win32.MessageBoxResult>("MessageBox", Win32.User32.MessageBox);
+            externalFunctions.AddExternalFunction<IntPtr, string, string, uint, Win32.MessageBoxResult>("MessageBox", Win32.LowLevel.User32.MessageBox);
 
             #endregion
 

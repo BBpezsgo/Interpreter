@@ -7,185 +7,156 @@ namespace LanguageCore
 {
     public interface IThingWithPosition
     {
-        public Position GetPosition();
+        public Position Position { get; }
     }
 
     public struct Position : IEquatable<Position>
     {
-        public static Position UnknownPosition => new(-1);
+        public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined, SinglePosition.Undefined), new Range<int>(-1, -1));
 
-        public Range<int> AbsolutePosition;
+        public Range<int> AbsoluteRange;
+        public Range<SinglePosition> Range;
 
-        public SinglePosition Start;
-        public SinglePosition End;
-
-        public readonly Range<SinglePosition> Range => new(Start, End);
-
-        public Position(int line)
+        public Position(Range<SinglePosition> range, Range<int> absoluteRange)
         {
-            Start = new SinglePosition(line, -1);
-            End = new SinglePosition(line, -1);
-            AbsolutePosition = new Range<int>(-1, -1);
-        }
-
-        public Position(int line, int column)
-        {
-            Start = new SinglePosition(line, column);
-            End = new SinglePosition(line, column);
-            AbsolutePosition = new Range<int>(-1, -1);
-        }
-
-        public Position(int line, int column, Range<int> absolutePosition)
-        {
-            Start = new SinglePosition(line, column);
-            End = new SinglePosition(line, column);
-            AbsolutePosition = absolutePosition;
-        }
-
-        public Position(Range<SinglePosition> position, Range<int> absolutePosition)
-        {
-            Start = position.Start;
-            End = position.End;
-            AbsolutePosition = absolutePosition;
+            Range = range;
+            AbsoluteRange = absoluteRange;
         }
 
         public Position(params IThingWithPosition?[] elements)
         {
             if (elements.Length == 0) throw new ArgumentException($"Array {nameof(elements)} length is 0");
 
-            Start = Position.UnknownPosition.Start;
-            End = Position.UnknownPosition.End;
-            AbsolutePosition = Position.UnknownPosition.AbsolutePosition;
+            Range = Position.UnknownPosition.Range;
+            AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
 
             for (int i = 0; i < elements.Length; i++)
             {
                 IThingWithPosition? element = elements[i];
                 if (element == null) continue;
                 if (element is Tokenizing.Token token && token.IsAnonymous) continue;
-                Start = element.GetPosition().Start;
-                End = element.GetPosition().End;
-                AbsolutePosition = element.GetPosition().AbsolutePosition;
+                Position position = element.Position;
+                Range = position.Range;
+                AbsoluteRange = position.AbsoluteRange;
                 break;
             }
 
             for (int i = 1; i < elements.Length; i++)
-            { Extend(elements[i]); }
+            { Union(elements[i]); }
         }
-        public Position(IEnumerable<IThingWithPosition> elements)
-            : this((elements ?? throw new ArgumentNullException(nameof(elements))).ToArray())
+        public Position(IEnumerable<IThingWithPosition?> elements) : this(elements.ToArray())
         { }
-        internal Position Extend(Position other)
+
+        public Position Union(Position other)
         {
-            if (other.AbsolutePosition == Position.UnknownPosition.AbsolutePosition) return this;
+            if (other.AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return this;
 
-            if (Start.Line > other.Start.Line)
+            if (Range.Start.Line > other.Range.Start.Line)
             {
-                Start.Line = other.Start.Line;
-                Start.Character = other.Start.Character;
+                Range.Start.Line = other.Range.Start.Line;
+                Range.Start.Character = other.Range.Start.Character;
             }
-            else if (Start.Character > other.Start.Character && Start.Line == other.Start.Line)
+            else if (Range.Start.Character > other.Range.Start.Character && Range.Start.Line == other.Range.Start.Line)
             {
-                Start.Character = other.Start.Character;
-            }
-
-            if (End.Line < other.End.Line)
-            {
-                End.Line = other.End.Line;
-                End.Character = other.End.Character;
-            }
-            else if (End.Character < other.End.Character && End.Line == other.End.Line)
-            {
-                End.Character = other.End.Character;
+                Range.Start.Character = other.Range.Start.Character;
             }
 
-            if (AbsolutePosition.Start > other.AbsolutePosition.Start)
+            if (Range.End.Line < other.Range.End.Line)
             {
-                AbsolutePosition.Start = other.AbsolutePosition.Start;
+                Range.End.Line = other.Range.End.Line;
+                Range.End.Character = other.Range.End.Character;
+            }
+            else if (Range.End.Character < other.Range.End.Character && Range.End.Line == other.Range.End.Line)
+            {
+                Range.End.Character = other.Range.End.Character;
             }
 
-            if (AbsolutePosition.End < other.AbsolutePosition.End)
+            if (AbsoluteRange.Start > other.AbsoluteRange.Start)
             {
-                AbsolutePosition.End = other.AbsolutePosition.End;
+                AbsoluteRange.Start = other.AbsoluteRange.Start;
+            }
+
+            if (AbsoluteRange.End < other.AbsoluteRange.End)
+            {
+                AbsoluteRange.End = other.AbsoluteRange.End;
             }
 
             return this;
         }
-
-        internal Position Extend(Range<int> absolutePosition)
-        {
-            AbsolutePosition.Extend(absolutePosition.Start, absolutePosition.End);
-            return this;
-        }
-        internal Position Extend(int start, int end)
-        {
-            AbsolutePosition.Extend(start, end);
-            return this;
-        }
-        internal Position Extend(IThingWithPosition? other)
+        public Position Union(IThingWithPosition? other)
         {
             if (other == null) return this;
             if (other is Tokenizing.Token token && token.IsAnonymous) return this;
-            Extend(other.GetPosition());
-            return this;
+            return Union(other.Position);
         }
-        internal Position Extend(params IThingWithPosition?[]? elements)
+        public Position Union(params IThingWithPosition?[]? elements)
         {
             if (elements == null) return this;
             if (elements.Length == 0) return this;
 
             for (int i = 0; i < elements.Length; i++)
-            { Extend(elements[i]); }
+            { Union(elements[i]); }
+
             return this;
         }
-        internal Position Extend(IEnumerable<IThingWithPosition?>? elements)
+        public Position Union(IEnumerable<IThingWithPosition?>? elements)
         {
             if (elements == null) return this;
 
             foreach (IThingWithPosition? element in elements)
-            { Extend(element); }
+            { Union(element); }
+
             return this;
         }
 
         public readonly string ToMinString()
         {
-            if (Start == End) return Start.ToMinString();
-            if (Start.Line == End.Line) return $"{Start.Line}:({Start.Character}-{End.Character})";
-            return $"{Start.ToMinString()}-{End.ToMinString()}";
+            if (Range.Start == Range.End) return Range.Start.ToMinString();
+            if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line}:({Range.Start.Character}-{Range.End.Character})";
+            return $"{Range.Start.ToMinString()}-{Range.End.ToMinString()}";
         }
 
         public readonly string? ToCoolString(string prefix = "", string postfix = "")
         {
-            if (Start.Line == -1)
+            if (Range.Start.Line < 0)
             { return null; }
 
             if (this == Position.UnknownPosition)
             { return null; }
 
-            if (Start.Character == -1)
-            { return $"{prefix}line {Start.Character}{postfix}"; }
+            if (Range.Start.Character < 0)
+            { return $"{prefix}line {Range.Start.Character}{postfix}"; }
 
-            return $"{prefix}line {Start.Line} and column {Start.Character}{postfix}";
+            return $"{prefix}line {Range.Start.Line} and column {Range.Start.Character}{postfix}";
         }
 
-        public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.End.Line, this.End.Character), new SinglePosition(this.End.Line, this.End.Character + 1)), new Range<int>(this.AbsolutePosition.End, this.AbsolutePosition.End + 1));
+        public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
 
         public override bool Equals(object? obj) => obj is Position position && Equals(position);
-        public bool Equals(Position other) =>
-            AbsolutePosition.Equals(other.AbsolutePosition) &&
-            Start.Equals(other.Start) &&
-            End.Equals(other.End);
+        public bool Equals(Position other) => AbsoluteRange.Equals(other.AbsoluteRange) && Range.Equals(other.Range);
 
-        public override readonly int GetHashCode() => HashCode.Combine(AbsolutePosition, Start, End);
+        public override readonly int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
         public static bool operator ==(Position left, Position right) => left.Equals(right);
         public static bool operator !=(Position left, Position right) => !left.Equals(right);
     }
 
     [DebuggerDisplay($"{{{nameof(ToMinString)}(),nq}}")]
-    public struct SinglePosition : IEquatable<SinglePosition>
+    public struct SinglePosition :
+        IEquatable<SinglePosition>,
+        System.Numerics.IComparisonOperators<SinglePosition, SinglePosition, bool>,
+        System.Numerics.IEqualityOperators<SinglePosition, SinglePosition, bool>,
+        System.Numerics.IMinMaxValue<SinglePosition>
     {
         public int Line;
         public int Character;
+
+        public readonly bool IsUndefined => Line < 0 || Character < 0;
+
+        public static SinglePosition MaxValue => new(int.MaxValue, int.MaxValue);
+        public static SinglePosition MinValue => new(0, 0);
+        public static SinglePosition Undefined => new(-1, -1);
+        public static SinglePosition Zero => new(0, 0);
 
         public SinglePosition(int line, int character)
         {
@@ -195,6 +166,9 @@ namespace LanguageCore
 
         public static bool operator ==(SinglePosition a, SinglePosition b) => a.Line == b.Line && a.Character == b.Character;
         public static bool operator !=(SinglePosition a, SinglePosition b) => a.Line != b.Line || a.Character != b.Character;
+
+        public static bool operator ==(SinglePosition a, int b) => a.Line == b && a.Character == b;
+        public static bool operator !=(SinglePosition a, int b) => a.Line != b || a.Character != b;
 
         public static bool operator >(SinglePosition a, SinglePosition b)
         {
@@ -207,6 +181,20 @@ namespace LanguageCore
         {
             if (a.Line < b.Line) return true;
             if (a.Character < b.Character && a.Line == b.Line) return true;
+            return false;
+        }
+
+        public static bool operator >=(SinglePosition a, SinglePosition b)
+        {
+            if (a.Line > b.Line) return true;
+            if (a.Character >= b.Character && a.Line == b.Line) return true;
+            return false;
+        }
+
+        public static bool operator <=(SinglePosition a, SinglePosition b)
+        {
+            if (a.Line < b.Line) return true;
+            if (a.Character <= b.Character && a.Line == b.Line) return true;
             return false;
         }
 

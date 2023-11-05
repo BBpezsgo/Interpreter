@@ -1,219 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
-    using System.Net.Http.Headers;
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
-
-    public interface IDuplicatable<T>
-    {
-        public T Duplicate();
-    }
+    using Runtime;
+    using Tokenizing;
 
     public static class Extensions
     {
-        internal static AddressingMode AddressingMode(this CompiledVariable v)
-            => v.IsGlobal ? Runtime.AddressingMode.ABSOLUTE : Runtime.AddressingMode.BASEPOINTER_RELATIVE;
-
-        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
+        public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
         {
             foreach (KeyValuePair<TKey, TValue> pair in elements)
             { v.Add(pair.Key, pair.Value); }
         }
 
-        internal static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, List<TValue> values, Func<TValue, TKey> keys) where TKey : notnull
-        {
-            foreach (TValue value in values)
-            { v.Add(keys.Invoke(value), value); }
-        }
-
-        public static bool ContainsSameDefinition(this IEnumerable<FunctionDefinition> functions, FunctionDefinition other)
-        {
-            foreach (var function in functions)
-            { if (function.IsSame(other)) return true; }
-            return false;
-        }
-
-        public static bool ContainsSameDefinition(this IEnumerable<MacroDefinition> functions, MacroDefinition other)
-        {
-            foreach (var function in functions)
-            { if (function.IsSame(other)) return true; }
-            return false;
-        }
-
-        public static bool ContainsSameDefinition(this IEnumerable<CompiledFunction> functions, CompiledFunction other)
-        {
-            foreach (var function in functions)
-            { if (function.IsSame(other)) return true; }
-            return false;
-        }
-        public static bool ContainsSameDefinition(this IEnumerable<CompiledGeneralFunction> functions, CompiledGeneralFunction other)
-        {
-            foreach (CompiledGeneralFunction function in functions)
-            { if (function.IsSame(other)) return true; }
-            return false;
-        }
-
-        public static string ID(this FunctionDefinition function)
-        {
-            string result = function.Identifier.Content;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            {
-                var param = function.Parameters[i];
-                // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
-                result += "," + param.Type.ToString();
-            }
-            return result;
-        }
-
-        public static string ID(this GeneralFunctionDefinition function)
-        {
-            string result = function.Identifier.Content;
-            for (int i = 0; i < function.Parameters.Length; i++)
-            {
-                var param = function.Parameters[i];
-                // var paramType = (param.type.typeName == BuiltinType.STRUCT) ? param.type.text : param.type.typeName.ToString().ToLower();
-                result += "," + param.Type.ToString();
-            }
-            return result;
-        }
-
-        public static bool TryGetValue<T>(this IEnumerable<IHaveKey<T>> self, T key, [NotNullWhen(true)] out IHaveKey<T>? value) where T : notnull
-        {
-            foreach (IHaveKey<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.Key.Equals(key))
-                {
-                    value = element;
-                    return true;
-                }
-            }
-            value = null;
-            return false;
-        }
-        public static bool TryGetValue<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key, [NotNullWhen(true)] out TResult? value) where TResult : IHaveKey<T> where T : notnull
-        {
-            bool result = self.TryGetValue<T>(key, out IHaveKey<T>? _value);
-            value = (_value == null) ? default : (TResult)_value;
-            return result;
-        }
-        public static bool ContainsKey<T>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
-        {
-            foreach (IHaveKey<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.Key.Equals(key))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        /// <exception cref="KeyNotFoundException"></exception>
-        public static IHaveKey<T> Get<T>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
-        {
-            foreach (IHaveKey<T> element in self)
-            {
-                if (element == null) continue;
-                if (element.Key.Equals(key))
-                {
-                    return element;
-                }
-            }
-            throw new KeyNotFoundException($"Key {key} not found in list {self}");
-        }
-        /// <exception cref="KeyNotFoundException"></exception>
-        public static TResult Get<T, TResult>(this IEnumerable<IHaveKey<T>> self, T key) where T : notnull
-            => (TResult)self.Get<T>(key);
-        public static bool Remove<TKey>(this IList<IHaveKey<TKey>> self, TKey key) where TKey : notnull
-        {
-            for (int i = self.Count - 1; i >= 0; i--)
-            {
-                IHaveKey<TKey> element = self[i];
-                if (element.Key.Equals(key))
-                {
-                    self.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-        public static bool Remove<TKey>(this IList<CompiledFunction> self, TKey key)
-        {
-            for (int i = self.Count - 1; i >= 0; i--)
-            {
-                CompiledFunction element = self[i];
-                if (element.Key.Equals(key))
-                {
-                    self.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public static Dictionary<TKey, IHaveKey<TKey>> ToDictionary<TKey>(this IEnumerable<IHaveKey<TKey>> self) where TKey : notnull
-        {
-            Dictionary<TKey, IHaveKey<TKey>> result = new();
-            foreach (IHaveKey<TKey> element in self)
-            { result.Add(element.Key, element); }
-            return result;
-        }
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<IHaveKey<TKey>> self) where TKey : notnull
-        {
-            Dictionary<TKey, TValue> result = new();
-            foreach (IHaveKey<TKey> element in self)
-            { result.Add(element.Key, (TValue)element); }
-            return result;
-        }
-
         #region KeyValuePair<TKey, TValue>
 
-        public static bool TryGetValue<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key, out TValue? value) where TKey : notnull
-        {
-            foreach (KeyValuePair<TKey, TValue> element in self)
-            {
-                if (element.Key.Equals(key))
-                {
-                    value = element.Value;
-                    return true;
-                }
-            }
-            value = default;
-            return false;
-        }
-        public static bool ContainsKey<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
-        {
-            foreach (KeyValuePair<TKey, TValue> element in self)
-            {
-                if (element.Key.Equals(key))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        /// <exception cref="KeyNotFoundException"></exception>
-        public static TValue Get<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
-        {
-            foreach (KeyValuePair<TKey, TValue> element in self)
-            {
-                if (element.Key.Equals(key))
-                {
-                    return element.Value;
-                }
-            }
-            throw new KeyNotFoundException($"Key {key} not found in list {self}");
-        }
         public static void Add<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key, TValue value)
             => self.Add(new KeyValuePair<TKey, TValue>(key, value));
         public static bool Remove<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
@@ -228,13 +36,6 @@ namespace LanguageCore.BBCode.Compiler
                 }
             }
             return false;
-        }
-        public static Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this IEnumerable<KeyValuePair<TKey, TValue>> self) where TKey : notnull
-        {
-            Dictionary<TKey, TValue> result = new();
-            foreach (KeyValuePair<TKey, TValue> element in self)
-            { result.Add(element.Key, element.Value); }
-            return result;
         }
 
         #endregion
@@ -418,7 +219,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public DefinitionReference(IThingWithPosition source, string? sourceFile)
         {
-            Source = source.GetPosition().Range;
+            Source = source.Position.Range;
             SourceFile = sourceFile;
         }
     }
@@ -427,12 +228,6 @@ namespace LanguageCore.BBCode.Compiler
     {
         public void AddReference(T reference);
         public void ClearReferences();
-    }
-
-    public interface IFunctionThing
-    {
-        internal int InstructionOffset { get; set; }
-        internal bool IsSame(IFunctionThing other);
     }
 
     public enum Protection
@@ -446,19 +241,19 @@ namespace LanguageCore.BBCode.Compiler
         /// <summary>
         /// Reserved for indicating that the <see cref="CompiledType"/> is not a built-in type
         /// </summary>
-        NONE,
+        NotBuiltin,
 
-        VOID,
+        Void,
 
-        BYTE,
-        INT,
-        FLOAT,
-        CHAR,
+        Byte,
+        Integer,
+        Float,
+        Char,
 
         /// <summary>
         /// Only used when get a value by it's memory address
         /// </summary>
-        UNKNOWN,
+        Unknown,
     }
 
     [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -467,7 +262,7 @@ namespace LanguageCore.BBCode.Compiler
         public readonly CompiledType ReturnType;
         public readonly CompiledType[] Parameters;
 
-        public bool ReturnSomething => ReturnType != Type.VOID;
+        public bool ReturnSomething => ReturnType != Type.Void;
 
         public FunctionType(CompiledFunction function)
         {
@@ -561,12 +356,12 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="NotImplementedException"/>
         internal RuntimeType RuntimeType => builtinType switch
         {
-            Type.BYTE => RuntimeType.BYTE,
-            Type.INT => RuntimeType.INT,
-            Type.FLOAT => RuntimeType.FLOAT,
-            Type.CHAR => RuntimeType.CHAR,
+            Type.Byte => RuntimeType.UInt8,
+            Type.Integer => RuntimeType.SInt32,
+            Type.Float => RuntimeType.Single,
+            Type.Char => RuntimeType.UInt16,
 
-            Type.NONE => throw new InternalException($"{this} is not a built-in type"),
+            Type.NotBuiltin => throw new InternalException($"{this} is not a built-in type"),
 
             _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
         };
@@ -592,16 +387,16 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (stackArrayOf is not null) return stackArrayOf.Name;
 
-                if (builtinType != Type.NONE) return builtinType switch
+                if (builtinType != Type.NotBuiltin) return builtinType switch
                 {
-                    Type.VOID => "void",
-                    Type.BYTE => "byte",
-                    Type.INT => "int",
-                    Type.FLOAT => "float",
-                    Type.CHAR => "char",
+                    Type.Void => "void",
+                    Type.Byte => "byte",
+                    Type.Integer => "int",
+                    Type.Float => "float",
+                    Type.Char => "char",
 
-                    Type.UNKNOWN => "unknown",
-                    Type.NONE => throw new ImpossibleException(),
+                    Type.Unknown => "unknown",
+                    Type.NotBuiltin => throw new ImpossibleException(),
 
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
@@ -626,12 +421,12 @@ namespace LanguageCore.BBCode.Compiler
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(function))]
         internal bool IsFunction => function is not null;
-        internal bool IsBuiltin => builtinType != Type.NONE;
+        internal bool IsBuiltin => builtinType != Type.NotBuiltin;
         internal bool CanBeBuiltin
         {
             get
             {
-                if (builtinType != Type.NONE) return true;
+                if (builtinType != Type.NotBuiltin) return true;
                 if (IsEnum) return true;
 
                 return false;
@@ -688,7 +483,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
                 if (IsStruct) return @struct.Size;
-                if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).ValueInt;
+                if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).ValueSInt32;
                 return 1;
             }
         }
@@ -698,7 +493,7 @@ namespace LanguageCore.BBCode.Compiler
             get
             {
                 if (!IsStackArray) throw new InternalException($"Can not get the stack array size of a non stack array type");
-                return stackArraySize.ValueInt;
+                return stackArraySize.ValueSInt32;
             }
         }
         public CompiledType StackArrayOf
@@ -712,7 +507,7 @@ namespace LanguageCore.BBCode.Compiler
 
         CompiledType()
         {
-            this.builtinType = Type.NONE;
+            this.builtinType = Type.NotBuiltin;
             this.@struct = null;
             this.@class = null;
             this.@enum = null;
@@ -772,10 +567,10 @@ namespace LanguageCore.BBCode.Compiler
         {
             this.builtinType = type switch
             {
-                RuntimeType.BYTE => Type.BYTE,
-                RuntimeType.INT => Type.INT,
-                RuntimeType.FLOAT => Type.FLOAT,
-                RuntimeType.CHAR => Type.CHAR,
+                RuntimeType.UInt8 => Type.Byte,
+                RuntimeType.SInt32 => Type.Integer,
+                RuntimeType.Single => Type.Float,
+                RuntimeType.UInt16 => Type.Char,
                 _ => throw new ImpossibleException(),
             };
         }
@@ -839,7 +634,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (type.GenericTypes == null || type.GenericTypes.Length == 0)
                 {
-                    funcRet = new(Type.VOID);
+                    funcRet = new(Type.Void);
                     funcParams = Array.Empty<CompiledType>();
                 }
                 else
@@ -887,7 +682,7 @@ namespace LanguageCore.BBCode.Compiler
             stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
             stackArraySizeStatement = type.StackArraySize!;
 
-            if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.INT, out stackArraySize))
+            if (!constComputer.Invoke(type.StackArraySize!, RuntimeType.SInt32, out stackArraySize))
             { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
         }
 
@@ -1308,5 +1103,10 @@ namespace LanguageCore.BBCode.Compiler
     public interface IAmInContext<T>
     {
         public T? Context { get; set; }
+    }
+
+    public interface ICanBeSame
+    {
+        public bool IsSame(ICanBeSame? other);
     }
 }

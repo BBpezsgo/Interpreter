@@ -15,7 +15,7 @@ namespace LanguageCore.BBCode.Compiler
         readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
         readonly List<CompiledParameter> parameters;
 
-        IFunctionThing? CurrentFunction;
+        ICanBeSame? CurrentFunction;
 
         #endregion
 
@@ -45,10 +45,32 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
-            => compiledVariables.TryGetValue(variableName, out compiledVariable);
+        {
+            foreach (KeyValuePair<string, CompiledVariable> compiledVariable_ in compiledVariables)
+            {
+                if (compiledVariable_.Value.VariableName.Content == variableName)
+                {
+                    compiledVariable = compiledVariable_.Value;
+                    return true;
+                }
+            }
+            compiledVariable = null;
+            return false;
+        }
 
         bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
-            => parameters.TryGetValue(parameterName, out parameter);
+        {
+            foreach (CompiledParameter compiledParameter_ in parameters)
+            {
+                if (compiledParameter_.Identifier.Content == parameterName)
+                {
+                    parameter = compiledParameter_;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
 
         CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
         {
@@ -398,7 +420,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     var paramType = FindStatementType(keywordCall.Parameters[0]);
 
-                    if (paramType == Type.INT)
+                    if (paramType == Type.Integer)
                     {
                         if (TryGetBuiltinFunction("free", out CompiledFunction? function))
                         {

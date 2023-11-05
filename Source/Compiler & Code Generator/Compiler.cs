@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.BBCode.Compiler
 {
@@ -68,8 +69,8 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
         {
-            { "alloc", (new CompiledType(Type.INT), new CompiledType[] { new CompiledType(Type.INT) }) },
-            { "free", (new CompiledType(Type.VOID), new CompiledType[] { new CompiledType(Type.INT) }) },
+            { "alloc", (new CompiledType(Type.Integer), new CompiledType[] { new CompiledType(Type.Integer) }) },
+            { "free", (new CompiledType(Type.Void), new CompiledType[] { new CompiledType(Type.Integer) }) },
         };
 
         Compiler(Dictionary<string, ExternalFunctionBase> externalFunctions, PrintCallback? printCallback, string? basePath)
@@ -112,9 +113,9 @@ namespace LanguageCore.BBCode.Compiler
                 }
             }
 
-            if (CompiledStructs.ContainsKey(name)) return new CompiledType(CompiledStructs.Get<string, ITypeDefinition>(name));
-            if (CompiledClasses.ContainsKey(name)) return new CompiledType(CompiledClasses.Get<string, ITypeDefinition>(name));
-            if (CompiledEnums.ContainsKey(name)) return new CompiledType(CompiledEnums.Get<string, ITypeDefinition>(name));
+            if (CodeGeneratorBase.GetStruct(CompiledStructs, name, out CompiledStruct? @struct)) return new CompiledType(@struct);
+            if (CodeGeneratorBase.GetClass(CompiledClasses, name, out CompiledClass? @class)) return new CompiledType(@class);
+            if (CodeGeneratorBase.GetEnum(CompiledEnums, name, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
             throw new InternalException($"Unknown type '{name}'");
         }
@@ -234,7 +235,7 @@ namespace LanguageCore.BBCode.Compiler
 
             @struct.Name.AnalyzedType = TokenAnalyzedType.Struct;
 
-            if (CompiledStructs.ContainsKey(@struct.Name.Content))
+            if (CodeGeneratorBase.GetStruct(CompiledStructs, @struct.Name.Content, out _))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@struct.Attributes);
@@ -249,7 +250,7 @@ namespace LanguageCore.BBCode.Compiler
 
             @class.Name.AnalyzedType = TokenAnalyzedType.Class;
 
-            if (CompiledClasses.ContainsKey(@class.Name.Content))
+            if (CodeGeneratorBase.GetClass(CompiledClasses, @class.Name.Content, out _))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@class.Attributes);
@@ -279,7 +280,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
-                    if (externalFunction.ReturnSomething != (type != Type.VOID))
+                    if (externalFunction.ReturnSomething != (type != Type.Void))
                     { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
@@ -290,7 +291,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (passedParameterType == definedParameterType)
                         { continue; }
 
-                        if (passedParameterType.IsClass && definedParameterType == Type.INT)
+                        if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
                         throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
@@ -326,7 +327,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (passedParameterType == definedParameterType)
                         { continue; }
 
-                        if (passedParameterType.IsClass && definedParameterType == Type.INT)
+                        if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
                         throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
@@ -362,7 +363,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
-                    if (externalFunction.ReturnSomething != (type != Type.VOID))
+                    if (externalFunction.ReturnSomething != (type != Type.Void))
                     { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
@@ -439,20 +440,20 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledEnumMember compiledMember = new(member);
                 switch (member.Value!.Type)
                 {
-                    case LiteralType.INT:
+                    case LiteralType.Integer:
                         compiledMember.Value = new DataItem(int.Parse(member.Value.Value));
                         break;
-                    case LiteralType.FLOAT:
+                    case LiteralType.Float:
                         compiledMember.Value = new DataItem(float.Parse(member.Value.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
                         break;
-                    case LiteralType.BOOLEAN:
+                    case LiteralType.Boolean:
                         compiledMember.Value = new DataItem(bool.Parse(member.Value.Value) ? 1 : 0);
                         break;
-                    case LiteralType.CHAR:
+                    case LiteralType.Char:
                         if (member.Value.Value.Length != 1) throw new InternalException($"Literal char contains {member.Value.Value.Length} characters but only 1 allowed", @enum.FilePath);
                         compiledMember.Value = new DataItem(member.Value.Value[0]);
                         break;
-                    case LiteralType.STRING:
+                    case LiteralType.String:
                         throw new CompilerException($"String literal is not valid for a enum member value", member.Value, @enum.FilePath);
                     default:
                         throw new ImpossibleException();
@@ -463,19 +464,65 @@ namespace LanguageCore.BBCode.Compiler
             return compiledEnum;
         }
 
+        bool IsSymbolExists(string symbol, [NotNullWhen(true)] out Token? where)
+        {
+            foreach (var @class in Classes)
+            {
+                if (@class.Name.Content == symbol)
+                {
+                    where = @class.Name;
+                    return true;
+                }
+            }
+            foreach (var @struct in Structs)
+            {
+                if (@struct.Name.Content == symbol)
+                {
+                    where = @struct.Name;
+                    return true;
+                }
+            }
+            foreach (var @enum in Enums)
+            {
+                if (@enum.Identifier.Content == symbol)
+                {
+                    where = @enum.Identifier;
+                    return true;
+                }
+            }
+            foreach (var function in this.Functions)
+            {
+                if (function.Identifier.Content == symbol)
+                {
+                    where = function.Identifier;
+                    return true;
+                }
+            }
+            foreach (var macro in this.Macros)
+            {
+                if (macro.Identifier.Content == symbol)
+                {
+                    where = macro.Identifier;
+                    return true;
+                }
+            }
+            where = null;
+            return false;
+        }
+
         void CompileFile(SourceCodeManager.CollectedAST collectedAST)
         {
-            foreach (var func in collectedAST.ParserResult.Functions)
+            foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
             {
-                if (Functions.ContainsSameDefinition(func))
-                { Errors.Add(new Error($"Function {func.ReadableID()} already defined", func.Identifier, func.FilePath)); continue; }
+                if (Functions.Any(other => function.IsSame(other)))
+                { Errors.Add(new Error($"Function {function.ReadableID()} already defined", function.Identifier, function.FilePath)); continue; }
 
-                Functions.Add(func);
+                Functions.Add(function);
             }
 
-            foreach (var macro in collectedAST.ParserResult.Macros)
+            foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
             {
-                if (Macros.ContainsSameDefinition(macro))
+                if (Macros.Any(other => macro.IsSame(other)))
                 { Errors.Add(new Error($"Macro {macro.ReadableID()} already defined", macro.Identifier, macro.FilePath)); continue; }
 
                 Macros.Add(macro);
@@ -493,33 +540,33 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (var @struct in collectedAST.ParserResult.Structs)
             {
-                if (Classes.ContainsKey(@struct.Name.Content) || Structs.ContainsKey(@struct.Name.Content) || Enums.ContainsKey(@struct.Name.Content))
-                { Errors.Add(new Error($"Type \" {@struct.Name.Content} \" already defined", @struct.Name, @struct.FilePath)); }
+                if (IsSymbolExists(@struct.Name.Content, out _))
+                { Errors.Add(new Error($"Symbol {@struct.Name} already defined", @struct.Name, @struct.FilePath)); continue; }
                 else
                 { Structs.Add(@struct); }
             }
 
             foreach (var @class in collectedAST.ParserResult.Classes)
             {
-                if (Classes.ContainsKey(@class.Name.Content) || Structs.ContainsKey(@class.Name.Content) || Enums.ContainsKey(@class.Name.Content))
-                { Errors.Add(new Error($"Type \"{@class.Name.Content}\" already defined", @class.Name, @class.FilePath)); }
+                if (IsSymbolExists(@class.Name.Content, out _))
+                { Errors.Add(new Error($"Symbol {@class.Name} already defined", @class.Name, @class.FilePath)); continue; }
                 else
                 { Classes.Add(@class); }
 
 
-                foreach (var func in @class.Operators)
+                foreach (var @operator in @class.Operators)
                 {
-                    if (Operators.ContainsSameDefinition(func))
-                    { Errors.Add(new Error($"Operator {func.ReadableID()} already defined", func.Identifier, func.FilePath)); continue; }
-
-                    Operators.Add(func);
+                    if (Operators.Any(other => @operator.IsSame(other)))
+                    { Errors.Add(new Error($"Operator {@operator.ReadableID()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
+                    else
+                    { Operators.Add(@operator); }
                 }
             }
 
             foreach (var @enum in collectedAST.ParserResult.Enums)
             {
-                if (Classes.ContainsKey(@enum.Identifier.Content) || Structs.ContainsKey(@enum.Identifier.Content) || Enums.ContainsKey(@enum.Identifier.Content))
-                { Errors.Add(new Error($"Type \"{@enum.Identifier.Content}\" already defined", @enum.Identifier, @enum.FilePath)); }
+                if (IsSymbolExists(@enum.Identifier.Content, out _))
+                { Errors.Add(new Error($"Symbol {@enum.Identifier} already defined", @enum.Identifier, @enum.FilePath)); continue; }
                 else
                 { Enums.Add(@enum); }
             }
@@ -580,7 +627,7 @@ namespace LanguageCore.BBCode.Compiler
                                 {
                                     parameterTypes[i] = paramType;
 
-                                    if (paramType == Type.VOID && i > 0)
+                                    if (paramType == Type.Void && i > 0)
                                     { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
                                 }
                                 else
@@ -595,18 +642,18 @@ namespace LanguageCore.BBCode.Compiler
                             x.RemoveAt(0);
                             Type[] pTypes = x.ToArray();
 
-                            if (parameterTypes[0] == Type.VOID)
+                            if (parameterTypes[0] == Type.Void)
                             {
                                 ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
-                                    Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                 });
                             }
                             else
                             {
                                 ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
                                 {
-                                    Output.Debug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
+                                    Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
                                     return DataItem.GetDefaultValue(returnType);
                                 });
                             }
@@ -688,7 +735,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     CompiledOperator compiledFunction = CompileOperator(function);
 
-                    if (compiledOperators.ContainsSameDefinition(compiledFunction))
+                    if (compiledOperators.Any(other => compiledFunction.IsSame(other)))
                     { throw new CompilerException($"Operator '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledOperators.Add(compiledFunction);
@@ -736,7 +783,7 @@ namespace LanguageCore.BBCode.Compiler
 
                         CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, new CompiledType(compiledClass));
 
-                        if (compiledGeneralFunctions.ContainsSameDefinition(methodInfo))
+                        if (compiledGeneralFunctions.Any(other => methodInfo.IsSame(other)))
                         { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
@@ -761,7 +808,7 @@ namespace LanguageCore.BBCode.Compiler
 
                         CompiledFunction methodInfo = CompileFunction(method);
 
-                        if (compiledFunctions.ContainsSameDefinition(methodInfo))
+                        if (compiledFunctions.Any(other => methodInfo.IsSame(other)))
                         { throw new CompilerException($"Function with name '{methodInfo.ReadableID}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
@@ -776,7 +823,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     var compiledFunction = CompileFunction(function);
 
-                    if (compiledFunctions.ContainsSameDefinition(compiledFunction))
+                    if (compiledFunctions.Any(other => compiledFunction.IsSame(other)))
                     { throw new CompilerException($"Function with name '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledFunctions.Add(compiledFunction);

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Win32.SafeHandles;
 using Win32;
-using Win32.Utilities;
+using Win32.LowLevel;
 
 namespace ConsoleGUI
 {
@@ -203,7 +203,7 @@ namespace ConsoleGUI
             {
                 fixed (char* fileNamePtr = "CONOUT$")
                 {
-                    ConsoleHandle = Kernel32.CreateFile(fileNamePtr, 0x40000000, 2, null, (uint)System.IO.FileMode.Open, 0, IntPtr.Zero);
+                    ConsoleHandle = Kernel32.CreateFileSafe(fileNamePtr, 0x40000000, 2, null, (uint)System.IO.FileMode.Open, 0, IntPtr.Zero);
                 }
             }
 

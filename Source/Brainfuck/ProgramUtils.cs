@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text;
 using LanguageCore;
 using LanguageCore.Brainfuck;
 using LanguageCore.Brainfuck.Compiler;
@@ -41,14 +42,14 @@ namespace TheProgram.Brainfuck
                         break;
                     case LogType.Warning:
                         if (!args.LogWarnings) break;
-                        Output.Warning(message);
+                        Output.LogWarning(message);
                         break;
                     case LogType.Error:
-                        Output.Error(message);
+                        Output.LogError(message);
                         break;
                     case LogType.Debug:
                         if (!args.LogDebugs) break;
-                        Output.Debug(message);
+                        Output.LogDebug(message);
                         break;
                     default:
                         Output.Log(message);
@@ -295,7 +296,7 @@ namespace TheProgram.Brainfuck
             return compiled;
         }
 
-        public static string? CompileFile(string file, CompileOptions options, LanguageCore .BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
+        public static string? CompileFile(string file, CompileOptions options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
             => CompileFile(file, (int)options, compilerSettings, printCallback);
         public static string? CompileFile(string file, int options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
         {
@@ -326,22 +327,25 @@ namespace TheProgram.Brainfuck
 
         public static string? GetArrows(Position position, string text)
         {
-            if (position.AbsolutePosition == new Range<int>(0, 0)) return null;
+            if (position.AbsoluteRange == 0) return null;
             if (position == Position.UnknownPosition) return null;
-            if (position.Start.Line != position.End.Line)
+            if (position.Range.Start.Line != position.Range.End.Line)
             { return null; }
+
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-            if (position.Start.Line - 1 >= lines.Length)
+
+            if (position.Range.Start.Line - 1 >= lines.Length)
             { return null; }
-            string line = lines[position.Start.Line - 1];
 
-            string result = string.Empty;
+            string line = lines[position.Range.Start.Line - 1];
 
-            result += line.Replace('\t', ' ');
-            result += "\r\n";
-            result += new string(' ', Math.Max(0, position.Start.Character - 1));
-            result += new string('^', Math.Max(1, position.End.Character - position.Start.Character));
-            return result;
+            StringBuilder result = new();
+
+            result.Append(line.Replace('\t', ' '));
+            result.Append("\r\n");
+            result.Append(' ', Math.Max(0, position.Range.Start.Character - 1));
+            result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
+            return result.ToString();
         }
 
         public static void PrintCode(string code)

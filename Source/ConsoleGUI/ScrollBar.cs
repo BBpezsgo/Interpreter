@@ -1,16 +1,12 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Win32;
 
 namespace ConsoleGUI
 {
     public class ScrollBar
     {
-        Func<Element, (int Min, int Max)> GetRange;
-        Element Parent;
+        readonly Func<Element, (int Min, int Max)> GetRange;
+        readonly Element Parent;
         int offset;
 
         public int Offset => offset;

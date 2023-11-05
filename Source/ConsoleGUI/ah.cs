@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Text;
 using Win32;
-using Win32.Utilities;
+using Win32.LowLevel;
 
 namespace LanguageCore
 {

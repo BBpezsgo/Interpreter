@@ -258,16 +258,16 @@ namespace LanguageCore.Brainfuck
         {
             switch (value.Type)
             {
-                case Runtime.RuntimeType.BYTE:
-                    SetValue(address, value.ValueByte);
+                case Runtime.RuntimeType.UInt8:
+                    SetValue(address, value.ValueUInt8);
                     return;
-                case Runtime.RuntimeType.INT:
-                    SetValue(address, value.ValueInt);
+                case Runtime.RuntimeType.SInt32:
+                    SetValue(address, value.ValueSInt32);
                     return;
-                case Runtime.RuntimeType.FLOAT:
+                case Runtime.RuntimeType.Single:
                     throw new NotSupportedException($"Floats not supported by brainfuck :(");
-                case Runtime.RuntimeType.CHAR:
-                    SetValue(address, value.ValueChar);
+                case Runtime.RuntimeType.UInt16:
+                    SetValue(address, value.ValueUInt16);
                     return;
                 default:
                     throw new ImpossibleException();
@@ -698,10 +698,10 @@ namespace LanguageCore.Brainfuck
         {
             return v.Type switch
             {
-                Runtime.RuntimeType.BYTE => Push(v.ValueByte),
-                Runtime.RuntimeType.INT => Push(v.ValueInt),
-                Runtime.RuntimeType.FLOAT => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
-                Runtime.RuntimeType.CHAR => Push(v.ValueChar),
+                Runtime.RuntimeType.UInt8 => Push(v.ValueUInt8),
+                Runtime.RuntimeType.SInt32 => Push(v.ValueSInt32),
+                Runtime.RuntimeType.Single => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
+                Runtime.RuntimeType.UInt16 => Push(v.ValueUInt16),
                 _ => throw new ImpossibleException(),
             };
         }

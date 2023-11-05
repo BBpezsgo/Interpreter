@@ -3,6 +3,11 @@ using System.Collections.Generic;
 
 namespace LanguageCore
 {
+    public interface IDuplicatable<T>
+    {
+        public T Duplicate();
+    }
+
     public static partial class Utils
     {
         public static double GetGoodNumber(double val) => Math.Round(val * 100) / 100;
@@ -32,14 +37,14 @@ namespace LanguageCore
             return GetGoodNumber(val).ToString(System.Globalization.CultureInfo.InvariantCulture) + " min";
         }
 
-        /// <exception cref="NotImplementedException"/>
-        public static void Map<TKey, TValue>(TKey[] keys, TValue[] values, Dictionary<TKey, TValue> typeParameters) where TKey : notnull
+        /// <exception cref="ArgumentException"/>
+        public static void Map<TKey, TValue>(TKey[] keys, TValue[] values, Dictionary<TKey, TValue> dictionary) where TKey : notnull
         {
             if (keys.Length != values.Length)
-            { throw new NotImplementedException($"There should be the same number of keys as values"); }
+            { throw new ArgumentException($"There should be the same number of keys as values"); }
 
             for (int i = 0; i < keys.Length; i++)
-            { typeParameters[keys[i]] = values[i]; }
+            { dictionary[keys[i]] = values[i]; }
         }
 
         public static int GCF(int a, int b)

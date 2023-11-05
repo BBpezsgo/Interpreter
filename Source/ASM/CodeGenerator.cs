@@ -166,11 +166,11 @@ namespace LanguageCore.ASM.Compiler
         }
         static int GetValueSize(Literal statement) => statement.Type switch
         {
-            LiteralType.STRING => statement.Value.Length,
-            LiteralType.INT => 1,
-            LiteralType.CHAR => 1,
-            LiteralType.FLOAT => 1,
-            LiteralType.BOOLEAN => 1,
+            LiteralType.String => statement.Value.Length,
+            LiteralType.Integer => 1,
+            LiteralType.Char => 1,
+            LiteralType.Float => 1,
+            LiteralType.Boolean => 1,
             _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
         };
         int GetValueSize(Identifier statement)
@@ -212,8 +212,8 @@ namespace LanguageCore.ASM.Compiler
             if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.INT
+                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||
+                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Integer
                 ))
             { return 1; }
 
@@ -491,8 +491,8 @@ namespace LanguageCore.ASM.Compiler
             if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.INT
+                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||
+                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Integer
                 ))
             {
                 throw new NotImplementedException();
@@ -533,7 +533,7 @@ namespace LanguageCore.ASM.Compiler
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.GetPosition().Range, CurrentFile));
+            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.Position.Range, CurrentFile));
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }

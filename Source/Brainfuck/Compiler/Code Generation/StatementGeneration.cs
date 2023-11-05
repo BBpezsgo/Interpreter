@@ -36,7 +36,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariable(VariableDeclaration variableDeclaration)
         {
-            if (Variables.TryFind(variableDeclaration.VariableName.Content, out _))
+            if (CodeGenerator.GetVariable(Variables, variableDeclaration.VariableName.Content, out _))
             { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
             CompiledType type;
@@ -59,7 +59,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariable(Stack<Variable> variables, string name, CompiledType type, StatementWithValue? initialValue)
         {
-            if (variables.TryFind(name, out _))
+            if (CodeGenerator.GetVariable(variables, name, out _))
             { return 0; }
 
             FunctionThingDefinition? scope = (CurrentMacro.Count == 0) ? null : CurrentMacro[^1];
@@ -70,11 +70,11 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 if (type.IsStackArray)
                 {
-                    if (type.StackArrayOf == Type.CHAR)
+                    if (type.StackArrayOf == Type.Char)
                     {
                         if (initialValue is not Literal literal)
                         { throw new InternalException(); }
-                        if (literal.Type != LiteralType.STRING)
+                        if (literal.Type != LiteralType.String)
                         { throw new InternalException(); }
                         if (literal.Value.Length != type.StackArraySize)
                         { throw new InternalException(); }
@@ -169,7 +169,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (GetConstant(statement.Content, out _))
             { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
-            if (!Variables.TryFind(statement.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement}\" not found", statement, CurrentFile); }
 
             CompileSetter(variable, value);
@@ -215,7 +215,7 @@ namespace LanguageCore.Brainfuck.Compiler
         void CompileSetter(Variable variable, StatementWithValue value)
         {
             if (value is Identifier _identifier &&
-                Variables.TryFind(_identifier.Content, out Variable valueVariable))
+                CodeGenerator.GetVariable(Variables, _identifier.Content, out Variable valueVariable))
             {
                 if (variable.Address == valueVariable.Address)
                 {
@@ -280,11 +280,11 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 if (variable.Type.IsStackArray)
                 {
-                    if (variable.Type.StackArrayOf == Type.CHAR)
+                    if (variable.Type.StackArrayOf == Type.Char)
                     {
                         if (value is not Literal literal)
                         { throw new InternalException(); }
-                        if (literal.Type != LiteralType.STRING)
+                        if (literal.Type != LiteralType.String)
                         { throw new InternalException(); }
                         if (literal.Value.Length != variable.Type.StackArraySize)
                         { throw new InternalException(); }
@@ -420,7 +420,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
-            if (!Variables.TryFind(_variableIdentifier.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, _variableIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
 
             if (variable.IsDiscarded)
@@ -555,7 +555,7 @@ namespace LanguageCore.Brainfuck.Compiler
             DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
             {
                 Instructions = (start, end),
-                SourcePosition = statement.GetPosition(),
+                SourcePosition = statement.Position,
             });
         }
         void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
@@ -1101,7 +1101,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                         if (statement.Parameters.Length == 1)
                         {
-                            if (!Variables.TryFind("@return", out Variable returnVariable))
+                            if (!CodeGenerator.GetVariable(Variables, ReturnVariableName, out Variable returnVariable))
                             { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
                             CompileSetter(returnVariable, statement.Parameters[0]);
@@ -1200,7 +1200,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             return;
                         }
 
-                        if (deletableType.BuiltinType == Type.INT)
+                        if (deletableType.BuiltinType == Type.Integer)
                         {
                             if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
                             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
@@ -1233,7 +1233,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
+                        if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarded)
@@ -1252,16 +1252,16 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             switch (constantValue.Type)
                             {
-                                case RuntimeType.BYTE:
-                                    Code.AddValue(variable.Address, constantValue.ValueByte);
+                                case RuntimeType.UInt8:
+                                    Code.AddValue(variable.Address, constantValue.ValueUInt8);
                                     break;
-                                case RuntimeType.INT:
-                                    Code.AddValue(variable.Address, constantValue.ValueInt);
+                                case RuntimeType.SInt32:
+                                    Code.AddValue(variable.Address, constantValue.ValueSInt32);
                                     break;
-                                case RuntimeType.FLOAT:
+                                case RuntimeType.Single:
                                     throw new NotSupportedException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
-                                case RuntimeType.CHAR:
-                                    Code.AddValue(variable.Address, constantValue.ValueChar);
+                                case RuntimeType.UInt16:
+                                    Code.AddValue(variable.Address, constantValue.ValueUInt16);
                                     break;
                                 default:
                                     throw new ImpossibleException();
@@ -1291,7 +1291,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
+                        if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarded)
@@ -1310,16 +1310,16 @@ namespace LanguageCore.Brainfuck.Compiler
 
                             switch (constantValue.Type)
                             {
-                                case RuntimeType.BYTE:
-                                    Code.AddValue(variable.Address, -constantValue.ValueByte);
+                                case RuntimeType.UInt8:
+                                    Code.AddValue(variable.Address, -constantValue.ValueUInt8);
                                     break;
-                                case RuntimeType.INT:
-                                    Code.AddValue(variable.Address, -constantValue.ValueInt);
+                                case RuntimeType.SInt32:
+                                    Code.AddValue(variable.Address, -constantValue.ValueSInt32);
                                     break;
-                                case RuntimeType.FLOAT:
+                                case RuntimeType.Single:
                                     throw new NotSupportedException($"Floats not supported by brainfuck :(", statement.Right, CurrentFile);
-                                case RuntimeType.CHAR:
-                                    Code.AddValue(variable.Address, -constantValue.ValueChar);
+                                case RuntimeType.UInt16:
+                                    Code.AddValue(variable.Address, -constantValue.ValueUInt16);
                                     break;
                                 default:
                                     throw new ImpossibleException();
@@ -1359,7 +1359,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
+                        if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarded)
@@ -1380,7 +1380,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!Variables.TryFind(variableIdentifier.Content, out Variable variable))
+                        if (!CodeGenerator.GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarded)
@@ -1404,7 +1404,7 @@ namespace LanguageCore.Brainfuck.Compiler
         {
             if (statement.InitialValue == null) return;
 
-            if (!Variables.TryFind(statement.VariableName.Content, out Variable variable))
+            if (!CodeGenerator.GetVariable(Variables, statement.VariableName.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
 
             if (variable.IsInitialValueSet)
@@ -1555,27 +1555,27 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 switch (statement.Type)
                 {
-                    case LiteralType.INT:
+                    case LiteralType.Integer:
                         {
                             int value = int.Parse(statement.Value);
                             Stack.Push(value);
                             break;
                         }
-                    case LiteralType.CHAR:
+                    case LiteralType.Char:
                         {
                             Stack.Push(statement.Value[0]);
                             break;
                         }
-                    case LiteralType.BOOLEAN:
+                    case LiteralType.Boolean:
                         {
                             bool value = bool.Parse(statement.Value);
                             Stack.Push(value ? 1 : 0);
                             break;
                         }
 
-                    case LiteralType.FLOAT:
+                    case LiteralType.Float:
                         throw new NotSupportedException($"Floats not supported by the brainfuck compiler", statement, CurrentFile);
-                    case LiteralType.STRING:
+                    case LiteralType.String:
                         {
                             // throw new NotSupportedException($"String literals not supported by the brainfuck compiler", statement, CurrentFile);
                             GenerateCodeForLiteralString(statement);
@@ -1589,19 +1589,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(Identifier statement)
         {
-            /*
-            if (statement.Content == "IN")
-            {
-                int address = Stack.PushVirtual(1);
-                Code.MovePointer(address);
-                Code += ',';
-                Code.MovePointer(0);
-
-                return;
-            }
-            */
-
-            if (Variables.TryFind(statement.Content, out Variable variable))
+            if (CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -1697,16 +1685,16 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             {
                                 if (statement.Left is Identifier _left &&
-                                    Variables.TryFind(_left.Content, out var left) &&
+                                    CodeGenerator.GetVariable(Variables, _left.Content, out var left) &&
                                     !left.IsDiscarded &&
                                     TryCompute(statement.Right, null, out var right) &&
-                                    right.Type == RuntimeType.BYTE)
+                                    right.Type == RuntimeType.UInt8)
                                 {
                                     int resultAddress = Stack.PushVirtual(1);
 
                                     Code.CopyValueWithTemp(left.Address, Stack.NextAddress, resultAddress);
 
-                                    Code.AddValue(resultAddress, -right.ValueByte);
+                                    Code.AddValue(resultAddress, -right.ValueUInt8);
 
                                     Optimizations++;
 
@@ -2115,21 +2103,21 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     switch (field.Type.BuiltinType)
                     {
-                        case Type.BYTE:
+                        case Type.Byte:
                             Code.SetValue(offsettedAddress, (byte)0);
                             break;
-                        case Type.INT:
+                        case Type.Integer:
                             Code.SetValue(offsettedAddress, (byte)0);
                             Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, instanceType.Struct.FilePath));
                             break;
-                        case Type.CHAR:
+                        case Type.Char:
                             Code.SetValue(offsettedAddress, (char)'\0');
                             break;
-                        case Type.FLOAT:
+                        case Type.Float:
                             throw new NotSupportedException($"Floats not supported by the brainfuck compiler", field.Identifier, instanceType.Struct.FilePath);
-                        case Type.VOID:
-                        case Type.UNKNOWN:
-                        case Type.NONE:
+                        case Type.Void:
+                        case Type.Unknown:
+                        case Type.NotBuiltin:
                         default:
                             throw new CompilerException($"Unknown field type \"{field.Type}\"", field.Identifier, instanceType.Struct.FilePath);
                     }
@@ -2365,12 +2353,12 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForPrinter(DataItem value)
         {
-            if (value.Type == RuntimeType.CHAR)
+            if (value.Type == RuntimeType.UInt16)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print character '{value.ValueChar}' (on address {tempAddress})"))
+                using (Code.Block($"Print character '{value.ValueUInt16}' (on address {tempAddress})"))
                 {
-                    Code.SetValue(tempAddress, value.ValueChar);
+                    Code.SetValue(tempAddress, value.ValueUInt16);
                     Code.SetPointer(tempAddress);
                     Code += '.';
                     Code.ClearValue(tempAddress);
@@ -2379,12 +2367,12 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            if (value.Type == RuntimeType.BYTE)
+            if (value.Type == RuntimeType.UInt8)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print number {value.ValueByte} as text (on address {tempAddress})"))
+                using (Code.Block($"Print number {value.ValueUInt8} as text (on address {tempAddress})"))
                 {
-                    Code.SetValue(tempAddress, value.ValueByte);
+                    Code.SetValue(tempAddress, value.ValueUInt8);
                     Code.SetPointer(tempAddress);
 
                     using (Code.Block($"SNIPPET OUT_AS_STRING"))
@@ -2395,12 +2383,12 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            if (value.Type == RuntimeType.INT)
+            if (value.Type == RuntimeType.SInt32)
             {
                 int tempAddress = Stack.NextAddress;
-                using (Code.Block($"Print number {value.ValueInt} as text (on address {tempAddress})"))
+                using (Code.Block($"Print number {value.ValueSInt32} as text (on address {tempAddress})"))
                 {
-                    Code.SetValue(tempAddress, value.ValueInt);
+                    Code.SetValue(tempAddress, value.ValueSInt32);
                     Code.SetPointer(tempAddress);
 
                     using (Code.Block($"SNIPPET OUT_AS_STRING"))
@@ -2469,24 +2457,24 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 switch (valueType.BuiltinType)
                 {
-                    case Type.BYTE:
+                    case Type.Byte:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
-                    case Type.INT:
+                    case Type.Integer:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
-                    case Type.FLOAT:
+                    case Type.Float:
                         using (Code.Block($"SNIPPET OUT_AS_STRING"))
                         { Code += Snippets.OUT_AS_STRING; }
                         break;
-                    case Type.CHAR:
+                    case Type.Char:
                         Code += '.';
                         break;
-                    case Type.NONE:
-                    case Type.VOID:
-                    case Type.UNKNOWN:
+                    case Type.NotBuiltin:
+                    case Type.Void:
+                    case Type.Unknown:
                     default:
                         throw new CompilerException($"Invalid type {valueType.BuiltinType}");
                 }
@@ -2630,7 +2618,7 @@ namespace LanguageCore.Brainfuck.Compiler
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
-            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.INT, size.ToString(), position) }, null, position);
+            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(), position) }, null, position);
             return pointerAddress;
         }
 
@@ -2708,7 +2696,7 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 int address = Stack.PushVirtual(1);
                 Code.SetPointer(address);
-                if (function.Type == Type.VOID)
+                if (function.Type == Type.Void)
                 {
                     Code += ',';
                     Code.ClearValue(address);
@@ -2744,7 +2732,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (function.ReturnSomething)
             {
                 var returnType = function.Type;
-                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -2764,11 +2752,17 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (passedType != definedType)
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
-                if (compiledParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                foreach (Variable compiledParameter in compiledParameters)
+                {
+                    if (compiledParameter.Name == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                }
 
-                if (constantParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                foreach (CompiledConstant constantParameter in constantParameters)
+                {
+                    if (constantParameter.Identifier == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                }
 
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
@@ -2784,7 +2778,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
+                                if (!CodeGenerator.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType)
@@ -2822,18 +2816,29 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
 
-                    if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
+                    bool parameterFound = false;
+                    Variable compiledParameter = default;
+                    foreach (Variable compiledParameter_ in compiledParameters)
+                    {
+                        if (compiledParameter_.Name == defined.Identifier.Content)
+                        {
+                            parameterFound = true;
+                            compiledParameter = compiledParameter_;
+                        }
+                    }
+
+                    if (!parameterFound)
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                    if (variable.Type != definedType)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
+                    if (compiledParameter.Type != definedType)
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
                         GenerateCodeForStatement(value);
 
-                        using (Code.Block($"STORE LAST TO {variable.Address}"))
-                        { Stack.PopAndStore(variable.Address); }
+                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        { Stack.PopAndStore(compiledParameter.Address); }
                     }
                     continue;
                 }
@@ -2962,7 +2967,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (function.ReturnSomething)
             {
                 CompiledType returnType = function.Type;
-                returnVariable = new Variable("@return", Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -2982,11 +2987,17 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (passedType != definedType)
                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
-                if (compiledParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                foreach (Variable compiledParameter in compiledParameters)
+                {
+                    if (compiledParameter.Name == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                }
 
-                if (constantParameters.TryFind(defined.Identifier.Content, out _))
-                { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                foreach (CompiledConstant constantParameter in constantParameters)
+                {
+                    if (constantParameter.Identifier == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                }
 
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
@@ -3002,7 +3013,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!Variables.TryFind(modifiedVariable.Content, out Variable v))
+                                if (!CodeGenerator.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType)
@@ -3034,18 +3045,29 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
 
-                    if (!compiledParameters.TryFind(defined.Identifier.Content, out Variable variable))
+                    bool parameterFound = false;
+                    Variable compiledParameter = default;
+                    foreach (Variable compiledParameter_ in compiledParameters)
+                    {
+                        if (compiledParameter_.Name == defined.Identifier.Content)
+                        {
+                            parameterFound = true;
+                            compiledParameter = compiledParameter_;
+                        }
+                    }
+
+                    if (!parameterFound)
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
-                    if (variable.Type != definedType)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {variable.Type}", passed, CurrentFile); }
+                    if (compiledParameter.Type != definedType)
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
                         GenerateCodeForStatement(value);
 
-                        using (Code.Block($"STORE LAST TO {variable.Address}"))
-                        { Stack.PopAndStore(variable.Address); }
+                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        { Stack.PopAndStore(compiledParameter.Address); }
                     }
                 }
                 else

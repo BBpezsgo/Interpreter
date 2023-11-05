@@ -135,8 +135,8 @@ namespace LanguageCore.Runtime
             if (basePointer < 1) return;
             if (basePointer - 1 >= stack.Length) return;
             DataItem item = stack[basePointer - 1];
-            if (item.Type != RuntimeType.INT) return;
-            int num = item.ValueInt;
+            if (item.Type != RuntimeType.SInt32) return;
+            int num = item.ValueSInt32;
             result.Add(num);
             if (num == basePointer) return;
             TraceBasePointers(result, stack, num);
@@ -165,7 +165,7 @@ namespace LanguageCore.Runtime
                 SourceCodeLocation _sourceLocation = SourceCodeLocations[i];
                 if (!_sourceLocation.Instructions.Contains(instruction))
                 { continue; }
-                if (success && sourceLocation.Instructions.Sum() < _sourceLocation.Instructions.Sum())
+                if (success && sourceLocation.Instructions.Size() < _sourceLocation.Instructions.Size())
                 { continue; }
                 sourceLocation = _sourceLocation;
                 success = true;

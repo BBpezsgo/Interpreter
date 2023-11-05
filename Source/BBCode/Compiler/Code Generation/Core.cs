@@ -88,9 +88,7 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly bool OptimizeCode;
         readonly bool CheckNullPointers;
-        readonly bool AddCommentsToCode;
         readonly bool TrimUnreachableCode = true;
-        readonly bool GenerateDebugInstructions;
 
         bool CanReturn;
 
@@ -112,8 +110,6 @@ namespace LanguageCore.BBCode.Compiler
         public CodeGenerator(Compiler.CompilerSettings settings) : base()
         {
             this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
-            this.GenerateDebugInstructions = settings.GenerateDebugInstructions;
-            this.AddCommentsToCode = settings.GenerateComments;
             this.CheckNullPointers = settings.CheckNullPointers;
             this.GeneratedCode = new List<Instruction>();
             this.ExternalFunctionsCache = new Dictionary<string, int>();
@@ -198,19 +194,19 @@ namespace LanguageCore.BBCode.Compiler
                     */
 
                     Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"{"  ".Repeat(indent)} {instruction.opcode}");
+                    Console.Write($"{new string(' ', indent * 2)} {instruction.opcode}");
                     Console.Write($" ");
 
-                    if (instruction.Parameter.Type == RuntimeType.INT)
+                    if (instruction.Parameter.Type == RuntimeType.SInt32)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueInt}");
+                        Console.Write($"{instruction.Parameter.ValueSInt32}");
                         Console.Write($" ");
                     }
-                    else if (instruction.Parameter.Type == RuntimeType.FLOAT)
+                    else if (instruction.Parameter.Type == RuntimeType.Single)
                     {
                         Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueFloat}");
+                        Console.Write($"{instruction.Parameter.ValueSingle}");
                         Console.Write($" ");
                     }
                     else

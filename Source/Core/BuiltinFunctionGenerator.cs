@@ -192,7 +192,7 @@ namespace LanguageCore.Runtime
             else
             {
                 functions[name] = function;
-                Output.Warning($"External function function \"{name}\" is already defined, so I'll override it");
+                Output.LogWarning($"External function function \"{name}\" is already defined, so I'll override it");
             }
         }
 
@@ -550,28 +550,28 @@ namespace LanguageCore.Runtime
             var type_ = typeof(T);
 
             if (type_ == typeof(byte))
-            { return BBCode.Compiler.Type.BYTE; }
+            { return BBCode.Compiler.Type.Byte; }
 
             if (type_ == typeof(int))
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             if (type_ == typeof(float))
-            { return BBCode.Compiler.Type.FLOAT; }
+            { return BBCode.Compiler.Type.Float; }
 
             if (type_ == typeof(char))
-            { return BBCode.Compiler.Type.CHAR; }
+            { return BBCode.Compiler.Type.Char; }
 
             if (type_.IsClass)
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             if (type_ == typeof(uint))
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             if (type_ == typeof(IntPtr))
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             if (type_ == typeof(UIntPtr))
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }
@@ -595,19 +595,19 @@ namespace LanguageCore.Runtime
         static BBCode.Compiler.Type GetType(Type type)
         {
             if (type == typeof(byte))
-            { return BBCode.Compiler.Type.BYTE; }
+            { return BBCode.Compiler.Type.Byte; }
 
             if (type == typeof(int))
-            { return BBCode.Compiler.Type.INT; }
+            { return BBCode.Compiler.Type.Integer; }
 
             if (type == typeof(float))
-            { return BBCode.Compiler.Type.FLOAT; }
+            { return BBCode.Compiler.Type.Float; }
 
             if (type == typeof(float))
-            { return BBCode.Compiler.Type.FLOAT; }
+            { return BBCode.Compiler.Type.Float; }
 
             if (type == typeof(void))
-            { return BBCode.Compiler.Type.VOID; }
+            { return BBCode.Compiler.Type.Void; }
 
             throw new InternalException($"Unknown type {type.FullName}");
         }

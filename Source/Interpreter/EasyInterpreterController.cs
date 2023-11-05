@@ -34,7 +34,7 @@ namespace LanguageCore.Runtime
             string? basePath = null
             )
         {
-            if (LogDebug) Output.Debug($"Run file \"{file.FullName}\" ...");
+            if (LogDebug) Output.LogDebug($"Run file \"{file.FullName}\" ...");
             string code = File.ReadAllText(file.FullName);
             Interpreter interpreter = new();
 
@@ -55,14 +55,14 @@ namespace LanguageCore.Runtime
                         break;
                     case LogType.Warning:
                         if (!LogWarnings) break;
-                        Output.Warning(message);
+                        Output.LogWarning(message);
                         break;
                     case LogType.Error:
-                        Output.Error(message);
+                        Output.LogError(message);
                         break;
                     case LogType.Debug:
                         if (!LogDebug) break;
-                        Output.Debug(message);
+                        Output.LogDebug(message);
                         break;
                 }
             }
@@ -107,14 +107,14 @@ namespace LanguageCore.Runtime
                 if (Directory.Exists(dllsFolderPath))
                 {
                     DirectoryInfo dllsFolder = new(dllsFolderPath);
-                    if (LogDebug) Output.Debug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                    if (LogDebug) Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
                     FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
                     foreach (var dll in dlls)
                     { interpreter.LoadDLL(dll.FullName); }
                 }
                 else
                 {
-                    Output.Warning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+                    Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
                 }
 
                 CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(

@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace LanguageCore.Parser
 {
-    using LanguageCore.BBCode.Compiler;
-    using LanguageCore.Tokenizing;
+    using BBCode.Compiler;
+    using Tokenizing;
 
     public interface IDefinition
     {
@@ -28,8 +27,8 @@ namespace LanguageCore.Parser
             Identifier = identifier;
         }
 
-        public Position GetPosition()
-            => new Position(Identifier, Type).Extend(Modifiers);
+        public Position Position
+            => new Position(Identifier, Type).Union(Modifiers);
 
         public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
     }
@@ -41,7 +40,7 @@ namespace LanguageCore.Parser
         public readonly Token? ProtectionToken;
         public Token? Semicolon;
 
-        public Position GetPosition()
+        public Position Position
             => new(Identifier, Type, ProtectionToken);
 
         public FieldDefinition(Token identifier, TypeInstance type, Token? protectionToken)
@@ -72,7 +71,7 @@ namespace LanguageCore.Parser
             Value = value;
         }
 
-        public Position GetPosition()
+        public Position Position
             => new(Identifier, Value);
     }
 
@@ -93,11 +92,14 @@ namespace LanguageCore.Parser
             Members = members;
         }
 
-        public Position GetPosition()
+        public Position Position
         {
-            Position result = new(Identifier);
-            result.Extend(Members);
-            return result;
+            get
+            {
+                Position result = new(Identifier);
+                result.Union(Members);
+                return result;
+            }
         }
     }
 
@@ -142,11 +144,14 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public Position GetPosition()
+        public Position Position
         {
-            Position result = new(TypeParameters);
-            result.Extend(Keyword, LeftP, RightP);
-            return result;
+            get
+            {
+                Position result = new(TypeParameters);
+                result.Union(Keyword, LeftP, RightP);
+                return result;
+            }
         }
 
         public override bool Equals(object? obj)
@@ -274,13 +279,16 @@ namespace LanguageCore.Parser
         }
         public static bool operator !=(FunctionThingDefinition? a, FunctionThingDefinition? b) => !(a == b);
 
-        public virtual Position GetPosition()
+        public virtual Position Position
         {
-            Position result = new(Identifier);
-            result.Extend(Parameters);
-            result.Extend(Block);
-            result.Extend(Modifiers);
-            return result;
+            get
+            {
+                Position result = new(Identifier);
+                result.Union(Parameters);
+                result.Union(Block);
+                result.Union(Modifiers);
+                return result;
+            }
         }
     }
 
@@ -393,8 +401,7 @@ namespace LanguageCore.Parser
                 Parameters = parameters;
             }
 
-            public Position GetPosition()
-                => new(Identifier);
+            public Position Position => new(Identifier);
         }
 
         public Attribute[] Attributes;
@@ -453,7 +460,17 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        public override Position GetPosition() => base.GetPosition().Extend(Type);
+        public Attribute? GetAttribute(string identifier)
+        {
+            for (int i = 0; i < Attributes.Length; i++)
+            {
+                if (Attributes[i].Identifier.Content == identifier)
+                { return Attributes[i]; }
+            }
+            return null;
+        }
+
+        public override Position Position => base.Position.Union(Type);
     }
 
     public class GeneralFunctionDefinition : FunctionThingDefinition
@@ -555,12 +572,15 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
 
-        public virtual Position GetPosition()
+        public virtual Position Position
         {
-            Position result = new(Name);
-            result.Extend(BracketStart);
-            result.Extend(BracketEnd);
-            return result;
+            get
+            {
+                Position result = new(Name);
+                result.Union(BracketStart);
+                result.Union(BracketEnd);
+                return result;
+            }
         }
     }
 
@@ -609,12 +629,15 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
 
-        public virtual Position GetPosition()
+        public virtual Position Position
         {
-            Position result = new(Name);
-            result.Extend(BracketStart);
-            result.Extend(BracketEnd);
-            return result;
+            get
+            {
+                Position result = new(Name);
+                result.Union(BracketStart);
+                result.Union(BracketEnd);
+                return result;
+            }
         }
     }
 

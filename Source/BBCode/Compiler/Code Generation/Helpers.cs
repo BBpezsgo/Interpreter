@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 
+#pragma warning disable IDE0051 // Remove unused private members
+
 namespace LanguageCore.BBCode.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
@@ -70,7 +72,7 @@ namespace LanguageCore.BBCode.Compiler
 
         int CallRuntime(CompiledVariable address)
         {
-            if (address.Type != Type.INT && !address.Type.IsFunction)
+            if (address.Type != Type.Integer && !address.Type.IsFunction)
             { throw new CompilerException($"This should be an integer", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
@@ -99,7 +101,7 @@ namespace LanguageCore.BBCode.Compiler
 
         int CallRuntime(CompiledParameter address)
         {
-            if (address.Type != Type.INT && !address.Type.IsFunction)
+            if (address.Type != Type.Integer && !address.Type.IsFunction)
             { throw new CompilerException($"This should be an integer", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
@@ -128,7 +130,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             CompiledType addressType = FindStatementType(address);
 
-            if (addressType != Type.INT && !addressType.IsFunction)
+            if (addressType != Type.Integer && !addressType.IsFunction)
             { throw new CompilerException($"This should be an \"int\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
@@ -193,10 +195,32 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
-            => CompiledVariables.TryGetValue(variableName, out compiledVariable);
+        {
+            foreach (KeyValuePair<string, CompiledVariable> compiledVariable_ in CompiledVariables)
+            {
+                if (compiledVariable_.Value.VariableName.Content == variableName)
+                {
+                    compiledVariable = compiledVariable_.Value;
+                    return true;
+                }
+            }
+            compiledVariable = null;
+            return false;
+        }
 
         bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
-            => CompiledParameters.TryGetValue(parameterName, out parameter);
+        {
+            foreach (CompiledParameter compiledParameter_ in CompiledParameters)
+            {
+                if (compiledParameter_.Identifier.Content == parameterName)
+                {
+                    parameter = compiledParameter_;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
 
         /// <exception cref="NotImplementedException"></exception>
         /// <exception cref="CompilerException"></exception>
@@ -615,11 +639,11 @@ namespace LanguageCore.BBCode.Compiler
             if (!prevType.IsStackArray)
             { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
 
-            if (!TryCompute(indexCall.Expression, RuntimeType.INT, out DataItem index))
+            if (!TryCompute(indexCall.Expression, RuntimeType.SInt32, out DataItem index))
             { throw new CompilerException($"Can't compute the index value", indexCall.Expression, CurrentFile); }
 
             int prevOffset = GetDataOffset(indexCall.PrevStatement!);
-            int offset = index.ValueInt * prevType.StackArrayOf.SizeOnStack;
+            int offset = index.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
             return prevOffset + offset;
         }
 

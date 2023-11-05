@@ -60,14 +60,14 @@ namespace LanguageCore.Runtime
                 if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
                 { return -1; }
 
-                return sourceLocation.SourcePosition.Start.Line;
+                return sourceLocation.SourcePosition.Range.Start.Line;
             }
             set
             {
                 if (!DebugInfo.TryGetSourceLocation(_absoluteBreakpoint, out SourceCodeLocation sourceLocation))
                 { return; }
 
-                AbsoluteBreakpoint = sourceLocation.SourcePosition.Start.Line;
+                AbsoluteBreakpoint = sourceLocation.SourcePosition.Range.Start.Line;
             }
         }
         public bool StackOperation => _stackOperation;

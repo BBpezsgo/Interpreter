@@ -96,7 +96,7 @@ namespace LanguageCore.Runtime
         public static DataItem GetHeader(ushort size, bool used)
             => new((size & BLOCK_SIZE_MASK) | (used ? BLOCK_STAT_MASK : 0));
         public static (ushort, bool) GetHeader(DataItem header)
-            => ((ushort)(header.ValueInt & BLOCK_SIZE_MASK), (header.ValueInt & BLOCK_STAT_MASK) != 0);
+            => ((ushort)(header.ValueSInt32 & BLOCK_SIZE_MASK), (header.ValueSInt32 & BLOCK_STAT_MASK) != 0);
 
         static void FixSize(ref ushort size)
         {
@@ -333,17 +333,17 @@ namespace LanguageCore.Runtime
             StringBuilder result = new(length);
             for (int i = start; i < end; i++)
             {
-                if (heap[i].Type != RuntimeType.CHAR)
+                if (heap[i].Type != RuntimeType.UInt16)
                 {
-                    throw new InternalException($"Unexpected data type {heap[i].Type}, expected {nameof(RuntimeType.CHAR)} (reading string from heap (start: {start} length: {length}) )");
+                    throw new InternalException($"Unexpected data type {heap[i].Type}, expected {nameof(RuntimeType.UInt16)} (reading string from heap (start: {start} length: {length}) )");
                 }
-                result.Append(heap[i].ValueChar);
+                result.Append(heap[i].ValueUInt16);
             }
             return result.ToString();
         }
         public static string GetStringByPointer(this IReadOnlyHeap heap, int pointer)
         {
-            int length = heap[pointer].ValueInt;
+            int length = heap[pointer].ValueSInt32;
             return heap.GetString(pointer + 1, length);
         }
     }

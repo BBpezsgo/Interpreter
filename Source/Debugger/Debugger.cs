@@ -20,7 +20,7 @@ namespace TheProgram
             get
             {
                 if (Interpreter.CompilerResult.DebugInfo.TryGetSourceLocation(Interpreter.BytecodeInterpreter.CodePointer, out SourceCodeLocation sourceLocation))
-                { return sourceLocation.SourcePosition.Start.Line; }
+                { return sourceLocation.SourcePosition.Range.Start.Line; }
 
                 return -1;
             }
@@ -249,7 +249,7 @@ namespace TheProgram
         public Data_Function(CompiledFunction v) : base(v)
         {
             this.FullName = v.Identifier.Content;
-            this.Position = new Data_Position(v.Identifier.GetPosition());
+            this.Position = new Data_Position(v.Identifier.Position);
         }
     }
 
@@ -264,14 +264,14 @@ namespace TheProgram
 
         public Data_Position(Position v) : base(v)
         {
-            StartLine = v.Start.Line;
-            StartChar = v.Start.Character;
+            StartLine = v.Range.Start.Line;
+            StartChar = v.Range.Start.Character;
 
-            EndLine = v.End.Line;
-            EndChar = v.End.Character;
+            EndLine = v.Range.End.Line;
+            EndChar = v.Range.End.Character;
 
-            StartTotal = v.AbsolutePosition.Start;
-            EndTotal = v.AbsolutePosition.End;
+            StartTotal = v.AbsoluteRange.Start;
+            EndTotal = v.AbsoluteRange.End;
         }
     }
 

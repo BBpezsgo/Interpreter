@@ -37,19 +37,19 @@ namespace LanguageCore
 
         public static readonly Dictionary<string, RuntimeType> BuiltinTypeMap1 = new()
         {
-            { "byte", RuntimeType.BYTE },
-            { "int", RuntimeType.INT },
-            { "float", RuntimeType.FLOAT },
-            { "char", RuntimeType.CHAR },
+            { "byte", RuntimeType.UInt8 },
+            { "int", RuntimeType.SInt32 },
+            { "float", RuntimeType.Single },
+            { "char", RuntimeType.UInt16 },
         };
 
         public static readonly Dictionary<string, Type> BuiltinTypeMap3 = new()
         {
-            { "byte", Type.BYTE },
-            { "int", Type.INT },
-            { "float", Type.FLOAT },
-            { "char", Type.CHAR },
-            { "void", Type.VOID },
+            { "byte", Type.Byte },
+            { "int", Type.Integer },
+            { "float", Type.Float },
+            { "char", Type.Char },
+            { "void", Type.Void },
         };
 
         public static class Operators

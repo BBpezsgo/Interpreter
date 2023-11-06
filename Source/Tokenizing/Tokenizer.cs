@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+
+// TODO: new lines aren't working
 
 namespace LanguageCore.Tokenizing
 {
@@ -60,12 +63,12 @@ namespace LanguageCore.Tokenizing
 
     public struct TokenizerSettings
     {
-        /// <summary> The Tokenizer will produce <see cref="TokenType.WHITESPACE"/> </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.WHITESPACE"/> tokens </summary>
         public bool TokenizeWhitespaces;
-        /// <summary> The Tokenizer will produce <see cref="TokenType.LINEBREAK"/> </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.LINEBREAK"/> tokens </summary>
         public bool DistinguishBetweenSpacesAndNewlines;
         public bool JoinLinebreaks;
-        /// <summary> The Tokenizer will produce <see cref="TokenType.COMMENT"/> and <see cref="TokenType.COMMENT_MULTILINE"/> </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.COMMENT"/> and <see cref="TokenType.COMMENT_MULTILINE"/> tokens </summary>
         public bool TokenizeComments;
 
         public static TokenizerSettings Default => new()
@@ -77,6 +80,7 @@ namespace LanguageCore.Tokenizing
         };
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class Token : BaseToken, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
     {
         readonly Position position;
@@ -149,13 +153,17 @@ namespace LanguageCore.Tokenizing
         public static bool operator ==(Token? a, string? b)
         {
             if (a is null && b is null) return true;
-            if (a is null && b is not null) return false;
-            if (a is not null && b is null) return false;
-            return a?.Content == b;
+            if (a is null || b is null) return false;
+            return a.Equals(b);
         }
         public static bool operator !=(Token? a, string? b) => !(a == b);
-        public static bool operator ==(string? a, Token? b) => b == a;
-        public static bool operator !=(string? a, Token? b) => b != a;
+
+        string GetDebuggerDisplay() => TokenType switch
+        {
+            TokenType.LITERAL_STRING => $"\"{Content.Escape()}\"",
+            TokenType.LITERAL_CHAR => $"\'{Content.Escape()}\'",
+            _ => Content.Escape(),
+        };
     }
 
     public readonly struct SimpleToken : IThingWithPosition
@@ -212,10 +220,10 @@ namespace LanguageCore.Tokenizing
     public class Tokenizer
     {
         static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
-        static readonly char[] Banned = new char[] { '\r', '\u200B' };
         static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
         static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
         static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
+        static readonly char[] Whitespaces = new char[] { ' ', '\t', '\u200B', '\r' };
 
         readonly PreparationToken CurrentToken;
         int CurrentColumn;
@@ -231,11 +239,13 @@ namespace LanguageCore.Tokenizing
 
         readonly TokenizerSettings Settings;
 
-        Tokenizer(TokenizerSettings settings, string text, string? file)
+        string? SavedUnicode;
+
+        Tokenizer(TokenizerSettings settings, string? text, string? file)
         {
             CurrentToken = new(new Position(Range<SinglePosition>.Default, Range<int>.Default));
             CurrentColumn = 0;
-            CurrentLine = 1;
+            CurrentLine = 0;
 
             Tokens = new();
             UnicodeCharacters = new();
@@ -243,446 +253,44 @@ namespace LanguageCore.Tokenizing
             Warnings = new();
 
             Settings = settings;
-            Text = text;
+            Text = text ?? string.Empty;
             File = file;
+
+            SavedUnicode = null;
         }
 
-        public static TokenizerResult Tokenize(string sourceCode, string? filePath = null)
+        public static TokenizerResult Tokenize(string? sourceCode, string? filePath = null)
             => new Tokenizer(TokenizerSettings.Default, sourceCode, filePath).TokenizeInternal();
 
-        public static TokenizerResult Tokenize(string sourceCode, TokenizerSettings settings, string? filePath = null)
+        public static TokenizerResult Tokenize(string? sourceCode, TokenizerSettings settings, string? filePath = null)
             => new Tokenizer(settings, sourceCode, filePath).TokenizeInternal();
 
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         TokenizerResult TokenizeInternal()
         {
-            string? savedUnicode = null;
-
-            for (int OffsetTotal = 0; OffsetTotal < Text.Length; OffsetTotal++)
+            for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
             {
-                char currChar = Text[OffsetTotal];
+                char? prev = (offsetTotal - 1 < 0) ? null : Text[offsetTotal - 1];
+                char curr = Text[offsetTotal];
+                char? next = (offsetTotal + 1 >= Text.Length) ? null : Text[offsetTotal + 1];
 
+                /*
                 CurrentColumn++;
                 if (currChar == '\n')
                 {
-                    CurrentColumn = 1;
+                    CurrentColumn = 0;
                     CurrentLine++;
                 }
+                */
 
-                if (Banned.Contains(currChar)) continue;
+                ProcessCharacter((prev, curr, next), offsetTotal, out bool breakLine);
 
-                if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
+                CurrentColumn++;
+                if (breakLine)
                 {
-                    EndToken(OffsetTotal);
-                    CurrentToken.Content.Clear();
-                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                }
-
-                if (currChar > byte.MaxValue)
-                {
-                    RefreshTokenPosition(OffsetTotal);
-                    if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
-                    {
-                        Warnings.Add(new Warning($"Don't use special characters. Use \\u{(((int)currChar).ToString("X").PadLeft(4, '0'))}", CurrentToken.Position.After(), File));
-                    }
-                    else
-                    {
-                        Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.Position.After(), File));
-                    }
-                }
-
-                if (CurrentToken.TokenType == TokenType.STRING_UNICODE_CHARACTER)
-                {
-                    if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
-                    if (savedUnicode.Length == 4)
-                    {
-                        string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        UnicodeCharacters.Add(new SimpleToken(
-                                unicodeChar,
-                                new Position(
-                                    new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
-                                    new Range<int>(OffsetTotal - 6, OffsetTotal)
-                                )
-                            ));
-                        CurrentToken.Content.Append(unicodeChar);
-                        CurrentToken.TokenType = TokenType.LITERAL_STRING;
-                        savedUnicode = null;
-                    }
-                    else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
-                    {
-                        throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(OffsetTotal));
-                    }
-                    else
-                    {
-                        savedUnicode += currChar;
-                        continue;
-                    }
-                }
-                else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
-                {
-                    if (savedUnicode == null) throw new InternalException($"savedUnicode is null");
-                    if (savedUnicode.Length == 4)
-                    {
-                        string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(savedUnicode, 16));
-                        UnicodeCharacters.Add(new SimpleToken(
-                            unicodeChar,
-                            new Position(
-                                new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
-                                new Range<int>(OffsetTotal - 6, OffsetTotal)
-                            )
-                        ));
-                        CurrentToken.Content.Append(unicodeChar);
-                        CurrentToken.TokenType = TokenType.LITERAL_CHAR;
-                        savedUnicode = null;
-                    }
-                    else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
-                    {
-                        throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(OffsetTotal));
-                    }
-                    else
-                    {
-                        savedUnicode += currChar;
-                        continue;
-                    }
-                }
-
-                if (CurrentToken.TokenType == TokenType.STRING_ESCAPE_SEQUENCE)
-                {
-                    if (currChar == 'u')
-                    {
-                        CurrentToken.TokenType = TokenType.STRING_UNICODE_CHARACTER;
-                        savedUnicode = string.Empty;
-                        continue;
-                    }
-                    CurrentToken.Content.Append(currChar switch
-                    {
-                        'n' => "\n",
-                        'r' => "\r",
-                        't' => "\t",
-                        '\\' => "\\",
-                        '"' => "\"",
-                        '0' => "\0",
-                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(OffsetTotal)),
-                    });
-                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
-                    continue;
-                }
-                else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
-                {
-                    if (currChar == 'u')
-                    {
-                        CurrentToken.TokenType = TokenType.CHAR_UNICODE_CHARACTER;
-                        savedUnicode = string.Empty;
-                        continue;
-                    }
-                    CurrentToken.Content.Append(currChar switch
-                    {
-                        'n' => "\n",
-                        'r' => "\r",
-                        't' => "\t",
-                        '\\' => "\\",
-                        '\'' => "\'",
-                        '0' => "\0",
-                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(OffsetTotal)),
-                    });
-                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
-                    continue;
-                }
-                else if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
-                {
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    if (currChar == '=')
-                    {
-                        CurrentToken.Content.Append(currChar);
-                    }
-                    EndToken(OffsetTotal);
-                    continue;
-                }
-                else if (CurrentToken.TokenType == TokenType.COMMENT && currChar != '\n')
-                {
-                    CurrentToken.Content.Append(currChar);
-                    continue;
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_STRING && currChar != '"')
-                {
-                    if (currChar == '\\')
-                    {
-                        CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE;
-                        continue;
-                    }
-                    CurrentToken.Content.Append(currChar);
-                    continue;
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR && currChar != '\'')
-                {
-                    if (currChar == '\\')
-                    {
-                        CurrentToken.TokenType = TokenType.CHAR_ESCAPE_SEQUENCE;
-                        continue;
-                    }
-                    CurrentToken.Content.Append(currChar);
-                    continue;
-                }
-
-                if (CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
-                {
-                    CurrentToken.Content.Append(currChar);
-                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                    EndToken(OffsetTotal);
-                    continue;
-                }
-
-                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
-                {
-                    CurrentToken.Content.Append(currChar);
-                    if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE && currChar == '*')
-                    {
-                        CurrentToken.TokenType = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
-                    }
-                    else
-                    {
-                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                    }
-                    continue;
-                }
-
-                if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
-                {
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    EndToken(OffsetTotal);
-                }
-
-                if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
-                {
-                    CurrentToken.Content.Append(currChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
-                    EndToken(OffsetTotal);
-                }
-                else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
-                {
-                    if (CurrentToken.ToString().Contains(currChar))
-                    { throw new TokenizerException($"Am I stupid or is this not a float number?", CurrentToken.Position); }
-                    CurrentToken.Content.Append(currChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
-                }
-                else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
-                {
-                    if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Am I stupid or is this not a hex number?", CurrentToken.Position); }
-                    CurrentToken.Content.Append(currChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_HEX;
-                }
-                else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
-                {
-                    if (!CurrentToken.ToString().EndsWith('0'))
-                    { throw new TokenizerException($"Am I stupid or is this not a binary number?", CurrentToken.Position); }
-                    CurrentToken.Content.Append(currChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_BIN;
-                }
-                else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
-                {
-                    if (CurrentToken.TokenType == TokenType.WHITESPACE)
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
-                    }
-                    else if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
-                    { CurrentToken.TokenType = TokenType.LITERAL_FLOAT; }
-                    else if (CurrentToken.TokenType == TokenType.OPERATOR)
-                    {
-                        if (CurrentToken.ToString() != "-")
-                        { EndToken(OffsetTotal); }
-                        CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
-                    }
-
-                    if (CurrentToken.TokenType == TokenType.LITERAL_BIN)
-                    {
-                        if (currChar != '0' && currChar != '1')
-                        {
-                            RefreshTokenPosition(OffsetTotal);
-                            throw new TokenizerException($"This isn't a binary digit am i right? \'{currChar}\'", CurrentToken.Position.After());
-                        }
-                    }
-
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
-                {
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
-                {
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
-                {
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (currChar == '.')
-                {
-                    if (CurrentToken.TokenType == TokenType.WHITESPACE)
-                    {
-                        CurrentToken.TokenType = TokenType.POTENTIAL_FLOAT;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                    else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
-                    {
-                        CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content.Append(currChar);
-                        EndToken(OffsetTotal);
-                    }
-                }
-                else if (currChar == '/')
-                {
-                    if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
-                    {
-                        CurrentToken.TokenType = TokenType.COMMENT;
-                        CurrentToken.Content.Clear();
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.POTENTIAL_COMMENT;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                }
-                else if (Bracelets.Contains(currChar))
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content.Append(currChar);
-                    EndToken(OffsetTotal);
-                }
-                else if (SimpleOperators.Contains(currChar))
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content.Append(currChar);
-                    EndToken(OffsetTotal);
-                }
-                else if (currChar == '=')
-                {
-                    if (CurrentToken.Content.Length == 1 && Operators.Contains(CurrentToken.Content[0]))
-                    {
-                        CurrentToken.Content.Append(currChar);
-                        EndToken(OffsetTotal);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                }
-                else if (DoubleOperators.Contains(CurrentToken.ToString() + currChar))
-                {
-                    CurrentToken.Content.Append(currChar);
-                    EndToken(OffsetTotal);
-                }
-                else if (currChar == '*' && CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
-                {
-                    if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
-                    {
-                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.OPERATOR;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                }
-                else if (Operators.Contains(currChar))
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (currChar == ' ' || currChar == '\t')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.TokenType = TokenType.WHITESPACE;
-                    CurrentToken.Content.Append(currChar);
-                }
-                else if (currChar == '\n')
-                {
-                    if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                    }
-                    else
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
-                        CurrentToken.Content.Append(currChar);
-                        EndToken(OffsetTotal);
-                    }
-                }
-                else if (currChar == '"')
-                {
-                    if (CurrentToken.TokenType != TokenType.LITERAL_STRING)
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.LITERAL_STRING;
-                    }
-                    else if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
-                    {
-                        EndToken(OffsetTotal);
-                    }
-                }
-                else if (currChar == '\'')
-                {
-                    if (CurrentToken.TokenType != TokenType.LITERAL_CHAR)
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.LITERAL_CHAR;
-                    }
-                    else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR)
-                    {
-                        EndToken(OffsetTotal);
-                    }
-                }
-                else if (currChar == '\\')
-                {
-                    EndToken(OffsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content.Append(currChar);
-                    EndToken(OffsetTotal);
-                }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_HEX)
-                {
-                    if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
-                    {
-                        RefreshTokenPosition(OffsetTotal);
-                        throw new TokenizerException($"This isn't a hex digit am i right? \'{currChar}\'", CurrentToken.Position.After());
-                    }
-                    CurrentToken.Content.Append(currChar);
-                }
-                else
-                {
-                    if (CurrentToken.TokenType == TokenType.WHITESPACE ||
-                        CurrentToken.TokenType == TokenType.LITERAL_NUMBER ||
-                        CurrentToken.TokenType == TokenType.LITERAL_HEX ||
-                        CurrentToken.TokenType == TokenType.LITERAL_FLOAT ||
-                        CurrentToken.TokenType == TokenType.OPERATOR)
-                    {
-                        EndToken(OffsetTotal);
-                        CurrentToken.TokenType = TokenType.IDENTIFIER;
-                        CurrentToken.Content.Append(currChar);
-                    }
-                    else
-                    {
-                        CurrentToken.Content.Append(currChar);
-                    }
+                    CurrentColumn = 0;
+                    CurrentLine++;
                 }
             }
 
@@ -693,64 +301,445 @@ namespace LanguageCore.Tokenizing
             return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToArray(), UnicodeCharacters.ToArray(), Warnings.ToArray());
         }
 
-        Position GetCurrentPosition(int OffsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(OffsetTotal, OffsetTotal + 1));
+        void ProcessCharacter((char? Prev, char Curr, char? Next) ctx, int offsetTotal, out bool breakLine)
+        {
+            breakLine = false;
+
+            char currChar = ctx.Curr;
+
+            if (currChar == '\n')
+            {
+                breakLine = true;
+            }
+
+            if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
+            {
+                EndToken(offsetTotal);
+                CurrentToken.Content.Clear();
+                CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+            }
+
+            /*
+            if (currChar > byte.MaxValue)
+            {
+                RefreshTokenPosition(offsetTotal);
+                if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
+                { Warnings.Add(new Warning($"Don't use special characters (please). Use \\u{((int)currChar).ToString("X").PadLeft(4, '0')}", CurrentToken.Position.After(), File)); }
+                else
+                { Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.Position.After(), File)); }
+            }
+            */
+
+            if (CurrentToken.TokenType == TokenType.STRING_UNICODE_CHARACTER)
+            {
+                if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
+                if (SavedUnicode.Length == 4)
+                {
+                    string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(SavedUnicode, 16));
+                    UnicodeCharacters.Add(new SimpleToken(
+                            unicodeChar,
+                            new Position(
+                                new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                                new Range<int>(offsetTotal - 6, offsetTotal)
+                            )
+                        ));
+                    CurrentToken.Content.Append(unicodeChar);
+                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                    SavedUnicode = null;
+                }
+                else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                {
+                    throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(offsetTotal));
+                }
+                else
+                {
+                    SavedUnicode += currChar;
+                    return;
+                }
+            }
+            else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
+            {
+                if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null"); 
+                if (SavedUnicode.Length == 4)
+                {
+                    string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(SavedUnicode, 16));
+                    UnicodeCharacters.Add(new SimpleToken(
+                        unicodeChar,
+                        new Position(
+                            new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn - 6), new SinglePosition(CurrentLine, CurrentColumn)),
+                            new Range<int>(offsetTotal - 6, offsetTotal)
+                        )
+                    ));
+                    CurrentToken.Content.Append(unicodeChar);
+                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                    SavedUnicode = null;
+                }
+                else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                {
+                    throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(offsetTotal));
+                }
+                else
+                {
+                    SavedUnicode += currChar;
+                    return;
+                }
+            }
+            
+            if (CurrentToken.TokenType == TokenType.STRING_ESCAPE_SEQUENCE)
+            {
+                if (currChar == 'u')
+                {
+                    CurrentToken.TokenType = TokenType.STRING_UNICODE_CHARACTER;
+                    SavedUnicode = string.Empty;
+                }
+                else
+                {
+                    CurrentToken.Content.Append(currChar switch
+                    {
+                        'n' => "\n",
+                        'r' => "\r",
+                        't' => "\t",
+                        '\\' => "\\",
+                        '"' => "\"",
+                        '0' => "\0",
+                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(offsetTotal)),
+                    });
+                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                }
+                return;
+            }
+            else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
+            {
+                if (currChar == 'u')
+                {
+                    CurrentToken.TokenType = TokenType.CHAR_UNICODE_CHARACTER;
+                    SavedUnicode = string.Empty;
+                }
+                else
+                {
+                    CurrentToken.Content.Append(currChar switch
+                    {
+                        'n' => "\n",
+                        'r' => "\r",
+                        't' => "\t",
+                        '\\' => "\\",
+                        '\'' => "\'",
+                        '0' => "\0",
+                        _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(offsetTotal)),
+                    });
+                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                }
+                return;
+            }
+            else if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
+            {
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                if (currChar == '=')
+                { CurrentToken.Content.Append(currChar); }
+                EndToken(offsetTotal);
+                return;
+            }
+            else if (CurrentToken.TokenType == TokenType.COMMENT && currChar != '\n')
+            {
+                CurrentToken.Content.Append(currChar);
+                return;
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_STRING && currChar != '"')
+            {
+                if (currChar == '\\')
+                { CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE; }
+                else
+                { CurrentToken.Content.Append(currChar); }
+                return;
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR && currChar != '\'')
+            {
+                if (currChar == '\\')
+                { CurrentToken.TokenType = TokenType.CHAR_ESCAPE_SEQUENCE; }
+                else
+                { CurrentToken.Content.Append(currChar); }
+                return;
+            }
+
+            if (CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
+            {
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                EndToken(offsetTotal);
+                return;
+            }
+
+            if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
+            {
+                CurrentToken.Content.Append(currChar);
+                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE && currChar == '*')
+                {
+                    CurrentToken.TokenType = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
+                }
+                else
+                {
+                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                }
+                return;
+            }
+
+            if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
+            {
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                EndToken(offsetTotal);
+            }
+
+            if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
+            {
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                EndToken(offsetTotal);
+            }
+            else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
+            {
+                if (CurrentToken.ToString().Contains(currChar))
+                { throw new TokenizerException($"Am I stupid or is this not a float number?", CurrentToken.Position); }
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+            }
+            else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            {
+                if (!CurrentToken.ToString().EndsWith('0'))
+                { throw new TokenizerException($"Am I stupid or is this not a hex number?", CurrentToken.Position); }
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = TokenType.LITERAL_HEX;
+            }
+            else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            {
+                if (!CurrentToken.ToString().EndsWith('0'))
+                { throw new TokenizerException($"Am I stupid or is this not a binary number?", CurrentToken.Position); }
+                CurrentToken.Content.Append(currChar);
+                CurrentToken.TokenType = TokenType.LITERAL_BIN;
+            }
+            else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
+            {
+                if (CurrentToken.TokenType == TokenType.WHITESPACE)
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
+                }
+                else if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
+                { CurrentToken.TokenType = TokenType.LITERAL_FLOAT; }
+                else if (CurrentToken.TokenType == TokenType.OPERATOR)
+                {
+                    if (CurrentToken.ToString() != "-")
+                    { EndToken(offsetTotal); }
+                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
+                }
+
+                if (CurrentToken.TokenType == TokenType.LITERAL_BIN)
+                {
+                    if (currChar != '0' && currChar != '1')
+                    {
+                        RefreshTokenPosition(offsetTotal);
+                        throw new TokenizerException($"This isn't a binary digit am i right? \'{currChar}\'", CurrentToken.Position.After());
+                    }
+                }
+
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            {
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            {
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            {
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (currChar == '.')
+            {
+                if (CurrentToken.TokenType == TokenType.WHITESPACE)
+                {
+                    CurrentToken.TokenType = TokenType.POTENTIAL_FLOAT;
+                    CurrentToken.Content.Append(currChar);
+                }
+                else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+                {
+                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                    CurrentToken.Content.Append(currChar);
+                }
+                else
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content.Append(currChar);
+                    EndToken(offsetTotal);
+                }
+            }
+            else if (currChar == '/')
+            {
+                if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
+                {
+                    CurrentToken.TokenType = TokenType.COMMENT;
+                    CurrentToken.Content.Clear();
+                }
+                else
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.POTENTIAL_COMMENT;
+                    CurrentToken.Content.Append(currChar);
+                }
+            }
+            else if (Bracelets.Contains(currChar))
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.Content.Append(currChar);
+                EndToken(offsetTotal);
+            }
+            else if (SimpleOperators.Contains(currChar))
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.Content.Append(currChar);
+                EndToken(offsetTotal);
+            }
+            else if (currChar == '=')
+            {
+                if (CurrentToken.Content.Length == 1 && Operators.Contains(CurrentToken.Content[0]))
+                {
+                    CurrentToken.Content.Append(currChar);
+                    EndToken(offsetTotal);
+                }
+                else
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content.Append(currChar);
+                }
+            }
+            else if (DoubleOperators.Contains(CurrentToken.ToString() + currChar))
+            {
+                CurrentToken.Content.Append(currChar);
+                EndToken(offsetTotal);
+            }
+            else if (currChar == '*' && CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
+            {
+                if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
+                {
+                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                    CurrentToken.Content.Append(currChar);
+                }
+                else
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.Content.Append(currChar);
+                }
+            }
+            else if (Operators.Contains(currChar))
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (Whitespaces.Contains(currChar))
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = TokenType.WHITESPACE;
+                CurrentToken.Content.Append(currChar);
+            }
+            else if (currChar == '\n')
+            {
+                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                }
+                else
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
+                    CurrentToken.Content.Append(currChar);
+                    EndToken(offsetTotal);
+                }
+            }
+            else if (currChar == '"')
+            {
+                if (CurrentToken.TokenType != TokenType.LITERAL_STRING)
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                }
+                else if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
+                {
+                    EndToken(offsetTotal);
+                }
+            }
+            else if (currChar == '\'')
+            {
+                if (CurrentToken.TokenType != TokenType.LITERAL_CHAR)
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                }
+                else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR)
+                {
+                    EndToken(offsetTotal);
+                }
+            }
+            else if (currChar == '\\')
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.Content.Append(currChar);
+                EndToken(offsetTotal);
+            }
+            else if (CurrentToken.TokenType == TokenType.LITERAL_HEX)
+            {
+                if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                {
+                    RefreshTokenPosition(offsetTotal);
+                    throw new TokenizerException($"This isn't a hex digit am i right? \'{currChar}\'", CurrentToken.Position.After());
+                }
+                CurrentToken.Content.Append(currChar);
+            }
+            else
+            {
+                if (CurrentToken.TokenType == TokenType.WHITESPACE ||
+                    CurrentToken.TokenType == TokenType.LITERAL_NUMBER ||
+                    CurrentToken.TokenType == TokenType.LITERAL_HEX ||
+                    CurrentToken.TokenType == TokenType.LITERAL_FLOAT ||
+                    CurrentToken.TokenType == TokenType.OPERATOR)
+                {
+                    EndToken(offsetTotal);
+                    CurrentToken.TokenType = TokenType.IDENTIFIER;
+                    CurrentToken.Content.Append(currChar);
+                }
+                else
+                {
+                    CurrentToken.Content.Append(currChar);
+                }
+            }
+        }
+
+        Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
 
         /// <exception cref="TokenizerException"/>
         static void CheckTokens(Token[] tokens)
         {
             for (int i = 0; i < tokens.Length; i++)
-            {
-                Token token = tokens[i];
+            { CheckToken(tokens[i]); }
+        }
 
-                switch (token.TokenType)
-                {
-                    case TokenType.WHITESPACE:
-                        break;
-                    case TokenType.LINEBREAK:
-                        break;
-                    case TokenType.IDENTIFIER:
-                        break;
-                    case TokenType.LITERAL_NUMBER:
-                        break;
-                    case TokenType.LITERAL_HEX:
-                        break;
-                    case TokenType.LITERAL_BIN:
-                        break;
-                    case TokenType.LITERAL_STRING:
-                        break;
-                    case TokenType.LITERAL_CHAR:
-                        {
-                            if (token.Content.Length != 1)
-                            {
-                                throw new TokenizerException($"I think there are more characters than there should be ({token.Content.Length})", token.Position);
-                            }
-                        }
-                        break;
-                    case TokenType.LITERAL_FLOAT:
-                        break;
-                    case TokenType.STRING_UNICODE_CHARACTER:
-                        break;
-                    case TokenType.CHAR_UNICODE_CHARACTER:
-                        break;
-                    case TokenType.OPERATOR:
-                        break;
-                    case TokenType.STRING_ESCAPE_SEQUENCE:
-                        break;
-                    case TokenType.CHAR_ESCAPE_SEQUENCE:
-                        break;
-                    case TokenType.POTENTIAL_FLOAT:
-                        break;
-                    case TokenType.POTENTIAL_COMMENT:
-                        break;
-                    case TokenType.POTENTIAL_END_MULTILINE_COMMENT:
-                        break;
-                    case TokenType.COMMENT:
-                        break;
-                    case TokenType.COMMENT_MULTILINE:
-                        break;
-                    default:
-                        break;
-                }
+        /// <exception cref="TokenizerException"/>
+        static void CheckToken(Token token)
+        {
+            if (token.TokenType == TokenType.LITERAL_CHAR)
+            {
+                if (token.Content.Length > 1)
+                { throw new TokenizerException($"I think there are more characters than there should be ({token.Content.Length})", token.Position); }
+                else if (token.Content.Length < 1)
+                { throw new TokenizerException($"I think there are less characters than there should be ({token.Content.Length})", token.Position); }
             }
         }
 

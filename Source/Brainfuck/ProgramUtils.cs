@@ -218,9 +218,12 @@ namespace TheProgram.Brainfuck
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine(exception.ToString());
 
-                string? arrows = GetArrows(exception.Position, code);
-                if (arrows != null)
-                { Console.WriteLine(arrows); }
+                if (exception.File != null)
+                {
+                    string? arrows = GetArrows(exception.Position, File.ReadAllText(exception.File));
+                    if (arrows != null)
+                    { Console.WriteLine(arrows); }
+                }
 
                 Console.ResetColor();
 
@@ -343,7 +346,7 @@ namespace TheProgram.Brainfuck
 
             result.Append(line.Replace('\t', ' '));
             result.Append("\r\n");
-            result.Append(' ', Math.Max(0, position.Range.Start.Character - 1));
+            result.Append(' ', Math.Max(0, position.Range.Start.Character - 2));
             result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
             return result.ToString();
         }

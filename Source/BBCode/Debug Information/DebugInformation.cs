@@ -14,7 +14,7 @@ namespace LanguageCore.Runtime
             Instructions.Start <= instruction &&
             Instructions.End >= instruction;
 
-        public override readonly string ToString() => $"({Instructions} -> {SourcePosition.ToMinString()})";
+        public override readonly string ToString() => $"({Instructions} -> {SourcePosition.ToStringRange()})";
         readonly string GetDebuggerDisplay() => ToString();
     }
 

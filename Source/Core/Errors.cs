@@ -31,7 +31,7 @@ namespace LanguageCore
         {
             StringBuilder result = new(Message);
 
-            result.Append(Position.ToCoolString(" (at ", ")") ?? string.Empty);
+            result.Append(Position.ToStringCool(" (at ", ")") ?? string.Empty);
 
             if (File != null)
             { result.Append($" (in {File})"); }
@@ -132,7 +132,7 @@ namespace LanguageCore
 
             StringBuilder result = new(Message);
 
-            result.Append(SourcePosition.ToCoolString(" (at ", ")") ?? string.Empty);
+            result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
 
             if (SourceFile != null)
             { result.Append($" (in {SourceFile})"); }
@@ -199,7 +199,7 @@ namespace LanguageCore
 
             StringBuilder result = new(Message);
 
-            result.Append(SourcePosition.ToCoolString(" (at ", ")") ?? string.Empty);
+            result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
 
             if (SourceFile != null)
             { result.Append($" (in {SourceFile})"); }

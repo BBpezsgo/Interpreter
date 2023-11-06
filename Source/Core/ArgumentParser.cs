@@ -10,10 +10,9 @@ namespace TheProgram
     using System.Diagnostics.CodeAnalysis;
     using LanguageCore;
     using LanguageCore.BBCode.Compiler;
-    using LanguageCore.Parser;
     using LanguageCore.Runtime;
 
-    internal static class ArgumentParser
+    public static class ArgumentParser
     {
         public enum RunType
         {

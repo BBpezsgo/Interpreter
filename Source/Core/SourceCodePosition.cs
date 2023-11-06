@@ -10,9 +10,10 @@ namespace LanguageCore
         public Position Position { get; }
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public struct Position : IEquatable<Position>
     {
-        public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined, SinglePosition.Undefined), new Range<int>(-1, -1));
+        public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined), new Range<int>(-1));
 
         public Range<int> AbsoluteRange;
         public Range<SinglePosition> Range;
@@ -109,14 +110,14 @@ namespace LanguageCore
             return this;
         }
 
-        public readonly string ToMinString()
+        public readonly string ToStringRange()
         {
-            if (Range.Start == Range.End) return Range.Start.ToMinString();
+            if (Range.Start == Range.End) return Range.Start.ToStringMin();
             if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line}:({Range.Start.Character}-{Range.End.Character})";
-            return $"{Range.Start.ToMinString()}-{Range.End.ToMinString()}";
+            return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
         }
 
-        public readonly string? ToCoolString(string prefix = "", string postfix = "")
+        public readonly string? ToStringCool(string prefix = "", string postfix = "")
         {
             if (Range.Start.Line < 0)
             { return null; }
@@ -130,6 +131,13 @@ namespace LanguageCore
             return $"{prefix}line {Range.Start.Line} and column {Range.Start.Character}{postfix}";
         }
 
+        readonly string GetDebuggerDisplay()
+        {
+            if (this == Position.UnknownPosition)
+            { return "?"; }
+            return this.ToStringRange();
+        }
+
         public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
 
         public override bool Equals(object? obj) => obj is Position position && Equals(position);
@@ -141,7 +149,7 @@ namespace LanguageCore
         public static bool operator !=(Position left, Position right) => !left.Equals(right);
     }
 
-    [DebuggerDisplay($"{{{nameof(ToMinString)}(),nq}}")]
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public struct SinglePosition :
         IEquatable<SinglePosition>,
         System.Numerics.IComparisonOperators<SinglePosition, SinglePosition, bool>,
@@ -163,6 +171,8 @@ namespace LanguageCore
             Line = line;
             Character = character;
         }
+
+        public static implicit operator SinglePosition(ValueTuple<int, int> v) => new(v.Item1, v.Item2);
 
         public static bool operator ==(SinglePosition a, SinglePosition b) => a.Line == b.Line && a.Character == b.Character;
         public static bool operator !=(SinglePosition a, SinglePosition b) => a.Line != b.Line || a.Character != b.Character;
@@ -198,8 +208,16 @@ namespace LanguageCore
             return false;
         }
 
-        public override readonly string ToString() => $"SinglePos{{line: {Line}, char: {Character}}}";
-        public readonly string ToMinString() => $"{Line}:{Character}";
+        public override readonly string ToString() => $"({Line}:{Character})";
+        public readonly string ToStringMin() => $"{Line}:{Character}";
+        readonly string GetDebuggerDisplay()
+        {
+            if (this == SinglePosition.Undefined)
+            { return "?"; }
+            if (this == SinglePosition.Zero)
+            { return "0"; }
+            return ToString();
+        }
 
         public override readonly bool Equals(object? obj) => obj is SinglePosition position && Equals(position);
         public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;

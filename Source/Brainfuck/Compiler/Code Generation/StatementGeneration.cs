@@ -1212,7 +1212,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         throw new CompilerException($"Bruh. This probably not stored in heap...", deletable, CurrentFile);
                     }
 
-                case "throw": throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)");
+                case "throw": throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)", statement.Identifier, CurrentFile);
 
                 default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
@@ -2871,8 +2871,8 @@ namespace LanguageCore.Brainfuck.Compiler
             for (int i = 0; i < compiledParameters.Count; i++)
             { Variables.Push(compiledParameters[i]); }
 
-
-
+            string? savedFilePath = CurrentFile;
+            CurrentFile = function.FilePath;
 
             CompiledConstant[] savedConstants = CompiledConstants.ToArray();
             CompiledConstants.Clear();
@@ -2917,6 +2917,8 @@ namespace LanguageCore.Brainfuck.Compiler
                     }
                 }
             }
+
+            CurrentFile = savedFilePath;
 
             InMacro.Pop();
             CurrentMacro.Pop();

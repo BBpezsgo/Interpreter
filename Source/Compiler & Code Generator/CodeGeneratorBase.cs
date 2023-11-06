@@ -944,7 +944,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.Type.Equals(type.ReturnType)) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -963,7 +963,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.Identifier != name) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -982,7 +982,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.Identifier != name.Content) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToMinString()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToMinString()}) ; (and possibly more)", name, CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
 
                 compiledFunction = function;
             }

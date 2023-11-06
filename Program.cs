@@ -6,50 +6,19 @@
         {
             if (DevelopmentEntry.Start(args)) return;
 
-            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, args))
-            { return; }
+            bool pauseAtEnd = true;
 
-            switch (settings.RunType)
+            if (ArgumentParser.Parse(out ArgumentParser.Settings settings, args))
             {
-                case ArgumentParser.RunType.Debugger:
-#if AOT
-                    LanguageCore.Output.LogError($"System.Text.Json isn't avaliable in AOT mode");
-#else
-                    _ = new Debugger(settings);
-#endif
-                    break;
-                case ArgumentParser.RunType.Normal:
-                    if (settings.ConsoleGUI)
-                    {
-                        ConsoleGUI.ConsoleGUI gui = new()
-                        {
-                            FilledElement = new ConsoleGUI.InterpreterElement(settings.File.FullName, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.HandleErrors, settings.BasePath)
-                        };
-                        while (!gui.Destroyed)
-                        { gui.Tick(); }
-                    }
-                    else
-                    {
-                        LanguageCore.Runtime.EasyInterpreter.Run(settings);
-                    }
-                    break;
-                case ArgumentParser.RunType.Brainfuck:
+                try
+                { Entry.Run(settings); }
+                catch (System.Exception exception)
+                { LanguageCore.Output.LogError($"Unhandled exception: {exception}"); }
 
-                    Brainfuck.ProgramUtils.CompileOptions compileOptions;
-                    if (settings.compilerSettings.PrintInstructions)
-                    { compileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized; }
-                    else
-                    { compileOptions = Brainfuck.ProgramUtils.CompileOptions.None; }
-
-                    if (settings.ConsoleGUI)
-                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.UI, Brainfuck.PrintFlags.None, compileOptions); }
-                    else
-                    { Brainfuck.ProgramUtils.Run(settings, Brainfuck.RunKind.Default, Brainfuck.PrintFlags.None, compileOptions); }
-                    break;
-                default: throw new System.NotImplementedException();
+                pauseAtEnd = !settings.IsTest || settings.PauseAtEnd;
             }
 
-            if (!settings.IsTest || settings.PauseAtEnd)
+            if (pauseAtEnd)
             {
                 System.Console.WriteLine();
                 System.Console.WriteLine();

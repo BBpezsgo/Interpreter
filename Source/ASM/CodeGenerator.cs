@@ -546,11 +546,11 @@ namespace LanguageCore.ASM.Compiler
                     string label = Builder.DataBuilder.NewString(literal.Value);
                     Builder.CodeBuilder.AppendInstruction("mov", "ebp", "esp");
                     Builder.CodeBuilder.AppendInstruction("sub", "esp", "4");
-                    Builder.CodeBuilder.AppendTextLine();
+                    
                     Builder.CodeBuilder.AppendInstruction("push", "-11");
                     Builder.CodeBuilder.AppendInstruction("call", "_GetStdHandle@4");
                     Builder.CodeBuilder.AppendInstruction("mov", "ebx", "eax");
-                    Builder.CodeBuilder.AppendTextLine();
+
                     Builder.CodeBuilder.AppendInstruction("push", "0");
                     Builder.CodeBuilder.AppendInstruction("lea", "eax", "[ebp-4]");
                     Builder.CodeBuilder.AppendInstruction("push", "eax");
@@ -779,7 +779,7 @@ namespace LanguageCore.ASM.Compiler
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
             PrintCallback? printCallback = null)
-            => new CodeGenerator(compilerResult, generatorSettings).GenerateCode(
+        => new CodeGenerator(compilerResult, generatorSettings).GenerateCode(
             compilerResult,
             settings,
             printCallback

@@ -82,13 +82,18 @@ namespace TheProgram
 
                         LanguageCore.ASM.Compiler.CodeGenerator.Result code = LanguageCore.ASM.Compiler.CodeGenerator.Generate(compiled, arguments.compilerSettings, default, null);
 
-                        const string OutputFile = @"C:\Users\bazsi\Desktop\ehs";
+                        string? fileDirectoryPath = arguments.File.DirectoryName;
+                        string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);
 
-                        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, OutputFile);
+                        fileDirectoryPath ??= ".\\";
 
-                        if (File.Exists(OutputFile + ".exe"))
+                        string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
+
+                        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
+
+                        if (File.Exists(outputFile + ".exe"))
                         {
-                            Process? process = Process.Start(new ProcessStartInfo(OutputFile + ".exe"));
+                            Process? process = Process.Start(new ProcessStartInfo(outputFile + ".exe"));
                             process?.WaitForExit();
                             Console.WriteLine();
                             Console.WriteLine($"Exit code: {process?.ExitCode}");

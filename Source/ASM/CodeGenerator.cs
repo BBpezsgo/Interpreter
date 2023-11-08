@@ -9,6 +9,7 @@ using System.Collections.Generic;
 namespace LanguageCore.ASM.Compiler
 {
     using System.Diagnostics.CodeAnalysis;
+    using System.Reflection.Metadata.Ecma335;
     using BBCode.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
@@ -143,36 +144,40 @@ namespace LanguageCore.ASM.Compiler
                 indexer = indexerTemplate.Function;
             }
 
-            return indexer.Type.SizeOnStack;
+            throw new NotImplementedException();
         }
         int GetValueSize(Field field)
         {
             CompiledType type = FindStatementType(field);
-            return type.Size;
+            throw new NotImplementedException();
         }
         int GetValueSize(NewInstance newInstance)
         {
             if (GetStruct(newInstance, out var @struct))
             {
-                return @struct.Size;
+                throw new NotImplementedException();
             }
 
             if (GetClass(newInstance, out _))
             {
-                return 1;
+                throw new NotImplementedException();
             }
 
             throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
         }
-        static int GetValueSize(Literal statement) => statement.Type switch
+        static int GetValueSize(Literal statement)
         {
-            LiteralType.String => statement.Value.Length,
-            LiteralType.Integer => 1,
-            LiteralType.Char => 1,
-            LiteralType.Float => 1,
-            LiteralType.Boolean => 1,
-            _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
-        };
+            throw new NotImplementedException();
+            return statement.Type switch
+            {
+                LiteralType.String => statement.Value.Length,
+                LiteralType.Integer => 1,
+                LiteralType.Char => 1,
+                LiteralType.Float => 1,
+                LiteralType.Boolean => 1,
+                _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
+            };
+        }
         int GetValueSize(Identifier statement)
         {
             { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
@@ -200,14 +205,16 @@ namespace LanguageCore.ASM.Compiler
                 Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
             }
 
-            return 1;
+            throw new NotImplementedException();
         }
         int GetValueSize(FunctionCall functionCall)
         {
             if (functionCall.Identifier == "Alloc" &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 0)
-            { return 1; }
+            {
+                throw new NotImplementedException();
+            }
 
             if (functionCall.Identifier == "AllocFrom" &&
                 functionCall.IsMethodCall == false &&
@@ -215,14 +222,16 @@ namespace LanguageCore.ASM.Compiler
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Integer
                 ))
-            { return 1; }
+            {
+                throw new NotImplementedException();
+            }
 
             if (GetFunction(functionCall, out CompiledFunction? function))
             {
                 if (!function.ReturnSomething)
                 { return 0; }
 
-                return function.Type.Size;
+                throw new NotImplementedException();
             }
 
             if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
@@ -230,35 +239,45 @@ namespace LanguageCore.ASM.Compiler
                 if (!compilableFunction.Function.ReturnSomething)
                 { return 0; }
 
-                return compilableFunction.Function.Type.Size;
+                throw new NotImplementedException();
             }
 
             throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
         }
-        int GetValueSize(OperatorCall statement) => statement.Operator.Content switch
+        int GetValueSize(OperatorCall statement)
         {
-            "==" => 1,
-            "+" => 1,
-            "-" => 1,
-            "*" => 1,
-            "/" => 1,
-            "^" => 1,
-            "%" => 1,
-            "<" => 1,
-            ">" => 1,
-            "<=" => 1,
-            ">=" => 1,
-            "&" => 1,
-            "|" => 1,
-            "&&" => 1,
-            "||" => 1,
-            "!=" => 1,
-            "<<" => 1,
-            ">>" => 1,
-            _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-        };
-        static int GetValueSize(AddressGetter _) => 1;
-        static int GetValueSize(Pointer _) => 1;
+            throw new NotImplementedException();
+            return statement.Operator.Content switch
+            {
+                "==" => 1,
+                "+" => 1,
+                "-" => 1,
+                "*" => 1,
+                "/" => 1,
+                "^" => 1,
+                "%" => 1,
+                "<" => 1,
+                ">" => 1,
+                "<=" => 1,
+                ">=" => 1,
+                "&" => 1,
+                "|" => 1,
+                "&&" => 1,
+                "||" => 1,
+                "!=" => 1,
+                "<<" => 1,
+                ">>" => 1,
+                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
+            };
+        }
+        static int GetValueSize(AddressGetter _)
+        {
+            throw new NotImplementedException();
+        }
+        static int GetValueSize(Pointer _)
+        {
+            throw new NotImplementedException();
+        }
         int GetValueSize(TypeCast typeCast) => GetValueSize(typeCast.PrevStatement);
         #endregion
 
@@ -363,6 +382,8 @@ namespace LanguageCore.ASM.Compiler
             { Compile(field); }
             else if (statement is IndexCall indexCall)
             { Compile(indexCall); }
+            else if (statement is AnyCall anyCall)
+            { Compile(anyCall); }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
 
@@ -373,6 +394,16 @@ namespace LanguageCore.ASM.Compiler
             {
                 throw new NotImplementedException();
             }
+        }
+        void Compile(AnyCall anyCall)
+        {
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            {
+                Compile(functionCall);
+                return;
+            }
+
+            throw new NotImplementedException();
         }
         void Compile(IndexCall indexCall)
         {
@@ -506,19 +537,37 @@ namespace LanguageCore.ASM.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
+            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                StatementWithValue valueToPrint = functionCall.Parameters[0];
+                CompiledType valueToPrintType = FindStatementType(valueToPrint);
+
+                if (valueToPrint is Literal literal)
+                {
+                    string label = Builder.NewStringDataLabel(literal.Value);
+                    Builder.AppendCodeLine("mov ebp, esp");
+                    Builder.AppendCodeLine("sub esp, 4");
+                    Builder.AppendCodeLine("");
+                    Builder.AppendCodeLine("push -11");
+                    Builder.AppendCodeLine("call _GetStdHandle@4");
+                    Builder.AppendCodeLine("mov ebx, eax");
+                    Builder.AppendCodeLine("");
+                    Builder.AppendCodeLine("push 0");
+                    Builder.AppendCodeLine("lea eax, [ebp-4]");
+                    Builder.AppendCodeLine("push eax");
+                    Builder.AppendCodeLine($"push {literal.Value.Length}");
+                    Builder.AppendCodeLine($"push {label}");
+                    Builder.AppendCodeLine("push ebx");
+                    Builder.AppendCodeLine("call _WriteFile@20");
+                    return;
+                }
+
+                throw new NotImplementedException();
+            }
+
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
                 Compile(functionCall.Parameters[i]);
-            }
-
-            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
-            {
-                var valueToPrint = functionCall.Parameters[0];
-                var valueToPrintType = FindStatementType(valueToPrint);
-
-                Builder.AppendCodeLine("    call StdOut");
-
-                return;
             }
 
             throw new NotImplementedException();
@@ -666,16 +715,38 @@ namespace LanguageCore.ASM.Compiler
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
-            Builder.AppendCodeLine("main:");
             for (int i = 0; i < statements.Length; i++)
             {
+                if (statements[i] is KeywordCall keywordCall &&
+                    keywordCall.Identifier == "return")
+                {
+                    if (keywordCall.Parameters.Length != 0 &&
+                        keywordCall.Parameters.Length != 1)
+                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {keywordCall.Parameters.Length})", keywordCall, CurrentFile); }
+
+                    if (keywordCall.Parameters.Length == 1)
+                    {
+                        if (keywordCall.Parameters[0] is not Literal literal)
+                        {
+                            throw new NotImplementedException();
+                        }
+                        if (literal.Type != LiteralType.Integer)
+                        {
+                            throw new NotImplementedException();
+                        }
+                        int exitCode = literal.GetInt();
+                        Builder.AppendCodeLine($"push {exitCode}");
+                        Builder.AppendCodeLine("call _ExitProcess@4");
+                        Builder.AppendCodeLine("hlt");
+                    }
+                    return;
+                }
                 Compile(statements[i]);
             }
 
-            Builder.AppendCodeLine("    push 0");
-            Builder.AppendCodeLine("    call ExitProcess");
-
-            Builder.AppendCodeLine("end main");
+            Builder.AppendCodeLine("push 0");
+            Builder.AppendCodeLine("call _ExitProcess@4");
+            Builder.AppendCodeLine("hlt");
         }
 
         Result GenerateCode(
@@ -685,44 +756,17 @@ namespace LanguageCore.ASM.Compiler
         {
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
-            Builder.AppendDataLine("    message db \"This is your first assembly program\", 0");
-
-            Builder.AppendCodeLine("main:");
-            Builder.AppendCodeLine("    push OFFSET message");
-            Builder.AppendCodeLine("    call StdOut");
-            Builder.AppendCodeLine("    push 0");
-            Builder.AppendCodeLine("    call ExitProcess");
-            Builder.AppendCodeLine("end main");
-
-            /*
-            // builder.Append("STD_OUTPUT_HANDLE   equ -11\r\nNULL                equ 0\r\n\r\nglobal WinMain\r\nextern ExitProcess, GetStdHandle, WriteConsoleA\r\n\r\nsection .data\r\nmsg                 db \"Hello World!\", 13, 10, 0\r\nmsg.len             equ $ - msg\r\n\r\nsection .bss\r\ndummy               resd 1\r\n\r\nsection .text\r\nWinMain:\r\n    push    STD_OUTPUT_HANDLE\r\n    call    GetStdHandle\r\n\r\n    push    NULL\r\n    push    dummy\r\n    push    msg.len\r\n    push    msg\r\n    push    eax\r\n    call    WriteConsoleA \r\n\r\n    push    NULL\r\n    call    ExitProcess");
-            builder.Append("NULL equ 0\r\n");
-            builder.Append("[section] .text");
-            builder.Append("\r\n");
-            builder.Append("global WinMain\r\n");
-            builder.Append("extern ExitProcess, GetStdHandle, WriteConsoleA\r\n");
-            builder.Append("\r\n");
-            builder.Append("WinMain:\r\n");
-            builder.Append("push NULL\r\n");
-            builder.Append("call ExitProcess\r\n");
-            // builder.Append("    mov rax, 60\r\n");
-            // builder.Append("    mov rdi, 69\r\n");
-            // builder.Append("    syscall\r\n");
-            builder.Append("    mov eax, 69\r\n");
-            builder.Append("    ret\r\n");
-            */
-
             return new Result()
             {
                 Tokens = compilerResult.Tokens,
 
                 AssemblyCode = Builder.Make(new AssemblyHeader()
                 {
-                    MasmPath = @"C:\masm32\",
-                    Libraries = new List<string>()
+                    Externs = new List<string>()
                     {
-                        "kernel32",
-                        "masm32",
+                        "_GetStdHandle@4",
+                        "_WriteFile@20",
+                        "_ExitProcess@4"
                     },
                 }),
 

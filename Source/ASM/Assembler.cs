@@ -35,11 +35,71 @@ namespace LanguageCore.ASM
         }
     }
 
+    [System.Serializable]
+    public class NasmException : Exception
+    {
+        public readonly string? File;
+        public readonly int LineNumber;
+        public readonly string OriginalMessage;
+
+        public NasmException(string file, int lineNumber, string originalMessage, Exception? inner) : base(originalMessage, inner)
+        {
+            this.File = file;
+            this.LineNumber = lineNumber;
+            this.OriginalMessage = originalMessage;
+        }
+        protected NasmException(
+            System.Runtime.Serialization.SerializationInfo info,
+            System.Runtime.Serialization.StreamingContext context) : base(info, context)
+        {
+            File = info.GetString("File");
+            LineNumber = info.GetInt32("LineNumber");
+            OriginalMessage = info.GetString("OriginalMessage") ?? string.Empty;
+        }
+        
+        public override string ToString()
+        {
+            StringBuilder result = new(OriginalMessage);
+
+            result.Append($" (at line {LineNumber})");
+
+            if (File != null)
+            { result.Append($" (in {File})"); }
+
+            return result.ToString();
+        }
+
+        public static NasmException? Parse(string text, Exception? innerException = null)
+        {
+            if (!text.Contains(':')) return null;
+
+            string potentialFileName = text.Split(':')[0];
+            text = text[(potentialFileName.Length + 1)..];
+
+            int lineNumber = -1;
+
+            if (text.Contains(':'))
+            {
+                string potentialLine = text.Split(':')[0];
+                if (int.TryParse(potentialLine, out lineNumber))
+                {
+                    text = text[(potentialLine.Length + 1)..].TrimStart();
+                    if (text.StartsWith("error:"))
+                    {
+                        text = text["error:".Length..].TrimStart();
+                    }
+                }
+            }
+            
+            return new NasmException(potentialFileName, lineNumber, text, innerException);
+        }
+    }
+
     public static class Assembler
     {
         static void Nasm(string input, string output)
         {
-            const string nasm = @"nasm";
+            string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
 
             if (!File.Exists(input))
             { return; }
@@ -61,13 +121,28 @@ namespace LanguageCore.ASM
 
             process.WaitForExit();
 
+            if (process.ExitCode == 0) {
+                Thread.Sleep(200);
+                return;
+            }
+
             string stdOutput = process.StandardOutput.ReadToEnd();
             string stdError = process.StandardError.ReadToEnd();
 
-            if (process.ExitCode != 0)
-            { throw new ProcessException(nasm, process.ExitCode, stdOutput, stdError); }
+            ProcessException processException = new(nasm, process.ExitCode, stdOutput, stdError);
 
-            Thread.Sleep(200);
+            string[] errorLines = stdError.Replace("\r\n", "\n").Replace("\r", "").Split('\n');
+
+            for (int i = 0; i < errorLines.Length; i++)
+            {
+                string errorLine = errorLines[i].Trim();
+                if (string.IsNullOrWhiteSpace(errorLine)) continue;
+                NasmException? nasmException = NasmException.Parse(errorLine);
+                if (nasmException != null) throw nasmException;
+                else throw new NotImplementedException();
+            }
+
+            throw processException;
         }
 
         static void Masm(string input, string output)
@@ -92,7 +167,7 @@ namespace LanguageCore.ASM
 
         static void Ln(string input, string output)
         {
-            const string ld = @"C:\MinGW\bin\ld";
+            string ld = @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
 
             if (!File.Exists(input))
             { return; }
@@ -146,7 +221,7 @@ namespace LanguageCore.ASM
             Thread.Sleep(200);
         }
 
-        public static void Assemble(string asmSourceCode, string outputFile)
+        public static void Assemble(string asmSourceCode, string outputFile, bool throwErrors)
         {
             string outputFilename = Path.GetFileName(outputFile);
 
@@ -183,8 +258,8 @@ namespace LanguageCore.ASM
             }
             finally
             {
-                if (File.Exists(fileAsmTemp))
-                { File.Delete(fileAsmTemp); }
+                // if (File.Exists(fileAsmTemp))
+                // { File.Delete(fileAsmTemp); }
                 if (File.Exists(fileObjTemp))
                 { File.Delete(fileObjTemp); }
                 if (File.Exists(fileExeTemp))

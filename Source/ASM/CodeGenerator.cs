@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 #pragma warning disable IDE0052 // Remove unread private members
 #pragma warning disable CA1822 // Mark members as static
@@ -8,8 +9,6 @@ using System.Collections.Generic;
 
 namespace LanguageCore.ASM.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
-    using System.Reflection.Metadata.Ecma335;
     using BBCode.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
@@ -544,21 +543,21 @@ namespace LanguageCore.ASM.Compiler
 
                 if (valueToPrint is Literal literal)
                 {
-                    string label = Builder.NewStringDataLabel(literal.Value);
-                    Builder.AppendCodeLine("mov ebp, esp");
-                    Builder.AppendCodeLine("sub esp, 4");
-                    Builder.AppendCodeLine("");
-                    Builder.AppendCodeLine("push -11");
-                    Builder.AppendCodeLine("call _GetStdHandle@4");
-                    Builder.AppendCodeLine("mov ebx, eax");
-                    Builder.AppendCodeLine("");
-                    Builder.AppendCodeLine("push 0");
-                    Builder.AppendCodeLine("lea eax, [ebp-4]");
-                    Builder.AppendCodeLine("push eax");
-                    Builder.AppendCodeLine($"push {literal.Value.Length}");
-                    Builder.AppendCodeLine($"push {label}");
-                    Builder.AppendCodeLine("push ebx");
-                    Builder.AppendCodeLine("call _WriteFile@20");
+                    string label = Builder.DataBuilder.NewString(literal.Value);
+                    Builder.CodeBuilder.AppendInstruction("mov", "ebp", "esp");
+                    Builder.CodeBuilder.AppendInstruction("sub", "esp", "4");
+                    Builder.CodeBuilder.AppendTextLine();
+                    Builder.CodeBuilder.AppendInstruction("push", "-11");
+                    Builder.CodeBuilder.AppendInstruction("call", "_GetStdHandle@4");
+                    Builder.CodeBuilder.AppendInstruction("mov", "ebx", "eax");
+                    Builder.CodeBuilder.AppendTextLine();
+                    Builder.CodeBuilder.AppendInstruction("push", "0");
+                    Builder.CodeBuilder.AppendInstruction("lea", "eax", "[ebp-4]");
+                    Builder.CodeBuilder.AppendInstruction("push", "eax");
+                    Builder.CodeBuilder.AppendInstruction("push", literal.Value.Length.ToString());
+                    Builder.CodeBuilder.AppendInstruction("push", label);
+                    Builder.CodeBuilder.AppendInstruction("push", "ebx");
+                    Builder.CodeBuilder.AppendInstruction("call", "_WriteFile@20");
                     return;
                 }
 
@@ -735,18 +734,18 @@ namespace LanguageCore.ASM.Compiler
                             throw new NotImplementedException();
                         }
                         int exitCode = literal.GetInt();
-                        Builder.AppendCodeLine($"push {exitCode}");
-                        Builder.AppendCodeLine("call _ExitProcess@4");
-                        Builder.AppendCodeLine("hlt");
+                        Builder.CodeBuilder.AppendInstruction("push", exitCode.ToString());
+                        Builder.CodeBuilder.AppendInstruction("call", "_ExitProcess@4");
+                        Builder.CodeBuilder.AppendInstruction("hlt");
                     }
                     return;
                 }
                 Compile(statements[i]);
             }
 
-            Builder.AppendCodeLine("push 0");
-            Builder.AppendCodeLine("call _ExitProcess@4");
-            Builder.AppendCodeLine("hlt");
+            Builder.CodeBuilder.AppendInstruction("push", "0");
+            Builder.CodeBuilder.AppendInstruction("call", "_ExitProcess@4");
+            Builder.CodeBuilder.AppendInstruction("hlt");
         }
 
         Result GenerateCode(
@@ -766,7 +765,7 @@ namespace LanguageCore.ASM.Compiler
                     {
                         "_GetStdHandle@4",
                         "_WriteFile@20",
-                        "_ExitProcess@4"
+                        "_ExitProcess@4",
                     },
                 }),
 

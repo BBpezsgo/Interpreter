@@ -1,19 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace LanguageCore.Brainfuck.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
     using BBCode.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
-    using Literal = LanguageCore.Parser.Statement.Literal;
+    using Literal = Parser.Statement.Literal;
 
-    public partial class CodeGenerator : CodeGeneratorBase
+    public partial class CodeGenerator : CodeGeneratorNonGeneratorBase
     {
         #region PrecompileVariables
         int PrecompileVariables(Block block)

@@ -18,7 +18,7 @@ namespace LanguageCore.IL.Compiler
     using Pointer = Parser.Statement.Pointer;
 
     [RequiresDynamicCode("Generating IL code")]
-    public class CodeGenerator : CodeGeneratorBase
+    public class CodeGenerator : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 

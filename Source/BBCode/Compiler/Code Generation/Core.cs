@@ -73,8 +73,6 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly Stack<CleanupItem[]> CleanupStack;
         IAmInContext<CompiledClass>? CurrentContext;
-        readonly List<CompiledParameter> CompiledParameters;
-        readonly List<CompiledVariable> CompiledVariables;
 
         readonly Stack<List<int>> ReturnInstructions;
         readonly Stack<List<int>> BreakInstructions;
@@ -124,9 +122,6 @@ namespace LanguageCore.BBCode.Compiler
             this.InMacro = new Stack<bool>();
 
             this.TagCount = new Stack<int>();
-
-            this.CompiledVariables = new List<CompiledVariable>();
-            this.CompiledParameters = new List<CompiledParameter>();
 
             this.Informations = new List<Information>();
         }

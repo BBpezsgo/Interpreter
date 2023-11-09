@@ -31,7 +31,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
     }
 
-    public partial class CodeGenerator : CodeGeneratorBase
+    public partial class CodeGenerator : CodeGeneratorNonGeneratorBase
     {
         const string ReturnVariableName = "@return";
 

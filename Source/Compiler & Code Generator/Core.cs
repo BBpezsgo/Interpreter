@@ -12,6 +12,60 @@ namespace LanguageCore.BBCode.Compiler
     using Runtime;
     using Tokenizing;
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    public readonly struct ValueAddress
+    {
+        public readonly int Address;
+        public readonly bool BasepointerRelative;
+        public readonly bool IsReference;
+        public readonly bool InHeap;
+        public AddressingMode AddressingMode => BasepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE;
+
+        public ValueAddress(int address, bool basepointerRelative, bool isReference, bool inHeap)
+        {
+            Address = address;
+            BasepointerRelative = basepointerRelative;
+            IsReference = isReference;
+            InHeap = inHeap;
+        }
+
+        public ValueAddress(CompiledVariable variable)
+        {
+            Address = variable.MemoryAddress;
+            BasepointerRelative = !variable.IsGlobal;
+            IsReference = false;
+            InHeap = false;
+        }
+
+        public ValueAddress(CompiledParameter parameter, int address)
+        {
+            Address = address;
+            BasepointerRelative = true;
+            IsReference = parameter.IsRef;
+            InHeap = false;
+        }
+
+        public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
+
+        public override string ToString()
+        {
+            StringBuilder result = new();
+            result.Append('(');
+            result.Append($"{Address}");
+            if (BasepointerRelative)
+            { result.Append(" (BPR)"); }
+            else
+            { result.Append(" (ABS)"); }
+            if (IsReference)
+            { result.Append(" | IsRef"); }
+            if (InHeap)
+            { result.Append(" | InHeap"); }
+            result.Append(')');
+            return result.ToString();
+        }
+        string GetDebuggerDisplay() => ToString();
+    }
+
     public static class Extensions
     {
         public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull

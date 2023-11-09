@@ -4,12 +4,9 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    internal class UnusedFunctionManager : CodeGeneratorBase
+    internal class UnusedFunctionManager : CodeGeneratorNonGeneratorBase
     {
         #region Fields
-
-        readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        readonly List<CompiledParameter> parameters;
 
         readonly Compiler.CompileLevel CompileLevel;
 
@@ -19,58 +16,9 @@ namespace LanguageCore.BBCode.Compiler
 
         internal UnusedFunctionManager(Compiler.CompileLevel compileLevel) : base()
         {
-            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
-            parameters = new List<CompiledParameter>();
-
             CompileLevel = compileLevel;
 
             Informations = new List<Information>();
-        }
-
-        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
-        {
-            if (GetVariable(symbolName, out CompiledVariable? variable))
-            {
-                type = variable.Type;
-                return true;
-            }
-
-            if (GetParameter(symbolName, out CompiledParameter? parameter))
-            {
-                type = parameter.Type;
-                return true;
-            }
-
-            type = null;
-            return false;
-        }
-
-        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
-        {
-            foreach (KeyValuePair<string, CompiledVariable> compiledVariable_ in compiledVariables)
-            {
-                if (compiledVariable_.Value.VariableName.Content == variableName)
-                {
-                    compiledVariable = compiledVariable_.Value;
-                    return true;
-                }
-            }
-            compiledVariable = null;
-            return false;
-        }
-
-        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
-        {
-            foreach (CompiledParameter compiledParameter_ in parameters)
-            {
-                if (compiledParameter_.Identifier.Content == parameterName)
-                {
-                    parameter = compiledParameter_;
-                    return true;
-                }
-            }
-            parameter = null;
-            return false;
         }
 
         int DoTheThing(PrintCallback? printCallback = null)

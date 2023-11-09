@@ -26,6 +26,7 @@ namespace LanguageCore.ASM
         SUB,
         /// <summary> Load Effective Address </summary>
         LEA,
+        POP,
     }
 
     public struct Registers
@@ -122,6 +123,7 @@ namespace LanguageCore.ASM
             Instruction.ADD => "add",
             Instruction.SUB => "sub",
             Instruction.LEA => "lea",
+            Instruction.POP => "pop",
             _ => throw new ImpossibleException(),
         };
 

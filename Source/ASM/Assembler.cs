@@ -6,7 +6,6 @@ using System.Threading;
 
 namespace LanguageCore.ASM
 {
-
     [Serializable]
     public class ProcessException : Exception
     {
@@ -16,6 +15,8 @@ namespace LanguageCore.ASM
         readonly string stdError;
 
         public override string Message => $"Process \"{processName}\" exited with code {exitCode}";
+        public string StandardOutput => stdOutput;
+        public string StandardError => stdError;
 
         public ProcessException(string processName, int exitCode, string stdOutput, string stdError) : base()
         {

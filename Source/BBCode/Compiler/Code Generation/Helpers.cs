@@ -14,60 +14,6 @@ namespace LanguageCore.BBCode.Compiler
 
     public partial class CodeGenerator : CodeGeneratorBase
     {
-        [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        public readonly struct ValueAddress
-        {
-            public readonly int Address;
-            public readonly bool BasepointerRelative;
-            public readonly bool IsReference;
-            public readonly bool InHeap;
-            public AddressingMode AddressingMode => BasepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE;
-
-            public ValueAddress(int address, bool basepointerRelative, bool isReference, bool inHeap)
-            {
-                Address = address;
-                BasepointerRelative = basepointerRelative;
-                IsReference = isReference;
-                InHeap = inHeap;
-            }
-
-            public ValueAddress(CompiledVariable variable)
-            {
-                Address = variable.MemoryAddress;
-                BasepointerRelative = !variable.IsGlobal;
-                IsReference = false;
-                InHeap = false;
-            }
-
-            public ValueAddress(CompiledParameter parameter, int address)
-            {
-                Address = address;
-                BasepointerRelative = true;
-                IsReference = parameter.IsRef;
-                InHeap = false;
-            }
-
-            public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
-
-            public override string ToString()
-            {
-                StringBuilder result = new();
-                result.Append('(');
-                result.Append($"{Address}");
-                if (BasepointerRelative)
-                { result.Append(" (BPR)"); }
-                else
-                { result.Append(" (ABS)"); }
-                if (IsReference)
-                { result.Append(" | IsRef"); }
-                if (InHeap)
-                { result.Append(" | InHeap"); }
-                result.Append(')');
-                return result.ToString();
-            }
-            string GetDebuggerDisplay() => ToString();
-        }
-
         #region Helper Functions
 
         int CallRuntime(CompiledVariable address)
@@ -174,52 +120,6 @@ namespace LanguageCore.BBCode.Compiler
         {
             AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RUNTIME, 0);
             AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.RUNTIME);
-        }
-
-        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
-        {
-            if (GetVariable(symbolName, out CompiledVariable? variable))
-            {
-                type = variable.Type;
-                return true;
-            }
-
-            if (GetParameter(symbolName, out CompiledParameter? parameter))
-            {
-                type = parameter.Type;
-                return true;
-            }
-
-            type = null;
-            return false;
-        }
-
-        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
-        {
-            foreach (CompiledVariable compiledVariable_ in CompiledVariables)
-            {
-                if (compiledVariable_.VariableName.Content == variableName)
-                {
-                    compiledVariable = compiledVariable_;
-                    return true;
-                }
-            }
-            compiledVariable = null;
-            return false;
-        }
-
-        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
-        {
-            foreach (CompiledParameter compiledParameter_ in CompiledParameters)
-            {
-                if (compiledParameter_.Identifier.Content == parameterName)
-                {
-                    parameter = compiledParameter_;
-                    return true;
-                }
-            }
-            parameter = null;
-            return false;
         }
 
         /// <exception cref="NotImplementedException"></exception>
@@ -381,26 +281,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #region Memory Helpers
 
-        void StackStore(ValueAddress address, int size)
-        {
-            for (int i = size - 1; i >= 0; i--)
-            {
-                StackStore(address + i);
-                // AddInstruction(Opcode.STORE_VALUE, address.AddressingMode, address.Address + i);
-            }
-        }
-        void StackLoad(ValueAddress address, int size)
-        {
-            AddComment($"Load from stack: {{");
-            for (int currentOffset = 0; currentOffset < size; currentOffset++)
-            {
-                AddComment($"Element {currentOffset}:");
-                StackLoad(address + currentOffset);
-            }
-            AddComment("}");
-        }
-
-        void StackLoad(ValueAddress address)
+        protected override void StackLoad(ValueAddress address)
         {
             if (address.IsReference)
             {
@@ -433,7 +314,7 @@ namespace LanguageCore.BBCode.Compiler
                 default: throw new ImpossibleException();
             }
         }
-        void StackStore(ValueAddress address)
+        protected override void StackStore(ValueAddress address)
         {
             if (address.IsReference)
             {
@@ -544,182 +425,15 @@ namespace LanguageCore.BBCode.Compiler
         public const int SavedBasePointerOffset = -1;
         public const int SavedCodePointerOffset = -2;
 
-        ValueAddress GetDataAddress(StatementWithValue value)
-        {
-            if (value is IndexCall indexCall)
-            { return GetDataAddress(indexCall); }
-
-            if (value is Identifier identifier)
-            { return GetDataAddress(identifier); }
-
-            if (value is Field field)
-            { return GetDataAddress(field); }
-
-            throw new NotImplementedException();
-        }
-        ValueAddress GetDataAddress(Identifier variable)
-        {
-            if (GetConstant(variable.Content, out _))
-            { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
-
-            if (GetParameter(variable.Content, out CompiledParameter? param))
-            {
-                return GetBaseAddress(param);
-            }
-
-            if (GetVariable(variable.Content, out CompiledVariable? val))
-            {
-                return new ValueAddress(val);
-            }
-
-            throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
-        }
-        ValueAddress GetDataAddress(Field field)
-        {
-            ValueAddress address = GetBaseAddress(field);
-            if (address.IsReference)
-            { throw new NotImplementedException(); }
-            int offset = GetDataOffset(field);
-            return new ValueAddress(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
-        }
-        ValueAddress GetDataAddress(IndexCall indexCall)
-        {
-            ValueAddress address = GetBaseAddress(indexCall.PrevStatement!);
-            if (address.IsReference)
-            { throw new NotImplementedException(); }
-            int currentOffset = GetDataOffset(indexCall);
-            return new ValueAddress(address.Address + currentOffset, address.BasepointerRelative, address.IsReference, address.InHeap);
-        }
-
-        int GetDataOffset(StatementWithValue value)
-        {
-            if (value is IndexCall indexCall)
-            { return GetDataOffset(indexCall); }
-
-            if (value is Field field)
-            { return GetDataOffset(field); }
-
-            if (value is Identifier)
-            { return 0; }
-
-            throw new NotImplementedException();
-        }
-        int GetDataOffset(Field field)
-        {
-            CompiledType prevType = FindStatementType(field.PrevStatement);
-
-            IReadOnlyDictionary<string, int> fieldOffsets;
-
-            if (prevType.IsStruct)
-            {
-                fieldOffsets = prevType.Struct.FieldOffsets;
-            }
-            else if (prevType.IsClass)
-            {
-                prevType.Class.AddTypeArguments(TypeArguments);
-                prevType.Class.AddTypeArguments(prevType.TypeParameters);
-
-                fieldOffsets = prevType.Class.FieldOffsets;
-
-                prevType.Class.ClearTypeArguments();
-            }
-            else
-            { throw new NotImplementedException(); }
-
-            if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
-            { throw new InternalException($"Field \"{field.FieldName}\" does not have an offset value", CurrentFile); }
-
-            int prevOffset = GetDataOffset(field.PrevStatement);
-            return prevOffset + fieldOffset;
-        }
-        int GetDataOffset(IndexCall indexCall)
-        {
-            CompiledType prevType = FindStatementType(indexCall.PrevStatement);
-
-            if (!prevType.IsStackArray)
-            { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
-
-            if (!TryCompute(indexCall.Expression, RuntimeType.SInt32, out DataItem index))
-            { throw new CompilerException($"Can't compute the index value", indexCall.Expression, CurrentFile); }
-
-            int prevOffset = GetDataOffset(indexCall.PrevStatement!);
-            int offset = index.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
-            return prevOffset + offset;
-        }
-
-        ValueAddress GetBaseAddress(StatementWithValue statement)
-        {
-            if (statement is Identifier identifier)
-            { return GetBaseAddress(identifier); }
-
-            if (statement is Field field)
-            { return GetBaseAddress(field); }
-
-            if (statement is IndexCall indexCall)
-            { return GetBaseAddress(indexCall); }
-
-            throw new NotImplementedException();
-        }
-        ValueAddress GetBaseAddress(CompiledParameter parameter)
+        protected override ValueAddress GetBaseAddress(CompiledParameter parameter)
         {
             int address = -(ParametersSizeBefore(parameter.Index) + TagsBeforeBasePointer);
             return new ValueAddress(parameter, address);
         }
-        ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
+        protected override ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
         {
             int address = -(ParametersSizeBefore(parameter.Index) - offset + TagsBeforeBasePointer);
             return new ValueAddress(parameter, address);
-        }
-        ValueAddress GetBaseAddress(Identifier variable)
-        {
-            if (GetConstant(variable.Content, out _))
-            { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
-
-            if (GetParameter(variable.Content, out CompiledParameter? param))
-            {
-                return GetBaseAddress(param);
-            }
-
-            if (GetVariable(variable.Content, out CompiledVariable? val))
-            {
-                return new ValueAddress(val);
-            }
-
-            throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
-        }
-        ValueAddress GetBaseAddress(Field statement)
-        {
-            ValueAddress address = GetBaseAddress(statement.PrevStatement);
-            bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
-            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
-        }
-        ValueAddress GetBaseAddress(IndexCall statement)
-        {
-            ValueAddress address = GetBaseAddress(statement.PrevStatement!);
-            bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
-            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
-        }
-
-        bool IsItInHeap(StatementWithValue value)
-        {
-            if (value is Identifier)
-            { return false; }
-
-            if (value is Field field)
-            { return IsItInHeap(field); }
-
-            if (value is IndexCall indexCall)
-            { return IsItInHeap(indexCall); }
-
-            throw new NotImplementedException();
-        }
-        bool IsItInHeap(IndexCall indexCall)
-        {
-            return IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement).InHEAP;
-        }
-        bool IsItInHeap(Field field)
-        {
-            return IsItInHeap(field.PrevStatement) || FindStatementType(field.PrevStatement).InHEAP;
         }
 
         #endregion

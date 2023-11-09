@@ -8,12 +8,9 @@ namespace LanguageCore.BBCode.Compiler
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
 
-    internal class ReferenceCollector : CodeGeneratorBase
+    internal class ReferenceCollector : CodeGeneratorNonGeneratorBase
     {
         #region Fields
-
-        readonly List<KeyValuePair<string, CompiledVariable>> compiledVariables;
-        readonly List<CompiledParameter> parameters;
 
         ICanBeSame? CurrentFunction;
 
@@ -21,55 +18,7 @@ namespace LanguageCore.BBCode.Compiler
 
         internal ReferenceCollector() : base()
         {
-            compiledVariables = new List<KeyValuePair<string, CompiledVariable>>();
-            parameters = new List<CompiledParameter>();
             CurrentFunction = null;
-        }
-
-        protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
-        {
-            if (GetVariable(symbolName, out CompiledVariable? variable))
-            {
-                type = variable.Type;
-                return true;
-            }
-
-            if (GetParameter(symbolName, out CompiledParameter? parameter))
-            {
-                type = parameter.Type;
-                return true;
-            }
-
-            type = null;
-            return false;
-        }
-
-        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
-        {
-            foreach (KeyValuePair<string, CompiledVariable> compiledVariable_ in compiledVariables)
-            {
-                if (compiledVariable_.Value.VariableName.Content == variableName)
-                {
-                    compiledVariable = compiledVariable_.Value;
-                    return true;
-                }
-            }
-            compiledVariable = null;
-            return false;
-        }
-
-        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
-        {
-            foreach (CompiledParameter compiledParameter_ in parameters)
-            {
-                if (compiledParameter_.Identifier.Content == parameterName)
-                {
-                    parameter = compiledParameter_;
-                    return true;
-                }
-            }
-            parameter = null;
-            return false;
         }
 
         CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
@@ -102,7 +51,7 @@ namespace LanguageCore.BBCode.Compiler
 
         void AnalyzeNewVariable(VariableDeclaration newVariable)
         {
-            this.compiledVariables.Add(newVariable.VariableName.Content, GetVariableInfo(newVariable));
+            this.CompiledVariables.Add(GetVariableInfo(newVariable));
         }
 
         int AnalyzeNewVariables(IEnumerable<Statement>? statements)
@@ -141,7 +90,7 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             for (int i = 0; i < variablesAdded; i++)
-            { this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key); }
+            { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
         }
 
         void AnalyzeStatements(Statement[] statements, CompiledType[] expectedTypes)
@@ -160,7 +109,7 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             for (int i = 0; i < variablesAdded; i++)
-            { this.compiledVariables.Remove(this.compiledVariables.ElementAt(this.compiledVariables.Count - 1).Key); }
+            { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
         }
 
         void AnalyzeStatement(Statement? statement, CompiledType? expectedType = null)
@@ -599,9 +548,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.IsTemplate)
                 { continue; }
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -609,7 +558,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
             }
 
             for (int i = 0; i < this.CompiledOperators.Length; i++)
@@ -619,9 +568,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.IsTemplate)
                 { continue; }
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -629,7 +578,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
             }
 
             for (int i = 0; i < this.CompiledGeneralFunctions.Length; i++)
@@ -639,9 +588,9 @@ namespace LanguageCore.BBCode.Compiler
                 if (function.IsTemplate)
                 { continue; }
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 foreach (ParameterDefinition parameter in function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.FilePath;
                 CurrentFunction = function;
 
@@ -649,7 +598,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
             }
 
             AnalyzeStatements(topLevelStatements);
@@ -660,10 +609,10 @@ namespace LanguageCore.BBCode.Compiler
 
                 SetTypeArguments(function.TypeArguments);
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 for (int j = 0; j < function.Function.Parameters.Length; j++)
                 {
-                    parameters.Add(new CompiledParameter(function.Function.ParameterTypes[j], function.Function.Parameters[j]));
+                    CompiledParameters.Add(new CompiledParameter(function.Function.ParameterTypes[j], function.Function.Parameters[j]));
                 }
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
@@ -672,7 +621,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
                 TypeArguments.Clear();
             }
 
@@ -682,9 +631,9 @@ namespace LanguageCore.BBCode.Compiler
 
                 SetTypeArguments(function.TypeArguments);
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 foreach (ParameterDefinition parameter in function.Function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
@@ -692,7 +641,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
                 TypeArguments.Clear();
             }
 
@@ -702,9 +651,9 @@ namespace LanguageCore.BBCode.Compiler
 
                 SetTypeArguments(function.TypeArguments);
 
-                parameters.Clear();
+                CompiledParameters.Clear();
                 foreach (ParameterDefinition parameter in function.Function.Parameters)
-                { parameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
+                { CompiledParameters.Add(new CompiledParameter(new CompiledType(parameter.Type, FindType), parameter)); }
                 CurrentFile = function.Function.FilePath;
                 CurrentFunction = function.Function;
 
@@ -712,7 +661,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 CurrentFunction = null;
                 CurrentFile = null;
-                parameters.Clear();
+                CompiledParameters.Clear();
                 TypeArguments.Clear();
             }
         }

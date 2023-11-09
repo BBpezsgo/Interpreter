@@ -18,7 +18,7 @@ namespace LanguageCore.BBCode
 
         public struct Result
         {
-            public CodeGenerator.Result CodeGeneratorResult;
+            public CodeGeneratorForMain.Result CodeGeneratorResult;
             public Compiler.Compiler.Result CompilerResult;
             public ParserResult ParserResult;
             public Token[] TokenizerResult;
@@ -80,13 +80,13 @@ namespace LanguageCore.BBCode
                 { throw new LanguageException("Failed to compile", compilerResult.Errors[0].ToException()); }
             }
 
-            CodeGenerator.Result codeGeneratorResult;
+            CodeGeneratorForMain.Result codeGeneratorResult;
 
             {
                 DateTime codeGenerationStarted = DateTime.Now;
                 printCallback?.Invoke("Generating code ...", LogType.Debug);
 
-                codeGeneratorResult = CodeGenerator.Generate(
+                codeGeneratorResult = CodeGeneratorForMain.Generate(
                     compilerResult,
                     compilerSettings,
                     printCallback,
@@ -123,7 +123,7 @@ namespace LanguageCore.BBCode
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="LanguageException"></exception>
         /// <exception cref="System.Exception"></exception>
-        public static CodeGenerator.Result? Compile(
+        public static CodeGeneratorForMain.Result? Compile(
             FileInfo file,
             Dictionary<string, ExternalFunctionBase> externalFunctions,
             TokenizerSettings tokenizerSettings,
@@ -134,7 +134,7 @@ namespace LanguageCore.BBCode
         {
             try
             {
-                CodeGenerator.Result codeGeneratorResult = EasyCompiler.Compile(
+                CodeGeneratorForMain.Result codeGeneratorResult = EasyCompiler.Compile(
                     file,
                     externalFunctions,
                     tokenizerSettings,

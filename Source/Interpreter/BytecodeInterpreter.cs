@@ -149,11 +149,11 @@ namespace LanguageCore.Runtime
         void TraceCalls(List<int> callTrace, int basePointer)
         {
             if (basePointer < 2) return;
-            if (basePointer + BBCode.Compiler.CodeGenerator.SavedCodePointerOffset >= Memory.Stack.Count) return;
-            if (basePointer + BBCode.Compiler.CodeGenerator.SavedBasePointerOffset >= Memory.Stack.Count) return;
+            if (basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset >= Memory.Stack.Count) return;
+            if (basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset >= Memory.Stack.Count) return;
 
-            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGenerator.SavedCodePointerOffset];
-            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGenerator.SavedBasePointerOffset];
+            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset];
+            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset];
 
             if (!savedCodePointerD.Integer.HasValue) return;
             if (!savedBasePointerD.Integer.HasValue) return;

@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 
 namespace LanguageCore.Brainfuck
 {
+    [Serializable]
     public readonly struct RuntimeContext
     {
         public readonly int MemoryPointer;

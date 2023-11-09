@@ -10,7 +10,7 @@ namespace LanguageCore.Brainfuck
         public static char GetChar(byte v) => Encoding.ASCII.GetChars(new byte[1] { v }, 0, 1)[0];
     }
 
-    public static class Utils
+    public static class BrainfuckCode
     {
         public static readonly char[] CodeCharacters = new char[]
         {
@@ -18,7 +18,7 @@ namespace LanguageCore.Brainfuck
             '<', '>',
             '[', ']',
             '.', ',',
-            '$',
+            '$', // IDK what it is
         };
 
         public static string RemoveNoncodes(string code)

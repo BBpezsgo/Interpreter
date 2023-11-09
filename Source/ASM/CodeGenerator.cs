@@ -30,7 +30,7 @@ namespace LanguageCore.ASM.Compiler
         public override string ToString() => $"_{Name}@{ParameterSizeBytes}";
     }
 
-    public class CodeGenerator : CodeGeneratorBase
+    public class CodeGenerator : BBCode.Compiler.CodeGenerator
     {
         #region Fields
 
@@ -193,7 +193,7 @@ namespace LanguageCore.ASM.Compiler
 
             if (type is TypeInstanceSimple simpleType)
             {
-                if (Constants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
+                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
                 {
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(builtinType));
                     return 1;
@@ -222,7 +222,7 @@ namespace LanguageCore.ASM.Compiler
                     if (instanceType.Enum.Members.Length == 0)
                     { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, instanceType.Enum.Members[0].Value);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, instanceType.Enum.Members[0].ComputedValue);
                     return 1;
                 }
 
@@ -550,7 +550,7 @@ namespace LanguageCore.ASM.Compiler
 
             GenerateCodeForStatement(new FunctionCall(
                 indexCall.PrevStatement,
-                Token.CreateAnonymous(FunctionNames.IndexerGet),
+                Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
                 indexCall.BracketLeft,
                 new StatementWithValue[]
                 {
@@ -723,7 +723,7 @@ namespace LanguageCore.ASM.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -800,10 +800,10 @@ namespace LanguageCore.ASM.Compiler
             {
                 throw new NotImplementedException();
             }
-            else if (Constants.Operators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
+            else if (LanguageConstants.Operators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
             {
-                if (Constants.Operators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {Constants.Operators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
+                if (LanguageConstants.Operators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageConstants.Operators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
 
                 GenerateCodeForStatement(statement.Left);
 

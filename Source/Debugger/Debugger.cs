@@ -55,7 +55,7 @@ namespace TheProgram
 
             if (!Interpreter.Initialize()) return;
 
-            CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
+            CodeGeneratorForMain.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
                 settings.File,
                 Interpreter.GenerateExternalFunctions(),
                 LanguageCore.Tokenizing.TokenizerSettings.Default,

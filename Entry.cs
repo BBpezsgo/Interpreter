@@ -43,16 +43,16 @@ namespace TheProgram
                     {
                         Brainfuck.PrintFlags printFlags = Brainfuck.PrintFlags.PrintMemory;
 
-                        Brainfuck.ProgramUtils.CompileOptions compileOptions;
+                        Brainfuck.BrainfuckRunner.CompileOptions compileOptions;
                         if (arguments.compilerSettings.PrintInstructions)
-                        { compileOptions = Brainfuck.ProgramUtils.CompileOptions.PrintCompiledMinimized; }
+                        { compileOptions = Brainfuck.BrainfuckRunner.CompileOptions.PrintCompiledMinimized; }
                         else
-                        { compileOptions = Brainfuck.ProgramUtils.CompileOptions.None; }
+                        { compileOptions = Brainfuck.BrainfuckRunner.CompileOptions.None; }
 
                         if (arguments.ConsoleGUI)
-                        { Brainfuck.ProgramUtils.Run(arguments, Brainfuck.RunKind.UI, printFlags, compileOptions); }
+                        { Brainfuck.BrainfuckRunner.Run(arguments, Brainfuck.RunKind.UI, printFlags, compileOptions); }
                         else
-                        { Brainfuck.ProgramUtils.Run(arguments, Brainfuck.RunKind.Default, printFlags, compileOptions); }
+                        { Brainfuck.BrainfuckRunner.Run(arguments, Brainfuck.RunKind.Default, printFlags, compileOptions); }
                         break;
                     }
                 case ArgumentParser.RunType.IL:
@@ -66,7 +66,7 @@ namespace TheProgram
 
                         LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), arguments.File, null, arguments.BasePath);
 
-                        LanguageCore.IL.Compiler.CodeGenerator.Result code = LanguageCore.IL.Compiler.CodeGenerator.Generate(compiled, arguments.compilerSettings, default, null);
+                        LanguageCore.IL.Compiler.CodeGeneratorForIL.Result code = LanguageCore.IL.Compiler.CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
 
                         System.Reflection.Assembly assembly = code.Assembly;
                         break;

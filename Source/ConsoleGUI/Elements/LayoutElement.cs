@@ -17,7 +17,7 @@ namespace ConsoleGUI
 
         public override CharInfo DrawContent(int x, int y)
         {
-            return Elements.DrawContent(x, y) ?? Brush.ErrorChar;
+            return Elements.DrawContent(x, y) ?? CharacterBrush.ErrorChar;
         }
 
         public override void OnMouseEvent(MouseEvent e)

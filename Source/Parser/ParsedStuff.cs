@@ -61,11 +61,11 @@ namespace LanguageCore.Parser
     public class EnumMemberDefinition : IHaveKey<string>, IThingWithPosition
     {
         public readonly Token Identifier;
-        public readonly Statement.Literal? Value;
+        public readonly Statement.StatementWithValue? Value;
 
         public string Key => Identifier.Content;
 
-        public EnumMemberDefinition(Token identifier, Statement.Literal? value)
+        public EnumMemberDefinition(Token identifier, Statement.StatementWithValue? value)
         {
             Identifier = identifier;
             Value = value;

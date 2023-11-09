@@ -11,7 +11,7 @@ namespace LanguageCore.Brainfuck.Compiler
     using LanguageCore.Tokenizing;
     using Literal = Parser.Statement.Literal;
 
-    public partial class CodeGenerator : CodeGeneratorNonGeneratorBase
+    public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         #region PrecompileVariables
         int PrecompileVariables(Block block)
@@ -34,7 +34,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariable(VariableDeclaration variableDeclaration)
         {
-            if (CodeGenerator.GetVariable(Variables, variableDeclaration.VariableName.Content, out _))
+            if (CodeGeneratorForBrainfuck.GetVariable(Variables, variableDeclaration.VariableName.Content, out _))
             { throw new CompilerException($"Variable \"{variableDeclaration.VariableName.Content}\" already defined", variableDeclaration.VariableName, CurrentFile); }
 
             CompiledType type;
@@ -57,7 +57,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         int PrecompileVariable(Stack<Variable> variables, string name, CompiledType type, StatementWithValue? initialValue)
         {
-            if (CodeGenerator.GetVariable(variables, name, out _))
+            if (CodeGeneratorForBrainfuck.GetVariable(variables, name, out _))
             { return 0; }
 
             FunctionThingDefinition? scope = (CurrentMacro.Count == 0) ? null : CurrentMacro[^1];
@@ -167,7 +167,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (GetConstant(statement.Content, out _))
             { throw new CompilerException($"This is a constant so you can not modify it's value", statement, CurrentFile); }
 
-            if (!CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement}\" not found", statement, CurrentFile); }
 
             CompileSetter(variable, value);
@@ -213,7 +213,7 @@ namespace LanguageCore.Brainfuck.Compiler
         void CompileSetter(Variable variable, StatementWithValue value)
         {
             if (value is Identifier _identifier &&
-                CodeGenerator.GetVariable(Variables, _identifier.Content, out Variable valueVariable))
+                CodeGeneratorForBrainfuck.GetVariable(Variables, _identifier.Content, out Variable valueVariable))
             {
                 if (variable.Address == valueVariable.Address)
                 {
@@ -418,7 +418,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
-            if (!CodeGenerator.GetVariable(Variables, _variableIdentifier.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, _variableIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{_variableIdentifier}\" not found", _variableIdentifier, CurrentFile); }
 
             if (variable.IsDiscarded)
@@ -444,7 +444,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                     GenerateCodeForStatement(new FunctionCall(
                             _variableIdentifier,
-                            Token.CreateAnonymous(FunctionNames.IndexerSet),
+                            Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
                             statement.BracketLeft,
                             new StatementWithValue[]
                             {
@@ -618,7 +618,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             GenerateCodeForStatement(new FunctionCall(
                 indexCall.PrevStatement,
-                Token.CreateAnonymous(FunctionNames.IndexerGet),
+                Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
                 indexCall.BracketLeft,
                 new StatementWithValue[]
                 {
@@ -1099,7 +1099,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                         if (statement.Parameters.Length == 1)
                         {
-                            if (!CodeGenerator.GetVariable(Variables, ReturnVariableName, out Variable returnVariable))
+                            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, ReturnVariableName, out Variable returnVariable))
                             { throw new CompilerException($"Can't return value for some reason :(", statement, CurrentFile); }
 
                             CompileSetter(returnVariable, statement.Parameters[0]);
@@ -1378,7 +1378,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Left is not Identifier variableIdentifier)
                         { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
 
-                        if (!CodeGenerator.GetVariable(Variables, variableIdentifier.Content, out Variable variable))
+                        if (!CodeGeneratorForBrainfuck.GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                         { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
 
                         if (variable.IsDiscarded)
@@ -1402,7 +1402,7 @@ namespace LanguageCore.Brainfuck.Compiler
         {
             if (statement.InitialValue == null) return;
 
-            if (!CodeGenerator.GetVariable(Variables, statement.VariableName.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, statement.VariableName.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{statement.VariableName.Content}\" not found", statement.VariableName, CurrentFile); }
 
             if (variable.IsInitialValueSet)
@@ -1517,7 +1517,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -1587,7 +1587,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(Identifier statement)
         {
-            if (CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
+            if (CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -1683,7 +1683,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             {
                                 if (statement.Left is Identifier _left &&
-                                    CodeGenerator.GetVariable(Variables, _left.Content, out var left) &&
+                                    CodeGeneratorForBrainfuck.GetVariable(Variables, _left.Content, out var left) &&
                                     !left.IsDiscarded &&
                                     TryCompute(statement.Right, null, out var right) &&
                                     right.Type == RuntimeType.UInt8)
@@ -2776,7 +2776,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!CodeGenerator.GetVariable(Variables, modifiedVariable.Content, out Variable v))
+                                if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType)
@@ -3013,7 +3013,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             {
                                 var modifiedVariable = (Identifier)modifiedStatement.Statement;
 
-                                if (!CodeGenerator.GetVariable(Variables, modifiedVariable.Content, out Variable v))
+                                if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                                 if (v.Type != definedType)

@@ -111,7 +111,7 @@ namespace ConsoleGUI
 
             if (points.Length == 1)
             {
-                this[points[0].x, points[0].y] = Brush.Solid(color);
+                this[points[0].x, points[0].y] = CharacterBrush.Solid(color);
                 return;
             }
 
@@ -141,7 +141,7 @@ namespace ConsoleGUI
                         }
                         */
 
-                        this[x, y] = Brush.Solid(color);
+                        this[x, y] = CharacterBrush.Solid(color);
                     }
                 }
             }

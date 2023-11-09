@@ -290,7 +290,7 @@ namespace ConsoleGUI
 
             if (Interpreter.Initialize())
             {
-                LanguageCore.BBCode.Compiler.CodeGenerator.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
+                LanguageCore.BBCode.Compiler.CodeGeneratorForMain.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
                     fileInfo,
                     Interpreter.GenerateExternalFunctions(),
                     LanguageCore.Tokenizing.TokenizerSettings.Default,
@@ -390,7 +390,7 @@ namespace ConsoleGUI
                             }
 
                             string param = parameters2[j];
-                            if (LanguageCore.Constants.BuiltinTypes.Contains(param))
+                            if (LanguageCore.LanguageConstants.BuiltinTypes.Contains(param))
                             {
                                 sender.DrawBuffer.ForegroundColor = ByteColor.BrightBlue;
                             }
@@ -474,7 +474,7 @@ namespace ConsoleGUI
                             }
 
                             string param = parameters2[j];
-                            if (LanguageCore.Constants.BuiltinTypes.Contains(param))
+                            if (LanguageCore.LanguageConstants.BuiltinTypes.Contains(param))
                             {
                                 sender.DrawBuffer.ForegroundColor = ByteColor.BrightBlue;
                             }

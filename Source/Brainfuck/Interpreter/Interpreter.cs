@@ -164,7 +164,7 @@ namespace LanguageCore.Brainfuck
             List<char> Code = new(code.Length);
             for (int i = 0; i < code.Length; i++)
             {
-                if (!Utils.CodeCharacters.Contains(code[i]))
+                if (!BrainfuckCode.CodeCharacters.Contains(code[i]))
                 { continue; }
 
                 Code.Add(code[i]);
@@ -674,7 +674,7 @@ namespace LanguageCore.Brainfuck
             List<char> Code = new(code.Length);
             for (int i = 0; i < code.Length; i++)
             {
-                if (!Utils.CodeCharacters.Contains(code[i]))
+                if (!BrainfuckCode.CodeCharacters.Contains(code[i]))
                 { continue; }
 
                 Code.Add(code[i]);

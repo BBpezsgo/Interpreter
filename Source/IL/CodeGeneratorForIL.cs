@@ -18,7 +18,7 @@ namespace LanguageCore.IL.Compiler
     using Pointer = Parser.Statement.Pointer;
 
     [RequiresDynamicCode("Generating IL code")]
-    public class CodeGenerator : CodeGeneratorNonGeneratorBase
+    public class CodeGeneratorForIL : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 
@@ -27,7 +27,7 @@ namespace LanguageCore.IL.Compiler
 
         #endregion
 
-        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base()
+        public CodeGeneratorForIL(Compiler.Result compilerResult, Settings settings) : base()
         {
             this.GeneratorSettings = settings;
         }
@@ -176,7 +176,7 @@ namespace LanguageCore.IL.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -382,7 +382,7 @@ namespace LanguageCore.IL.Compiler
 
             Compile(new FunctionCall(
                 indexCall.PrevStatement,
-                Token.CreateAnonymous(FunctionNames.IndexerGet),
+                Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
                 indexCall.BracketLeft,
                 new StatementWithValue[]
                 {
@@ -519,7 +519,7 @@ namespace LanguageCore.IL.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -705,7 +705,7 @@ namespace LanguageCore.IL.Compiler
             Settings generatorSettings,
             PrintCallback? printCallback = null)
         {
-            CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
+            CodeGeneratorForIL codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(
                 compilerResult,
                 settings,

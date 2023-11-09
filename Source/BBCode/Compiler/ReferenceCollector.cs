@@ -23,7 +23,7 @@ namespace LanguageCore.BBCode.Compiler
 
         CompiledVariable GetVariableInfo(VariableDeclaration newVariable)
         {
-            if (Constants.Keywords.Contains(newVariable.VariableName.Content))
+            if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Identifier \"{newVariable.VariableName.Content}\" reserved as a keyword, do not use it as a variable name", newVariable.VariableName, CurrentFile); }
 
             CompiledType type;
@@ -385,7 +385,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructor))
+                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
                     {
                         if (!destructor.CanUse(CurrentFile))
                         { return; }
@@ -398,7 +398,7 @@ namespace LanguageCore.BBCode.Compiler
 
                         return;
                     }
-                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var compilableGeneralFunction))
+                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var compilableGeneralFunction))
                     {
                         if (!compilableGeneralFunction.OriginalFunction.CanUse(CurrentFile))
                         { return; }
@@ -427,7 +427,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (!GetGeneralFunction(paramType.Class, FunctionNames.Cloner, out var cloner))
+                    if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out var cloner))
                     { return; }
 
                     if (!cloner.CanUse(CurrentFile))
@@ -482,7 +482,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!GetClass(constructorCall, out var @class))
                 { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+                if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
                 {
                     constructor.AddReference(constructorCall);
 

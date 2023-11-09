@@ -180,47 +180,47 @@ namespace LanguageCore.BBCode.Compiler
     public static class Utils
     {
         /// <exception cref="NotImplementedException"/>
-        public static Literal.Type ConvertType(System.Type type)
+        public static CompiledLiteralType ConvertType(System.Type type)
         {
             if (type == typeof(int))
-            { return Literal.Type.Integer; }
+            { return CompiledLiteralType.Integer; }
 
             if (type == typeof(float))
-            { return Literal.Type.Float; }
+            { return CompiledLiteralType.Float; }
 
             if (type == typeof(bool))
-            { return Literal.Type.Boolean; }
+            { return CompiledLiteralType.Boolean; }
 
             if (type == typeof(string))
-            { return Literal.Type.String; }
+            { return CompiledLiteralType.String; }
 
             throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
         }
 
         /// <exception cref="NotImplementedException"/>
-        public static bool TryConvertType(System.Type type, out Literal.Type result)
+        public static bool TryConvertType(System.Type type, out CompiledLiteralType result)
         {
             if (type == typeof(int))
             {
-                result = Literal.Type.Integer;
+                result = CompiledLiteralType.Integer;
                 return true;
             }
 
             if (type == typeof(float))
             {
-                result = Literal.Type.Float;
+                result = CompiledLiteralType.Float;
                 return true;
             }
 
             if (type == typeof(bool))
             {
-                result = Literal.Type.Boolean;
+                result = CompiledLiteralType.Boolean;
                 return true;
             }
 
             if (type == typeof(string))
             {
-                result = Literal.Type.String;
+                result = CompiledLiteralType.String;
                 return true;
             }
 
@@ -635,7 +635,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
             { return; }
 
             if (typeFinder == null) throw new InternalException($"Can't parse {type} to CompiledType");
@@ -676,7 +676,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (type is null) throw new ArgumentNullException(nameof(type));
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
             if (type.Identifier.Content == "func")
@@ -926,7 +926,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!CompiledType.Equals((CompiledType?[]?)this.typeParameters, (TypeInstance?[]?)otherSimple.GenericTypes)) return false;
             }
 
-            if (Constants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out var type))
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out var type))
             { return type == this.builtinType; }
 
             if (this.@struct != null && this.@struct.Name.Content == otherSimple.Identifier.Content)
@@ -963,7 +963,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 for (int i = 0; i < this.@enum.Members.Length; i++)
                 {
-                    if (this.@enum.Members[i].Value.Type == other)
+                    if (this.@enum.Members[i].ComputedValue.Type == other)
                     { return true; }
                 }
             }

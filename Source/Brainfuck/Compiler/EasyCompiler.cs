@@ -11,11 +11,11 @@ namespace LanguageCore.Brainfuck
     {
         string? BasePath;
         BBCode.Compiler.Compiler.CompilerSettings compilerSettings;
-        CodeGenerator.Settings generatorSettings;
+        CodeGeneratorForBrainfuck.Settings generatorSettings;
 
         public struct Result
         {
-            public CodeGenerator.Result CodeGeneratorResult;
+            public CodeGeneratorForBrainfuck.Result CodeGeneratorResult;
         }
 
         Result Compile_(
@@ -77,13 +77,13 @@ namespace LanguageCore.Brainfuck
                 { throw new LanguageException("Failed to compile", compilerResult.Errors[0].ToException()); }
             }
 
-            CodeGenerator.Result codeGeneratorResult;
+            CodeGeneratorForBrainfuck.Result codeGeneratorResult;
 
             {
                 DateTime codeGenerationStarted = DateTime.Now;
                 printCallback?.Invoke("Generating code ...", LogType.Debug);
 
-                codeGeneratorResult = CodeGenerator.Generate(
+                codeGeneratorResult = CodeGeneratorForBrainfuck.Generate(
                     compilerResult,
                     compilerSettings,
                     generatorSettings,
@@ -107,7 +107,7 @@ namespace LanguageCore.Brainfuck
         public static Result Compile(
             FileInfo file,
             BBCode.Compiler.Compiler.CompilerSettings compilerSettings,
-            CodeGenerator.Settings generatorSettings,
+            CodeGeneratorForBrainfuck.Settings generatorSettings,
             PrintCallback? printCallback = null,
             string? basePath = null
             ) => new EasyCompiler()

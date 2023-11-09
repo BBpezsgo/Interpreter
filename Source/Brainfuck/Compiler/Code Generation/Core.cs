@@ -31,7 +31,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
     }
 
-    public partial class CodeGenerator : CodeGeneratorNonGeneratorBase
+    public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         const string ReturnVariableName = "@return";
 
@@ -101,7 +101,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base(compilerResult)
+        public CodeGeneratorForBrainfuck(Compiler.Result compilerResult, Settings settings) : base(compilerResult)
         {
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
@@ -187,7 +187,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
-            if (CodeGenerator.GetVariable(Variables, symbolName, out Variable variable))
+            if (CodeGeneratorForBrainfuck.GetVariable(Variables, symbolName, out Variable variable))
             {
                 type = variable.Type;
                 return true;
@@ -263,7 +263,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (_statement == null) continue;
 
                 if (_statement is Identifier identifier &&
-                    CodeGenerator.GetVariable(Variables, identifier.Content, out Variable _variable) &&
+                    CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable _variable) &&
                     _variable.Name == variable.Name
                     )
                 {
@@ -385,7 +385,7 @@ namespace LanguageCore.Brainfuck.Compiler
         };
         int GetValueSize(Identifier statement)
         {
-            if (CodeGenerator.GetVariable(Variables, statement.Content, out Variable variable))
+            if (CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -408,7 +408,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -506,7 +506,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (index.PrevStatement is not Identifier arrayIdentifier)
             { throw new CompilerException($"This must be an identifier", index.PrevStatement, CurrentFile); }
 
-            if (!CodeGenerator.GetVariable(Variables, arrayIdentifier.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, arrayIdentifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{arrayIdentifier}\" not found", arrayIdentifier, CurrentFile); }
 
             if (variable.Type.IsStackArray)
@@ -572,7 +572,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         bool TryGetAddress(Identifier identifier, out int address, out int size)
         {
-            if (!CodeGenerator.GetVariable(Variables, identifier.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             address = variable.Address;
@@ -631,7 +631,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         bool TryGetRuntimeAddress(Identifier identifier, out int pointerAddress, out int size)
         {
-            if (!CodeGenerator.GetVariable(Variables, identifier.Content, out Variable variable))
+            if (!CodeGeneratorForBrainfuck.GetVariable(Variables, identifier.Content, out Variable variable))
             { throw new CompilerException($"Variable \"{identifier}\" not found", identifier, CurrentFile); }
 
             if (!variable.Type.IsClass)
@@ -722,7 +722,7 @@ namespace LanguageCore.Brainfuck.Compiler
             Settings generatorSettings,
             PrintCallback? printCallback = null)
         {
-            CodeGenerator codeGenerator = new(compilerResult, generatorSettings);
+            CodeGeneratorForBrainfuck codeGenerator = new(compilerResult, generatorSettings);
             return codeGenerator.GenerateCode(
                 compilerResult,
                 settings,

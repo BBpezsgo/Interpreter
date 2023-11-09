@@ -4,7 +4,7 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore
 {
-    public static partial class Constants
+    public static partial class LanguageConstants
     {
         public static readonly string[] Keywords = new string[]
         {

@@ -10,7 +10,7 @@ namespace LanguageCore.BBCode.Compiler
     using Parser.Statement;
     using LiteralStatement = Parser.Statement.Literal;
 
-    public partial class CodeGenerator : CodeGeneratorBase
+    public partial class CodeGeneratorForMain : CodeGenerator
     {
         #region AddInstruction()
 
@@ -171,9 +171,9 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructor))
+                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), FunctionNames.Destructor, out var destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructorTemplate))
                     {
                         GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                         AddInstruction(Opcode.HEAP_DEALLOC);
@@ -224,7 +224,7 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (!GetGeneralFunction(paramType.Class, FunctionNames.Cloner, out var cloner))
+                if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out var cloner))
                 { throw new CompilerException($"Cloner for type \"{paramType.Class.Name}\" not found. Check if you defined a general function with name \"clone\" in class \"{paramType.Class.Name}\"", keywordCall.Identifier, CurrentFile); }
 
                 if (!cloner.CanUse(CurrentFile))
@@ -920,10 +920,10 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddComment("}");
             }
-            else if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+            else if (LanguageConstants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
-                if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                if (LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
 
                 int jumpInstruction = -1;
 
@@ -1336,7 +1336,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!GetClass(constructorCall, out var @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
+            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
@@ -1538,7 +1538,7 @@ namespace LanguageCore.BBCode.Compiler
 
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     index.PrevStatement,
-                    Token.CreateAnonymous(FunctionNames.IndexerGet),
+                    Token.CreateAnonymous(BuiltinFunctionNames.IndexerGet),
                     index.BracketLeft,
                     new StatementWithValue[]
                     {
@@ -1880,7 +1880,7 @@ namespace LanguageCore.BBCode.Compiler
 
             GenerateCodeForFunctionCall_Function(new FunctionCall(
                     statementToSet.PrevStatement,
-                    Token.CreateAnonymous(FunctionNames.IndexerSet),
+                    Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
                     statementToSet.BracketLeft,
                     new StatementWithValue[]
                     {
@@ -1969,10 +1969,10 @@ namespace LanguageCore.BBCode.Compiler
             { return; }
 
             if (destination.IsEnum)
-            { if (CodeGeneratorBase.SameType(destination.Enum, valueType)) return; }
+            { if (CodeGenerator.SameType(destination.Enum, valueType)) return; }
 
             if (valueType.IsEnum)
-            { if (CodeGeneratorBase.SameType(valueType.Enum, destination)) return; }
+            { if (CodeGenerator.SameType(valueType.Enum, destination)) return; }
 
             if (destination.IsBuiltin && destination.BuiltinType == Type.Byte &&
                 TryCompute(value, null, out DataItem yeah) &&
@@ -2006,9 +2006,9 @@ namespace LanguageCore.BBCode.Compiler
 
             if (deallocateableType.IsClass)
             {
-                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, FunctionNames.Destructor, out var destructor))
+                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, FunctionNames.Destructor, out var destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructorTemplate))
                     {
                         AddInstruction(Opcode.HEAP_DEALLOC);
                         AddComment("}");
@@ -2301,7 +2301,7 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateCodeForFunction(FunctionThingDefinition function)
         {
-            if (Constants.Keywords.Contains(function.Identifier.Content))
+            if (LanguageConstants.Keywords.Contains(function.Identifier.Content))
             { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
 
             function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;

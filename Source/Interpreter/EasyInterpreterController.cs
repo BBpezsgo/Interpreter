@@ -121,7 +121,7 @@ namespace LanguageCore.Runtime
                 }
 #endif
 
-                CodeGenerator.Result? compiledCode = BBCode.EasyCompiler.Compile(
+                CodeGeneratorForMain.Result? compiledCode = BBCode.EasyCompiler.Compile(
                     file,
                     interpreter.GenerateExternalFunctions(),
                     Tokenizing.TokenizerSettings.Default,

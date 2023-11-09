@@ -149,7 +149,7 @@ namespace LanguageCore.Runtime
 
         protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
 
-        public CodeGenerator.Result CompilerResult;
+        public CodeGeneratorForMain.Result CompilerResult;
         public Instruction? NextInstruction
         {
             get

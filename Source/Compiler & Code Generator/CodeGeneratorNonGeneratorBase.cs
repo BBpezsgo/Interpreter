@@ -2,7 +2,7 @@
 
 namespace LanguageCore.BBCode.Compiler
 {
-    public class CodeGeneratorNonGeneratorBase : CodeGeneratorBase
+    public class CodeGeneratorNonGeneratorBase : CodeGenerator
     {
         public CodeGeneratorNonGeneratorBase() : base()
         { }

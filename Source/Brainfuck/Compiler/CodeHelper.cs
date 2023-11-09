@@ -20,13 +20,13 @@ namespace LanguageCore.Brainfuck
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, char b)
         {
             a.v.Append(b);
-            ProgramUtils.PrintCodeChar(b);
+            BrainfuckRunner.PrintCodeChar(b);
             return a;
         }
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, string b)
         {
             a.v.Append(b);
-            ProgramUtils.PrintCode(b);
+            BrainfuckRunner.PrintCode(b);
             return a;
         }
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, AutoPrintCodeString b)
@@ -38,19 +38,19 @@ namespace LanguageCore.Brainfuck
         public void Append(string value)
         {
             this.v.Append(value);
-            ProgramUtils.PrintCode(value);
+            BrainfuckRunner.PrintCode(value);
         }
 
         public void Append(char value)
         {
             this.v.Append(value);
-            ProgramUtils.PrintCodeChar(value);
+            BrainfuckRunner.PrintCodeChar(value);
         }
 
         public void Append(char value, int repeatCount)
         {
             this.v.Append(value, repeatCount);
-            ProgramUtils.PrintCode(new string(value, repeatCount));
+            BrainfuckRunner.PrintCode(new string(value, repeatCount));
         }
     }
 
@@ -93,7 +93,7 @@ namespace LanguageCore.Brainfuck
         public void CommentLine(string text)
         {
             LineBreak();
-            Code.Append(Utils.ReplaceCodes(text, '_'));
+            Code.Append(BrainfuckCode.ReplaceCodes(text, '_'));
             LineBreak();
         }
         public void StartBlock()
@@ -106,7 +106,7 @@ namespace LanguageCore.Brainfuck
         public void StartBlock(string label)
         {
             LineBreak();
-            this.Code.Append($"{Utils.ReplaceCodes(label, '_')} {{");
+            this.Code.Append($"{BrainfuckCode.ReplaceCodes(label, '_')} {{");
             this.indent += 2;
             LineBreak();
         }
@@ -622,7 +622,7 @@ namespace LanguageCore.Brainfuck
 
         public string GetFinalCode()
         {
-            string result = Minifier.Minify(Utils.RemoveNoncodes(CachedFinalCode.ToString()));
+            string result = Minifier.Minify(BrainfuckCode.RemoveNoncodes(CachedFinalCode.ToString()));
             CachedFinalCode = new StringBuilder(result);
             return result;
         }

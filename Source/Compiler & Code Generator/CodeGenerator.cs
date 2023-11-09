@@ -12,7 +12,7 @@ namespace LanguageCore.BBCode.Compiler
     using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
 
-    public readonly struct FunctionNames
+    public readonly struct BuiltinFunctionNames
     {
         public const string Destructor = "destructor";
         public const string Cloner = "clone";
@@ -21,7 +21,7 @@ namespace LanguageCore.BBCode.Compiler
         public const string IndexerSet = "indexer_set";
     }
 
-    public abstract class CodeGeneratorBase
+    public abstract class CodeGenerator
     {
         protected readonly struct CompliableTemplate<T> where T : IDuplicatable<T>
         {
@@ -197,7 +197,7 @@ namespace LanguageCore.BBCode.Compiler
 
         protected string? CurrentFile;
 
-        protected CodeGeneratorBase()
+        protected CodeGenerator()
         {
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledClasses = Array.Empty<CompiledClass>();
@@ -226,7 +226,7 @@ namespace LanguageCore.BBCode.Compiler
             compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
-        protected CodeGeneratorBase(Compiler.Result compilerResult) : this()
+        protected CodeGenerator(Compiler.Result compilerResult) : this()
         {
             CompiledStructs = compilerResult.Structs;
             CompiledClasses = compilerResult.Classes;
@@ -392,7 +392,7 @@ namespace LanguageCore.BBCode.Compiler
 
             for (int i = 0; i < @enum.Members.Length; i++)
             {
-                if (@enum.Members[i].Value.Type != runtimeType)
+                if (@enum.Members[i].ComputedValue.Type != runtimeType)
                 { return false; }
             }
 
@@ -468,7 +468,7 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         protected bool GetEnum(string name, [NotNullWhen(true)] out CompiledEnum? @enum)
-            => CodeGeneratorBase.GetEnum(CompiledEnums, name, out @enum);
+            => CodeGenerator.GetEnum(CompiledEnums, name, out @enum);
         public static bool GetEnum(CompiledEnum?[] enums, string name, [NotNullWhen(true)] out CompiledEnum? @enum)
         {
             for (int i = 0; i < enums.Length; i++)
@@ -639,7 +639,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
 
-                if (function.Identifier.Content != FunctionNames.Constructor) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.Constructor) continue;
                 if (function.Type.Class != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
@@ -673,16 +673,16 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (function.IsTemplate) continue;
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
                 compiledFunction = function;
                 return true;
@@ -693,16 +693,16 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledFunction function = compilableFunctions[i].Function;
 
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
                 compiledFunction = function;
                 return true;
@@ -727,22 +727,22 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (function.IsTemplate) continue;
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[2] != elementType)
                 { continue; }
 
                 if (function.ParameterTypes.Length > 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
                 compiledFunction = function;
                 return true;
@@ -753,22 +753,22 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledFunction function = compilableFunctions[i].Function;
 
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[2] != elementType)
                 { continue; }
 
                 if (function.ParameterTypes.Length > 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
                 compiledFunction = function;
                 return true;
@@ -797,16 +797,16 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (!function.IsTemplate) continue;
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerGet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerGet) continue;
 
                 if (function.ParameterTypes.Length != 2)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should have 1 integer parameter", function.Identifier, function.FilePath); }
 
                 if (!function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerGet}\" should return something", function.TypeToken, function.FilePath); }
 
                 TypeArguments typeParameters = new(context.CurrentTypeArguments);
 
@@ -839,22 +839,22 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (!function.IsTemplate) continue;
                 if (function.Context != context) continue;
-                if (function.Identifier.Content != FunctionNames.IndexerSet) continue;
+                if (function.Identifier.Content != BuiltinFunctionNames.IndexerSet) continue;
 
                 if (function.ParameterTypes.Length < 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (!function.ParameterTypes[2].IsGeneric && function.ParameterTypes[2] != elementType)
                 { continue; }
 
                 if (function.ParameterTypes.Length > 3)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ParameterTypes[1] != Type.Integer)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should have 1 integer parameter and 1 other parameter of any type", function.Identifier, function.FilePath); }
 
                 if (function.ReturnSomething)
-                { throw new CompilerException($"Method \"{FunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
+                { throw new CompilerException($"Method \"{BuiltinFunctionNames.IndexerSet}\" should not return anything", function.TypeToken, function.FilePath); }
 
                 TypeArguments typeParameters = new(context.CurrentTypeArguments);
 
@@ -1315,9 +1315,9 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         protected bool GetClass(string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
-            => CodeGeneratorBase.GetClass(CompiledClasses, className, 0, out compiledClass);
+            => CodeGenerator.GetClass(CompiledClasses, className, 0, out compiledClass);
         protected bool GetClass(string className, int typeParameterCount, [NotNullWhen(true)] out CompiledClass? compiledClass)
-            => CodeGeneratorBase.GetClass(CompiledClasses, className, typeParameterCount, out compiledClass);
+            => CodeGenerator.GetClass(CompiledClasses, className, typeParameterCount, out compiledClass);
 
         public static bool GetClass(CompiledClass?[] classes, string className, [NotNullWhen(true)] out CompiledClass? compiledClass)
             => GetClass(classes, className, 0, out compiledClass);
@@ -1637,7 +1637,7 @@ namespace LanguageCore.BBCode.Compiler
 
         protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset, bool isGlobal)
         {
-            if (Constants.Keywords.Contains(newVariable.VariableName.Content))
+            if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
 
             CompiledType type;
@@ -1749,7 +1749,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (type.Enum.Members.Length == 0)
                 { throw new CompilerException($"Could not get enum \"{type.Enum.Identifier.Content}\" initial value: enum has no members", type.Enum.Identifier, type.Enum.FilePath); }
 
-                return type.Enum.Members[0].Value;
+                return type.Enum.Members[0].ComputedValue;
             }
 
             if (type.IsFunction)
@@ -1839,10 +1839,10 @@ namespace LanguageCore.BBCode.Compiler
 
         protected CompiledType FindStatementType(OperatorCall @operator, CompiledType? expectedType)
         {
-            if (Constants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+            if (LanguageConstants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
-                if (Constants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {Constants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                if (LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
             }
             else
             { opcode = Opcode.UNKNOWN; }
@@ -2016,7 +2016,7 @@ namespace LanguageCore.BBCode.Compiler
                 foreach (CompiledEnumMember enumMember in prevStatementType.Enum.Members)
                 {
                     if (enumMember.Identifier.Content == field.FieldName.Content)
-                    { return new CompiledType(enumMember.Value.Type); }
+                    { return new CompiledType(enumMember.ComputedValue.Type); }
                 }
 
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
@@ -2307,7 +2307,7 @@ namespace LanguageCore.BBCode.Compiler
         #endregion
 
         #region TryCompute()
-        protected static DataItem Compute(string @operator, DataItem left, DataItem right)
+        public static DataItem Compute(string @operator, DataItem left, DataItem right)
         {
             return @operator switch
             {
@@ -2398,7 +2398,60 @@ namespace LanguageCore.BBCode.Compiler
             value = leftValue;
             return true;
         }
-        protected static bool TryCompute(LiteralStatement literal, RuntimeType? expectedType, out DataItem value)
+        public static bool TryComputeSimple(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
+        {
+            if (!TryComputeSimple(@operator.Left, expectedType, out DataItem leftValue))
+            {
+                value = DataItem.Null;
+                return false;
+            }
+
+            string op = @operator.Operator.Content;
+
+            if (op == "!")
+            {
+                value = !leftValue;
+                return true;
+            }
+
+            if (@operator.Right != null)
+            {
+                if (TryComputeSimple(@operator.Right, expectedType, out DataItem rightValue))
+                {
+                    value = Compute(op, leftValue, rightValue);
+                    return true;
+                }
+
+                switch (op)
+                {
+                    case "&&":
+                        {
+                            if (!leftValue.Boolean)
+                            {
+                                value = new DataItem(false);
+                                return true;
+                            }
+                            break;
+                        }
+                    case "||":
+                        {
+                            if (leftValue.Boolean)
+                            {
+                                value = new DataItem(true);
+                                return true;
+                            }
+                            break;
+                        }
+                    default:
+                        value = DataItem.Null;
+                        return false;
+                }
+            }
+
+            value = leftValue;
+            return true;
+        }
+        public static bool TryCompute(LiteralStatement literal, RuntimeType? expectedType, out DataItem value)
         {
             switch (literal.Type)
             {
@@ -2522,6 +2575,23 @@ namespace LanguageCore.BBCode.Compiler
 
             if (statement is Identifier identifier)
             { return TryCompute(identifier, expectedType, out value); }
+
+            value = DataItem.Null;
+            return false;
+        }
+        public static bool TryComputeSimple(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
+        {
+            if (statement is null)
+            {
+                value = DataItem.Null;
+                return false;
+            }
+
+            if (statement is LiteralStatement literal)
+            { return TryCompute(literal, expectedType, out value); }
+
+            if (statement is OperatorCall @operator)
+            { return TryComputeSimple(@operator, expectedType, out value); }
 
             value = DataItem.Null;
             return false;

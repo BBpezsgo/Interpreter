@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.BBCode.Compiler
 {
@@ -113,9 +113,9 @@ namespace LanguageCore.BBCode.Compiler
                 }
             }
 
-            if (CodeGeneratorBase.GetStruct(CompiledStructs, name, out CompiledStruct? @struct)) return new CompiledType(@struct);
-            if (CodeGeneratorBase.GetClass(CompiledClasses, name, out CompiledClass? @class)) return new CompiledType(@class);
-            if (CodeGeneratorBase.GetEnum(CompiledEnums, name, out CompiledEnum? @enum)) return new CompiledType(@enum);
+            if (CodeGenerator.GetStruct(CompiledStructs, name, out CompiledStruct? @struct)) return new CompiledType(@struct);
+            if (CodeGenerator.GetClass(CompiledClasses, name, out CompiledClass? @class)) return new CompiledType(@class);
+            if (CodeGenerator.GetEnum(CompiledEnums, name, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
             throw new InternalException($"Unknown type '{name}'");
         }
@@ -212,7 +212,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (attribute.Parameters != null)
                 {
                     for (int j = 0; j < attribute.Parameters.Length; j++)
-                    { newAttribute.parameters.Add(new Literal(attribute.Parameters[j])); }
+                    { newAttribute.parameters.Add(new CompiledLiteral(attribute.Parameters[j])); }
                 }
 
                 result.Add(attribute.Identifier.Content, newAttribute);
@@ -230,12 +230,12 @@ namespace LanguageCore.BBCode.Compiler
 
         CompiledStruct CompileStruct(StructDefinition @struct)
         {
-            if (Constants.Keywords.Contains(@struct.Name.Content))
+            if (LanguageConstants.Keywords.Contains(@struct.Name.Content))
             { throw new CompilerException($"Illegal struct name '{@struct.Name.Content}'", @struct.Name, @struct.FilePath); }
 
             @struct.Name.AnalyzedType = TokenAnalyzedType.Struct;
 
-            if (CodeGeneratorBase.GetStruct(CompiledStructs, @struct.Name.Content, out _))
+            if (CodeGenerator.GetStruct(CompiledStructs, @struct.Name.Content, out _))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@struct.Attributes);
@@ -245,12 +245,12 @@ namespace LanguageCore.BBCode.Compiler
 
         CompiledClass CompileClass(ClassDefinition @class)
         {
-            if (Constants.Keywords.Contains(@class.Name.Content))
+            if (LanguageConstants.Keywords.Contains(@class.Name.Content))
             { throw new CompilerException($"Illegal class name '{@class.Name.Content}'", @class.Name, @class.FilePath); }
 
             @class.Name.AnalyzedType = TokenAnalyzedType.Class;
 
-            if (CodeGeneratorBase.GetClass(CompiledClasses, @class.Name.Content, out _))
+            if (CodeGenerator.GetClass(CompiledClasses, @class.Name.Content, out _))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
 
             Dictionary<string, AttributeValues> attributes = CompileAttributes(@class.Attributes);
@@ -368,7 +368,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
-                        if (Constants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
+                        if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
                             { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
@@ -420,7 +420,7 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     foreach (object parameter in attribute.Parameters)
                     {
-                        newAttribute.parameters.Add(new Literal(parameter));
+                        newAttribute.parameters.Add(new CompiledLiteral(parameter));
                     }
                 }
 
@@ -438,26 +438,10 @@ namespace LanguageCore.BBCode.Compiler
             {
                 EnumMemberDefinition member = @enum.Members[i];
                 CompiledEnumMember compiledMember = new(member);
-                switch (member.Value!.Type)
-                {
-                    case LiteralType.Integer:
-                        compiledMember.Value = new DataItem(int.Parse(member.Value.Value));
-                        break;
-                    case LiteralType.Float:
-                        compiledMember.Value = new DataItem(float.Parse(member.Value.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture));
-                        break;
-                    case LiteralType.Boolean:
-                        compiledMember.Value = new DataItem(bool.Parse(member.Value.Value) ? 1 : 0);
-                        break;
-                    case LiteralType.Char:
-                        if (member.Value.Value.Length != 1) throw new InternalException($"Literal char contains {member.Value.Value.Length} characters but only 1 allowed", @enum.FilePath);
-                        compiledMember.Value = new DataItem(member.Value.Value[0]);
-                        break;
-                    case LiteralType.String:
-                        throw new CompilerException($"String literal is not valid for a enum member value", member.Value, @enum.FilePath);
-                    default:
-                        throw new ImpossibleException();
-                }
+
+                if (!CodeGenerator.TryComputeSimple(member.Value, null, out compiledMember.ComputedValue))
+                { throw new CompilerException($"I can't compute this. The developer should make a better preprocessor for this case I think...", member.Value, @enum.FilePath); }
+
                 compiledEnum.Members[i] = compiledMember;
             }
 
@@ -623,7 +607,7 @@ namespace LanguageCore.BBCode.Compiler
                             Type[] parameterTypes = new Type[bfParams.Length];
                             for (int i = 0; i < bfParams.Length; i++)
                             {
-                                if (Constants.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
+                                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
                                 {
                                     parameterTypes[i] = paramType;
 
@@ -839,7 +823,7 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         /// <summary>
-        /// Does some checks and prepares the AST for the <see cref="CodeGenerator"/>
+        /// Does some checks and prepares the AST for the <see cref="CodeGeneratorForMain"/>
         /// </summary>
         /// <param name="file">
         /// The source code file

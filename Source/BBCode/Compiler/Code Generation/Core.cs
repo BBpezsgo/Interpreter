@@ -36,7 +36,7 @@ namespace LanguageCore.BBCode.Compiler
         string GetDebuggerDisplay() => ToString();
     }
 
-    public partial class CodeGenerator : CodeGeneratorBase
+    public partial class CodeGeneratorForMain : CodeGenerator
     {
         /*
          *      
@@ -105,7 +105,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        public CodeGenerator(Compiler.CompilerSettings settings) : base()
+        public CodeGeneratorForMain(Compiler.CompilerSettings settings) : base()
         {
             this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
             this.CheckNullPointers = settings.CheckNullPointers;
@@ -525,7 +525,7 @@ namespace LanguageCore.BBCode.Compiler
             Compiler.CompilerSettings settings,
             PrintCallback? printCallback = null,
             Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
-            => new CodeGenerator(settings).GenerateCode(
+            => new CodeGeneratorForMain(settings).GenerateCode(
             compilerResult,
             settings,
             printCallback,

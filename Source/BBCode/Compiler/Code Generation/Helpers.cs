@@ -12,7 +12,7 @@ namespace LanguageCore.BBCode.Compiler
     using Parser;
     using Parser.Statement;
 
-    public partial class CodeGenerator : CodeGeneratorBase
+    public partial class CodeGeneratorForMain : CodeGenerator
     {
         #region Helper Functions
 
@@ -139,7 +139,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (type is TypeInstanceSimple simpleType)
             {
-                if (Constants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
+                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
                 {
                     AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType));
                     return 1;
@@ -169,7 +169,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (instanceType.Enum.Members.Length == 0)
                     { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
 
-                    AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].Value);
+                    AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].ComputedValue);
                     return 1;
                 }
 

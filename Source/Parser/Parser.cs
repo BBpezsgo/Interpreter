@@ -298,12 +298,12 @@ namespace LanguageCore.Parser
 
                 enumMemberIdentifier.AnalyzedType = TokenAnalyzedType.EnumMember;
 
-                Literal? enumMemberValue = null;
+                StatementWithValue? enumMemberValue = null;
 
                 if (ExpectOperator("=", out Token? assignOperator))
                 {
-                    if (!ExpectLiteral(out enumMemberValue))
-                    { throw new SyntaxException($"There should be a literal (after enum member) and not \"{CurrentToken}\"", assignOperator.Position.After()); }
+                    if (!ExpectOneValue(out enumMemberValue))
+                    { throw new SyntaxException($"There should be a value (after enum member) and not \"{CurrentToken}\"", assignOperator.Position.After()); }
                 }
 
                 members.Add(new EnumMemberDefinition(enumMemberIdentifier, enumMemberValue));
@@ -1604,7 +1604,7 @@ namespace LanguageCore.Parser
 
         static int OperatorPrecedence(string @operator)
         {
-            if (Constants.Operators.Precedencies.TryGetValue(@operator, out int precedence))
+            if (LanguageConstants.Operators.Precedencies.TryGetValue(@operator, out int precedence))
             { return precedence; }
             throw new InternalException($"Precedence for operator \"{@operator}\" not found");
         }

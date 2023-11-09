@@ -99,7 +99,7 @@ namespace LanguageCore.ASM
     {
         static void Nasm(string input, string output)
         {
-            string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
+            string nasm = "nasm"; // @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
 
             if (!File.Exists(input))
             { return; }
@@ -167,7 +167,7 @@ namespace LanguageCore.ASM
 
         static void Ln(string input, string output)
         {
-            string ld = @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
+            string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
 
             if (!File.Exists(input))
             { return; }

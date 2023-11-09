@@ -15,7 +15,7 @@ namespace LanguageCore.BBCode.Compiler
     public partial class CodeGenerator : CodeGeneratorBase
     {
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-        readonly struct ValueAddress
+        public readonly struct ValueAddress
         {
             public readonly int Address;
             public readonly bool BasepointerRelative;
@@ -196,11 +196,11 @@ namespace LanguageCore.BBCode.Compiler
 
         bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
         {
-            foreach (KeyValuePair<string, CompiledVariable> compiledVariable_ in CompiledVariables)
+            foreach (CompiledVariable compiledVariable_ in CompiledVariables)
             {
-                if (compiledVariable_.Value.VariableName.Content == variableName)
+                if (compiledVariable_.VariableName.Content == variableName)
                 {
-                    compiledVariable = compiledVariable_.Value;
+                    compiledVariable = compiledVariable_;
                     return true;
                 }
             }

@@ -11,7 +11,7 @@ namespace LanguageCore.Brainfuck.Compiler
     using LanguageCore.Parser.Statement;
     using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
-    using Literal = LanguageCore.Parser.Statement.Literal;
+    using LiteralStatement = Parser.Statement.Literal;
 
     readonly struct CleanupItem
     {
@@ -281,7 +281,7 @@ namespace LanguageCore.Brainfuck.Compiler
         #region GetValueSize
         int GetValueSize(StatementWithValue statement)
         {
-            if (statement is Literal literal)
+            if (statement is LiteralStatement literal)
             { return GetValueSize(literal); }
 
             if (statement is Identifier variable)
@@ -374,7 +374,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
         }
-        static int GetValueSize(Literal statement) => statement.Type switch
+        static int GetValueSize(LiteralStatement statement) => statement.Type switch
         {
             LiteralType.String => 1, // throw new NotSupportedException($"String literals not supported by brainfuck"),
             LiteralType.Integer => 1,

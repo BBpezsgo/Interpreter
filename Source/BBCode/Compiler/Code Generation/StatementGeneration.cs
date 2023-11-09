@@ -1728,7 +1728,7 @@ namespace LanguageCore.BBCode.Compiler
                     { AddInstruction(Opcode.POP_VALUE); }
                 }
 
-                CompiledVariables.Remove(CompiledVariables[^1].Key);
+                CompiledVariables.RemoveAt(CompiledVariables.Count - 1);
             }
         }
 
@@ -2118,9 +2118,9 @@ namespace LanguageCore.BBCode.Compiler
 
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
-                if (CompiledVariables[i].Value.VariableName.Content == newVariable.VariableName.Content)
+                if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
                 {
-                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].Value.VariableName}\" already defined", CompiledVariables[i].Value.VariableName, CurrentFile));
+                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
                     return CleanupItem.Null;
                 }
             }
@@ -2149,7 +2149,7 @@ namespace LanguageCore.BBCode.Compiler
 
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
 
-            CompiledVariables.Add(newVariable.VariableName.Content, compiledVariable);
+            CompiledVariables.Add(compiledVariable);
 
             newVariable.Type.SetAnalyzedType(compiledVariable.Type);
 
@@ -2227,7 +2227,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
-                    CompiledVariable variable = CompiledVariables[i].Value;
+                    CompiledVariable variable = CompiledVariables[i];
                     sum += variable.Type.SizeOnStack;
                 }
 
@@ -2243,7 +2243,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 for (int i = 0; i < CompiledVariables.Count; i++)
                 {
-                    CompiledVariable variable = CompiledVariables[i].Value;
+                    CompiledVariable variable = CompiledVariables[i];
 
                     if (variable.IsGlobal) continue;
 
@@ -2259,7 +2259,7 @@ namespace LanguageCore.BBCode.Compiler
 
             for (int i = IndexOfVariable(variable) + 1; i < CompiledVariables.Count; i++)
             {
-                CompiledVariable _variable = CompiledVariables[i].Value;
+                CompiledVariable _variable = CompiledVariables[i];
 
                 if (_variable.IsGlobal) continue;
 
@@ -2272,7 +2272,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             for (int i = 0; i < CompiledVariables.Count; i++)
             {
-                CompiledVariable _variable = CompiledVariables[i].Value;
+                CompiledVariable _variable = CompiledVariables[i];
 
                 if (_variable.VariableName.Content == variable.VariableName.Content)
                 { return i; }
@@ -2284,7 +2284,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             for (int i = CompiledVariables.Count - 1; i >= 0; i--)
             {
-                if (CompiledVariables[i].Value.IsGlobal) continue;
+                if (CompiledVariables[i].IsGlobal) continue;
                 CompiledVariables.RemoveAt(i);
             }
         }

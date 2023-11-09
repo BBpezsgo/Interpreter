@@ -12,9 +12,24 @@ namespace LanguageCore.ASM.Compiler
     using BBCode.Compiler;
     using LanguageCore.Parser;
     using LanguageCore.Parser.Statement;
+    using LanguageCore.Runtime;
     using LanguageCore.Tokenizing;
-    using Literal = Parser.Statement.Literal;
-    using Pointer = Parser.Statement.Pointer;
+    using LiteralStatement = Parser.Statement.Literal;
+    using ValueAddress = BBCode.Compiler.CodeGenerator.ValueAddress;
+
+    public class ImportedAsmFunction
+    {
+        public readonly string Name;
+        public readonly int ParameterSizeBytes;
+
+        public ImportedAsmFunction(string name, int parameterSizeBytes)
+        {
+            Name = name;
+            ParameterSizeBytes = parameterSizeBytes;
+        }
+
+        public override string ToString() => $"_{Name}@{ParameterSizeBytes}";
+    }
 
     public class CodeGenerator : CodeGeneratorBase
     {
@@ -22,6 +37,14 @@ namespace LanguageCore.ASM.Compiler
 
         readonly Settings GeneratorSettings;
         readonly AssemblyCode Builder;
+
+        readonly List<CompiledParameter> CompiledParameters;
+        readonly List<CompiledVariable> CompiledVariables;
+
+        static readonly ImportedAsmFunction[] ImportedAsmFunctions = new ImportedAsmFunction[]
+        {
+
+        };
 
         #endregion
 
@@ -35,6 +58,9 @@ namespace LanguageCore.ASM.Compiler
             this.CompiledEnums = compilerResult.Enums;
             this.CompiledMacros = compilerResult.Macros;
             this.Builder = new AssemblyCode();
+
+            this.CompiledParameters = new List<CompiledParameter>();
+            this.CompiledVariables = new List<CompiledVariable>();
         }
 
         public struct Result
@@ -52,232 +78,580 @@ namespace LanguageCore.ASM.Compiler
 
         }
 
+        static bool GetImportedFunction(string name, [NotNullWhen(true)] out ImportedAsmFunction? function)
+        {
+            for (int i = 0; i < ImportedAsmFunctions.Length; i++)
+            {
+                if (ImportedAsmFunctions[i].Name == name)
+                {
+                    function = ImportedAsmFunctions[i];
+                    return true;
+                }
+            }
+            function = null;
+            return false;
+        }
+
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
             type = null;
             return false;
         }
 
-        #region Precompile
-        void Precompile(IEnumerable<Statement>? statements)
+        bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
         {
-            if (statements == null) return;
-            foreach (Statement statement in statements)
-            { Precompile(statement); }
-        }
-        void Precompile(Statement statement)
-        {
-            if (statement is KeywordCall instruction)
-            { Precompile(instruction); }
-        }
-        void Precompile(KeywordCall instruction)
-        {
-            switch (instruction.Identifier.Content)
+            foreach (CompiledVariable compiledVariable_ in CompiledVariables)
             {
-                case "const":
-                    {
-                        break;
-                    }
-                default:
-                    break;
+                if (compiledVariable_.VariableName.Content == variableName)
+                {
+                    compiledVariable = compiledVariable_;
+                    return true;
+                }
+            }
+            compiledVariable = null;
+            return false;
+        }
+
+        bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter)
+        {
+            foreach (CompiledParameter compiledParameter_ in CompiledParameters)
+            {
+                if (compiledParameter_.Identifier.Content == parameterName)
+                {
+                    parameter = compiledParameter_;
+                    return true;
+                }
+            }
+            parameter = null;
+            return false;
+        }
+
+
+        #region Memory Helpers
+
+        void StackStore(ValueAddress address, int size)
+        {
+            for (int i = size - 1; i >= 0; i--)
+            {
+                StackStore(address + i);
+                // AddInstruction(Opcode.STORE_VALUE, address.AddressingMode, address.Address + i);
             }
         }
-        void Precompile(CompiledFunction function)
+        void StackLoad(ValueAddress address, int size)
         {
-            if (function.Block == null) return;
-            Precompile(function.Block?.Statements);
+            for (int currentOffset = 0; currentOffset < size; currentOffset++)
+            { StackLoad(address + currentOffset); }
         }
+
+        void StackLoad(ValueAddress address)
+        {
+            if (address.IsReference)
+            { throw new NotImplementedException(); }
+
+            if (address.InHeap)
+            { throw new NotImplementedException(); }
+
+            switch (address.AddressingMode)
+            {
+                case AddressingMode.ABSOLUTE:
+                case AddressingMode.BASEPOINTER_RELATIVE:
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.BasePointer}-{(address.Address + 1) * 4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                    break;
+
+                case AddressingMode.RELATIVE:
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.StackPointer}+{(address.Address + 1) * 4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                    throw new NotImplementedException();
+
+                case AddressingMode.POP:
+                    throw new NotImplementedException();
+
+                case AddressingMode.RUNTIME:
+                    throw new NotImplementedException();
+                default: throw new ImpossibleException();
+            }
+        }
+        void StackStore(ValueAddress address)
+        {
+            if (address.IsReference)
+            { throw new NotImplementedException(); }
+
+            if (address.InHeap)
+            { throw new NotImplementedException(); }
+
+            throw new NotImplementedException();
+            /*
+            switch (address.AddressingMode)
+            {
+                case AddressingMode.ABSOLUTE:
+                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, address.Address);
+                    break;
+                case AddressingMode.BASEPOINTER_RELATIVE:
+                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, address.Address);
+                    break;
+                case AddressingMode.RELATIVE:
+                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, address.Address);
+                    break;
+                case AddressingMode.POP:
+                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.POP);
+                    break;
+                case AddressingMode.RUNTIME:
+                    throw new NotImplementedException();
+                default: throw new ImpossibleException();
+            }
+            */
+        }
+
         #endregion
 
-        #region GetValueSize
-        int GetValueSize(StatementWithValue statement)
+        #region Addressing Helpers
+
+        int ParametersSize
         {
-            if (statement is Literal literal)
-            { return GetValueSize(literal); }
+            get
+            {
+                int sum = 0;
 
-            if (statement is Identifier variable)
-            { return GetValueSize(variable); }
+                for (int i = 0; i < CompiledParameters.Count; i++)
+                {
+                    sum += CompiledParameters[i].Type.SizeOnStack;
+                }
 
-            if (statement is OperatorCall expression)
-            { return GetValueSize(expression); }
+                return sum;
+            }
+        }
+        int ParametersSizeBefore(int beforeThis)
+        {
+            int sum = 0;
 
-            if (statement is AddressGetter addressGetter)
-            { return GetValueSize(addressGetter); }
+            for (int i = 0; i < CompiledParameters.Count; i++)
+            {
+                if (CompiledParameters[i].Index < beforeThis) continue;
 
-            if (statement is Pointer pointer)
-            { return GetValueSize(pointer); }
+                sum += CompiledParameters[i].Type.SizeOnStack;
+            }
 
-            if (statement is FunctionCall functionCall)
-            { return GetValueSize(functionCall); }
+            return sum;
+        }
 
-            if (statement is TypeCast typeCast)
-            { return GetValueSize(typeCast); }
+        public int ReturnValueOffset => -(ParametersSize + 1);
 
-            if (statement is NewInstance newInstance)
-            { return GetValueSize(newInstance); }
+        ValueAddress GetDataAddress(StatementWithValue value)
+        {
+            if (value is IndexCall indexCall)
+            { return GetDataAddress(indexCall); }
+
+            if (value is Identifier identifier)
+            { return GetDataAddress(identifier); }
+
+            if (value is Field field)
+            { return GetDataAddress(field); }
+
+            throw new NotImplementedException();
+        }
+        ValueAddress GetDataAddress(Identifier variable)
+        {
+            if (GetConstant(variable.Content, out _))
+            { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
+
+            if (GetParameter(variable.Content, out CompiledParameter? param))
+            {
+                return GetBaseAddress(param);
+            }
+
+            if (GetVariable(variable.Content, out CompiledVariable? val))
+            {
+                return new ValueAddress(val);
+            }
+
+            throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
+        }
+        ValueAddress GetDataAddress(Field field)
+        {
+            ValueAddress address = GetBaseAddress(field);
+            if (address.IsReference)
+            { throw new NotImplementedException(); }
+            int offset = GetDataOffset(field);
+            return new ValueAddress(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
+        }
+        ValueAddress GetDataAddress(IndexCall indexCall)
+        {
+            ValueAddress address = GetBaseAddress(indexCall.PrevStatement!);
+            if (address.IsReference)
+            { throw new NotImplementedException(); }
+            int currentOffset = GetDataOffset(indexCall);
+            return new ValueAddress(address.Address + currentOffset, address.BasepointerRelative, address.IsReference, address.InHeap);
+        }
+
+        int GetDataOffset(StatementWithValue value)
+        {
+            if (value is IndexCall indexCall)
+            { return GetDataOffset(indexCall); }
+
+            if (value is Field field)
+            { return GetDataOffset(field); }
+
+            if (value is Identifier)
+            { return 0; }
+
+            throw new NotImplementedException();
+        }
+        int GetDataOffset(Field field)
+        {
+            CompiledType prevType = FindStatementType(field.PrevStatement);
+
+            IReadOnlyDictionary<string, int> fieldOffsets;
+
+            if (prevType.IsStruct)
+            {
+                fieldOffsets = prevType.Struct.FieldOffsets;
+            }
+            else if (prevType.IsClass)
+            {
+                prevType.Class.AddTypeArguments(TypeArguments);
+                prevType.Class.AddTypeArguments(prevType.TypeParameters);
+
+                fieldOffsets = prevType.Class.FieldOffsets;
+
+                prevType.Class.ClearTypeArguments();
+            }
+            else
+            { throw new NotImplementedException(); }
+
+            if (!fieldOffsets.TryGetValue(field.FieldName.Content, out int fieldOffset))
+            { throw new InternalException($"Field \"{field.FieldName}\" does not have an offset value", CurrentFile); }
+
+            int prevOffset = GetDataOffset(field.PrevStatement);
+            return prevOffset + fieldOffset;
+        }
+        int GetDataOffset(IndexCall indexCall)
+        {
+            CompiledType prevType = FindStatementType(indexCall.PrevStatement);
+
+            if (!prevType.IsStackArray)
+            { throw new CompilerException($"Only stack arrays supported by now and this is not one", indexCall.PrevStatement, CurrentFile); }
+
+            if (!TryCompute(indexCall.Expression, RuntimeType.SInt32, out DataItem index))
+            { throw new CompilerException($"Can't compute the index value", indexCall.Expression, CurrentFile); }
+
+            int prevOffset = GetDataOffset(indexCall.PrevStatement!);
+            int offset = index.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
+            return prevOffset + offset;
+        }
+
+        ValueAddress GetBaseAddress(StatementWithValue statement)
+        {
+            if (statement is Identifier identifier)
+            { return GetBaseAddress(identifier); }
 
             if (statement is Field field)
-            { return GetValueSize(field); }
-
-            if (statement is ConstructorCall constructorCall)
-            { return GetValueSize(constructorCall); }
+            { return GetBaseAddress(field); }
 
             if (statement is IndexCall indexCall)
-            { return GetValueSize(indexCall); }
+            { return GetBaseAddress(indexCall); }
 
-            throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, CurrentFile);
+            throw new NotImplementedException();
         }
-        int GetValueSize(IndexCall indexCall)
+        ValueAddress GetBaseAddress(CompiledParameter parameter)
         {
-            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
+            int address = -(ParametersSizeBefore(parameter.Index));
+            return new ValueAddress(parameter, address);
+        }
+        ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
+        {
+            int address = -(ParametersSizeBefore(parameter.Index) - offset);
+            return new ValueAddress(parameter, address);
+        }
+        ValueAddress GetBaseAddress(Identifier variable)
+        {
+            if (GetConstant(variable.Content, out _))
+            { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
+            if (GetParameter(variable.Content, out CompiledParameter? param))
             {
-                if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
-
-                indexerTemplate = AddCompilable(indexerTemplate);
-                indexer = indexerTemplate.Function;
+                return GetBaseAddress(param);
             }
 
+            if (GetVariable(variable.Content, out CompiledVariable? val))
+            {
+                return new ValueAddress(val);
+            }
+
+            throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
+        }
+        ValueAddress GetBaseAddress(Field statement)
+        {
+            ValueAddress address = GetBaseAddress(statement.PrevStatement);
+            bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
+            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
+        }
+        ValueAddress GetBaseAddress(IndexCall statement)
+        {
+            ValueAddress address = GetBaseAddress(statement.PrevStatement!);
+            bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
+            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
+        }
+
+        bool IsItInHeap(StatementWithValue value)
+        {
+            if (value is Identifier)
+            { return false; }
+
+            if (value is Field field)
+            { return IsItInHeap(field); }
+
+            if (value is IndexCall indexCall)
+            { return IsItInHeap(indexCall); }
+
             throw new NotImplementedException();
         }
-        int GetValueSize(Field field)
+        bool IsItInHeap(IndexCall indexCall)
         {
-            CompiledType type = FindStatementType(field);
-            throw new NotImplementedException();
+            return IsItInHeap(indexCall.PrevStatement!) || FindStatementType(indexCall.PrevStatement).InHEAP;
         }
-        int GetValueSize(NewInstance newInstance)
+        bool IsItInHeap(Field field)
         {
-            if (GetStruct(newInstance, out var @struct))
+            return IsItInHeap(field.PrevStatement) || FindStatementType(field.PrevStatement).InHEAP;
+        }
+
+        #endregion
+
+        #region GenerateInitialValue
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="CompilerException"/>
+        /// <exception cref="InternalException"/>
+        int GenerateInitialValue(TypeInstance type)
+        {
+            if (type is TypeInstanceFunction)
             {
                 throw new NotImplementedException();
             }
 
-            if (GetClass(newInstance, out _))
+            if (type is TypeInstanceStackArray)
             {
                 throw new NotImplementedException();
             }
 
-            throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
-        }
-        static int GetValueSize(Literal statement)
-        {
-            throw new NotImplementedException();
-            return statement.Type switch
+            if (type is TypeInstanceSimple simpleType)
             {
-                LiteralType.String => statement.Value.Length,
-                LiteralType.Integer => 1,
-                LiteralType.Char => 1,
-                LiteralType.Float => 1,
-                LiteralType.Boolean => 1,
-                _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
-            };
-        }
-        int GetValueSize(Identifier statement)
-        {
-            { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
-        }
-        int GetValueSize(ConstructorCall constructorCall)
-        {
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), FunctionNames.Constructor, out CompiledGeneralFunction? constructor))
-            {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                if (Constants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
                 {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(builtinType));
+                    return 1;
                 }
-                else
+
+                CompiledType instanceType = FindType(simpleType);
+
+                if (instanceType.IsStruct)
                 {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
+                    int size = 0;
+                    foreach (FieldDefinition field in instanceType.Struct.Fields)
+                    {
+                        size++;
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(field.Type));
+                    }
+                    throw new NotImplementedException();
+                }
+
+                if (instanceType.IsClass)
+                {
+                    throw new NotImplementedException();
+                }
+
+                if (instanceType.IsEnum)
+                {
+                    if (instanceType.Enum.Members.Length == 0)
+                    { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, instanceType.Enum.Members[0].Value);
+                    return 1;
+                }
+
+                if (instanceType.IsFunction)
+                {
+                    throw new NotImplementedException();
+                }
+
+                throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", simpleType, CurrentFile);
+            }
+
+            throw new ImpossibleException();
+        }
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="CompilerException"/>
+        /// <exception cref="InternalException"/>
+        int GenerateInitialValue(CompiledType type)
+        {
+            if (type.IsStruct)
+            {
+                int size = 0;
+                foreach (CompiledField field in type.Struct.Fields)
+                {
+                    size += GenerateInitialValue(field.Type);
+                }
+                throw new NotImplementedException();
+            }
+
+            if (type.IsClass)
+            {
+                throw new NotImplementedException();
+            }
+
+            if (type.IsStackArray)
+            {
+                int stackSize = type.StackArraySize;
+
+                int size = 0;
+                for (int i = 0; i < stackSize; i++)
+                {
+                    size += GenerateInitialValue(type.StackArrayOf);
+                }
+                throw new NotImplementedException();
+            }
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(type));
+            return 1;
+        }
+        /// <exception cref="NotImplementedException"></exception>
+        /// <exception cref="CompilerException"></exception>
+        /// <exception cref="InternalException"></exception>
+        int GenerateInitialValue(CompiledType type, Action<int> afterValue)
+        {
+            if (type.IsStruct)
+            {
+                int size = 0;
+                foreach (CompiledField field in type.Struct.Fields)
+                {
+                    size++;
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(field.Type));
+                    afterValue?.Invoke(size);
+                }
+                throw new NotImplementedException();
+            }
+
+            if (type.IsClass)
+            {
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0.ToString());
+                afterValue?.Invoke(0);
+                throw new NotImplementedException();
+            }
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(type));
+            afterValue?.Invoke(0);
+            return 1;
+        }
+
+        #endregion
+
+        #region GenerateCodeForVariable
+        int VariablesSize
+        {
+            get
+            {
+                int sum = 0;
+
+                for (int i = 0; i < CompiledVariables.Count; i++)
+                {
+                    CompiledVariable variable = CompiledVariables[i];
+                    sum += variable.Type.SizeOnStack;
+                }
+
+                return sum;
+            }
+        }
+
+        int LocalVariablesSize
+        {
+            get
+            {
+                int sum = 0;
+
+                for (int i = 0; i < CompiledVariables.Count; i++)
+                {
+                    CompiledVariable variable = CompiledVariables[i];
+
+                    if (variable.IsGlobal) continue;
+
+                    sum += variable.Type.SizeOnStack;
+                }
+
+                return sum;
+            }
+        }
+
+        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable, bool isGlobal)
+        {
+            if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
+
+            newVariable.VariableName.AnalyzedType = TokenAnalyzedType.VariableName;
+
+            for (int i = 0; i < CompiledVariables.Count; i++)
+            {
+                if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
+                {
+                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
+                    return CleanupItem.Null;
                 }
             }
 
-            if (!constructor.CanUse(CurrentFile))
+            int offset = 0;
+            if (isGlobal)
+            { offset += VariablesSize; }
+            else
+            { offset += LocalVariablesSize; }
+
+            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, isGlobal);
+
+            CompiledVariables.Add(compiledVariable);
+
+            newVariable.Type.SetAnalyzedType(compiledVariable.Type);
+
+            int size;
+
+            if (TryCompute(newVariable.InitialValue, null, out DataItem computedInitialValue))
             {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                size = 1;
+
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, computedInitialValue);
+                compiledVariable.IsInitialized = true;
+
+                if (size <= 0)
+                { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
+            }
+            else
+            {
+
+                size = GenerateInitialValue(compiledVariable.Type);
+
+                if (size <= 0)
+                { throw new CompilerException($"Variable has a size of {size}", newVariable, CurrentFile); }
             }
 
-            throw new NotImplementedException();
+            if (size != compiledVariable.Type.SizeOnStack)
+            { throw new InternalException($"Variable size ({compiledVariable.Type.SizeOnStack}) and initial value size ({size}) mismatch"); }
+
+            return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
-        int GetValueSize(FunctionCall functionCall)
+        CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
         {
-            if (functionCall.Identifier == "Alloc" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (functionCall.Identifier == "AllocFrom" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Integer
-                ))
-            {
-                throw new NotImplementedException();
-            }
-
-            if (GetFunction(functionCall, out CompiledFunction? function))
-            {
-                if (!function.ReturnSomething)
-                { return 0; }
-
-                throw new NotImplementedException();
-            }
-
-            if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            {
-                if (!compilableFunction.Function.ReturnSomething)
-                { return 0; }
-
-                throw new NotImplementedException();
-            }
-
-            throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
+            if (st is VariableDeclaration newVariable)
+            { return GenerateCodeForVariable(newVariable, isGlobal); }
+            return CleanupItem.Null;
         }
-        int GetValueSize(OperatorCall statement)
+        CleanupItem[] GenerateCodeForVariable(Statement[] sts, bool isGlobal)
         {
-            throw new NotImplementedException();
-            return statement.Operator.Content switch
+            List<CleanupItem> result = new();
+            for (int i = 0; i < sts.Length; i++)
             {
-                "==" => 1,
-                "+" => 1,
-                "-" => 1,
-                "*" => 1,
-                "/" => 1,
-                "^" => 1,
-                "%" => 1,
-                "<" => 1,
-                ">" => 1,
-                "<=" => 1,
-                ">=" => 1,
-                "&" => 1,
-                "|" => 1,
-                "&&" => 1,
-                "||" => 1,
-                "!=" => 1,
-                "<<" => 1,
-                ">>" => 1,
-                _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-            };
+                CleanupItem item = GenerateCodeForVariable(sts[i], isGlobal);
+                if (item.Size == 0) continue;
+
+                result.Add(item);
+            }
+            return result.ToArray();
         }
-        static int GetValueSize(AddressGetter _)
-        {
-            throw new NotImplementedException();
-        }
-        static int GetValueSize(Pointer _)
-        {
-            throw new NotImplementedException();
-        }
-        int GetValueSize(TypeCast typeCast) => GetValueSize(typeCast.PrevStatement);
+
         #endregion
 
         #region CompileSetter
@@ -353,7 +727,7 @@ namespace LanguageCore.ASM.Compiler
             { Compile(@if.ToLinks()); }
             else if (statement is WhileLoop @while)
             { Compile(@while); }
-            else if (statement is Literal literal)
+            else if (statement is LiteralStatement literal)
             { Compile(literal); }
             else if (statement is Identifier variable)
             { Compile(variable); }
@@ -507,6 +881,11 @@ namespace LanguageCore.ASM.Compiler
         {
             if (statement.InitialValue == null) return;
 
+            if (!GetVariable(statement.VariableName.Content, out CompiledVariable? variable))
+            { throw new InternalException($"Variable \"{statement.VariableName.Content}\" not found", CurrentFile); }
+
+            if (variable.IsInitialized) return;
+
             throw new NotImplementedException();
         }
         void Compile(FunctionCall functionCall)
@@ -541,23 +920,23 @@ namespace LanguageCore.ASM.Compiler
                 StatementWithValue valueToPrint = functionCall.Parameters[0];
                 CompiledType valueToPrintType = FindStatementType(valueToPrint);
 
-                if (valueToPrint is Literal literal)
+                if (valueToPrint is LiteralStatement literal)
                 {
                     string label = Builder.DataBuilder.NewString(literal.Value);
-                    Builder.CodeBuilder.AppendInstruction("mov", "ebp", "esp");
-                    Builder.CodeBuilder.AppendInstruction("sub", "esp", "4");
-                    
-                    Builder.CodeBuilder.AppendInstruction("push", "-11");
-                    Builder.CodeBuilder.AppendInstruction("call", "_GetStdHandle@4");
-                    Builder.CodeBuilder.AppendInstruction("mov", "ebx", "eax");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.BasePointer, Registers.StackPointer);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.StackPointer, 4.ToString());
 
-                    Builder.CodeBuilder.AppendInstruction("push", "0");
-                    Builder.CodeBuilder.AppendInstruction("lea", "eax", "[ebp-4]");
-                    Builder.CodeBuilder.AppendInstruction("push", "eax");
-                    Builder.CodeBuilder.AppendInstruction("push", literal.Value.Length.ToString());
-                    Builder.CodeBuilder.AppendInstruction("push", label);
-                    Builder.CodeBuilder.AppendInstruction("push", "ebx");
-                    Builder.CodeBuilder.AppendInstruction("call", "_WriteFile@20");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (-11).ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_GetStdHandle@4");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBX, Registers.EAX);
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0.ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LEA, Registers.EAX, $"[{Registers.BasePointer}-{4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, literal.Value.Length.ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, label);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_WriteFile@20");
                     return;
                 }
 
@@ -610,13 +989,52 @@ namespace LanguageCore.ASM.Compiler
 
             throw new NotImplementedException();
         }
-        void Compile(Literal statement)
+        void Compile(LiteralStatement statement)
         {
-            throw new NotImplementedException();
+            switch (statement.Type)
+            {
+                case LiteralType.Integer:
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, statement.Value);
+                    break;
+                case LiteralType.Float:
+                    throw new NotImplementedException();
+                case LiteralType.Boolean:
+                    break;
+                case LiteralType.String:
+                    throw new NotImplementedException();
+                case LiteralType.Char:
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, ((int)statement.Value[0]).ToString());
+                    break;
+                default:
+                    throw new ImpossibleException();
+            }
         }
-        void Compile(Identifier statement)
+        void Compile(Identifier statement, CompiledType? expectedType = null)
         {
-            throw new NotImplementedException();
+            if (GetConstant(statement.Content, out DataItem constant))
+            {
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, constant);
+                return;
+            }
+
+            if (GetParameter(statement.Content, out CompiledParameter? param))
+            {
+                throw new NotImplementedException();
+            }
+
+            if (GetVariable(statement.Content, out CompiledVariable? val))
+            {
+                statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
+                return;
+            }
+
+            if (GetFunction(statement.Name, expectedType, out CompiledFunction? compiledFunction))
+            {
+                throw new NotImplementedException();
+            }
+
+            throw new CompilerException($"Variable \"{statement.Content}\" not found", statement, CurrentFile);
         }
         void Compile(OperatorCall statement)
         {
@@ -710,10 +1128,54 @@ namespace LanguageCore.ASM.Compiler
 
             Compile(typeCast.PrevStatement);
         }
+
+        void GenerateCodeForImportedFunctionCall(string functionName, params StatementWithValue[] parameters)
+        {
+            if (!GetImportedFunction(functionName, out var function))
+            { throw new InternalException($"Imported function \"{functionName}\" not found"); }
+            GenerateCodeForImportedFunctionCall(function, parameters);
+        }
+        void GenerateCodeForImportedFunctionCall(ImportedAsmFunction function, params StatementWithValue[] parameters)
+        {
+            int parametersSizeBytes = 0;
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                StatementWithValue parameter = parameters[i];
+                CompiledType parameterType = FindStatementType(parameter);
+
+                if (!parameterType.IsBuiltin)
+                { throw new NotImplementedException(); }
+
+                parametersSizeBytes += 4;
+            }
+
+            if (parametersSizeBytes != function.ParameterSizeBytes)
+            { throw new CompilerException($"Parameters size ({parametersSizeBytes}) and function paramaters' size ({function.ParameterSizeBytes}) mismatch", CurrentFile); }
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, $"_{function.Name}@{function.ParameterSizeBytes}");
+        }
+
         #endregion
+
+        void CleanupVariables(CleanupItem[] cleanup)
+        {
+            for (int i = 0; i < cleanup.Length; i++)
+            {
+                CleanupItem item = cleanup[i];
+                for (int j = 0; j < item.Size; j++)
+                {
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.StackPointer, 4.ToString());
+                }
+            }
+        }
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.BasePointer, Registers.StackPointer);
+
+            var cleanup = GenerateCodeForVariable(statements, true);
+            bool hasExited = false;
+
             for (int i = 0; i < statements.Length; i++)
             {
                 if (statements[i] is KeywordCall keywordCall &&
@@ -725,6 +1187,8 @@ namespace LanguageCore.ASM.Compiler
 
                     if (keywordCall.Parameters.Length == 1)
                     {
+                        Compile(keywordCall.Parameters[0]);
+                        /*
                         if (keywordCall.Parameters[0] is not Literal literal)
                         {
                             throw new NotImplementedException();
@@ -735,17 +1199,24 @@ namespace LanguageCore.ASM.Compiler
                         }
                         int exitCode = literal.GetInt();
                         Builder.CodeBuilder.AppendInstruction("push", exitCode.ToString());
-                        Builder.CodeBuilder.AppendInstruction("call", "_ExitProcess@4");
-                        Builder.CodeBuilder.AppendInstruction("hlt");
+                        */
+                        hasExited = true;
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_ExitProcess@4");
+                        break;
                     }
-                    return;
                 }
                 Compile(statements[i]);
             }
 
-            Builder.CodeBuilder.AppendInstruction("push", "0");
-            Builder.CodeBuilder.AppendInstruction("call", "_ExitProcess@4");
-            Builder.CodeBuilder.AppendInstruction("hlt");
+            CleanupVariables(cleanup);
+
+            if (!hasExited)
+            {
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0.ToString());
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_ExitProcess@4");
+            }
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.HALT);
         }
 
         Result GenerateCode(

@@ -92,6 +92,8 @@ namespace LanguageCore.Tokenizing
 
         public readonly string Content;
 
+        public static Token Empty => new(TokenType.WHITESPACE, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
+
         public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
         {
             TokenType = type;
@@ -148,7 +150,7 @@ namespace LanguageCore.Tokenizing
             _ => Content.Escape(),
         };
 
-        public (Token?, Token?) SplitInHalf()
+        public (Token?, Token?) CutInHalf()
         {
             if (string.IsNullOrEmpty(Content))
             { return (null, null); }

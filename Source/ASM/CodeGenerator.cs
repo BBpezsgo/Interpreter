@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 #pragma warning disable IDE0052 // Remove unread private members
 #pragma warning disable IDE0051 // Remove unused private members
@@ -29,16 +29,19 @@ namespace LanguageCore.ASM.Compiler
         public override string ToString() => $"_{Name}@{ParameterSizeBytes}";
     }
 
-    public class CodeGenerator : BBCode.Compiler.CodeGenerator
+    public class CodeGeneratorForAsm : CodeGenerator
     {
         #region Fields
 
         readonly Settings GeneratorSettings;
         readonly AssemblyCode Builder;
 
+        readonly Dictionary<CompiledFunction, string> FunctionLabels;
+        readonly List<CompiledFunction> GeneratedFunctions;
+
         #endregion
 
-        public CodeGenerator(Compiler.Result compilerResult, Settings settings) : base()
+        public CodeGeneratorForAsm(Compiler.Result compilerResult, Settings settings) : base()
         {
             this.GeneratorSettings = settings;
             this.CompiledFunctions = compilerResult.Functions;
@@ -48,6 +51,9 @@ namespace LanguageCore.ASM.Compiler
             this.CompiledEnums = compilerResult.Enums;
             this.CompiledMacros = compilerResult.Macros;
             this.Builder = new AssemblyCode();
+
+            this.FunctionLabels = new Dictionary<CompiledFunction, string>();
+            this.GeneratedFunctions = new List<CompiledFunction>();
         }
 
         public struct Result
@@ -79,12 +85,12 @@ namespace LanguageCore.ASM.Compiler
             {
                 case AddressingMode.ABSOLUTE:
                 case AddressingMode.BASEPOINTER_RELATIVE:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.BasePointer}-{(address.Address + 1) * 4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]");
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                     break;
 
                 case AddressingMode.RELATIVE:
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.StackPointer}+{(address.Address + 1) * 4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.ESP}+{(address.Address + 1) * 4}]");
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                     throw new NotImplementedException();
 
@@ -104,27 +110,19 @@ namespace LanguageCore.ASM.Compiler
             if (address.InHeap)
             { throw new NotImplementedException(); }
 
-            throw new NotImplementedException();
-            /*
             switch (address.AddressingMode)
             {
                 case AddressingMode.ABSOLUTE:
-                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, address.Address);
-                    break;
                 case AddressingMode.BASEPOINTER_RELATIVE:
-                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, address.Address);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]", Registers.EAX);
                     break;
                 case AddressingMode.RELATIVE:
-                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, address.Address);
-                    break;
                 case AddressingMode.POP:
-                    Builder.CodeBuilder.AppendInstruction(Opcode.STORE_VALUE, AddressingMode.POP);
-                    break;
                 case AddressingMode.RUNTIME:
                     throw new NotImplementedException();
                 default: throw new ImpossibleException();
             }
-            */
         }
 
         #endregion
@@ -448,6 +446,15 @@ namespace LanguageCore.ASM.Compiler
 
         void CompileSetter(Identifier statement, StatementWithValue value)
         {
+            if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
+            {
+                statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+
+                GenerateCodeForStatement(value);
+
+                StackStore(new ValueAddress(variable), variable.Type.SizeOnStack);
+                return;
+            }
             throw new NotImplementedException();
         }
 
@@ -474,6 +481,193 @@ namespace LanguageCore.ASM.Compiler
         #endregion
 
         #region GenerateCodeForStatement()
+
+        void Call(string label)
+        {
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, label);
+        }
+
+        void Return()
+        {
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.RET);
+        }
+
+        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
+        {
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+
+            if (functionCall.PrevStatement != null)
+            {
+                StatementWithValue passedParameter = functionCall.PrevStatement;
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                GenerateCodeForStatement(functionCall.PrevStatement);
+                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+            }
+
+            for (int i = 0; i < functionCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = functionCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
+                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+
+                bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                }
+                else
+                {
+                    if (explicitDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
+
+                GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
+
+                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+            }
+
+            return parameterCleanup;
+        }
+
+        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+        {
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+
+            for (int i = 0; i < functionCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = functionCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
+                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+
+                bool canDeallocate = definedParameter.Modifiers.Contains("temp");
+
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                }
+                else
+                {
+                    if (explicitDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
+
+                GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
+
+                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+            }
+
+            return parameterCleanup;
+        }
+
+        void GenerateCodeForParameterCleanup(Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup)
+        {
+            while (parameterCleanup.Count > 0)
+            {
+                var passedParameter = parameterCleanup.Pop();
+
+                if (passedParameter.CanDeallocate && passedParameter.Size == 1)
+                { throw new NotImplementedException(); }
+
+                for (int i = 0; i < passedParameter.Size; i++)
+                {
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                }
+            }
+        }
+
+        void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
+        {
+            if (!compiledFunction.CanUse(CurrentFile))
+            {
+                Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                return;
+            }
+
+            if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
+            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+
+            if (functionCall.IsMethodCall != compiledFunction.IsMethod)
+            { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
+
+            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                StatementWithValue valueToPrint = functionCall.Parameters[0];
+                CompiledType valueToPrintType = FindStatementType(valueToPrint);
+
+                if (valueToPrint is LiteralStatement literal)
+                {
+                    string dataLabel = Builder.DataBuilder.NewString(literal.Value);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.ESP, 4.ToString());
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (-11).ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_GetStdHandle@4");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBX, Registers.EAX);
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0.ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LEA, Registers.EAX, $"[{Registers.EBP}-{4}]");
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, literal.Value.Length.ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, dataLabel);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_WriteFile@20");
+                    return;
+                }
+            }
+
+            if (compiledFunction.IsMacro)
+            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
+
+            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+
+            int returnValueSize = 0;
+            if (compiledFunction.ReturnSomething)
+            {
+                returnValueSize = GenerateInitialValue(compiledFunction.Type);
+            }
+
+            if (compiledFunction.IsExternal)
+            {
+                switch (compiledFunction.ExternalFunctionName)
+                {
+                    case "stdout":
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+
+            parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
+
+            if (!FunctionLabels.TryGetValue(compiledFunction, out string? label))
+            {
+                label = Builder.CodeBuilder.NewLabel($"f_{compiledFunction.Identifier}");
+                FunctionLabels.Add(compiledFunction, label);
+            }
+
+            Call(label);
+
+            GenerateCodeForParameterCleanup(parameterCleanup);
+
+            if (compiledFunction.ReturnSomething && !functionCall.SaveValue)
+            {
+                for (int i = 0; i < returnValueSize; i++)
+                {
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.RAX);
+                }
+            }
+        }
+
         void GenerateCodeForStatement(Statement statement)
         {
             if (statement is KeywordCall instructionStatement)
@@ -481,7 +675,7 @@ namespace LanguageCore.ASM.Compiler
             else if (statement is FunctionCall functionCall)
             { GenerateCodeForStatement(functionCall); }
             else if (statement is IfContainer @if)
-            { GenerateCodeForStatement(@if.ToLinks()); }
+            { GenerateCodeForStatement(@if); }
             else if (statement is WhileLoop @while)
             { GenerateCodeForStatement(@while); }
             else if (statement is LiteralStatement literal)
@@ -514,6 +708,10 @@ namespace LanguageCore.ASM.Compiler
             { GenerateCodeForStatement(indexCall); }
             else if (statement is AnyCall anyCall)
             { GenerateCodeForStatement(anyCall); }
+            else if (statement is Block block)
+            { GenerateCodeForStatement(block); }
+            else if (statement is ModifiedStatement modifiedStatement)
+            { GenerateCodeForStatement(modifiedStatement); }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
 
@@ -524,6 +722,24 @@ namespace LanguageCore.ASM.Compiler
             {
                 throw new NotImplementedException();
             }
+        }
+        void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
+        {
+            StatementWithValue statement = modifiedStatement.Statement;
+            Token modifier = modifiedStatement.Modifier;
+
+            if (modifier == "ref")
+            {
+                throw new NotImplementedException();
+            }
+
+            if (modifier == "temp")
+            {
+                GenerateCodeForStatement(statement);
+                return;
+            }
+
+            throw new NotImplementedException();
         }
         void GenerateCodeForStatement(AnyCall anyCall)
         {
@@ -557,13 +773,64 @@ namespace LanguageCore.ASM.Compiler
                 },
                 indexCall.BracketRight));
         }
-        void GenerateCodeForStatement(LinkedIf @if)
+        void GenerateCodeForStatement(IfContainer @if)
         {
-            throw new NotImplementedException();
+            string endLabel = Builder.CodeBuilder.NewLabel("if_end");
+            for (int i = 0; i < @if.Parts.Length; i++)
+            {
+                BaseBranch part = @if.Parts[i];
+
+                if (part is IfBranch ifBranch)
+                {
+                    string nextLabel = Builder.CodeBuilder.NewLabel("if_next");
+                    GenerateCodeForStatement(ifBranch.Condition);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JZ, nextLabel);
+                    GenerateCodeForStatement(ifBranch.Block);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, endLabel);
+                    Builder.CodeBuilder.AppendLabel(nextLabel);
+                }
+                else if (part is ElseIfBranch elseIfBranch)
+                {
+                    string nextLabel = Builder.CodeBuilder.NewLabel("if_next");
+                    GenerateCodeForStatement(elseIfBranch.Condition);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JZ, nextLabel);
+                    GenerateCodeForStatement(elseIfBranch.Block);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, endLabel);
+                    Builder.CodeBuilder.AppendLabel(nextLabel);
+                }
+                else if (part is ElseBranch elseBranch)
+                {
+                    GenerateCodeForStatement(elseBranch.Block);
+                }
+                else
+                {
+                    throw new ImpossibleException();
+                }
+            }
+            Builder.CodeBuilder.AppendLabel(endLabel);
         }
         void GenerateCodeForStatement(WhileLoop @while)
         {
-            throw new NotImplementedException();
+            string startLabel = Builder.CodeBuilder.NewLabel("while_start");
+            string endLabel = Builder.CodeBuilder.NewLabel("while_end");
+
+            Builder.CodeBuilder.AppendLabel(startLabel);
+
+            GenerateCodeForStatement(@while.Condition);
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JZ, endLabel);
+
+            GenerateCodeForStatement(@while.Block);
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, startLabel);
+
+            Builder.CodeBuilder.AppendLabel(endLabel);
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
@@ -643,7 +910,9 @@ namespace LanguageCore.ASM.Compiler
 
             if (variable.IsInitialized) return;
 
-            throw new NotImplementedException();
+            CompileSetter(new Identifier(statement.VariableName), statement.InitialValue);
+
+            variable.IsInitialized = true;
         }
         void GenerateCodeForStatement(FunctionCall functionCall)
         {
@@ -672,40 +941,7 @@ namespace LanguageCore.ASM.Compiler
                 compiledFunction = compilableFunction.Function;
             }
 
-            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
-            {
-                StatementWithValue valueToPrint = functionCall.Parameters[0];
-                CompiledType valueToPrintType = FindStatementType(valueToPrint);
-
-                if (valueToPrint is LiteralStatement literal)
-                {
-                    string label = Builder.DataBuilder.NewString(literal.Value);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.BasePointer, Registers.StackPointer);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.StackPointer, 4.ToString());
-
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (-11).ToString());
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_GetStdHandle@4");
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBX, Registers.EAX);
-
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0.ToString());
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LEA, Registers.EAX, $"[{Registers.BasePointer}-{4}]");
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, literal.Value.Length.ToString());
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, label);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CALL, "_WriteFile@20");
-                    return;
-                }
-
-                throw new NotImplementedException();
-            }
-
-            for (int i = 0; i < functionCall.Parameters.Length; i++)
-            {
-                GenerateCodeForStatement(functionCall.Parameters[i]);
-            }
-
-            throw new NotImplementedException();
+            GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
@@ -756,6 +992,7 @@ namespace LanguageCore.ASM.Compiler
                 case LiteralType.Float:
                     throw new NotImplementedException();
                 case LiteralType.Boolean:
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (bool.Parse(statement.Value) ? 1 : 0).ToString());
                     break;
                 case LiteralType.String:
                     throw new NotImplementedException();
@@ -814,85 +1051,91 @@ namespace LanguageCore.ASM.Compiler
                 switch (opcode)
                 {
                     case Opcode.LOGIC_LT:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_MT:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_LTEQ:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_MTEQ:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_OR:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_AND:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_EQ:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_NEQ:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.LOGIC_NOT:
-                        break;
+                        throw new NotImplementedException();
 
                     case Opcode.BITS_AND:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PAND, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                         break;
                     case Opcode.BITS_OR:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POR, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                         break;
                     case Opcode.BITS_XOR:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.XOR, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                         break;
 
                     case Opcode.BITSHIFT_LEFT:
-                        break;
+                        throw new NotImplementedException();
                     case Opcode.BITSHIFT_RIGHT:
-                        break;
+                        throw new NotImplementedException();
 
                     case Opcode.MATH_ADD:
-                        {
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        break;
                     case Opcode.MATH_SUB:
-                        {
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.EBX, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.EBX, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
+                        break;
                     case Opcode.MATH_MULT:
-                        {
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MUL, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MUL, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        break;
                     case Opcode.MATH_DIV:
-                        {
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction("cdq");
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction("cdq");
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IDIV, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction("cdq");
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction("cdq");
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IDIV, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        break;
                     case Opcode.MATH_MOD:
-                        break;
+                        throw new NotImplementedException();
                     default:
-                        break;
+                        throw new NotImplementedException();
                 }
             }
             else
             { throw new CompilerException($"Unknown operator \"{statement.Operator.Content}\"", statement.Operator, CurrentFile); }
         }
-        void Compile(Block block)
+        void GenerateCodeForStatement(Block block)
         {
+            CleanupItem[] cleanup = GenerateCodeForVariable(block.Statements, !InFunction);
             foreach (Statement statement in block.Statements)
             {
                 GenerateCodeForStatement(statement);
             }
+            CleanupVariables(cleanup);
         }
         void GenerateCodeForStatement(AddressGetter addressGetter)
         {
@@ -926,16 +1169,16 @@ namespace LanguageCore.ASM.Compiler
                 CleanupItem item = cleanup[i];
                 for (int j = 0; j < item.Size; j++)
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.StackPointer, 4.ToString());
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.ESP, 4.ToString());
                 }
             }
         }
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.BasePointer, Registers.StackPointer);
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
 
-            var cleanup = GenerateCodeForVariable(statements, true);
+            CleanupItem[] cleanup = GenerateCodeForVariable(statements, !InFunction);
             bool hasExited = false;
 
             for (int i = 0; i < statements.Length; i++)
@@ -981,12 +1224,102 @@ namespace LanguageCore.ASM.Compiler
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.HALT);
         }
 
+        void CompileParameters(ParameterDefinition[] parameters)
+        {
+            int paramIndex = 0;
+            int paramsSize = 0;
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                paramIndex++;
+                CompiledType parameterType = new(parameters[i].Type, FindType);
+                parameters[i].Type.SetAnalyzedType(parameterType);
+
+                this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
+
+                paramsSize += parameterType.SizeOnStack;
+            }
+        }
+
+        void GenerateCodeForFunction(FunctionThingDefinition function)
+        {
+            if (LanguageConstants.Keywords.Contains(function.Identifier.Content))
+            { throw new CompilerException($"The identifier \"{function.Identifier.Content}\" is reserved as a keyword. Do not use it as a function name", function.Identifier, function.FilePath); }
+
+            function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
+
+            if (function is CompiledFunction compiledFunction1) GeneratedFunctions.Add(compiledFunction1);
+
+            if (function is FunctionDefinition functionDefinition)
+            {
+                for (int i = 0; i < functionDefinition.Attributes.Length; i++)
+                {
+                    if (functionDefinition.Attributes[i].Identifier == "External")
+                    { return; }
+                }
+            }
+
+            if (function.Block == null)
+            { return; }
+
+            string? label;
+
+            if (function is CompiledFunction compiledFunction2)
+            {
+                if (!FunctionLabels.TryGetValue(compiledFunction2, out label))
+                {
+                    label = Builder.CodeBuilder.NewLabel($"f_{compiledFunction2.Identifier}");
+                    FunctionLabels.Add(compiledFunction2, label);
+                }
+            }
+            else
+            {
+                throw new NotImplementedException();
+            }
+
+            Builder.CodeBuilder.AppendLabel(label);
+
+            CompiledParameters.Clear();
+
+            CompileParameters(function.Parameters);
+
+            CurrentFile = function.FilePath;
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBP);
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
+
+            GenerateCodeForStatement(function.Block);
+
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBP);
+
+            CurrentFile = null;
+
+            Return();
+
+            CompiledParameters.Clear();
+        }
+
         Result GenerateCode(
             Compiler.Result compilerResult,
             Compiler.CompilerSettings settings,
             PrintCallback? printCallback = null)
         {
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
+
+            while (true)
+            {
+                bool shouldExit = true;
+                foreach (var pair in FunctionLabels)
+                {
+                    CompiledFunction function = pair.Key;
+                    if (!GeneratedFunctions.Any(other => ReferenceEquals(function, other)))
+                    {
+                        shouldExit = false;
+                        GenerateCodeForFunction(function);
+                    }
+                }
+
+                if (shouldExit) break;
+            }
 
             return new Result()
             {
@@ -996,8 +1329,8 @@ namespace LanguageCore.ASM.Compiler
                 {
                     Externs = new List<string>()
                     {
-                        "_GetStdHandle@4",
-                        "_WriteFile@20",
+                        // "_GetStdHandle@4",
+                        // "_WriteFile@20",
                         "_ExitProcess@4",
                     },
                 }),
@@ -1012,7 +1345,7 @@ namespace LanguageCore.ASM.Compiler
             Compiler.CompilerSettings settings,
             Settings generatorSettings,
             PrintCallback? printCallback = null)
-        => new CodeGenerator(compilerResult, generatorSettings).GenerateCode(
+        => new CodeGeneratorForAsm(compilerResult, generatorSettings).GenerateCode(
             compilerResult,
             settings,
             printCallback

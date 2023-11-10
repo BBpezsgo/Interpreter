@@ -80,7 +80,7 @@ namespace TheProgram
 
                         LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), arguments.File, null, arguments.BasePath);
 
-                        LanguageCore.ASM.Compiler.CodeGenerator.Result code = LanguageCore.ASM.Compiler.CodeGenerator.Generate(compiled, arguments.compilerSettings, default, null);
+                        LanguageCore.ASM.Compiler.CodeGeneratorForAsm.Result code = LanguageCore.ASM.Compiler.CodeGeneratorForAsm.Generate(compiled, arguments.compilerSettings, default, null);
 
                         string? fileDirectoryPath = arguments.File.DirectoryName;
                         string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);

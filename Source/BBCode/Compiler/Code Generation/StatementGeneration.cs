@@ -24,16 +24,10 @@ namespace LanguageCore.BBCode.Compiler
 
         void AddComment(string comment)
         {
-            // if (!AddCommentsToCode) return;
-            AddCommentForce(comment);
-        }
-        void AddCommentForce(string comment)
-        {
             if (GeneratedDebugInfo.CodeComments.TryGetValue(GeneratedCode.Count, out var comments))
             { comments.Add(comment); }
             else
             { GeneratedDebugInfo.CodeComments.Add(GeneratedCode.Count, new List<string>() { comment }); }
-            // AddInstruction(Opcode.COMMENT, comment);
         }
         #endregion
 
@@ -1154,7 +1148,7 @@ namespace LanguageCore.BBCode.Compiler
             OnScopeEnter(forLoop.Block);
 
             {
-                CleanupItem cleanupItem = GenerateCodeForVariable(forLoop.VariableDeclaration, CurrentContext == null);
+                CleanupItem cleanupItem = GenerateCodeForVariable(forLoop.VariableDeclaration);
                 if (cleanupItem.Size != 0)
                 { CleanupStack[^1] = new List<CleanupItem>(CleanupStack[^1]) { cleanupItem }.ToArray(); }
             }
@@ -1619,7 +1613,7 @@ namespace LanguageCore.BBCode.Compiler
             if (silent)
             {
                 AddComment("Statements {");
-                for (int i = 0; i < block.Statements.Count; i++)
+                for (int i = 0; i < block.Statements.Length; i++)
                 { GenerateCodeForStatement(block.Statements[i]); }
                 AddComment("}");
 
@@ -1629,7 +1623,7 @@ namespace LanguageCore.BBCode.Compiler
             OnScopeEnter(block);
 
             AddComment("Statements {");
-            for (int i = 0; i < block.Statements.Count; i++)
+            for (int i = 0; i < block.Statements.Length; i++)
             { GenerateCodeForStatement(block.Statements[i]); }
             AddComment("}");
 
@@ -1690,7 +1684,7 @@ namespace LanguageCore.BBCode.Compiler
             });
         }
 
-        CleanupItem[] CompileVariables(Block block, bool isGlobal, bool addComments = true)
+        CleanupItem[] CompileVariables(Block block, bool addComments = true)
         {
             if (addComments) AddComment("Variables {");
 
@@ -1698,7 +1692,7 @@ namespace LanguageCore.BBCode.Compiler
 
             foreach (var s in block.Statements)
             {
-                CleanupItem item = GenerateCodeForVariable(s, isGlobal);
+                CleanupItem item = GenerateCodeForVariable(s);
                 if (item.Size == 0) continue;
 
                 result.Add(item);
@@ -2108,9 +2102,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #region GenerateCodeFor...
 
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable)
         {
             if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
@@ -2126,19 +2118,19 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             int offset = TagCount.Last;
-            if (isGlobal)
-            { offset += VariablesSize + ExternalFunctionsCache.Count; }
-            else
+            if (InFunction)
             { offset += LocalVariablesSize; }
+            else
+            { offset += VariablesSize + ExternalFunctionsCache.Count; }
 
-            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, isGlobal);
+            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, !InFunction);
 
             StackElementInformations debugInfo = new()
             {
                 Kind = StackElementKind.Variable,
                 Tag = compiledVariable.VariableName.Content,
                 Address = offset,
-                BasepointerRelative = !isGlobal,
+                BasepointerRelative = InFunction,
                 Size = compiledVariable.Type.SizeOnStack,
             };
 
@@ -2200,18 +2192,18 @@ namespace LanguageCore.BBCode.Compiler
 
             return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
-        CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(Statement st)
         {
             if (st is VariableDeclaration newVariable)
-            { return GenerateCodeForVariable(newVariable, isGlobal); }
+            { return GenerateCodeForVariable(newVariable); }
             return CleanupItem.Null;
         }
-        CleanupItem[] GenerateCodeForVariable(Statement[] sts, bool isGlobal)
+        CleanupItem[] GenerateCodeForVariable(Statement[] sts)
         {
             List<CleanupItem> result = new();
             for (int i = 0; i < sts.Length; i++)
             {
-                CleanupItem item = GenerateCodeForVariable(sts[i], isGlobal);
+                CleanupItem item = GenerateCodeForVariable(sts[i]);
                 if (item.Size == 0) continue;
 
                 result.Add(item);
@@ -2384,7 +2376,7 @@ namespace LanguageCore.BBCode.Compiler
             }
 
             AddComment("Statements {");
-            for (int i = 0; i < function.Block.Statements.Count; i++)
+            for (int i = 0; i < function.Block.Statements.Length; i++)
             { GenerateCodeForStatement(function.Block.Statements[i]); }
             AddComment("}");
 
@@ -2444,7 +2436,7 @@ namespace LanguageCore.BBCode.Compiler
             CompileConstants(statements);
 
             AddComment("Variables");
-            CleanupStack.Push(GenerateCodeForVariable(statements, true));
+            CleanupStack.Push(GenerateCodeForVariable(statements));
 
             AddComment("Statements {");
             for (int i = 0; i < statements.Length; i++)

@@ -265,6 +265,15 @@ namespace LanguageCore.Parser
 
                 statement.Semicolon = semicolon;
             }
+            else if (ExpectBlock(out Block? block))
+            {
+                if (ExpectOperator(";", out Token? semicolon))
+                { block.Semicolon = semicolon; }
+
+                SetStatementThings(block);
+
+                TopLevelStatements.Add(block);
+            }
             else
             { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken); }
         }
@@ -2058,7 +2067,7 @@ namespace LanguageCore.Parser
 
                         if (ExpectOperator(">>", out Token? doubleEnd))
                         {
-                            (Token? newA, Token? newB) = doubleEnd.SplitInHalf();
+                            (Token? newA, Token? newB) = doubleEnd.CutInHalf();
                             if (newA == null || newB == null)
                             { throw new InternalException($"I failed at token splitting :("); }
                             CurrentTokenIndex--;

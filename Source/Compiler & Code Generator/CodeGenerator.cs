@@ -196,6 +196,7 @@ namespace LanguageCore.BBCode.Compiler
         protected readonly List<Hint> Hints;
 
         protected string? CurrentFile;
+        protected bool InFunction;
 
         protected CodeGenerator()
         {
@@ -212,6 +213,7 @@ namespace LanguageCore.BBCode.Compiler
             Hints = new List<Hint>();
 
             CurrentFile = null;
+            InFunction = false;
 
             TypeArguments = new TypeArguments();
 
@@ -2186,9 +2188,9 @@ namespace LanguageCore.BBCode.Compiler
         {
             Statement result;
 
-            if (macro.Block.Statements.Count == 0)
+            if (macro.Block.Statements.Length == 0)
             { throw new CompilerException($"Macro \"{macro.ReadableID()}\" has no statements", macro.Block, macro.FilePath); }
-            else if (macro.Block.Statements.Count == 1)
+            else if (macro.Block.Statements.Length == 1)
             { result = InlineMacro(macro.Block.Statements[0], parameters); }
             else
             { result = InlineMacro(macro.Block, parameters); }
@@ -2207,8 +2209,8 @@ namespace LanguageCore.BBCode.Compiler
 
         protected static Block InlineMacro(Block block, Dictionary<string, StatementWithValue> parameters)
         {
-            Statement[] statements = new Statement[block.Statements.Count];
-            for (int i = 0; i < block.Statements.Count; i++)
+            Statement[] statements = new Statement[block.Statements.Length];
+            for (int i = 0; i < block.Statements.Length; i++)
             {
                 Statement statement = block.Statements[i];
                 statements[i] = InlineMacro(statement, parameters);
@@ -2779,7 +2781,7 @@ namespace LanguageCore.BBCode.Compiler
 
         protected Statement Collapse(Block block, Dictionary<string, StatementWithValue> parameters)
         {
-            if (block.Statements.Count == 1)
+            if (block.Statements.Length == 1)
             { return Collapse(block.Statements[0], parameters); }
 
             List<Statement> newStatements = new();

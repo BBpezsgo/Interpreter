@@ -42,15 +42,51 @@ namespace LanguageCore.ASM
         IMUL,
         /// <summary>  </summary>
         IDIV,
+        /// <summary>  </summary>
+        TEST,
+        /// <summary>  </summary>
+        JZ,
+        /// <summary>  </summary>
+        JMP,
+        /// <summary>  </summary>
+        AND,
+        /// <summary>  </summary>
+        XOR,
+        /// <summary>  </summary>
+        OR,
+        /// <summary>  </summary>
+        POR,
+        /// <summary>  </summary>
+        PAND,
+        RET,
     }
 
     public struct Registers
     {
-        public const string EAX = "eax";
-        public const string EBX = "ebx";
-
-        public const string StackPointer = "esp";
-        public const string BasePointer = "ebp";
+        /// <summary>Accumulator register. Used in arithmetic operations.</summary>
+        public const string RAX = "rax", EAX = "eax", AX = "ax", AL = "al";
+        /// <summary>Base register (BX). Used as a pointer to data (located in segment register DS, when in segmented mode).</summary>
+        public const string RBX = "rbx", EBX = "ebx", BX = "bx", BL = "bl";
+        /// <summary>Counter register (CX). Used in shift/rotate instructions and loops.</summary>
+        public const string RCX = "rcx", ECX = "ecx", CX = "cx", CL = "cl";
+        /// <summary>Data register (DX). Used in arithmetic operations and I/O operations.</summary>
+        public const string RDX = "rdx", EDX = "edx", DX = "dx", DL = "dl";
+        /// <summary>Source Index register (SI). Used as a pointer to a source in stream operations.</summary>
+        public const string RSI = "rsi", ESI = "esi", SI = "si", SIL = "sil";
+        /// <summary>Destination Index register (DI). Used as a pointer to a destination in stream operations.</summary>
+        public const string RDI = "rdi", EDI = "edi", DI = "di", DIL = "dil";
+        /// <summary>Stack Base Pointer register (BP). Used to point to the base of the stack.</summary>
+        public const string RBP = "rbp", EBP = "ebp", BP = "bp", BPL = "bpl";
+        /// <summary>Stack Pointer register (SP). Pointer to the top of the stack.</summary>
+        public const string RSP = "rsp", ESP = "esp", SP = "sp", SPL = "spl";
+        public const string R8 = "r8", R8d = "r8d", R8w = "r8w", R8b = "r8b";
+        public const string R9 = "r9", R9d = "r9d", R9w = "r9w", R9b = "r9b";
+        public const string R10 = "r10", R10d = "r10d   ", R10w = "r10w", R10b = "r10b";
+        public const string R11 = "r11", R11d = "r11d   ", R11w = "r11w", R11b = "r11b";
+        public const string R12 = "r12", R12d = "r12d   ", R12w = "r12w", R12b = "r12b";
+        public const string R13 = "r13", R13d = "r13d   ", R13w = "r13w", R13b = "r13b";
+        public const string R14 = "r14", R14d = "r14d   ", R14w = "r14w", R14b = "r14b";
+        public const string R15 = "r15", R15d = "r15d   ", R15w = "r15w", R15b = "r15b";
     }
 
     public class SectionBuilder
@@ -76,8 +112,6 @@ namespace LanguageCore.ASM
 
     public class DataSectionBuilder : SectionBuilder
     {
-        const string ValidIdentifierCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
         readonly List<string> DataLabels;
 
         public DataSectionBuilder() : base()
@@ -85,24 +119,6 @@ namespace LanguageCore.ASM
             this.DataLabels = new List<string>();
         }
 
-        string GenerateLabel(int length = 16)
-        {
-            StringBuilder result = new(length);
-
-            int endlessSafe = 128;
-            while (result.Length < length)
-            {
-                char newChar = ValidIdentifierCharacters[Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
-                while (HasLabel(result.ToString() + newChar) || AssemblyCode.IsReserved(result.ToString() + newChar))
-                {
-                    newChar = ValidIdentifierCharacters[Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
-                    if (endlessSafe-- < 0) throw new EndlessLoopException();
-                }
-                result.Append(newChar);
-            }
-
-            return result.ToString();
-        }
         bool HasLabel(string dataLabel)
         {
             for (int i = 0; i < DataLabels.Count; i++)
@@ -115,9 +131,9 @@ namespace LanguageCore.ASM
             return false;
         }
 
-        public string NewString(string data, int labelLength = 16)
+        public string NewString(string data, string? name = null, int labelLength = 16)
         {
-            string label = GenerateLabel(labelLength);
+            string label = AssemblyCode.GenerateLabel("d_" + name + "_", labelLength, HasLabel);
             DataLabels.Add(label);
             AppendText(' ', Indent);
             AppendTextLine($"{label}:");
@@ -129,25 +145,63 @@ namespace LanguageCore.ASM
 
     public class TextSectionBuilder : SectionBuilder
     {
-        public static string StringifyInstruction(Instruction instruction)
+        readonly List<string> Labels;
+
+        public TextSectionBuilder() : base()
         {
-            return instruction switch
-            {
-                Instruction.MOV => "mov",
-                Instruction.PUSH => "push",
-                Instruction.CALL => "call",
-                Instruction.HALT => "hlt",
-                Instruction.ADD => "add",
-                Instruction.SUB => "sub",
-                Instruction.LEA => "lea",
-                Instruction.POP => "pop",
-                Instruction.MUL => "mul",
-                Instruction.DIV => "div",
-                Instruction.IMUL => "imul",
-                Instruction.IDIV => "idiv",
-                _ => throw new ImpossibleException(),
-            };
+            this.Labels = new List<string>();
         }
+
+        bool HasLabel(string dataLabel)
+        {
+            for (int i = 0; i < Labels.Count; i++)
+            {
+                if (string.Equals(Labels[i], dataLabel))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public string NewLabel(string? name = null, int labelLength = 16)
+        {
+            string label = AssemblyCode.GenerateLabel("t_" + name + "_", labelLength, HasLabel);
+            Labels.Add(label);
+            return label;
+        }
+
+        public void AppendLabel(string label)
+        {
+            AppendText(' ', Indent);
+            AppendTextLine($"{label}:");
+        }
+
+        public static string StringifyInstruction(Instruction instruction) => instruction switch
+        {
+            Instruction.MOV => "mov",
+            Instruction.PUSH => "push",
+            Instruction.CALL => "call",
+            Instruction.HALT => "hlt",
+            Instruction.ADD => "add",
+            Instruction.SUB => "sub",
+            Instruction.LEA => "lea",
+            Instruction.POP => "pop",
+            Instruction.MUL => "mul",
+            Instruction.DIV => "div",
+            Instruction.IMUL => "imul",
+            Instruction.IDIV => "idiv",
+            Instruction.TEST => "test",
+            Instruction.JZ => "jz",
+            Instruction.JMP => "jmp",
+            Instruction.AND => "and",
+            Instruction.XOR => "xor",
+            Instruction.OR => "or",
+            Instruction.POR => "por",
+            Instruction.PAND => "pand",
+            Instruction.RET => "ret",
+            _ => throw new ImpossibleException(),
+        };
 
         public void AppendInstruction(Instruction keyword)
         {
@@ -378,6 +432,7 @@ namespace LanguageCore.ASM
             ".XLIST",
             "XOR",
         };
+        public const string ValidIdentifierCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
         public readonly TextSectionBuilder CodeBuilder;
         public readonly DataSectionBuilder DataBuilder;
@@ -394,6 +449,27 @@ namespace LanguageCore.ASM
             {
                 Indent = SectionBuilder.IndentIncrement,
             };
+        }
+
+        public static string GenerateLabel(string? prefix, int length, Func<string, bool>? isValidCallback)
+        {
+            StringBuilder result = new(prefix, length + (prefix?.Length ?? 0));
+
+            int endlessSafe = 128;
+            while (result.Length < length)
+            {
+                char newChar = ValidIdentifierCharacters[Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
+                while (AssemblyCode.IsReserved(result.ToString() + newChar) ||
+                       isValidCallback == null ||
+                       isValidCallback.Invoke(result.ToString() + newChar))
+                {
+                    newChar = ValidIdentifierCharacters[Random.Shared.Next(0, ValidIdentifierCharacters.Length)];
+                    if (endlessSafe-- < 0) throw new EndlessLoopException();
+                }
+                result.Append(newChar);
+            }
+
+            return result.ToString();
         }
 
         public static bool IsReserved(string word)

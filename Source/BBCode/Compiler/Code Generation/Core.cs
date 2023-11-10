@@ -325,6 +325,7 @@ namespace LanguageCore.BBCode.Compiler
                 { continue; }
 
                 CurrentContext = function;
+                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
                 foreach (var attribute in function.Attributes)
@@ -333,10 +334,12 @@ namespace LanguageCore.BBCode.Compiler
                     GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
                 }
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
+                
                 CurrentContext = null;
+                InFunction = false;
             }
 
             if (codeEntry != null && GeneratedCode[entryCallInstruction].ParameterInt == -1)
@@ -348,12 +351,15 @@ namespace LanguageCore.BBCode.Compiler
                 { continue; }
 
                 CurrentContext = function;
+                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
+
                 CurrentContext = null;
+                InFunction = false;
             }
 
             foreach (var function in this.CompiledGeneralFunctions)
@@ -362,15 +368,17 @@ namespace LanguageCore.BBCode.Compiler
                 { continue; }
 
                 CurrentContext = function;
+                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddCommentForce(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function);
 
-                if (function.Block != null && function.Block.Statements.Count > 0) AddCommentForce("}");
+                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
 
                 CurrentContext = null;
+                InFunction = false;
             }
 
             {
@@ -381,6 +389,7 @@ namespace LanguageCore.BBCode.Compiler
                     i++;
 
                     CurrentContext = function.Function;
+                    InFunction = true;
                     function.Function.InstructionOffset = GeneratedCode.Count;
 
                     foreach (var attribute in function.Function.Attributes)
@@ -391,13 +400,14 @@ namespace LanguageCore.BBCode.Compiler
 
                     SetTypeArguments(function.TypeArguments);
 
-                    AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                    AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                     GenerateCodeForFunction(function.Function);
 
-                    if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
+                    if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
 
                     CurrentContext = null;
+                    InFunction = false;
                     TypeArguments.Clear();
                 }
             }
@@ -405,34 +415,38 @@ namespace LanguageCore.BBCode.Compiler
             foreach (var function in this.CompilableOperators)
             {
                 CurrentContext = function.Function;
+                InFunction = true;
                 function.Function.InstructionOffset = GeneratedCode.Count;
 
                 SetTypeArguments(function.TypeArguments);
 
-                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
+                if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
 
                 CurrentContext = null;
+                InFunction = false;
                 TypeArguments.Clear();
             }
 
             foreach (var function in this.CompilableGeneralFunctions)
             {
                 CurrentContext = function.Function;
+                InFunction = true;
                 function.Function.InstructionOffset = GeneratedCode.Count;
 
                 SetTypeArguments(function.TypeArguments);
 
-                AddCommentForce(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Count > 0) ? string.Empty : " }"));
+                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
-                if (function.Function.Block != null && function.Function.Block.Statements.Count > 0) AddCommentForce("}");
+                if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
 
                 CurrentContext = null;
+                InFunction = false;
                 TypeArguments.Clear();
             }
 

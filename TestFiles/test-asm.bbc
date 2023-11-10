@@ -1,1 +1,6 @@
-return 5 / 0;
+int bruh = 0;
+while (bruh - 33)
+{
+	bruh = bruh + 1;
+};
+return bruh;

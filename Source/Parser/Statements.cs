@@ -114,7 +114,7 @@ namespace LanguageCore.Parser.Statement
 
     public class Block : Statement
     {
-        public readonly List<Statement> Statements;
+        public readonly Statement[] Statements;
 
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
@@ -122,7 +122,7 @@ namespace LanguageCore.Parser.Statement
         public Block(Token bracketStart, IEnumerable<Statement> statements, Token bracketEnd)
         {
             this.BracketStart = bracketStart;
-            this.Statements = new(statements);
+            this.Statements = statements.ToArray();
             this.BracketEnd = bracketEnd;
         }
 
@@ -134,7 +134,7 @@ namespace LanguageCore.Parser.Statement
             StringBuilder result = new(3);
             result.Append('{');
 
-            if (Statements.Count > 0)
+            if (Statements.Length > 0)
             { result.Append("..."); }
             else
             { result.Append(' '); }
@@ -145,7 +145,7 @@ namespace LanguageCore.Parser.Statement
 
         public override IEnumerable<Statement> GetStatements()
         {
-            for (int i = 0; i < Statements.Count; i++)
+            for (int i = 0; i < Statements.Length; i++)
             { yield return Statements[i]; }
         }
     }

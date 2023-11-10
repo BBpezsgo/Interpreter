@@ -167,7 +167,7 @@ namespace LanguageCore
                 leftRange.Start = Range.Start;
                 leftRange.End = new SinglePosition(Range.Start.Line, Range.Start.Character + leftRangeSize);
 
-                rightRange.Start = new SinglePosition(leftRange.End.Line, leftRange.End.Character + 1);
+                rightRange.Start = leftRange.End;
                 rightRange.End = Range.End;
             }
 
@@ -185,7 +185,7 @@ namespace LanguageCore
                 leftRange.Start = AbsoluteRange.Start;
                 leftRange.End = AbsoluteRange.Start + leftRangeSize;
 
-                rightRange.Start = leftRange.End + 1;
+                rightRange.Start = leftRange.End;
                 rightRange.End = AbsoluteRange.End;
             }
 

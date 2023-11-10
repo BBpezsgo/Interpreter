@@ -36,12 +36,13 @@ showing how to make a parser and a compiler. I basically copied the code with mi
 
 **Modes:**
 > Use only one of these!
-- `--console-gui|-cg` I use this mode for debugging
 - `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter
+- `--asm` Generates an assembly file, assemble it with nasm and execute the result exe file (expect buggy behavior and missing features)
 
 **Other:**
 - `--throw-errors|-te` Causes the program to crash on any syntax, parser, runtime, or internal exception.
 - `--basepath|-bp <base folder path>` Sets a new path where dll and bbc files will be searched for *using* statements. If it's not there, it will look for it next to the file.
+- `--console-gui|-cg` I use this mode for debugging
 
 ## Hello World:
 ```cs

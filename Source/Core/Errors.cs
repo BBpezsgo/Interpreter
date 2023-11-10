@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
 using LanguageCore.Runtime;
@@ -83,6 +84,37 @@ namespace LanguageCore
         public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 
         protected SyntaxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+    }
+
+    [Serializable]
+    public class ProcessRuntimeException : Exception
+    {
+        readonly uint exitCode;
+        public uint ExitCode => exitCode;
+
+        ProcessRuntimeException(uint exitCode, string message) : base(message)
+        {
+            this.exitCode = exitCode;
+        }
+        protected ProcessRuntimeException(
+          SerializationInfo info,
+          StreamingContext context) : base(info, context)
+        {
+            this.exitCode = info.GetUInt32("exitCode");
+        }
+
+        public static bool TryGetFromExitCode(int exitCode, [NotNullWhen(true)] out ProcessRuntimeException? processRuntimeException)
+            => ProcessRuntimeException.TryGetFromExitCode(unchecked((uint)exitCode), out processRuntimeException);
+
+        public static bool TryGetFromExitCode(uint exitCode, [NotNullWhen(true)] out ProcessRuntimeException? processRuntimeException)
+        {
+            processRuntimeException = exitCode switch
+            {
+                0xC0000094 => new ProcessRuntimeException(exitCode, "Integer division by zero"),
+                _ => null,
+            };
+            return processRuntimeException != null;
+        }
     }
 
     /// <summary> Thrown by the <see cref="Bytecode.BytecodeInterpreter"/> </summary>

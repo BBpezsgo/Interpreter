@@ -94,9 +94,14 @@ namespace TheProgram
                         if (File.Exists(outputFile + ".exe"))
                         {
                             Process? process = Process.Start(new ProcessStartInfo(outputFile + ".exe"));
-                            process?.WaitForExit();
+                            if (process == null)
+                            { throw new Exception($"Failed to start process \"{outputFile + ".exe"}\""); }
+                            process.WaitForExit();
                             Console.WriteLine();
-                            Console.WriteLine($"Exit code: {process?.ExitCode}");
+                            Console.WriteLine($"Exit code: {process.ExitCode}");
+
+                            if (LanguageCore.ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out var runtimeException))
+                            { throw runtimeException; }
                         }
 
                         /*

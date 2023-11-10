@@ -12,7 +12,7 @@ namespace LanguageCore.ASM
 
     public enum Instruction
     {
-        /// <summary>  </summary>
+        /// <summary> </summary>
         MOV,
         /// <summary>  </summary>
         PUSH,
@@ -20,13 +20,28 @@ namespace LanguageCore.ASM
         CALL,
         /// <summary>  </summary>
         HALT,
-        /// <summary>  </summary>
+        /// <summary>
+        /// <para> <c>add A B</c> </para>
+        /// <para> <c>A = A + B</c> </para>
+        /// </summary>
         ADD,
-        /// <summary> Subtraction </summary>
+        /// <summary>
+        /// <para> <c>sub A B</c> </para>
+        /// <para> <c>A = A - B</c> </para>
+        /// </summary>
         SUB,
         /// <summary> Load Effective Address </summary>
         LEA,
+        /// <summary>  </summary>
         POP,
+        /// <summary>  </summary>
+        MUL,
+        /// <summary>  </summary>
+        DIV,
+        /// <summary>  </summary>
+        IMUL,
+        /// <summary>  </summary>
+        IDIV,
     }
 
     public struct Registers
@@ -114,23 +129,37 @@ namespace LanguageCore.ASM
 
     public class TextSectionBuilder : SectionBuilder
     {
-        static string StringifyInstruction(Instruction instruction) => instruction switch
+        public static string StringifyInstruction(Instruction instruction)
         {
-            Instruction.MOV => "mov",
-            Instruction.PUSH => "push",
-            Instruction.CALL => "call",
-            Instruction.HALT => "hlt",
-            Instruction.ADD => "add",
-            Instruction.SUB => "sub",
-            Instruction.LEA => "lea",
-            Instruction.POP => "pop",
-            _ => throw new ImpossibleException(),
-        };
+            return instruction switch
+            {
+                Instruction.MOV => "mov",
+                Instruction.PUSH => "push",
+                Instruction.CALL => "call",
+                Instruction.HALT => "hlt",
+                Instruction.ADD => "add",
+                Instruction.SUB => "sub",
+                Instruction.LEA => "lea",
+                Instruction.POP => "pop",
+                Instruction.MUL => "mul",
+                Instruction.DIV => "div",
+                Instruction.IMUL => "imul",
+                Instruction.IDIV => "idiv",
+                _ => throw new ImpossibleException(),
+            };
+        }
 
         public void AppendInstruction(Instruction keyword)
         {
             AppendText(' ', Indent);
             AppendText(StringifyInstruction(keyword));
+            AppendText(EOL);
+        }
+
+        public void AppendInstruction(string keyword)
+        {
+            AppendText(' ', Indent);
+            AppendText(keyword);
             AppendText(EOL);
         }
 

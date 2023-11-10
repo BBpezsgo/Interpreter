@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
 #pragma warning disable IDE0052 // Remove unread private members
-#pragma warning disable CA1822 // Mark members as static
 #pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable IDE0060 // Remove unused parameter
 
@@ -775,7 +774,7 @@ namespace LanguageCore.ASM.Compiler
                 return;
             }
 
-            if (GetParameter(statement.Content, out CompiledParameter? param))
+            if (GetParameter(statement.Content, out _))
             {
                 throw new NotImplementedException();
             }
@@ -787,7 +786,7 @@ namespace LanguageCore.ASM.Compiler
                 return;
             }
 
-            if (GetFunction(statement.Name, expectedType, out CompiledFunction? compiledFunction))
+            if (GetFunction(statement.Name, expectedType, out _))
             {
                 throw new NotImplementedException();
             }
@@ -796,7 +795,7 @@ namespace LanguageCore.ASM.Compiler
         }
         void GenerateCodeForStatement(OperatorCall statement)
         {
-            if (GetOperator(statement, out CompiledOperator? operatorDefinition))
+            if (GetOperator(statement, out _))
             {
                 throw new NotImplementedException();
             }
@@ -854,11 +853,31 @@ namespace LanguageCore.ASM.Compiler
                             break;
                         }
                     case Opcode.MATH_SUB:
-                        break;
+                        {
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.SUB, Registers.EBX, Registers.EAX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EBX);
+                            break;
+                        }
                     case Opcode.MATH_MULT:
-                        break;
+                        {
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MUL, Registers.EBX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                            break;
+                        }
                     case Opcode.MATH_DIV:
-                        break;
+                        {
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                            Builder.CodeBuilder.AppendInstruction("cdq");
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                            Builder.CodeBuilder.AppendInstruction("cdq");
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IDIV, Registers.EBX);
+                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                            break;
+                        }
                     case Opcode.MATH_MOD:
                         break;
                     default:

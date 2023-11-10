@@ -100,7 +100,7 @@ namespace LanguageCore.ASM
     {
         static void Nasm(string input, string output)
         {
-            string nasm = "nasm"; // @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
+            string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
 
             if (!File.Exists(input))
             { return; }

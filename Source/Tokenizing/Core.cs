@@ -147,6 +147,30 @@ namespace LanguageCore.Tokenizing
             Tokenizing.TokenType.LITERAL_CHAR => $"\'{Content.Escape()}\'",
             _ => Content.Escape(),
         };
+
+        public (Token?, Token?) SplitInHalf()
+        {
+            if (string.IsNullOrEmpty(Content))
+            { return (null, null); }
+
+            Token left;
+            Token right;
+
+            if (Content.Length == 1)
+            {
+                left = Duplicate();
+                return (left, null);
+            }
+
+            int leftSize = Content.Length / 2;
+
+            (Position leftPosition, Position rightPosition) = position.CutInHalf();
+
+            left = new Token(TokenType, Content[..leftSize], IsAnonymous, leftPosition);
+            right = new Token(TokenType, Content[leftSize..], IsAnonymous, rightPosition);
+
+            return (left, right);
+        }
     }
 
     public readonly struct SimpleToken : IThingWithPosition

@@ -2056,6 +2056,16 @@ namespace LanguageCore.Parser
                         if (ExpectOperator(">"))
                         { break; }
 
+                        if (ExpectOperator(">>", out Token? doubleEnd))
+                        {
+                            (Token? newA, Token? newB) = doubleEnd.SplitInHalf();
+                            if (newA == null || newB == null)
+                            { throw new InternalException($"I failed at token splitting :("); }
+                            CurrentTokenIndex--;
+                            Tokens[CurrentTokenIndex] = newB;
+                            break;
+                        }
+
                         if (ExpectOperator(","))
                         { continue; }
                     }

@@ -145,6 +145,53 @@ namespace LanguageCore
 
         public override readonly int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
+        public readonly (Position, Position) CutInHalf()
+        {
+            if (Range.Start.Line != Range.End.Line)
+            { throw new NotImplementedException(); }
+
+            Position left = default;
+            Position right = default;
+
+            {
+                ref Range<SinglePosition> leftRange = ref left.Range;
+                ref Range<SinglePosition> rightRange = ref right.Range;
+
+                int rangeSize = Range.End.Character - Range.Start.Character;
+
+                if (rangeSize < 0)
+                { throw new NotImplementedException(); }
+
+                int leftRangeSize = rangeSize / 2;
+
+                leftRange.Start = Range.Start;
+                leftRange.End = new SinglePosition(Range.Start.Line, Range.Start.Character + leftRangeSize);
+
+                rightRange.Start = new SinglePosition(leftRange.End.Line, leftRange.End.Character + 1);
+                rightRange.End = Range.End;
+            }
+
+            {
+                ref Range<int> leftRange = ref left.AbsoluteRange;
+                ref Range<int> rightRange = ref right.AbsoluteRange;
+
+                int rangeSize = AbsoluteRange.End - AbsoluteRange.Start;
+
+                if (rangeSize < 0)
+                { throw new NotImplementedException(); }
+
+                int leftRangeSize = rangeSize / 2;
+
+                leftRange.Start = AbsoluteRange.Start;
+                leftRange.End = AbsoluteRange.Start + leftRangeSize;
+
+                rightRange.Start = leftRange.End + 1;
+                rightRange.End = AbsoluteRange.End;
+            }
+
+            return (left, right);
+        }
+
         public static bool operator ==(Position left, Position right) => left.Equals(right);
         public static bool operator !=(Position left, Position right) => !left.Equals(right);
     }

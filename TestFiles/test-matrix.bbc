@@ -4,7 +4,7 @@ using System.Lists;
 [CodeEntry]
 void Start()
 {
-	Array<Array<int> > matrix = new Array<Array<int> >(5);
+	Array<Array<int>> matrix = new Array<Array<int>>(5);
 
 	for (int y; y < 5; y++)
 	{

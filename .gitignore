@@ -10,4 +10,6 @@
 /Source/bb.bbcode-interpreter.asmdef
 /Diagsessions
 
-/publish-win64.txt
+/TestFiles/*.exe
+
+/publish-*.txt

@@ -95,85 +95,22 @@ namespace LanguageCore.BBCode.Compiler
         #endregion
     }
 
-    readonly struct UndefinedOperatorFunctionOffset
+    readonly struct UndefinedOffset<T>
     {
         public readonly int CallInstructionIndex;
 
-        public readonly CompiledOperator Operator;
-        public readonly OperatorCall CallStatement;
+        public readonly Statement? Caller;
+        public readonly T Function;
 
-        internal readonly string? CurrentFile;
+        public readonly string? CurrentFile;
 
-        public UndefinedOperatorFunctionOffset(int callInstructionIndex, OperatorCall statement, CompiledOperator @operator, string? file)
+        public UndefinedOffset(int callInstructionIndex, Statement? statement, T called, string? file)
         {
             this.CallInstructionIndex = callInstructionIndex;
-
-            this.Operator = @operator;
-            this.CallStatement = statement;
-
+            this.Caller = statement;
             this.CurrentFile = file;
-        }
-    }
 
-    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    readonly struct UndefinedFunctionOffset
-    {
-        public readonly int CallInstructionIndex;
-
-        public readonly CompiledFunction? Function;
-        public readonly FunctionCall? CallStatement;
-        public readonly Identifier? VariableStatement;
-        public readonly IndexCall? IndexStatement;
-
-        internal readonly string? CurrentFile;
-
-        public UndefinedFunctionOffset(int callInstructionIndex, FunctionCall functionCallStatement, CompiledFunction function, string? file)
-        {
-            this.CallInstructionIndex = callInstructionIndex;
-            this.CallStatement = functionCallStatement;
-            this.VariableStatement = null;
-            this.IndexStatement = null;
-            this.Function = function;
-
-            this.CurrentFile = file;
-        }
-
-        public UndefinedFunctionOffset(int callInstructionIndex, Identifier variable, CompiledFunction function, string? file)
-        {
-            this.CallInstructionIndex = callInstructionIndex;
-            this.CallStatement = null;
-            this.VariableStatement = variable;
-            this.IndexStatement = null;
-            this.Function = function;
-
-            this.CurrentFile = file;
-        }
-
-        private readonly string GetDebuggerDisplay()
-        {
-            if (CallStatement != null) return CallStatement.ToString();
-            if (VariableStatement != null) return VariableStatement.ToString();
-            return "null";
-        }
-    }
-
-    readonly struct UndefinedGeneralFunctionOffset
-    {
-        public readonly int CallInstructionIndex;
-
-        public readonly Statement? CallStatement;
-        public readonly CompiledGeneralFunction GeneralFunction;
-
-        internal readonly string? CurrentFile;
-
-        public UndefinedGeneralFunctionOffset(int callInstructionIndex, Statement? functionCallStatement, CompiledGeneralFunction generalFunction, string? file)
-        {
-            this.CallInstructionIndex = callInstructionIndex;
-
-            this.CallStatement = functionCallStatement;
-            this.GeneralFunction = generalFunction;
-
-            this.CurrentFile = file;
+            this.Function = called;
         }
     }
 

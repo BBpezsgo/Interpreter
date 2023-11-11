@@ -80,9 +80,9 @@ namespace LanguageCore.BBCode.Compiler
 
         readonly List<Instruction> GeneratedCode;
 
-        readonly List<UndefinedFunctionOffset> UndefinedFunctionOffsets;
-        readonly List<UndefinedOperatorFunctionOffset> UndefinedOperatorFunctionOffsets;
-        readonly List<UndefinedGeneralFunctionOffset> UndefinedGeneralFunctionOffsets;
+        readonly List<UndefinedOffset<CompiledFunction>> UndefinedFunctionOffsets;
+        readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
+        readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
 
         readonly bool OptimizeCode;
         readonly bool CheckNullPointers;
@@ -116,9 +116,9 @@ namespace LanguageCore.BBCode.Compiler
             this.CleanupStack = new Stack<CleanupItem[]>();
             this.ReturnInstructions = new Stack<List<int>>();
             this.BreakInstructions = new Stack<List<int>>();
-            this.UndefinedFunctionOffsets = new List<UndefinedFunctionOffset>();
-            this.UndefinedOperatorFunctionOffsets = new List<UndefinedOperatorFunctionOffset>();
-            this.UndefinedGeneralFunctionOffsets = new List<UndefinedGeneralFunctionOffset>();
+            this.UndefinedFunctionOffsets = new List<UndefinedOffset<CompiledFunction>>();
+            this.UndefinedOperatorFunctionOffsets = new List<UndefinedOffset<CompiledOperator>>();
+            this.UndefinedGeneralFunctionOffsets = new List<UndefinedOffset<CompiledGeneralFunction>>();
             this.InMacro = new Stack<bool>();
 
             this.TagCount = new Stack<int>();
@@ -451,17 +451,17 @@ namespace LanguageCore.BBCode.Compiler
                 TypeArguments.Clear();
             }
 
-            foreach (UndefinedFunctionOffset item in UndefinedFunctionOffsets)
+            foreach (var item in UndefinedFunctionOffsets)
             {
                 CompiledFunction? function = item.Function;
                 if (function is null) throw new InternalException();
-                bool useAbsolute;
 
-                if (item.CallStatement != null)
+                bool useAbsolute;
+                if (item.Caller is FunctionCall)
                 { useAbsolute = false; }
-                else if (item.VariableStatement != null)
+                else if (item.Caller is Identifier)
                 { useAbsolute = true; }
-                else if (item.IndexStatement != null)
+                else if (item.Caller is IndexCall)
                 { useAbsolute = false; }
                 else
                 { throw new InternalException(); }
@@ -473,39 +473,39 @@ namespace LanguageCore.BBCode.Compiler
                 GeneratedCode[item.CallInstructionIndex].ParameterInt = offset;
             }
 
-            foreach (UndefinedOperatorFunctionOffset item in UndefinedOperatorFunctionOffsets)
+            foreach (var item in UndefinedOperatorFunctionOffsets)
             {
-                if (item.Operator.InstructionOffset == -1)
-                { throw new InternalException($"Operator {item.Operator.ReadableID()} does not have instruction offset", item.CurrentFile); }
+                if (item.Function.InstructionOffset == -1)
+                { throw new InternalException($"Operator {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Operator.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
-            foreach (UndefinedGeneralFunctionOffset item in UndefinedGeneralFunctionOffsets)
+            foreach (var item in UndefinedGeneralFunctionOffsets)
             {
-                if (item.CallStatement == null) { }
-                else if (item.CallStatement is ConstructorCall constructorCall)
+                if (item.Caller == null) { }
+                else if (item.Caller is ConstructorCall constructorCall)
                 {
-                    if (item.GeneralFunction.InstructionOffset == -1)
+                    if (item.Function.InstructionOffset == -1)
                     { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
                 }
-                else if (item.CallStatement is KeywordCall functionCall)
+                else if (item.Caller is KeywordCall functionCall)
                 {
                     if (functionCall.Identifier.Content == "delete")
                     {
-                        if (item.GeneralFunction.InstructionOffset == -1)
-                        { throw new InternalException($"Constructor for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
+                        if (item.Function.InstructionOffset == -1)
+                        { throw new InternalException($"Constructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile); }
                     }
                     else if (functionCall.Identifier.Content == "clone")
                     {
-                        if (item.GeneralFunction.InstructionOffset == -1)
-                        { throw new InternalException($"Cloner for \"{item.GeneralFunction.Context}\" does not have instruction offset", item.CurrentFile); }
+                        if (item.Function.InstructionOffset == -1)
+                        { throw new InternalException($"Cloner for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile); }
                     }
                     /*
                     else if (functionCall.Identifier.Content == "out")
                     {
-                        if (item.GeneralFunction.InstructionOffset == -1)
-                        { throw new InternalException($"Function {item.GeneralFunction.ReadableID()} does not have instruction offset", item.CurrentFile); }
+                        if (item.Function.InstructionOffset == -1)
+                        { throw new InternalException($"Function {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
                     }
                     */
                     else
@@ -514,7 +514,7 @@ namespace LanguageCore.BBCode.Compiler
                 else
                 { throw new NotImplementedException(); }
 
-                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.GeneralFunction.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
             return new Result()

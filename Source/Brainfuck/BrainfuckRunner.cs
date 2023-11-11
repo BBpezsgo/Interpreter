@@ -57,7 +57,7 @@ namespace TheProgram.Brainfuck
                 }
             }
 
-            CodeGeneratorForBrainfuck.Result? _code = BrainfuckRunner.CompilePlus(args.File, flags, args.compilerSettings, PrintCallback);
+            CodeGeneratorForBrainfuck.Result? _code = BrainfuckRunner.CompilePlus(args.File, flags, PrintCallback);
             if (!_code.HasValue)
             { return; }
 
@@ -194,9 +194,9 @@ namespace TheProgram.Brainfuck
             PrintFinal = 0b_1000,
         }
 
-        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, CompileOptions options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
-                => CompilePlus(file, (int)options, compilerSettings, printCallback);
-        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, int options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings _compilerSettings, PrintCallback printCallback)
+        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, CompileOptions options, PrintCallback printCallback)
+                => CompilePlus(file, (int)options, printCallback);
+        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, int options, PrintCallback printCallback)
         {
             CodeGeneratorForBrainfuck.Settings compilerSettings = CodeGeneratorForBrainfuck.Settings.Default;
 
@@ -210,7 +210,7 @@ namespace TheProgram.Brainfuck
 
             try
             {
-                compilerResult = EasyCompiler.Compile(file, _compilerSettings, compilerSettings, printCallback).CodeGeneratorResult;
+                compilerResult = EasyCompiler.Compile(file, compilerSettings, printCallback).CodeGeneratorResult;
                 printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
             catch (LanguageException exception)
@@ -299,9 +299,9 @@ namespace TheProgram.Brainfuck
             return compiled;
         }
 
-        public static string? CompileFile(string file, CompileOptions options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
-            => CompileFile(file, (int)options, compilerSettings, printCallback);
-        public static string? CompileFile(string file, int options, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, PrintCallback printCallback)
+        public static string? CompileFile(string file, CompileOptions options, PrintCallback printCallback)
+            => CompileFile(file, (int)options, printCallback);
+        public static string? CompileFile(string file, int options, PrintCallback printCallback)
         {
             if (!File.Exists(file))
             {
@@ -314,7 +314,7 @@ namespace TheProgram.Brainfuck
             string extension = Path.GetExtension(file)[1..];
             if (extension == "bfpp")
             {
-                return CompilePlus(new FileInfo(file), options, compilerSettings, printCallback)?.Code;
+                return CompilePlus(new FileInfo(file), options, printCallback)?.Code;
             }
 
             if (extension == "bf")

@@ -509,7 +509,7 @@ namespace LanguageCore.ASM.Compiler
                 StatementWithValue passedParameter = functionCall.Parameters[i];
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+                // CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
@@ -544,7 +544,7 @@ namespace LanguageCore.ASM.Compiler
                 StatementWithValue passedParameter = functionCall.Parameters[i];
                 CompiledType passedParameterType = FindStatementType(passedParameter);
                 ParameterDefinition definedParameter = compiledFunction.Parameters[compiledFunction.IsMethod ? (i + 1) : i];
-                CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
+                // CompiledType definedParameterType = compiledFunction.ParameterTypes[compiledFunction.IsMethod ? (i + 1) : i];
 
                 bool canDeallocate = definedParameter.Modifiers.Contains("temp");
 
@@ -603,7 +603,7 @@ namespace LanguageCore.ASM.Compiler
             if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
             {
                 StatementWithValue valueToPrint = functionCall.Parameters[0];
-                CompiledType valueToPrintType = FindStatementType(valueToPrint);
+                // CompiledType valueToPrintType = FindStatementType(valueToPrint);
 
                 if (valueToPrint is LiteralStatement literal)
                 {

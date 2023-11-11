@@ -10,7 +10,6 @@ namespace LanguageCore.Brainfuck
     public class EasyCompiler
     {
         string? BasePath;
-        BBCode.Compiler.Compiler.CompilerSettings compilerSettings;
         CodeGeneratorForBrainfuck.Settings generatorSettings;
 
         public struct Result
@@ -85,7 +84,6 @@ namespace LanguageCore.Brainfuck
 
                 codeGeneratorResult = CodeGeneratorForBrainfuck.Generate(
                     compilerResult,
-                    compilerSettings,
                     generatorSettings,
                     printCallback);
 
@@ -106,14 +104,12 @@ namespace LanguageCore.Brainfuck
 
         public static Result Compile(
             FileInfo file,
-            BBCode.Compiler.Compiler.CompilerSettings compilerSettings,
             CodeGeneratorForBrainfuck.Settings generatorSettings,
             PrintCallback? printCallback = null,
             string? basePath = null
             ) => new EasyCompiler()
         {
             BasePath = basePath,
-            compilerSettings = compilerSettings,
             generatorSettings = generatorSettings,
         }.Compile_(file, printCallback);
     }

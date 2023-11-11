@@ -122,6 +122,90 @@ class Map
 }
 
 template<T>
+class Stack
+{
+    private int length;
+    private int capacity;
+    private Array<T> array;
+    
+    export T indexer_get(int index)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        return *((&this.array) + 1 + index * sizeof(T));
+    }
+
+    export void indexer_set(int index, T value)
+    {
+        if (index < 0 || index >= this.length)
+        { throw "Index out of range exception"; };
+        *((&this.array) + 1 + index * sizeof(T)) = value;
+    }
+    
+    export constructor(int capacity)
+    {
+        Stack<T> result = new Stack<T>;
+        result.capacity = capacity;
+        result.array = new Array<T>(capacity);
+        result.length = 0;
+        return result;
+    }
+
+    export void Push(T item)
+    {
+        if (this.capacity <= this.length)
+        {
+            Array<T> newArray = new Array<T>(this.capacity + 1);
+            for (int i; i < this.capacity; i++)
+            {
+                newArray[i] = this.array[i];
+            }
+            newArray[this.capacity] = item;
+            delete this.array;
+            this.array = newArray;
+            this.capacity++;
+            this.length++;
+        }
+        else
+        {
+            this.array[this.length] = item;
+            this.length++;
+        }
+    }
+
+    export T Pop()
+    {
+        if (this.length <= 0)
+        { throw "Stack contains no elements to pop"; }
+        int lastIndex = this.length - 1;
+        T result = this.array[lastIndex];
+        this.length--;
+        return result;
+    }
+    
+    export String ToString()
+    {
+        if (this.length)
+        {
+            String result = "{ ";
+
+            for (int i; i < this.length; i++)
+            {
+                if (i > 0) { result = (temp result) + ", "; }
+                result = (temp result) + (temp this.array[i].ToString());
+            }
+
+            result += " }";
+            return result;
+        }
+        else
+        {
+            return "{ }";
+        }
+    }
+}
+
+template<T>
 class LinkedNode
 {
     T Value;
@@ -132,6 +216,13 @@ class LinkedNode
         LinkedNode<T> result = new LinkedNode<T>;
         result.Value = value;
         return result;
+    }
+
+    export destructor()
+    {
+        if (this.Next)
+        { delete this.Next; }
+        delete &this;
     }
 }
 
@@ -191,4 +282,12 @@ class LinkedList
         };
     }
 
+    export void Clear()
+    {
+        if (this.Root)
+        {
+            delete this.Root;
+            this.Root = 0 as LinkedNode<T>;
+        }
+    }
 }

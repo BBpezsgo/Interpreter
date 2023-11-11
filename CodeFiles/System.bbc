@@ -14,34 +14,6 @@ enum bool
     True = 1,
 }
 
-char DigitToChar(int digit)
-{
-      if (digit == 0) { return '0'; }
-      elseif (digit == 1) { return '1'; }
-      elseif (digit == 2) { return '2'; }
-      elseif (digit == 3) { return '3'; }
-      elseif (digit == 4) { return '4'; }
-      elseif (digit == 5) { return '5'; }
-      elseif (digit == 6) { return '6'; }
-      elseif (digit == 7) { return '7'; }
-      elseif (digit == 8) { return '8'; }
-      elseif (digit == 9) { return '9'; };  
-}
-
-char DigitToChar(byte digit)
-{
-      if (digit == 0) { return '0'; }
-      elseif (digit == 1) { return '1'; }
-      elseif (digit == 2) { return '2'; }
-      elseif (digit == 3) { return '3'; }
-      elseif (digit == 4) { return '4'; }
-      elseif (digit == 5) { return '5'; }
-      elseif (digit == 6) { return '6'; }
-      elseif (digit == 7) { return '7'; }
-      elseif (digit == 8) { return '8'; }
-      elseif (digit == 9) { return '9'; };  
-}
-
 export String ToString(this bool v)
 {
     if (v) { return "true"; }
@@ -66,7 +38,7 @@ export String ToString(this byte number)
 		
 		String newResult = new String(result.length + 1);
 		CopyString(result, newResult);
-		newResult[result.length] = DigitToChar(rem);
+		newResult[result.length] = (rem + 48) as char;
 		delete result;
 		result = newResult;
 
@@ -99,7 +71,7 @@ export String ToString(this int number)
 		
 		String newResult = new String(result.length + 1);
 		CopyString(result, newResult);
-		newResult[result.length] = DigitToChar(rem);
+		newResult[result.length] = (rem + 48) as char;
 		delete result;
 		result = newResult;
 

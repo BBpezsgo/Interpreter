@@ -70,19 +70,19 @@ namespace LanguageCore.Brainfuck
             code.AddValue(addressX, 1);
 
             code.SetPointer(addressY);
-            code += '[';
+            code.JumpStart();
             code.AddValue(tempAddress2, -1);
             code.AddValue(tempAddress1, 1);
             code.AddValue(addressY, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.MoveValue(tempAddress1, addressY);
 
             code.SetPointer(tempAddress2);
-            code += '[';
+            code.JumpStart();
             code.AddValue(addressX, -1);
             code.ClearValue(tempAddress2);
-            code += ']';
+            code.JumpEnd();
 
             code.ClearValue(tempAddress1);
             code.ClearValue(tempAddress2);
@@ -102,24 +102,24 @@ namespace LanguageCore.Brainfuck
         {
             // x[-y-x]
             code.SetPointer(addressX);
-            code += '[';
+            code.JumpStart();
             code += '-';
             code.SetPointer(addressY);
             code += '-';
             code.SetPointer(addressX);
-            code += ']';
+            code.JumpEnd();
 
             // +y
             code += '+';
             code.SetPointer(addressY);
 
             // [x-y[-]]
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressX);
             code += '-';
             code.SetPointer(addressY);
             code.ClearCurrent();
-            code += ']';
+            code.JumpEnd();
         }
 
         /// <summary>
@@ -151,18 +151,18 @@ namespace LanguageCore.Brainfuck
             code.MoveValue(addressX, tempAddress2);
 
             code.SetPointer(addressY);
-            code += '[';
+            code.JumpStart();
             code.AddValue(tempAddress2, -1);
             code.AddValue(tempAddress1, 1);
             code.AddValue(addressY, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.MoveValue(tempAddress1, addressY);
             code.SetPointer(tempAddress2);
-            code += '[';
+            code.JumpStart();
             code.AddValue(addressX, 1);
             code.ClearValue(tempAddress2);
-            code += ']';
+            code.JumpEnd();
         }
 
         /// <summary>
@@ -211,7 +211,7 @@ namespace LanguageCore.Brainfuck
 
             code.SetPointer(addressTemp1);
 
-            code += '[';
+            code.JumpStart();
 
             code.AddValue(addressTemp2, -1);
 
@@ -228,7 +228,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.AddValue(addressTemp1, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.ClearValue(addressTemp1);
             code.ClearValue(addressTemp2);
@@ -275,7 +275,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.SetPointer(tempAddress1);
-            code += '[';
+            code.JumpStart();
             code.AddValue(tempAddress2, -1);
             code += "[>-]>";
 
@@ -290,7 +290,7 @@ namespace LanguageCore.Brainfuck
             code += ">->]<+<";
 
             code.AddValue(tempAddress1, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.ClearValue(tempAddress1);
             code.ClearValue(tempAddress2);
@@ -452,35 +452,35 @@ namespace LanguageCore.Brainfuck
 
             code.SetPointer(addressX);
 
-            code += '[';
+            code.JumpStart();
 
             code.SetPointer(addressTemp2);
             code += '+';
             code.SetPointer(addressX);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.SetPointer(addressTemp2);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressY);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressX);
             code += '+';
             code.SetPointer(addressTemp1);
             code += '+';
             code.SetPointer(addressY);
             code += '-';
-            code += ']';
+            code.JumpEnd();
             code.SetPointer(addressTemp1);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressY);
             code += '+';
             code.SetPointer(addressTemp1);
             code += '-';
-            code += ']';
+            code.JumpEnd();
             code.SetPointer(addressTemp2);
             code += '-';
-            code += ']';
+            code.JumpEnd();
         }
 
         /// <summary>
@@ -499,13 +499,7 @@ namespace LanguageCore.Brainfuck
         {
             code.ClearValue(addressTemp1, addressTemp2, addressTemp3, addressTemp4);
 
-            code.SetPointer(addressX);
-            code += '[';
-            code.SetPointer(addressTemp1);
-            code += '+';
-            code.SetPointer(addressX);
-            code += '-';
-            code += ']';
+            code.MoveValue(addressX, addressTemp1);
 
             code.JumpStart(addressTemp1);
 
@@ -519,44 +513,44 @@ namespace LanguageCore.Brainfuck
 
             code.SetPointer(addressTemp1);
             code += '-';
-            code += '[';
+            code.JumpStart();
 
             code.ClearValue(addressTemp3);
             code.SetPointer(addressTemp4);
             code += '+';
             code.SetPointer(addressTemp1);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.MoveValue(addressTemp4, addressTemp1);
 
             code.SetPointer(addressTemp3);
-            code += '[';
+            code.JumpStart();
 
             code.SetPointer(addressTemp2);
             code += '-';
 
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressX);
             code += '-';
             code.ClearValue(addressTemp2);
             code.SetPointer(addressTemp2);
-            code += ']';
+            code.JumpEnd();
             code += '+';
 
             code.SetPointer(addressTemp3);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.SetPointer(addressTemp2);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.SetPointer(addressX);
             code += '+';
 
             code.SetPointer(addressTemp1);
-            code += ']';
+            code.JumpEnd();
         }
 
         /// <summary>
@@ -581,34 +575,34 @@ namespace LanguageCore.Brainfuck
             code += '+';
 
             code.SetPointer(addressY);
-            code += '[';
+            code.JumpStart();
 
             code.ClearValue(addressTemp2);
 
             code.MoveValue(addressX, addressTemp3);
 
             code.SetPointer(addressTemp3);
-            code += '[';
+            code.JumpStart();
 
             code.SetPointer(addressTemp1);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressX);
             code += '+';
             code.SetPointer(addressTemp2);
             code += '+';
             code.SetPointer(addressTemp1);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.MoveValue(addressTemp2, addressTemp1);
 
             code.SetPointer(addressTemp3);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.SetPointer(addressY);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             code.ClearValue(addressTemp1);
         }
@@ -646,12 +640,12 @@ namespace LanguageCore.Brainfuck
             // x[temp0+x-]
 
             code.SetPointer(addressX);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(tempAddress1);
             code += '+';
             code.SetPointer(addressX);
             code += '-';
-            code += ']';
+            code.JumpEnd();
 
             // temp0[-[temp1+x++temp0-]x+temp1[temp0+temp1-]temp0]
 
@@ -667,13 +661,13 @@ namespace LanguageCore.Brainfuck
             code.SetPointer(addressX);
             code += '+';
             code.SetPointer(tempAddress2);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(tempAddress1);
             code += '+';
             code.SetPointer(tempAddress2);
             code += "-]";
             code.SetPointer(tempAddress1);
-            code += ']';
+            code.JumpEnd();
         }
 
         /// <summary>
@@ -693,12 +687,12 @@ namespace LanguageCore.Brainfuck
             code += "-]";
 
             code.SetPointer(tempAddress);
-            code += '[';
+            code.JumpStart();
             code.SetPointer(addressX);
             code += '-';
             code.SetPointer(tempAddress);
             code += '+';
-            code += ']';
+            code.JumpEnd();
         }
 
         #endregion
@@ -769,23 +763,23 @@ namespace LanguageCore.Brainfuck
             // code.ClearValue(resultAddress);
 
             code.SetPointer(valueAddressB);
-            code += '[';
+            code.JumpStart();
             code.MoveValue(switchAddress, resultAddress);
             code.AddValue(valueAddressB, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.SetPointer(valueAddressA);
-            code += '[';
+            code.JumpStart();
 
             code.AddValue(switchAddress, -1);
-            code += '[';
+            code.JumpStart();
             code.ClearCurrent();
             code.SetValue(resultAddress, 1);
             code.SetPointer(switchAddress);
-            code += ']';
+            code.JumpEnd();
 
             code.AddValue(valueAddressA, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.ClearValue(switchAddress);
         }
@@ -805,10 +799,10 @@ namespace LanguageCore.Brainfuck
             code.ClearValue(tempAddress);
 
             code.AddValue(addressX, -1);
-            code += '[';
+            code.JumpStart();
             code.AddValue(tempAddress, -1);
             code.AddValue(addressX, -1);
-            code += ']';
+            code.JumpEnd();
 
             code.MoveValue(tempAddress, addressX);
 

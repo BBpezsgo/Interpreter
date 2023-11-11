@@ -60,7 +60,7 @@ namespace LanguageCore
 
         public static bool Contains<TRange, TValue>(this Range<TRange> range, TValue value)
             where TRange : IEquatable<TRange>, IComparisonOperators<TRange, TValue, bool>
-            => range.Start >= value && range.End <= value;
+            => range.Start <= value && range.End >= value;
 
         public static bool Overlaps<T>(this Range<T> a, Range<T> b)
             where T : IEquatable<T>, IComparisonOperators<T, T, bool>

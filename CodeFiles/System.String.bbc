@@ -1,6 +1,16 @@
 using System;
 using System.Memory;
 
+macro UnsafeGet(list, index)
+{
+    return *(&list + 1 + index);
+}
+
+macro UnsafeSet(list, index, value)
+{
+    *(&list + 1 + index) = value;
+}
+
 [Define("string")]
 class String
 {
@@ -9,12 +19,21 @@ class String
     export constructor(int length)
     {
         int pointer = Alloc(sizeof(String) + length);
+        
+        *pointer = length;
+
+        return pointer as String;
+    }
+
+    export constructor(int length, char character)
+    {
+        int pointer = Alloc(sizeof(String) + length);
 
         *pointer = length;
 
         for (int offset; offset < length; offset++)
         {
-            *(pointer + sizeof(String) + offset) = '\0';
+            *(pointer + sizeof(String) + offset) = character;
         };
 
         return pointer as String;
@@ -25,7 +44,7 @@ class String
         String result = new String(other.length);
         for (int i; i < other.length; i++)
         {
-            result[i] = other[i];
+            UnsafeSet(result, i, UnsafeGet(other, i));
         };
         return result;
     }
@@ -41,12 +60,12 @@ class String
   
         for (int i; i < al; i++)
         {
-            result[i] = a[i];
+            UnsafeSet(result, i, UnsafeGet(a, i));
         };
   
         for (int i; i < bl; i++)
         {
-            result[al + i] = b[i];
+            UnsafeSet(result, al + i, UnsafeGet(b, i));
         };
 
         return result;
@@ -70,8 +89,8 @@ class String
 
         for (int i = 0; i < length; i++)
         {
-            char _a = a[i];
-            char _b = b[i];
+            char _a = UnsafeGet(a, i);
+            char _b = UnsafeGet(b, i);
             
             if (_a != _b)
             {
@@ -102,7 +121,7 @@ export void CopyString(temp String from, String to)
     int newLength = Min(from.length, to.length);
     for (int i; i < newLength; i++)
     {
-        to[i] = from[i];
+        UnsafeSet(to, i, UnsafeGet(from, i));
     };
 }
 
@@ -116,7 +135,7 @@ export String Substring(temp this String v, int start)
     String newV = new String(newLength);
     for (int i = start; i < v.length; i++)
     {
-        newV[i - start] = v[i];
+        UnsafeSet(newV, i - start, UnsafeGet(v, i));
     };
     return newV;
 }
@@ -126,7 +145,7 @@ export String Substring(temp this String v, int start, int length)
     String newV = new String(Min(v.length, start + length));
     for (int i = start; i < Min(v.length, start + length); i++)
     {
-        newV[i - start] = v[i];
+        UnsafeSet(newV, i - start, UnsafeGet(v, i));
     };
     return newV;
 }
@@ -136,7 +155,7 @@ export String Reverse(temp this String v)
     String newV = new String(v.length);
     for (int i = 0; i < v.length; i++)
     {
-        newV[i] = v[v.length - 1 - i];
+        UnsafeSet(newV, i, UnsafeGet(v, v.length - 1 - i));
     };
     return newV;
 }

@@ -11,43 +11,23 @@ using Win32;
 
 namespace ConsoleGUI
 {
-    internal sealed class InterpreterElement : WindowElement
+    public sealed class InterpreterElement : WindowElement
     {
         public string File;
         InterpreterDebuggabble Interpreter;
 
-        readonly struct ConsoleText
-        {
-            public readonly string Text;
-            public readonly byte Color;
-
-            public ConsoleText(string text, byte color)
-            {
-                Text = text;
-                Color = color;
-            }
-            public ConsoleText(string text)
-            {
-                Text = text;
-                Color = ByteColor.Silver;
-            }
-        }
-
-        readonly List<ConsoleText> ConsoleTexts;
-
-        ScrollBar ConsoleScrollBar;
         ScrollBar HeapScrollBar;
 
         int NextCodeJumpCount;
         int CurrentlyJumping;
         MainThreadTimer InterpreterTimer;
+        StandardIOElement ConsolePanel;
 
         InterpreterElement() : base()
         {
             ClearBuffer();
             InitElements();
             HasBorder = false;
-            ConsoleTexts = new List<ConsoleText>();
 
             NextCodeJumpCount = 1;
             CurrentlyJumping = 0;
@@ -70,79 +50,8 @@ namespace ConsoleGUI
             this.InterpreterTimer?.Tick(deltaTime);
         }
 
-        /*
-        static void CalculateLayoutBoxes(
-            out Rectangle StatePanelRect,
-            out Rectangle ConsolePanelRect,
-            out Rectangle CodePanelRect,
-            out Rectangle StackPanelRect,
-            out Rectangle HeapPanelRect,
-            out Rectangle CallstackPanelRect
-            )
-        {
-            Rectangle left = new(0, 0, Console.WindowWidth / 2, Console.WindowHeight);
-            Rectangle right = new(left.Right + 1, 0, Console.WindowWidth - left.Right - 2, Console.WindowHeight);
-
-            StatePanelRect = left;
-            StatePanelRect.Height = 3;
-
-            ConsolePanelRect = left;
-            ConsolePanelRect.Y = StatePanelRect.Bottom + 1;
-            ConsolePanelRect.Height = (left.Height - StatePanelRect.Height) / 2;
-
-            CodePanelRect = left;
-            CodePanelRect.Y = ConsolePanelRect.Bottom + 1;
-            CodePanelRect.Height = left.Height - CodePanelRect.Y - 1;
-
-            StackPanelRect = right;
-            StackPanelRect.Height = right.Height / 3;
-
-            HeapPanelRect = right;
-            HeapPanelRect.Y = StackPanelRect.Bottom + 1;
-            HeapPanelRect.Height = right.Height / 3;
-
-            CallstackPanelRect = right;
-            CallstackPanelRect.Y = HeapPanelRect.Bottom + 1;
-            CallstackPanelRect.Height = right.Height - CallstackPanelRect.Y - 1;
-        }
-        */
-
         void InitElements()
         {
-            /*
-            CalculateLayoutBoxes(
-                out Rectangle StatePanelRect,
-                out Rectangle ConsolePanelRect,
-                out Rectangle CodePanelRect,
-                out Rectangle StackPanelRect,
-                out Rectangle HeapPanelRect,
-                out Rectangle CallstackPanelRect
-                );
-
-            Rectangle left = new(0, 0, Console.WindowWidth / 2, Console.WindowHeight);
-            Rectangle right = new(left.Right + 1, 0, Console.WindowWidth - (left.Right + 1), Console.WindowHeight);
-
-            var leftWidth = Console.WindowWidth / 2;
-
-            Rectangle StatePanelRect = left;
-            StatePanelRect.Height = 3;
-
-            Rectangle ConsolePanelRect = left;
-            ConsolePanelRect.Y = StatePanelRect.Bottom + 1;
-            ConsolePanelRect.Height = (left.Height - StatePanelRect.Height) / 2;
-
-            Rectangle CodePanelRect = left;
-            CodePanelRect.Y = ConsolePanelRect.Bottom + 1;
-            CodePanelRect.Height = left.Height - CodePanelRect.Y;
-
-            var StackPanelRect = new Rectangle(leftWidth + 1, 0, Console.WindowWidth - 2 - leftWidth,
-                (Console.WindowHeight - 1) / 2);
-            var HeapPanelRect = new Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth,
-                (Console.WindowHeight - 2) - StackPanelRect.Bottom - 20);
-            var CallstackPanelRect = new Rectangle(leftWidth + 1, StackPanelRect.Bottom + 1, Console.WindowWidth - 2 - leftWidth,
-                (Console.WindowHeight - 3) - HeapPanelRect.Bottom);
-            */
-
             var StatePanel = new InlineElement
             {
                 HasBorder = true,
@@ -158,32 +67,11 @@ namespace ConsoleGUI
             };
             CodePanel.OnBeforeDraw += SourceCodeElement_OnBeforeDraw;
 
-            var ConsolePanel = new InlineElement
+            ConsolePanel = new StandardIOElement
             {
                 HasBorder = true,
                 Title = "Console",
             };
-
-            ConsoleScrollBar = new ScrollBar((parent) =>
-            {
-                int totalLines = 0;
-                for (int i = 0; i < ConsoleTexts.Count; i++)
-                {
-                    string[] lines = ConsoleTexts[i].Text.Split('\n');
-                    totalLines += lines.Length - 1;
-
-                    for (int j = 0; j < lines.Length; j++)
-                    {
-                        if (lines[j].Length >= parent.DrawBuffer.Width) totalLines++;
-                    }
-                }
-
-                return (0, Math.Max(1, totalLines));
-            }, ConsolePanel);
-
-            ConsolePanel.OnBeforeDraw += ConsolePanel_OnBeforeDraw;
-            ConsolePanel.OnMouseEventInvoked += ConsoleScrollBar.FeedEvent;
-            ConsolePanel.OnKeyEventInvoked += ConsoleScrollBar.FeedEvent;
 
             var StackPanel = new InlineElement
             {
@@ -212,15 +100,15 @@ namespace ConsoleGUI
             };
             CallstackPanel.OnBeforeDraw += CallstackElement_OnBeforeDraw;
 
-            this.Elements = new IElement[]{
+            this.Elements = new Element[]{
             new HorizontalLayoutElement()
                 {
                     Rect = new Rectangle(0, 0, Console.WindowWidth, Console.WindowHeight),
-                    Elements = new IElement[]
+                    Elements = new Element[]
                     {
                         new VerticalLayoutElement()
                         {
-                            Elements = new IElement[]
+                            Elements = new Element[]
                             {
                                 StatePanel,
                                 ConsolePanel,
@@ -229,7 +117,7 @@ namespace ConsoleGUI
                         },
                         new VerticalLayoutElement()
                         {
-                            Elements = new IElement[]
+                            Elements = new Element[]
                             {
                                 StackPanel,
                                 HeapPanel,
@@ -266,7 +154,7 @@ namespace ConsoleGUI
 
             void PrintOutput(string message, LogType logType)
             {
-                ConsoleTexts.Add(new ConsoleText(message + "\n", logType switch
+                ConsolePanel.Write(message + "\n", logType switch
                 {
                     LogType.System => ByteColor.Silver,
                     LogType.Normal => ByteColor.Silver,
@@ -274,13 +162,13 @@ namespace ConsoleGUI
                     LogType.Error => ByteColor.BrightRed,
                     LogType.Debug => ByteColor.Silver,
                     _ => ByteColor.Silver,
-                }));
+                });
             }
 
             Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
-            Interpreter.OnStdOut += (sender, data) => ConsoleTexts.Add(new ConsoleText(data));
-            Interpreter.OnStdError += (sender, data) => ConsoleTexts.Add(new ConsoleText(data, ByteColor.BrightRed));
+            Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(data);
+            Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(data, ByteColor.BrightRed);
 
             Interpreter.OnNeedInput += (sender) =>
             {
@@ -504,42 +392,6 @@ namespace ConsoleGUI
                 }
             }
 
-        }
-
-        private void ConsolePanel_OnBeforeDraw(InlineElement sender)
-        {
-            DrawBuffer b = sender.DrawBuffer;
-            b.StepTo(0);
-
-            b.ResetColor();
-
-            int start = Math.Max(0, ConsoleScrollBar.Offset);
-
-            int line = 0;
-            for (int i = 0; i < ConsoleTexts.Count; i++)
-            {
-                ConsoleText consoleText = ConsoleTexts[i];
-                string text = consoleText.Text;
-
-                string[] lines = text.Split('\n');
-
-                b.ForegroundColor = consoleText.Color;
-
-                for (int j = 0; j < lines.Length; j++)
-                {
-                    if (line + j < start) continue;
-                    if (j == lines.Length - 1 && lines[j] == string.Empty) continue;
-
-                    var line_ = lines[j];
-                    b.AddText(line_.TrimEnd());
-                    if (j < lines.Length - 1)
-                    { b.FinishLine(sender.Rect.Width); }
-                }
-
-                line += lines.Length - 1;
-            }
-
-            ConsoleScrollBar.Draw(b);
         }
 
         private void StateElement_OnBeforeDraw(InlineElement sender)

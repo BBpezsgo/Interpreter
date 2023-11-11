@@ -3,16 +3,19 @@ using Win32;
 
 namespace ConsoleGUI
 {
-    public class Element : IElement, IElementWithEvents
+    public class Element : IMainThreadThing
     {
         public Rectangle Rect { get; set; } = Rectangle.Empty;
 
-        internal DrawBuffer DrawBuffer = new();
+        public bool HasBorder;
+        public string? Title;
+
+        public DrawBuffer DrawBuffer = new();
         protected MouseEvent LastMouse;
 
         public virtual CharInfo DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
-        internal void ClearBuffer() => DrawBuffer = new(Rect.Width, Rect.Height);
+        public void ClearBuffer() => DrawBuffer = new(Rect.Width, Rect.Height);
 
         public virtual void BeforeDraw()
         { /*if (DrawBuffer.Length == 0) ClearBuffer();*/ }

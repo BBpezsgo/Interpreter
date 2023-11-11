@@ -490,7 +490,10 @@ namespace LanguageCore.Brainfuck.Compiler
         #region GenerateCodeForStatement()
         void GenerateCodeForStatement(Statement statement)
         {
-            int start = Code.GetFinalCode().Length;
+            int start = 0;
+
+            if (GenerateDebugInformation)
+            { start = Code.GetFinalCode().Length; }
 
             if (statement is KeywordCall instructionStatement)
             { GenerateCodeForStatement(instructionStatement); }
@@ -549,12 +552,15 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (InMacro.Count > 0 && InMacro.Last) return;
 
-            int end = Code.GetFinalCode().Length;
-            DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
+            if (GenerateDebugInformation)
             {
-                Instructions = (start, end),
-                SourcePosition = statement.Position,
-            });
+                int end = Code.GetFinalCode().Length;
+                DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
+                {
+                    Instructions = (start, end),
+                    SourcePosition = statement.Position,
+                });
+            }
         }
         void GenerateCodeForStatement(ModifiedStatement modifiedStatement)
         {
@@ -576,7 +582,21 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(AnyCall anyCall)
         {
-            if (anyCall.ToFunctionCall(out var functionCall))
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            {
+                GenerateCodeForStatement(functionCall);
+                return;
+            }
+
+            StatementWithValue collapsedPrevStatement = Collapse(anyCall.PrevStatement, new Dictionary<string, StatementWithValue>());
+
+            AnyCall newAnyCall = new(collapsedPrevStatement, anyCall.BracketLeft, anyCall.Parameters, anyCall.BracketRight)
+            {
+                SaveValue = anyCall.SaveValue,
+                Semicolon = anyCall.Semicolon,
+            };
+
+            if (newAnyCall.ToFunctionCall(out functionCall))
             {
                 GenerateCodeForStatement(functionCall);
                 return;
@@ -648,7 +668,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block("The if statements"))
                 {
-                    Compile(@if.Block);
+                    GenerateCodeForStatement(@if.Block);
                 }
 
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -718,7 +738,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             if (@if.NextLink is LinkedElse elseBlock)
                             {
                                 using (Code.Block("Block (else)"))
-                                { Compile(elseBlock.Block); }
+                                { GenerateCodeForStatement(elseBlock.Block); }
                             }
                             else if (@if.NextLink is LinkedIf elseIf)
                             {
@@ -751,201 +771,6 @@ namespace LanguageCore.Brainfuck.Compiler
                 Code.CommentLine($"Pointer: {Code.Pointer}");
             }
         }
-        /*
-        void Compile(IfContainer ifContainer)
-        {
-            Compile(ifContainer.Parts.ToArray(), 0, -1);
-        }
-        void Compile(BaseBranch[] branches, int index, int conditionAddress)
-        {
-            if (index >= branches.Length)
-            { return; }
-
-            BaseBranch branch = branches[index];
-
-            if (branch is IfBranch @if)
-            {
-                using (Code.Block($"If ({@if.Condition})"))
-                {
-                    int _conditionAddress = Stack.NextAddress;
-                    using (Code.Block("Compute condition"))
-                    { Compile(@if.Condition); }
-
-                    Code.CommentLine($"Condition result at {_conditionAddress}");
-
-                    Code.JumpStart(_conditionAddress);
-
-                    ReturnCount.Push(0);
-
-                    using (Code.Block("The if statements"))
-                    { Compile(@if.Block); }
-
-                    FinishReturnStatements(ReturnCount.Pop());
-
-                    if (index + 1 >= branches.Length)
-                    {
-                        using (Code.Block("Cleanup condition"))
-                        {
-                            Code.ClearValue(_conditionAddress);
-                            Code.JumpEnd(_conditionAddress);
-                            Stack.PopVirtual();
-                        }
-                    }
-                    else
-                    {
-                        Compile(branches, index + 1, _conditionAddress);
-                    }
-
-                    Code.JumpStart(ReturnTagStack[^1]);
-                    ReturnCount[^1]++;
-                }
-                return;
-            }
-
-            if (branch is ElseIfBranch @elseif)
-            {
-                FinishReturnStatements(ReturnCount.Pop());
-
-                Code.LOGIC_NOT(conditionAddress, conditionAddress + 1);
-
-                using (Code.Block("Else if"))
-                {
-                    using (Code.Block("Finish if statement"))
-                    {
-                        Code.MoveValue(conditionAddress, conditionAddress + 1);
-                        Code.JumpEnd(conditionAddress);
-                        Code.MoveValue(conditionAddress + 1, conditionAddress);
-                    }
-
-                    Stack.PopVirtual();
-
-                    int elseFlag = conditionAddress + 1;
-
-                    Code.CommentLine($"ELSE flag is at {elseFlag}");
-
-                    using (Code.Block("Set ELSE flag"))
-                    { Code.SetValue(elseFlag, 1); }
-
-                    using (Code.Block("If condition is true"))
-                    {
-                        Code.JumpStart(conditionAddress);
-
-                        using (Code.Block("Reset condition"))
-                        { Code.ClearValue(conditionAddress); }
-
-                        using (Code.Block("Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        Code.JumpEnd(conditionAddress);
-                    }
-
-                    using (Code.Block($"If ELSE flag set"))
-                    {
-                        Code.JumpStart(elseFlag);
-
-                        using (Code.Block("Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        using (Code.Block($"Elseif ({@elseif.Condition})"))
-                        {
-                            int _conditionAddress = Stack.NextAddress;
-                            using (Code.Block("Compute condition"))
-                            { Compile(@elseif.Condition); }
-
-                            Code.CommentLine($"Condition result at {_conditionAddress}");
-
-                            Code.JumpStart(_conditionAddress);
-
-                            using (Code.Block("The if statements"))
-                            { Compile(@elseif.Block); }
-
-                            if (index + 1 >= branches.Length)
-                            {
-                                using (Code.Block("Cleanup condition"))
-                                {
-                                    Code.ClearValue(_conditionAddress);
-                                    Code.JumpEnd(_conditionAddress);
-                                    Stack.PopVirtual();
-                                }
-                            }
-                            else
-                            {
-                                Compile(branches, index + 1, _conditionAddress);
-                            }
-                        }
-
-                        using (Code.Block($"Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        Code.JumpEnd(elseFlag);
-                    }
-
-                    using (Code.Block("Reset ELSE flag"))
-                    { Code.ClearValue(elseFlag); }
-                }
-                return;
-            }
-
-            if (branch is ElseBranch @else)
-            {
-                Code.LOGIC_NOT(conditionAddress, conditionAddress + 1);
-
-                using (Code.Block("Else"))
-                {
-                    using (Code.Block("Finish if statement"))
-                    {
-                        Code.MoveValue(conditionAddress, conditionAddress + 1);
-                        Code.JumpEnd(conditionAddress);
-                        Code.MoveValue(conditionAddress + 1, conditionAddress);
-                    }
-
-                    Stack.PopVirtual();
-
-                    int elseFlag = conditionAddress + 1;
-
-                    Code.CommentLine($"ELSE flag is at {elseFlag}");
-
-                    using (Code.Block("Set ELSE flag"))
-                    { Code.SetValue(elseFlag, 1); }
-
-                    using (Code.Block("If condition is true"))
-                    {
-                        Code.JumpStart(conditionAddress);
-
-                        using (Code.Block("Reset condition"))
-                        { Code.ClearValue(conditionAddress); }
-
-                        using (Code.Block("Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        Code.JumpEnd(conditionAddress);
-                    }
-
-                    using (Code.Block($"If ELSE flag set"))
-                    {
-                        Code.JumpStart(elseFlag);
-
-                        using (Code.Block("Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        using (Code.Block("Block"))
-                        {
-                            Compile(@else.Block);
-                        }
-
-                        using (Code.Block($"Reset ELSE flag"))
-                        { Code.ClearValue(elseFlag); }
-
-                        Code.JumpEnd(elseFlag);
-                    }
-
-                    using (Code.Block("Reset ELSE flag"))
-                    { Code.ClearValue(elseFlag); }
-                }
-                return;
-            }
-        }
-        */
         void GenerateCodeForStatement(WhileLoop @while)
         {
             using (Code.Block($"While ({@while.Condition})"))
@@ -958,54 +783,49 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 BreakTagStack.Push(Stack.Push(1));
 
-                Code.JumpStart(conditionAddress);
-
-                using (Code.Block("The while statements"))
+                using (Code.Jump(conditionAddress))
                 {
-                    Compile(@while.Block);
+                    using (Code.Block("The while statements"))
+                    {
+                        GenerateCodeForStatement(@while.Block);
+                    }
+
+                    using (Code.Block("Compute condition again"))
+                    {
+                        GenerateCodeForStatement(@while.Condition);
+                        Stack.PopAndStore(conditionAddress);
+                    }
+
+                    {
+                        int tempAddress = Stack.PushVirtual(1);
+
+                        Code.CopyValue(ReturnTagStack[^1], tempAddress);
+                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        using (Code.Jump(tempAddress))
+                        {
+                            Code.SetValue(conditionAddress, 0);
+                            Code.ClearValue(tempAddress);
+                        }
+
+                        Code.CopyValue(BreakTagStack[^1], tempAddress);
+                        Code.LOGIC_NOT(tempAddress, tempAddress + 1);
+                        using (Code.Jump(tempAddress))
+                        {
+                            Code.SetValue(conditionAddress, 0);
+                            Code.ClearValue(tempAddress);
+                        }
+
+                        Stack.PopVirtual();
+                    }
                 }
-
-                using (Code.Block("Compute condition again"))
-                {
-                    GenerateCodeForStatement(@while.Condition);
-                    Stack.PopAndStore(conditionAddress);
-                }
-
-                {
-                    int tempAddress = Stack.PushVirtual(1);
-
-                    Code.CopyValue(ReturnTagStack[^1], tempAddress);
-                    Code.LOGIC_NOT(tempAddress, tempAddress + 1);
-                    Code.JumpStart(tempAddress);
-
-                    Code.SetValue(conditionAddress, 0);
-
-                    Code.ClearValue(tempAddress);
-                    Code.JumpEnd(tempAddress);
-
-
-                    Code.CopyValue(BreakTagStack[^1], tempAddress);
-                    Code.LOGIC_NOT(tempAddress, tempAddress + 1);
-                    Code.JumpStart(tempAddress);
-
-                    Code.SetValue(conditionAddress, 0);
-
-                    Code.ClearValue(tempAddress);
-                    Code.JumpEnd(tempAddress);
-
-                    Stack.PopVirtual();
-                }
-
-                Code.JumpEnd(conditionAddress);
 
                 if (Stack.LastAddress != BreakTagStack.Pop())
                 { throw new InternalException(); }
-                Stack.Pop();
+                Stack.Pop(); // Pop BreakTag
 
-                Stack.Pop();
+                Stack.Pop(); // Pop Condition
 
                 ContinueReturnStatements();
-                ContinueBreakStatements();
             }
         }
         void GenerateCodeForStatement(ForLoop @for)
@@ -1029,7 +849,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 using (Code.Block("The while statements"))
                 {
-                    Compile(@for.Block);
+                    GenerateCodeForStatement(@for.Block);
                 }
 
                 using (Code.Block("Compute expression"))
@@ -1176,28 +996,6 @@ namespace LanguageCore.Brainfuck.Compiler
                         var deletable = statement.Parameters[0];
                         var deletableType = FindStatementType(deletable);
 
-                        if (deletableType.IsClass)
-                        {
-                            if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
-                            { throw new CompilerException($"I tried to get the address of \"{deletable}\" but I failed", deletable, CurrentFile); }
-
-                            int _pointerAddress = Stack.PushVirtual(1);
-
-                            for (int offset = 0; offset < size; offset++)
-                            {
-                                Code.CopyValue(pointerAddress, _pointerAddress);
-                                Code.AddValue(_pointerAddress, offset);
-
-                                Heap.Set(_pointerAddress, 0);
-                                // Heap.Free(_pointerAddress);
-                            }
-
-                            Stack.Pop();
-
-                            Stack.Pop();
-                            return;
-                        }
-
                         if (deletableType.BuiltinType == Type.Integer)
                         {
                             if (!TryGetBuiltinFunction("free", out CompiledFunction? function))
@@ -1207,10 +1005,78 @@ namespace LanguageCore.Brainfuck.Compiler
                             return;
                         }
 
-                        throw new CompilerException($"Bruh. This probably not stored in heap...", deletable, CurrentFile);
+                        TypeArguments typeArguments = new();
+
+                        if (!GetGeneralFunction(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
+                        {
+                            if (!GetGeneralFunctionTemplate(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                            {
+                                if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
+                                {
+                                    // throw new CompilerException($"I tried to get the address of \"{deletable}\" but I failed", deletable, CurrentFile);
+
+                                    if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
+                                    { throw new CompilerException($"No function found with attribute [Builtin({"free"})]", statement, CurrentFile); }
+
+                                    if (!deallocator.CanUse(CurrentFile))
+                                    {
+                                        Errors.Add(new Error($"Function \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                                        return;
+                                    }
+
+                                    GenerateCodeForMacro(deallocator, statement.Parameters, null, statement);
+                                    return;
+                                }
+                                else
+                                {
+                                    int _pointerAddress = Stack.PushVirtual(1);
+
+                                    for (int offset = 0; offset < size; offset++)
+                                    {
+                                        Code.CopyValue(pointerAddress, _pointerAddress);
+                                        Code.AddValue(_pointerAddress, offset);
+
+                                        Heap.Set(_pointerAddress, 0);
+                                        // Heap.Free(_pointerAddress);
+                                    }
+
+                                    Stack.Pop();
+
+                                    Stack.Pop();
+                                    return;
+                                }
+                            }
+
+                            destructor = destructorTemplate.Function;
+                            typeArguments = destructorTemplate.TypeArguments;
+                        }
+
+                        if (!destructor.CanUse(CurrentFile))
+                        {
+                            Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                            return;
+                        }
+
+                        typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
+
+                        GenerateCodeForMacro(destructor, statement.Parameters, typeArguments, statement);
+
+                        break;
                     }
 
-                case "throw": throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)", statement.Identifier, CurrentFile);
+                case "throw":
+                    {
+                        if (statement.Parameters.Length != 1)
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        GenerateCodeForPrinter(ANSI.Generator.Generate(ANSI.ForegroundColor.BRIGHT_RED));
+                        GenerateCodeForPrinter(statement.Parameters[0]);
+                        GenerateCodeForPrinter(ANSI.Generator.Generate(0));
+                        Code.SetPointer(Stack.Push(1));
+                        Code += "[]";
+                        Stack.PopVirtual();
+                        break;
+                        throw new NotSupportedException($"How to make exceptions work in brainfuck? (idk)", statement.Identifier, CurrentFile);
+                    }
 
                 default: throw new CompilerException($"Unknown keyword-call \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
@@ -1472,7 +1338,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
 
                 if (inlinedMacro is Block inlinedMacroBlock)
-                { Compile(inlinedMacroBlock); }
+                { GenerateCodeForStatement(inlinedMacroBlock); }
                 else
                 { GenerateCodeForStatement(inlinedMacro); }
 
@@ -1495,8 +1361,11 @@ namespace LanguageCore.Brainfuck.Compiler
 
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
 
-            // if (!function.Modifiers.Contains("macro"))
-            // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", functionCall, CurrentFile); }
+            if (!compiledFunction.CanUse(CurrentFile))
+            {
+                Errors.Add(new Error($"Function \"{compiledFunction.ReadableID()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                return;
+            }
 
             typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
 
@@ -1517,17 +1386,15 @@ namespace LanguageCore.Brainfuck.Compiler
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
+            TypeArguments typeArguments = new();
+
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
-                {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
-                }
-                else
-                {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
-                }
+                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
+                { throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
+
+                constructor = compilableGeneralFunction.Function;
+                typeArguments = compilableGeneralFunction.TypeArguments;
             }
 
             if (!constructor.CanUse(CurrentFile))
@@ -1536,14 +1403,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
-
-            TypeArguments typeArguments = new();
-            if (@class.TemplateInfo != null &&
-                constructorCall.TypeName is TypeInstanceSimple instanceTypeSimple &&
-                instanceTypeSimple.GenericTypes != null)
-            { typeArguments = @class.TemplateInfo.ToDictionary(CompiledType.FromArray(instanceTypeSimple.GenericTypes, FindType)); }
+            typeArguments = Utils.ConcatDictionary(typeArguments, constructor.Context?.CurrentTypeArguments);
 
             GenerateCodeForMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
         }
@@ -1587,7 +1447,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(Identifier statement)
         {
-            if (CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Content, out Variable variable))
+            if (GetVariable(Variables, statement.Content, out Variable variable))
             {
                 if (!variable.IsInitialized)
                 { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
@@ -1635,7 +1495,10 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile);
+            if (GetFunction(statement.Name, out _))
+            { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement, CurrentFile); }
+
+            throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);
         }
         void GenerateCodeForStatement(OperatorCall statement)
         {
@@ -1995,8 +1858,10 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
             }
         }
-        void Compile(Block block)
+        void GenerateCodeForStatement(Block block)
         {
+            using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
+
             using (this.DebugBlock(block.BracketStart))
             {
                 VariableCleanupStack.Push(PrecompileVariables(block));
@@ -2008,10 +1873,12 @@ namespace LanguageCore.Brainfuck.Compiler
                 { BreakCount.Push(0); }
             }
 
-            foreach (Statement statement in block.Statements)
+            int branchDepth = Code.BranchDepth;
+            for (int i = 0; i < block.Statements.Length; i++)
             {
+                progressBar.Print(i, block.Statements.Length);
                 VariableCanBeDiscarded = null;
-                GenerateCodeForStatement(statement);
+                GenerateCodeForStatement(block.Statements[i]);
                 VariableCanBeDiscarded = null;
             }
 
@@ -2025,6 +1892,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 CleanupVariables(VariableCleanupStack.Pop());
             }
+            if (branchDepth != Code.BranchDepth)
+            { throw new InternalException($"Unbalanced branches", block, CurrentFile); }
         }
         void GenerateCodeForStatement(AddressGetter addressGetter)
         {
@@ -2664,9 +2533,6 @@ namespace LanguageCore.Brainfuck.Compiler
             }
         }
 
-        /// <param name="callerPosition">
-        /// Used for exceptions
-        /// </param>
         void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
             if (function.CompiledAttributes.HasAttribute("StandardOutput"))
@@ -2710,27 +2576,28 @@ namespace LanguageCore.Brainfuck.Compiler
                 return;
             }
 
-            // if (!function.Modifiers.Contains("macro"))
-            // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
-
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
-            if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (required {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
+            if (function.ParameterCount != parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             if (function.Block is null)
             { throw new CompilerException($"Function \"{function.ReadableID()}\" does not have any body definition", callerPosition, CurrentFile); }
+
+            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ReadableID(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+
+            progressLabel.Print();
 
             Variable? returnVariable = null;
 
             if (function.ReturnSomething)
             {
                 var returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, returnType, returnType.SizeOnStack);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -2893,10 +2760,11 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
             }
 
-            Compile(function.Block);
+            GenerateCodeForStatement(function.Block);
 
             using (DebugBlock(function.Block.BracketEnd))
             {
+                // TODO: not working with test11.bbc
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
                 { throw new InternalException(); }
                 Stack.Pop();
@@ -2945,29 +2813,23 @@ namespace LanguageCore.Brainfuck.Compiler
             { SetTypeArguments(savedTypeArguments); }
         }
 
-        /// <param name="callerPosition">
-        /// Used for exceptions
-        /// </param>
         void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
-            // if (!function.Modifiers.Contains("macro"))
-            // { throw new NotSupportedException($"Functions not supported by the brainfuck compiler, try using macros instead", callerPosition, CurrentFile); }
-
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.Identifier}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
-            if (function.Parameters.Length != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.Identifier}\" (required {function.Parameters.Length} passed {parameters.Length})", callerPosition, CurrentFile); }
+            if (function.ParameterCount != parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
             if (function.ReturnSomething)
             {
-                CompiledType returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.Size), function, false, returnType, returnType.Size);
+                CompiledType returnType = new(function.Type, typeArguments);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, returnType, returnType.SizeOnStack);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -3122,7 +2984,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 ReturnTagStack.Push(Stack.Push(1));
             }
 
-            Compile(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
+            GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
 
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)

@@ -1617,26 +1617,6 @@ namespace LanguageCore.BBCode.Compiler
             LanguageCore.Utils.Map(typeParameterNames, type.TypeParameters, typeParameters);
         }
 
-        /// <summary>
-        /// <para>
-        /// Collects the type parameters from <paramref name="type"/> and puts the result to <paramref name="typeParameters"/>
-        /// </para>
-        /// <para>
-        /// <paramref name="type"/> must be a class template type!
-        /// </para>
-        /// </summary>
-        /// <exception cref="NotImplementedException"/>
-        static void MapTypeParameters(CompiledType type, TypeArguments typeParameters)
-        {
-            if (!type.IsClass)
-            { return; }
-
-            if (type.Class.TemplateInfo == null)
-            { return; }
-
-            MapTypeParameters(type, type.Class.TemplateInfo.TypeParameters, typeParameters);
-        }
-
         protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset, bool isGlobal)
         {
             if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
@@ -1775,9 +1755,12 @@ namespace LanguageCore.BBCode.Compiler
         {
             if (anyCall.ToFunctionCall(out var functionCall))
             { return FindStatementType(functionCall); }
+
             CompiledType prevType = FindStatementType(anyCall.PrevStatement);
+
             if (!prevType.IsFunction)
             { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
+
             return prevType.Function.ReturnType;
         }
         protected CompiledType FindStatementType(KeywordCall keywordCall)
@@ -2282,6 +2265,24 @@ namespace LanguageCore.BBCode.Compiler
             return statement;
         }
 
+        protected static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new Pointer(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        }
+
+        protected static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new AddressGetter(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        }
+
         protected static StatementWithValue InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (statement is Identifier identifier)
@@ -2302,6 +2303,22 @@ namespace LanguageCore.BBCode.Compiler
 
             if (statement is AnyCall anyCall)
             { return InlineMacro(anyCall, parameters); }
+
+            if (statement is Pointer pointer)
+            { return InlineMacro(pointer, parameters); }
+
+            if (statement is AddressGetter addressGetter)
+            { return InlineMacro(addressGetter, parameters); }
+
+            if (statement is LiteralStatement literal)
+            {
+                return new LiteralStatement(literal.Type, literal.Value, literal.ValueToken)
+                {
+                    ImaginaryPosition = literal.ImaginaryPosition,
+                    SaveValue = literal.SaveValue,
+                    Semicolon = literal.Semicolon,
+                };
+            }
 
             throw new NotImplementedException();
         }
@@ -2832,8 +2849,48 @@ namespace LanguageCore.BBCode.Compiler
                 SaveValue = statement.SaveValue,
             };
         }
+        protected Assignment Collapse(Assignment statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new Assignment(
+                statement.Operator,
+                Collapse(statement.Left, parameters),
+                Collapse(statement.Right, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
+        }
+        protected CompoundAssignment Collapse(CompoundAssignment statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new CompoundAssignment(
+                statement.Operator,
+                Collapse(statement.Left, parameters),
+                Collapse(statement.Right, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
+        }
+        protected ShortOperatorCall Collapse(ShortOperatorCall statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new ShortOperatorCall(
+                statement.Operator,
+                Collapse(statement.Left, parameters))
+            {
+                Semicolon = statement.Semicolon,
+            };
+        }
         protected AnyAssignment Collapse(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        {
+            if (statement is Assignment assignment)
+            { return Collapse(assignment, parameters); }
+
+            if (statement is CompoundAssignment compoundAssignment)
+            { return Collapse(compoundAssignment, parameters); }
+
+            if (statement is ShortOperatorCall shortOperatorCall)
+            { return Collapse(shortOperatorCall, parameters); }
+
+            throw new NotImplementedException();
+        }
         protected LiteralStatement Collapse(LiteralStatement statement, Dictionary<string, StatementWithValue> parameters)
         { return statement; }
         protected StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
@@ -2843,9 +2900,21 @@ namespace LanguageCore.BBCode.Compiler
             return statement;
         }
         protected AddressGetter Collapse(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        {
+            return new AddressGetter(statement.OperatorToken, Collapse(statement.PrevStatement, parameters))
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        }
         protected Pointer Collapse(Pointer statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        {
+            return new Pointer(statement.OperatorToken, Collapse(statement.PrevStatement, parameters))
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        }
         protected WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected ForLoop Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
@@ -2926,7 +2995,13 @@ namespace LanguageCore.BBCode.Compiler
         protected IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected Field Collapse(Field statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        {
+            return new Field(Collapse(statement.PrevStatement, parameters), statement.FieldName)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+        }
         protected TypeCast Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)

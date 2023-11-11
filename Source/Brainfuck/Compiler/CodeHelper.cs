@@ -62,6 +62,8 @@ namespace LanguageCore.Brainfuck
         public StringBuilder Code;
         StringBuilder CachedFinalCode;
 
+        const int InitialSize = 1024;
+
         int indent;
         int pointer;
         int branchDepth;
@@ -71,7 +73,7 @@ namespace LanguageCore.Brainfuck
 
         public CompiledCode()
         {
-            this.Code = new StringBuilder();
+            this.Code = new StringBuilder(InitialSize);
             this.CachedFinalCode = new StringBuilder();
             this.indent = 0;
             this.pointer = 0;
@@ -365,7 +367,7 @@ namespace LanguageCore.Brainfuck
         public void JumpStart()
         {
             Code.Append('[');
-            CachedFinalCode.Append("[");
+            CachedFinalCode.Append('[');
             branchDepth++;
         }
 
@@ -375,7 +377,7 @@ namespace LanguageCore.Brainfuck
         public void JumpEnd()
         {
             Code.Append(']');
-            CachedFinalCode.Append("]");
+            CachedFinalCode.Append(']');
             branchDepth--;
         }
 
@@ -453,10 +455,13 @@ namespace LanguageCore.Brainfuck
             int _step = Math.Abs(step);
             char _code = (step < 0) ? '<' : '>';
 
-            string snippet = $"[{new string(_code, _step)}]";
+            Code.Append('[');
+            Code.Append(_code, _step);
+            Code.Append(']');
 
-            Code.Append(snippet);
-            CachedFinalCode.Append(snippet);
+            CachedFinalCode.Append('[');
+            CachedFinalCode.Append(_code, _step);
+            CachedFinalCode.Append(']');
         }
 
         /// <summary>
@@ -487,13 +492,13 @@ namespace LanguageCore.Brainfuck
         {
             if (offset < 0)
             {
-                Code.Append(new string('<', -offset));
-                CachedFinalCode.Append(new string('<', -offset));
+                Code.Append('<', -offset);
+                CachedFinalCode.Append('<', -offset);
             }
             else if (offset > 0)
             {
-                Code.Append(new string('>', offset));
-                CachedFinalCode.Append(new string('>', offset));
+                Code.Append('>', offset);
+                CachedFinalCode.Append('>', offset);
             }
         }
 

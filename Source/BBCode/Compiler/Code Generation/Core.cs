@@ -431,8 +431,9 @@ namespace LanguageCore.BBCode.Compiler
                 TypeArguments.Clear();
             }
 
-            foreach (var function in this.CompilableGeneralFunctions)
+            for (int i = 0; i < CompilableGeneralFunctions.Count; i++)
             {
+                CompliableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
                 CurrentContext = function.Function;
                 InFunction = true;
                 function.Function.InstructionOffset = GeneratedCode.Count;

@@ -1524,7 +1524,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!GetIndexGetter(prevType, out CompiledFunction? indexer))
             {
                 if (!GetIndexGetterTemplate(prevType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for type \"{prevType}\" not found", index, CurrentFile); }
+                { throw new CompilerException($"Index getter \"{prevType}[]\" not found", index, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
                 indexer = indexerTemplate.Function;
@@ -1866,7 +1866,7 @@ namespace LanguageCore.BBCode.Compiler
             if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
             {
                 if (!GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index setter for class \"{prevType.Class.Name}\" not found", statementToSet, CurrentFile); }
+                { throw new CompilerException($"Index setter \"{prevType.Class.Name}[] = {valueType}\" not found", statementToSet, CurrentFile); }
 
                 indexerTemplate = AddCompilable(indexerTemplate);
                 indexer = indexerTemplate.Function;

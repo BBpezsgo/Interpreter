@@ -4,9 +4,9 @@ using Win32;
 
 namespace ConsoleGUI
 {
-    internal class LayoutElement : Element, IElement, IElementWithSubelements, IElementWithEvents, IInlineLayoutElement
+    public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElement
     {
-        public IElement[] Elements { get; set; } = Array.Empty<IElement>();
+        public Element[] Elements { get; set; } = Array.Empty<Element>();
         public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();
 
         public override void BeforeDraw()
@@ -33,7 +33,7 @@ namespace ConsoleGUI
         }
     }
 
-    internal class VerticalLayoutElement : LayoutElement
+    public class VerticalLayoutElement : LayoutElement
     {
         public override void RefreshSize()
         {
@@ -45,7 +45,7 @@ namespace ConsoleGUI
 
             for (int i = 0; i < Elements.Length; i++)
             {
-                IElement element = Elements[i];
+                Element element = Elements[i];
                 Rectangle rect = element.Rect;
 
                 int currentHeight;
@@ -95,7 +95,7 @@ namespace ConsoleGUI
         }
     }
 
-    internal class HorizontalLayoutElement : LayoutElement
+    public class HorizontalLayoutElement : LayoutElement
     {
         public override void RefreshSize()
         {
@@ -107,7 +107,7 @@ namespace ConsoleGUI
 
             for (int i = 0; i < Elements.Length; i++)
             {
-                IElement element = Elements[i];
+                Element element = Elements[i];
                 Rectangle rect = element.Rect;
 
                 if (Elements[i] is IInlineLayoutElement inlineLayoutElement)
@@ -145,7 +145,7 @@ namespace ConsoleGUI
                 rect.Height = Rect.Height;
                 rect.Y = Rect.Y;
 
-                if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
+                if (element.HasBorder)
                 {
                     rect.Width -= 0;
                     rect.Height -= 0;

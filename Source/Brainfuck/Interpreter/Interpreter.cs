@@ -279,20 +279,20 @@ namespace LanguageCore.Brainfuck
         {
             Console.Clear();
 
-            int width = Console.WindowWidth;
-            int height = Console.WindowHeight;
+            short width = ConsoleHandler.WindowWidth;
+            short height = ConsoleHandler.WindowHeight;
 
-            using Win32.ConsoleRenderer renderer = new(null, width, height);
-            Win32.ConsoleListener.Start();
+            ConsoleRenderer renderer = new(width, height);
+            ConsoleListener.Start();
             GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
 
-            Win32.ConsoleListener.KeyEvent += Win32.Keyboard.Feed;
-            Win32.ConsoleListener.MouseEvent += Win32.Mouse.Feed;
+            ConsoleListener.KeyEvent += Keyboard.Feed;
+            ConsoleListener.MouseEvent += Mouse.Feed;
 
-            Win32.ConsoleListener.KeyEvent += (e) =>
+            ConsoleListener.KeyEvent += (e) =>
             {
                 if (e.IsDown != 0)
                 { inputBuffer.Enqueue(e.UnicodeChar); }
@@ -370,11 +370,11 @@ namespace LanguageCore.Brainfuck
 
             Draw();
 
-            Win32.ConsoleListener.Stop();
+            ConsoleListener.Stop();
         }
 
         int StartToken;
-        void DrawOriginalCode(Win32.ConsoleRenderer renderer, int x, int y, int width, int height)
+        void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
             {
@@ -802,17 +802,17 @@ namespace LanguageCore.Brainfuck
         {
             Console.Clear();
 
-            int width = Console.WindowWidth;
-            int height = Console.WindowHeight;
+            short width = ConsoleHandler.WindowWidth;
+            short height = ConsoleHandler.WindowHeight;
 
-            using Win32.ConsoleRenderer renderer = new(null, width, height);
-            Win32.ConsoleListener.Start();
+            ConsoleRenderer renderer = new(width, height);
+            ConsoleListener.Start();
             GUI.ConsoleRenderer = renderer;
 
             Queue<char> inputBuffer = new();
             string outputBuffer = string.Empty;
 
-            Win32.ConsoleListener.KeyEvent += (e) =>
+            ConsoleListener.KeyEvent += (e) =>
             {
                 if (e.IsDown != 0)
                 { inputBuffer.Enqueue(e.UnicodeChar); }

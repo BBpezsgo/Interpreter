@@ -89,7 +89,7 @@ namespace TheProgram
 
                         string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
 
-                        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile, true);
+                        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
 
                         if (File.Exists(outputFile + ".exe"))
                         {

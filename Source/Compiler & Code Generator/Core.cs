@@ -572,6 +572,71 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
+        internal CompiledType(CompiledType? other, TypeArguments? typeArguments) : this()
+        {
+            if (other is null) throw new ArgumentNullException(nameof(other));
+
+            this.Set(other);
+
+            if (IsBuiltin)
+            {
+                return;
+            }
+
+            if (IsEnum)
+            {
+                return;
+            }
+
+            if (IsFunction)
+            {
+                function = new FunctionType(
+                    new CompiledType(other.Function.ReturnType, typeArguments),
+                    CompiledType.FromArray(other.Function.Parameters, typeArguments)
+                    );
+                return;
+            }
+
+            if (IsClass)
+            {
+                if (typeArguments != null && @class.TemplateInfo is not null)
+                {
+                    string[] keys = @class.TemplateInfo.TypeParameterNames;
+                    CompiledType[] typeArgumentValues = new CompiledType[keys.Length];
+                    for (int i = 0; i < keys.Length; i++)
+                    {
+                        string key = keys[i];
+                        if (!typeArguments.TryGetValue(key, out CompiledType? typeArgumentValue))
+                        { return; }
+                        typeArgumentValues[i] = typeArgumentValue;
+                    }
+                    typeParameters = typeArgumentValues;
+                }
+                return;
+            }
+
+            if (IsStruct)
+            {
+                return;
+            }
+
+            if (IsStackArray)
+            {
+                stackArrayOf = new CompiledType(other.StackArrayOf, typeArguments);
+                return;
+            }
+
+            if (IsGeneric)
+            {
+                if (typeArguments != null && typeArguments.TryGetValue(genericName, out other))
+                { this.Set(other); }
+                return;
+            }
+
+            throw new NotImplementedException();
+        }
+
+        /// <exception cref="ArgumentNullException"/>
         internal CompiledType(CompiledStruct @struct) : this()
         {
             this.@struct = @struct ?? throw new ArgumentNullException(nameof(@struct));
@@ -831,7 +896,17 @@ namespace LanguageCore.BBCode.Compiler
             if (IsBuiltin)
             {
                 if (TypeParameters.Length > 0) throw new InternalException();
-                return BuiltinType.ToString();
+                return BuiltinType switch
+                {
+                    Type.NotBuiltin => "?",
+                    Type.Void => "void",
+                    Type.Byte => "byte",
+                    Type.Integer => "int",
+                    Type.Float => "float",
+                    Type.Char => "char",
+                    Type.Unknown => "?",
+                    _ => "?",
+                };
             }
 
             string result = Name;
@@ -1062,6 +1137,14 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType[] result = new CompiledType[types.Length];
             for (int i = 0; i < types.Length; i++)
             { result[i] = new CompiledType(types[i], typeFinder); }
+            return result;
+        }
+        public static CompiledType[] FromArray(CompiledType[]? types, TypeArguments? typeArguments)
+        {
+            if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+            CompiledType[] result = new CompiledType[types.Length];
+            for (int i = 0; i < types.Length; i++)
+            { result[i] = new CompiledType(types[i], typeArguments); }
             return result;
         }
 

@@ -64,7 +64,7 @@ export void Print(temp String message)
         int length = message.length;
         for (int i; i < length; i++)
         {
-            Print(message[i]);
+            Print(*(&message + sizeof(String) + i) as char);
         };
     };
 }

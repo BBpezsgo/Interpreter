@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 
 namespace LanguageCore.Brainfuck.Compiler
 {
@@ -31,6 +30,126 @@ namespace LanguageCore.Brainfuck.Compiler
         }
     }
 
+    readonly struct ConsoleProgressBar : IDisposable
+    {
+        readonly int Line;
+        readonly ConsoleColor Color;
+        readonly bool Show;
+
+        public ConsoleProgressBar(ConsoleColor color, bool show)
+        {
+            Line = 0;
+            Color = color;
+            Show = show;
+
+            if (!Show) return;
+
+            Line = Console.GetCursorPosition().Top;
+            Console.WriteLine();
+        }
+
+        public void Print(int iterator, int count) => Print((float)(iterator) / (float)count);
+        public void Print(float progress)
+        {
+            if (!Show) return;
+
+            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
+
+            Console.SetCursorPosition(0, Line);
+
+            int width = Console.WindowWidth;
+            Console.ForegroundColor = Color;
+            for (int i = 0; i < width; i++)
+            {
+                float v = (float)(i + 1) / (float)(width);
+                if (v <= progress)
+                { Console.Write('═'); }
+                else
+                { Console.Write(' '); }
+            }
+            Console.ResetColor();
+
+            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
+        }
+
+        public void Clear()
+        {
+            if (!Show) return;
+
+            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
+
+            Console.SetCursorPosition(0, Line);
+
+            int width = Console.WindowWidth;
+            for (int i = 0; i < width; i++)
+            { Console.Write(' '); }
+
+            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top - 1);
+        }
+
+        public void Dispose() => Clear();
+    }
+
+    readonly struct ConsoleProgressLabel : IDisposable
+    {
+        readonly int Line;
+        readonly string Label;
+        readonly ConsoleColor Color;
+        readonly bool Show;
+
+        public ConsoleProgressLabel(string label, ConsoleColor color, bool show)
+        {
+            Line = 0;
+            Label = label;
+            Color = color;
+            Show = show;
+
+            if (!Show) return;
+
+            Line = Console.GetCursorPosition().Top;
+            Console.WriteLine();
+        }
+
+        public void Print()
+        {
+            if (!Show) return;
+
+            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
+
+            Console.SetCursorPosition(0, Line);
+
+            int width = Console.WindowWidth;
+            Console.ForegroundColor = Color;
+            for (int i = 0; i < width; i++)
+            {
+                if (i < Label.Length)
+                { Console.Write(Label[i]); }
+                else
+                { Console.Write(' '); }
+            }
+            Console.ResetColor();
+
+            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top);
+        }
+
+        public void Clear()
+        {
+            if (!Show) return;
+
+            (int Left, int Top) prevCursorPosition = Console.GetCursorPosition();
+
+            Console.SetCursorPosition(0, Line);
+
+            int width = Console.WindowWidth;
+            for (int i = 0; i < width; i++)
+            { Console.Write(' '); }
+
+            Console.SetCursorPosition(prevCursorPosition.Left, prevCursorPosition.Top - 1);
+        }
+
+        public void Dispose() => Clear();
+    }
+
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         const string ReturnVariableName = "@return";
@@ -39,27 +158,30 @@ namespace LanguageCore.Brainfuck.Compiler
         {
             readonly int InstructionStart;
             readonly CompiledCode Code;
-            readonly DebugInformation DebugInfo;
+            readonly DebugInformation? DebugInfo;
             readonly Position Position;
 
-            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, Position position)
+            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, Position position)
             {
-                InstructionStart = code.GetFinalCode().Length;
                 Code = code;
                 DebugInfo = debugInfo;
                 Position = position;
+
+                if (debugInfo == null) return;
+
+                InstructionStart = code.GetFinalCode().Length;
             }
 
-            public DebugInfoBlock(CompiledCode code, DebugInformation debugInfo, IThingWithPosition position)
+            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IThingWithPosition position)
+                : this(code, debugInfo, position.Position)
             {
-                InstructionStart = code.GetFinalCode().Length;
-                Code = code;
-                DebugInfo = debugInfo;
-                Position = position.Position;
+
             }
 
             public void Dispose()
             {
+                if (DebugInfo == null) return;
+
                 int end = Code.GetFinalCode().Length;
                 if (InstructionStart == end) return;
                 DebugInfo.SourceCodeLocations.Add(new SourceCodeLocation()
@@ -99,9 +221,15 @@ namespace LanguageCore.Brainfuck.Compiler
 
         readonly DebugInformation DebugInfo;
 
+        readonly bool ShowProgress;
+
+        readonly PrintCallback? PrintCallback;
+
+        readonly bool GenerateDebugInformation;
+
         #endregion
 
-        public CodeGeneratorForBrainfuck(Compiler.Result compilerResult, Settings settings) : base(compilerResult)
+        public CodeGeneratorForBrainfuck(Compiler.Result compilerResult, Settings settings, PrintCallback? printCallback) : base(compilerResult)
         {
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
@@ -116,6 +244,9 @@ namespace LanguageCore.Brainfuck.Compiler
             this.BreakTagStack = new Stack<int>();
             this.InMacro = new Stack<bool>();
             this.DebugInfo = new DebugInformation();
+            this.PrintCallback = printCallback;
+            this.GenerateDebugInformation = false; //  settings.GenerateDebugInformation;
+            this.ShowProgress = false;
         }
 
         public enum ValueType
@@ -143,6 +274,7 @@ namespace LanguageCore.Brainfuck.Compiler
             public int StackSize;
             public int HeapStart;
             public int HeapSize;
+            public bool GenerateDebugInformation;
 
             public static Settings Default => new()
             {
@@ -151,6 +283,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 StackSize = 32,
                 HeapStart = 32,
                 HeapSize = 8,
+                GenerateDebugInformation = true,
             };
         }
 
@@ -183,7 +316,7 @@ namespace LanguageCore.Brainfuck.Compiler
             readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
         }
 
-        DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, DebugInfo, position);
+        DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {
@@ -281,198 +414,13 @@ namespace LanguageCore.Brainfuck.Compiler
         #region GetValueSize
         int GetValueSize(StatementWithValue statement)
         {
-            if (statement is LiteralStatement literal)
-            { return GetValueSize(literal); }
+            CompiledType statementType = FindStatementType(statement);
 
-            if (statement is Identifier variable)
-            { return GetValueSize(variable); }
+            if (statementType == Type.Void)
+            { throw new CompilerException($"Statement \"{statement}\" (with type \"{statementType}\") does not have a size", statement, CurrentFile); }
 
-            if (statement is OperatorCall expression)
-            { return GetValueSize(expression); }
-
-            if (statement is AddressGetter addressGetter)
-            { return GetValueSize(addressGetter); }
-
-            if (statement is Pointer pointer)
-            { return GetValueSize(pointer); }
-
-            if (statement is FunctionCall functionCall)
-            { return GetValueSize(functionCall); }
-
-            if (statement is TypeCast typeCast)
-            { return GetValueSize(typeCast); }
-
-            if (statement is NewInstance newInstance)
-            { return GetValueSize(newInstance); }
-
-            if (statement is Field field)
-            { return GetValueSize(field); }
-
-            if (statement is ConstructorCall constructorCall)
-            { return GetValueSize(constructorCall); }
-
-            if (statement is IndexCall indexCall)
-            { return GetValueSize(indexCall); }
-
-            if (statement is AnyCall anyCall)
-            { return GetValueSize(anyCall); }
-
-            throw new CompilerException($"Statement {statement.GetType().Name} does not have a size", statement, CurrentFile);
+            return statementType.SizeOnStack;
         }
-        int GetValueSize(AnyCall anyCall)
-        {
-            if (anyCall.ToFunctionCall(out var functionCall))
-            { return GetValueSize(functionCall); }
-
-            CompiledType prevType = FindStatementType(anyCall.PrevStatement);
-
-            if (!prevType.IsFunction)
-            { throw new CompilerException($"This isn't a function", anyCall.PrevStatement, CurrentFile); }
-
-            if (!prevType.Function.ReturnSomething)
-            { throw new CompilerException($"Return value \"void\" does not have a size", anyCall.PrevStatement, CurrentFile); }
-
-            return prevType.Function.ReturnType.SizeOnStack;
-        }
-        int GetValueSize(IndexCall indexCall)
-        {
-            CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
-
-            if (arrayType.IsStackArray)
-            { return arrayType.StackArrayOf.SizeOnStack; }
-
-            if (!arrayType.IsClass)
-            { throw new CompilerException($"Index getter for type \"{arrayType.Name}\" not found", indexCall, CurrentFile); }
-
-            if (!GetIndexGetter(arrayType, out CompiledFunction? indexer))
-            {
-                if (!GetIndexGetterTemplate(arrayType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                { throw new CompilerException($"Index getter for class \"{arrayType.Class.Name}\" not found", indexCall, CurrentFile); }
-
-                indexerTemplate = AddCompilable(indexerTemplate);
-                indexer = indexerTemplate.Function;
-            }
-
-            return indexer.Type.SizeOnStack;
-        }
-        int GetValueSize(Field field)
-        {
-            CompiledType type = FindStatementType(field);
-            return type.SizeOnStack;
-        }
-        int GetValueSize(NewInstance newInstance)
-        {
-            if (GetStruct(newInstance, out var @struct))
-            {
-                return @struct.Size;
-            }
-
-            if (GetClass(newInstance, out _))
-            {
-                return 1;
-            }
-
-            throw new CompilerException($"Type \"{newInstance.TypeName}\" not found", newInstance.TypeName, CurrentFile);
-        }
-        static int GetValueSize(LiteralStatement statement) => statement.Type switch
-        {
-            LiteralType.String => 1, // throw new NotSupportedException($"String literals not supported by brainfuck"),
-            LiteralType.Integer => 1,
-            LiteralType.Char => 1,
-            LiteralType.Float => 1,
-            LiteralType.Boolean => 1,
-            _ => throw new ImpossibleException($"Unknown literal type {statement.Type}"),
-        };
-        int GetValueSize(Identifier statement)
-        {
-            if (CodeGeneratorForBrainfuck.GetVariable(Variables, statement.Content, out Variable variable))
-            {
-                if (!variable.IsInitialized)
-                { throw new CompilerException($"Variable \"{variable.Name}\" not initialized", statement, CurrentFile); }
-
-                return variable.Size;
-            }
-            else if (GetConstant(statement.Content, out _))
-            {
-                return 1;
-            }
-            else if (TryGetFunction(statement.Name, out _))
-            {
-                throw new NotSupportedException($"Function pointers not supported by the brainfuck compiler", statement, CurrentFile);
-            }
-            else
-            { throw new CompilerException($"Variable or constant \"{statement}\" not found", statement, CurrentFile); }
-        }
-        int GetValueSize(ConstructorCall constructorCall)
-        {
-            if (!GetClass(constructorCall, out CompiledClass? @class))
-            { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
-
-            if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
-            {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
-                {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
-                }
-                else
-                {
-                    compilableGeneralFunction = AddCompilable(compilableGeneralFunction);
-                    constructor = compilableGeneralFunction.Function;
-                }
-            }
-
-            if (!constructor.CanUse(CurrentFile))
-            {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
-            }
-
-            return 1;
-        }
-        int GetValueSize(FunctionCall functionCall)
-        {
-            if (GetFunction(functionCall, out CompiledFunction? function))
-            {
-                if (!function.ReturnSomething)
-                { return 0; }
-
-                return function.Type.SizeOnStack;
-            }
-
-            if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-            {
-                if (!compilableFunction.Function.ReturnSomething)
-                { return 0; }
-
-                return compilableFunction.Function.Type.SizeOnStack;
-            }
-
-            throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall, CurrentFile);
-        }
-        int GetValueSize(OperatorCall statement) => statement.Operator.Content switch
-        {
-            "==" => 1,
-            "+" => 1,
-            "-" => 1,
-            "*" => 1,
-            "/" => 1,
-            "^" => 1,
-            "%" => 1,
-            "<" => 1,
-            ">" => 1,
-            "<=" => 1,
-            ">=" => 1,
-            "&" => 1,
-            "|" => 1,
-            "&&" => 1,
-            "||" => 1,
-            "!=" => 1,
-            "<<" => 1,
-            ">>" => 1,
-            _ => throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile),
-        };
-        static int GetValueSize(AddressGetter _) => 1;
-        static int GetValueSize(Pointer _) => 1;
-        int GetValueSize(TypeCast typeCast) => GetValueSize(typeCast.PrevStatement);
         #endregion
 
         #region TryGetAddress
@@ -651,11 +599,10 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        Result GenerateCode(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
-            PrintCallback? printCallback = null)
+        Result GenerateCode(Compiler.Result compilerResult)
         {
+            PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
+
             int constantCount = CompileConstants(compilerResult.TopLevelStatements);
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
@@ -670,14 +617,27 @@ namespace LanguageCore.Brainfuck.Compiler
                 ReturnCount.Push(0);
                 ReturnTagStack.Push(Stack.Push(1));
             }
+            {
+                PrintCallback?.Invoke("  Generating top level statements ...", LogType.Debug);
 
-            foreach (Statement statement in compilerResult.TopLevelStatements)
-            { GenerateCodeForStatement(statement); }
+                using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
+
+                for (int i = 0; i < compilerResult.TopLevelStatements.Length; i++)
+                {
+                    progressBar.Print(i, compilerResult.TopLevelStatements.Length);
+                    GenerateCodeForStatement(compilerResult.TopLevelStatements[i]);
+                }
+            }
 
             CompiledFunction? codeEntry = GetCodeEntry();
 
             if (codeEntry != null)
-            { GenerateCodeForMacro(codeEntry, Array.Empty<StatementWithValue>(), null, codeEntry.Identifier); }
+            {
+                PrintCallback?.Invoke("  Generating code entry ...", LogType.Debug);
+                GenerateCodeForMacro(codeEntry, Array.Empty<StatementWithValue>(), null, codeEntry.Identifier);
+            }
+
+            PrintCallback?.Invoke("  Finishing up ...", LogType.Debug);
 
             {
                 FinishReturnStatements();
@@ -718,16 +678,12 @@ namespace LanguageCore.Brainfuck.Compiler
 
         public static Result Generate(
             Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
             Settings generatorSettings,
             PrintCallback? printCallback = null)
-        {
-            CodeGeneratorForBrainfuck codeGenerator = new(compilerResult, generatorSettings);
-            return codeGenerator.GenerateCode(
-                compilerResult,
-                settings,
-                printCallback
-                );
-        }
+        => new CodeGeneratorForBrainfuck(
+            compilerResult,
+            generatorSettings,
+            printCallback
+        ).GenerateCode(compilerResult);
     }
 }

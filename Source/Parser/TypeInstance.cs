@@ -5,6 +5,7 @@ namespace LanguageCore.Parser
     using System.Collections.Generic;
     using System.Data.Common;
     using System.Linq;
+    using System.Text;
     using LanguageCore.BBCode.Compiler;
     using LanguageCore.Tokenizing;
     using Statement;
@@ -38,6 +39,7 @@ namespace LanguageCore.Parser
 
         public abstract override int GetHashCode();
         public abstract override string ToString();
+        public virtual string ToString(TypeArguments typeArguments) => ToString();
 
         protected static bool TryGetAnalyzedType(CompiledType type, out TokenAnalyzedType analyzedType)
         {
@@ -117,6 +119,7 @@ namespace LanguageCore.Parser
         }
 
         public override string ToString() => $"{StackArrayOf}[{StackArraySize}]";
+        public override string ToString(TypeArguments typeArguments) => $"{StackArrayOf.ToString(typeArguments)}[{StackArraySize}]";
     }
 
     public class TypeInstanceFunction : TypeInstance
@@ -172,6 +175,19 @@ namespace LanguageCore.Parser
         }
 
         public override string ToString() => $"{FunctionReturnType}({string.Join<TypeInstance>(", ", FunctionParameterTypes)})";
+        public override string ToString(TypeArguments typeArguments)
+        {
+            StringBuilder result = new();
+            result.Append(FunctionReturnType.ToString(typeArguments));
+            result.Append('(');
+            for (int i = 0; i < FunctionParameterTypes.Length; i++)
+            {
+                if (i > 0) result.Append(", ");
+                result.Append(FunctionParameterTypes[i].ToString(typeArguments));
+            }
+            result.Append(')');
+            return result.ToString();
+        }
     }
 
     public class TypeInstanceSimple : TypeInstance
@@ -264,6 +280,25 @@ namespace LanguageCore.Parser
         {
             if (GenericTypes is null) return Identifier.Content;
             return $"{Identifier.Content}<{string.Join<TypeInstance>(", ", GenericTypes)}>";
+        }
+        public override string ToString(TypeArguments typeArguments)
+        {
+            string identifier = Identifier.Content;
+            if (typeArguments.TryGetValue(Identifier.Content, out CompiledType? replaced))
+            { identifier = replaced.ToString(); }
+
+            if (GenericTypes is null)
+            { return identifier; }
+
+            StringBuilder result = new(identifier);
+            result.Append('<');
+            for (int i = 0; i < GenericTypes.Length; i++)
+            {
+                if (i > 0) result.Append(", ");
+                result.Append(GenericTypes[i].ToString(typeArguments));
+            }
+            result.Append('>');
+            return result.ToString();
         }
     }
 }

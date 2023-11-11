@@ -1,10 +1,9 @@
-﻿using System.Drawing;
-using Win32;
+﻿using Win32;
 using Point = System.Drawing.Point;
 
 namespace ConsoleGUI
 {
-    internal class WindowElement : Element
+    public class WindowElement : Element
     {
         public bool IsFocused { get; private set; }
         bool IsDragging;
@@ -12,9 +11,8 @@ namespace ConsoleGUI
         Point MouseDragStart = Point.Empty;
         Point MouseDragStartPos = Point.Empty;
 
-        internal bool CanDrag = true;
-        internal bool HasBorder = true;
-        internal IElement[] Elements = System.Array.Empty<IElement>();
+        public bool CanDrag = true;
+        public Element[] Elements = System.Array.Empty<Element>();
 
         public override void BeforeDraw()
         {
@@ -24,7 +22,7 @@ namespace ConsoleGUI
 
         public override CharInfo DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
 
-        internal void OnMouseEventBase(MouseEvent mouse)
+        public void OnMouseEventBase(MouseEvent mouse)
         {
             if (!CanDrag) return;
 

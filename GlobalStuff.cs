@@ -1,1 +1,1 @@
-﻿global using TypeArguments = System.Collections.Generic.Dictionary<System.String, LanguageCore.BBCode.Compiler.CompiledType>;
+﻿global using TypeArguments = System.Collections.Generic.Dictionary<string, LanguageCore.BBCode.Compiler.CompiledType>;

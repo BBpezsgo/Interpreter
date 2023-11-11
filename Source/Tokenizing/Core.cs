@@ -108,12 +108,13 @@ namespace LanguageCore.Tokenizing
         public override string ToString() => Content;
         public string ToOriginalString() => TokenType switch
         {
-            Tokenizing.TokenType.LITERAL_STRING => $"\"{Content}\"",
-            Tokenizing.TokenType.LITERAL_CHAR => $"\'{Content}\'",
+            TokenType.LITERAL_STRING => $"\"{Content}\"",
+            TokenType.LITERAL_CHAR => $"\'{Content}\'",
+            TokenType.COMMENT => $"//{Content}",
             _ => Content,
         };
 
-        public static Token CreateAnonymous(string content, TokenType type = Tokenizing.TokenType.IDENTIFIER)
+        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER)
             => new(type, content, true, Position.UnknownPosition);
 
         public static Token CreateAnonymous(string content, TokenType type, Position position)
@@ -145,8 +146,8 @@ namespace LanguageCore.Tokenizing
 
         string GetDebuggerDisplay() => TokenType switch
         {
-            Tokenizing.TokenType.LITERAL_STRING => $"\"{Content.Escape()}\"",
-            Tokenizing.TokenType.LITERAL_CHAR => $"\'{Content.Escape()}\'",
+            TokenType.LITERAL_STRING => $"\"{Content.Escape()}\"",
+            TokenType.LITERAL_CHAR => $"\'{Content.Escape()}\'",
             _ => Content.Escape(),
         };
 
@@ -241,8 +242,6 @@ namespace LanguageCore.Tokenizing
         readonly string Text;
         readonly string? File;
 
-        readonly TextSource Source;
-
         readonly List<Token> Tokens;
         readonly List<SimpleToken> UnicodeCharacters;
 
@@ -269,8 +268,6 @@ namespace LanguageCore.Tokenizing
             File = file;
 
             SavedUnicode = null;
-
-            Source = new TextSource(text ?? string.Empty);
         }
 
         public static TokenizerResult Tokenize(string? sourceCode, string? filePath = null)

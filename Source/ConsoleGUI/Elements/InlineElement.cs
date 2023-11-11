@@ -2,10 +2,8 @@
 
 namespace ConsoleGUI
 {
-    internal class InlineElement : Element, IBorderedElement, IElementWithTitle, IInlineLayoutElement
+    public class InlineElement : Element, IInlineLayoutElement
     {
-        public bool HasBorder { get; set; } = false;
-        public string? Title { get; set; }
         public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();
 
         public class BeforeDrawEvent { }

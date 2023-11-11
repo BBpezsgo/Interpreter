@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using Microsoft.Win32.SafeHandles;
 using Win32;
 using Win32.LowLevel;
@@ -99,8 +100,8 @@ namespace ConsoleGUI
             Background = ByteColor.Black,
         };
 
-        internal IElement[] Elements = Array.Empty<IElement>();
-        internal IElement? FilledElement = null;
+        internal Element[] Elements = Array.Empty<Element>();
+        internal Element? FilledElement = null;
 
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
@@ -164,9 +165,9 @@ namespace ConsoleGUI
 
                 foreach (var _element in Elements)
                 {
-                    if (_element is IElementWithEvents element) element.OnStart();
+                    if (_element is Element element) element.OnStart();
                 }
-                if (FilledElement is IElementWithEvents elementWithEvents) elementWithEvents?.OnStart();
+                if (FilledElement is Element elementWithEvents) elementWithEvents?.OnStart();
             };
             TimerOnStart.Enabled = true;
 
@@ -336,7 +337,7 @@ namespace ConsoleGUI
             WriteConsole(ref ConsoleRect);
         }
 
-        void DrawElement(IElement Element, bool IsFilled = false)
+        void DrawElement(Element Element, bool IsFilled = false)
         {
             for (int x = Element.Rect.Left; x <= Element.Rect.Right; x++)
             {
@@ -382,11 +383,11 @@ namespace ConsoleGUI
                 {
                     for (int i = Elements.Length - 1; i >= 0; i--)
                     {
-                        if (Elements[i] is not IElementWithEvents element) continue;
+                        if (Elements[i] is not Element element) continue;
                         element.OnDestroy();
                     }
 
-                    if (FilledElement is IElementWithEvents elementWithEvents)
+                    if (FilledElement is Element elementWithEvents)
                     {
                         elementWithEvents.OnDestroy();
                     }
@@ -455,13 +456,13 @@ namespace ConsoleGUI
             {
                 for (int i = Elements.Length - 1; i >= 0; i--)
                 {
-                    if (Elements[i] is not IElementWithEvents element) continue;
+                    if (Elements[i] is not Element element) continue;
                     if (!element.Contains(MousePosition.X, MousePosition.Y)) continue;
                     element.OnKeyEvent(e);
                     element.BeforeDraw();
                     DrawElement(element);
                 }
-                if (FilledElement is IElementWithEvents elementWithEvents)
+                if (FilledElement is Element elementWithEvents)
                 {
                     elementWithEvents.OnKeyEvent(e);
                     elementWithEvents.BeforeDraw();
@@ -477,7 +478,7 @@ namespace ConsoleGUI
             {
                 try
                 {
-                    if (Elements[i] is not IElementWithEvents element) continue;
+                    if (Elements[i] is not Element element) continue;
                     if (!element.Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                     element.OnMouseEvent(e);
                     element.BeforeDraw();
@@ -488,7 +489,7 @@ namespace ConsoleGUI
                 catch (Exception exception)
                 { System.Diagnostics.Debug.WriteLine(exception.ToString()); }
             }
-            if (FilledElement is IElementWithEvents elementWithEvents)
+            if (FilledElement is Element elementWithEvents)
             {
                 if (FilledElement is IElementWithSubelements elementWithSubelements)
                 {
@@ -496,7 +497,7 @@ namespace ConsoleGUI
                     {
                         try
                         {
-                            if (elementWithSubelements.Elements[i] is not IElementWithEvents element) continue;
+                            if (elementWithSubelements.Elements[i] is not Element element) continue;
                             if (!element.Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                             element.OnMouseEvent(e);
                         }

@@ -230,6 +230,20 @@ namespace LanguageCore.Parser
             return result;
         }
 
+        public string ReadableID(TypeArguments? typeArguments)
+        {
+            if (typeArguments == null) return ReadableID();
+            string result = this.Identifier.ToString();
+            result += "(";
+            for (int j = 0; j < this.Parameters.Length; j++)
+            {
+                if (j > 0) { result += ", "; }
+                result += this.Parameters[j].Type.ToString(typeArguments);
+            }
+            result += ")";
+            return result;
+        }
+
         public override bool Equals(object? obj)
         {
             if (obj is not FunctionThingDefinition other) return false;

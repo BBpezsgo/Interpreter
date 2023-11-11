@@ -793,7 +793,7 @@ namespace LanguageCore.BBCode.Compiler
                         CompiledFunction methodInfo = CompileFunction(method);
 
                         if (compiledFunctions.Any(other => methodInfo.IsSame(other)))
-                        { throw new CompilerException($"Function with name '{methodInfo.ReadableID}' already defined", method.Identifier, compiledClass.FilePath); }
+                        { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
                         compiledFunctions.Add(methodInfo);

@@ -146,26 +146,6 @@ namespace LanguageCore.ASM
             throw processException;
         }
 
-        static void Masm(string input, string output)
-        {
-            const string masm = @"C:\masm32\bin\";
-
-            if (!File.Exists(input))
-            { return; }
-
-            if (File.Exists(output))
-            {
-                File.Delete(output);
-                Thread.Sleep(100);
-            }
-
-            Process? process = Process.Start(new ProcessStartInfo(masm + "ml", $"/c /Zd /Fo \"{output}\" /coff \"{input}\""));
-            process?.WaitForExit();
-            Console.WriteLine();
-            Console.WriteLine($"Exit code: {process?.ExitCode}");
-            Thread.Sleep(200);
-        }
-
         static void Ln(string input, string output)
         {
             string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
@@ -200,29 +180,7 @@ namespace LanguageCore.ASM
             Thread.Sleep(200);
         }
 
-        static void Batch(string bat)
-        {
-            Process? process = Process.Start(new ProcessStartInfo(bat)
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-            });
-
-            if (process == null)
-            { throw new Exception($"Failed to start process \"{bat}\""); }
-
-            process.WaitForExit();
-
-            string stdOutput = process.StandardOutput.ReadToEnd();
-            string stdError = process.StandardError.ReadToEnd();
-
-            if (process.ExitCode != 0)
-            { throw new ProcessException(bat, process.ExitCode, stdOutput, stdError); }
-
-            Thread.Sleep(200);
-        }
-
-        public static void Assemble(string asmSourceCode, string outputFile, bool throwErrors)
+        public static void Assemble(string asmSourceCode, string outputFile)
         {
             string outputFilename = Path.GetFileName(outputFile);
 

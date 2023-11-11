@@ -292,35 +292,9 @@ namespace ConsoleGUI
         }
     }
 
-    public interface IElementWithSubelements : IElement
+    public interface IElementWithSubelements
     {
-        IElement[] Elements { get; }
-    }
-
-    public interface IElementWithEvents : IElement
-    {
-        void OnMouseEvent(MouseEvent mouse);
-        void OnKeyEvent(KeyEvent e);
-        void OnStart();
-        void OnDestroy();
-    }
-
-    public interface IElementWithTitle
-    {
-        public string? Title { get; }
-    }
-
-    public interface IElement : IMainThreadThing
-    {
-        Rectangle Rect { get; set; }
-        void RefreshSize();
-        void BeforeDraw();
-        CharInfo DrawContent(int x, int y);
-    }
-
-    public interface IBorderedElement : IElement
-    {
-        bool HasBorder { get; }
+        Element[] Elements { get; }
     }
 
     public enum InlineLayoutSizeMode
@@ -365,23 +339,22 @@ namespace ConsoleGUI
 
     public static class Extensions
     {
-        public static CharInfo DrawBorder(this IElement element, int x, int y)
+        public static CharInfo DrawBorder(this Element element, int x, int y)
         {
             if (!element.Contains(x, y)) return ConsoleGUI.NullCharacter;
             Side side = element.Rect.GetSide(x, y);
-            if (element is IElementWithTitle elementWithTitle && !string.IsNullOrEmpty(elementWithTitle.Title))
+            if (!string.IsNullOrEmpty(element.Title))
             {
-                string title = elementWithTitle.Title;
-                int titleOffset = 2;
+                const int titleOffset = 2;
                 int relativeX = x - element.Rect.X;
                 if (side == Side.Top)
                 {
                     if (relativeX == titleOffset - 1)
                     { return '┤'.Details(); }
-                    if (relativeX == title.Length + titleOffset)
+                    if (relativeX == element.Title.Length + titleOffset)
                     { return '├'.Details(); }
-                    if (relativeX >= titleOffset && relativeX < title.Length + titleOffset)
-                    { return title[relativeX - titleOffset].Details(); }
+                    if (relativeX >= titleOffset && relativeX < element.Title.Length + titleOffset)
+                    { return element.Title[relativeX - titleOffset].Details(); }
                 }
             }
             return side switch
@@ -398,53 +371,53 @@ namespace ConsoleGUI
             };
         }
 
-        public static bool Contains(this IElement element, int x, int y)
+        public static bool Contains(this Element element, int x, int y)
             =>
             element.Rect.Contains(x, y) ||
             element.Rect.Contains(x - 1, y) ||
             element.Rect.Contains(x, y - 1) ||
             element.Rect.Contains(x - 1, y - 1);
-        public static bool Contains(this IElement element, Coord position)
+        public static bool Contains(this Element element, Coord position)
             => element.Contains(position.X, position.Y);
 
-        public static void OnMouseEvent(this IElement[] elements, MouseEvent e)
+        public static void OnMouseEvent(this Element[] elements, MouseEvent e)
         {
             for (int i = 0; i < elements.Length; i++)
             {
-                if (elements[i] is not IElementWithEvents element) continue;
+                if (elements[i] is not Element element) continue;
                 if (elements[i].Rect.IsEmpty) continue;
                 if (!elements[i].Contains(e.MousePosition.X, e.MousePosition.Y)) continue;
                 element.OnMouseEvent(e);
             }
         }
 
-        public static void OnKeyEvent(this IElement[] elements, KeyEvent e)
+        public static void OnKeyEvent(this Element[] elements, KeyEvent e)
         {
             for (int i = 0; i < elements.Length; i++)
             {
-                if (elements[i] is not IElementWithEvents element) continue;
+                if (elements[i] is not Element element) continue;
                 if (elements[i].Rect.IsEmpty) continue;
                 element.OnKeyEvent(e);
             }
         }
 
-        public static CharInfo DrawContentWithBorders(this IElement element, int x, int y)
+        public static CharInfo DrawContentWithBorders(this Element element, int x, int y)
         {
-            if (element is IBorderedElement borderedElement && borderedElement.HasBorder)
+            if (element.HasBorder)
             {
-                if (borderedElement.Rect.Top == y ||
-                    borderedElement.Rect.Left == x ||
-                    borderedElement.Rect.Bottom == y ||
-                    borderedElement.Rect.Right == x)
-                { return borderedElement.DrawBorder(x, y); }
+                if (element.Rect.Top == y ||
+                    element.Rect.Left == x ||
+                    element.Rect.Bottom == y ||
+                    element.Rect.Right == x)
+                { return element.DrawBorder(x, y); }
 
-                return borderedElement.DrawContent(x - borderedElement.Rect.Left - 1, y - borderedElement.Rect.Top - 1);
+                return element.DrawContent(x - element.Rect.Left - 1, y - element.Rect.Top - 1);
             }
 
             return element.DrawContent(x, y);
         }
 
-        public static CharInfo? DrawContent(this IElement[] elements, int x, int y)
+        public static CharInfo? DrawContent(this Element[] elements, int x, int y)
         {
             for (int i = 0; i < elements.Length; i++)
             {
@@ -455,16 +428,16 @@ namespace ConsoleGUI
             return null;
         }
 
-        public static void BeforeDraw(this IElement[] elements)
+        public static void BeforeDraw(this Element[] elements)
         { for (int i = 0; i < elements.Length; i++) elements[i].BeforeDraw(); }
 
-        public static void BeforeDraw(this IEnumerable<IElement> elements)
+        public static void BeforeDraw(this IEnumerable<Element> elements)
         { foreach (var element in elements) element.BeforeDraw(); }
 
-        public static void RefreshSize(this IElement[] elements)
+        public static void RefreshSize(this Element[] elements)
         { for (int i = 0; i < elements.Length; i++) elements[i].RefreshSize(); }
 
-        public static void RefreshSize(this IEnumerable<IElement> elements)
+        public static void RefreshSize(this IEnumerable<Element> elements)
         { foreach (var element in elements) element.RefreshSize(); }
 
         public static bool IsOutside<T>(this T[] v, int i) => (i < 0) || (i >= v.Length);
@@ -475,7 +448,7 @@ namespace ConsoleGUI
         public static CharInfo Clamp(this DrawBuffer v, int i, CharInfo @default) => v.IsOutside(i) ? @default : v[i];
         public static CharInfo? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
-        internal static Side GetSide(this System.Drawing.Rectangle v, int x, int y)
+        internal static Side GetSide(this Rectangle v, int x, int y)
         {
             if (v.Left == x)
             {

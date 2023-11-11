@@ -6,3 +6,5 @@ PrintLine(temp list.ToString());
 list.Add(5);
 list.Add(6);
 list.Add(44);
+list.Clear();
+delete list;

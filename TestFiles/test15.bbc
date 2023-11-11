@@ -7,5 +7,5 @@ void Start()
 	
 	delete g_str;
 
-	delete new String(7);
+	delete new String(7) as int;
 }

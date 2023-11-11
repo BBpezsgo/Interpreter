@@ -1,0 +1,10 @@
+using System;
+using System.Console;
+using System.Lists; 
+
+Stack<int> list = new Stack<int>(2);
+list.Push(34);
+list.Push(7);
+list.Pop();
+list.Push(9);
+Print(temp list.ToString());

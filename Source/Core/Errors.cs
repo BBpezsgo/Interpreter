@@ -267,22 +267,14 @@ namespace LanguageCore
 
     /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>
     [Serializable]
-    public class InternalException : Exception
+    public class InternalException : LanguageException
     {
-        public readonly string? File;
+        public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }
+        public InternalException(string message) : base(message, Position.UnknownPosition, null) { }
+        public InternalException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
+        public InternalException(string message, IThingWithPosition position, string? file) : base(message, position.Position, file) { }
 
-        public InternalException() : base() { }
-        public InternalException(string message) : base(message) { }
-        public InternalException(string message, Exception inner) : base(message, inner) { }
-        public InternalException(string message, string? file) : base(message)
-        {
-            this.File = file;
-        }
-
-        protected InternalException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-            this.File = info.GetString("File");
-        }
+        protected InternalException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>

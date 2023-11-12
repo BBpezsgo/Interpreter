@@ -1,0 +1,13 @@
+using System; 
+using System.Memory; 
+
+SetHeader(0, 126, 0);
+int ptr1 = Alloc(5);
+*ptr1 = 5;
+int ptr2 = Alloc(2);
+*ptr2 = 2;
+int ptr3;
+int ptr4;
+int ptr5;
+int ptr6;
+int ptr7;

@@ -642,7 +642,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (!function.IsTemplate) continue;
 
                 if (function.Identifier.Content != BuiltinFunctionNames.Constructor) continue;
-                if (function.Type.Class != @class) continue;
+                if (function.Context != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
                 if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
@@ -1109,7 +1109,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
-                if (function.Type.Class != @class) continue;
+                if (function.Context != @class) continue;
                 if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
 
                 generalFunction = function;
@@ -1121,7 +1121,7 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledGeneralFunction function = compilableGeneralFunctions[i].Function;
 
                 if (function.Identifier.Content != name) continue;
-                if (function.Type.Class != @class) continue;
+                if (function.Context != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
                 bool not = false;
@@ -1154,7 +1154,7 @@ namespace LanguageCore.BBCode.Compiler
             {
                 if (!function.IsTemplate) continue;
                 if (function.Identifier != name) continue;
-                if (function.Type.Class != @class) continue;
+                if (function.Context != @class) continue;
                 if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);

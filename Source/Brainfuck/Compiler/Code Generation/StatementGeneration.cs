@@ -53,9 +53,9 @@ namespace LanguageCore.Brainfuck.Compiler
                 type = new CompiledType(variableDeclaration.Type, FindType, TryCompute);
             }
 
-            return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, type, initialValue);
+            return PrecompileVariable(Variables, variableDeclaration.VariableName.Content, type, initialValue, variableDeclaration.Modifiers.Contains("temp"));
         }
-        int PrecompileVariable(Stack<Variable> variables, string name, CompiledType type, StatementWithValue? initialValue)
+        int PrecompileVariable(Stack<Variable> variables, string name, CompiledType type, StatementWithValue? initialValue, bool deallocateOnClean)
         {
             if (CodeGeneratorForBrainfuck.GetVariable(variables, name, out _))
             { return 0; }
@@ -84,7 +84,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             int size = Snippets.ARRAY_SIZE(arraySize);
 
                             int address = Stack.PushVirtual(size);
-                            variables.Push(new Variable(name, address, scope, true, type, size)
+                            variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, size)
                             {
                                 IsInitialValueSet = true
                             });
@@ -102,7 +102,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     { throw new CompilerException($"Variable initial value type ({initialValueType}) and variable type ({type}) mismatch", initialValue, CurrentFile); }
 
                     int address = Stack.PushVirtual(type.SizeOnStack);
-                    variables.Push(new Variable(name, address, scope, true, type, type.SizeOnStack));
+                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.SizeOnStack));
                 }
             }
             else
@@ -114,12 +114,12 @@ namespace LanguageCore.Brainfuck.Compiler
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
                     int address = Stack.PushVirtual(size);
-                    variables.Push(new Variable(name, address, scope, true, type, size));
+                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, size));
                 }
                 else
                 {
                     int address = Stack.PushVirtual(type.SizeOnStack);
-                    variables.Push(new Variable(name, address, scope, true, type, type.SizeOnStack));
+                    variables.Push(new Variable(name, address, scope, true, deallocateOnClean, type, type.SizeOnStack));
                 }
             }
 
@@ -415,6 +415,42 @@ namespace LanguageCore.Brainfuck.Compiler
 
         void GenerateCodeForSetter(IndexCall statement, StatementWithValue value)
         {
+            CompiledType prevType = FindStatementType(statement.PrevStatement);
+            CompiledType valueType = FindStatementType(value);
+
+            TypeArguments typeArguments = new();
+            if (!GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
+            {
+                if (GetIndexSetterTemplate(prevType, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
+                {
+                    indexer = indexerTemplate.Function;
+                    typeArguments = indexerTemplate.TypeArguments;
+                }
+            }
+
+            if (indexer is not null)
+            {
+                if (!indexer.CanUse(CurrentFile))
+                {
+                    Errors.Add(new Error($"Function \"{indexer.ReadableID()}\" cannot be called due to its protection level", statement, CurrentFile));
+                    return;
+                }
+
+                typeArguments = Utils.ConcatDictionary(typeArguments, indexer.Context?.CurrentTypeArguments);
+
+                GenerateCodeForMacro(indexer, new StatementWithValue[]
+                {
+                    statement.PrevStatement,
+                    statement.Expression,
+                    value,
+                }, typeArguments, statement);
+
+                if (!statement.SaveValue && indexer.ReturnSomething)
+                { Stack.Pop(); }
+
+                return;
+            }
+
             if (statement.PrevStatement is not Identifier _variableIdentifier)
             { throw new NotSupportedException($"Only variable indexers supported for now", statement.PrevStatement, CurrentFile); }
 
@@ -426,36 +462,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
             using (Code.Block($"Set array (variable {variable.Name}) index ({statement.Expression}) (at {variable.Address}) to {value}"))
             {
-                CompiledType valueType = FindStatementType(value);
-
                 if (!variable.Type.IsStackArray)
-                {
-                    if (!variable.Type.IsClass)
-                    { throw new CompilerException($"Index setter for type \"{variable.Type.Name}\" not found", statement, CurrentFile); }
-
-                    if (!GetIndexSetter(variable.Type, valueType, out CompiledFunction? indexer))
-                    {
-                        if (!GetIndexSetterTemplate(variable.Type, valueType, out CompliableTemplate<CompiledFunction> indexerTemplate))
-                        { throw new CompilerException($"Index setter for class \"{variable.Type.Class.Name}\" not found", statement, CurrentFile); }
-
-                        indexerTemplate = AddCompilable(indexerTemplate);
-                        indexer = indexerTemplate.Function;
-                    }
-
-                    GenerateCodeForStatement(new FunctionCall(
-                            _variableIdentifier,
-                            Token.CreateAnonymous(BuiltinFunctionNames.IndexerSet),
-                            statement.BracketLeft,
-                            new StatementWithValue[]
-                            {
-                                statement.Expression,
-                                value,
-                            },
-                            statement.BracketRight
-                        ));
-
-                    return;
-                }
+                { throw new CompilerException($"Index setter for type \"{variable.Type}\" not found", statement, CurrentFile); }
 
                 CompiledType elementType = variable.Type.StackArrayOf;
 
@@ -539,14 +547,6 @@ namespace LanguageCore.Brainfuck.Compiler
             { GenerateCodeForStatement(modifiedStatement); }
             else
             { throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile); }
-
-            if (statement is FunctionCall statementWithValue &&
-                !statementWithValue.SaveValue &&
-                GetFunction(statementWithValue, out CompiledFunction? _f) &&
-                _f.ReturnSomething)
-            {
-                Stack.Pop();
-            }
 
             Code.SetPointer(0);
 
@@ -820,7 +820,7 @@ namespace LanguageCore.Brainfuck.Compiler
                 }
 
                 if (Stack.LastAddress != BreakTagStack.Pop())
-                { throw new InternalException(); }
+                { throw new InternalException(string.Empty, @while.Block, CurrentFile); }
                 Stack.Pop(); // Pop BreakTag
 
                 Stack.Pop(); // Pop Condition
@@ -1002,6 +1002,9 @@ namespace LanguageCore.Brainfuck.Compiler
                             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", statement, CurrentFile); }
 
                             GenerateCodeForMacro(function, statement.Parameters, null, statement);
+
+                            if (!statement.SaveValue && function.ReturnSomething)
+                            { Stack.Pop(); }
                             return;
                         }
 
@@ -1025,6 +1028,9 @@ namespace LanguageCore.Brainfuck.Compiler
                                     }
 
                                     GenerateCodeForMacro(deallocator, statement.Parameters, null, statement);
+
+                                    if (!statement.SaveValue && deallocator.ReturnSomething)
+                                    { Stack.Pop(); }
                                     return;
                                 }
                                 else
@@ -1060,6 +1066,9 @@ namespace LanguageCore.Brainfuck.Compiler
                         typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
 
                         GenerateCodeForMacro(destructor, statement.Parameters, typeArguments, statement);
+
+                        if (!statement.SaveValue && destructor.ReturnSomething)
+                        { Stack.Pop(); }
 
                         break;
                     }
@@ -1278,38 +1287,6 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(FunctionCall functionCall)
         {
-            /*
-            if (false &&functionCall.Identifier == "Alloc" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 0)
-            {
-                int resultAddress = Stack.PushVirtual(1);
-                // Heap.Allocate(resultAddress);
-                throw new NotSupportedException($"Heap is not supported :(");
-                return;
-            }
-
-            if (false &&functionCall.Identifier == "AllocFrom" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.BYTE ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.INT
-                ))
-            {
-                int resultAddress = Stack.PushVirtual(1);
-
-                int fromAddress = Stack.NextAddress;
-                Compile(functionCall.Parameters[0]);
-
-                // Heap.AllocateFrom(resultAddress, fromAddress);
-
-                Stack.Pop();
-
-                throw new NotSupportedException($"Heap is not supported :(");
-                return;
-            }
-            */
-
             if (functionCall.FunctionName == "sizeof")
             {
                 functionCall.Identifier.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -1370,6 +1347,9 @@ namespace LanguageCore.Brainfuck.Compiler
             typeArguments = Utils.ConcatDictionary(typeArguments, compiledFunction.Context?.CurrentTypeArguments);
 
             GenerateCodeForMacro(compiledFunction, functionCall.MethodParameters, typeArguments, functionCall);
+
+            if (!functionCall.SaveValue && compiledFunction.ReturnSomething)
+            { Stack.Pop(); }
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
@@ -1406,6 +1386,9 @@ namespace LanguageCore.Brainfuck.Compiler
             typeArguments = Utils.ConcatDictionary(typeArguments, constructor.Context?.CurrentTypeArguments);
 
             GenerateCodeForMacro(constructor, constructorCall.Parameters, typeArguments, constructorCall);
+
+            if (!constructorCall.SaveValue && constructor.ReturnSomething)
+            { Stack.Pop(); }
         }
         void GenerateCodeForStatement(Literal statement)
         {
@@ -1502,6 +1485,38 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(OperatorCall statement)
         {
+            {
+                TypeArguments typeArguments = new();
+
+                if (!GetOperator(statement, out CompiledOperator? compiledOperator))
+                {
+                    if (GetOperatorTemplate(statement, out CompliableTemplate<CompiledOperator> compilableFunction))
+                    {
+                        compiledOperator = compilableFunction.Function;
+                        typeArguments = compilableFunction.TypeArguments;
+                    }
+                }
+
+                if (compiledOperator is not null)
+                {
+                    statement.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+
+                    if (!compiledOperator.CanUse(CurrentFile))
+                    {
+                        Errors.Add(new Error($"Function \"{compiledOperator.ReadableID()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                        return;
+                    }
+
+                    typeArguments = Utils.ConcatDictionary(typeArguments, compiledOperator.Context?.CurrentTypeArguments);
+
+                    GenerateCodeForMacro(compiledOperator, statement.Parameters, typeArguments, statement);
+
+                    if (!statement.SaveValue)
+                    { Stack.Pop(); }
+                    return;
+                }
+            }
+
             using (Code.Block($"Expression {statement.Left} {statement.Operator} {statement.Right}"))
             {
                 switch (statement.Operator.Content)
@@ -2489,6 +2504,64 @@ namespace LanguageCore.Brainfuck.Compiler
             return pointerAddress;
         }
 
+        void Free(int pointer, IThingWithPosition position)
+        {
+            if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
+            { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", position, CurrentFile); }
+
+            GenerateCodeForMacro(deallocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, pointer.ToString(), position) }, null, position);
+
+            if (deallocator.ReturnSomething)
+            { Stack.Pop(); }
+        }
+
+        void GenerateDeallocator(StatementWithValue value)
+        {
+            CompiledType deallocateableType = FindStatementType(value);
+
+            if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
+            { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", value, CurrentFile); }
+
+            if (deallocateableType == Type.Integer)
+            {
+                GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
+                return;
+            }
+
+            if (deallocateableType.IsClass)
+            {
+                TypeArguments typeArguments = new();
+
+                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructor))
+                {
+                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                    {
+                        GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
+                        return;
+                    }
+                    typeArguments = destructorTemplate.TypeArguments;
+                    destructor = destructorTemplate.Function;
+                }
+
+                if (!destructor.CanUse(CurrentFile))
+                {
+                    Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    return;
+                }
+
+                typeArguments = Utils.ConcatDictionary(typeArguments, deallocator.Context?.CurrentTypeArguments);
+
+                GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, typeArguments, value);
+
+                if (deallocator.ReturnSomething)
+                { Stack.Pop(); }
+
+                return;
+            }
+
+            GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
+        }
+
         int GenerateCodeForLiteralString(Literal literal)
             => GenerateCodeForLiteralString(literal.Value, literal);
         int GenerateCodeForLiteralString(string literal, IThingWithPosition position)
@@ -2535,6 +2608,10 @@ namespace LanguageCore.Brainfuck.Compiler
 
         void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
+            int instructionStart = 0;
+            if (GenerateDebugInformation)
+            { instructionStart = Code.GetFinalCode().Length; }
+
             if (function.CompiledAttributes.HasAttribute("StandardOutput"))
             {
                 bool canPrint = true;
@@ -2552,6 +2629,21 @@ namespace LanguageCore.Brainfuck.Compiler
                 {
                     foreach (StatementWithValue parameter in parameters)
                     { GenerateCodeForPrinter(parameter); }
+
+                    if (GenerateDebugInformation)
+                    {
+                        DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                        {
+                            File = function.FilePath,
+                            Identifier = function.Identifier.Content,
+                            ReadableIdentifier = function.ReadableID(),
+                            Instructions = (instructionStart, Code.GetFinalCode().Length),
+                            IsMacro = false,
+                            IsValid = true,
+                            SourcePosition = function.Position,
+                        });
+                    }
+
                     return;
                 }
             }
@@ -2573,6 +2665,21 @@ namespace LanguageCore.Brainfuck.Compiler
                     }
                     Code += ',';
                 }
+
+                if (GenerateDebugInformation)
+                {
+                    DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                    {
+                        File = function.FilePath,
+                        Identifier = function.Identifier.Content,
+                        ReadableIdentifier = function.ReadableID(),
+                        Instructions = (instructionStart, Code.GetFinalCode().Length),
+                        IsMacro = false,
+                        IsValid = true,
+                        SourcePosition = function.Position,
+                    });
+                }
+
                 return;
             }
 
@@ -2597,7 +2704,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (function.ReturnSomething)
             {
                 var returnType = function.Type;
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, returnType, returnType.SizeOnStack);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -2632,6 +2739,8 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
+                bool deallocateOnClean = false;
+
                 if (passed is ModifiedStatement modifiedStatement)
                 {
                     if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
@@ -2649,7 +2758,7 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (v.Type != definedType)
                                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
+                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
                                 continue;
                             }
                         case "const":
@@ -2663,6 +2772,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             }
                         case "temp":
                             {
+                                deallocateOnClean = true;
                                 passed = modifiedStatement.Statement;
                                 break;
                             }
@@ -2679,7 +2789,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
                     bool parameterFound = false;
                     Variable compiledParameter = default;
@@ -2764,9 +2874,8 @@ namespace LanguageCore.Brainfuck.Compiler
 
             using (DebugBlock(function.Block.BracketEnd))
             {
-                // TODO: not working with test11.bbc
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
-                { throw new InternalException(); }
+                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
                 Stack.Pop();
             }
 
@@ -2779,6 +2888,9 @@ namespace LanguageCore.Brainfuck.Compiler
                     {
                         Variable variable = Variables.Pop();
                         if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.InHEAP)
+                        { }
                         Stack.Pop();
                     }
                 }
@@ -2811,25 +2923,121 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (savedTypeArguments != null)
             { SetTypeArguments(savedTypeArguments); }
+
+            if (GenerateDebugInformation)
+            {
+                DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                {
+                    File = function.FilePath,
+                    Identifier = function.Identifier.Content,
+                    ReadableIdentifier = function.ReadableID(),
+                    Instructions = (instructionStart, Code.GetFinalCode().Length),
+                    IsMacro = false,
+                    IsValid = true,
+                    SourcePosition = function.Position,
+                });
+            }
         }
 
-        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledOperator function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
         {
+            int instructionStart = 0;
+            if (GenerateDebugInformation)
+            { instructionStart = Code.GetFinalCode().Length; }
+
+            if (function.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                bool canPrint = true;
+
+                foreach (StatementWithValue parameter in parameters)
+                {
+                    if (!CanGenerateCodeForPrinter(parameter))
+                    {
+                        canPrint = false;
+                        break;
+                    }
+                }
+
+                if (canPrint)
+                {
+                    foreach (StatementWithValue parameter in parameters)
+                    { GenerateCodeForPrinter(parameter); }
+
+                    if (GenerateDebugInformation)
+                    {
+                        DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                        {
+                            File = function.FilePath,
+                            Identifier = function.Identifier.Content,
+                            ReadableIdentifier = function.ReadableID(),
+                            Instructions = (instructionStart, Code.GetFinalCode().Length),
+                            IsMacro = false,
+                            IsValid = true,
+                            SourcePosition = function.Position,
+                        });
+                    }
+
+                    return;
+                }
+            }
+
+            if (function.CompiledAttributes.HasAttribute("StandardInput"))
+            {
+                int address = Stack.PushVirtual(1);
+                Code.SetPointer(address);
+                if (function.Type == Type.Void)
+                {
+                    Code += ',';
+                    Code.ClearValue(address);
+                }
+                else
+                {
+                    if (function.Type.SizeOnStack != 1)
+                    {
+                        throw new CompilerException($"Function with \"{"StandardInput"}\" must have a return type with size of 1", (function as FunctionDefinition).Type, function.FilePath);
+                    }
+                    Code += ',';
+                }
+
+                if (GenerateDebugInformation)
+                {
+                    DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                    {
+                        File = function.FilePath,
+                        Identifier = function.Identifier.Content,
+                        ReadableIdentifier = function.ReadableID(),
+                        Instructions = (instructionStart, Code.GetFinalCode().Length),
+                        IsMacro = false,
+                        IsValid = true,
+                        SourcePosition = function.Position,
+                    });
+                }
+
+                return;
+            }
+
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
-                if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
+                if (CurrentMacro[i] == function)
                 { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.ParameterCount != parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
+            if (function.Block is null)
+            { throw new CompilerException($"Function \"{function.ReadableID()}\" does not have any body definition", callerPosition, CurrentFile); }
+
+            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ReadableID(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+
+            progressLabel.Print();
+
             Variable? returnVariable = null;
 
-            if (function.ReturnSomething)
+            if (true) // always returns something
             {
-                CompiledType returnType = new(function.Type, typeArguments);
-                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, returnType, returnType.SizeOnStack);
+                var returnType = function.Type;
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
 
             Stack<Variable> compiledParameters = new();
@@ -2864,6 +3072,8 @@ namespace LanguageCore.Brainfuck.Compiler
                 if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
                 { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
 
+                bool deallocateOnClean = false;
+
                 if (passed is ModifiedStatement modifiedStatement)
                 {
                     if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
@@ -2881,23 +3091,30 @@ namespace LanguageCore.Brainfuck.Compiler
                                 if (v.Type != definedType)
                                 { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
-                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, v.Type, v.Size));
-                                break;
+                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                                continue;
                             }
                         case "const":
                             {
                                 var valueStatement = modifiedStatement.Statement;
-                                if (!TryCompute(valueStatement, null, out DataItem value))
+                                if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
-                                constantParameters.Add(new CompiledParameterConstant(defined, value));
+                                constantParameters.Add(new CompiledParameterConstant(defined, constValue));
+                                continue;
+                            }
+                        case "temp":
+                            {
+                                deallocateOnClean = true;
+                                passed = modifiedStatement.Statement;
                                 break;
                             }
                         default:
                             throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
                     }
                 }
-                else if (passed is StatementWithValue value)
+
+                if (passed is StatementWithValue value)
                 {
                     if (defined.Modifiers.Contains("ref"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
@@ -2905,7 +3122,261 @@ namespace LanguageCore.Brainfuck.Compiler
                     if (defined.Modifiers.Contains("const"))
                     { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
 
-                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value);
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
+
+                    bool parameterFound = false;
+                    Variable compiledParameter = default;
+                    foreach (Variable compiledParameter_ in compiledParameters)
+                    {
+                        if (compiledParameter_.Name == defined.Identifier.Content)
+                        {
+                            parameterFound = true;
+                            compiledParameter = compiledParameter_;
+                        }
+                    }
+
+                    if (!parameterFound)
+                    { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
+
+                    if (compiledParameter.Type != definedType)
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+
+                    using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
+                    {
+                        GenerateCodeForStatement(value);
+
+                        using (Code.Block($"STORE LAST TO {compiledParameter.Address}"))
+                        { Stack.PopAndStore(compiledParameter.Address); }
+                    }
+                    continue;
+                }
+
+                throw new NotImplementedException($"Unimplemented invocation parameter {passed.GetType().Name}");
+            }
+
+            TypeArguments? savedTypeArguments = null;
+            if (typeArguments != null)
+            { SetTypeArguments(typeArguments, out savedTypeArguments); }
+
+            int[] savedBreakTagStack = new int[BreakTagStack.Count];
+            for (int i = 0; i < BreakTagStack.Count; i++)
+            { savedBreakTagStack[i] = BreakTagStack[i]; }
+            BreakTagStack.Clear();
+
+            int[] savedBreakCount = new int[BreakCount.Count];
+            for (int i = 0; i < BreakCount.Count; i++)
+            { savedBreakCount[i] = BreakCount[i]; }
+            BreakCount.Clear();
+
+            Variable[] savedVariables = new Variable[Variables.Count];
+            for (int i = 0; i < Variables.Count; i++)
+            { savedVariables[i] = Variables[i]; }
+            Variables.Clear();
+
+            if (returnVariable.HasValue)
+            { Variables.Push(returnVariable.Value); }
+
+            for (int i = 0; i < compiledParameters.Count; i++)
+            { Variables.Push(compiledParameters[i]); }
+
+            string? savedFilePath = CurrentFile;
+            CurrentFile = function.FilePath;
+
+            CompiledConstant[] savedConstants = CompiledConstants.ToArray();
+            CompiledConstants.Clear();
+
+            for (int i = 0; i < constantParameters.Count; i++)
+            { CompiledConstants.Push(constantParameters[i]); }
+
+            for (int i = 0; i < savedConstants.Length; i++)
+            {
+                if (GetConstant(savedConstants[i].Identifier, out _))
+                { continue; }
+                CompiledConstants.Push(savedConstants[i]);
+            }
+
+            using (DebugBlock(function.Block.BracketStart))
+            {
+                using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
+                {
+                    ReturnTagStack.Push(Stack.Push(1));
+                }
+            }
+
+            GenerateCodeForStatement(function.Block);
+
+            using (DebugBlock(function.Block.BracketEnd))
+            {
+                if (ReturnTagStack.Pop() != Stack.LastAddress)
+                { throw new InternalException(string.Empty, function.Block, function.FilePath); }
+                Stack.Pop();
+            }
+
+            using (DebugBlock((callerPosition is Statement statement && statement.Semicolon is not null) ? statement.Semicolon : function.Block.BracketEnd))
+            {
+                using (Code.Block($"Clean up macro variables ({Variables.Count})"))
+                {
+                    int n = Variables.Count;
+                    for (int i = 0; i < n; i++)
+                    {
+                        Variable variable = Variables.Pop();
+                        if (!variable.HaveToClean) continue;
+                        if (variable.DeallocateOnClean &&
+                            variable.Type.InHEAP)
+                        { }
+                        Stack.Pop();
+                    }
+                }
+            }
+
+            CurrentFile = savedFilePath;
+
+            InMacro.Pop();
+            CurrentMacro.Pop();
+
+            Variables.Clear();
+            for (int i = 0; i < savedVariables.Length; i++)
+            { Variables.Push(savedVariables[i]); }
+
+            CompiledConstants.Clear();
+            for (int i = 0; i < savedConstants.Length; i++)
+            { CompiledConstants.Push(savedConstants[i]); }
+
+            if (BreakCount.Count > 0 ||
+                BreakTagStack.Count > 0)
+            { throw new InternalException(); }
+
+            BreakCount.Clear();
+            for (int i = 0; i < savedBreakCount.Length; i++)
+            { BreakCount.Push(savedBreakCount[i]); }
+
+            BreakTagStack.Clear();
+            for (int i = 0; i < savedBreakTagStack.Length; i++)
+            { BreakTagStack.Push(savedBreakTagStack[i]); }
+
+            if (savedTypeArguments != null)
+            { SetTypeArguments(savedTypeArguments); }
+
+            if (GenerateDebugInformation)
+            {
+                DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                {
+                    File = function.FilePath,
+                    Identifier = function.Identifier.Content,
+                    ReadableIdentifier = function.ReadableID(),
+                    Instructions = (instructionStart, Code.GetFinalCode().Length),
+                    IsMacro = false,
+                    IsValid = true,
+                    SourcePosition = function.Position,
+                });
+            }
+        }
+
+        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        {
+            int instructionStart = 0;
+            if (GenerateDebugInformation)
+            { instructionStart = Code.GetFinalCode().Length; }
+
+            for (int i = 0; i < CurrentMacro.Count; i++)
+            {
+                if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
+            }
+
+            if (function.ParameterCount != parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+
+            Variable? returnVariable = null;
+
+            if (function.ReturnSomething)
+            {
+                CompiledType returnType = new(function.Type, typeArguments);
+                returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
+            }
+
+            Stack<Variable> compiledParameters = new();
+            List<CompiledConstant> constantParameters = new();
+
+            CurrentMacro.Push(function);
+            InMacro.Push(false);
+
+            for (int i = 0; i < parameters.Length; i++)
+            {
+                StatementWithValue passed = parameters[i];
+                ParameterDefinition defined = function.Parameters[i];
+
+                CompiledType passedType = FindStatementType(passed);
+                CompiledType definedType = function.ParameterTypes[i];
+
+                if (passedType != definedType)
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+
+                foreach (Variable compiledParameter in compiledParameters)
+                {
+                    if (compiledParameter.Name == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as parameter", defined.Identifier, CurrentFile); }
+                }
+
+                foreach (CompiledConstant constantParameter in constantParameters)
+                {
+                    if (constantParameter.Identifier == defined.Identifier.Content)
+                    { throw new CompilerException($"Parameter \"{defined}\" already defined as constant", defined.Identifier, CurrentFile); }
+                }
+
+                if (defined.Modifiers.Contains("ref") && defined.Modifiers.Contains("const"))
+                { throw new CompilerException($"Bruh", defined.Identifier, CurrentFile); }
+
+                bool deallocateOnClean = false;
+
+                if (passed is ModifiedStatement modifiedStatement)
+                {
+                    if (!defined.Modifiers.Contains(modifiedStatement.Modifier.Content))
+                    { throw new CompilerException($"Invalid modifier \"{modifiedStatement.Modifier.Content}\"", modifiedStatement.Modifier, CurrentFile); }
+
+                    switch (modifiedStatement.Modifier.Content)
+                    {
+                        case "ref":
+                            {
+                                var modifiedVariable = (Identifier)modifiedStatement.Statement;
+
+                                if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
+                                { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
+
+                                if (v.Type != definedType)
+                                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+
+                                compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
+                                continue;
+                            }
+                        case "const":
+                            {
+                                var valueStatement = modifiedStatement.Statement;
+                                if (!TryCompute(valueStatement, null, out DataItem constValue))
+                                { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
+
+                                constantParameters.Add(new CompiledParameterConstant(defined, constValue));
+                                continue;
+                            }
+                        case "temp":
+                            {
+                                deallocateOnClean = true;
+                                break;
+                            }
+                        default:
+                            throw new CompilerException($"Unknown identifier modifier \"{modifiedStatement.Modifier}\"", modifiedStatement.Modifier, CurrentFile);
+                    }
+                }
+
+                if (passed is StatementWithValue value)
+                {
+                    if (defined.Modifiers.Contains("ref"))
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"ref"}\" modifier", passed, CurrentFile); }
+
+                    if (defined.Modifiers.Contains("const"))
+                    { throw new CompilerException($"You must pass the parameter \"{passed}\" with a \"{"const"}\" modifier", passed, CurrentFile); }
+
+                    PrecompileVariable(compiledParameters, defined.Identifier.Content, definedType, value, defined.Modifiers.Contains("temp") && deallocateOnClean);
 
                     bool parameterFound = false;
                     Variable compiledParameter = default;
@@ -3028,6 +3499,20 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (savedTypeArguments != null)
             { SetTypeArguments(savedTypeArguments); }
+
+            if (GenerateDebugInformation)
+            {
+                DebugInfo.FunctionInformations.Add(new FunctionInformations()
+                {
+                    File = function.FilePath,
+                    Identifier = function.Identifier.Content,
+                    ReadableIdentifier = function.ReadableID(),
+                    Instructions = (instructionStart, Code.GetFinalCode().Length),
+                    IsMacro = false,
+                    IsValid = true,
+                    SourcePosition = function.Position,
+                });
+            }
         }
 
         void FinishReturnStatements()

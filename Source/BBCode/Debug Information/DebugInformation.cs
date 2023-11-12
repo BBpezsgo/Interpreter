@@ -84,6 +84,7 @@ namespace LanguageCore.Runtime
         }
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public struct FunctionInformations
     {
         public bool IsValid;
@@ -98,6 +99,21 @@ namespace LanguageCore.Runtime
         {
             if (!IsValid) return "<unknown>";
             StringBuilder result = new();
+
+            if (IsMacro)
+            { result.Append("macro "); }
+
+            result.Append(ReadableIdentifier);
+
+            return result.ToString();
+        }
+
+        readonly string GetDebuggerDisplay()
+        {
+            if (!IsValid) return "<unknown>";
+            StringBuilder result = new();
+
+            result.Append(Instructions.ToString());
 
             if (IsMacro)
             { result.Append("macro "); }
@@ -192,6 +208,20 @@ namespace LanguageCore.Runtime
                 { return info; }
             }
             return default;
+        }
+
+        public FunctionInformations[] GetFunctionInformationsNested(int codePointer)
+        {
+            List<FunctionInformations> result = new();
+            for (int j = 0; j < FunctionInformations.Count; j++)
+            {
+                FunctionInformations info = FunctionInformations[j];
+
+                if (info.Instructions.Contains(codePointer))
+                { result.Add(info); }
+            }
+            result.Sort((a, b) => a.Instructions.Size() - b.Instructions.Size());
+            return result.ToArray();
         }
 
         public ScopeInformations[] GetScopes(int codePointer)

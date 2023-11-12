@@ -72,7 +72,7 @@ namespace LanguageCore
         public IEnumerator<T> GetEnumerator() => stack.GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => stack.GetEnumerator();
 
-        string GetDebuggerDisplay()
+        internal string GetDebuggerDisplay()
         {
             if (stack is null)
             { return "null"; }
@@ -82,7 +82,7 @@ namespace LanguageCore
 
             StringBuilder result = new(3 + stack.Count * 3);
 
-            result.Append('{');
+            result.Append("{ ");
 
             for (int i = 0; i < stack.Count; i++)
             {
@@ -98,7 +98,7 @@ namespace LanguageCore
                 result.Append(stack[i]?.ToString() ?? "null");
             }
 
-            result.Append('}');
+            result.Append(" }");
 
             return result.ToString();
         }

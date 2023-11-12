@@ -55,7 +55,7 @@ export void Print(bool message)
 [StandardOutput]
 export void Print(temp String message)
 {
-    if (&message < 0)
+    if (&message <= 0)
     {
         Print("null");
     }

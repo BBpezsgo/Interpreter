@@ -245,7 +245,7 @@ namespace LanguageCore.Brainfuck.Compiler
             this.InMacro = new Stack<bool>();
             this.DebugInfo = new DebugInformation();
             this.PrintCallback = printCallback;
-            this.GenerateDebugInformation = false; //  settings.GenerateDebugInformation;
+            this.GenerateDebugInformation = settings.GenerateDebugInformation;
             this.ShowProgress = false;
         }
 
@@ -276,15 +276,22 @@ namespace LanguageCore.Brainfuck.Compiler
             public int HeapSize;
             public bool GenerateDebugInformation;
 
-            public static Settings Default => new()
+            public static Settings Default
             {
-                ClearGlobalVariablesBeforeExit = true,
-                StackStart = 0,
-                StackSize = 32,
-                HeapStart = 32,
-                HeapSize = 8,
-                GenerateDebugInformation = true,
-            };
+                get
+                {
+                    Settings result = new()
+                    {
+                        ClearGlobalVariablesBeforeExit = false,
+                        StackStart = 0,
+                        HeapStart = 64,
+                        HeapSize = 8,
+                        GenerateDebugInformation = false,
+                    };
+                    result.StackSize = result.HeapStart - 1;
+                    return result;
+                }
+            }
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -293,7 +300,10 @@ namespace LanguageCore.Brainfuck.Compiler
             public readonly string Name;
             public readonly int Address;
             public readonly FunctionThingDefinition? Scope;
+
             public readonly bool HaveToClean;
+            public readonly bool DeallocateOnClean;
+
             public readonly CompiledType Type;
             public readonly int Size;
             public bool IsDiscarded;
@@ -301,12 +311,15 @@ namespace LanguageCore.Brainfuck.Compiler
 
             public readonly bool IsInitialized => Type.SizeOnStack > 0;
 
-            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, CompiledType type, int size)
+            public Variable(string name, int address, FunctionThingDefinition? scope, bool haveToClean, bool deallocateOnClean, CompiledType type, int size)
             {
                 Name = name;
                 Address = address;
                 Scope = scope;
+
                 HaveToClean = haveToClean;
+                DeallocateOnClean = deallocateOnClean;
+
                 Type = type;
                 IsDiscarded = false;
                 Size = size;
@@ -610,7 +623,7 @@ namespace LanguageCore.Brainfuck.Compiler
             else
             { PrecompileVariables(compilerResult.TopLevelStatements); }
 
-            // Heap.Init();
+            Heap.Init();
 
             using (Code.Block($"Begin \"return\" block (depth: {ReturnTagStack.Count} (now its one more))"))
             {

@@ -51,28 +51,28 @@ namespace LanguageCore.Brainfuck
     {
         public static byte OpCode(char c) => c switch
         {
-            '>' => 1,
-            '<' => 2,
-            '+' => 3,
-            '-' => 4,
-            '[' => 5,
-            ']' => 6,
-            '.' => 7,
-            ',' => 8,
-            '$' => 9,
+            '>' => OpCodes.POINTER_R,
+            '<' => OpCodes.POINTER_L,
+            '+' => OpCodes.ADD,
+            '-' => OpCodes.SUB,
+            '[' => OpCodes.BRANCH_START,
+            ']' => OpCodes.BRANCH_END,
+            '.' => OpCodes.OUT,
+            ',' => OpCodes.IN,
+            '$' => OpCodes.DEBUG,
             _ => 0,
         };
         public static char OpCode(byte c) => c switch
         {
-            1 => '>',
-            2 => '<',
-            3 => '+',
-            4 => '-',
-            5 => '[',
-            6 => ']',
-            7 => '.',
-            8 => ',',
-            9 => '$',
+            OpCodes.POINTER_R => '>',
+            OpCodes.POINTER_L => '<',
+            OpCodes.ADD => '+',
+            OpCodes.SUB => '-',
+            OpCodes.BRANCH_START => '[',
+            OpCodes.BRANCH_END => ']',
+            OpCodes.OUT => '.',
+            OpCodes.IN => ',',
+            OpCodes.DEBUG => '$',
             _ => '\0',
         };
 

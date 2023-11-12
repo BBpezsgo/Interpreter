@@ -27,6 +27,8 @@ namespace TheProgram.Brainfuck
 
     public static class BrainfuckRunner
     {
+        static CodeGeneratorForBrainfuck.Settings CompilerSettings => CodeGeneratorForBrainfuck.Settings.Default;
+      
         public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags, CompileOptions flags = CompileOptions.None)
         {
             void PrintCallback(string message, LogType level)
@@ -134,13 +136,42 @@ namespace TheProgram.Brainfuck
                             finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
                             finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
 
+                            int heapStart = CompilerSettings.HeapStart;
+                            int heapEnd = heapStart + CompilerSettings.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
+                            // heapStart += HeapCodeHelper.BLOCK_SIZE;
+
                             for (int i = 0; i < finalIndex; i++)
                             {
                                 var cell = interpreter.Memory[i];
+
+                                ConsoleColor fg = ConsoleColor.White;
+                                ConsoleColor bg = ConsoleColor.Black;
+
+                                if (cell == 0)
+                                { fg = ConsoleColor.DarkGray; }
+
+                                if (i == heapStart)
+                                {
+                                    bg = ConsoleColor.DarkBlue;
+                                }
+
+                                if (i > heapStart + 2)
+                                {
+                                    int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
+                                    int k = (i - heapStart) % BasicHeapCodeHelper.BLOCK_SIZE;
+                                    if (k == BasicHeapCodeHelper.OFFSET_DATA)
+                                    { bg = ConsoleColor.DarkGreen; }
+                                }
+
                                 if (i == interpreter.MemoryPointer)
-                                { Console.ForegroundColor = ConsoleColor.Red; }
-                                else if (cell == 0)
-                                { Console.ForegroundColor = ConsoleColor.DarkGray; }
+                                {
+                                    bg = ConsoleColor.DarkRed;
+                                    fg = ConsoleColor.Gray;
+                                }
+
+                                Console.ForegroundColor = fg;
+                                Console.BackgroundColor = bg;
+
                                 Console.Write($" {cell} ");
                                 Console.ResetColor();
                             }
@@ -150,6 +181,8 @@ namespace TheProgram.Brainfuck
                                 Console.ForegroundColor = ConsoleColor.DarkGray;
                                 Console.Write($" ... ");
                                 Console.ResetColor();
+                                Console.WriteLine();
+                                break;
                             }
 
                             Console.WriteLine();
@@ -198,11 +231,7 @@ namespace TheProgram.Brainfuck
                 => CompilePlus(file, (int)options, printCallback);
         public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, int options, PrintCallback printCallback)
         {
-            CodeGeneratorForBrainfuck.Settings compilerSettings = CodeGeneratorForBrainfuck.Settings.Default;
-
             string code = File.ReadAllText(file.FullName);
-
-            compilerSettings.ClearGlobalVariablesBeforeExit = true;
 
             bool throwErrors = true;
 
@@ -210,7 +239,7 @@ namespace TheProgram.Brainfuck
 
             try
             {
-                compilerResult = EasyCompiler.Compile(file, compilerSettings, printCallback).CodeGeneratorResult;
+                compilerResult = EasyCompiler.Compile(file, CompilerSettings, printCallback).CodeGeneratorResult;
                 printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
             catch (LanguageException exception)

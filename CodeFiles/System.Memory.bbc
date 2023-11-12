@@ -29,6 +29,11 @@ void FixSize(ref int size) {
 export int Alloc(int sizeNeed)
 {
     FixSize(ref sizeNeed);
+    
+    // Print("Allocating ");
+    // Print(sizeNeed);
+    // Print(" ...");
+    // PrintLine();
 
     int headerPointer = 0;
     while (1)
@@ -37,6 +42,15 @@ export int Alloc(int sizeNeed)
         int blockUsed;
         GetHeader(headerPointer, ref blockSize, ref blockUsed);
         int dataPointer = headerPointer + 1;
+        
+        // Print("Block #");
+        // Print(headerPointer);
+        // Print(": ");
+        // Print("Size: ");
+        // Print(blockSize);
+        // Print("  Used: ");
+        // Print(blockUsed);
+        // PrintLine();
 
         if (blockUsed == 0)
         {
@@ -45,16 +59,20 @@ export int Alloc(int sizeNeed)
             {
                 // Update the current block's header
                 SetHeader(headerPointer, sizeNeed, 1);
+                
+                // PrintLine("Perfect match");
 
                 return dataPointer;
             };
-
+            
             // If the block's size is larger than needed
             if (blockSize > sizeNeed)
             {
+                // PrintLine("Found a big block ...");
+
                 // Update the current block's header
                 SetHeader(headerPointer, sizeNeed, 1);
-
+                
                 int nextHeaderPointer = dataPointer + sizeNeed;
 
                 // If the next block is exists
@@ -62,7 +80,7 @@ export int Alloc(int sizeNeed)
                 // {
                     // Calculate remaining size
                     int _remainingSize = blockSize - sizeNeed - 1;
-
+                    
                     // If a larger block is allocated than needed
                     if (_remainingSize >= 0)
                     {
@@ -70,11 +88,11 @@ export int Alloc(int sizeNeed)
                         SetHeader(nextHeaderPointer, _remainingSize, 0);
                     };
                 // };
-
+                
                 return dataPointer;
             };
         };
-
+        
         headerPointer += blockSize + 1;
     };
 }

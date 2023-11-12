@@ -65,7 +65,9 @@ namespace LanguageCore.Brainfuck
         const int InitialSize = 1024;
 
         int indent;
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         int pointer;
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         int branchDepth;
 
         public int Pointer => pointer;
@@ -631,6 +633,17 @@ namespace LanguageCore.Brainfuck
             CachedFinalCode = new StringBuilder(result);
             return result;
         }
+
+        public void Append(string code)
+        {
+            this.Code.Append(code);
+            this.CachedFinalCode.Append(code);
+        }
+        public void Append(char code)
+        {
+            this.Code.Append(code);
+            this.CachedFinalCode.Append(code);
+        }
     }
 
     public readonly struct CodeBlock : IDisposable
@@ -665,6 +678,7 @@ namespace LanguageCore.Brainfuck
         }
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class StackCodeHelper
     {
         readonly CompiledCode Code;
@@ -719,7 +733,10 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(1);
 
             if (Size > MaxSize)
-            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            {
+                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.Append("[-]+[]");
+            }
 
             Code.SetValue(address, v);
             return address;
@@ -733,7 +750,10 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(1);
 
             if (Size > MaxSize)
-            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            {
+                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.Append("[-]+[]");
+            }
 
             Code.SetValue(address, v);
             return address;
@@ -751,7 +771,10 @@ namespace LanguageCore.Brainfuck
             int address = PushVirtual(size);
 
             if (Size > MaxSize)
-            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            {
+                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.Append("[-]+[]");
+            }
 
             for (int i = 0; i < size; i++)
             {
@@ -767,7 +790,10 @@ namespace LanguageCore.Brainfuck
             int address = NextAddress;
 
             if (Size >= MaxSize)
-            { Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n"); }
+            {
+                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.Append("[-]+[]");
+            }
 
             TheStack.Push(size);
             return address;
@@ -834,6 +860,8 @@ namespace LanguageCore.Brainfuck
         }
 
         public int PopVirtual() => TheStack.Pop();
+
+        internal string GetDebuggerDisplay() => TheStack.GetDebuggerDisplay();
     }
 
     public class BasicHeapCodeHelper
@@ -845,10 +873,10 @@ namespace LanguageCore.Brainfuck
 
         int OffsettedStart => Start + BLOCK_SIZE;
 
-        const int BLOCK_SIZE = 3;
-        const int OFFSET_ADDRESS_CARRY = 0;
-        const int OFFSET_VALUE_CARRY = 1;
-        const int OFFSET_DATA = 2;
+        public const int BLOCK_SIZE = 3;
+        public const int OFFSET_ADDRESS_CARRY = 0;
+        public const int OFFSET_VALUE_CARRY = 1;
+        public const int OFFSET_DATA = 2;
 
         public BasicHeapCodeHelper(CompiledCode code, int start, int size)
         {
@@ -953,7 +981,8 @@ namespace LanguageCore.Brainfuck
         {
             using (Code.Block("Initialize HEAP"))
             {
-                Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY, 1);
+                // SetAbsolute(0, 126);
+                Code.SetValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_DATA, 126);
                 Code.SetPointer(0);
             }
         }
@@ -962,7 +991,7 @@ namespace LanguageCore.Brainfuck
         {
             using (Code.Block("Destroy HEAP"))
             {
-                Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
+                // Code.ClearValue(OffsettedStart + (BLOCK_SIZE * Size) + OFFSET_ADDRESS_CARRY);
                 Code.SetPointer(0);
             }
         }
@@ -976,6 +1005,26 @@ namespace LanguageCore.Brainfuck
 
             Code.MoveValue(pointerAddress, OffsettedStart);
             Code.MoveValue(valueAddress, OffsettedStart + 1);
+
+            Code.SetPointer(OffsettedStart);
+
+            CarryTo();
+
+            // Copy the carried value to the address
+            Code.MoveValueUnsafe(OFFSET_VALUE_CARRY, true, OFFSET_DATA);
+
+            GoBack();
+        }
+
+        /// <summary>
+        /// <b>Pointer:</b> <see cref="OffsettedStart"/>
+        /// </summary>
+        public void SetAbsolute(int pointer, int value)
+        {
+            Code.ClearValue(OffsettedStart, OffsettedStart + 1);
+
+            Code.SetValue(OffsettedStart, pointer);
+            Code.SetValue(OffsettedStart + 1, value);
 
             Code.SetPointer(OffsettedStart);
 
@@ -1060,11 +1109,11 @@ namespace LanguageCore.Brainfuck
 
         int OffsettedStart => Start + BLOCK_SIZE;
 
-        const int BLOCK_SIZE = 4;
-        const int OFFSET_ADDRESS_CARRY = 0;
-        const int OFFSET_VALUE_CARRY = 1;
-        const int OFFSET_STATUS = 2;
-        const int OFFSET_DATA = 3;
+        public const int BLOCK_SIZE = 4;
+        public const int OFFSET_ADDRESS_CARRY = 0;
+        public const int OFFSET_VALUE_CARRY = 1;
+        public const int OFFSET_STATUS = 2;
+        public const int OFFSET_DATA = 3;
 
         public HeapCodeHelper(CompiledCode code, int start, int size)
         {

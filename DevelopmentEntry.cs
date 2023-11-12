@@ -11,7 +11,7 @@ namespace TheProgram
         [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles]
         public static bool Start(string[] args)
         {
-            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "test49.bbc");
+            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "test11.bbc");
 
             string[] generatedArgs = new string[]
             {
@@ -20,8 +20,8 @@ namespace TheProgram
                 // "--hide-debug",
                 "--hide-system",
                 // "--dont-optimize",
-                "--console-gui",
-                // "--brainfuck",
+                // "--console-gui",
+                "--brainfuck",
                 // "--asm",
                 // "--no-nullcheck",
                 "--heap-size 2048",

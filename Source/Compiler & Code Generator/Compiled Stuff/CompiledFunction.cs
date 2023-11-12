@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statement;
 
@@ -107,30 +108,35 @@ namespace LanguageCore.BBCode.Compiler
 
         public override string ToString()
         {
-            string result = string.Empty;
+            StringBuilder result = new();
             if (IsExport)
-            {
-                result += "export ";
-            }
-            result += this.Type.ToString();
-            result += ' ';
+            { result.Append("export "); }
 
-            result += this.Identifier.Content;
+            result.Append(this.Type.ToString());
+            result.Append(' ');
 
-            result += '(';
+            result.Append(this.Identifier.Content);
+
+            result.Append('(');
             if (this.ParameterTypes.Length > 0)
             {
                 for (int i = 0; i < ParameterTypes.Length; i++)
                 {
-                    if (i > 0) result += ", ";
-                    result += ParameterTypes[i].ToString();
+                    if (i > 0) result.Append(", ");
+                    result.Append(ParameterTypes[i].ToString());
                 }
             }
-            result += ')';
+            result.Append(')');
 
-            result += Block?.ToString() ?? ";";
+            if (Block != null)
+            {
+                result.Append(' ');
+                result.Append(Block.ToString());
+            }
+            else
+            { result.Append(';'); }
 
-            return result;
+            return result.ToString();
         }
 
         public CompiledFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)

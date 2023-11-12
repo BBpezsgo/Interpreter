@@ -396,10 +396,10 @@ namespace LanguageCore.BBCode.Compiler
             };
         }
 
-        CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, CompiledType baseType)
+        CompiledGeneralFunction CompileGeneralFunction(GeneralFunctionDefinition function, CompiledType returnType)
         {
             return new CompiledGeneralFunction(
-                baseType,
+                returnType,
                 CompileTypes(function.Parameters, GetCustomType),
                 function
                 );
@@ -753,6 +753,8 @@ namespace LanguageCore.BBCode.Compiler
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
                         }
 
+                        CompiledType returnType = new(compiledClass);
+
                         if (method.Identifier.Content == "destructor")
                         {
                             List<ParameterDefinition> parameters = method.Parameters.ToList();
@@ -763,9 +765,10 @@ namespace LanguageCore.BBCode.Compiler
                                     Token.CreateAnonymous("this"))
                                 );
                             method.Parameters = parameters.ToArray();
+                            returnType = new CompiledType(Type.Void);
                         }
 
-                        CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, new CompiledType(compiledClass));
+                        CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, returnType);
 
                         if (compiledGeneralFunctions.Any(other => methodInfo.IsSame(other)))
                         { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }

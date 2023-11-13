@@ -2,9 +2,9 @@
 
 namespace LanguageCore.Brainfuck
 {
-    internal static class Simplifier
+    public static class Simplifier
     {
-        internal static string Simplify(string code)
+        public static string Simplify(string code)
         {
             StringBuilder result = new(code.Length);
 

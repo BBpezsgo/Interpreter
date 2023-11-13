@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Generic;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    internal class UnusedFunctionManager : CodeGeneratorNonGeneratorBase
+    public class UnusedFunctionManager : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 
@@ -14,7 +12,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        internal UnusedFunctionManager(Compiler.CompileLevel compileLevel) : base()
+        public UnusedFunctionManager(Compiler.CompileLevel compileLevel) : base()
         {
             CompileLevel = compileLevel;
 

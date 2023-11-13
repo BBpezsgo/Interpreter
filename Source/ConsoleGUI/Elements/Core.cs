@@ -258,6 +258,14 @@ namespace ConsoleGUI
             { if (!this.AddChar(v[i])) break; }
         }
 
+        public void AddText(char v, int count)
+        {
+            for (int i = 0; i < count; i++)
+            { if (!this.AddChar(v)) break; }
+        }
+
+        public void AddText(char v) => this.AddChar(v);
+
         public void AddSpace(int to, int totalWidth)
         {
             if (totalWidth == 0) return;
@@ -282,7 +290,7 @@ namespace ConsoleGUI
             this.currentIndex = this.v.Length;
         }
 
-        internal void FillRemaining()
+        public void FillRemaining()
         {
             for (int i = this.currentIndex; i < this.v.Length; i++)
             {
@@ -448,7 +456,7 @@ namespace ConsoleGUI
         public static CharInfo Clamp(this DrawBuffer v, int i, CharInfo @default) => v.IsOutside(i) ? @default : v[i];
         public static CharInfo? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
-        internal static Side GetSide(this Rectangle v, int x, int y)
+        public static Side GetSide(this Rectangle v, int x, int y)
         {
             if (v.Left == x)
             {
@@ -485,10 +493,10 @@ namespace ConsoleGUI
             return Side.None;
         }
 
-        internal static CharInfo Details(this char v) => new(v, ByteColor.Silver, ByteColor.Black);
+        public static CharInfo Details(this char v) => new(v, ByteColor.Silver, ByteColor.Black);
     }
 
-    internal static class Utils
+    public static class Utils
     {
         public static int GetIndex(int x, int y, int width) => x + (y * width);
         public static int GetIndex(Coord position, int width) => position.X + (position.Y * width);

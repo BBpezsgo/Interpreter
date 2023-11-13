@@ -409,9 +409,9 @@ namespace LanguageCore.Parser.Statement
         public readonly Token BracketLeft;
         public readonly Token BracketRight;
 
-        internal string FunctionName => Identifier.Content;
-        internal bool IsMethodCall => PrevStatement != null;
-        internal StatementWithValue[] MethodParameters
+        public string FunctionName => Identifier.Content;
+        public bool IsMethodCall => PrevStatement != null;
+        public StatementWithValue[] MethodParameters
         {
             get
             {

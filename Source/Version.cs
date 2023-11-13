@@ -3,13 +3,13 @@ using System.Threading;
 
 namespace TheProgram
 {
-    internal static class Version
+    public static class Version
     {
-        internal static string Current => Convert(DateTime.Now);
+        public static string Current => Convert(DateTime.Now);
         static DateTime UploadedSavedD;
 
-        internal static string? UploadedSaved { get; private set; }
-        internal static string Uploaded
+        public static string? UploadedSaved { get; private set; }
+        public static string Uploaded
         {
             get
             {
@@ -32,7 +32,7 @@ namespace TheProgram
             }
         }
 
-        internal static Thread DownloadVersion(Action<string> StateCallback, Action DoneCallback)
+        public static Thread DownloadVersion(Action<string> StateCallback, Action DoneCallback)
         {
             Thread thread = new(new ThreadStart(() =>
             {
@@ -60,9 +60,9 @@ namespace TheProgram
             return thread;
         }
 
-        internal static string Convert(DateTime d) => $"{d.Year}.{d.Month}.{d.Day}";
+        public static string Convert(DateTime d) => $"{d.Year}.{d.Month}.{d.Day}";
 
-        internal static bool HasNewVersion()
+        public static bool HasNewVersion()
         {
             var Current = DateTime.Now;
 

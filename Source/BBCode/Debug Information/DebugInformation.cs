@@ -141,14 +141,20 @@ namespace LanguageCore.Runtime
 
         public static int[] TraceBasePointers(DataItem[] stack, int basePointer)
         {
+            if (!CanTraceBPsWith(basePointer))
+            { return System.Array.Empty<int>(); }
+
             List<int> result = new();
             TraceBasePointers(result, stack, basePointer);
             return result.ToArray();
         }
 
+        static bool CanTraceBPsWith(int basePointer) =>
+            basePointer >= 1;
+
         static void TraceBasePointers(List<int> result, DataItem[] stack, int basePointer)
         {
-            if (basePointer < 1) return;
+            if (!CanTraceBPsWith(basePointer)) return;
             if (basePointer - 1 >= stack.Length) return;
             DataItem item = stack[basePointer - 1];
             if (item.Type != RuntimeType.SInt32) return;
@@ -192,6 +198,9 @@ namespace LanguageCore.Runtime
 
         public FunctionInformations[] GetFunctionInformations(int[] callstack)
         {
+            if (callstack.Length == 0)
+            { return System.Array.Empty<FunctionInformations>(); }
+
             FunctionInformations[] result = new FunctionInformations[callstack.Length];
             for (int i = 0; i < callstack.Length; i++)
             { result[i] = GetFunctionInformations(callstack[i]); }

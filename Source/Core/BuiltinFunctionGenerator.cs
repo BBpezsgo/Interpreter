@@ -21,7 +21,7 @@ namespace LanguageCore.Runtime
         public int ParameterCount => ParameterTypes.Length;
         public readonly bool ReturnSomething;
 
-        internal BytecodeInterpreter? BytecodeInterpreter;
+        public BytecodeInterpreter? BytecodeInterpreter;
 
         public readonly ExternalFunctionFlags Flags;
 
@@ -38,7 +38,7 @@ namespace LanguageCore.Runtime
             this.Flags = flags;
         }
 
-        internal object ID
+        public object ID
         {
             get
             {
@@ -409,7 +409,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="RuntimeException"/>
-        internal static void CheckTypes(DataItem[] values, RuntimeType[] types)
+        public static void CheckTypes(DataItem[] values, RuntimeType[] types)
         {
             int n = Math.Min(values.Length, types.Length);
             for (int i = 0; i < n; i++)
@@ -422,7 +422,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="RuntimeException"/>
-        internal static void CheckTypes(DataItem[] values, BBCode.Compiler.Type[] types)
+        public static void CheckTypes(DataItem[] values, BBCode.Compiler.Type[] types)
         {
             int n = Math.Min(values.Length, types.Length);
             for (int i = 0; i < n; i++)
@@ -434,7 +434,7 @@ namespace LanguageCore.Runtime
             }
         }
 
-        internal static object?[] GetValues(DataItem[] values)
+        public static object?[] GetValues(DataItem[] values)
         {
             object?[] result = new object?[values.Length];
             for (int i = 0; i < values.Length; i++)

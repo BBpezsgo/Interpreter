@@ -21,9 +21,9 @@ namespace LanguageCore.Runtime
 
         protected abstract class Stream
         {
-            internal int ID;
-            internal int MemoryAddress;
-            internal int BufferSize;
+            public int ID;
+            public int MemoryAddress;
+            public int BufferSize;
 
             public Stream(int id, int memoryAddress, int bufferSize)
             {
@@ -32,19 +32,19 @@ namespace LanguageCore.Runtime
                 BufferSize = bufferSize;
             }
 
-            internal abstract void Dispose();
+            public abstract void Dispose();
 
-            internal abstract void Tick(IHeap heap);
+            public abstract void Tick(IHeap heap);
         }
 
         protected class InputStream : Stream
         {
-            internal int Length;
+            public int Length;
 
-            internal System.IO.Stream SystemStream;
+            public System.IO.Stream SystemStream;
 
-            internal bool SystemHasData => (SystemStream.Position >= SystemStream.Length);
-            internal int RemainingBufferSize => (BufferSize - Length);
+            public bool SystemHasData => (SystemStream.Position >= SystemStream.Length);
+            public int RemainingBufferSize => (BufferSize - Length);
 
             public InputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
                 : base(id, memoryAddress, bufferSize)
@@ -52,7 +52,7 @@ namespace LanguageCore.Runtime
                 SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
             }
 
-            internal override void Dispose()
+            public override void Dispose()
             {
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
@@ -60,14 +60,14 @@ namespace LanguageCore.Runtime
                 Debug.Log($"[STREAM {ID}]: Disposed");
             }
 
-            internal void ClearBuffer()
+            public void ClearBuffer()
             {
                 this.Length = 0;
 
                 Debug.Log($"[STREAM {ID}]: Buffer cleared");
             }
 
-            internal override void Tick(IHeap heap)
+            public override void Tick(IHeap heap)
             {
                 if (RemainingBufferSize == 0) return;
                 if (SystemHasData) return;
@@ -87,9 +87,9 @@ namespace LanguageCore.Runtime
 
         protected class OutputStream : Stream
         {
-            internal int Pointer;
+            public int Pointer;
 
-            internal System.IO.Stream SystemStream;
+            public System.IO.Stream SystemStream;
 
             public OutputStream(int id, int memoryAddress, int bufferSize, System.IO.Stream stream)
                 : base(id, memoryAddress, bufferSize)
@@ -97,7 +97,7 @@ namespace LanguageCore.Runtime
                 SystemStream = stream ?? throw new ArgumentNullException(nameof(stream));
             }
 
-            internal override void Dispose()
+            public override void Dispose()
             {
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
@@ -105,7 +105,7 @@ namespace LanguageCore.Runtime
                 Debug.Log($"[STREAM {ID}]: Disposed");
             }
 
-            internal void Flush(byte[] buffer)
+            public void Flush(byte[] buffer)
             {
                 this.Pointer = 0;
 
@@ -115,7 +115,7 @@ namespace LanguageCore.Runtime
                 Debug.Log($"[STREAM {ID}]: Write {buffer.Length} bytes");
             }
 
-            internal override void Tick(IHeap heap) { }
+            public override void Tick(IHeap heap) { }
         }
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);

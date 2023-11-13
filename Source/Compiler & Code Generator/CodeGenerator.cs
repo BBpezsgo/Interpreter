@@ -25,9 +25,9 @@ namespace LanguageCore.BBCode.Compiler
     {
         protected readonly struct CompliableTemplate<T> where T : IDuplicatable<T>
         {
-            internal readonly T OriginalFunction;
-            internal readonly T Function;
-            internal readonly TypeArguments TypeArguments;
+            public readonly T OriginalFunction;
+            public readonly T Function;
+            public readonly TypeArguments TypeArguments;
 
             public CompliableTemplate(T function, TypeArguments typeArguments)
             {

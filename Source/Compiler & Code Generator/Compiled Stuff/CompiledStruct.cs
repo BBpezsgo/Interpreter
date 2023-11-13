@@ -6,9 +6,9 @@ namespace LanguageCore.BBCode.Compiler
     public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>
     {
         public new readonly CompiledField[] Fields;
-        internal Dictionary<string, AttributeValues> CompiledAttributes;
+        public CompiledAttributeCollection CompiledAttributes;
         public readonly List<DefinitionReference> References;
-        internal IReadOnlyDictionary<string, int> FieldOffsets
+        public IReadOnlyDictionary<string, int> FieldOffsets
         {
             get
             {

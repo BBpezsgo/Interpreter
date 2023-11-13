@@ -29,8 +29,8 @@ namespace ConsoleGUI
         double Timer;
         readonly double Interval;
 
-        internal bool Enabled;
-        internal event MainThreadTimerCallback? Elapsed;
+        public bool Enabled;
+        public event MainThreadTimerCallback? Elapsed;
 
         public MainThreadTimer(double interval)
         {
@@ -93,15 +93,15 @@ namespace ConsoleGUI
         const int TIMER_AUTO_REFRESH_CONSOLE = 500;
         const int TIMER_REFRESH_CONSOLE = 100;
 
-        internal static CharInfo NullCharacter => new()
+        public static CharInfo NullCharacter => new()
         {
             Char = ' ',
             Foreground = ByteColor.Black,
             Background = ByteColor.Black,
         };
 
-        internal Element[] Elements = Array.Empty<Element>();
-        internal Element? FilledElement = null;
+        public Element[] Elements = Array.Empty<Element>();
+        public Element? FilledElement = null;
 
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
@@ -122,12 +122,12 @@ namespace ConsoleGUI
         Coord MousePosition;
 
         bool ResizeElements;
-        internal bool NextRefreshConsole;
+        public bool NextRefreshConsole;
 
-        internal static ConsoleGUI? Instance = null;
+        public static ConsoleGUI? Instance = null;
 
         double LastTick;
-        internal bool Destroyed { get; private set; }
+        public bool Destroyed { get; private set; }
 
         void Log(string message)
         {
@@ -135,7 +135,7 @@ namespace ConsoleGUI
             System.Diagnostics.Debug.WriteLine(message);
         }
 
-        internal ConsoleGUI(bool DebugLogs = false)
+        public ConsoleGUI(bool DebugLogs = false)
         {
             Instance = this;
             this.DebugLogs = DebugLogs;
@@ -222,7 +222,7 @@ namespace ConsoleGUI
             Start();
         }
 
-        internal void Destroy()
+        public void Destroy()
         {
             if (Destroyed) return;
             Destroyed = true;
@@ -235,7 +235,7 @@ namespace ConsoleGUI
             ConsoleHandler.Restore();
         }
 
-        internal void Start()
+        public void Start()
         {
             Clear();
 
@@ -277,7 +277,7 @@ namespace ConsoleGUI
             }
         }
 
-        internal void Tick()
+        public void Tick()
         {
             double now = DateTime.UtcNow.TimeOfDay.TotalMilliseconds;
             double deltaTime = now - this.LastTick;
@@ -297,6 +297,9 @@ namespace ConsoleGUI
 
         void RefreshConsole()
         {
+            Mouse.Tick();
+            Keyboard.Tick();
+
             NextRefreshConsole = false;
 
             if (ConsoleHandle.IsInvalid)
@@ -473,6 +476,7 @@ namespace ConsoleGUI
         void MouseEvent(MouseEvent e)
         {
             MousePosition = e.MousePosition;
+            Mouse.Feed(e);
 
             for (int i = Elements.Length - 1; i >= 0; i--)
             {

@@ -3,10 +3,10 @@ using System.IO;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using LanguageCore.Parser;
-    using LanguageCore.Tokenizing;
+    using Parser;
+    using Tokenizing;
 
-    internal class SourceCodeManager
+    public class SourceCodeManager
     {
         readonly List<string> AlreadyCompiledCodes;
         readonly List<Warning> Warnings;
@@ -21,22 +21,22 @@ namespace LanguageCore.BBCode.Compiler
             Print = null;
         }
 
-        internal struct CollectedAST
+        public struct CollectedAST
         {
-            internal ParserResult ParserResult;
-            internal string Path;
-            internal UsingDefinition UsingDefinition;
+            public ParserResult ParserResult;
+            public string Path;
+            public UsingDefinition UsingDefinition;
         }
 
-        internal struct Result
+        public struct Result
         {
-            internal CollectedAST[] CollectedASTs;
+            public CollectedAST[] CollectedASTs;
 
-            internal Warning[] Warnings;
-            internal Error[] Errors;
+            public Warning[] Warnings;
+            public Error[] Errors;
         }
 
-        (string?, string?) LoadSourceCode(
+        (string? Text, string? Path) LoadSourceCode(
             UsingDefinition @using,
             FileInfo file,
             string? basePath)
@@ -206,7 +206,7 @@ namespace LanguageCore.BBCode.Compiler
             };
         }
 
-        internal static Result Collect(
+        public static Result Collect(
             ParserResult parserResult,
             FileInfo file,
             PrintCallback? printCallback = null,

@@ -1,27 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Brainfuck.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
     using BBCode.Compiler;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
-    using LiteralStatement = Parser.Statement.Literal;
+    using Parser;
+    using Parser.Statement;
+    using Runtime;
+    using Tokenizing;
 
     readonly struct CleanupItem
     {
         /// <summary>
         /// The actual data size on the stack
         /// </summary>
-        internal readonly int Size;
+        public readonly int Size;
         /// <summary>
         /// The element count
         /// </summary>
-        internal readonly int Count;
+        public readonly int Count;
 
         public CleanupItem(int size, int count)
         {

@@ -342,10 +342,10 @@ namespace LanguageCore.BBCode.Compiler
         FunctionType? function;
         CompiledType[] typeParameters;
 
-        internal Type BuiltinType => builtinType;
+        public Type BuiltinType => builtinType;
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
-        internal RuntimeType RuntimeType => builtinType switch
+        public RuntimeType RuntimeType => builtinType switch
         {
             Type.Byte => RuntimeType.UInt8,
             Type.Integer => RuntimeType.SInt32,
@@ -357,11 +357,11 @@ namespace LanguageCore.BBCode.Compiler
             _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
         };
 
-        internal CompiledStruct Struct => @struct ?? throw new InternalException($"This isn't a struct");
-        internal CompiledClass Class => @class ?? throw new InternalException($"This isn't a class");
-        internal CompiledEnum Enum => @enum ?? throw new InternalException($"This isn't an enum");
-        internal FunctionType Function => function ?? throw new InternalException($"This isn't a function");
-        internal CompiledType[] TypeParameters => typeParameters;
+        public CompiledStruct Struct => @struct ?? throw new InternalException($"This isn't a struct");
+        public CompiledClass Class => @class ?? throw new InternalException($"This isn't a class");
+        public CompiledEnum Enum => @enum ?? throw new InternalException($"This isn't an enum");
+        public FunctionType Function => function ?? throw new InternalException($"This isn't a function");
+        public CompiledType[] TypeParameters => typeParameters;
 
         string? genericName;
         CompiledType? stackArrayOf;
@@ -370,7 +370,7 @@ namespace LanguageCore.BBCode.Compiler
 
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
-        internal string Name
+        public string Name
         {
             get
             {
@@ -402,18 +402,18 @@ namespace LanguageCore.BBCode.Compiler
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@class))]
-        internal bool IsClass => @class is not null;
+        public bool IsClass => @class is not null;
         /// <summary><c><see cref="Enum"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@enum))]
-        internal bool IsEnum => @enum is not null;
+        public bool IsEnum => @enum is not null;
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@struct))]
-        internal bool IsStruct => @struct is not null;
+        public bool IsStruct => @struct is not null;
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(function))]
-        internal bool IsFunction => function is not null;
-        internal bool IsBuiltin => builtinType != Type.NotBuiltin;
-        internal bool CanBeBuiltin
+        public bool IsFunction => function is not null;
+        public bool IsBuiltin => builtinType != Type.NotBuiltin;
+        public bool CanBeBuiltin
         {
             get
             {
@@ -423,11 +423,11 @@ namespace LanguageCore.BBCode.Compiler
                 return false;
             }
         }
-        internal bool InHEAP => IsClass;
+        public bool InHEAP => IsClass;
         [MemberNotNullWhen(true, nameof(genericName))]
-        internal bool IsGeneric => !string.IsNullOrEmpty(genericName);
+        public bool IsGeneric => !string.IsNullOrEmpty(genericName);
         [MemberNotNullWhen(true, nameof(stackArrayOf))]
-        internal bool IsStackArray => stackArrayOf is not null;
+        public bool IsStackArray => stackArrayOf is not null;
 
         public int Size
         {
@@ -509,7 +509,7 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledType? other, TypeArguments? typeArguments) : this()
+        public CompiledType(CompiledType? other, TypeArguments? typeArguments) : this()
         {
             if (other is null) throw new ArgumentNullException(nameof(other));
 
@@ -574,25 +574,25 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledStruct @struct) : this()
+        public CompiledType(CompiledStruct @struct) : this()
         {
             this.@struct = @struct ?? throw new ArgumentNullException(nameof(@struct));
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(FunctionType function) : this()
+        public CompiledType(FunctionType function) : this()
         {
             this.function = function ?? throw new ArgumentNullException(nameof(function));
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledClass @class) : this()
+        public CompiledType(CompiledClass @class) : this()
         {
             this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledClass @class, params CompiledType[][] typeParameters) : this()
+        public CompiledType(CompiledClass @class, params CompiledType[][] typeParameters) : this()
         {
             this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
             List<CompiledType> typeParameters1 = new();
@@ -602,24 +602,24 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledEnum @enum) : this()
+        public CompiledType(CompiledEnum @enum) : this()
         {
             this.@enum = @enum ?? throw new ArgumentNullException(nameof(@enum));
         }
 
         /// <exception cref="ArgumentNullException"/>
-        internal CompiledType(CompiledFunction @function) : this()
+        public CompiledType(CompiledFunction @function) : this()
         {
             this.function = new FunctionType(@function);
         }
 
-        internal CompiledType(Type type) : this()
+        public CompiledType(Type type) : this()
         {
             this.builtinType = type;
         }
 
         /// <exception cref="InternalException"/>
-        internal CompiledType(RuntimeType type) : this()
+        public CompiledType(RuntimeType type) : this()
         {
             this.builtinType = type switch
             {

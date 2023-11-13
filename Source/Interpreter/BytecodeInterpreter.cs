@@ -34,14 +34,14 @@ namespace LanguageCore.Runtime
 
     class UserInvoke
     {
-        internal readonly int InstructionOffset;
-        internal readonly DataItem[] Arguments;
-        internal readonly Action<DataItem> Callback;
-        internal bool NeedReturnValue;
+        public readonly int InstructionOffset;
+        public readonly DataItem[] Arguments;
+        public readonly Action<DataItem> Callback;
+        public bool NeedReturnValue;
 
-        internal bool IsInvoking;
+        public bool IsInvoking;
 
-        internal UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
+        public UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
         {
             this.InstructionOffset = instructionOffset;
             this.Arguments = arguments;
@@ -51,7 +51,7 @@ namespace LanguageCore.Runtime
             this.IsInvoking = false;
         }
 
-        internal UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
+        public UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
         {
             this.InstructionOffset = instructionOffset;
             this.Arguments = arguments;
@@ -110,7 +110,7 @@ namespace LanguageCore.Runtime
             SleepTickCallback = null;
         }
 
-        internal bool Jump(int instructionOffset)
+        public bool Jump(int instructionOffset)
         {
             if (!IsDone) return false;
 
@@ -126,31 +126,39 @@ namespace LanguageCore.Runtime
             return true;
         }
 
-        internal Context GetContext()
+        public Context GetContext() => new()
         {
+            CallTrace = TraceCalls(),
+            ExecutedInstructionCount = this.EndlessSafe,
+            CodePointer = this.CodePointer,
+            Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
+            Stack = this.Memory.Stack,
+            CodeSampleStart = Math.Max(this.CodePointer - 20, 0),
+        };
+
+        bool CanTraceCallsWith(int basePointer) =>
+            basePointer >= 2 &&
+            basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset < Memory.Stack.Count &&
+            basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset < Memory.Stack.Count;
+
+        public int[] TraceCalls()
+        {
+            if (!CanTraceCallsWith(BasePointer))
+            { return Array.Empty<int>(); }
+
             List<int> callTrace = new();
 
             TraceCalls(callTrace, BasePointer);
 
-            int[] callTraceResult = callTrace.ToArray();
+            int[] callTraceResult;
+            callTraceResult = callTrace.ToArray();
             Array.Reverse(callTraceResult);
-
-            return new Context()
-            {
-                CallTrace = callTraceResult,
-                ExecutedInstructionCount = this.EndlessSafe,
-                CodePointer = this.CodePointer,
-                Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
-                Stack = this.Memory.Stack,
-                CodeSampleStart = Math.Max(this.CodePointer - 20, 0),
-            };
+            return callTraceResult;
         }
 
         void TraceCalls(List<int> callTrace, int basePointer)
         {
-            if (basePointer < 2) return;
-            if (basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset >= Memory.Stack.Count) return;
-            if (basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset >= Memory.Stack.Count) return;
+            if (!CanTraceCallsWith(basePointer)) return;
 
             DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset];
             DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset];
@@ -291,7 +299,7 @@ namespace LanguageCore.Runtime
             TryUserInvoke();
         }
 
-        internal int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
+        public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
         {
             AddressingMode.ABSOLUTE => offset,
             AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,

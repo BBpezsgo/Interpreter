@@ -8,7 +8,7 @@ namespace LanguageCore.Runtime
     {
         readonly DataItem[] heap;
 
-        internal HEAP(int size = 0)
+        public HEAP(int size = 0)
         {
             ushort _size = (ushort)size;
             FixSize(ref _size);

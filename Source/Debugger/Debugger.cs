@@ -12,7 +12,7 @@ namespace TheProgram
 {
     [RequiresDynamicCode("Uses System.Text.Json.JsonSerializer")]
     [RequiresUnreferencedCode("Uses System.Text.Json.JsonSerializer")]
-    internal class Debugger
+    public class Debugger
     {
         readonly InterProcessCommunication Ipc;
         readonly string SourceCode;
@@ -31,7 +31,7 @@ namespace TheProgram
 
         private bool NeedStdin;
 
-        internal Debugger(ArgumentParser.Settings settings_)
+        public Debugger(ArgumentParser.Settings settings_)
         {
             Ipc = new InterProcessCommunication();
             Ipc.OnReceived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
@@ -148,7 +148,7 @@ namespace TheProgram
                     break;
                 case "interpreter/callstack":
                     {
-                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.GetContext().CallTrace, message);
+                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.TraceCalls(), message);
                     }
                     break;
 
@@ -184,7 +184,7 @@ namespace TheProgram
     public abstract class Data_Serializable<TOriginal>
     {
 #pragma warning disable IDE0060 // Remove unused parameter
-        internal Data_Serializable(TOriginal v) { }
+        public Data_Serializable(TOriginal v) { }
 #pragma warning restore IDE0060 // Remove unused parameter
     }
 
@@ -193,7 +193,7 @@ namespace TheProgram
         public int BasePointer { get; set; }
         public int CodePointer { get; set; }
 
-        internal BytecodeProcessorRegisters(BytecodeInterpreter v)
+        public BytecodeProcessorRegisters(BytecodeInterpreter v)
         {
             BasePointer = v.BasePointer;
             CodePointer = v.CodePointer;
@@ -204,17 +204,17 @@ namespace TheProgram
     {
         public Data_StackItem[] Stack { get; set; }
 
-        internal Stack_(BytecodeInterpreter v)
+        public Stack_(BytecodeInterpreter v)
         {
             Stack = v.Memory.Stack.ToArray().ToData(v => new Data_StackItem(v));
         }
     }
 
-    internal class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter>
+    public class Data_BytecodeInterpreterDetails : Data_Serializable<BytecodeInterpreter>
     {
         public Data_StackItem[] Heap { get; set; }
 
-        internal Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
+        public Data_BytecodeInterpreterDetails(BytecodeInterpreter v) : base(v)
         {
             Heap = v.Memory.Heap.ToArray().ToData(v => new Data_StackItem(v));
         }
@@ -322,7 +322,7 @@ namespace TheProgram
             }
 
             CodePointer = v.BytecodeInterpreter.CodePointer;
-            CallStack = v.BytecodeInterpreter.GetContext().CallTrace;
+            CallStack = v.BytecodeInterpreter.TraceCalls();
         }
     }
 }

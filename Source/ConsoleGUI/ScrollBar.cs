@@ -64,21 +64,25 @@ namespace ConsoleGUI
                 return;
             }
 
-            Coord localMousePos = e.MousePosition;
-            localMousePos.X -= (short)sender.Rect.X;
-            localMousePos.Y -=(short) ((short)sender.Rect.Y + (short)1);
+            Coord currentPos = e.MousePosition;
+            currentPos.X -= (short)sender.Rect.X;
+            currentPos.Y -= (short)((short)sender.Rect.Y + (short)1);
 
-            if (localMousePos.X != Parent.Rect.Width - 1)
-            { return; }
+            Coord pressedPos = Mouse.LeftPressedAt;
+            pressedPos.X -= (short)sender.Rect.X;
+            pressedPos.Y -= (short)((short)sender.Rect.Y + (short)1);
 
-            if (localMousePos.Y < 0 || localMousePos.Y > Parent.Rect.Height - 2)
+            if (pressedPos.X != Parent.Rect.Width - 1)
             { return; }
 
             if (e.ButtonState == MouseButton.Left)
             {
                 int height = Parent.Rect.Height - 1;
 
-                float v = localMousePos.Y;
+                int y = currentPos.Y;
+                y = Math.Clamp(y, 0, height);
+
+                float v = y;
                 v /= (float)height;
 
                 v *= range.Max - range.Min;

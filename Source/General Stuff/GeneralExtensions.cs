@@ -7,25 +7,40 @@ namespace LanguageCore
 {
     public static partial class GeneralExtensions
     {
+        readonly struct EscapedCharacters
+        {
+            public static readonly string QuotationMark = "\\\"";
+            public static readonly string Backslash = @"\\";
+            public static readonly string Null = @"\0";
+            public static readonly string A = @"\a";
+            public static readonly string B = @"\b";
+            public static readonly string F = @"\f";
+            public static readonly string N = @"\n";
+            public static readonly string R = @"\r";
+            public static readonly string Tab = @"\t";
+            public static readonly string V = @"\v";
+            public static readonly string U = @"\u";
+        }
+
         public static string Escape(this char v)
         {
             switch (v)
             {
-                case '\"': return "\\\"";
-                case '\\': return @"\\";
-                case '\0': return @"\0";
-                case '\a': return @"\a";
-                case '\b': return @"\b";
-                case '\f': return @"\f";
-                case '\n': return @"\n";
-                case '\r': return @"\r";
-                case '\t': return @"\t";
-                case '\v': return @"\v";
+                case '\"': return EscapedCharacters.QuotationMark;
+                case '\\': return EscapedCharacters.Backslash;
+                case '\0': return EscapedCharacters.Null;
+                case '\a': return EscapedCharacters.A;
+                case '\b': return EscapedCharacters.B;
+                case '\f': return EscapedCharacters.F;
+                case '\n': return EscapedCharacters.N;
+                case '\r': return EscapedCharacters.R;
+                case '\t': return EscapedCharacters.Tab;
+                case '\v': return EscapedCharacters.V;
                 default:
                     if (v >= 0x20 && v <= 0x7e)
                     { return v.ToString(); }
                     else
-                    { return @"\u" + ((int)v).ToString("x4"); }
+                    { return EscapedCharacters.U + ((int)v).ToString("x4"); }
             }
         }
         public static string Escape(this string v)

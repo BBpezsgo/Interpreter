@@ -21,7 +21,7 @@ namespace Communicating
         public event OnReceivedEventHandler OnReceived;
 
         readonly Interface @interface;
-        internal Interface.Type CommunicationType => @interface.CommunicationType;
+        public Interface.Type CommunicationType => @interface.CommunicationType;
 
         public static readonly JsonSerializerOptions SerializerOptions = new()
         {
@@ -97,22 +97,22 @@ namespace Communicating
 
     public class Interface
     {
-        internal delegate void OnReceivedEventHandler(string message);
-        internal event OnReceivedEventHandler OnReceived;
+        public delegate void OnReceivedEventHandler(string message);
+        public event OnReceivedEventHandler OnReceived;
 
         static readonly char EOM = Convert.ToChar(4);
         Thread Listener;
         const int BufferSize = 1024;
         string Incoming = string.Empty;
 
-        internal enum Type
+        public enum Type
         {
             Standard,
             Pipe,
             Socket,
         }
 
-        internal Type CommunicationType => Type.Standard; // PipeName != null ? Type.Pipe : Port != -1 ? Type.Socket : Type.Standard;
+        public Type CommunicationType => Type.Standard; // PipeName != null ? Type.Pipe : Port != -1 ? Type.Socket : Type.Standard;
 
         public void Log(string v)
         {

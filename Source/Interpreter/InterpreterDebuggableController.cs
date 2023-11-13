@@ -136,7 +136,7 @@ namespace LanguageCore.Runtime
             DoUpdate();
         }
 
-        internal void SampleHeap()
+        public void SampleHeap()
         {
             if (this.BytecodeInterpreter == null) return;
             if (this.BytecodeInterpreter.Memory.Heap == null) return;

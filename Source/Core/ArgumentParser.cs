@@ -31,9 +31,9 @@ namespace TheProgram
             Readable,
         }
 
-        internal class ArgumentNormalizer
+        class ArgumentNormalizer
         {
-            internal readonly List<string> Result;
+            public readonly List<string> Result;
 
             NormalizerState State;
             string CurrentArg;

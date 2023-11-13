@@ -4,11 +4,10 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
+    using Parser;
+    using Parser.Statement;
 
-    internal class ReferenceCollector : CodeGeneratorNonGeneratorBase
+    public class ReferenceCollector : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 
@@ -16,7 +15,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        internal ReferenceCollector() : base()
+        public ReferenceCollector() : base()
         {
             CurrentFunction = null;
         }

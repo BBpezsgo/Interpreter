@@ -99,7 +99,7 @@ namespace LanguageCore.BBCode.Compiler
                 currentTypeArguments[key] = new CompiledType(value);
             }
         }
-        internal void AddTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
+        public void AddTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
         {
             if (TemplateInfo == null)
             { return; }

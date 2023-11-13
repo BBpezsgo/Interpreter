@@ -13,3 +13,5 @@
 /TestFiles/*.exe
 
 /publish-*.txt
+
+/DevelopmentEntry.cs

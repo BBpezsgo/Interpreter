@@ -1,11 +1,13 @@
 # Interpreter
 
-[![.Net v7.0](https://img.shields.io/badge/.NET-v6.0-5C2D91)](#)
-[![C# v11](https://img.shields.io/badge/C%23-v10.0-239120.svg)](#)
+[![.Net v7.0](https://img.shields.io/badge/.NET-v7-5C2D91)](#)
+[![C# v11](https://img.shields.io/badge/C%23-v11-239120.svg)](#)
 
-## [Download](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM](https://drive.google.com/uc?export=download&id=1CkZ_b0OFzaiLnU6dcoRTiy-gZOiCl3jM))
+## Download
 
-[![win-x86](https://img.shields.io/badge/win-x86-0078D6?logo=windows&logoColor=white)](#)
+[Download win-x64 JIT](https://drive.google.com/uc?export=download&id=1tlonja46cQfgcAPrV-6hxesONnVzdW2o)
+
+[Download win-x64 AOT](https://drive.google.com/uc?export=download&id=1eEvYsDmbwt2s5ND8-DStJG1WFoc7WTXZ) Google says it's a virus ☹
 
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 

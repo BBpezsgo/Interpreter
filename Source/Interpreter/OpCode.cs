@@ -405,6 +405,26 @@
         ///     <b>Expected stack elements:</b><br/>
         ///     <c>...</c><br/>
         ///     <c>left</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Tag:</b><br/>
+        ///     Inherits from left side
+        /// </para>
+        /// </summary>
+        BITS_NOT,
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c>left</c><br/>
         ///     <c>right</c><br/>
         /// </para>
         /// <br/><br/>

@@ -72,7 +72,7 @@ namespace LanguageCore.Parser
 
         static readonly string[] UnaryPrefixOperators = new string[]
         {
-            "!",
+            "!", "~",
         };
 
         static readonly string[] UnaryPostfixOperators = Array.Empty<string>();

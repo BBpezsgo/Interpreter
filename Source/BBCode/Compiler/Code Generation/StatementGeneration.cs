@@ -971,7 +971,7 @@ namespace LanguageCore.BBCode.Compiler
                     GenerateCodeForLiteralString(literal.Value);
                     break;
                 case LiteralType.Boolean:
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem((bool.Parse(literal.Value) ? 1 : 0)));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(bool.Parse(literal.Value) ? 1 : 0));
                     break;
                 case LiteralType.Char:
                     if (literal.Value.Length != 1) throw new InternalException($"Literal char contains {literal.Value.Length} characters but only 1 allowed", CurrentFile);

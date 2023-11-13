@@ -410,5 +410,31 @@
 
             throw new RuntimeException($"Can't do ^ operation with type {leftSide.Type} and {rightSide.Type}");
         }
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator ~(DataItem leftSide)
+        {
+            if (leftSide.Type == RuntimeType.UInt8)
+            {
+                byte? left = leftSide.Byte;
+
+                if (left.HasValue)
+                {
+                    int r = ~left.Value;
+                    if (r < byte.MinValue || r > byte.MaxValue)
+                    { return new DataItem(r); }
+                    else
+                    { return new DataItem((byte)r); }
+                }
+            }
+
+            {
+                int? left = leftSide.Integer;
+
+                if (left.HasValue)
+                { return new DataItem(~left.Value); }
+            }
+
+            throw new RuntimeException($"Can't do ~ operation with type {leftSide.Type}");
+        }
     }
 }

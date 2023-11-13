@@ -67,6 +67,7 @@ namespace LanguageCore.Runtime
                 case Opcode.BITS_AND: BITS_AND(); break;
                 case Opcode.BITS_OR: BITS_OR(); break;
                 case Opcode.BITS_XOR: BITS_XOR(); break;
+                case Opcode.BITS_NOT: BITS_NOT(); break;
 
                 case Opcode.LOGIC_LT: LOGIC_LT(); break;
                 case Opcode.LOGIC_MT: LOGIC_MT(); break;
@@ -309,6 +310,15 @@ namespace LanguageCore.Runtime
             var leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(leftSide ^ rightSide);
+
+            Step();
+        }
+
+        void BITS_NOT()
+        {
+            var rightSide = Memory.Stack.Pop();
+
+            Memory.Stack.Push(~rightSide);
 
             Step();
         }

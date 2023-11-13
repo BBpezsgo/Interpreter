@@ -230,7 +230,7 @@ namespace LanguageCore.Tokenizing
     public partial class Tokenizer
     {
         static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
-        static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&' };
+        static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~' };
         static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
         static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
         static readonly char[] Whitespaces = new char[] { ' ', '\t', '\u200B', '\r' };

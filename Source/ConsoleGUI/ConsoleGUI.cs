@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using Microsoft.Win32.SafeHandles;
 using Win32;
 using Win32.LowLevel;

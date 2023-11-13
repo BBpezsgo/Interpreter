@@ -102,7 +102,9 @@ namespace LanguageCore.Runtime
         {
             this.opcode = (Opcode)deserializer.DeserializeByte();
             this.AddressingMode = (AddressingMode)deserializer.DeserializeByte();
-            this.parameter = deserializer.DeserializeObject<DataItem>();
+            DataItem dataItem = new();
+            dataItem.Deserialize(deserializer);
+            this.parameter = dataItem;
         }
 
         public Value SerializeText()
@@ -119,7 +121,9 @@ namespace LanguageCore.Runtime
         {
             opcode = data["OpCode"].Enum<Opcode>();
             AddressingMode = data["AddressingMode"].Enum<AddressingMode>();
-            parameter = data["Parameter"].Object<DataItem>();
+            DataItem dataItem = new();
+            dataItem.DeserializeText(data["Parameter"]);
+            parameter = dataItem;
         }
         #endregion
     }

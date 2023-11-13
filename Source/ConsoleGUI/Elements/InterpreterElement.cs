@@ -23,7 +23,7 @@ namespace ConsoleGUI
         int CurrentlyJumping;
         MainThreadTimer InterpreterTimer;
         StandardIOElement ConsolePanel;
-        bool StackAutoScroll;
+        // bool StackAutoScroll;
 
         InterpreterElement() : base()
         {
@@ -33,7 +33,7 @@ namespace ConsoleGUI
 
             NextCodeJumpCount = 1;
             CurrentlyJumping = 0;
-            StackAutoScroll = true;
+            // StackAutoScroll = true;
         }
 
         public InterpreterElement(string file, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()

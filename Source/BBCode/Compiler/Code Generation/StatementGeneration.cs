@@ -451,6 +451,8 @@ namespace LanguageCore.BBCode.Compiler
 
         void GenerateCodeForFunctionCall_Function(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
+            compiledFunction.AddReference(functionCall, CurrentFile);
+
             if (!compiledFunction.CanUse(CurrentFile))
             {
                 Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
@@ -816,6 +818,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
             {
+                operatorDefinition.AddReference(@operator, CurrentFile);
                 @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
@@ -1050,6 +1053,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (GetFunction(variable.Name, expectedType, out CompiledFunction? compiledFunction))
             {
+                compiledFunction.AddReference(variable, CurrentFile);
                 variable.Name.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (compiledFunction.InstructionOffset == -1)
@@ -1342,6 +1346,8 @@ namespace LanguageCore.BBCode.Compiler
                     constructor = compilableGeneralFunction.Function;
                 }
             }
+
+            constructor.AddReference(constructorCall, CurrentFile);
 
             if (!constructor.CanUse(CurrentFile))
             {

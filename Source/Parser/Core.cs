@@ -37,6 +37,18 @@ namespace LanguageCore.Parser
         public readonly EnumDefinition[] Enums;
         public readonly Token[] Tokens;
 
+        public static ParserResult Empty => new(
+            new List<Error>(),
+            new List<FunctionDefinition>(),
+            new List<MacroDefinition>(),
+            new List<StructDefinition>(),
+            new List<UsingDefinition>(),
+            new List<Statement.CompileTag>(),
+            new List<ClassDefinition>(),
+            new List<Statement.Statement>(),
+            new List<EnumDefinition>(),
+            Array.Empty<Token>());
+
         public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, Token[] tokens)
         {
             Errors = errors.ToArray();

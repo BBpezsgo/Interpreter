@@ -5,7 +5,13 @@ using LanguageCore.Parser.Statement;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    public class CompiledGeneralFunction : GeneralFunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<KeywordCall>, IReferenceable<ConstructorCall>, IDuplicatable<CompiledGeneralFunction>
+    public class CompiledGeneralFunction :
+        GeneralFunctionDefinition,
+        ICanBeSame,
+        IAmInContext<CompiledClass>,
+        IReferenceable<KeywordCall>,
+        IReferenceable<ConstructorCall>,
+        IDuplicatable<CompiledGeneralFunction>
     {
         public CompiledType[] ParameterTypes;
 
@@ -16,8 +22,8 @@ namespace LanguageCore.BBCode.Compiler
 
         public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
 
-        public IReadOnlyList<Statement> References => references;
-        readonly List<Statement> references = new();
+        public IReadOnlyList<(Statement Statement, string? File)> References => references;
+        readonly List<(Statement Statement, string? File)> references = new();
 
         public override bool IsTemplate
         {
@@ -49,8 +55,8 @@ namespace LanguageCore.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(KeywordCall statement) => references.Add(statement);
-        public void AddReference(ConstructorCall statement) => references.Add(statement);
+        public void AddReference(KeywordCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(ConstructorCall statement, string? file) => references.Add((statement, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledGeneralFunction other)

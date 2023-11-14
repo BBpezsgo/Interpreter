@@ -217,7 +217,7 @@ namespace LanguageCore.BBCode.Compiler
 
     public interface IReferenceable<T>
     {
-        public void AddReference(T reference);
+        public void AddReference(T reference, string? file);
         public void ClearReferences();
     }
 
@@ -835,14 +835,14 @@ namespace LanguageCore.BBCode.Compiler
                 if (TypeParameters.Length > 0) throw new InternalException();
                 return BuiltinType switch
                 {
-                    Type.NotBuiltin => "?",
                     Type.Void => "void",
                     Type.Byte => "byte",
                     Type.Integer => "int",
                     Type.Float => "float",
                     Type.Char => "char",
                     Type.Unknown => "?",
-                    _ => "?",
+                    Type.NotBuiltin => throw new ImpossibleException(),
+                    _ => throw new ImpossibleException(),
                 };
             }
 

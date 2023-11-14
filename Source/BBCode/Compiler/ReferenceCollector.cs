@@ -153,7 +153,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (GetIndexGetter(prevType, out CompiledFunction? indexer))
                 {
-                    indexer.AddReference(index);
+                    indexer.AddReference(index, CurrentFile);
 
                     if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
                     { indexer.TimesUsed++; }
@@ -163,8 +163,8 @@ namespace LanguageCore.BBCode.Compiler
                 {
                     indexerTemplate = AddCompilable(indexerTemplate);
 
-                    indexerTemplate.OriginalFunction.AddReference(index);
-                    indexerTemplate.Function.AddReference(index);
+                    indexerTemplate.OriginalFunction.AddReference(index, CurrentFile);
+                    indexerTemplate.Function.AddReference(index, CurrentFile);
 
                     if (CurrentFunction == null || !indexerTemplate.Function.IsSame(CurrentFunction))
                     {
@@ -186,7 +186,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (GetOperator(@operator, out CompiledOperator? operatorDefinition))
                 {
-                    operatorDefinition.AddReference(@operator);
+                    operatorDefinition.AddReference(@operator, CurrentFile);
 
                     if (CurrentFunction == null || !operatorDefinition.IsSame(CurrentFunction))
                     { operatorDefinition.TimesUsed++; }
@@ -194,7 +194,7 @@ namespace LanguageCore.BBCode.Compiler
                 }
                 else if (GetOperatorTemplate(@operator, out var compilableOperator))
                 {
-                    compilableOperator.Function.AddReference(@operator);
+                    compilableOperator.Function.AddReference(@operator, CurrentFile);
 
                     if (CurrentFunction == null || !compilableOperator.Function.IsSame(CurrentFunction))
                     { compilableOperator.Function.TimesUsed++; }
@@ -218,7 +218,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
-                        indexer.AddReference(indexSetter);
+                        indexer.AddReference(indexSetter, CurrentFile);
 
                         if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
                         { indexer.TimesUsed++; }
@@ -228,8 +228,8 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         indexerTemplate = AddCompilable(indexerTemplate);
 
-                        indexerTemplate.OriginalFunction.AddReference(indexSetter);
-                        indexerTemplate.Function.AddReference(indexSetter);
+                        indexerTemplate.OriginalFunction.AddReference(indexSetter, CurrentFile);
+                        indexerTemplate.Function.AddReference(indexSetter, CurrentFile);
 
                         if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
                         {
@@ -259,7 +259,7 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (GetIndexSetter(prevType, valueType, out CompiledFunction? indexer))
                     {
-                        indexer.AddReference(indexSetter);
+                        indexer.AddReference(indexSetter, CurrentFile);
 
                         if (CurrentFunction == null || !indexer.IsSame(CurrentFunction))
                         { indexer.TimesUsed++; }
@@ -269,8 +269,8 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         indexerTemplate = AddCompilable(indexerTemplate);
 
-                        indexerTemplate.OriginalFunction.AddReference(indexSetter);
-                        indexerTemplate.Function.AddReference(indexSetter);
+                        indexerTemplate.OriginalFunction.AddReference(indexSetter, CurrentFile);
+                        indexerTemplate.Function.AddReference(indexSetter, CurrentFile);
 
                         if (CurrentFunction == null || !indexerTemplate.OriginalFunction.IsSame(CurrentFunction))
                         {
@@ -324,7 +324,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (GetFunction(functionCall, out CompiledFunction? function))
                 {
-                    function.AddReference(functionCall);
+                    function.AddReference(functionCall, CurrentFile);
 
                     if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                     { function.TimesUsed++; }
@@ -332,7 +332,7 @@ namespace LanguageCore.BBCode.Compiler
                 }
                 else if (GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
                 {
-                    compilableFunction.OriginalFunction.AddReference(functionCall);
+                    compilableFunction.OriginalFunction.AddReference(functionCall, CurrentFile);
 
                     if (CurrentFunction == null || !compilableFunction.OriginalFunction.IsSame(CurrentFunction))
                     {
@@ -372,7 +372,7 @@ namespace LanguageCore.BBCode.Compiler
                     {
                         if (TryGetBuiltinFunction("free", out CompiledFunction? function))
                         {
-                            function.AddReference(keywordCall);
+                            function.AddReference(keywordCall, CurrentFile);
 
                             if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                             { function.TimesUsed++; }
@@ -389,7 +389,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (!destructor.CanUse(CurrentFile))
                         { return; }
 
-                        destructor.AddReference(keywordCall);
+                        destructor.AddReference(keywordCall, CurrentFile);
 
                         if (CurrentFunction == null || !destructor.IsSame(CurrentFunction))
                         { destructor.TimesUsed++; }
@@ -402,7 +402,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (!compilableGeneralFunction.OriginalFunction.CanUse(CurrentFile))
                         { return; }
 
-                        compilableGeneralFunction.OriginalFunction.AddReference(keywordCall);
+                        compilableGeneralFunction.OriginalFunction.AddReference(keywordCall, CurrentFile);
 
                         if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
                         {
@@ -432,7 +432,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (!cloner.CanUse(CurrentFile))
                     { return; }
 
-                    cloner.AddReference(keywordCall);
+                    cloner.AddReference(keywordCall, CurrentFile);
 
                     if (CurrentFunction == null || !cloner.IsSame(CurrentFunction))
                     { cloner.TimesUsed++; }
@@ -440,26 +440,6 @@ namespace LanguageCore.BBCode.Compiler
 
                     return;
                 }
-
-                /*
-                if (keywordCall.FunctionName == "out")
-                {
-                    AnalyzeStatements(keywordCall.Parameters);
-
-                    if (keywordCall.Parameters.Length != 1)
-                    { return; }
-
-                    if (!GetOutputWriter(FindStatementType(keywordCall.Parameters[0]), out var function))
-                    { return; }
-
-                    function.AddReference(keywordCall);
-
-                    if (CurrentFunction == null || !function.IsSame(CurrentFunction))
-                    { function.TimesUsed++; }
-                    function.TimesUsedTotal++;
-                }
-                */
-
             }
             else if (statement is Field field)
             { AnalyzeStatement(field.PrevStatement); }
@@ -483,7 +463,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
                 {
-                    constructor.AddReference(constructorCall);
+                    constructor.AddReference(constructorCall, CurrentFile);
 
                     if (CurrentFunction == null || !constructor.IsSame(CurrentFunction))
                     { constructor.TimesUsed++; }
@@ -491,7 +471,7 @@ namespace LanguageCore.BBCode.Compiler
                 }
                 else if (GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
                 {
-                    compilableGeneralFunction.OriginalFunction.AddReference(constructorCall);
+                    compilableGeneralFunction.OriginalFunction.AddReference(constructorCall, CurrentFile);
 
                     if (CurrentFunction == null || !compilableGeneralFunction.OriginalFunction.IsSame(CurrentFunction))
                     {
@@ -665,7 +645,7 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
-        void ResetReferences()
+        void ClearReferences()
         {
             for (int i = 0; i < this.CompiledFunctions.Length; i++)
             {
@@ -693,7 +673,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             printCallback?.Invoke($"  Collect references ...", LogType.Debug);
 
-            ResetReferences();
+            ClearReferences();
 
             SearchForReferences(topLevelStatements);
         }
@@ -701,8 +681,7 @@ namespace LanguageCore.BBCode.Compiler
         public static void CollectReferences(
             Compiler.Result compilerResult,
             PrintCallback? printCallback = null)
-        {
-            ReferenceCollector referenceCollector = new()
+            => new ReferenceCollector()
             {
                 CompiledClasses = compilerResult.Classes,
                 CompiledStructs = compilerResult.Structs,
@@ -713,9 +692,20 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledGeneralFunctions = compilerResult.GeneralFunctions,
 
                 CompiledEnums = compilerResult.Enums,
-            };
+            }.AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
 
-            referenceCollector.AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
-        }
+        public static void ClearReferences(Compiler.Result compilerResult)
+            => new ReferenceCollector()
+            {
+                CompiledClasses = compilerResult.Classes,
+                CompiledStructs = compilerResult.Structs,
+
+                CompiledFunctions = compilerResult.Functions,
+                CompiledMacros = compilerResult.Macros,
+                CompiledOperators = compilerResult.Operators,
+                CompiledGeneralFunctions = compilerResult.GeneralFunctions,
+
+                CompiledEnums = compilerResult.Enums,
+            }.ClearReferences();
     }
 }

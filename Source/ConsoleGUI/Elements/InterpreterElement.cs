@@ -903,7 +903,7 @@ namespace ConsoleGUI
                 {
                     b.ForegroundColor = ByteColor.BrightBlue;
                     b.AddText('►');
-                    basepointerShown = true;
+                    // basepointerShown = true;
                     b.ForegroundColor = ByteColor.Silver;
                 }
                 else
@@ -946,7 +946,7 @@ namespace ConsoleGUI
                 b.FinishLine(sender.Rect.Width);
                 b.ForegroundColor = ByteColor.Silver;
 
-                i++;
+                // i++;
 
                 break;
             }

@@ -5,7 +5,12 @@ using LanguageCore.Parser.Statement;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    public class CompiledOperator : FunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<OperatorCall>, IDuplicatable<CompiledOperator>
+    public class CompiledOperator :
+        FunctionDefinition,
+        ICanBeSame,
+        IAmInContext<CompiledClass>,
+        IReferenceable<OperatorCall>,
+        IDuplicatable<CompiledOperator>
     {
         public CompiledType[] ParameterTypes;
 
@@ -14,10 +19,10 @@ namespace LanguageCore.BBCode.Compiler
 
         public int InstructionOffset = -1;
 
-        public Dictionary<string, AttributeValues> CompiledAttributes;
+        public CompiledAttributeCollection CompiledAttributes;
 
-        public IReadOnlyList<OperatorCall> ReferencesOperator => references;
-        readonly List<OperatorCall> references = new();
+        public IReadOnlyList<(OperatorCall Statement, string? File)> ReferencesOperator => references;
+        readonly List<(OperatorCall Statement, string? File)> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -49,7 +54,7 @@ namespace LanguageCore.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(OperatorCall statement) => references.Add(statement);
+        public void AddReference(OperatorCall statement, string? file) => references.Add((statement, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledOperator other)

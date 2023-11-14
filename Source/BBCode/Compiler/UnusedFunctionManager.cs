@@ -127,6 +127,7 @@ namespace LanguageCore.BBCode.Compiler
                 ReferenceCollector.CollectReferences(compilerResult, printCallback);
 
                 int functionsRemoved = unusedFunctionManager.DoTheThing(printCallback);
+
                 if (functionsRemoved == 0)
                 {
                     printCallback?.Invoke($"  Deletion of unused functions is complete", LogType.Debug);
@@ -135,6 +136,8 @@ namespace LanguageCore.BBCode.Compiler
 
                 printCallback?.Invoke($"  Removed {functionsRemoved} unused functions at iteration {iteration}", LogType.Debug);
             }
+
+            ReferenceCollector.ClearReferences(compilerResult);
 
             return (unusedFunctionManager.CompiledFunctions, unusedFunctionManager.CompiledOperators, unusedFunctionManager.CompiledGeneralFunctions);
         }

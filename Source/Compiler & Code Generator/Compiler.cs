@@ -117,7 +117,7 @@ namespace LanguageCore.BBCode.Compiler
             if (CodeGenerator.GetClass(CompiledClasses, name, out CompiledClass? @class)) return new CompiledType(@class);
             if (CodeGenerator.GetEnum(CompiledEnums, name, out CompiledEnum? @enum)) return new CompiledType(@enum);
 
-            throw new InternalException($"Unknown type '{name}'");
+            throw new InternalException($"Type \"{name}\" not found");
         }
 
         protected string? TypeDefinitionReplacer(string? typeName)

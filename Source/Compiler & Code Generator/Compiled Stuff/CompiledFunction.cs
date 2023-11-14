@@ -7,7 +7,15 @@ using LanguageCore.Parser.Statement;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    public class CompiledFunction : FunctionDefinition, ICanBeSame, IAmInContext<CompiledClass>, IReferenceable<FunctionCall>, IReferenceable<IndexCall>, IDuplicatable<CompiledFunction>
+    public class CompiledFunction :
+        FunctionDefinition,
+        ICanBeSame,
+        IAmInContext<CompiledClass>, 
+        IReferenceable<FunctionCall>,
+        IReferenceable<IndexCall>, 
+        IReferenceable<Identifier>,
+        IReferenceable<KeywordCall>, 
+        IDuplicatable<CompiledFunction>
     {
         public readonly CompiledType[] ParameterTypes;
 
@@ -18,10 +26,10 @@ namespace LanguageCore.BBCode.Compiler
 
         public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
 
-        public Dictionary<string, AttributeValues> CompiledAttributes;
+        public CompiledAttributeCollection CompiledAttributes;
 
-        public IReadOnlyList<Statement> ReferencesFunction => references;
-        readonly List<Statement> references = new();
+        public IReadOnlyList<(Statement Statement, string? File)> References => references;
+        readonly List<(Statement Statement, string? File)> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -80,9 +88,10 @@ namespace LanguageCore.BBCode.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(FunctionCall statement) => references.Add(statement);
-        public void AddReference(KeywordCall statement) => references.Add(statement);
-        public void AddReference(IndexCall statement) => references.Add(statement);
+        public void AddReference(FunctionCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(Identifier statement, string? file) => references.Add((statement, file));
+        public void AddReference(KeywordCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(IndexCall statement, string? file) => references.Add((statement, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledFunction other)

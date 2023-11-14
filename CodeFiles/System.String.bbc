@@ -89,8 +89,8 @@ class String
 
         for (int i = 0; i < length; i++)
         {
-            char _a = UnsafeGet(a, i);
-            char _b = UnsafeGet(b, i);
+            char _a = UnsafeGet(a, i) as char;
+            char _b = UnsafeGet(b, i) as char;
             
             if (_a != _b)
             {

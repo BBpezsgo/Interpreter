@@ -170,7 +170,7 @@ int ParseDigit(char digit)
     elseif (digit == '6') { return 6; }
     elseif (digit == '7') { return 7; }
     elseif (digit == '8') { return 8; }
-    elseif (digit == '9') { return 9; };
+    elseif (digit == '9') { return 9; }
 }
 
 [External("int-to-float")]

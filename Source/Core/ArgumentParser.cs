@@ -167,9 +167,9 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--pause-end", "-pe"))
+                    if (ExpectArg(args, ref i, out arg, "--no-pause", "-np"))
                     {
-                        result.PauseAtEnd = true;
+                        result.DoNotPause = true;
                         continue;
                     }
 
@@ -432,7 +432,7 @@ namespace TheProgram
 
             public bool ConsoleGUI;
 
-            public bool PauseAtEnd;
+            public bool DoNotPause;
 
             public static Settings Default => new()
             {
@@ -453,7 +453,7 @@ namespace TheProgram
                 CompileToFileType = FileType.Binary,
                 IsTest = false,
                 ConsoleGUI = false,
-                PauseAtEnd = false,
+                DoNotPause = false,
             };
         }
 

@@ -15,7 +15,8 @@
                 catch (System.Exception exception)
                 { LanguageCore.Output.LogError($"Unhandled exception: {exception}"); }
 
-                pauseAtEnd = !settings.IsTest || settings.PauseAtEnd;
+                if (settings.IsTest) pauseAtEnd = false;
+                if (settings.DoNotPause) pauseAtEnd = false;
             }
 
             if (pauseAtEnd)

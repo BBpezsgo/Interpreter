@@ -174,6 +174,51 @@ namespace LanguageCore.BBCode.Compiler
             public readonly Statement[] TopLevelStatements;
             public readonly Token[] Tokens;
 
+            public static Result Empty => new(
+                Array.Empty<CompiledFunction>(),
+                Array.Empty<MacroDefinition>(),
+                Array.Empty<CompiledGeneralFunction>(),
+                Array.Empty<CompiledOperator>(),
+                new Dictionary<string, ExternalFunctionBase>(),
+                Array.Empty<CompiledStruct>(),
+                Array.Empty<CompiledClass>(),
+                Array.Empty<CompileTag>(),
+                Array.Empty<CompiledEnum>(),
+                Array.Empty<Error>(),
+                Array.Empty<Warning>(),
+                Array.Empty<Statement>(),
+                Array.Empty<Token>());
+
+            Result(
+                CompiledFunction[] functions,
+                MacroDefinition[] macros,
+                CompiledGeneralFunction[] generalFunctions,
+                CompiledOperator[] operators,
+                Dictionary<string, ExternalFunctionBase> externalFunctions,
+                CompiledStruct[] structs,
+                CompiledClass[] classes,
+                CompileTag[] hashes,
+                CompiledEnum[] enums,
+                Error[] errors,
+                Warning[] warnings,
+                Statement[] topLevelStatements,
+                Token[] tokens)
+            {
+                Functions = functions;
+                Macros = macros;
+                GeneralFunctions = generalFunctions;
+                Operators = operators;
+                ExternalFunctions = externalFunctions;
+                Structs = structs;
+                Classes = classes;
+                Hashes = hashes;
+                Enums = enums;
+                Errors = errors;
+                Warnings = warnings;
+                TopLevelStatements = topLevelStatements;
+                Tokens = tokens;
+            }
+
             public Result(Compiler compiler, ParserResult parserResult)
             {
                 Functions = compiler.CompiledFunctions;

@@ -9,6 +9,7 @@ namespace LanguageCore.BBCode.Compiler
     using Parser;
     using Parser.Statement;
     using LiteralStatement = Parser.Statement.Literal;
+    using ParameterCleanupItem = (int Size, bool CanDeallocate, CompiledType Type);
 
     public partial class CodeGeneratorForMain : CodeGenerator
     {
@@ -348,9 +349,9 @@ namespace LanguageCore.BBCode.Compiler
         }
 
 
-        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+            Stack<ParameterCleanupItem> parameterCleanup = new();
 
             if (functionCall.PrevStatement != null)
             {
@@ -394,9 +395,54 @@ namespace LanguageCore.BBCode.Compiler
             return parameterCleanup;
         }
 
-        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, FunctionType function)
         {
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+            Stack<ParameterCleanupItem> parameterCleanup = new();
+
+            if (functionCall.PrevStatement != null)
+            {
+                StatementWithValue passedParameter = functionCall.PrevStatement;
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                AddComment(" Param prev:");
+                GenerateCodeForStatement(functionCall.PrevStatement);
+                parameterCleanup.Push((passedParameterType.SizeOnStack, false, passedParameterType));
+            }
+
+            for (int i = 0; i < functionCall.Parameters.Length; i++)
+            {
+                StatementWithValue passedParameter = functionCall.Parameters[i];
+                CompiledType passedParameterType = FindStatementType(passedParameter);
+                CompiledType definedParameterType = function.Parameters[i];
+
+                AddComment($" Param {i}:");
+
+                bool canDeallocate = true; // temp type maybe?
+
+                canDeallocate = canDeallocate && (passedParameterType.InHEAP || passedParameterType == Type.Integer);
+
+                if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
+                {
+                    if (explicitDeallocate && !canDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                }
+                else
+                {
+                    if (explicitDeallocate)
+                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    canDeallocate = false;
+                }
+
+                GenerateCodeForStatement(passedParameter, definedParameterType);
+
+                parameterCleanup.Push((passedParameterType.SizeOnStack, canDeallocate, passedParameterType));
+            }
+
+            return parameterCleanup;
+        }
+
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+        {
+            Stack<ParameterCleanupItem> parameterCleanup = new();
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
@@ -431,7 +477,7 @@ namespace LanguageCore.BBCode.Compiler
             return parameterCleanup;
         }
 
-        void GenerateCodeForParameterCleanup(Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup)
+        void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
         {
             AddComment(" Clear Params:");
             while (parameterCleanup.Count > 0)
@@ -477,7 +523,7 @@ namespace LanguageCore.BBCode.Compiler
 
             AddComment($"Call {compiledFunction.ReadableID()} {{");
 
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+            Stack<ParameterCleanupItem> parameterCleanup;
 
             int returnValueSize = 0;
             if (compiledFunction.ReturnSomething)
@@ -603,58 +649,30 @@ namespace LanguageCore.BBCode.Compiler
         {
             FunctionType functionType = compiledVariable.Type.Function;
 
-            AddComment($"Call {compiledVariable.Type.Function} {{");
+            if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+
+            AddComment($"Call {functionType} {{");
 
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-            if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            Stack<ParameterCleanupItem> parameterCleanup;
 
             int returnValueSize = 0;
             if (functionType.ReturnSomething)
             {
+                AddComment($"Initial return value {{");
                 returnValueSize = GenerateInitialValue(functionType.ReturnType);
+                AddComment($"}}");
             }
 
-            if (functionCall.PrevStatement != null)
-            {
-                AddComment(" Param prev:");
-                // TODO: variable sized prev statement
-                GenerateCodeForStatement(functionCall.PrevStatement);
-            }
-
-            int paramsSize = 0;
-
-            for (int i = 0; i < functionCall.Parameters.Length; i++)
-            {
-                StatementWithValue passedParameter = functionCall.Parameters[i];
-                CompiledType passedParameterType = FindStatementType(passedParameter);
-                CompiledType definedParameterType = functionType.Parameters[i];
-
-                if (passedParameterType != definedParameterType)
-                { throw new CompilerException($"This should be a {definedParameterType} not a {passedParameterType} (parameter {i + 1})", passedParameter, CurrentFile); }
-
-                AddComment($" Param {i}:");
-                GenerateCodeForStatement(passedParameter, definedParameterType);
-
-                paramsSize += definedParameterType.SizeOnStack;
-            }
+            parameterCleanup = GenerateCodeForParameterPassing(functionCall, functionType);
 
             AddComment(" .:");
 
             CallRuntime(compiledVariable);
 
-            AddComment(" Clear Params:");
-            for (int i = 0; i < paramsSize; i++)
-            {
-                AddInstruction(Opcode.POP_VALUE);
-            }
-
-            if (functionCall.PrevStatement != null)
-            {
-                // TODO: variable sized prev statement
-                AddInstruction(Opcode.POP_VALUE);
-            }
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             if (functionType.ReturnSomething && !functionCall.SaveValue)
             {
@@ -669,58 +687,30 @@ namespace LanguageCore.BBCode.Compiler
         {
             FunctionType functionType = compiledParameter.Type.Function;
 
-            AddComment($"Call {compiledParameter.Type.Function} {{");
+            if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
+            { throw new CompilerException($"Wrong number of parameters passed to function {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+
+            AddComment($"Call (runtime) {functionType} {{");
 
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
-            if (functionCall.MethodParameters.Length != functionType.Parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            Stack<ParameterCleanupItem> parameterCleanup;
 
             int returnValueSize = 0;
             if (functionType.ReturnSomething)
             {
+                AddComment($"Initial return value {{");
                 returnValueSize = GenerateInitialValue(functionType.ReturnType);
+                AddComment($"}}");
             }
 
-            if (functionCall.PrevStatement != null)
-            {
-                AddComment(" Param prev:");
-                // TODO: variable sized prev statement
-                GenerateCodeForStatement(functionCall.PrevStatement);
-            }
-
-            int paramsSize = 0;
-
-            for (int i = 0; i < functionCall.Parameters.Length; i++)
-            {
-                StatementWithValue passedParameter = functionCall.Parameters[i];
-                CompiledType passedParameterType = FindStatementType(passedParameter);
-                CompiledType definedParameterType = functionType.Parameters[i];
-
-                if (passedParameterType != definedParameterType)
-                { throw new CompilerException($"This should be a {definedParameterType} not a {passedParameterType} (parameter {i + 1})", passedParameter, CurrentFile); }
-
-                AddComment($" Param {i}:");
-                GenerateCodeForStatement(passedParameter, definedParameterType);
-
-                paramsSize += definedParameterType.SizeOnStack;
-            }
+            parameterCleanup = GenerateCodeForParameterPassing(functionCall, functionType);
 
             AddComment(" .:");
 
             CallRuntime(compiledParameter);
 
-            AddComment(" Clear Params:");
-            for (int i = 0; i < paramsSize; i++)
-            {
-                AddInstruction(Opcode.POP_VALUE);
-            }
-
-            if (functionCall.PrevStatement != null)
-            {
-                // TODO: variable sized prev statement
-                AddInstruction(Opcode.POP_VALUE);
-            }
+            GenerateCodeForParameterCleanup(parameterCleanup);
 
             if (functionType.ReturnSomething && !functionCall.SaveValue)
             {
@@ -760,7 +750,7 @@ namespace LanguageCore.BBCode.Compiler
 
             FunctionType functionType = prevType.Function;
 
-            AddComment($"Call (dynamic) {prevType.Function} {{");
+            AddComment($"Call (runtime) {prevType.Function} {{");
 
             if (anyCall.Parameters.Length != functionType.Parameters.Length)
             { throw new CompilerException($"Wrong number of parameters passed to {functionType}: required {functionType.Parameters.Length} passed {anyCall.Parameters.Length}", new Position(anyCall.Parameters), CurrentFile); }
@@ -823,7 +813,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 AddComment($"Call {operatorDefinition.Identifier} {{");
 
-                Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+                Stack<ParameterCleanupItem> parameterCleanup;
 
                 if (!operatorDefinition.CanUse(CurrentFile))
                 {
@@ -1298,7 +1288,7 @@ namespace LanguageCore.BBCode.Compiler
                     if (fieldType.IsGeneric && !instanceType.Class.CurrentTypeArguments.TryGetValue(fieldType.Name, out fieldType))
                     { throw new CompilerException($"Type argument \"{fieldType?.Name}\" not found", field, instanceType.Class.FilePath); }
 
-                    GenerateInitialValue(fieldType, j =>
+                    GenerateInitialValue2(fieldType, j =>
                     {
                         AddComment($"Save Chunk {j}:");
                         AddInstruction(Opcode.PUSH_VALUE, currentOffset);

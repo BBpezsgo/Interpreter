@@ -271,15 +271,12 @@ namespace LanguageCore.BBCode.Compiler
         public override string ToString()
         {
             StringBuilder result = new();
-            result.Append(ReturnType?.ToString() ?? "null");
+            result.Append(ReturnType.ToString());
             result.Append('(');
-            if (Parameters != null)
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                for (int i = 0; i < Parameters.Length; i++)
-                {
-                    if (i > 0) result.Append(", ");
-                    result.Append(Parameters[i]?.ToString() ?? "null");
-                }
+                if (i > 0) result.Append(", ");
+                result.Append(Parameters[i].ToString());
             }
             result.Append(')');
 

@@ -1,16 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
 
 #pragma warning disable IDE0051 // Remove unused private members
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Diagnostics.CodeAnalysis;
-    using LanguageCore.Runtime;
-    using Parser;
     using Parser.Statement;
+    using Runtime;
 
     public partial class CodeGeneratorForMain : CodeGenerator
     {
@@ -19,7 +14,7 @@ namespace LanguageCore.BBCode.Compiler
         int CallRuntime(CompiledVariable address)
         {
             if (address.Type != Type.Integer && !address.Type.IsFunction)
-            { throw new CompilerException($"This should be an integer", address, CurrentFile); }
+            { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.PUSH_VALUE, 0);
@@ -48,7 +43,7 @@ namespace LanguageCore.BBCode.Compiler
         int CallRuntime(CompiledParameter address)
         {
             if (address.Type != Type.Integer && !address.Type.IsFunction)
-            { throw new CompilerException($"This should be an integer", address, CurrentFile); }
+            { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{address.Type}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.PUSH_VALUE, 0);
@@ -77,7 +72,7 @@ namespace LanguageCore.BBCode.Compiler
             CompiledType addressType = FindStatementType(address);
 
             if (addressType != Type.Integer && !addressType.IsFunction)
-            { throw new CompilerException($"This should be an \"int\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
+            { throw new CompilerException($"This should be an \"{new CompiledType(Type.Integer)}\" or function pointer and not \"{addressType}\"", address, CurrentFile); }
 
             int returnToValueInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.PUSH_VALUE, 0); // Saved code pointer
@@ -122,79 +117,18 @@ namespace LanguageCore.BBCode.Compiler
             AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.RUNTIME);
         }
 
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(TypeInstance type)
-        {
-            if (type is TypeInstanceFunction)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (type is TypeInstanceStackArray)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (type is TypeInstanceSimple simpleType)
-            {
-                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
-                {
-                    AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(builtinType));
-                    return 1;
-                }
-
-                CompiledType instanceType = FindType(simpleType);
-
-                if (instanceType.IsStruct)
-                {
-                    int size = 0;
-                    foreach (FieldDefinition field in instanceType.Struct.Fields)
-                    {
-                        size++;
-                        AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(field.Type));
-                    }
-                    return size;
-                }
-
-                if (instanceType.IsClass)
-                {
-                    AddInstruction(Opcode.PUSH_VALUE, 0);
-                    return 1;
-                }
-
-                if (instanceType.IsEnum)
-                {
-                    if (instanceType.Enum.Members.Length == 0)
-                    { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
-
-                    AddInstruction(Opcode.PUSH_VALUE, instanceType.Enum.Members[0].ComputedValue);
-                    return 1;
-                }
-
-                if (instanceType.IsFunction)
-                {
-                    AddInstruction(Opcode.PUSH_VALUE, 0);
-                    return 1;
-                }
-
-                throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", simpleType, CurrentFile);
-            }
-
-            throw new ImpossibleException();
-        }
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(CompiledType type)
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="CompilerException"/>
+        /// <exception cref="InternalException"/>
+        int GenerateInitialValue(CompiledType type, Action<int>? afterValue = null)
         {
             if (type.IsStruct)
             {
                 int size = 0;
                 foreach (CompiledField field in type.Struct.Fields)
                 {
-                    size += GenerateInitialValue(field.Type);
+                    size += GenerateInitialValue(field.Type, afterValue);
+                    afterValue?.Invoke(size);
                 }
                 return size;
             }
@@ -202,6 +136,7 @@ namespace LanguageCore.BBCode.Compiler
             if (type.IsClass)
             {
                 AddInstruction(Opcode.PUSH_VALUE, 0);
+                afterValue?.Invoke(0);
                 return 1;
             }
 
@@ -212,18 +147,18 @@ namespace LanguageCore.BBCode.Compiler
                 int size = 0;
                 for (int i = 0; i < stackSize; i++)
                 {
-                    size += GenerateInitialValue(type.StackArrayOf);
+                    size += GenerateInitialValue(type.StackArrayOf, afterValue);
+                    afterValue?.Invoke(size);
                 }
                 return size;
             }
 
             AddInstruction(Opcode.PUSH_VALUE, GetInitialValue(type));
+            afterValue?.Invoke(0);
             return 1;
         }
-        /// <exception cref="NotImplementedException"></exception>
-        /// <exception cref="CompilerException"></exception>
-        /// <exception cref="InternalException"></exception>
-        int GenerateInitialValue(CompiledType type, Action<int> afterValue)
+
+        int GenerateInitialValue2(CompiledType type, Action<int> afterValue)
         {
             if (type.IsStruct)
             {

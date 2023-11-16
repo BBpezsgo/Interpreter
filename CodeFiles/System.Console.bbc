@@ -134,10 +134,7 @@ export String ReadLine() {
 
         String newResult = new String(result.length + 1);
 
-        for (int i = 0; i < result.length; i++)
-        {
-            newResult[i] = result[i];
-        };
+        CopyString(result, newResult);
 
         newResult[result.length] = inpChar;
       

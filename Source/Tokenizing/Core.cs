@@ -229,7 +229,7 @@ namespace LanguageCore.Tokenizing
         public static implicit operator Token[](TokenizerResult result) => result.Tokens;
     }
 
-    public partial class Tokenizer
+    public abstract partial class Tokenizer
     {
         static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
         static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~' };
@@ -239,23 +239,19 @@ namespace LanguageCore.Tokenizing
         static readonly char[] DigitsHex = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
         readonly PreparationToken CurrentToken;
-        int CurrentColumn;
-        int CurrentLine;
+       protected int CurrentColumn;
+       protected int CurrentLine;
 
-        readonly string Text;
-        readonly string? File;
+        protected readonly List<Token> Tokens;
+        protected readonly List<SimpleToken> UnicodeCharacters;
 
-        readonly List<Token> Tokens;
-        readonly List<SimpleToken> UnicodeCharacters;
+        protected readonly List<Warning> Warnings;
 
-        readonly List<Warning> Warnings;
-
-        readonly TokenizerSettings Settings;
+        protected readonly TokenizerSettings Settings;
 
         string? SavedUnicode;
 
-
-        Tokenizer(TokenizerSettings settings, string? text, string? file)
+        protected Tokenizer(TokenizerSettings settings)
         {
             CurrentToken = new(new Position(Range<SinglePosition>.Default, Range<int>.Default));
             CurrentColumn = 0;
@@ -267,54 +263,16 @@ namespace LanguageCore.Tokenizing
             Warnings = new();
 
             Settings = settings;
-            Text = text ?? string.Empty;
-            File = file;
 
             SavedUnicode = null;
         }
 
-        public static TokenizerResult Tokenize(string? sourceCode, string? filePath = null)
-            => new Tokenizer(TokenizerSettings.Default, sourceCode, filePath).TokenizeInternal();
-
-        public static TokenizerResult Tokenize(string? sourceCode, TokenizerSettings settings, string? filePath = null)
-            => new Tokenizer(settings, sourceCode, filePath).TokenizeInternal();
-
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        TokenizerResult TokenizeInternal()
-        {
-            for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
-            {
-                /*
-                CurrentColumn++;
-                if (currChar == '\n')
-                {
-                    CurrentColumn = 0;
-                    CurrentLine++;
-                }
-                */
-
-                ProcessCharacter(offsetTotal, out bool breakLine);
-
-                CurrentColumn++;
-                if (breakLine)
-                {
-                    CurrentColumn = 0;
-                    CurrentLine++;
-                }
-            }
-
-            EndToken(Text.Length);
-
-            CheckTokens(Tokens.ToArray());
-
-            return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToArray(), UnicodeCharacters.ToArray(), Warnings.ToArray());
-        }
+        protected abstract TokenizerResult TokenizeInternal();
 
         Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
 
         /// <exception cref="TokenizerException"/>
-        static void CheckTokens(Token[] tokens)
+        protected static void CheckTokens(Token[] tokens)
         {
             for (int i = 0; i < tokens.Length; i++)
             { CheckToken(tokens[i]); }
@@ -338,7 +296,7 @@ namespace LanguageCore.Tokenizing
             CurrentToken.position.AbsoluteRange.End = OffsetTotal;
         }
 
-        static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+        protected static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
         {
             List<Token> result = new();
 

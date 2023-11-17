@@ -60,7 +60,7 @@ namespace TheProgram
 #if AOT
                         throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
 #else
-                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(arguments.File.FullName), arguments.File.FullName);
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.StringTokenizer.Tokenize(File.ReadAllText(arguments.File.FullName));
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
@@ -74,7 +74,7 @@ namespace TheProgram
                     }
                 case ArgumentParser.RunType.ASM:
                     {
-                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.Tokenizer.Tokenize(File.ReadAllText(arguments.File.FullName), arguments.File.FullName);
+                        LanguageCore.Tokenizing.Token[] tokens = LanguageCore.Tokenizing.StringTokenizer.Tokenize(File.ReadAllText(arguments.File.FullName));
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 

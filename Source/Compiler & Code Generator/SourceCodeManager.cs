@@ -149,7 +149,7 @@ namespace LanguageCore.BBCode.Compiler
             ParserResult parserResult2;
             {
 
-                TokenizerResult tokenizerResult = Tokenizer.Tokenize(content, file.FullName);
+                TokenizerResult tokenizerResult = StringTokenizer.Tokenize(content);
                 Warnings.AddRange(tokenizerResult.Warnings);
 
                 System.DateTime parseStarted = System.DateTime.Now;

@@ -31,7 +31,7 @@ namespace LanguageCore.Brainfuck
                 if (printCallback != null)
                 { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
 
-                Tokenizing.TokenizerResult tokenizerResult = Tokenizing.Tokenizer.Tokenize(sourceCode, file.FullName);
+                Tokenizing.TokenizerResult tokenizerResult = Tokenizing.StringTokenizer.Tokenize(sourceCode);
                 tokens = tokenizerResult.Tokens;
 
                 foreach (Warning warning in tokenizerResult.Warnings)

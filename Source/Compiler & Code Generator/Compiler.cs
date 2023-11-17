@@ -907,7 +907,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (printCallback != null)
                 { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
 
-                TokenizerResult tokenizerResult = Tokenizer.Tokenize(sourceCode, tokenizerSettings, file.FullName);
+                TokenizerResult tokenizerResult = StringTokenizer.Tokenize(sourceCode, tokenizerSettings);
                 tokens = tokenizerResult.Tokens;
 
                 foreach (Warning warning in tokenizerResult.Warnings)

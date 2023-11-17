@@ -5,19 +5,10 @@ using System.Linq;
 
 namespace LanguageCore.Tokenizing
 {
-    enum TokenizerState
+    public abstract partial class Tokenizer
     {
-        Normal,
-    }
-
-    public partial class Tokenizer
-    {
-        TokenizerState State = TokenizerState.Normal;
-
-        void ProcessCharacter(int offsetTotal, out bool breakLine)
+        protected void ProcessCharacter(char currChar, int offsetTotal, out bool breakLine)
         {
-            char currChar = Text[offsetTotal];
-
             breakLine = false;
 
             if (currChar == '\n')
@@ -31,17 +22,6 @@ namespace LanguageCore.Tokenizing
                 CurrentToken.Content.Clear();
                 CurrentToken.TokenType = TokenType.CommentMultiline;
             }
-
-            /*
-            if (currChar > byte.MaxValue)
-            {
-                RefreshTokenPosition(offsetTotal);
-                if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
-                { Warnings.Add(new Warning($"Don't use special characters (please). Use \\u{((int)currChar).ToString("X").PadLeft(4, '0')}", CurrentToken.Position.After(), File)); }
-                else
-                { Warnings.Add(new Warning($"Don't use special characters.", CurrentToken.Position.After(), File)); }
-            }
-            */
 
             if (CurrentToken.TokenType == TokenType.STRING_UnicodeCharacter)
             {
@@ -426,7 +406,7 @@ namespace LanguageCore.Tokenizing
             }
         }
 
-        void EndToken(int offsetTotal)
+        protected void EndToken(int offsetTotal)
         {
             CurrentToken.position.Range.End.Character = CurrentColumn;
             CurrentToken.position.Range.End.Line = CurrentLine;

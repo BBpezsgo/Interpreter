@@ -184,7 +184,7 @@ namespace LanguageCore.Parser
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<Token> tokens = new();
-            if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
+            if (CurrentToken.TokenType == TokenType.LiteralString)
             {
                 tokens.Add(CurrentToken);
                 CurrentTokenIndex++;
@@ -787,7 +787,7 @@ namespace LanguageCore.Parser
 
             string v = CurrentToken?.Content ?? string.Empty;
 
-            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
+            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
             {
                 v = v.Replace("_", "");
 
@@ -798,7 +798,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
                 v = v.Replace("_", "");
 
@@ -809,7 +809,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralHex)
             {
                 v = v[2..];
                 v = v.Replace("_", "");
@@ -821,7 +821,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
             {
                 v = v[2..];
                 v = v.Replace("_", "");
@@ -833,7 +833,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralString)
             {
                 Literal literal = new(LiteralType.String, v, CurrentToken);
 
@@ -842,7 +842,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_CHAR)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralCharacter)
             {
                 Literal literal = new(LiteralType.Char, v, CurrentToken);
 
@@ -1855,31 +1855,31 @@ namespace LanguageCore.Parser
         {
             value = null;
 
-            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
+            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
             {
                 value = float.Parse(CurrentToken.Content.Replace("_", ""));
 
                 CurrentTokenIndex++;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
                 value = int.Parse(CurrentToken.Content.Replace("_", ""));
 
                 CurrentTokenIndex++;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_HEX)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralHex)
             {
                 value = Convert.ToInt32(CurrentToken.Content, 16);
 
                 CurrentTokenIndex++;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_BIN)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
             {
                 value = Convert.ToInt32(CurrentToken.Content.Replace("_", ""), 2);
 
                 CurrentTokenIndex++;
             }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LITERAL_STRING)
+            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralString)
             {
                 value = CurrentToken.Content;
 
@@ -1948,7 +1948,7 @@ namespace LanguageCore.Parser
         {
             result = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.TokenType != TokenType.IDENTIFIER) return false;
+            if (CurrentToken.TokenType != TokenType.Identifier) return false;
             if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             result = CurrentToken;
@@ -1972,7 +1972,7 @@ namespace LanguageCore.Parser
         {
             result = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.TokenType != TokenType.OPERATOR) return false;
+            if (CurrentToken.TokenType != TokenType.Operator) return false;
             if (name.Contains(CurrentToken.Content) == false) return false;
 
             result = CurrentToken;
@@ -1984,7 +1984,7 @@ namespace LanguageCore.Parser
         {
             result = null;
             if (CurrentToken == null) return false;
-            if (CurrentToken.TokenType != TokenType.OPERATOR) return false;
+            if (CurrentToken.TokenType != TokenType.Operator) return false;
             if (name.Length > 0 && CurrentToken.Content != name) return false;
 
             result = CurrentToken;

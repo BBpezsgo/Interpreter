@@ -12,28 +12,30 @@ namespace LanguageCore.Tokenizing
 
     public enum TokenType
     {
-        WHITESPACE,
-        LINEBREAK,
+        Whitespace,
+        LineBreak,
 
-        IDENTIFIER,
+        Identifier,
 
-        LITERAL_NUMBER,
-        LITERAL_HEX,
-        LITERAL_BIN,
-        LITERAL_STRING,
-        LITERAL_CHAR,
-        LITERAL_FLOAT,
+        LiteralNumber,
+        LiteralHex,
+        LiteralBinary,
+        LiteralString,
+        LiteralCharacter,
+        LiteralFloat,
 
-        OPERATOR,
+        Operator,
 
-        COMMENT,
-        COMMENT_MULTILINE,
+        Comment,
+        CommentMultiline,
 
-        STRING_UNICODE_CHARACTER,
-        CHAR_ESCAPE_SEQUENCE,
-        CHAR_UNICODE_CHARACTER,
+        STRING_EscapeSequence,
+        STRING_UnicodeCharacter,
+        
+        CHAR_EscapeSequence,
+        CHAR_UnicodeCharacter,
+
         POTENTIAL_COMMENT,
-        STRING_ESCAPE_SEQUENCE,
         POTENTIAL_END_MULTILINE_COMMENT,
         POTENTIAL_FLOAT,
     }
@@ -63,12 +65,12 @@ namespace LanguageCore.Tokenizing
 
     public struct TokenizerSettings
     {
-        /// <summary> The tokenizer will produce <see cref="TokenType.WHITESPACE"/> tokens </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.Whitespace"/> tokens </summary>
         public bool TokenizeWhitespaces;
-        /// <summary> The tokenizer will produce <see cref="TokenType.LINEBREAK"/> tokens </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.LineBreak"/> tokens </summary>
         public bool DistinguishBetweenSpacesAndNewlines;
         public bool JoinLinebreaks;
-        /// <summary> The tokenizer will produce <see cref="TokenType.COMMENT"/> and <see cref="TokenType.COMMENT_MULTILINE"/> tokens </summary>
+        /// <summary> The tokenizer will produce <see cref="TokenType.Comment"/> and <see cref="TokenType.CommentMultiline"/> tokens </summary>
         public bool TokenizeComments;
 
         public static TokenizerSettings Default => new()
@@ -92,7 +94,7 @@ namespace LanguageCore.Tokenizing
 
         public readonly string Content;
 
-        public static Token Empty => new(TokenType.WHITESPACE, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
+        public static Token Empty => new(TokenType.Whitespace, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
 
         public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
         {
@@ -108,13 +110,13 @@ namespace LanguageCore.Tokenizing
         public override string ToString() => Content;
         public string ToOriginalString() => TokenType switch
         {
-            TokenType.LITERAL_STRING => $"\"{Content}\"",
-            TokenType.LITERAL_CHAR => $"\'{Content}\'",
-            TokenType.COMMENT => $"//{Content}",
+            TokenType.LiteralString => $"\"{Content}\"",
+            TokenType.LiteralCharacter => $"\'{Content}\'",
+            TokenType.Comment => $"//{Content}",
             _ => Content,
         };
 
-        public static Token CreateAnonymous(string content, TokenType type = TokenType.IDENTIFIER)
+        public static Token CreateAnonymous(string content, TokenType type = TokenType.Identifier)
             => new(type, content, true, Position.UnknownPosition);
 
         public static Token CreateAnonymous(string content, TokenType type, Position position)
@@ -146,8 +148,8 @@ namespace LanguageCore.Tokenizing
 
         string GetDebuggerDisplay() => TokenType switch
         {
-            TokenType.LITERAL_STRING => $"\"{Content.Escape()}\"",
-            TokenType.LITERAL_CHAR => $"\'{Content.Escape()}\'",
+            TokenType.LiteralString => $"\"{Content.Escape()}\"",
+            TokenType.LiteralCharacter => $"\'{Content.Escape()}\'",
             _ => Content.Escape(),
         };
 
@@ -199,7 +201,7 @@ namespace LanguageCore.Tokenizing
         public PreparationToken(Position position) : base()
         {
             this.position = position;
-            TokenType = Tokenizing.TokenType.WHITESPACE;
+            TokenType = Tokenizing.TokenType.Whitespace;
             Content = new StringBuilder();
         }
 
@@ -234,6 +236,7 @@ namespace LanguageCore.Tokenizing
         static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
         static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
         static readonly char[] Whitespaces = new char[] { ' ', '\t', '\u200B', '\r' };
+        static readonly char[] DigitsHex = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
         readonly PreparationToken CurrentToken;
         int CurrentColumn;
@@ -282,10 +285,6 @@ namespace LanguageCore.Tokenizing
         {
             for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
             {
-                char? prev = (offsetTotal - 1 < 0) ? null : Text[offsetTotal - 1];
-                char curr = Text[offsetTotal];
-                char? next = (offsetTotal + 1 >= Text.Length) ? null : Text[offsetTotal + 1];
-
                 /*
                 CurrentColumn++;
                 if (currChar == '\n')
@@ -295,7 +294,7 @@ namespace LanguageCore.Tokenizing
                 }
                 */
 
-                ProcessCharacter((prev, curr, next), offsetTotal, out bool breakLine);
+                ProcessCharacter(offsetTotal, out bool breakLine);
 
                 CurrentColumn++;
                 if (breakLine)
@@ -323,7 +322,7 @@ namespace LanguageCore.Tokenizing
         /// <exception cref="TokenizerException"/>
         static void CheckToken(Token token)
         {
-            if (token.TokenType == TokenType.LITERAL_CHAR)
+            if (token.TokenType == TokenType.LiteralCharacter)
             {
                 if (token.Content.Length > 1)
                 { throw new TokenizerException($"I think there are more characters than there should be ({token.Content.Length})", token.Position); }
@@ -337,6 +336,49 @@ namespace LanguageCore.Tokenizing
             CurrentToken.position.Range.End.Character = CurrentColumn;
             CurrentToken.position.Range.End.Line = CurrentLine;
             CurrentToken.position.AbsoluteRange.End = OffsetTotal;
+        }
+
+        static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
+        {
+            List<Token> result = new();
+
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                Token token = tokens[i];
+
+                if (result.Count == 0)
+                {
+                    result.Add(token);
+                    continue;
+                }
+
+                Token lastToken = result[^1];
+
+                if (token.TokenType == TokenType.Whitespace && lastToken.TokenType == TokenType.Whitespace)
+                {
+                    result[^1] = new Token(
+                        lastToken.TokenType,
+                        lastToken.Content + token.Content,
+                        lastToken.IsAnonymous,
+                        lastToken.Position);
+                    continue;
+                }
+
+                if (token.TokenType == TokenType.LineBreak && lastToken.TokenType == TokenType.LineBreak && settings.JoinLinebreaks)
+                {
+                    result[^1] = new Token(
+                        lastToken.TokenType,
+                        lastToken.Content + token.Content,
+                        lastToken.IsAnonymous,
+                        lastToken.Position);
+                    continue;
+                }
+
+
+                result.Add(token);
+            }
+
+            return result;
         }
     }
 }

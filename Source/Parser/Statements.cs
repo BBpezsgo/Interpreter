@@ -714,9 +714,9 @@ namespace LanguageCore.Parser.Statement
                         Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
                         one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.OPERATOR, Operator.Position), Left, one);
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
 
-                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position);
+                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
 
                         return new Assignment(assignmentToken, Left, operatorCall);
                     }
@@ -726,9 +726,9 @@ namespace LanguageCore.Parser.Statement
                         Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
                         one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.OPERATOR, Operator.Position), Left, one);
+                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
 
-                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position);
+                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
 
                         return new Assignment(assignmentToken, Left, operatorCall);
                     }
@@ -796,8 +796,8 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", ""), TokenType.OPERATOR, Operator.Position), Left, Right);
-            return new Assignment(Token.CreateAnonymous("=", TokenType.OPERATOR, Operator.Position), Left, statementToAssign);
+            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", ""), TokenType.Operator, Operator.Position), Left, Right);
+            return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
         }
     }
 
@@ -825,12 +825,12 @@ namespace LanguageCore.Parser.Statement
         {
             TokenType tokenType = type switch
             {
-                LiteralType.Integer => TokenType.LITERAL_NUMBER,
-                LiteralType.Float => TokenType.LITERAL_FLOAT,
-                LiteralType.Boolean => TokenType.IDENTIFIER,
-                LiteralType.String => TokenType.LITERAL_STRING,
-                LiteralType.Char => TokenType.LITERAL_CHAR,
-                _ => TokenType.IDENTIFIER,
+                LiteralType.Integer => TokenType.LiteralNumber,
+                LiteralType.Float => TokenType.LiteralFloat,
+                LiteralType.Boolean => TokenType.Identifier,
+                LiteralType.String => TokenType.LiteralString,
+                LiteralType.Char => TokenType.LiteralCharacter,
+                _ => TokenType.Identifier,
             };
             return new Literal(type, value, Token.CreateAnonymous(value, tokenType))
             {

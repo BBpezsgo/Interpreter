@@ -39,7 +39,7 @@ namespace TheProgram
             catch (System.Exception exception)
             { LanguageCore.Output.LogError($"Unhandled exception: {exception}"); }
 
-            if (settings.PauseAtEnd)
+            if (!settings.DoNotPause)
             {
                 System.Console.WriteLine();
                 System.Console.WriteLine();

@@ -1,31 +1,35 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 // TODO: new lines aren't working
 
 namespace LanguageCore.Tokenizing
 {
+    enum TokenizerState
+    {
+        Normal,
+    }
+
     public partial class Tokenizer
     {
-        void ProcessCharacter((char? Prev, char Curr, char? Next) ctx, int offsetTotal, out bool breakLine)
-        {
-            breakLine = false;
+        TokenizerState State = TokenizerState.Normal;
 
-            char currChar = ctx.Curr;
+        void ProcessCharacter(int offsetTotal, out bool breakLine)
+        {
+            char currChar = Text[offsetTotal];
+
+            breakLine = false;
 
             if (currChar == '\n')
             {
                 breakLine = true;
             }
 
-            if (currChar == '\n' && CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
+            if (currChar == '\n' && CurrentToken.TokenType == TokenType.CommentMultiline)
             {
                 EndToken(offsetTotal);
                 CurrentToken.Content.Clear();
-                CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                CurrentToken.TokenType = TokenType.CommentMultiline;
             }
 
             /*
@@ -39,7 +43,7 @@ namespace LanguageCore.Tokenizing
             }
             */
 
-            if (CurrentToken.TokenType == TokenType.STRING_UNICODE_CHARACTER)
+            if (CurrentToken.TokenType == TokenType.STRING_UnicodeCharacter)
             {
                 if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
                 if (SavedUnicode.Length == 4)
@@ -53,10 +57,10 @@ namespace LanguageCore.Tokenizing
                             )
                         ));
                     CurrentToken.Content.Append(unicodeChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                    CurrentToken.TokenType = TokenType.LiteralString;
                     SavedUnicode = null;
                 }
-                else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                else if (!DigitsHex.Contains(char.ToLowerInvariant(currChar)))
                 {
                     throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(offsetTotal));
                 }
@@ -66,9 +70,9 @@ namespace LanguageCore.Tokenizing
                     return;
                 }
             }
-            else if (CurrentToken.TokenType == TokenType.CHAR_UNICODE_CHARACTER)
+            else if (CurrentToken.TokenType == TokenType.CHAR_UnicodeCharacter)
             {
-                if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null"); 
+                if (SavedUnicode == null) throw new InternalException($"{nameof(SavedUnicode)} is null");
                 if (SavedUnicode.Length == 4)
                 {
                     string unicodeChar = char.ConvertFromUtf32(Convert.ToInt32(SavedUnicode, 16));
@@ -80,10 +84,10 @@ namespace LanguageCore.Tokenizing
                         )
                     ));
                     CurrentToken.Content.Append(unicodeChar);
-                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                    CurrentToken.TokenType = TokenType.LiteralCharacter;
                     SavedUnicode = null;
                 }
-                else if (!(new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                else if (!DigitsHex.Contains(char.ToLowerInvariant(currChar)))
                 {
                     throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(offsetTotal));
                 }
@@ -93,12 +97,12 @@ namespace LanguageCore.Tokenizing
                     return;
                 }
             }
-            
-            if (CurrentToken.TokenType == TokenType.STRING_ESCAPE_SEQUENCE)
+
+            if (CurrentToken.TokenType == TokenType.STRING_EscapeSequence)
             {
                 if (currChar == 'u')
                 {
-                    CurrentToken.TokenType = TokenType.STRING_UNICODE_CHARACTER;
+                    CurrentToken.TokenType = TokenType.STRING_UnicodeCharacter;
                     SavedUnicode = string.Empty;
                 }
                 else
@@ -113,15 +117,15 @@ namespace LanguageCore.Tokenizing
                         '0' => "\0",
                         _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(offsetTotal)),
                     });
-                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                    CurrentToken.TokenType = TokenType.LiteralString;
                 }
                 return;
             }
-            else if (CurrentToken.TokenType == TokenType.CHAR_ESCAPE_SEQUENCE)
+            else if (CurrentToken.TokenType == TokenType.CHAR_EscapeSequence)
             {
                 if (currChar == 'u')
                 {
-                    CurrentToken.TokenType = TokenType.CHAR_UNICODE_CHARACTER;
+                    CurrentToken.TokenType = TokenType.CHAR_UnicodeCharacter;
                     SavedUnicode = string.Empty;
                 }
                 else
@@ -136,35 +140,35 @@ namespace LanguageCore.Tokenizing
                         '0' => "\0",
                         _ => throw new TokenizerException($"I don't know this escape sequence: \\{currChar}", GetCurrentPosition(offsetTotal)),
                     });
-                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                    CurrentToken.TokenType = TokenType.LiteralCharacter;
                 }
                 return;
             }
             else if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT && currChar != '/' && currChar != '*')
             {
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 if (currChar == '=')
                 { CurrentToken.Content.Append(currChar); }
                 EndToken(offsetTotal);
                 return;
             }
-            else if (CurrentToken.TokenType == TokenType.COMMENT && currChar != '\n')
+            else if (CurrentToken.TokenType == TokenType.Comment && currChar != '\n')
             {
                 CurrentToken.Content.Append(currChar);
                 return;
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_STRING && currChar != '"')
+            else if (CurrentToken.TokenType == TokenType.LiteralString && currChar != '"')
             {
                 if (currChar == '\\')
-                { CurrentToken.TokenType = TokenType.STRING_ESCAPE_SEQUENCE; }
+                { CurrentToken.TokenType = TokenType.STRING_EscapeSequence; }
                 else
                 { CurrentToken.Content.Append(currChar); }
                 return;
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR && currChar != '\'')
+            else if (CurrentToken.TokenType == TokenType.LiteralCharacter && currChar != '\'')
             {
                 if (currChar == '\\')
-                { CurrentToken.TokenType = TokenType.CHAR_ESCAPE_SEQUENCE; }
+                { CurrentToken.TokenType = TokenType.CHAR_EscapeSequence; }
                 else
                 { CurrentToken.Content.Append(currChar); }
                 return;
@@ -173,75 +177,75 @@ namespace LanguageCore.Tokenizing
             if (CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
             {
                 CurrentToken.Content.Append(currChar);
-                CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                CurrentToken.TokenType = TokenType.CommentMultiline;
                 EndToken(offsetTotal);
                 return;
             }
 
-            if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
+            if (CurrentToken.TokenType == TokenType.CommentMultiline || CurrentToken.TokenType == TokenType.POTENTIAL_END_MULTILINE_COMMENT)
             {
                 CurrentToken.Content.Append(currChar);
-                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE && currChar == '*')
+                if (CurrentToken.TokenType == TokenType.CommentMultiline && currChar == '*')
                 {
                     CurrentToken.TokenType = TokenType.POTENTIAL_END_MULTILINE_COMMENT;
                 }
                 else
                 {
-                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                    CurrentToken.TokenType = TokenType.CommentMultiline;
                 }
                 return;
             }
 
-            if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT && !int.TryParse(currChar.ToString(), out _))
+            if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT && !char.IsAsciiDigit(currChar))
             {
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 EndToken(offsetTotal);
             }
 
-            if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
+            if (currChar == 'f' && (CurrentToken.TokenType == TokenType.LiteralNumber || CurrentToken.TokenType == TokenType.LiteralFloat))
             {
                 CurrentToken.Content.Append(currChar);
-                CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                CurrentToken.TokenType = TokenType.LiteralFloat;
                 EndToken(offsetTotal);
             }
-            else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LITERAL_NUMBER || CurrentToken.TokenType == TokenType.LITERAL_FLOAT))
+            else if (currChar == 'e' && (CurrentToken.TokenType == TokenType.LiteralNumber || CurrentToken.TokenType == TokenType.LiteralFloat))
             {
                 if (CurrentToken.ToString().Contains(currChar))
-                { throw new TokenizerException($"Am I stupid or is this not a float number?", CurrentToken.Position); }
+                { throw new TokenizerException($"Am I stupid or this is not a float number?", CurrentToken.Position); }
                 CurrentToken.Content.Append(currChar);
-                CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                CurrentToken.TokenType = TokenType.LiteralFloat;
             }
-            else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            else if (currChar == 'x' && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
                 if (!CurrentToken.ToString().EndsWith('0'))
-                { throw new TokenizerException($"Am I stupid or is this not a hex number?", CurrentToken.Position); }
+                { throw new TokenizerException($"Am I stupid or this is not a hex number?", CurrentToken.Position); }
                 CurrentToken.Content.Append(currChar);
-                CurrentToken.TokenType = TokenType.LITERAL_HEX;
+                CurrentToken.TokenType = TokenType.LiteralHex;
             }
-            else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+            else if (currChar == 'b' && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
-                if (!CurrentToken.ToString().EndsWith('0'))
-                { throw new TokenizerException($"Am I stupid or is this not a binary number?", CurrentToken.Position); }
+                if (!CurrentToken.Content.ToString().EndsWith('0'))
+                { throw new TokenizerException($"Am I stupid or this is not a binary number?", CurrentToken.Position); }
                 CurrentToken.Content.Append(currChar);
-                CurrentToken.TokenType = TokenType.LITERAL_BIN;
+                CurrentToken.TokenType = TokenType.LiteralBinary;
             }
-            else if ((new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', }).Contains(currChar))
+            else if (char.IsAsciiDigit(currChar))
             {
-                if (CurrentToken.TokenType == TokenType.WHITESPACE)
+                if (CurrentToken.TokenType == TokenType.Whitespace)
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
+                    CurrentToken.TokenType = TokenType.LiteralNumber;
                 }
                 else if (CurrentToken.TokenType == TokenType.POTENTIAL_FLOAT)
-                { CurrentToken.TokenType = TokenType.LITERAL_FLOAT; }
-                else if (CurrentToken.TokenType == TokenType.OPERATOR)
+                { CurrentToken.TokenType = TokenType.LiteralFloat; }
+                else if (CurrentToken.TokenType == TokenType.Operator)
                 {
                     if (CurrentToken.ToString() != "-")
                     { EndToken(offsetTotal); }
-                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
+                    CurrentToken.TokenType = TokenType.LiteralNumber;
                 }
 
-                if (CurrentToken.TokenType == TokenType.LITERAL_BIN)
+                if (CurrentToken.TokenType == TokenType.LiteralBinary)
                 {
                     if (currChar != '0' && currChar != '1')
                     {
@@ -252,34 +256,34 @@ namespace LanguageCore.Tokenizing
 
                 CurrentToken.Content.Append(currChar);
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_BIN && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            else if (CurrentToken.TokenType == TokenType.LiteralBinary && currChar == '_')
             {
                 CurrentToken.Content.Append(currChar);
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            else if (CurrentToken.TokenType == TokenType.LiteralNumber && currChar == '_')
             {
                 CurrentToken.Content.Append(currChar);
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT && new char[] { '_' }.Contains(currChar.ToString().ToLower()[0]))
+            else if (CurrentToken.TokenType == TokenType.LiteralFloat && currChar == '_')
             {
                 CurrentToken.Content.Append(currChar);
             }
             else if (currChar == '.')
             {
-                if (CurrentToken.TokenType == TokenType.WHITESPACE)
+                if (CurrentToken.TokenType == TokenType.Whitespace)
                 {
                     CurrentToken.TokenType = TokenType.POTENTIAL_FLOAT;
                     CurrentToken.Content.Append(currChar);
                 }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_NUMBER)
+                else if (CurrentToken.TokenType == TokenType.LiteralNumber)
                 {
-                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                    CurrentToken.TokenType = TokenType.LiteralFloat;
                     CurrentToken.Content.Append(currChar);
                 }
                 else
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.Operator;
                     CurrentToken.Content.Append(currChar);
                     EndToken(offsetTotal);
                 }
@@ -288,7 +292,7 @@ namespace LanguageCore.Tokenizing
             {
                 if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
                 {
-                    CurrentToken.TokenType = TokenType.COMMENT;
+                    CurrentToken.TokenType = TokenType.Comment;
                     CurrentToken.Content.Clear();
                 }
                 else
@@ -301,14 +305,14 @@ namespace LanguageCore.Tokenizing
             else if (Bracelets.Contains(currChar))
             {
                 EndToken(offsetTotal);
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
                 EndToken(offsetTotal);
             }
             else if (SimpleOperators.Contains(currChar))
             {
                 EndToken(offsetTotal);
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
                 EndToken(offsetTotal);
             }
@@ -322,7 +326,7 @@ namespace LanguageCore.Tokenizing
                 else
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.Operator;
                     CurrentToken.Content.Append(currChar);
                 }
             }
@@ -333,65 +337,56 @@ namespace LanguageCore.Tokenizing
             }
             else if (currChar == '*' && CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
             {
-                if (CurrentToken.TokenType == TokenType.POTENTIAL_COMMENT)
-                {
-                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
-                    CurrentToken.Content.Append(currChar);
-                }
-                else
-                {
-                    EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.OPERATOR;
-                    CurrentToken.Content.Append(currChar);
-                }
+                CurrentToken.TokenType = TokenType.CommentMultiline;
+                CurrentToken.Content.Append(currChar);
             }
             else if (Operators.Contains(currChar))
             {
                 EndToken(offsetTotal);
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
             }
             else if (Whitespaces.Contains(currChar))
             {
                 EndToken(offsetTotal);
-                CurrentToken.TokenType = TokenType.WHITESPACE;
+                CurrentToken.TokenType = TokenType.Whitespace;
                 CurrentToken.Content.Append(currChar);
             }
             else if (currChar == '\n')
             {
-                if (CurrentToken.TokenType == TokenType.COMMENT_MULTILINE)
+                if (CurrentToken.TokenType == TokenType.CommentMultiline)
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.COMMENT_MULTILINE;
+                    CurrentToken.TokenType = TokenType.CommentMultiline;
                 }
                 else
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LINEBREAK : TokenType.WHITESPACE;
+                    CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LineBreak : TokenType.Whitespace;
                     CurrentToken.Content.Append(currChar);
                     EndToken(offsetTotal);
                 }
             }
             else if (currChar == '"')
             {
-                if (CurrentToken.TokenType != TokenType.LITERAL_STRING)
+                if (CurrentToken.TokenType != TokenType.LiteralString)
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.LITERAL_STRING;
+                    CurrentToken.TokenType = TokenType.LiteralString;
                 }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_STRING)
+                else if (CurrentToken.TokenType == TokenType.LiteralString)
                 {
                     EndToken(offsetTotal);
                 }
             }
             else if (currChar == '\'')
             {
-                if (CurrentToken.TokenType != TokenType.LITERAL_CHAR)
+                if (CurrentToken.TokenType != TokenType.LiteralCharacter)
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.LITERAL_CHAR;
+                    CurrentToken.TokenType = TokenType.LiteralCharacter;
                 }
-                else if (CurrentToken.TokenType == TokenType.LITERAL_CHAR)
+                else if (CurrentToken.TokenType == TokenType.LiteralCharacter)
                 {
                     EndToken(offsetTotal);
                 }
@@ -399,13 +394,13 @@ namespace LanguageCore.Tokenizing
             else if (currChar == '\\')
             {
                 EndToken(offsetTotal);
-                CurrentToken.TokenType = TokenType.OPERATOR;
+                CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
                 EndToken(offsetTotal);
             }
-            else if (CurrentToken.TokenType == TokenType.LITERAL_HEX)
+            else if (CurrentToken.TokenType == TokenType.LiteralHex)
             {
-                if (!(new char[] { '_', 'a', 'b', 'c', 'd', 'e', 'f' }).Contains(currChar.ToString().ToLower()[0]))
+                if (currChar is not ((>= 'a' and <= 'f') or (>= 'A' and <= 'F') or '_'))
                 {
                     RefreshTokenPosition(offsetTotal);
                     throw new TokenizerException($"This isn't a hex digit am i right? \'{currChar}\'", CurrentToken.Position.After());
@@ -414,14 +409,14 @@ namespace LanguageCore.Tokenizing
             }
             else
             {
-                if (CurrentToken.TokenType == TokenType.WHITESPACE ||
-                    CurrentToken.TokenType == TokenType.LITERAL_NUMBER ||
-                    CurrentToken.TokenType == TokenType.LITERAL_HEX ||
-                    CurrentToken.TokenType == TokenType.LITERAL_FLOAT ||
-                    CurrentToken.TokenType == TokenType.OPERATOR)
+                if (CurrentToken.TokenType == TokenType.Whitespace ||
+                    CurrentToken.TokenType == TokenType.LiteralNumber ||
+                    CurrentToken.TokenType == TokenType.LiteralHex ||
+                    CurrentToken.TokenType == TokenType.LiteralFloat ||
+                    CurrentToken.TokenType == TokenType.Operator)
                 {
                     EndToken(offsetTotal);
-                    CurrentToken.TokenType = TokenType.IDENTIFIER;
+                    CurrentToken.TokenType = TokenType.Identifier;
                     CurrentToken.Content.Append(currChar);
                 }
                 else
@@ -431,30 +426,30 @@ namespace LanguageCore.Tokenizing
             }
         }
 
-        void EndToken(int OffsetTotal)
+        void EndToken(int offsetTotal)
         {
             CurrentToken.position.Range.End.Character = CurrentColumn;
             CurrentToken.position.Range.End.Line = CurrentLine;
-            CurrentToken.position.AbsoluteRange.End = OffsetTotal;
+            CurrentToken.position.AbsoluteRange.End = offsetTotal;
 
             // Skip comments if they should be ignored
             if (!Settings.TokenizeComments &&
-                (CurrentToken.TokenType == TokenType.COMMENT ||
-                CurrentToken.TokenType == TokenType.COMMENT_MULTILINE))
+                (CurrentToken.TokenType == TokenType.Comment ||
+                CurrentToken.TokenType == TokenType.CommentMultiline))
             { goto Finish; }
 
             // Skip whitespaces if they should be ignored
             if (!Settings.TokenizeWhitespaces &&
-                CurrentToken.TokenType == TokenType.WHITESPACE)
+                CurrentToken.TokenType == TokenType.Whitespace)
             { goto Finish; }
 
             // Skip empty whitespaces
             if (Settings.TokenizeWhitespaces &&
-                CurrentToken.TokenType == TokenType.WHITESPACE &&
+                CurrentToken.TokenType == TokenType.Whitespace &&
                 string.IsNullOrEmpty(CurrentToken.ToString()))
             { goto Finish; }
 
-            if (CurrentToken.TokenType == TokenType.LITERAL_FLOAT)
+            if (CurrentToken.TokenType == TokenType.LiteralFloat)
             {
                 if (CurrentToken.ToString().EndsWith('.'))
                 {
@@ -462,7 +457,7 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.position.Range.End.Line--;
                     CurrentToken.position.AbsoluteRange.End--;
                     CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
-                    CurrentToken.TokenType = TokenType.LITERAL_NUMBER;
+                    CurrentToken.TokenType = TokenType.LiteralNumber;
                     Tokens.Add(CurrentToken.Instantiate());
 
                     CurrentToken.position.Range.Start.Character = CurrentToken.position.Range.End.Character + 1;
@@ -472,7 +467,7 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.position.Range.End.Character++;
                     CurrentToken.position.Range.End.Line++;
                     CurrentToken.position.AbsoluteRange.End++;
-                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.Operator;
                     CurrentToken.Content.Clear();
                     CurrentToken.Content.Append('.');
                 }
@@ -482,65 +477,22 @@ namespace LanguageCore.Tokenizing
             {
                 if (CurrentToken.ToString().CompareTo(".") == 0)
                 {
-                    CurrentToken.TokenType = TokenType.OPERATOR;
+                    CurrentToken.TokenType = TokenType.Operator;
                 }
                 else
                 {
-                    CurrentToken.TokenType = TokenType.LITERAL_FLOAT;
+                    CurrentToken.TokenType = TokenType.LiteralFloat;
                 }
             }
 
             Tokens.Add(CurrentToken.Instantiate());
 
         Finish:
-            CurrentToken.TokenType = TokenType.WHITESPACE;
+            CurrentToken.TokenType = TokenType.Whitespace;
             CurrentToken.Content.Clear();
             CurrentToken.position.Range.Start.Line = CurrentLine;
             CurrentToken.position.Range.Start.Character = CurrentColumn;
-            CurrentToken.position.AbsoluteRange.Start = OffsetTotal;
-        }
-
-        static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
-        {
-            List<Token> result = new();
-
-            for (int i = 0; i < tokens.Count; i++)
-            {
-                Token token = tokens[i];
-
-                if (result.Count == 0)
-                {
-                    result.Add(token);
-                    continue;
-                }
-
-                Token lastToken = result[^1];
-
-                if (token.TokenType == TokenType.WHITESPACE && lastToken.TokenType == TokenType.WHITESPACE)
-                {
-                    result[^1] = new Token(
-                        lastToken.TokenType,
-                        lastToken.Content + token.Content,
-                        lastToken.IsAnonymous,
-                        lastToken.Position);
-                    continue;
-                }
-
-                if (token.TokenType == TokenType.LINEBREAK && lastToken.TokenType == TokenType.LINEBREAK && settings.JoinLinebreaks)
-                {
-                    result[^1] = new Token(
-                        lastToken.TokenType,
-                        lastToken.Content + token.Content,
-                        lastToken.IsAnonymous,
-                        lastToken.Position);
-                    continue;
-                }
-
-
-                result.Add(token);
-            }
-
-            return result;
+            CurrentToken.position.AbsoluteRange.Start = offsetTotal;
         }
     }
 }

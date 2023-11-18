@@ -350,6 +350,7 @@ namespace LanguageCore.ASM.Compiler
                 }
             }
 
+
             int offset = 0;
             if (isGlobal)
             { offset += VariablesSize; }
@@ -361,6 +362,8 @@ namespace LanguageCore.ASM.Compiler
             CompiledVariables.Add(compiledVariable);
 
             newVariable.Type.SetAnalyzedType(compiledVariable.Type);
+
+            Builder.CodeBuilder.AppendCommentLine($"{compiledVariable.Type} {compiledVariable.VariableName.Content}");
 
             int size;
 
@@ -815,22 +818,34 @@ namespace LanguageCore.ASM.Compiler
         }
         void GenerateCodeForStatement(WhileLoop @while)
         {
+            Builder.CodeBuilder.AppendCommentLine($"while ({@while.Condition}) {{");
+            Builder.CodeBuilder.Indent += SectionBuilder.IndentIncrement;
+
             string startLabel = Builder.CodeBuilder.NewLabel("while_start");
             string endLabel = Builder.CodeBuilder.NewLabel("while_end");
 
             Builder.CodeBuilder.AppendLabel(startLabel);
 
-            GenerateCodeForStatement(@while.Condition);
+            Builder.CodeBuilder.AppendCommentLine($"Condition {{");
+            using (Builder.CodeBuilder.Block())
+            { GenerateCodeForStatement(@while.Condition); }
+            Builder.CodeBuilder.AppendCommentLine($"}}");
 
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JZ, endLabel);
 
-            GenerateCodeForStatement(@while.Block);
+            Builder.CodeBuilder.AppendCommentLine($"{{");
+            using (Builder.CodeBuilder.Block())
+            { GenerateCodeForStatement(@while.Block); }
+            Builder.CodeBuilder.AppendCommentLine($"}}");
 
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, startLabel);
 
             Builder.CodeBuilder.AppendLabel(endLabel);
+
+            Builder.CodeBuilder.Indent -= SectionBuilder.IndentIncrement;
+            Builder.CodeBuilder.AppendCommentLine($"}}");
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
@@ -1088,9 +1103,9 @@ namespace LanguageCore.ASM.Compiler
                         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                         break;
 
-                    case Opcode.BITSHIFT_LEFT:
+                    case Opcode.BITS_SHIFT_LEFT:
                         throw new NotImplementedException();
-                    case Opcode.BITSHIFT_RIGHT:
+                    case Opcode.BITS_SHIFT_RIGHT:
                         throw new NotImplementedException();
 
                     case Opcode.MATH_ADD:
@@ -1176,8 +1191,13 @@ namespace LanguageCore.ASM.Compiler
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)
         {
+            Builder.CodeBuilder.AppendCommentLine(null);
+            Builder.CodeBuilder.AppendCommentLine("Top level statements");
+            Builder.CodeBuilder.AppendCommentLine(null);
+
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
 
+            Builder.CodeBuilder.AppendCommentLine("Variables:");
             CleanupItem[] cleanup = GenerateCodeForVariable(statements, !InFunction);
             bool hasExited = false;
 

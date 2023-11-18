@@ -36,7 +36,7 @@ namespace LanguageCore.ASM
         }
     }
 
-    [System.Serializable]
+    [Serializable]
     public class NasmException : Exception
     {
         public readonly string? File;

@@ -108,6 +108,40 @@ namespace LanguageCore.ASM
         public void AppendText(string text) => Builder.Append(text);
         public void AppendTextLine() => Builder.Append(EOL);
         public void AppendTextLine(string text) { Builder.Append(text); Builder.Append(EOL); }
+
+        public void AppendComment(string? comment)
+        {
+            Builder.Append(' ', Indent);
+            Builder.Append(';');
+            if (!string.IsNullOrWhiteSpace(comment))
+            {
+                Builder.Append(' ');
+                Builder.Append(comment);
+            }
+        }
+        public void AppendCommentLine(string? comment)
+        {
+            AppendComment(comment);
+            Builder.Append(EOL);
+        }
+
+        public IndentBlock Block() => new(this);
+    }
+
+    public readonly struct IndentBlock : IDisposable
+    {
+        readonly SectionBuilder Builder;
+
+        public IndentBlock(SectionBuilder builder)
+        {
+            Builder = builder;
+            Builder.Indent += SectionBuilder.IndentIncrement;
+        }
+
+        public void Dispose()
+        {
+            Builder.Indent -= SectionBuilder.IndentIncrement;
+        }
     }
 
     public class DataSectionBuilder : SectionBuilder
@@ -491,15 +525,24 @@ namespace LanguageCore.ASM
             builder.Append(";" + EOL);
             builder.Append(EOL);
 
+            builder.Append(";" + EOL);
+            builder.Append("; External functions" + EOL);
+            builder.Append(";" + EOL);
             for (int i = 0; i < header.Externs.Count; i++)
             {
                 builder.Append($"extern {header.Externs[i]}" + EOL);
             }
             builder.Append(EOL);
 
+            builder.Append(";" + EOL);
+            builder.Append("; Global functions" + EOL);
+            builder.Append(";" + EOL);
             builder.Append("global _main" + EOL);
             builder.Append(EOL);
 
+            builder.Append(";" + EOL);
+            builder.Append("; Code Section" + EOL);
+            builder.Append(";" + EOL);
             builder.Append("section .text" + EOL);
             builder.Append(EOL);
             builder.Append("_main:" + EOL);
@@ -507,6 +550,9 @@ namespace LanguageCore.ASM
             builder.Append(CodeBuilder.Builder);
             builder.Append(EOL);
 
+            builder.Append(";" + EOL);
+            builder.Append("; Data Section" + EOL);
+            builder.Append(";" + EOL);
             builder.Append("section .rodata" + EOL);
             builder.Append(DataBuilder.Builder);
             builder.Append(EOL);

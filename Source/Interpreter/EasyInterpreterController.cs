@@ -3,7 +3,7 @@ using System.IO;
 
 namespace LanguageCore.Runtime
 {
-    using BBCode.Compiler;
+    using BBCode.Generator;
 
     /// <summary>
     /// A simpler form of <see cref="Interpreter"/><br/>
@@ -11,7 +11,7 @@ namespace LanguageCore.Runtime
     /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.BasePath);
+        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.compilerSettings.BasePath);
 
         /// <summary>
         /// Compiles and interprets source code
@@ -120,22 +120,30 @@ namespace LanguageCore.Runtime
                     Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
                 }
 #endif
+                Compiler.CompilerResult compiled;
+                BBCodeGeneratorResult generatedCode;
 
-                CodeGeneratorForMain.Result? compiledCode = BBCode.EasyCompiler.Compile(
-                    file,
-                    interpreter.GenerateExternalFunctions(),
-                    Tokenizing.TokenizerSettings.Default,
-                    compilerSettings,
-                    HandleErrors,
-                    PrintOutput,
-                    basePath
-                    );
-
-                if (compiledCode.HasValue)
+                if (HandleErrors)
                 {
-                    interpreter.CompilerResult = compiledCode.Value;
-                    interpreter.ExecuteProgram(compiledCode.Value.Code, bytecodeInterpreterSettings);
+                    try
+                    {
+                        compiled = LanguageCore.Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
+                        generatedCode = CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                    }
+                    catch (Exception ex)
+                    {
+                        PrintOutput(ex.ToString(), LogType.Error);
+                        return;
+                    }
                 }
+                else
+                {
+                    compiled = LanguageCore.Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
+                    generatedCode = CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                }
+
+                interpreter.CompilerResult = generatedCode;
+                interpreter.ExecuteProgram(generatedCode.Code, bytecodeInterpreterSettings);
             }
 
             while (interpreter.IsExecutingCode)

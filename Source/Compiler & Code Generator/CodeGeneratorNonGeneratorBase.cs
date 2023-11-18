@@ -1,13 +1,15 @@
 ﻿using System;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using BBCode.Generator;
+
     public class CodeGeneratorNonGeneratorBase : CodeGenerator
     {
         public CodeGeneratorNonGeneratorBase() : base()
         { }
 
-        public CodeGeneratorNonGeneratorBase(Compiler.Result compilerResult) : base(compilerResult)
+        public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult) : base(compilerResult)
         { }
 
         protected override ValueAddress GetBaseAddress(CompiledParameter parameter) => throw new NotImplementedException();

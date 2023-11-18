@@ -1,11 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using LanguageCore.BBCode.Compiler;
-using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
-
-namespace LanguageCore
+﻿namespace LanguageCore
 {
+    using Compiler;
+    using Runtime;
+    using Tokenizing;
+
     public static class Extensions
     {
         public static bool Contains(this Token[] tokens, string value)

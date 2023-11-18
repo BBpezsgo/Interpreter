@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LanguageCore.Brainfuck.Compiler
+namespace LanguageCore.Brainfuck.Generator
 {
-    using BBCode.Compiler;
+    using Compiler;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -149,6 +149,44 @@ namespace LanguageCore.Brainfuck.Compiler
         public void Dispose() => Clear();
     }
 
+    public struct BrainfuckGeneratorResult
+    {
+        public string Code;
+        public int Optimizations;
+        public Token[] Tokens;
+
+        public Warning[] Warnings;
+        public Error[] Errors;
+        public DebugInformation DebugInfo;
+    }
+
+    public struct BrainfuckGeneratorSettings
+    {
+        public bool ClearGlobalVariablesBeforeExit;
+        public int StackStart;
+        public int StackSize;
+        public int HeapStart;
+        public int HeapSize;
+        public bool GenerateDebugInformation;
+
+        public static BrainfuckGeneratorSettings Default
+        {
+            get
+            {
+                BrainfuckGeneratorSettings result = new()
+                {
+                    ClearGlobalVariablesBeforeExit = false,
+                    StackStart = 0,
+                    HeapStart = 64,
+                    HeapSize = 8,
+                    GenerateDebugInformation = false,
+                };
+                result.StackSize = result.HeapStart - 1;
+                return result;
+            }
+        }
+    }
+
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
     {
         const string ReturnVariableName = "@return";
@@ -214,7 +252,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         readonly Stack<FunctionThingDefinition> CurrentMacro;
 
-        readonly Settings GeneratorSettings;
+        readonly BrainfuckGeneratorSettings GeneratorSettings;
 
         string? VariableCanBeDiscarded = null;
 
@@ -228,7 +266,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        public CodeGeneratorForBrainfuck(Compiler.Result compilerResult, Settings settings, PrintCallback? printCallback) : base(compilerResult)
+        public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback) : base(compilerResult)
         {
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
@@ -246,51 +284,6 @@ namespace LanguageCore.Brainfuck.Compiler
             this.PrintCallback = printCallback;
             this.GenerateDebugInformation = settings.GenerateDebugInformation;
             this.ShowProgress = false;
-        }
-
-        public enum ValueType
-        {
-            Byte,
-            Char,
-            String,
-        }
-
-        public struct Result
-        {
-            public string Code;
-            public int Optimizations;
-            public Token[] Tokens;
-
-            public Warning[] Warnings;
-            public Error[] Errors;
-            public DebugInformation DebugInfo;
-        }
-
-        public struct Settings
-        {
-            public bool ClearGlobalVariablesBeforeExit;
-            public int StackStart;
-            public int StackSize;
-            public int HeapStart;
-            public int HeapSize;
-            public bool GenerateDebugInformation;
-
-            public static Settings Default
-            {
-                get
-                {
-                    Settings result = new()
-                    {
-                        ClearGlobalVariablesBeforeExit = false,
-                        StackStart = 0,
-                        HeapStart = 64,
-                        HeapSize = 8,
-                        GenerateDebugInformation = false,
-                    };
-                    result.StackSize = result.HeapStart - 1;
-                    return result;
-                }
-            }
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -611,7 +604,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
         #endregion
 
-        Result GenerateCode(Compiler.Result compilerResult)
+        BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
         {
             PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
 
@@ -676,7 +669,7 @@ namespace LanguageCore.Brainfuck.Compiler
             if (Code.BranchDepth != 0)
             { throw new InternalException($"Unbalanced branches", CurrentFile); }
 
-            return new Result()
+            return new BrainfuckGeneratorResult()
             {
                 Code = Code.ToString(),
                 Optimizations = Optimizations,
@@ -688,9 +681,9 @@ namespace LanguageCore.Brainfuck.Compiler
             };
         }
 
-        public static Result Generate(
-            Compiler.Result compilerResult,
-            Settings generatorSettings,
+        public static BrainfuckGeneratorResult Generate(
+            CompilerResult compilerResult,
+            BrainfuckGeneratorSettings generatorSettings,
             PrintCallback? printCallback = null)
         => new CodeGeneratorForBrainfuck(
             compilerResult,

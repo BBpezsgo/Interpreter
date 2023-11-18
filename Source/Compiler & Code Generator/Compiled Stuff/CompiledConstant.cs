@@ -1,7 +1,7 @@
-﻿using LanguageCore.Runtime;
-
-namespace LanguageCore.BBCode.Compiler
+﻿namespace LanguageCore.Compiler
 {
+    using Runtime;
+
     public abstract class CompiledConstant : IThingWithPosition
     {
         public readonly DataItem Value;

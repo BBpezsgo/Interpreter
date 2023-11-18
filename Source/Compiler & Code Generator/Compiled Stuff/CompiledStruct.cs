@@ -1,8 +1,10 @@
 ﻿using System.Collections.Generic;
-using LanguageCore.Parser;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using LanguageCore.BBCode.Generator;
+    using Parser;
+
     public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>
     {
         public new readonly CompiledField[] Fields;

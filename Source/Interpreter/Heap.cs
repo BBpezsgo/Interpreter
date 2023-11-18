@@ -4,7 +4,7 @@ using System.Text;
 
 namespace LanguageCore.Runtime
 {
-    public class HEAP : IHeap
+    public class HEAP : IReadOnlyHeap
     {
         readonly DataItem[] heap;
 
@@ -346,13 +346,6 @@ namespace LanguageCore.Runtime
             int length = heap[pointer].ValueSInt32;
             return heap.GetString(pointer + 1, length);
         }
-    }
-
-    public interface IHeap : IReadOnlyHeap
-    {
-        public new DataItem this[int i] { get; set; }
-        public int Allocate(int size);
-        public void Deallocate(int pointer);
     }
 
     public interface IReadOnlyHeap

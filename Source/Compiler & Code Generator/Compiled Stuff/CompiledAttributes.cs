@@ -1,10 +1,10 @@
-﻿global using CompiledAttributeCollection = System.Collections.Generic.Dictionary<string, LanguageCore.BBCode.Compiler.AttributeValues>;
+﻿global using CompiledAttributeCollection = System.Collections.Generic.Dictionary<string, LanguageCore.Compiler.AttributeValues>;
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
     using Tokenizing;
 

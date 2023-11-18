@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using Parser;
+    using Parser.Statement;
+
     public class CompiledOperator :
         FunctionDefinition,
         ICanBeSame,

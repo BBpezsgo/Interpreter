@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.Parser
 {
-    using BBCode.Compiler;
+    using Compiler;
     using Tokenizing;
 
     public interface IDefinition

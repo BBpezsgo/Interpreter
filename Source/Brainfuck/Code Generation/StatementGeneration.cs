@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace LanguageCore.Brainfuck.Compiler
+namespace LanguageCore.Brainfuck.Generator
 {
-    using BBCode.Compiler;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
+    using Compiler;
+    using Parser;
+    using Parser.Statement;
+    using Runtime;
+    using Tokenizing;
     using Literal = Parser.Statement.Literal;
 
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
@@ -250,7 +250,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             using (Code.Block($"Set variable \"{variable.Name}\" (at {variable.Address}) to {value}"))
             {
-                if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
+                if (TryCompute(value, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
                 {
                     if (variable.Type != constantValue.Type)
                     { throw new CompilerException($"Cannot set {constantValue.Type} to variable of type {variable.Type}", value, CurrentFile); }
@@ -387,7 +387,7 @@ namespace LanguageCore.Brainfuck.Compiler
         {
             using (Code.Block($"Set value {value} to address {address}"))
             {
-                if (TryCompute(value, null, out var constantValue))
+                if (TryCompute(value, null, out DataItem constantValue))
                 {
                     // if (constantValue.Size != 1)
                     // { throw new CompilerException($"Value size can be only 1", value, CurrentFile); }
@@ -875,7 +875,6 @@ namespace LanguageCore.Brainfuck.Compiler
                     Code.ClearValue(tempAddress);
                     Code.JumpEnd(tempAddress);
 
-
                     Code.CopyValue(BreakTagStack[^1], tempAddress);
                     Code.LOGIC_NOT(tempAddress, tempAddress + 1);
                     Code.JumpStart(tempAddress);
@@ -993,8 +992,8 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Parameters.Length != 1)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        var deletable = statement.Parameters[0];
-                        var deletableType = FindStatementType(deletable);
+                        StatementWithValue deletable = statement.Parameters[0];
+                        CompiledType deletableType = FindStatementType(deletable);
 
                         if (deletableType.BuiltinType == Type.Integer)
                         {
@@ -1010,9 +1009,9 @@ namespace LanguageCore.Brainfuck.Compiler
 
                         TypeArguments typeArguments = new();
 
-                        if (!GetGeneralFunction(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
+                        if (!GetGeneralFunction(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                         {
-                            if (!GetGeneralFunctionTemplate(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                            if (!GetGeneralFunctionTemplate(deletableType.Class, FindStatementTypes(statement.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                             {
                                 if (!TryGetRuntimeAddress(deletable, out int pointerAddress, out int size))
                                 {
@@ -1118,7 +1117,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Right == null)
                         { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                        if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
+                        if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
                         {
                             if (variable.Type != constantValue.Type)
                             { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
@@ -1176,7 +1175,7 @@ namespace LanguageCore.Brainfuck.Compiler
                         if (statement.Right == null)
                         { throw new CompilerException($"Value is required for '{statement.Operator}' assignment", statement, CurrentFile); }
 
-                        if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out var constantValue))
+                        if (TryCompute(statement.Right, variable.Type.IsBuiltin ? variable.Type.RuntimeType : null, out DataItem constantValue))
                         {
                             if (variable.Type != constantValue.Type)
                             { throw new CompilerException($"Variable and value type mismatch ({variable.Type} != {constantValue.Type})", statement.Right, CurrentFile); }
@@ -1353,7 +1352,7 @@ namespace LanguageCore.Brainfuck.Compiler
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
-            var instanceType = FindType(constructorCall.TypeName);
+            CompiledType instanceType = FindType(constructorCall.TypeName);
 
             if (instanceType.IsStruct)
             { throw new NotImplementedException(); }
@@ -1561,9 +1560,9 @@ namespace LanguageCore.Brainfuck.Compiler
                         {
                             {
                                 if (statement.Left is Identifier _left &&
-                                    CodeGeneratorForBrainfuck.GetVariable(Variables, _left.Content, out var left) &&
+                                    CodeGeneratorForBrainfuck.GetVariable(Variables, _left.Content, out Variable left) &&
                                     !left.IsDiscarded &&
-                                    TryCompute(statement.Right, null, out var right) &&
+                                    TryCompute(statement.Right, null, out DataItem right) &&
                                     right.Type == RuntimeType.UInt8)
                                 {
                                     int resultAddress = Stack.PushVirtual(1);
@@ -1806,7 +1805,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
-                            if (TryCompute(statement.Right, null, out var rightConst) && rightConst.Integer.HasValue)
+                            if (TryCompute(statement.Right, null, out DataItem rightConst) && rightConst.Integer.HasValue)
                             {
                                 Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
                             }
@@ -1841,7 +1840,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             { GenerateCodeForStatement(statement.Left); }
 
                             int rightAddress = Stack.NextAddress;
-                            if (TryCompute(statement.Right, null, out var rightConst) && rightConst.Integer.HasValue)
+                            if (TryCompute(statement.Right, null, out DataItem rightConst) && rightConst.Integer.HasValue)
                             {
                                 Code.SetValue(rightAddress, (int)Math.Pow(2, rightConst.Integer.Value));
                             }
@@ -1974,7 +1973,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
                 int address = Stack.PushVirtual(instanceType.Struct.Size);
 
-                foreach (var field in instanceType.Struct.Fields)
+                foreach (CompiledField field in instanceType.Struct.Fields)
                 {
                     if (!field.Type.IsBuiltin)
                     { throw new NotSupportedException($"Not supported :(", field.Identifier, instanceType.Struct.FilePath); }
@@ -2181,7 +2180,6 @@ namespace LanguageCore.Brainfuck.Compiler
                  */
 
                 int _pointerAddress = Stack.PushVirtual(1);
-
 
                 /*
                  *      resultAddress
@@ -2532,9 +2530,9 @@ namespace LanguageCore.Brainfuck.Compiler
             {
                 TypeArguments typeArguments = new();
 
-                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructor))
+                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, null, value);
                         return;
@@ -2703,7 +2701,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (function.ReturnSomething)
             {
-                var returnType = function.Type;
+                CompiledType returnType = function.Type;
                 returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
 
@@ -2750,7 +2748,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     {
                         case "ref":
                             {
-                                var modifiedVariable = (Identifier)modifiedStatement.Statement;
+                                Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
                                 if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
@@ -2763,7 +2761,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             }
                         case "const":
                             {
-                                var valueStatement = modifiedStatement.Statement;
+                                StatementWithValue valueStatement = modifiedStatement.Statement;
                                 if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
@@ -3036,7 +3034,7 @@ namespace LanguageCore.Brainfuck.Compiler
 
             if (true) // always returns something
             {
-                var returnType = function.Type;
+                CompiledType returnType = function.Type;
                 returnVariable = new Variable(ReturnVariableName, Stack.PushVirtual(returnType.SizeOnStack), function, false, false, returnType, returnType.SizeOnStack);
             }
 
@@ -3083,7 +3081,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     {
                         case "ref":
                             {
-                                var modifiedVariable = (Identifier)modifiedStatement.Statement;
+                                Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
                                 if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
@@ -3096,7 +3094,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             }
                         case "const":
                             {
-                                var valueStatement = modifiedStatement.Statement;
+                                StatementWithValue valueStatement = modifiedStatement.Statement;
                                 if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
@@ -3338,7 +3336,7 @@ namespace LanguageCore.Brainfuck.Compiler
                     {
                         case "ref":
                             {
-                                var modifiedVariable = (Identifier)modifiedStatement.Statement;
+                                Identifier modifiedVariable = (Identifier)modifiedStatement.Statement;
 
                                 if (!CodeGeneratorForBrainfuck.GetVariable(Variables, modifiedVariable.Content, out Variable v))
                                 { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
@@ -3351,7 +3349,7 @@ namespace LanguageCore.Brainfuck.Compiler
                             }
                         case "const":
                             {
-                                var valueStatement = modifiedStatement.Statement;
+                                StatementWithValue valueStatement = modifiedStatement.Statement;
                                 if (!TryCompute(valueStatement, null, out DataItem constValue))
                                 { throw new CompilerException($"Constant parameter must have a constant value", valueStatement, CurrentFile); }
 
@@ -3433,9 +3431,6 @@ namespace LanguageCore.Brainfuck.Compiler
 
             for (int i = 0; i < compiledParameters.Count; i++)
             { Variables.Push(compiledParameters[i]); }
-
-
-
 
             CompiledConstant[] savedConstants = CompiledConstants.ToArray();
             CompiledConstants.Clear();

@@ -1,7 +1,8 @@
-﻿using LanguageCore.Parser.Statement;
-
-namespace LanguageCore.BBCode.Compiler
+﻿namespace LanguageCore.BBCode.Generator
 {
+    using LanguageCore.Compiler;
+    using Parser.Statement;
+
     public class CompiledVariable : VariableDeclaration
     {
         public readonly new CompiledType Type;

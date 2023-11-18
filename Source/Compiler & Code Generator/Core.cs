@@ -5,12 +5,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
-    using Parser;
-    using Parser.Statement;
     using Runtime;
-    using Tokenizing;
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public readonly struct ValueAddress
@@ -65,6 +62,14 @@ namespace LanguageCore.BBCode.Compiler
         }
         string GetDebuggerDisplay() => ToString();
     }
+}
+
+namespace LanguageCore.Compiler
+{
+    using Parser;
+    using Parser.Statement;
+    using Runtime;
+    using Tokenizing;
 
     public static class Extensions
     {

@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using LanguageCore.Runtime;
 
 namespace LanguageCore.ASM
 {
+    using Runtime;
+
     public struct AssemblyHeader
     {
         public List<string> Externs;
@@ -94,7 +95,7 @@ namespace LanguageCore.ASM
         public const string EOL = "\r\n";
 
         public readonly StringBuilder Builder;
-        public int Indent = 0;
+        public int Indent;
         public const int IndentIncrement = 2;
 
         public SectionBuilder()
@@ -556,7 +557,6 @@ namespace LanguageCore.ASM
             builder.Append("section .rodata" + EOL);
             builder.Append(DataBuilder.Builder);
             builder.Append(EOL);
-
 
             return builder.ToString();
         }

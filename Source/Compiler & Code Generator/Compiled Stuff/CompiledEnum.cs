@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using LanguageCore.Parser;
-using LanguageCore.Runtime;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using LanguageCore.BBCode.Generator;
+    using Parser;
+    using Runtime;
+
     public class CompiledEnumMember : EnumMemberDefinition, IHaveKey<string>
     {
         public DataItem ComputedValue;

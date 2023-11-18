@@ -36,10 +36,10 @@ namespace ConsoleGUI
             // StackAutoScroll = true;
         }
 
-        public InterpreterElement(string file, LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath) : this()
+        public InterpreterElement(string file, LanguageCore.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors) : this()
         {
             this.File = file;
-            SetupInterpreter(compilerSettings, interpreterSettings, handleErrors, basePath);
+            SetupInterpreter(compilerSettings, interpreterSettings, handleErrors);
         }
 
         public InterpreterElement(string file) : this()
@@ -137,8 +137,8 @@ namespace ConsoleGUI
             };
         }
 
-        void SetupInterpreter() => SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings.Default, BytecodeInterpreterSettings.Default, false, string.Empty);
-        void SetupInterpreter(LanguageCore.BBCode.Compiler.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors, string basePath)
+        void SetupInterpreter() => SetupInterpreter(LanguageCore.Compiler.CompilerSettings.Default, BytecodeInterpreterSettings.Default, false);
+        void SetupInterpreter(LanguageCore.Compiler.CompilerSettings compilerSettings, BytecodeInterpreterSettings interpreterSettings, bool handleErrors)
         {
             this.InterpreterTimer = new MainThreadTimer(200);
             this.InterpreterTimer.Elapsed += () =>
@@ -187,26 +187,35 @@ namespace ConsoleGUI
 
             if (Interpreter.Initialize())
             {
-                LanguageCore.BBCode.Compiler.CodeGeneratorForMain.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
-                    fileInfo,
-                    Interpreter.GenerateExternalFunctions(),
-                    LanguageCore.Tokenizing.TokenizerSettings.Default,
-                    compilerSettings,
-                    handleErrors,
-                    PrintOutput,
-                    basePath
-                    );
+                LanguageCore.Compiler.CompilerResult compiled;
+                LanguageCore.BBCode.Generator.BBCodeGeneratorResult generatedCode;
 
-                if (compiledCode.HasValue)
+                if (handleErrors)
                 {
-                    Interpreter.CompilerResult = compiledCode.Value;
-                    Interpreter.ExecuteProgram(compiledCode.Value.Code, new BytecodeInterpreterSettings()
+                    try
                     {
-                        InstructionLimit = interpreterSettings.InstructionLimit,
-                        StackMaxSize = interpreterSettings.StackMaxSize,
-                        HeapSize = interpreterSettings.HeapSize,
-                    });
+                        compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), Interpreter.GenerateExternalFunctions(), fileInfo, compilerSettings.BasePath, PrintOutput);
+                        generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                    }
+                    catch (Exception ex)
+                    {
+                        PrintOutput(ex.ToString(), LogType.Error);
+                        return;
+                    }
                 }
+                else
+                {
+                    compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), Interpreter.GenerateExternalFunctions(), fileInfo, compilerSettings.BasePath, PrintOutput);
+                    generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                }
+
+                Interpreter.CompilerResult = generatedCode;
+                Interpreter.ExecuteProgram(generatedCode.Code, new BytecodeInterpreterSettings()
+                {
+                    InstructionLimit = interpreterSettings.InstructionLimit,
+                    StackMaxSize = interpreterSettings.StackMaxSize,
+                    HeapSize = interpreterSettings.HeapSize,
+                });
             }
         }
 
@@ -1098,7 +1107,7 @@ namespace ConsoleGUI
 
         public override void OnKeyEvent(KeyEvent e)
         {
-            Debug.Log(e.ToString());
+            System.Diagnostics.Debug.WriteLine(e.ToString());
 
             base.OnKeyEvent(e);
             Elements.OnKeyEvent(e);

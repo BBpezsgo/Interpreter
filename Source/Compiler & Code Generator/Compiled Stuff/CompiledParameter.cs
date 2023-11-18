@@ -1,8 +1,10 @@
 ﻿using System.Diagnostics;
-using LanguageCore.Parser;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
+    using LanguageCore.Compiler;
+    using Parser;
+
     [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
     public class CompiledParameter : ParameterDefinition
     {

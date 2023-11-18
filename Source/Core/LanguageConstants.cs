@@ -1,9 +1,10 @@
 ﻿using System.Collections.Generic;
-using LanguageCore.BBCode.Compiler;
-using LanguageCore.Runtime;
 
 namespace LanguageCore
 {
+    using Compiler;
+    using Runtime;
+
     public static partial class LanguageConstants
     {
         public static readonly string[] Keywords = new string[]

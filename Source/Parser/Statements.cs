@@ -6,8 +6,8 @@ using System.Text;
 
 namespace LanguageCore.Parser.Statement
 {
-    using LanguageCore.BBCode.Compiler;
-    using LanguageCore.Tokenizing;
+    using Compiler;
+    using Tokenizing;
 
     struct Stringify
     {

@@ -7,14 +7,6 @@ namespace LanguageCore
 {
     public delegate void PrintCallback(string message, LogType logType);
 
-    internal static class Debug
-    {
-        public static void Log(string message) => System.Diagnostics.Debug.WriteLine(message);
-        public static void LogError(string message) => System.Diagnostics.Debug.WriteLine(message);
-        public static void LogError(object? message) => System.Diagnostics.Debug.WriteLine(message);
-        public static void LogWarning(string message) => System.Diagnostics.Debug.WriteLine(message);
-    }
-
     public static class Output
     {
         public static void LogDebug(string message) => LogColor(message, ConsoleColor.DarkGray);

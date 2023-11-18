@@ -2,10 +2,11 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
-using LanguageCore.Runtime;
 
 namespace LanguageCore
 {
+    using Runtime;
+
     #region Exception
 
     [Serializable]

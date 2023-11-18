@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using LanguageCore.Runtime;
 using Win32;
 using Win32.LowLevel;
 
 namespace LanguageCore.Brainfuck
 {
+    using Runtime;
+
     public class Interpreter
     {
         public const int MEMORY_SIZE = 1024;

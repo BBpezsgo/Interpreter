@@ -1,7 +1,8 @@
 ﻿using System;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
+    using Compiler;
     using Parser.Statement;
     using Runtime;
 

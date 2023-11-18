@@ -31,7 +31,7 @@ namespace LanguageCore.Tokenizing
 
         STRING_EscapeSequence,
         STRING_UnicodeCharacter,
-        
+
         CHAR_EscapeSequence,
         CHAR_UnicodeCharacter,
 
@@ -239,8 +239,8 @@ namespace LanguageCore.Tokenizing
         static readonly char[] DigitsHex = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 
         readonly PreparationToken CurrentToken;
-       protected int CurrentColumn;
-       protected int CurrentLine;
+        protected int CurrentColumn;
+        protected int CurrentLine;
 
         protected readonly List<Token> Tokens;
         protected readonly List<SimpleToken> UnicodeCharacters;

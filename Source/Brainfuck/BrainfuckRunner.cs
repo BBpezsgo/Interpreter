@@ -5,7 +5,8 @@ using System.Linq;
 using System.Text;
 using LanguageCore;
 using LanguageCore.Brainfuck;
-using LanguageCore.Brainfuck.Compiler;
+using LanguageCore.Brainfuck.Generator;
+using LanguageCore.Parser;
 
 namespace TheProgram.Brainfuck
 {
@@ -27,8 +28,8 @@ namespace TheProgram.Brainfuck
 
     public static class BrainfuckRunner
     {
-        static CodeGeneratorForBrainfuck.Settings CompilerSettings => CodeGeneratorForBrainfuck.Settings.Default;
-      
+        static BrainfuckGeneratorSettings CompilerSettings => BrainfuckGeneratorSettings.Default;
+
         public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags, CompileOptions flags = CompileOptions.None)
         {
             void PrintCallback(string message, LogType level)
@@ -59,11 +60,11 @@ namespace TheProgram.Brainfuck
                 }
             }
 
-            CodeGeneratorForBrainfuck.Result? _code = BrainfuckRunner.CompilePlus(args.File, flags, PrintCallback);
+            BrainfuckGeneratorResult? _code = BrainfuckRunner.CompilePlus(args.File, flags, PrintCallback);
             if (!_code.HasValue)
             { return; }
 
-            CodeGeneratorForBrainfuck.Result code = _code.Value;
+            BrainfuckGeneratorResult code = _code.Value;
 
             InterpreterCompact interpreter = new(code.Code)
             {
@@ -227,20 +228,19 @@ namespace TheProgram.Brainfuck
             PrintFinal = 0b_1000,
         }
 
-        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, CompileOptions options, PrintCallback printCallback)
+        public static BrainfuckGeneratorResult? CompilePlus(FileInfo file, CompileOptions options, PrintCallback printCallback)
                 => CompilePlus(file, (int)options, printCallback);
-        public static CodeGeneratorForBrainfuck.Result? CompilePlus(FileInfo file, int options, PrintCallback printCallback)
+        public static BrainfuckGeneratorResult? CompilePlus(FileInfo file, int options, PrintCallback printCallback)
         {
-            string code = File.ReadAllText(file.FullName);
-
             bool throwErrors = true;
 
-            CodeGeneratorForBrainfuck.Result compilerResult;
+            BrainfuckGeneratorResult generated;
 
             try
             {
-                compilerResult = EasyCompiler.Compile(file, CompilerSettings, printCallback).CodeGeneratorResult;
-                printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
+                LanguageCore.Compiler.CompilerResult compiled = LanguageCore.Compiler.Compiler.Compile(Parser.ParseFile(file.FullName), null, file, null, printCallback);
+                generated = CodeGeneratorForBrainfuck.Generate(compiled, CompilerSettings, printCallback);
+                // printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
             }
             catch (LanguageException exception)
             {
@@ -274,29 +274,29 @@ namespace TheProgram.Brainfuck
             {
                 Console.WriteLine();
                 Console.WriteLine($" === COMPILED ===");
-                PrintCode(Simplifier.Simplify(compilerResult.Code));
+                PrintCode(Simplifier.Simplify(generated.Code));
                 Console.WriteLine();
                 Console.ResetColor();
             }
 
-            compilerResult.Code = Minifier.Minify(compilerResult.Code);
+            generated.Code = Minifier.Minify(generated.Code);
 
             if ((options & (int)CompileOptions.PrintCompiledMinimized) != 0)
             {
                 Console.WriteLine();
                 Console.WriteLine($" === MINIFIED ===");
-                PrintCode(Simplifier.Simplify(compilerResult.Code));
+                PrintCode(Simplifier.Simplify(generated.Code));
                 Console.WriteLine();
                 Console.ResetColor();
             }
 
-            compilerResult.Code = Minifier.Minify(LanguageCore.Brainfuck.BrainfuckCode.RemoveNoncodes(compilerResult.Code));
+            generated.Code = Minifier.Minify(BrainfuckCode.RemoveNoncodes(generated.Code));
 
             if ((options & (int)CompileOptions.PrintFinal) != 0)
             {
                 Console.WriteLine();
                 Console.WriteLine($" === FINAL ===");
-                PrintCode(compilerResult.Code);
+                PrintCode(generated.Code);
                 Console.WriteLine();
                 Console.ResetColor();
             }
@@ -304,17 +304,17 @@ namespace TheProgram.Brainfuck
             if ((options & (int)CompileOptions.WriteToFile) != 0)
             {
                 string compiledFilePath = Path.Combine(Path.GetDirectoryName(file.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{file.FullName}\""), Path.GetFileNameWithoutExtension(file.FullName) + ".bf");
-                File.WriteAllText(compiledFilePath, compilerResult.Code);
+                File.WriteAllText(compiledFilePath, generated.Code);
             }
 
-            return compilerResult;
+            return generated;
         }
 
         public static string? Compile(string code, CompileOptions options)
             => Compile(code, (int)options);
         public static string Compile(string code, int options)
         {
-            string compiled = Minifier.Minify(LanguageCore.Brainfuck.BrainfuckCode.RemoveNoncodes(code));
+            string compiled = Minifier.Minify(BrainfuckCode.RemoveNoncodes(code));
 
             if ((options & (int)CompileOptions.PrintFinal) != 0)
             {

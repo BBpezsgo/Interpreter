@@ -1,14 +1,13 @@
-﻿
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
 namespace LanguageCore.Parser
 {
-    using System;
-    using System.Collections.Generic;
-    using System.Data.Common;
-    using System.Linq;
-    using System.Text;
-    using LanguageCore.BBCode.Compiler;
-    using LanguageCore.Tokenizing;
+    using Compiler;
     using Statement;
+    using Tokenizing;
 
     public abstract class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
     {

@@ -1,8 +1,8 @@
-﻿using LanguageCore.Parser.Statement;
-using LanguageCore.Runtime;
-
-namespace LanguageCore.BBCode.Compiler
+﻿namespace LanguageCore.Compiler
 {
+    using Parser.Statement;
+    using Runtime;
+
     public class CompiledVariableConstant : CompiledConstant
     {
         public readonly VariableDeclaration Declaration;

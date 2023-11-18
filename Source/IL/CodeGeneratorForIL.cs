@@ -8,42 +8,43 @@ using System.Reflection.Emit;
 #pragma warning disable CA1822 // Mark members as static
 #pragma warning disable IDE0060 // Remove unused parameter
 
-namespace LanguageCore.IL.Compiler
+namespace LanguageCore.IL.Generator
 {
-    using BBCode.Compiler;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Tokenizing;
+    using BBCode.Generator;
+    using LanguageCore.Compiler;
+    using Parser;
+    using Parser.Statement;
+    using Tokenizing;
     using Literal = Parser.Statement.Literal;
     using Pointer = Parser.Statement.Pointer;
+
+    public struct ILGeneratorResult
+    {
+        public Token[] Tokens;
+
+        public Warning[] Warnings;
+        public Error[] Errors;
+        public Assembly Assembly;
+    }
+
+    public struct ILGeneratorSettings
+    {
+
+    }
 
     [RequiresDynamicCode("Generating IL code")]
     public class CodeGeneratorForIL : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 
-        readonly Settings GeneratorSettings;
+        readonly ILGeneratorSettings GeneratorSettings;
         readonly string AssemblyName = "Bruh";
 
         #endregion
 
-        public CodeGeneratorForIL(Compiler.Result compilerResult, Settings settings) : base()
+        public CodeGeneratorForIL(CompilerResult compilerResult, ILGeneratorSettings settings) : base()
         {
             this.GeneratorSettings = settings;
-        }
-
-        public struct Result
-        {
-            public Token[] Tokens;
-
-            public Warning[] Warnings;
-            public Error[] Errors;
-            public Assembly Assembly;
-        }
-
-        public struct Settings
-        {
-
         }
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
@@ -669,12 +670,12 @@ namespace LanguageCore.IL.Compiler
 
         }
 
-        Result GenerateCode(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
+        ILGeneratorResult GenerateCode(
+            CompilerResult compilerResult,
+            CompilerSettings settings,
             PrintCallback? printCallback = null)
         {
-            (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, Compiler.CompileLevel.Minimal);
+            (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, CompileLevel.Minimal);
 
             AssemblyName assemblyName = new($"{AssemblyName}Assembly");
 
@@ -689,7 +690,7 @@ namespace LanguageCore.IL.Compiler
             System.Type? type = typeBuilder.CreateType();
             Assembly? assembly = Assembly.GetAssembly(type!);
 
-            return new Result()
+            return new ILGeneratorResult()
             {
                 Tokens = compilerResult.Tokens,
                 Assembly = assembly!,
@@ -699,10 +700,10 @@ namespace LanguageCore.IL.Compiler
             };
         }
 
-        public static Result Generate(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
-            Settings generatorSettings,
+        public static ILGeneratorResult Generate(
+            CompilerResult compilerResult,
+            CompilerSettings settings,
+            ILGeneratorSettings generatorSettings,
             PrintCallback? printCallback = null)
         {
             CodeGeneratorForIL codeGenerator = new(compilerResult, generatorSettings);

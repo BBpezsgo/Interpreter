@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
-using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using Parser;
+    using Parser.Statement;
+
     public class CompiledGeneralFunction :
         GeneralFunctionDefinition,
         ICanBeSame,
@@ -20,7 +21,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public int InstructionOffset = -1;
 
-        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
+        public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
         public IReadOnlyList<(Statement Statement, string? File)> References => references;
         readonly List<(Statement Statement, string? File)> references = new();

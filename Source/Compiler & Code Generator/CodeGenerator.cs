@@ -3,23 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
     using ConsoleGUI;
+    using BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
     using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
-
-    public readonly struct BuiltinFunctionNames
-    {
-        public const string Destructor = "destructor";
-        public const string Cloner = "clone";
-        public const string Constructor = "constructor";
-        public const string IndexerGet = "indexer_get";
-        public const string IndexerSet = "indexer_set";
-    }
 
     public abstract class CodeGenerator
     {
@@ -228,7 +220,7 @@ namespace LanguageCore.BBCode.Compiler
             compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
-        protected CodeGenerator(Compiler.Result compilerResult) : this()
+        protected CodeGenerator(CompilerResult compilerResult) : this()
         {
             CompiledStructs = compilerResult.Structs;
             CompiledClasses = compilerResult.Classes;

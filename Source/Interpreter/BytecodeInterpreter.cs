@@ -138,8 +138,8 @@ namespace LanguageCore.Runtime
 
         bool CanTraceCallsWith(int basePointer) =>
             basePointer >= 2 &&
-            basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset < Memory.Stack.Count &&
-            basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset < Memory.Stack.Count;
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset < Memory.Stack.Count &&
+            basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset < Memory.Stack.Count;
 
         public int[] TraceCalls()
         {
@@ -160,8 +160,8 @@ namespace LanguageCore.Runtime
         {
             if (!CanTraceCallsWith(basePointer)) return;
 
-            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedCodePointerOffset];
-            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Compiler.CodeGeneratorForMain.SavedBasePointerOffset];
+            DataItem savedCodePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedCodePointerOffset];
+            DataItem savedBasePointerD = Memory.Stack[basePointer + BBCode.Generator.CodeGeneratorForMain.SavedBasePointerOffset];
 
             if (!savedCodePointerD.Integer.HasValue) return;
             if (!savedBasePointerD.Integer.HasValue) return;

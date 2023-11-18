@@ -2,18 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 
-#pragma warning disable IDE0052 // Remove unread private members
-#pragma warning disable IDE0051 // Remove unused private members
-#pragma warning disable IDE0060 // Remove unused parameter
-
-namespace LanguageCore.ASM.Compiler
+namespace LanguageCore.ASM.Generator
 {
-    using BBCode.Compiler;
-    using LanguageCore.Parser;
-    using LanguageCore.Parser.Statement;
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
+    using Compiler;
+    using BBCode.Generator;
+    using Parser;
+    using Parser.Statement;
+    using Runtime;
+    using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
+    using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.CompiledType Type);
 
     public class ImportedAsmFunction
     {
@@ -41,7 +39,7 @@ namespace LanguageCore.ASM.Compiler
 
         #endregion
 
-        public CodeGeneratorForAsm(Compiler.Result compilerResult, Settings settings) : base()
+        public CodeGeneratorForAsm(CompilerResult compilerResult, Settings settings) : base()
         {
             this.GeneratorSettings = settings;
             this.CompiledFunctions = compilerResult.Functions;
@@ -350,7 +348,6 @@ namespace LanguageCore.ASM.Compiler
                 }
             }
 
-
             int offset = 0;
             if (isGlobal)
             { offset += VariablesSize; }
@@ -495,9 +492,9 @@ namespace LanguageCore.ASM.Compiler
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.RET);
         }
 
-        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+            Stack<ParameterCleanupItem> parameterCleanup = new();
 
             if (functionCall.PrevStatement != null)
             {
@@ -538,9 +535,9 @@ namespace LanguageCore.ASM.Compiler
             return parameterCleanup;
         }
 
-        Stack<(int Size, bool CanDeallocate, CompiledType Type)> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
+        Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(OperatorCall functionCall, CompiledOperator compiledFunction)
         {
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup = new();
+            Stack<ParameterCleanupItem> parameterCleanup = new();
 
             for (int i = 0; i < functionCall.Parameters.Length; i++)
             {
@@ -573,11 +570,11 @@ namespace LanguageCore.ASM.Compiler
             return parameterCleanup;
         }
 
-        void GenerateCodeForParameterCleanup(Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup)
+        void GenerateCodeForParameterCleanup(Stack<ParameterCleanupItem> parameterCleanup)
         {
             while (parameterCleanup.Count > 0)
             {
-                var passedParameter = parameterCleanup.Pop();
+                ParameterCleanupItem passedParameter = parameterCleanup.Pop();
 
                 if (passedParameter.CanDeallocate && passedParameter.Size == 1)
                 { throw new NotImplementedException(); }
@@ -632,7 +629,7 @@ namespace LanguageCore.ASM.Compiler
             if (compiledFunction.IsMacro)
             { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
 
-            Stack<(int Size, bool CanDeallocate, CompiledType Type)> parameterCleanup;
+            Stack<ParameterCleanupItem> parameterCleanup;
 
             int returnValueSize = 0;
             if (compiledFunction.ReturnSomething)
@@ -960,7 +957,7 @@ namespace LanguageCore.ASM.Compiler
         }
         void GenerateCodeForStatement(ConstructorCall constructorCall)
         {
-            var instanceType = FindType(constructorCall.TypeName);
+            CompiledType instanceType = FindType(constructorCall.TypeName);
 
             if (instanceType.IsStruct)
             { throw new NotImplementedException(); }
@@ -975,7 +972,7 @@ namespace LanguageCore.ASM.Compiler
 
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
@@ -1319,8 +1316,8 @@ namespace LanguageCore.ASM.Compiler
         }
 
         Result GenerateCode(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
+            CompilerResult compilerResult,
+            CompilerSettings settings,
             PrintCallback? printCallback = null)
         {
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
@@ -1328,7 +1325,7 @@ namespace LanguageCore.ASM.Compiler
             while (true)
             {
                 bool shouldExit = true;
-                foreach (var pair in FunctionLabels)
+                foreach (KeyValuePair<CompiledFunction, string> pair in FunctionLabels)
                 {
                     CompiledFunction function = pair.Key;
                     if (!GeneratedFunctions.Any(other => ReferenceEquals(function, other)))
@@ -1361,8 +1358,8 @@ namespace LanguageCore.ASM.Compiler
         }
 
         public static Result Generate(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
+            CompilerResult compilerResult,
+            CompilerSettings settings,
             Settings generatorSettings,
             PrintCallback? printCallback = null)
         => new CodeGeneratorForAsm(compilerResult, generatorSettings).GenerateCode(

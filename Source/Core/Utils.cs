@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore
 {
+    using Tokenizing;
+
     public static partial class Utils
     {
         /// <exception cref="ArgumentException"/>

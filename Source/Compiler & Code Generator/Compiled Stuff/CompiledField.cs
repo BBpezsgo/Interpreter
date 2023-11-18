@@ -1,7 +1,7 @@
-﻿using LanguageCore.Parser;
-
-namespace LanguageCore.BBCode.Compiler
+﻿namespace LanguageCore.Compiler
 {
+    using Parser;
+
     public class CompiledField : FieldDefinition
     {
         public new CompiledType Type;

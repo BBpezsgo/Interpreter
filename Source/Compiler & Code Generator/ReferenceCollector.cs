@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using BBCode.Generator;
     using Parser;
     using Parser.Statement;
 
@@ -679,7 +680,7 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         public static void CollectReferences(
-            Compiler.Result compilerResult,
+            CompilerResult compilerResult,
             PrintCallback? printCallback = null)
             => new ReferenceCollector()
             {
@@ -694,7 +695,7 @@ namespace LanguageCore.BBCode.Compiler
                 CompiledEnums = compilerResult.Enums,
             }.AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
 
-        public static void ClearReferences(Compiler.Result compilerResult)
+        public static void ClearReferences(CompilerResult compilerResult)
             => new ReferenceCollector()
             {
                 CompiledClasses = compilerResult.Classes,

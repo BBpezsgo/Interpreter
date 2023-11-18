@@ -3,7 +3,9 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Communicating;
 using LanguageCore;
-using LanguageCore.BBCode.Compiler;
+using LanguageCore.BBCode.Generator;
+using LanguageCore.Compiler;
+using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
 #nullable disable
@@ -55,20 +57,19 @@ namespace TheProgram
 
             if (!Interpreter.Initialize()) return;
 
-            CodeGeneratorForMain.Result? compiledCode = LanguageCore.BBCode.EasyCompiler.Compile(
-                settings.File,
-                Interpreter.GenerateExternalFunctions(),
-                LanguageCore.Tokenizing.TokenizerSettings.Default,
-                settings.compilerSettings,
-                settings.HandleErrors,
-                (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))),
-                settings.BasePath
-                );
+            try
+            {
+                CompilerResult compiled = Compiler.Compile(Parser.ParseFile(settings.File.FullName), Interpreter.GenerateExternalFunctions(), settings.File, settings.compilerSettings.BasePath, (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))));
+                BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, settings.compilerSettings, (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))));
 
-            if (!compiledCode.HasValue) return;
-
-            Interpreter.CompilerResult = compiledCode.Value;
-            Interpreter.ExecuteProgram(compiledCode.Value.Code, settings.bytecodeInterpreterSettings);
+                Interpreter.CompilerResult = generatedCode;
+                Interpreter.ExecuteProgram(generatedCode.Code, settings.bytecodeInterpreterSettings);
+            }
+            catch (Exception ex)
+            {
+                Ipc.Send("console/out", new Data_Log(LogType.Error, ex.ToString(), new Data_Context(Interpreter)));
+                return;
+            }
         }
 
         static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)

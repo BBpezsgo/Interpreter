@@ -1,18 +1,20 @@
 ﻿using System.Collections.Generic;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
+    using LanguageCore.Compiler;
+
     public class UnusedFunctionManager : CodeGeneratorNonGeneratorBase
     {
         #region Fields
 
-        readonly Compiler.CompileLevel CompileLevel;
+        readonly CompileLevel CompileLevel;
 
         readonly List<Information> Informations;
 
         #endregion
 
-        public UnusedFunctionManager(Compiler.CompileLevel compileLevel) : base()
+        public UnusedFunctionManager(CompileLevel compileLevel) : base()
         {
             CompileLevel = compileLevel;
 
@@ -37,8 +39,8 @@ namespace LanguageCore.BBCode.Compiler
                     if (function.CompiledAttributes.ContainsKey("CodeEntry")) continue;
                     if (function.CompiledAttributes.ContainsKey("Catch")) continue;
 
-                    if (CompileLevel == Compiler.CompileLevel.All) continue;
-                    if (CompileLevel == Compiler.CompileLevel.Exported && function.IsExport) continue;
+                    if (CompileLevel == CompileLevel.All) continue;
+                    if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
 
                     string readableID = function.ReadableID();
 
@@ -61,8 +63,8 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (@operator.TimesUsed > 0) continue;
 
-                    if (CompileLevel == Compiler.CompileLevel.All) continue;
-                    if (CompileLevel == Compiler.CompileLevel.Exported && @operator.IsExport) continue;
+                    if (CompileLevel == CompileLevel.All) continue;
+                    if (CompileLevel == CompileLevel.Exported && @operator.IsExport) continue;
 
                     string readableID = @operator.ReadableID();
 
@@ -85,8 +87,8 @@ namespace LanguageCore.BBCode.Compiler
 
                     if (generalFunction.TimesUsed > 0) continue;
 
-                    if (CompileLevel == Compiler.CompileLevel.All) continue;
-                    if (CompileLevel == Compiler.CompileLevel.Exported && generalFunction.IsExport) continue;
+                    if (CompileLevel == CompileLevel.All) continue;
+                    if (CompileLevel == CompileLevel.Exported && generalFunction.IsExport) continue;
 
                     string readableID = generalFunction.ReadableID();
 
@@ -104,10 +106,10 @@ namespace LanguageCore.BBCode.Compiler
         }
 
         public static (CompiledFunction[] functions, CompiledOperator[] operators, CompiledGeneralFunction[] generalFunctions) RemoveUnusedFunctions(
-            Compiler.Result compilerResult,
+            CompilerResult compilerResult,
             int iterations,
             PrintCallback? printCallback = null,
-            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
+            CompileLevel level = CompileLevel.Minimal)
         {
             UnusedFunctionManager unusedFunctionManager = new(level)
             {

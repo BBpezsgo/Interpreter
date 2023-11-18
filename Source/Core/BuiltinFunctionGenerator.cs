@@ -3,7 +3,6 @@ using System.Collections.Generic;
 
 namespace LanguageCore.Runtime
 {
-
     [Flags]
     public enum ExternalFunctionFlags : byte
     {
@@ -11,9 +10,9 @@ namespace LanguageCore.Runtime
         CheckParamType = 2,
     }
 
-    public abstract class ExternalFunctionBase : BBCode.Compiler.IHaveKey<string>
+    public abstract class ExternalFunctionBase : Compiler.IHaveKey<string>
     {
-        public readonly BBCode.Compiler.Type[] ParameterTypes;
+        public readonly Compiler.Type[] ParameterTypes;
         public readonly string Name;
 
         public string Key => Name;
@@ -30,7 +29,7 @@ namespace LanguageCore.Runtime
 
         public const ExternalFunctionFlags DefaultFlags = ExternalFunctionFlags.CheckParamLength | ExternalFunctionFlags.CheckParamType;
 
-        protected ExternalFunctionBase(string name, BBCode.Compiler.Type[] parameters, bool returnSomething, ExternalFunctionFlags flags)
+        protected ExternalFunctionBase(string name, Compiler.Type[] parameters, bool returnSomething, ExternalFunctionFlags flags)
         {
             this.Name = name;
             this.ParameterTypes = parameters;
@@ -69,7 +68,7 @@ namespace LanguageCore.Runtime
         protected Func<BytecodeProcessor, DataItem[], DataItem> callback;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ExternalFunctionSimple(Action<BytecodeProcessor, DataItem[]> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+        public ExternalFunctionSimple(Action<BytecodeProcessor, DataItem[]> callback, string name, Compiler.Type[] parameters, ExternalFunctionFlags flags)
                  : base(name, parameters, false, flags)
         {
             this.callback = (sender, v) =>
@@ -80,7 +79,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ExternalFunctionSimple(Func<BytecodeProcessor, DataItem[], DataItem> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+        public ExternalFunctionSimple(Func<BytecodeProcessor, DataItem[], DataItem> callback, string name, Compiler.Type[] parameters, ExternalFunctionFlags flags)
                  : base(name, parameters, true, flags)
         {
             this.callback = callback;
@@ -106,7 +105,7 @@ namespace LanguageCore.Runtime
         readonly Func<DataItem[], DataItem> callback;
 
         /// <param name="callback">Callback when the interpreter process this function</param>
-        public ExternalFunctionManaged(Action<DataItem[], ExternalFunctionManaged> callback, string name, BBCode.Compiler.Type[] parameters, ExternalFunctionFlags flags)
+        public ExternalFunctionManaged(Action<DataItem[], ExternalFunctionManaged> callback, string name, Compiler.Type[] parameters, ExternalFunctionFlags flags)
                  : base(name, parameters, true, flags)
         {
             this.callback = new Func<DataItem[], DataItem>((p) =>
@@ -146,7 +145,7 @@ namespace LanguageCore.Runtime
             if (!method.IsStatic)
             { throw new InternalException($"Only static functions can be added as an external function"); }
 
-            BBCode.Compiler.Type[] parameterTypes = GetTypes(method.GetParameters());
+            Compiler.Type[] parameterTypes = GetTypes(method.GetParameters());
 
             ExternalFunctionSimple function;
 
@@ -175,12 +174,12 @@ namespace LanguageCore.Runtime
             return function;
         }
 
-        public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        public static void AddManagedExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Compiler.Type[] parameterTypes, Action<DataItem[], ExternalFunctionManaged> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionManaged(callback, name, parameterTypes, flags));
 
-        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Compiler.Type[] parameterTypes, Func<BytecodeProcessor, DataItem[], DataItem> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
-        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, BBCode.Compiler.Type[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
+        public static void AddSimpleExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Compiler.Type[] parameterTypes, Action<BytecodeProcessor, DataItem[]> callback, ExternalFunctionFlags flags = ExternalFunctionBase.DefaultFlags)
             => functions.AddExternalFunction(name, new ExternalFunctionSimple(callback, name, parameterTypes, flags));
 
         static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
@@ -198,7 +197,7 @@ namespace LanguageCore.Runtime
 
         public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
         {
-            var types = Array.Empty<BBCode.Compiler.Type>();
+            var types = Array.Empty<Compiler.Type>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -298,7 +297,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<TResult> callback)
         {
-            var types = Array.Empty<BBCode.Compiler.Type>();
+            var types = Array.Empty<Compiler.Type>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -422,7 +421,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="RuntimeException"/>
-        public static void CheckTypes(DataItem[] values, BBCode.Compiler.Type[] types)
+        public static void CheckTypes(DataItem[] values, Compiler.Type[] types)
         {
             int n = Math.Min(values.Length, types.Length);
             for (int i = 0; i < n; i++)
@@ -491,7 +490,7 @@ namespace LanguageCore.Runtime
         #endregion
 
         /// <exception cref="RuntimeException"/>
-        static void CheckParameters(string functionName, BBCode.Compiler.Type[] required, DataItem[] passed)
+        static void CheckParameters(string functionName, Compiler.Type[] required, DataItem[] passed)
         {
             if (passed.Length != required.Length) throw new RuntimeException($"Wrong number of parameters passed to external function '{functionName}' ({passed.Length}) which requires {required.Length}");
         }
@@ -499,25 +498,25 @@ namespace LanguageCore.Runtime
         #region GetTypes<>()
 
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0>() => new BBCode.Compiler.Type[1]
+        static Compiler.Type[] GetTypes<T0>() => new Compiler.Type[1]
         {
             GetType<T0>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0, T1>() => new BBCode.Compiler.Type[2]
+        static Compiler.Type[] GetTypes<T0, T1>() => new Compiler.Type[2]
         {
             GetType<T0>(),
             GetType<T1>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2>() => new BBCode.Compiler.Type[3]
+        static Compiler.Type[] GetTypes<T0, T1, T2>() => new Compiler.Type[3]
         {
             GetType<T0>(),
             GetType<T1>(),
             GetType<T2>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3>() => new BBCode.Compiler.Type[4]
+        static Compiler.Type[] GetTypes<T0, T1, T2, T3>() => new Compiler.Type[4]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -525,7 +524,7 @@ namespace LanguageCore.Runtime
             GetType<T3>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3, T4>() => new BBCode.Compiler.Type[5]
+        static Compiler.Type[] GetTypes<T0, T1, T2, T3, T4>() => new Compiler.Type[5]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -534,7 +533,7 @@ namespace LanguageCore.Runtime
             GetType<T4>(),
         };
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type[] GetTypes<T0, T1, T2, T3, T4, T5>() => new BBCode.Compiler.Type[6]
+        static Compiler.Type[] GetTypes<T0, T1, T2, T3, T4, T5>() => new Compiler.Type[6]
         {
             GetType<T0>(),
             GetType<T1>(),
@@ -545,69 +544,71 @@ namespace LanguageCore.Runtime
         };
 
         /// <exception cref="NotImplementedException"/>
-        static BBCode.Compiler.Type GetType<T>()
+        static Compiler.Type GetType<T>()
         {
             var type_ = typeof(T);
 
             if (type_ == typeof(byte))
-            { return BBCode.Compiler.Type.Byte; }
+            { return Compiler.Type.Byte; }
 
             if (type_ == typeof(int))
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             if (type_ == typeof(float))
-            { return BBCode.Compiler.Type.Float; }
+            { return Compiler.Type.Float; }
 
             if (type_ == typeof(char))
-            { return BBCode.Compiler.Type.Char; }
+            { return Compiler.Type.Char; }
 
             if (type_.IsClass)
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             if (type_ == typeof(uint))
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             if (type_ == typeof(IntPtr))
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             if (type_ == typeof(UIntPtr))
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             throw new NotImplementedException($"Type conversion for type {typeof(T)} not implemented");
         }
 
-        static BBCode.Compiler.Type[] GetTypes(params System.Reflection.ParameterInfo[] parameters)
+        static Compiler.Type[] GetTypes(params System.Reflection.ParameterInfo[] parameters)
         {
-            BBCode.Compiler.Type[] result = new BBCode.Compiler.Type[parameters.Length];
+            Compiler.Type[] result = new Compiler.Type[parameters.Length];
             for (int i = 0; i < parameters.Length; i++)
             { result[i] = GetType(parameters[i].ParameterType); }
             return result;
         }
 
-        static BBCode.Compiler.Type[] GetTypes(params Type[] types)
+        /*
+        static Compiler.Type[] GetTypes(params Type[] types)
         {
-            BBCode.Compiler.Type[] result = new BBCode.Compiler.Type[types.Length];
+            Compiler.Type[] result = new Compiler.Type[types.Length];
             for (int i = 0; i < types.Length; i++)
             { result[i] = GetType(types[i]); }
             return result;
         }
+        */
 
-        static BBCode.Compiler.Type GetType(Type type)
+        static Compiler.Type GetType(Type type)
         {
             if (type == typeof(byte))
-            { return BBCode.Compiler.Type.Byte; }
+            { return Compiler.Type.Byte; }
 
             if (type == typeof(int))
-            { return BBCode.Compiler.Type.Integer; }
+            { return Compiler.Type.Integer; }
 
             if (type == typeof(float))
-            { return BBCode.Compiler.Type.Float; }
+            { return Compiler.Type.Float; }
 
             if (type == typeof(float))
-            { return BBCode.Compiler.Type.Float; }
+            { return Compiler.Type.Float; }
 
             if (type == typeof(void))
-            { return BBCode.Compiler.Type.Void; }
+            { return Compiler.Type.Void; }
 
             throw new InternalException($"Unknown type {type.FullName}");
         }

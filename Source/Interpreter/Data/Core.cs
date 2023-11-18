@@ -365,16 +365,16 @@ namespace LanguageCore.Runtime
             };
 
         /// <exception cref="InternalException"/>
-        public static DataItem GetDefaultValue(BBCode.Compiler.Type type)
+        public static DataItem GetDefaultValue(Compiler.Type type)
             => type switch
             {
-                BBCode.Compiler.Type.Byte => new DataItem((byte)0),
-                BBCode.Compiler.Type.Integer => new DataItem((int)0),
-                BBCode.Compiler.Type.Float => new DataItem((float)0f),
-                BBCode.Compiler.Type.Char => new DataItem((char)'\0'),
-                BBCode.Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                BBCode.Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                BBCode.Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                Compiler.Type.Byte => new DataItem((byte)0),
+                Compiler.Type.Integer => new DataItem((int)0),
+                Compiler.Type.Float => new DataItem((float)0f),
+                Compiler.Type.Char => new DataItem((char)'\0'),
+                Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+                Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
                 _ => DataItem.Null,
             };
 

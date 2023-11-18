@@ -5,8 +5,8 @@ using System.Linq;
 
 namespace LanguageCore.Parser
 {
-    using LanguageCore.Tokenizing;
     using Statement;
+    using Tokenizing;
 
     public class Parser
     {
@@ -91,7 +91,18 @@ namespace LanguageCore.Parser
 
         Parser(Token[] tokens)
         {
-            this.Tokens = tokens;
+            Tokens = tokens;
+        }
+
+        /// <exception cref="EndlessLoopException"/>
+        /// <exception cref="SyntaxException"/>
+        /// <exception cref="ImpossibleException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
+        public static ParserResult ParseFile(string filePath)
+        {
+            TokenizerResult tokens = FileTokenizer.Tokenize(filePath);
+            return new Parser(tokens.Tokens).ParseInternal();
         }
 
         /// <exception cref="EndlessLoopException"/>
@@ -100,8 +111,8 @@ namespace LanguageCore.Parser
         public static ParserResult Parse(Token[] tokens)
             => new Parser(tokens).ParseInternal();
 
-        public static ParserResultHeader ParseCodeHeader(Token[] tokens)
-            => new Parser(tokens).ParseCodeHeaderInternal();
+        public static ParserResultHeader ParseHeader(Token[] tokens)
+            => new Parser(tokens).ParseHeaderInternal();
 
         ParserResult ParseInternal()
         {
@@ -121,7 +132,7 @@ namespace LanguageCore.Parser
             return new ParserResult(this.Errors, this.Functions, this.Macros, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.Tokens.ToArray());
         }
 
-        ParserResultHeader ParseCodeHeaderInternal()
+        ParserResultHeader ParseHeaderInternal()
         {
             CurrentTokenIndex = 0;
 
@@ -439,7 +450,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             macro = null;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            _ = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 

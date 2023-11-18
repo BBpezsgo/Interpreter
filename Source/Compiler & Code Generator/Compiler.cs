@@ -4,44 +4,121 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
-    using LanguageCore.Tokenizing;
+    using LanguageCore.BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
+    using Tokenizing;
+
+    public readonly struct BuiltinFunctionNames
+    {
+        public const string Destructor = "destructor";
+        public const string Cloner = "clone";
+        public const string Constructor = "constructor";
+        public const string IndexerGet = "indexer_get";
+        public const string IndexerSet = "indexer_set";
+    }
+
+    public readonly struct CompilerResult
+    {
+        public readonly CompiledFunction[] Functions;
+        public readonly MacroDefinition[] Macros;
+        public readonly CompiledGeneralFunction[] GeneralFunctions;
+        public readonly CompiledOperator[] Operators;
+
+        public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+
+        public readonly CompiledStruct[] Structs;
+        public readonly CompiledClass[] Classes;
+        public readonly CompileTag[] Hashes;
+        public readonly CompiledEnum[] Enums;
+
+        public readonly Error[] Errors;
+        public readonly Warning[] Warnings;
+        public readonly Statement[] TopLevelStatements;
+        public readonly Token[] Tokens;
+
+        public static CompilerResult Empty => new(
+            Array.Empty<CompiledFunction>(),
+            Array.Empty<MacroDefinition>(),
+            Array.Empty<CompiledGeneralFunction>(),
+            Array.Empty<CompiledOperator>(),
+            new Dictionary<string, ExternalFunctionBase>(),
+            Array.Empty<CompiledStruct>(),
+            Array.Empty<CompiledClass>(),
+            Array.Empty<CompileTag>(),
+            Array.Empty<CompiledEnum>(),
+            Array.Empty<Error>(),
+            Array.Empty<Warning>(),
+            Array.Empty<Statement>(),
+            Array.Empty<Token>());
+
+        public CompilerResult(
+            CompiledFunction[] functions,
+            MacroDefinition[] macros,
+            CompiledGeneralFunction[] generalFunctions,
+            CompiledOperator[] operators,
+            Dictionary<string, ExternalFunctionBase> externalFunctions,
+            CompiledStruct[] structs,
+            CompiledClass[] classes,
+            CompileTag[] hashes,
+            CompiledEnum[] enums,
+            Error[] errors,
+            Warning[] warnings,
+            Statement[] topLevelStatements,
+            Token[] tokens)
+        {
+            Functions = functions;
+            Macros = macros;
+            GeneralFunctions = generalFunctions;
+            Operators = operators;
+            ExternalFunctions = externalFunctions;
+            Structs = structs;
+            Classes = classes;
+            Hashes = hashes;
+            Enums = enums;
+            Errors = errors;
+            Warnings = warnings;
+            TopLevelStatements = topLevelStatements;
+            Tokens = tokens;
+        }
+    }
+
+    public struct CompilerSettings
+    {
+        public bool GenerateComments;
+        public int RemoveUnusedFunctionsMaxIterations;
+        public bool PrintInstructions;
+        public bool DontOptimize;
+        public bool GenerateDebugInstructions;
+        public bool ExternalFunctionsCache;
+        public bool CheckNullPointers;
+        public string? BasePath;
+
+        public static CompilerSettings Default => new()
+        {
+            GenerateComments = true,
+            RemoveUnusedFunctionsMaxIterations = 10,
+            PrintInstructions = false,
+            DontOptimize = false,
+            GenerateDebugInstructions = true,
+            ExternalFunctionsCache = true,
+            CheckNullPointers = true,
+            BasePath = null,
+        };
+    }
+
+    public enum CompileLevel
+    {
+        Minimal,
+        Exported,
+        All,
+    }
 
     public class Compiler
     {
-        public struct CompilerSettings
-        {
-            public bool GenerateComments;
-            public int RemoveUnusedFunctionsMaxIterations;
-            public bool PrintInstructions;
-            public bool DontOptimize;
-            public bool GenerateDebugInstructions;
-            public bool ExternalFunctionsCache;
-            public bool CheckNullPointers;
-
-            public static CompilerSettings Default => new()
-            {
-                GenerateComments = true,
-                RemoveUnusedFunctionsMaxIterations = 10,
-                PrintInstructions = false,
-                DontOptimize = false,
-                GenerateDebugInstructions = true,
-                ExternalFunctionsCache = true,
-                CheckNullPointers = true,
-            };
-        }
-
-        public enum CompileLevel
-        {
-            Minimal,
-            Exported,
-            All,
-        }
-
         readonly List<Error> Errors;
         readonly List<Warning> Warnings;
 
@@ -73,7 +150,7 @@ namespace LanguageCore.BBCode.Compiler
             { "free", (new CompiledType(Type.Void), new CompiledType[] { new CompiledType(Type.Integer) }) },
         };
 
-        Compiler(Dictionary<string, ExternalFunctionBase> externalFunctions, PrintCallback? printCallback, string? basePath)
+        Compiler(Dictionary<string, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, string? basePath)
         {
             Functions = new List<FunctionDefinition>();
             Macros = new List<MacroDefinition>();
@@ -94,7 +171,7 @@ namespace LanguageCore.BBCode.Compiler
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
-            ExternalFunctions = externalFunctions;
+            ExternalFunctions = externalFunctions ?? new Dictionary<string, ExternalFunctionBase>();
             BasePath = basePath;
             PrintCallback = printCallback;
         }
@@ -155,92 +232,9 @@ namespace LanguageCore.BBCode.Compiler
             return null;
         }
 
-        public readonly struct Result
+        static CompiledAttributeCollection CompileAttributes(FunctionDefinition.Attribute[] attributes)
         {
-            public readonly CompiledFunction[] Functions;
-            public readonly MacroDefinition[] Macros;
-            public readonly CompiledGeneralFunction[] GeneralFunctions;
-            public readonly CompiledOperator[] Operators;
-
-            public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
-
-            public readonly CompiledStruct[] Structs;
-            public readonly CompiledClass[] Classes;
-            public readonly CompileTag[] Hashes;
-            public readonly CompiledEnum[] Enums;
-
-            public readonly Error[] Errors;
-            public readonly Warning[] Warnings;
-            public readonly Statement[] TopLevelStatements;
-            public readonly Token[] Tokens;
-
-            public static Result Empty => new(
-                Array.Empty<CompiledFunction>(),
-                Array.Empty<MacroDefinition>(),
-                Array.Empty<CompiledGeneralFunction>(),
-                Array.Empty<CompiledOperator>(),
-                new Dictionary<string, ExternalFunctionBase>(),
-                Array.Empty<CompiledStruct>(),
-                Array.Empty<CompiledClass>(),
-                Array.Empty<CompileTag>(),
-                Array.Empty<CompiledEnum>(),
-                Array.Empty<Error>(),
-                Array.Empty<Warning>(),
-                Array.Empty<Statement>(),
-                Array.Empty<Token>());
-
-            Result(
-                CompiledFunction[] functions,
-                MacroDefinition[] macros,
-                CompiledGeneralFunction[] generalFunctions,
-                CompiledOperator[] operators,
-                Dictionary<string, ExternalFunctionBase> externalFunctions,
-                CompiledStruct[] structs,
-                CompiledClass[] classes,
-                CompileTag[] hashes,
-                CompiledEnum[] enums,
-                Error[] errors,
-                Warning[] warnings,
-                Statement[] topLevelStatements,
-                Token[] tokens)
-            {
-                Functions = functions;
-                Macros = macros;
-                GeneralFunctions = generalFunctions;
-                Operators = operators;
-                ExternalFunctions = externalFunctions;
-                Structs = structs;
-                Classes = classes;
-                Hashes = hashes;
-                Enums = enums;
-                Errors = errors;
-                Warnings = warnings;
-                TopLevelStatements = topLevelStatements;
-                Tokens = tokens;
-            }
-
-            public Result(Compiler compiler, ParserResult parserResult)
-            {
-                Functions = compiler.CompiledFunctions;
-                Macros = compiler.Macros.ToArray();
-                Operators = compiler.CompiledOperators;
-                GeneralFunctions = compiler.CompiledGeneralFunctions;
-                ExternalFunctions = compiler.ExternalFunctions;
-                Classes = compiler.CompiledClasses;
-                Structs = compiler.CompiledStructs;
-                Enums = compiler.CompiledEnums;
-                Hashes = compiler.Hashes.ToArray();
-                TopLevelStatements = parserResult.TopLevelStatements;
-                Tokens = parserResult.Tokens;
-
-                Errors = compiler.Errors.ToArray();
-                Warnings = compiler.Warnings.ToArray();
-            }
-        }
-
-        static Dictionary<string, AttributeValues> CompileAttributes(FunctionDefinition.Attribute[] attributes)
-        {
-            Dictionary<string, AttributeValues> result = new();
+            CompiledAttributeCollection result = new();
 
             for (int i = 0; i < attributes.Length; i++)
             {
@@ -283,7 +277,7 @@ namespace LanguageCore.BBCode.Compiler
             if (CodeGenerator.GetStruct(CompiledStructs, @struct.Name.Content, out _))
             { throw new CompilerException($"Struct with name '{@struct.Name.Content}' already exist", @struct.Name, @struct.FilePath); }
 
-            Dictionary<string, AttributeValues> attributes = CompileAttributes(@struct.Attributes);
+            CompiledAttributeCollection attributes = CompileAttributes(@struct.Attributes);
 
             return new CompiledStruct(attributes, new CompiledField[@struct.Fields.Length], @struct);
         }
@@ -298,14 +292,14 @@ namespace LanguageCore.BBCode.Compiler
             if (CodeGenerator.GetClass(CompiledClasses, @class.Name.Content, out _))
             { throw new CompilerException($"Class with name '{@class.Name.Content}' already exist", @class.Name, @class.FilePath); }
 
-            Dictionary<string, AttributeValues> attributes = CompileAttributes(@class.Attributes);
+            CompiledAttributeCollection attributes = CompileAttributes(@class.Attributes);
 
             return new CompiledClass(attributes, new CompiledField[@class.Fields.Length], @class);
         }
 
         CompiledFunction CompileFunction(FunctionDefinition function)
         {
-            Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
+            CompiledAttributeCollection attributes = CompileAttributes(function.Attributes);
 
             if (function.TemplateInfo != null)
             {
@@ -397,7 +391,7 @@ namespace LanguageCore.BBCode.Compiler
 
         CompiledOperator CompileOperator(FunctionDefinition function)
         {
-            Dictionary<string, AttributeValues> attributes = CompileAttributes(function.Attributes);
+            CompiledAttributeCollection attributes = CompileAttributes(function.Attributes);
 
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
@@ -452,7 +446,7 @@ namespace LanguageCore.BBCode.Compiler
 
         static CompiledEnum CompileEnum(EnumDefinition @enum)
         {
-            Dictionary<string, AttributeValues> attributes = new();
+            CompiledAttributeCollection attributes = new();
 
             foreach (var attribute in @enum.Attributes)
             {
@@ -603,7 +597,7 @@ namespace LanguageCore.BBCode.Compiler
             Hashes.AddRange(collectedAST.ParserResult.Hashes);
         }
 
-        Result CompileMainFile(ParserResult parserResult, FileInfo? file)
+        CompilerResult CompileMainFile(ParserResult parserResult, FileInfo? file)
         {
             Structs.AddRange(parserResult.Structs);
             Classes.AddRange(parserResult.Classes);
@@ -867,7 +861,21 @@ namespace LanguageCore.BBCode.Compiler
 
             #endregion
 
-            return new Result(this, parserResult);
+            return new CompilerResult(
+                CompiledFunctions,
+                Macros.ToArray(),
+                CompiledGeneralFunctions,
+                CompiledOperators,
+                ExternalFunctions,
+                CompiledStructs,
+                CompiledClasses,
+                Hashes.ToArray(),
+                CompiledEnums,
+                Errors.ToArray(),
+                Warnings.ToArray(),
+                parserResult.TopLevelStatements,
+                parserResult.Tokens
+                );
         }
 
         /// <summary>
@@ -883,59 +891,12 @@ namespace LanguageCore.BBCode.Compiler
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="System.Exception"/>
-        public static Result Compile(
+        public static CompilerResult Compile(
             ParserResult parserResult,
-            Dictionary<string, ExternalFunctionBase> externalFunctions,
+            Dictionary<string, ExternalFunctionBase>? externalFunctions,
             FileInfo? file,
-            PrintCallback? printCallback = null,
-            string? basePath = null)
+            string? basePath,
+            PrintCallback? printCallback = null)
             => new Compiler(externalFunctions, printCallback, basePath).CompileMainFile(parserResult, file);
-
-        public static Result Compile(
-            FileInfo file,
-            Dictionary<string, ExternalFunctionBase> externalFunctions,
-            TokenizerSettings tokenizerSettings,
-            PrintCallback? printCallback = null,
-            string? basePath = null)
-        {
-            string sourceCode = File.ReadAllText(file.FullName);
-
-            Token[] tokens;
-
-            {
-                DateTime tokenizeStarted = DateTime.Now;
-                if (printCallback != null)
-                { printCallback?.Invoke("Tokenizing ...", LogType.Debug); }
-
-                TokenizerResult tokenizerResult = StringTokenizer.Tokenize(sourceCode, tokenizerSettings);
-                tokens = tokenizerResult.Tokens;
-
-                foreach (Warning warning in tokenizerResult.Warnings)
-                { printCallback?.Invoke(warning.ToString(), LogType.Warning); }
-
-                if (printCallback != null)
-                { printCallback?.Invoke($"Tokenized in {(DateTime.Now - tokenizeStarted).TotalMilliseconds} ms", LogType.Debug); }
-            }
-
-            ParserResult parserResult;
-
-            {
-                DateTime parseStarted = DateTime.Now;
-                if (printCallback != null)
-                { printCallback?.Invoke("Parsing ...", LogType.Debug); }
-
-                parserResult = Parser.Parse(tokens);
-
-                if (parserResult.Errors.Length > 0)
-                { throw new LanguageException("Failed to parse", parserResult.Errors[0].ToException()); }
-
-                if (printCallback != null)
-                { printCallback?.Invoke($"Parsed in {(DateTime.Now - parseStarted).TotalMilliseconds} ms", LogType.Debug); }
-            }
-
-            parserResult.SetFile(file.FullName);
-
-            return Compile(parserResult, externalFunctions, file, printCallback, basePath);
-        }
     }
 }

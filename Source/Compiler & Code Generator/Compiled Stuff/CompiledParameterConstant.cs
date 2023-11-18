@@ -1,8 +1,8 @@
-﻿using LanguageCore.Parser;
-using LanguageCore.Runtime;
-
-namespace LanguageCore.BBCode.Compiler
+﻿namespace LanguageCore.Compiler
 {
+    using Parser;
+    using Runtime;
+
     public class CompiledParameterConstant : CompiledConstant
     {
         public readonly ParameterDefinition Declaration;

@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using LanguageCore.BBCode.Compiler;
 
 namespace LanguageCore.Runtime
 {
+    using LanguageCore.BBCode.Generator;
+    using LanguageCore.Compiler;
+
     /// <summary>
     /// This compiles and runs the code
     /// </summary>
@@ -34,7 +36,7 @@ namespace LanguageCore.Runtime
 
             public abstract void Dispose();
 
-            public abstract void Tick(IHeap heap);
+            public abstract void Tick(HEAP heap);
         }
 
         protected class InputStream : Stream
@@ -57,17 +59,17 @@ namespace LanguageCore.Runtime
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
 
-                Debug.Log($"[STREAM {ID}]: Disposed");
+                System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Disposed");
             }
 
             public void ClearBuffer()
             {
                 this.Length = 0;
 
-                Debug.Log($"[STREAM {ID}]: Buffer cleared");
+                System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Buffer cleared");
             }
 
-            public override void Tick(IHeap heap)
+            public override void Tick(HEAP heap)
             {
                 if (RemainingBufferSize == 0) return;
                 if (SystemHasData) return;
@@ -81,7 +83,7 @@ namespace LanguageCore.Runtime
                 }
                 Length += readCount;
 
-                Debug.Log($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
+                System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: (AUTO) Read {readCount} bytes");
             }
         }
 
@@ -102,7 +104,7 @@ namespace LanguageCore.Runtime
                 this.SystemStream?.Close();
                 this.SystemStream?.Dispose();
 
-                Debug.Log($"[STREAM {ID}]: Disposed");
+                System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Disposed");
             }
 
             public void Flush(byte[] buffer)
@@ -112,10 +114,10 @@ namespace LanguageCore.Runtime
                 this.SystemStream.Write(buffer, 0, buffer.Length);
                 this.SystemStream.Flush();
 
-                Debug.Log($"[STREAM {ID}]: Write {buffer.Length} bytes");
+                System.Diagnostics.Debug.WriteLine($"[STREAM {ID}]: Write {buffer.Length} bytes");
             }
 
-            public override void Tick(IHeap heap) { }
+            public override void Tick(HEAP heap) { }
         }
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
@@ -149,7 +151,7 @@ namespace LanguageCore.Runtime
 
         protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
 
-        public CodeGeneratorForMain.Result CompilerResult;
+        public BBCodeGeneratorResult CompilerResult;
         public Instruction? NextInstruction
         {
             get
@@ -296,7 +298,7 @@ namespace LanguageCore.Runtime
 
             #region Console
 
-            externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<BBCode.Compiler.Type>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
+            externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<Type>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
             {
                 this.IsPaused = true;
                 this.ReturnValueConsumer = function;
@@ -412,7 +414,7 @@ namespace LanguageCore.Runtime
                         byte[] buffer = new byte[count];
                         for (int j = 0; j < count; j++)
                         {
-                            buffer[j] = ((IHeap)BytecodeInterpreter!.Memory.Heap)[j + stream.MemoryAddress].Byte ?? 0;
+                            buffer[j] = BytecodeInterpreter!.Memory.Heap[j + stream.MemoryAddress].Byte ?? 0;
                         }
 
                         stream.Flush(buffer);

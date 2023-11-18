@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using LanguageCore.BBCode.Generator;
+using LanguageCore.Parser;
 
 namespace TheProgram
 {
@@ -24,7 +26,7 @@ namespace TheProgram
                     {
                         ConsoleGUI.ConsoleGUI gui = new()
                         {
-                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.compilerSettings, arguments.bytecodeInterpreterSettings, arguments.HandleErrors, arguments.BasePath)
+                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.compilerSettings, arguments.bytecodeInterpreterSettings, arguments.HandleErrors)
                         };
                         while (!gui.Destroyed)
                         { gui.Tick(); }
@@ -35,10 +37,12 @@ namespace TheProgram
                     }
                     break;
                 case ArgumentParser.RunType.Compile:
-                    LanguageCore.BBCode.EasyCompiler.Result yeah = LanguageCore.BBCode.EasyCompiler.Compile(arguments.File, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), LanguageCore.Tokenizing.TokenizerSettings.Default, arguments.compilerSettings, null, arguments.BasePath);
-                    LanguageCore.Runtime.Instruction[] yeahCode = yeah.CodeGeneratorResult.Code;
-                    File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(yeahCode));
-                    break;
+                    {
+                        LanguageCore.Compiler.CompilerResult compiled = LanguageCore.Compiler.Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.compilerSettings.BasePath);
+                        BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.compilerSettings);
+                        File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
+                        break;
+                    }
                 case ArgumentParser.RunType.Brainfuck:
                     {
                         Brainfuck.PrintFlags printFlags = Brainfuck.PrintFlags.PrintMemory;
@@ -64,9 +68,9 @@ namespace TheProgram
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), arguments.File, null, arguments.BasePath);
+                        LanguageCore.Compiler.CompilerResult compiled = LanguageCore.Compiler.Compiler.Compile(ast, null, arguments.File, null);
 
-                        LanguageCore.IL.Compiler.CodeGeneratorForIL.Result code = LanguageCore.IL.Compiler.CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
+                        LanguageCore.IL.Generator.ILGeneratorResult code = LanguageCore.IL.Generator.CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
 
                         System.Reflection.Assembly assembly = code.Assembly;
                         break;
@@ -78,9 +82,9 @@ namespace TheProgram
 
                         LanguageCore.Parser.ParserResult ast = LanguageCore.Parser.Parser.Parse(tokens);
 
-                        LanguageCore.BBCode.Compiler.Compiler.Result compiled = LanguageCore.BBCode.Compiler.Compiler.Compile(ast, new System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>(), arguments.File, null, arguments.BasePath);
+                        LanguageCore.Compiler.CompilerResult compiled = LanguageCore.Compiler.Compiler.Compile(ast, null, arguments.File, null);
 
-                        LanguageCore.ASM.Compiler.CodeGeneratorForAsm.Result code = LanguageCore.ASM.Compiler.CodeGeneratorForAsm.Generate(compiled, arguments.compilerSettings, default, null);
+                        LanguageCore.ASM.Generator.CodeGeneratorForAsm.Result code = LanguageCore.ASM.Generator.CodeGeneratorForAsm.Generate(compiled, arguments.compilerSettings, default, null);
 
                         string? fileDirectoryPath = arguments.File.DirectoryName;
                         string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);

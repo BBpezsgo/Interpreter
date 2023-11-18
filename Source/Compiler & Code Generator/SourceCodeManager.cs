@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
     using Parser;
     using Tokenizing;

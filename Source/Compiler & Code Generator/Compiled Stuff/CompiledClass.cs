@@ -1,14 +1,15 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using LanguageCore.Parser;
-using LanguageCore.Tokenizing;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using Parser;
+    using Tokenizing;
+
     public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>, IDuplicatable<CompiledClass>
     {
         public new readonly CompiledField[] Fields;
-        public Dictionary<string, AttributeValues> CompiledAttributes;
+        public CompiledAttributeCollection CompiledAttributes;
         public readonly List<DefinitionReference> References;
         readonly TypeArguments currentTypeArguments;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;

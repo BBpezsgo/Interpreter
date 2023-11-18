@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 
 #pragma warning disable IDE0059 // Unnecessary assignment of a value
@@ -7,9 +8,7 @@ using System.IO.Compression;
 
 namespace TheProgram
 {
-    using System.Diagnostics.CodeAnalysis;
     using LanguageCore;
-    using LanguageCore.BBCode.Compiler;
     using LanguageCore.Runtime;
 
     public static class ArgumentParser
@@ -253,7 +252,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--basepath", "-bp"))
                     {
-                        if (!ExpectParam(args, ref i, out result.BasePath))
+                        if (!ExpectParam(args, ref i, out result.compilerSettings.BasePath))
                         { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
                         continue;
@@ -410,7 +409,7 @@ namespace TheProgram
         {
             public System.IO.FileInfo File;
 
-            public Compiler.CompilerSettings compilerSettings;
+            public LanguageCore.Compiler.CompilerSettings compilerSettings;
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
             public bool ThrowErrors;
             public readonly bool HandleErrors => !ThrowErrors;
@@ -425,7 +424,6 @@ namespace TheProgram
             public RunType RunType;
             public string? CompileOutput;
             public CompressionLevel CompressionLevel;
-            public string? BasePath;
             public string? TestID;
             public FileType CompileToFileType;
             public bool IsTest;
@@ -441,9 +439,8 @@ namespace TheProgram
                 LogSystem = true,
                 LogWarnings = true,
                 LogInfo = true,
-                BasePath = null,
                 RunType = RunType.Normal,
-                compilerSettings = Compiler.CompilerSettings.Default,
+                compilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
                 bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
                 CompileOutput = null,
                 CompressionLevel = CompressionLevel.Optimal,

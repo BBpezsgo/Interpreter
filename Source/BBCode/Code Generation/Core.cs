@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
+    using Compiler;
     using Parser.Statement;
     using Runtime;
 
@@ -34,6 +35,100 @@ namespace LanguageCore.BBCode.Compiler
             return $"({(ShouldDeallocate ? "temp " : string.Empty)}{Type} : {Size} bytes)";
         }
         string GetDebuggerDisplay() => ToString();
+    }
+
+    public struct BBCodeGeneratorResult
+    {
+        public Instruction[] Code;
+        public DebugInformation DebugInfo;
+
+        public CompiledFunction[] Functions;
+        public CompiledOperator[] Operators;
+        public CompiledGeneralFunction[] GeneralFunctions;
+
+        public CompiledStruct[] Structs;
+        public CompiledClass[] Classes;
+
+        public Hint[] Hints;
+        public Information[] Informations;
+        public Warning[] Warnings;
+        public Error[] Errors;
+
+        public readonly bool GetFunctionOffset(CompiledFunction compiledFunction, out int offset)
+        {
+            offset = -1;
+            for (int i = 0; i < Functions.Length; i++)
+            {
+                if (Functions[i].IsSame(compiledFunction))
+                {
+                    if (offset != -1)
+                    { throw new InternalException($"BRUH"); }
+                    offset = i;
+                }
+            }
+            return offset != -1;
+        }
+
+        public readonly void PrintInstructions() => BBCodeGeneratorResult.PrintInstructions(Code);
+        public static void PrintInstructions(Instruction[] code)
+        {
+            Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
+            int indent = 0;
+
+            for (int i = 0; i < code.Length; i++)
+            {
+                Instruction instruction = code[i];
+                /*
+                if (instruction.opcode == Opcode.COMMENT)
+                {
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
+                    {
+                        indent--;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.DarkGray;
+                    Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
+                    Console.ResetColor();
+
+                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
+                    {
+                        indent++;
+                    }
+
+                    continue;
+                }
+                */
+
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.Write($"{new string(' ', indent * 2)} {instruction.opcode}");
+                Console.Write($" ");
+
+                if (instruction.Parameter.Type == RuntimeType.SInt32)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($"{instruction.Parameter.ValueSInt32}");
+                    Console.Write($" ");
+                }
+                else if (instruction.Parameter.Type == RuntimeType.Single)
+                {
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.Write($"{instruction.Parameter.ValueSingle}");
+                    Console.Write($" ");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"{instruction.Parameter}");
+                    Console.Write($" ");
+                }
+
+                Console.Write("\n\r");
+
+                Console.ResetColor();
+            }
+
+            Console.WriteLine("\n\r === ===\n\r");
+        }
     }
 
     public partial class CodeGeneratorForMain : CodeGenerator
@@ -96,7 +191,7 @@ namespace LanguageCore.BBCode.Compiler
 
         #endregion
 
-        public CodeGeneratorForMain(Compiler.CompilerSettings settings) : base()
+        public CodeGeneratorForMain(CompilerSettings settings) : base()
         {
             this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
             this.CheckNullPointers = settings.CheckNullPointers;
@@ -117,105 +212,11 @@ namespace LanguageCore.BBCode.Compiler
             this.Informations = new List<Information>();
         }
 
-        public struct Result
-        {
-            public Instruction[] Code;
-            public DebugInformation DebugInfo;
-
-            public CompiledFunction[] Functions;
-            public CompiledOperator[] Operators;
-            public CompiledGeneralFunction[] GeneralFunctions;
-
-            public CompiledStruct[] Structs;
-            public CompiledClass[] Classes;
-
-            public Hint[] Hints;
-            public Information[] Informations;
-            public Warning[] Warnings;
-            public Error[] Errors;
-
-            public readonly bool GetFunctionOffset(CompiledFunction compiledFunction, out int offset)
-            {
-                offset = -1;
-                for (int i = 0; i < Functions.Length; i++)
-                {
-                    if (Functions[i].IsSame(compiledFunction))
-                    {
-                        if (offset != -1)
-                        { throw new InternalException($"BRUH"); }
-                        offset = i;
-                    }
-                }
-                return offset != -1;
-            }
-
-            public readonly void PrintInstructions() => Result.PrintInstructions(Code);
-            public static void PrintInstructions(Instruction[] code)
-            {
-                Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
-                int indent = 0;
-
-                for (int i = 0; i < code.Length; i++)
-                {
-                    Instruction instruction = code[i];
-                    /*
-                    if (instruction.opcode == Opcode.COMMENT)
-                    {
-                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
-                        {
-                            indent--;
-                        }
-
-                        Console.ForegroundColor = ConsoleColor.DarkGray;
-                        Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
-                        Console.ResetColor();
-
-                        if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
-                        {
-                            indent++;
-                        }
-
-                        continue;
-                    }
-                    */
-
-                    Console.ForegroundColor = ConsoleColor.DarkYellow;
-                    Console.Write($"{new string(' ', indent * 2)} {instruction.opcode}");
-                    Console.Write($" ");
-
-                    if (instruction.Parameter.Type == RuntimeType.SInt32)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueSInt32}");
-                        Console.Write($" ");
-                    }
-                    else if (instruction.Parameter.Type == RuntimeType.Single)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Cyan;
-                        Console.Write($"{instruction.Parameter.ValueSingle}");
-                        Console.Write($" ");
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.Write($"{instruction.Parameter}");
-                        Console.Write($" ");
-                    }
-
-                    Console.Write("\n\r");
-
-                    Console.ResetColor();
-                }
-
-                Console.WriteLine("\n\r === ===\n\r");
-            }
-        }
-
-        Result GenerateCode(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
+        BBCodeGeneratorResult GenerateCode(
+            CompilerResult compilerResult,
+            CompilerSettings settings,
             PrintCallback? printCallback = null,
-            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
+            CompileLevel level = CompileLevel.Minimal)
         {
             base.CompiledClasses = compilerResult.Classes;
             base.CompiledStructs = compilerResult.Structs;
@@ -508,7 +509,7 @@ namespace LanguageCore.BBCode.Compiler
                 GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
-            return new Result()
+            return new BBCodeGeneratorResult()
             {
                 Code = GeneratedCode.ToArray(),
                 DebugInfo = GeneratedDebugInfo,
@@ -526,16 +527,11 @@ namespace LanguageCore.BBCode.Compiler
             };
         }
 
-        public static Result Generate(
-            Compiler.Result compilerResult,
-            Compiler.CompilerSettings settings,
+        public static BBCodeGeneratorResult Generate(
+            CompilerResult compilerResult,
+            CompilerSettings settings,
             PrintCallback? printCallback = null,
-            Compiler.CompileLevel level = Compiler.CompileLevel.Minimal)
-            => new CodeGeneratorForMain(settings).GenerateCode(
-            compilerResult,
-            settings,
-            printCallback,
-            level
-        );
+            CompileLevel level = CompileLevel.Minimal)
+            => new CodeGeneratorForMain(settings).GenerateCode(compilerResult, settings, printCallback, level);
     }
 }

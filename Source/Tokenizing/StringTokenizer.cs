@@ -9,9 +9,13 @@
             Text = text ?? string.Empty;
         }
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public static TokenizerResult Tokenize(string? sourceCode)
             => new StringTokenizer(TokenizerSettings.Default, sourceCode).TokenizeInternal();
 
+        /// <exception cref="InternalException"/>
+        /// <exception cref="TokenizerException"/>
         public static TokenizerResult Tokenize(string? sourceCode, TokenizerSettings settings)
             => new StringTokenizer(settings, sourceCode).TokenizeInternal();
 
@@ -36,7 +40,6 @@
             CheckTokens(Tokens.ToArray());
 
             return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToArray(), UnicodeCharacters.ToArray(), Warnings.ToArray());
-
         }
     }
 }

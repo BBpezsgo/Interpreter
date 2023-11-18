@@ -2,14 +2,15 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.BBCode.Generator
 {
+    using Compiler;
     using Parser;
     using Parser.Statement;
     using Runtime;
     using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
-    using ParameterCleanupItem = (int Size, bool CanDeallocate, CompiledType Type);
+    using ParameterCleanupItem = (int Size, bool CanDeallocate, Compiler.CompiledType Type);
 
     public partial class CodeGeneratorForMain : CodeGenerator
     {
@@ -25,7 +26,7 @@ namespace LanguageCore.BBCode.Compiler
 
         void AddComment(string comment)
         {
-            if (GeneratedDebugInfo.CodeComments.TryGetValue(GeneratedCode.Count, out var comments))
+            if (GeneratedDebugInfo.CodeComments.TryGetValue(GeneratedCode.Count, out List<string>? comments))
             { comments.Add(comment); }
             else
             { GeneratedDebugInfo.CodeComments.Add(GeneratedCode.Count, new List<string>() { comment }); }
@@ -166,9 +167,9 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
+                if (!GetGeneralFunction(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(valueType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         GenerateCodeForStatement(keywordCall.Parameters[0], new CompiledType(Type.Integer));
                         AddInstruction(Opcode.HEAP_DEALLOC);
@@ -211,7 +212,7 @@ namespace LanguageCore.BBCode.Compiler
                 if (keywordCall.Parameters.Length != 1)
                 { throw new CompilerException($"Wrong number of parameters passed to \"clone\": required {1} passed {0}", keywordCall, CurrentFile); }
 
-                var paramType = FindStatementType(keywordCall.Parameters[0]);
+                CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
 
                 if (!paramType.IsClass)
                 {
@@ -219,7 +220,7 @@ namespace LanguageCore.BBCode.Compiler
                     return;
                 }
 
-                if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out var cloner))
+                if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out CompiledGeneralFunction? cloner))
                 { throw new CompilerException($"Cloner for type \"{paramType.Class.Name}\" not found. Check if you defined a general function with name \"clone\" in class \"{paramType.Class.Name}\"", keywordCall.Identifier, CurrentFile); }
 
                 if (!cloner.CanUse(CurrentFile))
@@ -347,7 +348,6 @@ namespace LanguageCore.BBCode.Compiler
             functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
             GenerateCodeForFunctionCall_Function(functionCall, compiledFunction);
         }
-
 
         Stack<ParameterCleanupItem> GenerateCodeForParameterPassing(FunctionCall functionCall, CompiledFunction compiledFunction)
         {
@@ -482,7 +482,7 @@ namespace LanguageCore.BBCode.Compiler
             AddComment(" Clear Params:");
             while (parameterCleanup.Count > 0)
             {
-                var passedParameter = parameterCleanup.Pop();
+                ParameterCleanupItem passedParameter = parameterCleanup.Pop();
 
                 if (passedParameter.CanDeallocate && passedParameter.Size == 1)
                 {
@@ -535,7 +535,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (compiledFunction.IsExternal)
             {
-                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out var externalFunction))
+                if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
                 {
                     Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
                     AddComment("}");
@@ -1180,7 +1180,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             List<int> jumpOutInstructions = new();
 
-            foreach (var ifSegment in @if.Parts)
+            foreach (BaseBranch ifSegment in @if.Parts)
             {
                 if (ifSegment is IfBranch partIf)
                 {
@@ -1232,7 +1232,7 @@ namespace LanguageCore.BBCode.Compiler
                 }
             }
 
-            foreach (var item in jumpOutInstructions)
+            foreach (int item in jumpOutInstructions)
             {
                 GeneratedCode[item].ParameterInt = GeneratedCode.Count - item;
             }
@@ -1310,7 +1310,7 @@ namespace LanguageCore.BBCode.Compiler
         {
             AddComment($"new {constructorCall.TypeName}(...): {{");
 
-            var instanceType = FindType(constructorCall.TypeName);
+            CompiledType instanceType = FindType(constructorCall.TypeName);
             constructorCall.TypeName.SetAnalyzedType(instanceType);
 
             if (instanceType.IsStruct)
@@ -1321,12 +1321,12 @@ namespace LanguageCore.BBCode.Compiler
 
             instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
 
-            if (!GetClass(constructorCall, out var @class))
+            if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
@@ -1418,9 +1418,9 @@ namespace LanguageCore.BBCode.Compiler
 
             if (!prevType.IsStruct && !prevType.IsClass) throw new NotImplementedException();
 
-            var type = FindStatementType(field);
+            CompiledType type = FindStatementType(field);
 
-            if (!GetField(field, out var compiledField))
+            if (!GetField(field, out CompiledField? compiledField))
             { throw new CompilerException($"Field definition \"{field.FieldName}\" not found in type \"{prevType}\"", field, CurrentFile); }
 
             if (CurrentContext?.Context != null)
@@ -1472,7 +1472,7 @@ namespace LanguageCore.BBCode.Compiler
                         if (param.Type != prevType)
                         { throw new NotImplementedException(); }
 
-                        var offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack));
+                        ValueAddress offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack));
                         AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
 
                         if (offset.IsReference)
@@ -1499,7 +1499,7 @@ namespace LanguageCore.BBCode.Compiler
                 }
 
                 {
-                    var address = GetDataAddress(identifier);
+                    ValueAddress address = GetDataAddress(identifier);
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
                     if (address.BasepointerRelative)
                     {
@@ -1546,7 +1546,7 @@ namespace LanguageCore.BBCode.Compiler
 
             if (modifier == "ref")
             {
-                var address = GetDataAddress(statement);
+                ValueAddress address = GetDataAddress(statement);
 
                 if (address.InHeap)
                 { throw new CompilerException($"This value is stored in the heap and not in the stack", statement, CurrentFile); }
@@ -1686,7 +1686,7 @@ namespace LanguageCore.BBCode.Compiler
 
             List<CleanupItem> result = new();
 
-            foreach (var s in block.Statements)
+            foreach (Statement s in block.Statements)
             {
                 CleanupItem item = GenerateCodeForVariable(s);
                 if (item.Size == 0) continue;
@@ -1751,7 +1751,7 @@ namespace LanguageCore.BBCode.Compiler
 
                 if (parameter.IsRef)
                 {
-                    var offset = GetBaseAddress(parameter);
+                    ValueAddress offset = GetBaseAddress(parameter);
                     AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
                 }
@@ -1804,14 +1804,14 @@ namespace LanguageCore.BBCode.Compiler
             if (_inHeap)
             {
                 int offset = GetDataOffset(statementToSet);
-                var pointerOffset = GetBaseAddress(statementToSet);
+                ValueAddress pointerOffset = GetBaseAddress(statementToSet);
                 HeapStore(pointerOffset, offset);
 
                 return;
             }
             else
             {
-                var offset = GetDataAddress(statementToSet);
+                ValueAddress offset = GetDataAddress(statementToSet);
                 StackStore(offset, valueType.SizeOnStack);
 
                 return;
@@ -1901,7 +1901,7 @@ namespace LanguageCore.BBCode.Compiler
             if (value is LiteralList)
             { throw new NotImplementedException(); }
 
-            if (!GetVariable(statementToSet.VariableName.Content, out var variable))
+            if (!GetVariable(statementToSet.VariableName.Content, out CompiledVariable? variable))
             { throw new CompilerException($"Variable \"{statementToSet.VariableName.Content}\" not found", statementToSet.VariableName, CurrentFile); }
 
             CompiledType valueType = FindStatementType(value);
@@ -1996,9 +1996,9 @@ namespace LanguageCore.BBCode.Compiler
 
             if (deallocateableType.IsClass)
             {
-                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructor))
+                if (!GetGeneralFunction(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                 {
-                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out var destructorTemplate))
+                    if (!GetGeneralFunctionTemplate(deallocateableType.Class, new CompiledType[] { deallocateableType }, BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> destructorTemplate))
                     {
                         AddInstruction(Opcode.HEAP_DEALLOC);
                         AddComment("}");

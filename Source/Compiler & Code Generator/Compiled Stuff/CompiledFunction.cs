@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
-using LanguageCore.Parser;
-using LanguageCore.Parser.Statement;
 
-namespace LanguageCore.BBCode.Compiler
+namespace LanguageCore.Compiler
 {
+    using Parser;
+    using Parser.Statement;
+
     public class CompiledFunction :
         FunctionDefinition,
         ICanBeSame,
@@ -24,7 +25,7 @@ namespace LanguageCore.BBCode.Compiler
 
         public int InstructionOffset = -1;
 
-        public bool ReturnSomething => this.Type.BuiltinType != BBCode.Compiler.Type.Void;
+        public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
         public CompiledAttributeCollection CompiledAttributes;
 

@@ -73,8 +73,8 @@ namespace LanguageCore
                 { "^", Opcode.BITS_XOR },
                 { "<=", Opcode.LOGIC_LTEQ },
                 { ">=", Opcode.LOGIC_MTEQ },
-                { "<<", Opcode.BITSHIFT_LEFT },
-                { ">>", Opcode.BITSHIFT_RIGHT },
+                { "<<", Opcode.BITS_SHIFT_LEFT },
+                { ">>", Opcode.BITS_SHIFT_RIGHT },
             };
 
             public static readonly Dictionary<string, int> ParameterCounts = new()

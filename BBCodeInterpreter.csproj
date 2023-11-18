@@ -19,6 +19,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="out\**" />
+    <EmbeddedResource Remove="out\**" />
+    <None Remove="out\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="ConsoleGUI.cs" />
     <Compile Remove="Core.cs" />
     <Compile Remove="SomeTests.cs" />
@@ -36,7 +42,6 @@
 
   <ItemGroup>
     <Folder Include="Examples\" />
-    <Folder Include="out\" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

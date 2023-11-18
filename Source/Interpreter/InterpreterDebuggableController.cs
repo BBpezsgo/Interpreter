@@ -100,8 +100,8 @@ namespace LanguageCore.Runtime
                     nextInstruction.opcode == Opcode.HEAP_SET;
 
                 _aluOperation =
-                    nextInstruction.opcode == Opcode.BITSHIFT_LEFT ||
-                    nextInstruction.opcode == Opcode.BITSHIFT_RIGHT ||
+                    nextInstruction.opcode == Opcode.BITS_SHIFT_LEFT ||
+                    nextInstruction.opcode == Opcode.BITS_SHIFT_RIGHT ||
 
                     nextInstruction.opcode == Opcode.BITS_AND ||
                     nextInstruction.opcode == Opcode.LOGIC_EQ ||

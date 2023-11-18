@@ -34,7 +34,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="RuntimeException"></exception>
         /// <exception cref="UserException"></exception>
         /// <exception cref="InternalException"></exception>
-        /// <exception cref="System.Exception"></exception>
+        /// <exception cref="Exception"></exception>
         public void Process()
         {
             switch (CurrentInstruction.opcode)
@@ -53,6 +53,9 @@ namespace LanguageCore.Runtime
                 case Opcode.JUMP_BY: JUMP_BY(); break;
                 case Opcode.THROW: THROW(); break;
 
+                case Opcode.CALL: CALL(); break;
+                case Opcode.RETURN: RETURN(); break;
+
                 case Opcode.CALL_EXTERNAL: CALL_EXTERNAL(); break;
 
                 case Opcode.MATH_ADD: MATH_ADD(); break;
@@ -61,8 +64,8 @@ namespace LanguageCore.Runtime
                 case Opcode.MATH_DIV: MATH_DIV(); break;
                 case Opcode.MATH_MOD: MATH_MOD(); break;
 
-                case Opcode.BITSHIFT_LEFT: BITSHIFT_LEFT(); break;
-                case Opcode.BITSHIFT_RIGHT: BITSHIFT_RIGHT(); break;
+                case Opcode.BITS_SHIFT_LEFT: BITSHIFT_LEFT(); break;
+                case Opcode.BITS_SHIFT_RIGHT: BITSHIFT_RIGHT(); break;
 
                 case Opcode.BITS_AND: BITS_AND(); break;
                 case Opcode.BITS_OR: BITS_OR(); break;
@@ -116,7 +119,16 @@ namespace LanguageCore.Runtime
             AddressingMode.ABSOLUTE => CurrentInstruction.ParameterInt,
             AddressingMode.RUNTIME => Memory.Stack.Pop().ValueSInt32,
 
-            _ => throw new InternalException($"Invalid heap addressing mode {CurrentInstruction.AddressingMode}"),
+            _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
+        };
+
+        /// <exception cref="InternalException"/>
+        DataItem GetData() => CurrentInstruction.AddressingMode switch
+        {
+            AddressingMode.ABSOLUTE => CurrentInstruction.Parameter,
+            AddressingMode.RUNTIME => Memory.Stack.Pop(),
+
+            _ => throw new InternalException($"Invalid addressing mode {CurrentInstruction.AddressingMode}"),
         };
 
         #region Instruction Methods
@@ -147,7 +159,7 @@ namespace LanguageCore.Runtime
 
         void HEAP_GET()
         {
-            int address = GetAddress();
+            int address = GetData().ValueSInt32;
             var value = Memory.Heap[address];
             Memory.Stack.Push(value);
             Step();
@@ -155,7 +167,7 @@ namespace LanguageCore.Runtime
 
         void HEAP_SET()
         {
-            int address = GetAddress();
+            int address = GetData().ValueSInt32;
             var value = Memory.Stack.Pop();
             Memory.Heap[address] = value;
             Step();
@@ -179,16 +191,32 @@ namespace LanguageCore.Runtime
             throw new UserException(value ?? "null");
         }
 
+        void CALL()
+        {
+            int relativeAddress = GetData().ValueSInt32;
+
+            Memory.Stack.Push(new DataItem(CodePointer));
+
+            Step(relativeAddress);
+        }
+
+        void RETURN()
+        {
+            DataItem codePointer = Memory.Stack.Pop();
+
+            CodePointer = codePointer.ValueSInt32;
+        }
+
         void JUMP_BY()
         {
-            int relativeAddress = GetAddress();
+            int relativeAddress = GetData().ValueSInt32;
 
             Step(relativeAddress);
         }
 
         void JUMP_BY_IF_FALSE()
         {
-            int relativeAddress = GetAddress();
+            int relativeAddress = GetData().ValueSInt32;
 
             var condition = Memory.Stack.Pop();
 

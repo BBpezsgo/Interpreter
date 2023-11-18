@@ -4,7 +4,7 @@
     {
         UNKNOWN = 0,
 
-        // === STACK OPERATIONS ===
+        #region === STACK OPERATIONS ===
         /// <summary>
         /// <para>
         ///     <b>Stack elements added:</b><br/>
@@ -71,10 +71,40 @@
         /// </para>
         /// </summary>
         STORE_VALUE,
-        // === ===
+        #endregion
 
-        // === FLOW CONTROL ===
+        #region === FLOW CONTROL ===
         EXIT,
+
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c><see cref="int"/> relative address</c> (depends on the addressing mode)<br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c><see cref="int"/> saved CP</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// </para>
+        /// </summary>
+        CALL,
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c><see cref="int"/> CP</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// </summary>
+        RETURN,
 
         /// <summary>
         /// <para>
@@ -86,7 +116,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
         /// </para>
         /// </summary>
         JUMP_BY_IF_FALSE,
@@ -99,7 +129,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
         /// </para>
         /// </summary>
         JUMP_BY,
@@ -208,9 +238,9 @@
         /// </para>
         /// </summary>
         THROW,
-        // === ===
+        #endregion
 
-        // === LOGIC OPERATIONS ===
+        #region === LOGIC OPERATIONS ===
         /// <summary>
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
@@ -357,6 +387,71 @@
         ///     Inherits from left side
         /// </para>
         /// </summary>
+        LOGIC_EQ,
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c>left</c><br/>
+        ///     <c>right</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Tag:</b><br/>
+        ///     none
+        /// </para>
+        /// </summary>
+        LOGIC_NEQ,
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c>value</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Tag:</b><br/>
+        ///     Inherits from value
+        /// </para>
+        /// </summary>
+        LOGIC_NOT,
+        #endregion
+
+        #region === BITWISE OPERATIONS ===
+        /// <summary>
+        /// <para>
+        ///     <b>Expected stack elements:</b><br/>
+        ///     <c>...</c><br/>
+        ///     <c>left</c><br/>
+        ///     <c>right</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Stack elements added:</b><br/>
+        ///     <c>result</c><br/>
+        /// </para>
+        /// <br/><br/>
+        /// 
+        /// <para>
+        ///     <b>Tag:</b><br/>
+        ///     Inherits from left side
+        /// </para>
+        /// </summary>
         BITS_AND,
         /// <summary>
         /// <para>
@@ -420,68 +515,6 @@
         /// </para>
         /// </summary>
         BITS_NOT,
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        ///     <c>left</c><br/>
-        ///     <c>right</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Stack elements added:</b><br/>
-        ///     <c>result</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     Inherits from left side
-        /// </para>
-        /// </summary>
-        LOGIC_EQ,
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        ///     <c>left</c><br/>
-        ///     <c>right</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Stack elements added:</b><br/>
-        ///     <c>result</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     none
-        /// </para>
-        /// </summary>
-        LOGIC_NEQ,
-        /// <summary>
-        /// <para>
-        ///     <b>Expected stack elements:</b><br/>
-        ///     <c>...</c><br/>
-        ///     <c>value</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Stack elements added:</b><br/>
-        ///     <c>result</c><br/>
-        /// </para>
-        /// <br/><br/>
-        /// 
-        /// <para>
-        ///     <b>Tag:</b><br/>
-        ///     Inherits from value
-        /// </para>
-        /// </summary>
-        LOGIC_NOT,
 
         /// <summary>
         /// <para>
@@ -503,7 +536,7 @@
         ///     Inherits from left side
         /// </para>
         /// </summary>
-        BITSHIFT_LEFT,
+        BITS_SHIFT_LEFT,
         /// <summary>
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
@@ -524,10 +557,10 @@
         ///     Inherits from left side
         /// </para>
         /// </summary>
-        BITSHIFT_RIGHT,
-        // === ===
+        BITS_SHIFT_RIGHT,
+        #endregion
 
-        // === MATH OPERATIONS ===
+        #region === MATH OPERATIONS ===
         /// <summary>
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
@@ -633,9 +666,9 @@
         /// </para>
         /// </summary>
         MATH_MOD,
-        // === ===
+        #endregion
 
-        // === HEAP OPERATIONS ===
+        #region === HEAP OPERATIONS ===
         /// <summary>
         /// <para>
         ///     <b>Expected stack elements:</b><br/>
@@ -657,7 +690,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
         /// </para>
         /// </summary>
         HEAP_GET,
@@ -677,7 +710,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
         /// </para>
         /// </summary>
         HEAP_SET,
@@ -716,11 +749,11 @@
         /// </para>
         /// </summary>
         HEAP_DEALLOC,
-        // === ===
+        #endregion
 
-        // === TYPE OPERATINS ===
+        #region === TYPE OPERATINS ===
         TYPE_GET,
         TYPE_SET,
-        // === ===
+        #endregion
     }
 }

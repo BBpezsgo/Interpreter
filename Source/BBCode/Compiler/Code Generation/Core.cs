@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using System.Diagnostics;
-    using LanguageCore.Runtime;
     using Parser.Statement;
+    using Runtime;
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public readonly struct CleanupItem
@@ -93,15 +93,6 @@ namespace LanguageCore.BBCode.Compiler
         readonly List<Information> Informations;
         readonly DebugInformation GeneratedDebugInfo;
         readonly Stack<ScopeInformations> CurrentScopeDebug = new();
-
-        /// <summary>
-        /// Used for keep track of local (after base pointer) tag count that are not variables.
-        /// <br/>
-        /// ie.:
-        /// <br/>
-        /// <c>Return Flag</c>
-        /// </summary>
-        readonly Stack<int> TagCount;
 
         #endregion
 
@@ -337,7 +328,7 @@ namespace LanguageCore.BBCode.Compiler
                 AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
                 if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
-                
+
                 CurrentContext = null;
                 InFunction = false;
             }

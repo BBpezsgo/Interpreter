@@ -4,10 +4,10 @@ using System.Linq;
 
 namespace LanguageCore.BBCode.Compiler
 {
-    using LanguageCore.Runtime;
-    using LanguageCore.Tokenizing;
     using Parser;
     using Parser.Statement;
+    using Runtime;
+    using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
     using ParameterCleanupItem = (int Size, bool CanDeallocate, CompiledType Type);
 

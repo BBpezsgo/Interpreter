@@ -1,7 +1,5 @@
 ﻿using System;
 
-#pragma warning disable IDE0051 // Remove unused private members
-
 namespace LanguageCore.BBCode.Compiler
 {
     using Parser.Statement;
@@ -184,34 +182,6 @@ namespace LanguageCore.BBCode.Compiler
             return 1;
         }
 
-        int ParametersSize
-        {
-            get
-            {
-                int sum = 0;
-
-                for (int i = 0; i < CompiledParameters.Count; i++)
-                {
-                    sum += CompiledParameters[i].Type.SizeOnStack;
-                }
-
-                return sum;
-            }
-        }
-        int ParametersSizeBefore(int beforeThis)
-        {
-            int sum = 0;
-
-            for (int i = 0; i < CompiledParameters.Count; i++)
-            {
-                if (CompiledParameters[i].Index < beforeThis) continue;
-
-                sum += CompiledParameters[i].Type.SizeOnStack;
-            }
-
-            return sum;
-        }
-
         #endregion
 
         #region Memory Helpers
@@ -283,6 +253,7 @@ namespace LanguageCore.BBCode.Compiler
             }
         }
 
+        /*
         void BoxData(int to, int size)
         {
             AddComment($"Box: {{");
@@ -312,6 +283,7 @@ namespace LanguageCore.BBCode.Compiler
             }
             AddComment("}");
         }
+        */
 
         void CheckPointerNull(bool preservePointer = true, string exceptionMessage = "null pointer")
         {
@@ -355,10 +327,47 @@ namespace LanguageCore.BBCode.Compiler
 
         public const int TagsBeforeBasePointer = 2;
 
+        /// <summary>
+        /// Used for keep track of local (after base pointer) tag count that are not variables.
+        /// <br/>
+        /// ie.:
+        /// <br/>
+        /// <c>Return Flag</c>
+        /// </summary>
+        readonly Stack<int> TagCount;
+
         public int ReturnValueOffset => -(ParametersSize + 1 + TagsBeforeBasePointer);
         public const int ReturnFlagOffset = 0;
         public const int SavedBasePointerOffset = -1;
         public const int SavedCodePointerOffset = -2;
+
+        int ParametersSize
+        {
+            get
+            {
+                int sum = 0;
+
+                for (int i = 0; i < CompiledParameters.Count; i++)
+                {
+                    sum += CompiledParameters[i].Type.SizeOnStack;
+                }
+
+                return sum;
+            }
+        }
+        int ParametersSizeBefore(int beforeThis)
+        {
+            int sum = 0;
+
+            for (int i = 0; i < CompiledParameters.Count; i++)
+            {
+                if (CompiledParameters[i].Index < beforeThis) continue;
+
+                sum += CompiledParameters[i].Type.SizeOnStack;
+            }
+
+            return sum;
+        }
 
         protected override ValueAddress GetBaseAddress(CompiledParameter parameter)
         {

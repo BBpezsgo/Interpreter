@@ -212,7 +212,6 @@ namespace ConsoleGUI
                 Interpreter.CompilerResult = generatedCode;
                 Interpreter.ExecuteProgram(generatedCode.Code, new BytecodeInterpreterSettings()
                 {
-                    InstructionLimit = interpreterSettings.InstructionLimit,
                     StackMaxSize = interpreterSettings.StackMaxSize,
                     HeapSize = interpreterSettings.HeapSize,
                 });

@@ -955,10 +955,10 @@ namespace LanguageCore.BBCode.Generator
             switch (literal.Type)
             {
                 case LiteralType.Integer:
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(int.Parse(literal.Value)));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetInt()));
                     break;
                 case LiteralType.Float:
-                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(float.Parse(literal.Value.TrimEnd('f'), System.Globalization.CultureInfo.InvariantCulture)));
+                    AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal.GetFloat()));
                     break;
                 case LiteralType.String:
                     GenerateCodeForLiteralString(literal.Value);

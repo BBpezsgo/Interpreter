@@ -200,9 +200,6 @@ namespace LanguageCore
             { result.Append($" (in {SourceFile})"); }
 
             result.Append(Environment.NewLine);
-            result.Append($"Executed Instructions: {context.ExecutedInstructionCount}");
-
-            result.Append(Environment.NewLine);
             result.Append($"Code Pointer: {context.CodePointer}");
 
             result.Append(Environment.NewLine);

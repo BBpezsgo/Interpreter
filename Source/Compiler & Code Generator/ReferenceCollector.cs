@@ -55,7 +55,7 @@ namespace LanguageCore.Compiler
             if (statements == null) return 0;
 
             int variablesAdded = 0;
-            foreach (var st in statements)
+            foreach (Statement st in statements)
             {
                 if (st is VariableDeclaration newVar)
                 {
@@ -77,7 +77,7 @@ namespace LanguageCore.Compiler
 
             int variablesAdded = AnalyzeNewVariables(statements);
 
-            foreach (var st in statements)
+            foreach (Statement st in statements)
             {
                 AnalyzeStatement(st);
 
@@ -189,7 +189,7 @@ namespace LanguageCore.Compiler
                     { operatorDefinition.TimesUsed++; }
                     operatorDefinition.TimesUsedTotal++;
                 }
-                else if (GetOperatorTemplate(@operator, out var compilableOperator))
+                else if (GetOperatorTemplate(@operator, out CompliableTemplate<CompiledOperator> compilableOperator))
                 {
                     compilableOperator.Function.AddReference(@operator, CurrentFile);
 
@@ -311,7 +311,7 @@ namespace LanguageCore.Compiler
 
                 if (TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
-                    var inlinedMacro = InlineMacro(macro, functionCall.Parameters);
+                    Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
                     if (inlinedMacro is Block block)
                     { AnalyzeStatements(block.Statements); }
                     else
@@ -363,7 +363,7 @@ namespace LanguageCore.Compiler
                     if (keywordCall.Parameters.Length != 1)
                     { return; }
 
-                    var paramType = FindStatementType(keywordCall.Parameters[0]);
+                    CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
 
                     if (paramType == Type.Integer)
                     {
@@ -381,7 +381,7 @@ namespace LanguageCore.Compiler
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var destructor))
+                    if (GetGeneralFunction(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompiledGeneralFunction? destructor))
                     {
                         if (!destructor.CanUse(CurrentFile))
                         { return; }
@@ -394,7 +394,7 @@ namespace LanguageCore.Compiler
 
                         return;
                     }
-                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out var compilableGeneralFunction))
+                    else if (GetGeneralFunctionTemplate(paramType.Class, FindStatementTypes(keywordCall.Parameters), BuiltinFunctionNames.Destructor, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                     {
                         if (!compilableGeneralFunction.OriginalFunction.CanUse(CurrentFile))
                         { return; }
@@ -418,12 +418,12 @@ namespace LanguageCore.Compiler
                     if (keywordCall.Parameters.Length != 1)
                     { return; }
 
-                    var paramType = FindStatementType(keywordCall.Parameters[0]);
+                    CompiledType paramType = FindStatementType(keywordCall.Parameters[0]);
 
                     if (!paramType.IsClass)
                     { return; }
 
-                    if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out var cloner))
+                    if (!GetGeneralFunction(paramType.Class, BuiltinFunctionNames.Cloner, out CompiledGeneralFunction? cloner))
                     { return; }
 
                     if (!cloner.CanUse(CurrentFile))
@@ -442,7 +442,7 @@ namespace LanguageCore.Compiler
             { AnalyzeStatement(field.PrevStatement); }
             else if (statement is Identifier variable)
             {
-                if (GetFunction(variable.Name, expectedType, out var function))
+                if (GetFunction(variable.Name, expectedType, out CompiledFunction? function))
                 {
                     if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                     { function.TimesUsed++; }
@@ -455,7 +455,7 @@ namespace LanguageCore.Compiler
             {
                 AnalyzeStatements(constructorCall.Parameters);
 
-                if (!GetClass(constructorCall, out var @class))
+                if (!GetClass(constructorCall, out CompiledClass? @class))
                 { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
 
                 if (GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
@@ -466,7 +466,7 @@ namespace LanguageCore.Compiler
                     { constructor.TimesUsed++; }
                     constructor.TimesUsedTotal++;
                 }
-                else if (GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                else if (GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     compilableGeneralFunction.OriginalFunction.AddReference(constructorCall, CurrentFile);
 
@@ -500,7 +500,7 @@ namespace LanguageCore.Compiler
             }
             else if (statement is AnyCall anyCall)
             {
-                if (anyCall.ToFunctionCall(out var functionCall1))
+                if (anyCall.ToFunctionCall(out FunctionCall? functionCall1))
                 {
                     AnalyzeStatement(functionCall1);
                 }

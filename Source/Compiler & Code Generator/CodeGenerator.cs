@@ -2463,10 +2463,10 @@ namespace LanguageCore.Compiler
             switch (literal.Type)
             {
                 case LiteralType.Integer:
-                    value = new DataItem(int.Parse(literal.Value));
+                    value = new DataItem(literal.GetInt());
                     break;
                 case LiteralType.Float:
-                    value = new DataItem(float.Parse(literal.Value.EndsWith('f') ? literal.Value[..^1] : literal.Value));
+                    value = new DataItem(literal.GetFloat());
                     break;
                 case LiteralType.Boolean:
                     value = new DataItem(bool.Parse(literal.Value));
@@ -3006,9 +3006,7 @@ namespace LanguageCore.Compiler
         {
             if (from is null || to is null) return false;
 
-            if (from == Type.Integer &&
-                to.IsEnum &&
-                to.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
+            if (to.IsEnum && to.Enum.Type == from)
             { return true; }
 
             return false;
@@ -3018,9 +3016,7 @@ namespace LanguageCore.Compiler
         {
             if (type is null || targetType is null) return false;
 
-            if (type == Type.Integer &&
-                targetType.IsEnum &&
-                targetType.Enum.CompiledAttributes.HasAttribute("Define", "boolean"))
+            if (targetType.IsEnum && targetType.Enum.Type == type)
             {
                 type = targetType;
                 return true;

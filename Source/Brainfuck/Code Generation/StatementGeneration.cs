@@ -1399,7 +1399,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     case LiteralType.Integer:
                         {
-                            int value = int.Parse(statement.Value);
+                            int value = statement.GetInt();
                             Stack.Push(value);
                             break;
                         }

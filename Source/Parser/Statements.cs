@@ -851,39 +851,42 @@ namespace LanguageCore.Parser.Statement
         public object? TryGetValue()
             => Type switch
             {
-                LiteralType.Integer => int.Parse(Value),
-                LiteralType.Float => float.Parse(Value),
+                LiteralType.Integer => GetInt(),
+                LiteralType.Float => GetFloat(),
                 LiteralType.Boolean => bool.Parse(Value),
                 _ => null,
             };
 
-        public int GetInt()
+        public static int GetInt(string value)
         {
-            string v = Value;
-            v = v.Trim();
+            value = value.Trim();
             int @base = 10;
-            if (v.StartsWith("0b"))
+            if (value.StartsWith("0b"))
             {
-                v = v[2..];
+                value = value[2..];
                 @base = 2;
             }
-            if (v.StartsWith("0x"))
+            if (value.StartsWith("0x"))
             {
-                v = v[2..];
+                value = value[2..];
                 @base = 16;
             }
-            v = v.Replace("_", "");
-            return Convert.ToInt32(v, @base);
+            value = value.Replace("_", "");
+            return Convert.ToInt32(value, @base);
         }
-        public float GetFloat()
+        public static float GetFloat(string value)
         {
-            return float.Parse(Value.EndsWith('f') ? Value[..^1] : Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
+            value = value.Trim();
+            value = value.Replace("_", "");
+            value = value.EndsWith('f') ? value[..^1] : value;
+            return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         }
 
+        public int GetInt() => Literal.GetInt(Value);
+        public float GetFloat() => Literal.GetFloat(Value);
+
         public override Position Position
-            => ValueToken == null
-                ? ImaginaryPosition
-                : new Position(ValueToken);
+            => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);
     }
 
     public class Identifier : StatementWithValue

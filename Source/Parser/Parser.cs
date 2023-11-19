@@ -862,7 +862,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (ExpectIdentifier("true", out var tTrue))
+            else if (ExpectIdentifier("true", out Token? tTrue))
             {
                 Literal literal = new(LiteralType.Boolean, tTrue.Content, tTrue);
 
@@ -871,7 +871,7 @@ namespace LanguageCore.Parser
                 statement = literal;
                 return true;
             }
-            else if (ExpectIdentifier("false", out var tFalse))
+            else if (ExpectIdentifier("false", out Token? tFalse))
             {
                 Literal literal = new(LiteralType.Boolean, tFalse.Content, tFalse);
 
@@ -1868,13 +1868,13 @@ namespace LanguageCore.Parser
 
             if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
             {
-                value = float.Parse(CurrentToken.Content.Replace("_", ""));
+                value = Literal.GetFloat(CurrentToken.Content);
 
                 CurrentTokenIndex++;
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
-                value = int.Parse(CurrentToken.Content.Replace("_", ""));
+                value = Literal.GetInt(CurrentToken.Content);
 
                 CurrentTokenIndex++;
             }

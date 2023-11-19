@@ -37,7 +37,7 @@ using System.Math;
     
     for (int y = 0; y < screen_height; y++)
     {
-        PrintD("\r\n");
+        PrintLine();
     };
 }
 
@@ -48,8 +48,8 @@ adaptive void RenderFrame(float A, float B, float R1, float R2, float K1, float 
 	int screen_width = 50;
 	int screen_height = 20;
 
-	float theta_spacing = 0.2f;
-	float phi_spacing = 0.05f;
+	float theta_spacing = 0.15f;
+	float phi_spacing = 0.1f;
 
     Clear();
 
@@ -60,14 +60,14 @@ adaptive void RenderFrame(float A, float B, float R1, float R2, float K1, float 
     float sinB = Sin(B);
 
     // theta goes around the cross-sectional circle of a torus
-    for (float theta = 0f; theta < 2 * PI; theta += theta_spacing)
+    for (float theta; theta < 2 * PI; theta += theta_spacing)
     {
         // precompute sines and cosines of theta
         float costheta = Cos(theta);
         float sintheta = Sin(theta);
 
         // phi goes around the center of revolution of a torus
-        for (float phi = 0f; phi < 2 * PI; phi += phi_spacing)
+        for (float phi; phi < 2 * PI; phi += phi_spacing)
         {
             // precompute sines and cosines of phi
             float cosphi = Cos(phi);

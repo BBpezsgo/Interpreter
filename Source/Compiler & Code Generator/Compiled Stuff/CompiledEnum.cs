@@ -4,13 +4,13 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Compiler
 {
-    using LanguageCore.BBCode.Generator;
     using Parser;
     using Runtime;
 
     public class CompiledEnumMember : EnumMemberDefinition, IHaveKey<string>
     {
         public DataItem ComputedValue;
+        public CompiledType Type => new(ComputedValue.Type);
 
         public CompiledEnumMember(EnumMemberDefinition definition)
             : base(definition.Identifier, definition.Value)
@@ -20,7 +20,23 @@ namespace LanguageCore.Compiler
     public class CompiledEnum : EnumDefinition, ITypeDefinition, IHaveKey<string>
     {
         public new CompiledEnumMember[] Members;
-        public Dictionary<string, AttributeValues> CompiledAttributes;
+        public CompiledAttributeCollection CompiledAttributes;
+        public CompiledType? Type
+        {
+            get
+            {
+                CompiledType? result = null;
+                for (int i = 0; i < Members.Length; i++)
+                {
+                    CompiledEnumMember member = Members[i];
+                    if (result is null)
+                    { result = member.Type; }
+                    else if (result != member.Type)
+                    { return null; }
+                }
+                return result;
+            }
+        }
 
         public CompiledEnum(EnumDefinition definition) : base(definition.Identifier, definition.Attributes, definition.Members)
         {

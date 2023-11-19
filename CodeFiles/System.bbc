@@ -10,8 +10,8 @@ using System.Memory;
 [Define("boolean")]
 enum bool
 {
-    False = 0,
-    True = 1,
+    false = 0,
+    true = 1,
 }
 
 export String ToString(this bool v)

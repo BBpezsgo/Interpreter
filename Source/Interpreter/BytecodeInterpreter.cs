@@ -26,7 +26,6 @@ namespace LanguageCore.Runtime
     {
         public int[] CallTrace;
         public int CodePointer;
-        public int ExecutedInstructionCount;
         public Instruction[] Code;
         public DataStack Stack;
         public int CodeSampleStart;
@@ -80,13 +79,11 @@ namespace LanguageCore.Runtime
 
         // Safety
         int LastInstructionPointer = -1;
-        int EndlessSafe;
 
         public BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
         {
             this.Settings = settings;
 
-            this.EndlessSafe = 0;
             this.LastInstructionPointer = -1;
         }
 
@@ -129,7 +126,6 @@ namespace LanguageCore.Runtime
         public Context GetContext() => new()
         {
             CallTrace = TraceCalls(),
-            ExecutedInstructionCount = this.EndlessSafe,
             CodePointer = this.CodePointer,
             Code = this.Memory.Code[Math.Max(this.CodePointer - 20, 0)..Math.Clamp(this.CodePointer + 20, 0, this.Memory.Code.Length - 1)],
             Stack = this.Memory.Stack,
@@ -204,9 +200,6 @@ namespace LanguageCore.Runtime
         /// <exception cref="RuntimeException"/>
         public bool Tick()
         {
-            if (EndlessSafe > Settings.InstructionLimit)
-            { throw new RuntimeException("Instruction limit reached!", GetContext()); }
-
             if (Memory.Stack.Count > Settings.StackMaxSize)
             { throw new RuntimeException("Stack size exceed the StackMaxSize", GetContext()); }
 
@@ -241,8 +234,6 @@ namespace LanguageCore.Runtime
                 OnStop();
                 return false;
             }
-
-            EndlessSafe++;
 
             try
             {
@@ -294,7 +285,6 @@ namespace LanguageCore.Runtime
             }
 
             LastInstructionPointer = -1;
-            EndlessSafe = 0;
 
             TryUserInvoke();
         }
@@ -312,13 +302,11 @@ namespace LanguageCore.Runtime
 
     public struct BytecodeInterpreterSettings
     {
-        public int InstructionLimit;
         public int StackMaxSize;
         public int HeapSize;
 
         public static BytecodeInterpreterSettings Default => new()
         {
-            InstructionLimit = 8192,
             StackMaxSize = 128,
             HeapSize = 2048,
         };

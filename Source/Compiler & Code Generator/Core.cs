@@ -940,7 +940,7 @@ namespace LanguageCore.Compiler
                 if (!CompiledType.Equals((CompiledType?[]?)this.typeParameters, (TypeInstance?[]?)otherSimple.GenericTypes)) return false;
             }
 
-            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out var type))
+            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(otherSimple.Identifier.Content, out Type type))
             { return type == this.builtinType; }
 
             if (this.@struct != null && this.@struct.Name.Content == otherSimple.Identifier.Content)

@@ -12,15 +12,25 @@
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## About
-This is my own "programming language". This parses the given source code (text file), generates a list of instructions (opcodes with parameters) and executes it (with a bytecode interpreter).
+It's my own programming language with three different output formats: bytecodes (executed by a custom interpreter), x86-64 assembly file that can be assembled by [nasm](https://www.nasm.us/) (WIP), and [brainfuck](https://esolangs.org/wiki/brainfuck) (with limitations).
 
 I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great
 [tutorial series](https://www.youtube.com/watch?v=2DTNDrdqGlo&list=PLZjGMBjt_VVAMW53XnMtNfAQowZwMviBF)
 showing how to make a parser and a compiler. I basically copied the code with minimal changes. When the series ended, I was left on my own, so I improved the code myself.
 
-### Arguments:
+## Command line arguments
 
-`BBCodeInterpreter.exe [arguments...] <source path>`
+> `BBCodeInterpreter.exe` is the compiled compiler program
+> 
+> `[stuff]` is an optional argument
+> 
+> `<stuff>` is a required argument
+> 
+> `stuff1|stuff2` you can sue one of the listed arguments separated by `|`
+
+`BBCodeInterpreter.exe [options...] <source path>`
+
+### Options:
 
 **Logging:**
 - `--hide-debug|-hd` Hides debug logs

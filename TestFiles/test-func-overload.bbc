@@ -17,11 +17,7 @@ void Foo(int p1, int p2)
   PrintLine("int int");
 }
 
-[CodeEntry]
-void Start()
-{
-  Foo();
-  Foo(0);
-  Foo(true);
-  Foo(0, 0);
-}
+Foo();
+Foo(0);
+Foo(true);
+Foo(0, 0);

@@ -29,7 +29,7 @@ namespace LanguageCore.BBCode.Generator
         public ValueAddress(CompiledVariable variable)
         {
             Address = variable.MemoryAddress;
-            BasepointerRelative = !variable.IsGlobal;
+            BasepointerRelative = true;
             IsReference = false;
             InHeap = false;
         }

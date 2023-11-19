@@ -636,14 +636,6 @@ namespace LanguageCore.Brainfuck.Generator
                 InMacro.Pop();
             }
 
-            CompiledFunction? codeEntry = GetCodeEntry();
-
-            if (codeEntry != null)
-            {
-                PrintCallback?.Invoke("  Generating code entry ...", LogType.Debug);
-                GenerateCodeForMacro(codeEntry, Array.Empty<StatementWithValue>(), null, codeEntry.Identifier);
-            }
-
             PrintCallback?.Invoke("  Finishing up ...", LogType.Debug);
 
             {

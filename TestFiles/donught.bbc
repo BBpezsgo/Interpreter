@@ -2,8 +2,6 @@ using System;
 using System.Lists;
 using System.Math;
 
-[CodeEntry]
-void Start()
 {
 	float A = 20f;
 	float B = 20f;

@@ -1609,7 +1609,7 @@ namespace LanguageCore.Compiler
             LanguageCore.Utils.Map(typeParameterNames, type.TypeParameters, typeParameters);
         }
 
-        protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset, bool isGlobal)
+        protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
         {
             if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
             { throw new CompilerException($"Illegal variable name '{newVariable.VariableName.Content}'", newVariable.VariableName, CurrentFile); }
@@ -1630,11 +1630,7 @@ namespace LanguageCore.Compiler
             if (!type.AllGenericsDefined())
             { throw new InternalException($"Failed to qualify all generics in variable \"{newVariable.VariableName}\" type \"{type}\"", newVariable.FilePath); }
 
-            return new CompiledVariable(
-                memoryOffset,
-                type,
-                isGlobal,
-                newVariable);
+            return new CompiledVariable(memoryOffset, type, newVariable);
         }
 
         protected CompiledFunction? GetCodeEntry()

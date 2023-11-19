@@ -28,8 +28,6 @@ class DataClassB
   int ClassIndex;
 }
 
-[CodeEntry]
-void Main()
 {
   DataStructA data1 = new DataStructA;
   DataStructA dataCopyBefore = data1;

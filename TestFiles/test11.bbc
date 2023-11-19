@@ -1,8 +1,6 @@
 using System;
 using System.Lists;
 
-[CodeEntry]
-void Start()
 {
   Array<int> list = new Array<int>(3);
 

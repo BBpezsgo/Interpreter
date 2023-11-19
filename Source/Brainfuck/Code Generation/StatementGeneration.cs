@@ -545,6 +545,8 @@ namespace LanguageCore.Brainfuck.Generator
             { GenerateCodeForStatement(anyCall); }
             else if (statement is ModifiedStatement modifiedStatement)
             { GenerateCodeForStatement(modifiedStatement); }
+            else if (statement is Block block)
+            { GenerateCodeForStatement(block); }
             else
             { throw new CompilerException($"Unknown statement \"{statement.GetType().Name}\"", statement, CurrentFile); }
 

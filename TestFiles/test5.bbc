@@ -1,7 +1,3 @@
 ﻿using System;
 
-[CodeEntry]
-void Start()
-{
-    PrintLine(5 + 10);
-}
+PrintLine(5 + 10);

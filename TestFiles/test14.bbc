@@ -1,7 +1,5 @@
 using System;
 
-[CodeEntry]
-void Start()
 {
 	Print("Type something > ");
 	temp String input = ReadLine();

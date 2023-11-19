@@ -42,11 +42,7 @@ namespace LanguageCore.Compiler
                 type = new(newVariable.Type, FindType, TryCompute);
             }
 
-            return new CompiledVariable(
-                -1,
-                type,
-                false,
-                newVariable);
+            return new CompiledVariable(-1, type, newVariable);
         }
 
         void AnalyzeNewVariable(VariableDeclaration newVariable)
@@ -495,6 +491,8 @@ namespace LanguageCore.Compiler
             { AnalyzeStatement(memoryAddressFinder.PrevStatement); }
             else if (statement is LiteralList listValue)
             { AnalyzeStatements(listValue.Values); }
+            else if (statement is Block block)
+            { AnalyzeStatements(block.Statements); }
             else if (statement is ModifiedStatement modifiedStatement)
             {
                 Warnings.Add(new Warning($"Modifiers not supported", modifiedStatement.Modifier, CurrentFile));

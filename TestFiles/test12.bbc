@@ -1,7 +1,5 @@
 ﻿using System;
 
-[CodeEntry]
-void Start()
 {
     var v = 1 + 5 * 3 + 6 == 0 && 4 == 3;
     Print(v);

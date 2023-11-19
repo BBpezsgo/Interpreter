@@ -1,5 +1,4 @@
-﻿[CodeEntry]
-void Start() {
+﻿{
     var x = 6;
     if (x == 6) {
         var y = 1;

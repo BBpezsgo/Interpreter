@@ -1,7 +1,4 @@
 ﻿using System;
 
-[CodeEntry]
-void Start()
-{
-	PrintLine(temp (5 + 5 * 5).ToString());
-}
+PrintLine(temp (5 + 5 * 5).ToString());
+

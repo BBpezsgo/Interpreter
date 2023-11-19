@@ -1670,6 +1670,8 @@ namespace LanguageCore.BBCode.Generator
             { GenerateCodeForStatement(modifiedStatement); }
             else if (statement is AnyCall anyCall)
             { GenerateCodeForStatement(anyCall); }
+            else if (statement is Block block)
+            { GenerateCodeForStatement(block); }
             else
             { throw new InternalException($"Unimplemented statement {statement.GetType().Name}"); }
 
@@ -1768,7 +1770,7 @@ namespace LanguageCore.BBCode.Generator
                 { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{variable.Type.Name}\" type variable.", value, CurrentFile); }
 
                 GenerateCodeForStatement(value);
-                AddInstruction(Opcode.STORE_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
             }
             else
             {
@@ -1938,16 +1940,15 @@ namespace LanguageCore.BBCode.Generator
 
             if (variable.Type.InHEAP)
             {
-                AddInstruction(Opcode.STORE_VALUE, variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
             }
             else
             {
                 int destination = variable.MemoryAddress;
                 int size = variable.Type.Size;
-                AddressingMode addressingMode = variable.IsGlobal ? AddressingMode.ABSOLUTE : AddressingMode.BASEPOINTER_RELATIVE;
 
                 for (int offset = 1; offset <= size; offset++)
-                { AddInstruction(Opcode.STORE_VALUE, addressingMode, destination + size - offset); }
+                { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, destination + size - offset); }
 
                 return;
             }
@@ -2113,20 +2114,16 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
-            int offset = TagCount.Last;
-            if (InFunction)
-            { offset += LocalVariablesSize; }
-            else
-            { offset += VariablesSize + ExternalFunctionsCache.Count; }
+            int offset = TagCount.Last + VariablesSize;
 
-            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, !InFunction);
+            CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
             StackElementInformations debugInfo = new()
             {
                 Kind = StackElementKind.Variable,
                 Tag = compiledVariable.VariableName.Content,
                 Address = offset,
-                BasepointerRelative = InFunction,
+                BasepointerRelative = true,
                 Size = compiledVariable.Type.SizeOnStack,
             };
 
@@ -2212,68 +2209,9 @@ namespace LanguageCore.BBCode.Generator
             get
             {
                 int sum = 0;
-
                 for (int i = 0; i < CompiledVariables.Count; i++)
-                {
-                    CompiledVariable variable = CompiledVariables[i];
-                    sum += variable.Type.SizeOnStack;
-                }
-
+                { sum += CompiledVariables[i].Type.SizeOnStack; }
                 return sum;
-            }
-        }
-
-        int LocalVariablesSize
-        {
-            get
-            {
-                int sum = 0;
-
-                for (int i = 0; i < CompiledVariables.Count; i++)
-                {
-                    CompiledVariable variable = CompiledVariables[i];
-
-                    if (variable.IsGlobal) continue;
-
-                    sum += variable.Type.SizeOnStack;
-                }
-
-                return sum;
-            }
-        }
-        int LocalVariablesSizeAfter(CompiledVariable variable)
-        {
-            int sum = 0;
-
-            for (int i = IndexOfVariable(variable) + 1; i < CompiledVariables.Count; i++)
-            {
-                CompiledVariable _variable = CompiledVariables[i];
-
-                if (_variable.IsGlobal) continue;
-
-                sum += _variable.Type.SizeOnStack;
-            }
-
-            return sum;
-        }
-        int IndexOfVariable(CompiledVariable variable)
-        {
-            for (int i = 0; i < CompiledVariables.Count; i++)
-            {
-                CompiledVariable _variable = CompiledVariables[i];
-
-                if (_variable.VariableName.Content == variable.VariableName.Content)
-                { return i; }
-            }
-            return -1;
-        }
-
-        void RemoveLocalVariables()
-        {
-            for (int i = CompiledVariables.Count - 1; i >= 0; i--)
-            {
-                if (CompiledVariables[i].IsGlobal) continue;
-                CompiledVariables.RemoveAt(i);
             }
         }
 
@@ -2307,7 +2245,7 @@ namespace LanguageCore.BBCode.Generator
             InMacro.Push(false);
 
             CompiledParameters.Clear();
-            RemoveLocalVariables();
+            CompiledVariables.Clear();
             ReturnInstructions.Clear();
 
             CompileParameters(function.Parameters);
@@ -2400,7 +2338,7 @@ namespace LanguageCore.BBCode.Generator
             });
 
             CompiledParameters.Clear();
-            RemoveLocalVariables();
+            CompiledVariables.Clear();
             ReturnInstructions.Clear();
 
             InMacro.Pop();
@@ -2423,11 +2361,37 @@ namespace LanguageCore.BBCode.Generator
 
             AddComment("TopLevelStatements {");
 
+            AddInstruction(Opcode.GET_BASEPOINTER);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);
+
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            {
+                Address = SavedBasePointerOffset,
+                BasepointerRelative = true,
+                Kind = StackElementKind.Internal,
+                Size = 1,
+                Tag = "Saved BasePointer",
+                Type = StackElementType.Value,
+            });
+
             CurrentFile = null;
             CurrentContext = null;
             TagCount.Push(0);
             InMacro.Push(false);
             ReturnInstructions.Push(new List<int>());
+
+            CanReturn = true;
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            {
+                Address = ReturnFlagOffset,
+                BasepointerRelative = true,
+                Kind = StackElementKind.Internal,
+                Size = 1,
+                Tag = "RETURN_FLAG",
+                Type = StackElementType.Value,
+            });
+            TagCount.Last++;
 
             CompileConstants(statements);
 
@@ -2446,8 +2410,14 @@ namespace LanguageCore.BBCode.Generator
 
             CleanupConstants();
 
+            CanReturn = false;
+            AddInstruction(Opcode.POP_VALUE);
+            TagCount.Last--;
+
             InMacro.Pop();
             TagCount.Pop();
+
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RUNTIME, 0);
 
             AddComment("}");
 

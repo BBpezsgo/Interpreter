@@ -10,8 +10,6 @@ struct Hehe
   int w;
 }
 
-[CodeEntry]
-void Start()
 {
   Foo foo = new Foo;
   foo.Func();

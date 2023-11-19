@@ -1,7 +1,6 @@
 ﻿using System;
 
-[CodeEntry]
-void Start() {
+{
     Print("Enter your name > ");
     PrintLine("Hello " + (temp ReadLine()) + "!");
 }

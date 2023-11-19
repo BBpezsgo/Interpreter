@@ -21,8 +21,6 @@ namespace MyNamespace
     }
 }
 
-[CodeEntry]
-void Main()
 {
     MyNamespace.Main();
     var xd = new MyNamespace.Xd;

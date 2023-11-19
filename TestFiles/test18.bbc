@@ -1,7 +1,5 @@
 using System.Memory;
 
-[CodeEntry]
-void Start()
 {
 	var func = Yes;
 

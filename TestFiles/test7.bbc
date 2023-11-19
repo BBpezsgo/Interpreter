@@ -1,11 +1,7 @@
 ﻿using System;
 
-[CodeEntry]
-void Start()
-{
-  PrintLine(Foo(0));
-  PrintLine(Time.tmnw());
-}
+PrintLine(Foo(0));
+PrintLine(Time.tmnw());
 
 int Foo(int p)
 {

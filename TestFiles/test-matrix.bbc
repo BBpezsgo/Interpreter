@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Lists;
 
-[CodeEntry]
-void Start()
 {
 	Array<Array<int>> matrix = new Array<Array<int>>(5);
 

@@ -1,8 +1,6 @@
 using System;
 using System.Streams;
 
-[CodeEntry]
-void Start()
 {
 	Stream stream = new Stream();
 	while (stream.HasData())

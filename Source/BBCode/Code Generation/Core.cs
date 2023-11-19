@@ -41,7 +41,7 @@ namespace LanguageCore.BBCode.Generator
         public Information[] Informations;
         public Warning[] Warnings;
         public Error[] Errors;
-                }
+    }
 
     public partial class CodeGeneratorForMain : CodeGenerator
     {
@@ -147,8 +147,6 @@ namespace LanguageCore.BBCode.Generator
                     level
                     );
 
-            CompiledFunction? codeEntry = GetCodeEntry();
-
             List<string> UsedExternalFunctions = new();
 
             foreach (CompiledFunction function in this.CompiledFunctions)
@@ -209,10 +207,6 @@ namespace LanguageCore.BBCode.Generator
 
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
-            int entryCallInstruction = -1;
-            if (codeEntry != null)
-            { entryCallInstruction = Call(-1); }
-
             if (ExternalFunctionsCache.Count > 0)
             {
                 AddComment("Clear external functions cache {");
@@ -232,12 +226,6 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                foreach (Parser.FunctionDefinition.Attribute attribute in function.Attributes)
-                {
-                    if (attribute.Identifier.Content != "CodeEntry") continue;
-                    GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
-                }
-
                 AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
                 if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
@@ -245,9 +233,6 @@ namespace LanguageCore.BBCode.Generator
                 CurrentContext = null;
                 InFunction = false;
             }
-
-            if (codeEntry != null && GeneratedCode[entryCallInstruction].ParameterInt == -1)
-            { throw new InternalException($"Failed to set code entry call instruction's parameter", CurrentFile); }
 
             foreach (CompiledOperator function in this.CompiledOperators)
             {
@@ -295,12 +280,6 @@ namespace LanguageCore.BBCode.Generator
                     CurrentContext = function.Function;
                     InFunction = true;
                     function.Function.InstructionOffset = GeneratedCode.Count;
-
-                    foreach (Parser.FunctionDefinition.Attribute attribute in function.Function.Attributes)
-                    {
-                        if (attribute.Identifier.Content != "CodeEntry") continue;
-                        GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
-                    }
 
                     SetTypeArguments(function.TypeArguments);
 

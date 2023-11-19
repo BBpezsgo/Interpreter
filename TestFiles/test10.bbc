@@ -13,8 +13,6 @@ class Foo
   Yes yes;
 }
 
-[CodeEntry]
-void Start()
 {
   Foo foo = new Foo; // Bar2();
   

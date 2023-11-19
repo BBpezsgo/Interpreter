@@ -1,7 +1,6 @@
 using System;
 
-[CodeEntry]
-void Start() {
+{
 	String value = "Hello";
 	int valueAddress = &value;
 	PrintLine(value);

@@ -36,7 +36,6 @@ namespace LanguageCore.BBCode.Generator
 
                     if (function.TimesUsed > 0) continue;
 
-                    if (function.CompiledAttributes.ContainsKey("CodeEntry")) continue;
                     if (function.CompiledAttributes.ContainsKey("Catch")) continue;
 
                     if (CompileLevel == CompileLevel.All) continue;

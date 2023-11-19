@@ -301,37 +301,13 @@ namespace LanguageCore.ASM.Generator
             get
             {
                 int sum = 0;
-
                 for (int i = 0; i < CompiledVariables.Count; i++)
-                {
-                    CompiledVariable variable = CompiledVariables[i];
-                    sum += variable.Type.SizeOnStack;
-                }
-
+                { sum += CompiledVariables[i].Type.SizeOnStack; }
                 return sum;
             }
         }
 
-        int LocalVariablesSize
-        {
-            get
-            {
-                int sum = 0;
-
-                for (int i = 0; i < CompiledVariables.Count; i++)
-                {
-                    CompiledVariable variable = CompiledVariables[i];
-
-                    if (variable.IsGlobal) continue;
-
-                    sum += variable.Type.SizeOnStack;
-                }
-
-                return sum;
-            }
-        }
-
-        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(VariableDeclaration newVariable)
         {
             if (newVariable.Modifiers.Contains("const")) return CleanupItem.Null;
 
@@ -346,13 +322,9 @@ namespace LanguageCore.ASM.Generator
                 }
             }
 
-            int offset = 0;
-            if (isGlobal)
-            { offset += VariablesSize; }
-            else
-            { offset += LocalVariablesSize; }
+            int offset = VariablesSize;
 
-            CompiledVariable compiledVariable = CompileVariable(newVariable, offset, isGlobal);
+            CompiledVariable compiledVariable = CompileVariable(newVariable, offset);
 
             CompiledVariables.Add(compiledVariable);
 
@@ -386,19 +358,19 @@ namespace LanguageCore.ASM.Generator
 
             return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
-        CleanupItem GenerateCodeForVariable(Statement st, bool isGlobal)
+        CleanupItem GenerateCodeForVariable(Statement st)
         {
             if (st is VariableDeclaration newVariable)
-            { return GenerateCodeForVariable(newVariable, isGlobal); }
+            { return GenerateCodeForVariable(newVariable); }
             return CleanupItem.Null;
         }
-        CleanupItem[] GenerateCodeForVariable(Statement[] sts, bool isGlobal)
+        CleanupItem[] GenerateCodeForVariable(Statement[] sts)
         {
             List<CleanupItem> result = new();
             for (int i = 0; i < sts.Length; i++)
             {
-                CleanupItem item = GenerateCodeForVariable(sts[i], isGlobal);
-                if (item.Size == 0) continue;
+                CleanupItem item = GenerateCodeForVariable(sts[i]);
+                if (item.SizeOnStack == 0) continue;
 
                 result.Add(item);
             }
@@ -421,10 +393,10 @@ namespace LanguageCore.ASM.Generator
             { GenerateCodeForSetter(field, value); }
             else
             { throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile); }
-            }
+        }
 
         void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
-            {
+        {
             if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
             {
                 statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
@@ -1116,7 +1088,7 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(Block block)
         {
-            CleanupItem[] cleanup = GenerateCodeForVariable(block.Statements, !InFunction);
+            CleanupItem[] cleanup = GenerateCodeForVariable(block.Statements);
             foreach (Statement statement in block.Statements)
             {
                 GenerateCodeForStatement(statement);
@@ -1169,7 +1141,7 @@ namespace LanguageCore.ASM.Generator
             Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EBP, Registers.ESP);
 
             Builder.CodeBuilder.AppendCommentLine("Variables:");
-            CleanupItem[] cleanup = GenerateCodeForVariable(statements, !InFunction);
+            CleanupItem[] cleanup = GenerateCodeForVariable(statements);
             bool hasExited = false;
 
             for (int i = 0; i < statements.Length; i++)

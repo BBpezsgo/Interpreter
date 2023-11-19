@@ -8,7 +8,9 @@ namespace TheProgram
     using LanguageCore.BBCode.Generator;
     using LanguageCore.Brainfuck;
     using LanguageCore.Compiler;
+#if !AOT
     using LanguageCore.IL.Generator;
+#endif
     using LanguageCore.Parser;
 
     public static class Entry

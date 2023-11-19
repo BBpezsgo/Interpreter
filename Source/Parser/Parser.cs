@@ -21,18 +21,25 @@ namespace LanguageCore.Parser
             "adaptive",
         };
 
+        static readonly string[] FunctionModifiers = new string[]
+        {
+            "export",
+            "macro",
+            "adaptive",
+        };
+
         static readonly string[] GeneralStatementModifiers = new string[]
         {
             "temp",
         };
 
-        static readonly string[] VariableModifiers = new string[]
+        static readonly string[] VariableDefinitionModifiers = new string[]
         {
             "const",
             "temp",
         };
 
-        static readonly string[] ParameterModifiers = new string[]
+        static readonly string[] ParameterDefinitionModifiers = new string[]
         {
             "this",
             "ref",
@@ -129,7 +136,16 @@ namespace LanguageCore.Parser
                 if (endlessSafe > 500) { throw new EndlessLoopException(); }
             }
 
-            return new ParserResult(this.Errors, this.Functions, this.Macros, this.Structs.Values, this.Usings, this.Hashes, this.Classes.Values, this.TopLevelStatements, this.Enums, this.Tokens.ToArray());
+            return new ParserResult(
+                Errors,
+                Functions,
+                Macros,
+                Structs.Values,
+                Usings,
+                Hashes,
+                Classes.Values,
+                TopLevelStatements,
+                Enums);
         }
 
         ParserResultHeader ParseHeaderInternal()
@@ -147,12 +163,12 @@ namespace LanguageCore.Parser
         {
             hashStatement = null;
 
-            if (!ExpectOperator("#", out var hashT))
+            if (!ExpectOperator("#", out Token? hashT))
             { return false; }
 
             hashT.AnalyzedType = TokenAnalyzedType.Hash;
 
-            if (!ExpectIdentifier(out var hashName))
+            if (!ExpectIdentifier(out Token? hashName))
             { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", hashT); }
 
             hashName.AnalyzedType = TokenAnalyzedType.Hash;
@@ -162,7 +178,7 @@ namespace LanguageCore.Parser
             Token? semicolon;
             while (!ExpectOperator(";", out semicolon))
             {
-                if (!ExpectLiteral(out var parameter))
+                if (!ExpectLiteral(out Literal? parameter))
                 { throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", CurrentToken); }
 
                 parameter.ValueToken.AnalyzedType = TokenAnalyzedType.HashParameter;
@@ -187,7 +203,7 @@ namespace LanguageCore.Parser
         bool ExpectUsing([NotNullWhen(true)] out UsingDefinition? usingDefinition)
         {
             usingDefinition = null;
-            if (!ExpectIdentifier("using", out var keyword))
+            if (!ExpectIdentifier("using", out Token? keyword))
             { return false; }
 
             if (CurrentToken == null) throw new SyntaxException($"Expected url after keyword \"using\"", keyword.Position.After());
@@ -240,9 +256,9 @@ namespace LanguageCore.Parser
         {
             while (true)
             {
-                if (ExpectHash(out var hashStatement))
+                if (ExpectHash(out CompileTag? hashStatement))
                 { Hashes.Add(hashStatement); }
-                else if (ExpectUsing(out var usingDefinition))
+                else if (ExpectUsing(out UsingDefinition? usingDefinition))
                 { Usings.Add(usingDefinition); }
                 else
                 { break; }
@@ -253,11 +269,11 @@ namespace LanguageCore.Parser
         {
             if (ExpectStructDefinition()) { }
             else if (ExpectClassDefinition()) { }
-            else if (ExpectMacroDefinition(out var macroDefinition))
+            else if (ExpectMacroDefinition(out MacroDefinition? macroDefinition))
             { Macros.Add(macroDefinition); }
-            else if (ExpectFunctionDefinition(out var functionDefinition))
+            else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition))
             { Functions.Add(functionDefinition); }
-            else if (ExpectEnumDefinition(out var enumDefinition))
+            else if (ExpectEnumDefinition(out EnumDefinition? enumDefinition))
             { Enums.Add(enumDefinition); }
             else if (ExpectStatement(out Statement.Statement? statement))
             {
@@ -364,7 +380,7 @@ namespace LanguageCore.Parser
 
             List<ParameterDefinition> parameters = new();
 
-            var expectParameter = false;
+            bool expectParameter = false;
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
@@ -423,7 +439,7 @@ namespace LanguageCore.Parser
 
             Token? rightP;
 
-            var expectParameter = false;
+            bool expectParameter = false;
             while (!ExpectOperator(">", out rightP) || expectParameter)
             {
                 if (!ExpectIdentifier(out Token? parameter))
@@ -469,7 +485,7 @@ namespace LanguageCore.Parser
 
             Token? bracketRight;
 
-            var expectParameter = false;
+            bool expectParameter = false;
             while (!ExpectOperator(")", out bracketRight) || expectParameter)
             {
                 if (!ExpectIdentifier(out Token? possibleParameterNameT))
@@ -521,7 +537,7 @@ namespace LanguageCore.Parser
 
             List<ParameterDefinition> parameters = new();
 
-            var expectParameter = false;
+            bool expectParameter = false;
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
@@ -547,7 +563,7 @@ namespace LanguageCore.Parser
                 { expectParameter = true; }
             }
 
-            CheckModifiers(modifiers, "export", "macro", "adaptive");
+            CheckModifiers(modifiers, FunctionModifiers);
 
             function = new(modifiers, possibleType, possibleNameT, templateInfo)
             {
@@ -582,7 +598,7 @@ namespace LanguageCore.Parser
 
             List<ParameterDefinition> parameters = new();
 
-            var expectParameter = false;
+            bool expectParameter = false;
             while (!ExpectOperator(")") || expectParameter)
             {
                 Token[] parameterModifiers = ParseParameterModifiers(parameters.Count);
@@ -639,7 +655,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(out Token? possibleClassName))
             { throw new SyntaxException("Expected class identifier after keyword \"class\"", keyword); }
 
-            if (!ExpectOperator("{", out var braceletStart))
+            if (!ExpectOperator("{", out Token? braceletStart))
             { throw new SyntaxException("Expected \"{\" after class identifier", possibleClassName); }
 
             possibleClassName.AnalyzedType = TokenAnalyzedType.Class;
@@ -654,15 +670,15 @@ namespace LanguageCore.Parser
             Token? braceletEnd;
             while (!ExpectOperator("}", out braceletEnd))
             {
-                if (ExpectOperatorDefinition(out var operatorDefinition))
+                if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
                 {
                     operators.Add(operatorDefinition);
                 }
-                else if (ExpectFunctionDefinition(out var methodDefinition))
+                else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
                 {
                     methods.Add(methodDefinition);
                 }
-                else if (ExpectGeneralFunctionDefinition(out var generalMethodDefinition))
+                else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition))
                 {
                     generalMethods.Add(generalMethodDefinition);
                 }
@@ -712,7 +728,7 @@ namespace LanguageCore.Parser
             if (!ExpectIdentifier(out Token? possibleStructName))
             { throw new SyntaxException("Expected struct identifier after keyword \"struct\"", keyword); }
 
-            if (!ExpectOperator("{", out var braceletStart))
+            if (!ExpectOperator("{", out Token? braceletStart))
             { throw new SyntaxException("Expected \"{\" after struct identifier", possibleStructName); }
 
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -753,7 +769,7 @@ namespace LanguageCore.Parser
 
         bool ExpectListValue([NotNullWhen(true)] out LiteralList? listValue)
         {
-            if (!ExpectOperator("[", out var bracketLeft))
+            if (!ExpectOperator("[", out Token? bracketLeft))
             {
                 listValue = null;
                 return false;
@@ -895,7 +911,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            if (!ExpectExpression(out var expression))
+            if (!ExpectExpression(out StatementWithValue? expression))
             {
                 statement = null;
                 return false;
@@ -913,7 +929,7 @@ namespace LanguageCore.Parser
             statementWithValue = null;
 
             {
-                if (ExpectKeywordCall("clone", 1, out var keywordCallClone))
+                if (ExpectKeywordCall("clone", 1, out KeywordCall? keywordCallClone))
                 {
                     statementWithValue = keywordCallClone;
                 }
@@ -1008,7 +1024,7 @@ namespace LanguageCore.Parser
 
             while (true)
             {
-                if (ExpectOperator(".", out var tokenDot))
+                if (ExpectOperator(".", out Token? tokenDot))
                 {
                     if (!ExpectIdentifier(out Token? fieldName))
                     { throw new SyntaxException("Expected a symbol after \".\"", tokenDot.Position.After()); }
@@ -1018,7 +1034,7 @@ namespace LanguageCore.Parser
                     continue;
                 }
 
-                if (ExpectIndex(statementWithValue, out var statementIndex))
+                if (ExpectIndex(statementWithValue, out IndexCall? statementIndex))
                 {
                     statementWithValue = statementIndex;
                     continue;
@@ -1122,7 +1138,7 @@ namespace LanguageCore.Parser
             Token? braceletEnd;
             while (!ExpectOperator("}", out braceletEnd))
             {
-                if (!ExpectStatement(out var statement))
+                if (!ExpectStatement(out Statement.Statement? statement))
                 { throw new SyntaxException($"Expected a statement, got a token \"{CurrentToken}\"", CurrentToken); }
 
                 SetStatementThings(statement);
@@ -1154,7 +1170,7 @@ namespace LanguageCore.Parser
             int startTokenIndex = CurrentTokenIndex;
 
             List<Token> modifiers = new();
-            while (ExpectIdentifier(out Token? modifier, VariableModifiers))
+            while (ExpectIdentifier(out Token? modifier, VariableDefinitionModifiers))
             { modifiers.Add(modifier); }
 
             if (!ExpectType(AllowedType.Implicit | AllowedType.FunctionPointer | AllowedType.StackArrayWithLength, out TypeInstance? possibleType))
@@ -1307,67 +1323,67 @@ namespace LanguageCore.Parser
 
         bool ExpectStatement([NotNullWhen(true)] out Statement.Statement? statement)
         {
-            if (ExpectWhileStatement(out var whileLoop))
+            if (ExpectWhileStatement(out WhileLoop? whileLoop))
             {
                 statement = whileLoop;
                 return true;
             }
 
-            if (ExpectForStatement(out var forLoop))
+            if (ExpectForStatement(out ForLoop? forLoop))
             {
                 statement = forLoop;
                 return true;
             }
 
-            if (ExpectKeywordCall("return", 0, 1, out var keywordCallReturn))
+            if (ExpectKeywordCall("return", 0, 1, out KeywordCall? keywordCallReturn))
             {
                 statement = keywordCallReturn;
                 return true;
             }
 
-            if (ExpectKeywordCall("throw", 1, out var keywordCallThrow))
+            if (ExpectKeywordCall("throw", 1, out KeywordCall? keywordCallThrow))
             {
                 statement = keywordCallThrow;
                 return true;
             }
 
-            if (ExpectKeywordCall("break", 0, out var keywordCallBreak))
+            if (ExpectKeywordCall("break", 0, out KeywordCall? keywordCallBreak))
             {
                 statement = keywordCallBreak;
                 return true;
             }
 
-            if (ExpectKeywordCall("delete", 1, out var keywordCallDelete))
+            if (ExpectKeywordCall("delete", 1, out KeywordCall? keywordCallDelete))
             {
                 statement = keywordCallDelete;
                 return true;
             }
 
-            if (ExpectKeywordCall("clone", 1, out var keywordCallClone))
+            if (ExpectKeywordCall("clone", 1, out KeywordCall? keywordCallClone))
             {
                 statement = keywordCallClone;
                 return true;
             }
 
-            if (ExpectIfStatement(out var ifContainer))
+            if (ExpectIfStatement(out IfContainer? ifContainer))
             {
                 statement = ifContainer;
                 return true;
             }
 
-            if (ExpectVariableDeclaration(out var variableDeclaration))
+            if (ExpectVariableDeclaration(out VariableDeclaration? variableDeclaration))
             {
                 statement = variableDeclaration;
                 return true;
             }
 
-            if (ExpectAnySetter(out var assignment))
+            if (ExpectAnySetter(out AnyAssignment? assignment))
             {
                 statement = assignment;
                 return true;
             }
 
-            if (ExpectExpression(out var expression))
+            if (ExpectExpression(out StatementWithValue? expression))
             {
                 statement = expression;
                 return true;
@@ -1449,7 +1465,7 @@ namespace LanguageCore.Parser
                 return true;
             }
 
-            if (!ExpectModifiedOrOneValue(out var leftStatement, GeneralStatementModifiers)) return false;
+            if (!ExpectModifiedOrOneValue(out StatementWithValue? leftStatement, GeneralStatementModifiers)) return false;
 
             while (true)
             {
@@ -1479,17 +1495,17 @@ namespace LanguageCore.Parser
 
         bool ExpectAnySetter([NotNullWhen(true)] out AnyAssignment? assignment)
         {
-            if (ExpectShortOperator(out var shortOperatorCall))
+            if (ExpectShortOperator(out ShortOperatorCall? shortOperatorCall))
             {
                 assignment = shortOperatorCall;
                 return true;
             }
-            if (ExpectCompoundSetter(out var compoundAssignment))
+            if (ExpectCompoundSetter(out CompoundAssignment? compoundAssignment))
             {
                 assignment = compoundAssignment;
                 return true;
             }
-            if (ExpectSetter(out var simpleSetter))
+            if (ExpectSetter(out Assignment? simpleSetter))
             {
                 assignment = simpleSetter;
                 return true;
@@ -1533,7 +1549,7 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            if (!ExpectOperator(CompoundAssignmentOperators, out var @operator))
+            if (!ExpectOperator(CompoundAssignmentOperators, out Token? @operator))
             {
                 CurrentTokenIndex = parseStart;
                 return false;
@@ -1557,13 +1573,13 @@ namespace LanguageCore.Parser
                 return false;
             }
 
-            if (ExpectOperator("++", out var t0))
+            if (ExpectOperator("++", out Token? t0))
             {
                 shortOperatorCall = new ShortOperatorCall(t0, leftStatement);
                 return true;
             }
 
-            if (ExpectOperator("--", out var t1))
+            if (ExpectOperator("--", out Token? t1))
             {
                 shortOperatorCall = new ShortOperatorCall(t1, leftStatement);
                 return true;
@@ -1778,7 +1794,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             attribute = null;
 
-            if (!ExpectOperator("[", out var t0))
+            if (!ExpectOperator("[", out Token? t0))
             { CurrentTokenIndex = parseStart; return false; }
 
             if (!ExpectIdentifier(out Token? attributeT))
@@ -1787,7 +1803,7 @@ namespace LanguageCore.Parser
             attributeT.AnalyzedType = TokenAnalyzedType.Attribute;
 
             List<object> parameters = new();
-            if (ExpectOperator("(", out var t3))
+            if (ExpectOperator("(", out Token? t3))
             {
                 int endlessSafe = 50;
                 while (!ExpectOperator(")"))
@@ -1906,7 +1922,7 @@ namespace LanguageCore.Parser
             int endlessSafe = 16;
             while (true)
             {
-                if (ExpectIdentifier(out Token? modifier, ParameterModifiers))
+                if (ExpectIdentifier(out Token? modifier, ParameterDefinitionModifiers))
                 {
                     modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                     modifiers.Add(modifier);
@@ -2068,7 +2084,7 @@ namespace LanguageCore.Parser
 
                     while (true)
                     {
-                        if (!ExpectType(AllowedType.FunctionPointer, out var typeParameter))
+                        if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeParameter))
                         { return false; }
 
                         genericTypes.Add(typeParameter);
@@ -2104,7 +2120,7 @@ namespace LanguageCore.Parser
                     List<TypeInstance> parameterTypes = new();
                     while (!ExpectOperator(")"))
                     {
-                        if (!ExpectType(AllowedType.FunctionPointer, out var subtype))
+                        if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? subtype))
                         {
                             CurrentTokenIndex = afterIdentifier;
                             return true;
@@ -2121,7 +2137,7 @@ namespace LanguageCore.Parser
 
                     type = new TypeInstanceFunction(type, parameterTypes);
                 }
-                else if (ExpectOperator("[", out var bracket1Left))
+                else if (ExpectOperator("[", out Token? bracket1Left))
                 {
                     if (!flags.HasFlag(AllowedType.StackArrayWithLength) &&
                         !flags.HasFlag(AllowedType.StackArrayWithoutLength))

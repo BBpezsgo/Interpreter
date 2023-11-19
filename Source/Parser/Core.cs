@@ -35,7 +35,6 @@ namespace LanguageCore.Parser
         public readonly List<UsingAnalysis> UsingsAnalytics;
         public readonly Statement.Statement[] TopLevelStatements;
         public readonly EnumDefinition[] Enums;
-        public readonly Token[] Tokens;
 
         public static ParserResult Empty => new(
             new List<Error>(),
@@ -46,10 +45,9 @@ namespace LanguageCore.Parser
             new List<Statement.CompileTag>(),
             new List<ClassDefinition>(),
             new List<Statement.Statement>(),
-            new List<EnumDefinition>(),
-            Array.Empty<Token>());
+            new List<EnumDefinition>());
 
-        public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums, Token[] tokens)
+        public ParserResult(IEnumerable<Error> errors, IEnumerable<FunctionDefinition> functions, IEnumerable<MacroDefinition> macros, IEnumerable<StructDefinition> structs, IEnumerable<UsingDefinition> usings, IEnumerable<Statement.CompileTag> hashes, IEnumerable<ClassDefinition> classes, IEnumerable<Statement.Statement> topLevelStatements, IEnumerable<EnumDefinition> enums)
         {
             Errors = errors.ToArray();
 
@@ -62,7 +60,6 @@ namespace LanguageCore.Parser
             Classes = classes.ToArray();
             TopLevelStatements = topLevelStatements.ToArray();
             Enums = enums.ToArray();
-            Tokens = tokens;
         }
 
         public void SetFile(string path)
@@ -144,12 +141,6 @@ namespace LanguageCore.Parser
                 { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
                 return false;
             });
-        }
-
-        public void ThrowErrors()
-        {
-            if (Errors.Length == 0) return;
-            throw new LanguageException(Errors[0]);
         }
     }
 

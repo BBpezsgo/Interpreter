@@ -38,7 +38,6 @@ namespace LanguageCore.Compiler
         public readonly Error[] Errors;
         public readonly Warning[] Warnings;
         public readonly Statement[] TopLevelStatements;
-        public readonly Token[] Tokens;
 
         public static CompilerResult Empty => new(
             Array.Empty<CompiledFunction>(),
@@ -52,8 +51,7 @@ namespace LanguageCore.Compiler
             Array.Empty<CompiledEnum>(),
             Array.Empty<Error>(),
             Array.Empty<Warning>(),
-            Array.Empty<Statement>(),
-            Array.Empty<Token>());
+            Array.Empty<Statement>());
 
         public CompilerResult(
             CompiledFunction[] functions,
@@ -67,8 +65,7 @@ namespace LanguageCore.Compiler
             CompiledEnum[] enums,
             Error[] errors,
             Warning[] warnings,
-            Statement[] topLevelStatements,
-            Token[] tokens)
+            Statement[] topLevelStatements)
         {
             Functions = functions;
             Macros = macros;
@@ -82,7 +79,6 @@ namespace LanguageCore.Compiler
             Errors = errors;
             Warnings = warnings;
             TopLevelStatements = topLevelStatements;
-            Tokens = tokens;
         }
     }
 
@@ -872,8 +868,7 @@ namespace LanguageCore.Compiler
                 CompiledEnums,
                 Errors.ToArray(),
                 Warnings.ToArray(),
-                parserResult.TopLevelStatements,
-                parserResult.Tokens
+                parserResult.TopLevelStatements
                 );
         }
 

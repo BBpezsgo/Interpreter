@@ -17,11 +17,10 @@ namespace LanguageCore.IL.Generator
 
     public struct ILGeneratorResult
     {
-        public Token[] Tokens;
+        public Assembly Assembly;
 
         public Warning[] Warnings;
         public Error[] Errors;
-        public Assembly Assembly;
     }
 
     public struct ILGeneratorSettings
@@ -687,7 +686,6 @@ namespace LanguageCore.IL.Generator
 
             return new ILGeneratorResult()
             {
-                Tokens = compilerResult.Tokens,
                 Assembly = assembly!,
 
                 Warnings = this.Warnings.ToArray(),

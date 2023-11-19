@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.BBCode.Generator
 {
-    using LanguageCore.Compiler;
+    using Compiler;
     using Parser.Statement;
 
     public class CompiledVariable : VariableDeclaration

@@ -5,7 +5,7 @@ namespace ConsoleGUI
 {
     public class ScrollBar
     {
-        readonly Func<Element, (int Min, int Max)> GetRange;
+        readonly Func<Element, LanguageCore.Range<int>> GetRange;
         readonly Element Parent;
         int offset;
 
@@ -15,14 +15,14 @@ namespace ConsoleGUI
         {
             get
             {
-                var range = GetRange.Invoke(Parent);
-                offset -= range.Min;
-                int max = range.Max - range.Min;
+                LanguageCore.Range<int> range = GetRange.Invoke(Parent);
+                offset -= range.Start;
+                int max = range.End - range.Start;
                 return (float)offset / (float)max;
             }
         }
 
-        public ScrollBar(Func<Element, (int Min, int Max)> getRange, Element parent)
+        public ScrollBar(Func<Element, LanguageCore.Range<int>> getRange, Element parent)
         {
             GetRange = getRange;
             Parent = parent;
@@ -51,16 +51,16 @@ namespace ConsoleGUI
 
         public void FeedEvent(Element sender, MouseEvent e)
         {
-            var range = GetRange.Invoke(sender);
+            LanguageCore.Range<int> range = GetRange.Invoke(sender);
             if (e.ButtonState == MouseButton.ScrollDown)
             {
-                offset = Math.Clamp(offset + 1, range.Min, range.Max);
+                offset = Math.Clamp(offset + 1, range.Start, range.End);
                 return;
             }
 
             if (e.ButtonState == MouseButton.ScrollUp)
             {
-                offset = Math.Clamp(offset - 1, range.Min, range.Max);
+                offset = Math.Clamp(offset - 1, range.Start, range.End);
                 return;
             }
 
@@ -85,8 +85,8 @@ namespace ConsoleGUI
                 float v = y;
                 v /= (float)height;
 
-                v *= range.Max - range.Min;
-                v += range.Min;
+                v *= range.End - range.Start;
+                v += range.Start;
 
                 offset = (int)MathF.Round(v);
             }

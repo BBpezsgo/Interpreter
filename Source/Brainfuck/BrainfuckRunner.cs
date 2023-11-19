@@ -1,16 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using LanguageCore;
-using LanguageCore.Brainfuck;
-using LanguageCore.Brainfuck.Generator;
-using LanguageCore.Parser;
 
-namespace TheProgram.Brainfuck
+namespace LanguageCore.Brainfuck
 {
-    public enum RunKind : int
+    using Generator;
+
+    public enum BrainfuckRunKind : int
     {
         Default,
         UI,
@@ -18,7 +13,7 @@ namespace TheProgram.Brainfuck
     }
 
     [Flags]
-    public enum PrintFlags : int
+    public enum BrainfuckPrintFlags : int
     {
         None = 0,
         PrintResultLabel = 1,
@@ -30,7 +25,7 @@ namespace TheProgram.Brainfuck
     {
         static BrainfuckGeneratorSettings CompilerSettings => BrainfuckGeneratorSettings.Default;
 
-        public static void Run(ArgumentParser.Settings args, RunKind runKind, PrintFlags runFlags, CompileOptions flags = CompileOptions.None)
+        public static void Run(TheProgram.ArgumentParser.Settings args, BrainfuckRunKind runKind, BrainfuckPrintFlags runFlags, EasyBrainfuckCompilerFlags flags = EasyBrainfuckCompilerFlags.None)
         {
             void PrintCallback(string message, LogType level)
             {
@@ -60,21 +55,21 @@ namespace TheProgram.Brainfuck
                 }
             }
 
-            BrainfuckGeneratorResult? _code = BrainfuckRunner.CompilePlus(args.File, flags, PrintCallback);
+            EasyBrainfuckCompilerResult? _code = EasyBrainfuckCompiler.Compile(args.File, flags, PrintCallback);
             if (!_code.HasValue)
             { return; }
 
-            BrainfuckGeneratorResult code = _code.Value;
+            EasyBrainfuckCompilerResult generated = _code.Value;
 
-            InterpreterCompact interpreter = new(code.Code)
+            InterpreterCompact interpreter = new(generated.GeneratorResult.Code)
             {
-                DebugInfo = code.DebugInfo,
-                OriginalCode = code.Tokens,
+                DebugInfo = generated.GeneratorResult.DebugInfo,
+                OriginalCode = generated.Tokens,
             };
 
             switch (runKind)
             {
-                case RunKind.UI:
+                case BrainfuckRunKind.UI:
                     {
                         Console.WriteLine();
                         Console.Write("Press any key to start the interpreter");
@@ -83,28 +78,28 @@ namespace TheProgram.Brainfuck
                         interpreter.RunWithUI(true, 2);
                         break;
                     }
-                case RunKind.SpeedTest:
+                case BrainfuckRunKind.SpeedTest:
                     {
-                        if (runFlags.HasFlag(PrintFlags.PrintResultLabel))
+                        if (runFlags.HasFlag(BrainfuckPrintFlags.PrintResultLabel))
                         {
                             Console.WriteLine();
                             Console.WriteLine($" === RESULT ===");
                             Console.WriteLine();
                         }
 
-                        SpeedTest(code.Code, 3);
+                        SpeedTest(generated.GeneratorResult.Code, 3);
                         break;
                     }
-                case RunKind.Default:
+                case BrainfuckRunKind.Default:
                     {
-                        if (runFlags.HasFlag(PrintFlags.PrintResultLabel))
+                        if (runFlags.HasFlag(BrainfuckPrintFlags.PrintResultLabel))
                         {
                             Console.WriteLine();
                             Console.WriteLine($" === RESULT ===");
                             Console.WriteLine();
                         }
 
-                        if (runFlags.HasFlag(PrintFlags.PrintExecutionTime))
+                        if (runFlags.HasFlag(BrainfuckPrintFlags.PrintExecutionTime))
                         {
                             Stopwatch sw = Stopwatch.StartNew();
                             interpreter.Run();
@@ -119,7 +114,7 @@ namespace TheProgram.Brainfuck
                             interpreter.Run();
                         }
 
-                        if (runFlags.HasFlag(PrintFlags.PrintMemory))
+                        if (runFlags.HasFlag(BrainfuckPrintFlags.PrintMemory))
                         {
                             Console.ResetColor();
                             Console.WriteLine();
@@ -143,7 +138,7 @@ namespace TheProgram.Brainfuck
 
                             for (int i = 0; i < finalIndex; i++)
                             {
-                                var cell = interpreter.Memory[i];
+                                byte cell = interpreter.Memory[i];
 
                                 ConsoleColor fg = ConsoleColor.White;
                                 ConsoleColor bg = ConsoleColor.Black;
@@ -215,247 +210,5 @@ namespace TheProgram.Brainfuck
             Console.SetCursorPosition(0, line);
             Console.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms                 ");
         }
-
-        [Flags]
-        public enum CompileOptions : int
-        {
-            None = 0b_0000,
-
-            PrintCompiled = 0b_0001,
-            PrintCompiledMinimized = 0b_0010,
-            WriteToFile = 0b_0100,
-
-            PrintFinal = 0b_1000,
-        }
-
-        public static BrainfuckGeneratorResult? CompilePlus(FileInfo file, CompileOptions options, PrintCallback printCallback)
-                => CompilePlus(file, (int)options, printCallback);
-        public static BrainfuckGeneratorResult? CompilePlus(FileInfo file, int options, PrintCallback printCallback)
-        {
-            bool throwErrors = true;
-
-            BrainfuckGeneratorResult generated;
-
-            try
-            {
-                LanguageCore.Compiler.CompilerResult compiled = LanguageCore.Compiler.Compiler.Compile(Parser.ParseFile(file.FullName), null, file, null, printCallback);
-                generated = CodeGeneratorForBrainfuck.Generate(compiled, CompilerSettings, printCallback);
-                // printCallback?.Invoke($"Optimized {compilerResult.Optimizations} statements", LogType.Debug);
-            }
-            catch (LanguageException exception)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(exception.ToString());
-
-                if (exception.File != null)
-                {
-                    string? arrows = GetArrows(exception.Position, File.ReadAllText(exception.File));
-                    if (arrows != null)
-                    { Console.WriteLine(arrows); }
-                }
-
-                Console.ResetColor();
-
-                if (throwErrors) throw;
-                else return null;
-            }
-            catch (Exception exception)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(exception.ToString());
-
-                Console.ResetColor();
-
-                if (throwErrors) throw;
-                else return null;
-            }
-
-            if ((options & (int)CompileOptions.PrintCompiled) != 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine($" === COMPILED ===");
-                PrintCode(Simplifier.Simplify(generated.Code));
-                Console.WriteLine();
-                Console.ResetColor();
-            }
-
-            generated.Code = Minifier.Minify(generated.Code);
-
-            if ((options & (int)CompileOptions.PrintCompiledMinimized) != 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine($" === MINIFIED ===");
-                PrintCode(Simplifier.Simplify(generated.Code));
-                Console.WriteLine();
-                Console.ResetColor();
-            }
-
-            generated.Code = Minifier.Minify(BrainfuckCode.RemoveNoncodes(generated.Code));
-
-            if ((options & (int)CompileOptions.PrintFinal) != 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine($" === FINAL ===");
-                PrintCode(generated.Code);
-                Console.WriteLine();
-                Console.ResetColor();
-            }
-
-            if ((options & (int)CompileOptions.WriteToFile) != 0)
-            {
-                string compiledFilePath = Path.Combine(Path.GetDirectoryName(file.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{file.FullName}\""), Path.GetFileNameWithoutExtension(file.FullName) + ".bf");
-                File.WriteAllText(compiledFilePath, generated.Code);
-            }
-
-            return generated;
-        }
-
-        public static string? Compile(string code, CompileOptions options)
-            => Compile(code, (int)options);
-        public static string Compile(string code, int options)
-        {
-            string compiled = Minifier.Minify(BrainfuckCode.RemoveNoncodes(code));
-
-            if ((options & (int)CompileOptions.PrintFinal) != 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine($" === FINAL ===");
-                PrintCode(compiled);
-                Console.WriteLine();
-                Console.ResetColor();
-            }
-
-            return compiled;
-        }
-
-        public static string? CompileFile(string file, CompileOptions options, PrintCallback printCallback)
-            => CompileFile(file, (int)options, printCallback);
-        public static string? CompileFile(string file, int options, PrintCallback printCallback)
-        {
-            if (!File.Exists(file))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"File \"{file}\" does not exists");
-                Console.ResetColor();
-                return null;
-            }
-
-            string extension = Path.GetExtension(file)[1..];
-            if (extension == "bfpp")
-            {
-                return CompilePlus(new FileInfo(file), options, printCallback)?.Code;
-            }
-
-            if (extension == "bf")
-            {
-                return Compile(File.ReadAllText(file), options);
-            }
-
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"Unknown extension \"{extension}\"");
-            Console.ResetColor();
-            return null;
-        }
-
-        public static string? GetArrows(Position position, string text)
-        {
-            if (position.AbsoluteRange == 0) return null;
-            if (position == Position.UnknownPosition) return null;
-            if (position.Range.Start.Line != position.Range.End.Line)
-            { return null; }
-
-            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
-
-            if (position.Range.Start.Line - 1 >= lines.Length)
-            { return null; }
-
-            string line = lines[position.Range.Start.Line - 1];
-
-            StringBuilder result = new();
-
-            result.Append(line.Replace('\t', ' '));
-            result.Append("\r\n");
-            result.Append(' ', Math.Max(0, position.Range.Start.Character - 2));
-            result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
-            return result.ToString();
-        }
-
-        public static void PrintCode(string code)
-        {
-            bool expectNumber = false;
-            for (int i = 0; i < code.Length; i++)
-            {
-                switch (code[i])
-                {
-                    case '>':
-                    case '<':
-                        if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
-                        expectNumber = true;
-                        break;
-                    case '+':
-                    case '-':
-                        if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
-                        expectNumber = true;
-                        break;
-                    case '[':
-                    case ']':
-                        if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
-                        expectNumber = false;
-                        break;
-                    case '.':
-                    case ',':
-                        if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
-                        expectNumber = false;
-                        break;
-                    default:
-                        if (expectNumber && (new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }).Contains(code[i]))
-                        {
-                            if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
-                        }
-                        else if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code[i]))
-                        {
-                            expectNumber = false;
-                            if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
-                        }
-                        else
-                        {
-                            expectNumber = false;
-                            if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray;
-                        }
-                        break;
-                }
-                Console.Write(code[i]);
-            }
-        }
-
-        public static void PrintCodeChar(char code)
-        {
-            switch (code)
-            {
-                case '>':
-                case '<':
-                    if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
-                    break;
-                case '+':
-                case '-':
-                    if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
-                    break;
-                case '[':
-                case ']':
-                    if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
-                    break;
-                case '.':
-                case ',':
-                    if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
-                    break;
-                default:
-                    if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code))
-                    { if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta; }
-                    else
-                    { if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray; }
-                    break;
-            }
-            Console.Write(code);
-        }
-    }
+   }
 }

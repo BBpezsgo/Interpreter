@@ -199,7 +199,7 @@ namespace LanguageCore.Compiler
 
         protected string? TypeDefinitionReplacer(string? typeName)
         {
-            foreach (var @struct in CompiledStructs)
+            foreach (CompiledStruct @struct in CompiledStructs)
             {
                 if (@struct.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
@@ -209,7 +209,7 @@ namespace LanguageCore.Compiler
                     }
                 }
             }
-            foreach (var @class in CompiledClasses)
+            foreach (CompiledClass @class in CompiledClasses)
             {
                 if (@class.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
@@ -219,7 +219,7 @@ namespace LanguageCore.Compiler
                     }
                 }
             }
-            foreach (var @enum in CompiledEnums)
+            foreach (CompiledEnum @enum in CompiledEnums)
             {
                 if (@enum.CompiledAttributes.TryGetAttribute("Define", out string? definedType))
                 {
@@ -313,7 +313,7 @@ namespace LanguageCore.Compiler
 
             if (attributes.TryGetAttribute("External", out string? externalName))
             {
-                if (!ExternalFunctions.TryGetValue(externalName, out var externalFunction))
+                if (!ExternalFunctions.TryGetValue(externalName, out ExternalFunctionBase? externalFunction))
                 { Errors.Add(new Error($"External function \"{externalName}\" not found", function, function.FilePath)); }
                 else
                 {
@@ -348,7 +348,7 @@ namespace LanguageCore.Compiler
 
             if (attributes.TryGetAttribute("Builtin", out string? builtinName))
             {
-                if (!BuiltinFunctions.TryGetValue(builtinName, out var builtinFunction))
+                if (!BuiltinFunctions.TryGetValue(builtinName, out (CompiledType ReturnValue, CompiledType[] Parameters) builtinFunction))
                 { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", function, function.FilePath)); }
                 else
                 {
@@ -398,7 +398,7 @@ namespace LanguageCore.Compiler
 
             if (attributes.TryGetAttribute("External", out string? name))
             {
-                if (ExternalFunctions.TryGetValue(name, out var externalFunction))
+                if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Length)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
@@ -448,7 +448,7 @@ namespace LanguageCore.Compiler
         {
             CompiledAttributeCollection attributes = new();
 
-            foreach (var attribute in @enum.Attributes)
+            foreach (FunctionDefinition.Attribute attribute in @enum.Attributes)
             {
                 attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
 
@@ -489,7 +489,7 @@ namespace LanguageCore.Compiler
 
         bool IsSymbolExists(string symbol, [NotNullWhen(true)] out Token? where)
         {
-            foreach (var @class in Classes)
+            foreach (ClassDefinition @class in Classes)
             {
                 if (@class.Name.Content == symbol)
                 {
@@ -497,7 +497,7 @@ namespace LanguageCore.Compiler
                     return true;
                 }
             }
-            foreach (var @struct in Structs)
+            foreach (StructDefinition @struct in Structs)
             {
                 if (@struct.Name.Content == symbol)
                 {
@@ -505,7 +505,7 @@ namespace LanguageCore.Compiler
                     return true;
                 }
             }
-            foreach (var @enum in Enums)
+            foreach (EnumDefinition @enum in Enums)
             {
                 if (@enum.Identifier.Content == symbol)
                 {
@@ -513,7 +513,7 @@ namespace LanguageCore.Compiler
                     return true;
                 }
             }
-            foreach (var function in this.Functions)
+            foreach (FunctionDefinition function in this.Functions)
             {
                 if (function.Identifier.Content == symbol)
                 {
@@ -521,7 +521,7 @@ namespace LanguageCore.Compiler
                     return true;
                 }
             }
-            foreach (var macro in this.Macros)
+            foreach (MacroDefinition macro in this.Macros)
             {
                 if (macro.Identifier.Content == symbol)
                 {
@@ -561,7 +561,7 @@ namespace LanguageCore.Compiler
             }
             */
 
-            foreach (var @struct in collectedAST.ParserResult.Structs)
+            foreach (StructDefinition @struct in collectedAST.ParserResult.Structs)
             {
                 if (IsSymbolExists(@struct.Name.Content, out _))
                 { Errors.Add(new Error($"Symbol {@struct.Name} already defined", @struct.Name, @struct.FilePath)); continue; }
@@ -569,15 +569,14 @@ namespace LanguageCore.Compiler
                 { Structs.Add(@struct); }
             }
 
-            foreach (var @class in collectedAST.ParserResult.Classes)
+            foreach (ClassDefinition @class in collectedAST.ParserResult.Classes)
             {
                 if (IsSymbolExists(@class.Name.Content, out _))
                 { Errors.Add(new Error($"Symbol {@class.Name} already defined", @class.Name, @class.FilePath)); continue; }
                 else
                 { Classes.Add(@class); }
 
-
-                foreach (var @operator in @class.Operators)
+                foreach (FunctionDefinition @operator in @class.Operators)
                 {
                     if (Operators.Any(other => @operator.IsSame(other)))
                     { Errors.Add(new Error($"Operator {@operator.ReadableID()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
@@ -586,7 +585,7 @@ namespace LanguageCore.Compiler
                 }
             }
 
-            foreach (var @enum in collectedAST.ParserResult.Enums)
+            foreach (EnumDefinition @enum in collectedAST.ParserResult.Enums)
             {
                 if (IsSymbolExists(@enum.Identifier.Content, out _))
                 { Errors.Add(new Error($"Symbol {@enum.Identifier} already defined", @enum.Identifier, @enum.FilePath)); continue; }
@@ -627,7 +626,7 @@ namespace LanguageCore.Compiler
 
             #region Compile test external functions
 
-            foreach (var hash in Hashes)
+            foreach (CompileTag hash in Hashes)
             {
                 switch (hash.HashName.Content)
                 {
@@ -646,7 +645,7 @@ namespace LanguageCore.Compiler
                             Type[] parameterTypes = new Type[bfParams.Length];
                             for (int i = 0; i < bfParams.Length; i++)
                             {
-                                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out var paramType))
+                                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out Type paramType))
                                 {
                                     parameterTypes[i] = paramType;
 
@@ -754,7 +753,7 @@ namespace LanguageCore.Compiler
             {
                 List<CompiledOperator> compiledOperators = new();
 
-                foreach (var function in Operators)
+                foreach (FunctionDefinition function in Operators)
                 {
                     CompiledOperator compiledFunction = CompileOperator(function);
 
@@ -784,9 +783,9 @@ namespace LanguageCore.Compiler
                         { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
                     }
 
-                    foreach (var method in compiledClass.GeneralMethods)
+                    foreach (GeneralFunctionDefinition method in compiledClass.GeneralMethods)
                     {
-                        foreach (var parameter in method.Parameters)
+                        foreach (ParameterDefinition parameter in method.Parameters)
                         {
                             if (parameter.Modifiers.Contains("this"))
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
@@ -818,7 +817,7 @@ namespace LanguageCore.Compiler
 
                     foreach (FunctionDefinition method in compiledClass.Methods)
                     {
-                        foreach (var parameter in method.Parameters)
+                        foreach (ParameterDefinition parameter in method.Parameters)
                         {
                             if (parameter.Modifiers.Contains("this"))
                             { throw new CompilerException($"Keyword 'this' is not valid in the current context", parameter.Identifier, compiledClass.FilePath); }
@@ -845,9 +844,9 @@ namespace LanguageCore.Compiler
                     { GenericParameters.Pop(); }
                 }
 
-                foreach (var function in Functions)
+                foreach (FunctionDefinition function in Functions)
                 {
-                    var compiledFunction = CompileFunction(function);
+                    CompiledFunction compiledFunction = CompileFunction(function);
 
                     if (compiledFunctions.Any(other => compiledFunction.IsSame(other)))
                     { throw new CompilerException($"Function with name '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }

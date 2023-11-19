@@ -68,5 +68,83 @@ namespace LanguageCore.Brainfuck
             }
             return builder.ToString();
         }
+
+        public static void PrintCode(string code)
+        {
+            bool expectNumber = false;
+            for (int i = 0; i < code.Length; i++)
+            {
+                switch (code[i])
+                {
+                    case '>':
+                    case '<':
+                        if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
+                        expectNumber = true;
+                        break;
+                    case '+':
+                    case '-':
+                        if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
+                        expectNumber = true;
+                        break;
+                    case '[':
+                    case ']':
+                        if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
+                        expectNumber = false;
+                        break;
+                    case '.':
+                    case ',':
+                        if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                        expectNumber = false;
+                        break;
+                    default:
+                        if (expectNumber && (new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }).Contains(code[i]))
+                        {
+                            if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
+                        }
+                        else if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code[i]))
+                        {
+                            expectNumber = false;
+                            if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                        }
+                        else
+                        {
+                            expectNumber = false;
+                            if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray;
+                        }
+                        break;
+                }
+                Console.Write(code[i]);
+            }
+        }
+
+        public static void PrintCodeChar(char code)
+        {
+            switch (code)
+            {
+                case '>':
+                case '<':
+                    if (Console.ForegroundColor != ConsoleColor.Red) Console.ForegroundColor = ConsoleColor.Red;
+                    break;
+                case '+':
+                case '-':
+                    if (Console.ForegroundColor != ConsoleColor.Blue) Console.ForegroundColor = ConsoleColor.Blue;
+                    break;
+                case '[':
+                case ']':
+                    if (Console.ForegroundColor != ConsoleColor.Green) Console.ForegroundColor = ConsoleColor.Green;
+                    break;
+                case '.':
+                case ',':
+                    if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta;
+                    break;
+                default:
+                    if (LanguageCore.Brainfuck.BrainfuckCode.CodeCharacters.Contains(code))
+                    { if (Console.ForegroundColor != ConsoleColor.Magenta) Console.ForegroundColor = ConsoleColor.Magenta; }
+                    else
+                    { if (Console.ForegroundColor != ConsoleColor.DarkGray) Console.ForegroundColor = ConsoleColor.DarkGray; }
+                    break;
+            }
+            Console.Write(code);
+        }
     }
 }

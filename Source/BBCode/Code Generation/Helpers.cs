@@ -328,13 +328,7 @@ namespace LanguageCore.BBCode.Generator
 
         public const int TagsBeforeBasePointer = 2;
 
-        /// <summary>
-        /// Used for keep track of local (after base pointer) tag count that are not variables.
-        /// <br/>
-        /// ie.:
-        /// <br/>
-        /// <c>Return Flag</c>
-        /// </summary>
+        /// <summary>Stuff after BasePointer but before any variables</summary>
         readonly Stack<int> TagCount;
 
         public int ReturnValueOffset => -(ParametersSize + 1 + TagsBeforeBasePointer);

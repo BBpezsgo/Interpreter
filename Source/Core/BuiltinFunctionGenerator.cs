@@ -197,7 +197,7 @@ namespace LanguageCore.Runtime
 
         public static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, Action callback)
         {
-            var types = Array.Empty<Compiler.Type>();
+            Compiler.Type[] types = Array.Empty<Compiler.Type>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -208,7 +208,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0> callback)
         {
-            var types = GetTypes<T0>();
+            Compiler.Type[] types = GetTypes<T0>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -220,7 +220,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1> callback)
         {
-            var types = GetTypes<T0, T1>();
+            Compiler.Type[] types = GetTypes<T0, T1>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -233,7 +233,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2> callback)
         {
-            var types = GetTypes<T0, T1, T2>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -247,7 +247,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -262,7 +262,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3, T4>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3, T4>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3, T4>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -278,7 +278,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3, T4, T5>(this Dictionary<string, ExternalFunctionBase> functions, string name, Action<T0, T1, T2, T3, T4, T5> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -293,11 +293,10 @@ namespace LanguageCore.Runtime
             });
         }
 
-
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<TResult> callback)
         {
-            var types = Array.Empty<Compiler.Type>();
+            Compiler.Type[] types = Array.Empty<Compiler.Type>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -310,7 +309,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, TResult> callback)
         {
-            var types = GetTypes<T0>();
+            Compiler.Type[] types = GetTypes<T0>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -324,7 +323,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, TResult> callback)
         {
-            var types = GetTypes<T0, T1>();
+            Compiler.Type[] types = GetTypes<T0, T1>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -339,7 +338,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, TResult> callback)
         {
-            var types = GetTypes<T0, T1, T2>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -355,7 +354,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, TResult> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -372,7 +371,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3, T4, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, TResult> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3, T4>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3, T4>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -390,7 +389,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         public static void AddExternalFunction<T0, T1, T2, T3, T4, T5, TResult>(this Dictionary<string, ExternalFunctionBase> functions, string name, Func<T0, T1, T2, T3, T4, T5, TResult> callback)
         {
-            var types = GetTypes<T0, T1, T2, T3, T4, T5>();
+            Compiler.Type[] types = GetTypes<T0, T1, T2, T3, T4, T5>();
 
             functions.AddSimpleExternalFunction(name, types, (sender, args) =>
             {
@@ -546,7 +545,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="NotImplementedException"/>
         static Compiler.Type GetType<T>()
         {
-            var type_ = typeof(T);
+            Type type_ = typeof(T);
 
             if (type_ == typeof(byte))
             { return Compiler.Type.Byte; }

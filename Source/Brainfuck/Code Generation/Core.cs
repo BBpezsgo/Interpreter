@@ -153,7 +153,6 @@ namespace LanguageCore.Brainfuck.Generator
     {
         public string Code;
         public int Optimizations;
-        public Token[] Tokens;
 
         public Warning[] Warnings;
         public Error[] Errors;
@@ -254,7 +253,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         readonly BrainfuckGeneratorSettings GeneratorSettings;
 
-        string? VariableCanBeDiscarded = null;
+        string? VariableCanBeDiscarded;
 
         readonly DebugInformation DebugInfo;
 
@@ -395,8 +394,8 @@ namespace LanguageCore.Brainfuck.Generator
         {
             int usages = 0;
 
-            var statements = statement.GetStatements();
-            foreach (var _statement in statements)
+            IEnumerable<Statement> statements = statement.GetStatements();
+            foreach (Statement _statement in statements)
             {
                 if (_statement == null) continue;
 
@@ -484,7 +483,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool TryGetAddress(Field field, out int address, out int size)
         {
-            var type = FindStatementType(field.PrevStatement);
+            CompiledType type = FindStatementType(field.PrevStatement);
 
             if (type.IsStruct)
             {
@@ -495,9 +494,9 @@ namespace LanguageCore.Brainfuck.Generator
                     return false;
                 }
 
-                var fieldType = FindStatementType(field);
+                CompiledType fieldType = FindStatementType(field);
 
-                var @struct = type.Struct;
+                CompiledStruct @struct = type.Struct;
 
                 address = @struct.FieldOffsets[field.FieldName.Content] + prevAddress;
                 size = fieldType.SizeOnStack;
@@ -511,7 +510,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         bool TryGetAddress(Pointer pointer, out int address, out int size)
         {
-            if (!TryCompute(pointer.PrevStatement, null, out var addressToSet))
+            if (!TryCompute(pointer.PrevStatement, null, out DataItem addressToSet))
             { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.PrevStatement, CurrentFile); }
 
             if (!DataItem.TryShrinkToByte(ref addressToSet))
@@ -622,7 +621,9 @@ namespace LanguageCore.Brainfuck.Generator
                 ReturnCount.Push(0);
                 ReturnTagStack.Push(Stack.Push(1));
             }
+
             {
+                InMacro.Push(false);
                 PrintCallback?.Invoke("  Generating top level statements ...", LogType.Debug);
 
                 using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
@@ -632,6 +633,7 @@ namespace LanguageCore.Brainfuck.Generator
                     progressBar.Print(i, compilerResult.TopLevelStatements.Length);
                     GenerateCodeForStatement(compilerResult.TopLevelStatements[i]);
                 }
+                InMacro.Pop();
             }
 
             CompiledFunction? codeEntry = GetCodeEntry();
@@ -674,10 +676,9 @@ namespace LanguageCore.Brainfuck.Generator
                 Code = Code.ToString(),
                 Optimizations = Optimizations,
                 DebugInfo = DebugInfo,
-                Tokens = compilerResult.Tokens,
 
-                Warnings = this.Warnings.ToArray(),
-                Errors = this.Errors.ToArray(),
+                Warnings = Warnings.ToArray(),
+                Errors = Errors.ToArray(),
             };
         }
 

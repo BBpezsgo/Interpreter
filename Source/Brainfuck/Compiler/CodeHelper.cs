@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Text;
-using TheProgram.Brainfuck;
 
 namespace LanguageCore.Brainfuck
 {
@@ -20,13 +19,13 @@ namespace LanguageCore.Brainfuck
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, char b)
         {
             a.v.Append(b);
-            BrainfuckRunner.PrintCodeChar(b);
+            BrainfuckCode.PrintCodeChar(b);
             return a;
         }
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, string b)
         {
             a.v.Append(b);
-            BrainfuckRunner.PrintCode(b);
+            BrainfuckCode.PrintCode(b);
             return a;
         }
         public static AutoPrintCodeString operator +(AutoPrintCodeString a, AutoPrintCodeString b)
@@ -38,19 +37,19 @@ namespace LanguageCore.Brainfuck
         public void Append(string value)
         {
             this.v.Append(value);
-            BrainfuckRunner.PrintCode(value);
+            BrainfuckCode.PrintCode(value);
         }
 
         public void Append(char value)
         {
             this.v.Append(value);
-            BrainfuckRunner.PrintCodeChar(value);
+            BrainfuckCode.PrintCodeChar(value);
         }
 
         public void Append(char value, int repeatCount)
         {
             this.v.Append(value, repeatCount);
-            BrainfuckRunner.PrintCode(new string(value, repeatCount));
+            BrainfuckCode.PrintCode(new string(value, repeatCount));
         }
     }
 

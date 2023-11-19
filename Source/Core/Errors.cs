@@ -43,6 +43,35 @@ namespace LanguageCore
 
             return result.ToString();
         }
+
+        public string? GetArrows()
+        {
+            if (File == null) return null;
+            return GetArrows(Position, System.IO.File.ReadAllText(File));
+        }
+
+        public static string? GetArrows(Position position, string text)
+        {
+            if (position.AbsoluteRange == 0) return null;
+            if (position == Position.UnknownPosition) return null;
+            if (position.Range.Start.Line != position.Range.End.Line)
+            { return null; }
+
+            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+
+            if (position.Range.Start.Line - 1 >= lines.Length)
+            { return null; }
+
+            string line = lines[position.Range.Start.Line - 1];
+
+            StringBuilder result = new();
+
+            result.Append(line.Replace('\t', ' '));
+            result.Append("\r\n");
+            result.Append(' ', Math.Max(0, position.Range.Start.Character - 2));
+            result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
+            return result.ToString();
+        }
     }
 
     [Serializable]

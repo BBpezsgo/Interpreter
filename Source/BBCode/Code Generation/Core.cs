@@ -11,18 +11,13 @@ namespace LanguageCore.BBCode.Generator
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public readonly struct CleanupItem
     {
-        /// <summary>
-        /// Data size on the stack
-        /// </summary>
-        public readonly int Size;
-
+        public readonly int SizeOnStack;
         public readonly bool ShouldDeallocate;
-
         public readonly CompiledType? Type;
 
         public CleanupItem(int size, bool shouldDeallocate, CompiledType? type)
         {
-            Size = size;
+            SizeOnStack = size;
             ShouldDeallocate = shouldDeallocate;
             Type = type;
         }
@@ -31,8 +26,8 @@ namespace LanguageCore.BBCode.Generator
 
         public override string ToString()
         {
-            if (Type is null && Size == 0 && !ShouldDeallocate) return "null";
-            return $"({(ShouldDeallocate ? "temp " : string.Empty)}{Type} : {Size} bytes)";
+            if (Type is null && SizeOnStack == 0 && !ShouldDeallocate) return "null";
+            return $"({(ShouldDeallocate ? "temp " : string.Empty)}{Type} : {SizeOnStack} bytes)";
         }
         string GetDebuggerDisplay() => ToString();
     }
@@ -42,94 +37,11 @@ namespace LanguageCore.BBCode.Generator
         public Instruction[] Code;
         public DebugInformation DebugInfo;
 
-        public CompiledFunction[] Functions;
-        public CompiledOperator[] Operators;
-        public CompiledGeneralFunction[] GeneralFunctions;
-
-        public CompiledStruct[] Structs;
-        public CompiledClass[] Classes;
-
         public Hint[] Hints;
         public Information[] Informations;
         public Warning[] Warnings;
         public Error[] Errors;
-
-        public readonly bool GetFunctionOffset(CompiledFunction compiledFunction, out int offset)
-        {
-            offset = -1;
-            for (int i = 0; i < Functions.Length; i++)
-            {
-                if (Functions[i].IsSame(compiledFunction))
-                {
-                    if (offset != -1)
-                    { throw new InternalException($"BRUH"); }
-                    offset = i;
                 }
-            }
-            return offset != -1;
-        }
-
-        public readonly void PrintInstructions() => BBCodeGeneratorResult.PrintInstructions(Code);
-        public static void PrintInstructions(Instruction[] code)
-        {
-            Console.WriteLine("\n\r === INSTRUCTIONS ===\n\r");
-            int indent = 0;
-
-            for (int i = 0; i < code.Length; i++)
-            {
-                Instruction instruction = code[i];
-                /*
-                if (instruction.opcode == Opcode.COMMENT)
-                {
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("}"))
-                    {
-                        indent--;
-                    }
-
-                    Console.ForegroundColor = ConsoleColor.DarkGray;
-                    Console.WriteLine($"{"  ".Repeat(indent)}{instruction.tag}");
-                    Console.ResetColor();
-
-                    if (!instruction.tag.EndsWith("{ }") && instruction.tag.EndsWith("{"))
-                    {
-                        indent++;
-                    }
-
-                    continue;
-                }
-                */
-
-                Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.Write($"{new string(' ', indent * 2)} {instruction.opcode}");
-                Console.Write($" ");
-
-                if (instruction.Parameter.Type == RuntimeType.SInt32)
-                {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write($"{instruction.Parameter.ValueSInt32}");
-                    Console.Write($" ");
-                }
-                else if (instruction.Parameter.Type == RuntimeType.Single)
-                {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.Write($"{instruction.Parameter.ValueSingle}");
-                    Console.Write($" ");
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"{instruction.Parameter}");
-                    Console.Write($" ");
-                }
-
-                Console.Write("\n\r");
-
-                Console.ResetColor();
-            }
-
-            Console.WriteLine("\n\r === ===\n\r");
-        }
-    }
 
     public partial class CodeGeneratorForMain : CodeGenerator
     {
@@ -311,7 +223,7 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.EXIT);
 
-            foreach (var function in this.CompiledFunctions)
+            foreach (CompiledFunction function in this.CompiledFunctions)
             {
                 if (function.IsTemplate)
                 { continue; }
@@ -320,7 +232,7 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                foreach (var attribute in function.Attributes)
+                foreach (Parser.FunctionDefinition.Attribute attribute in function.Attributes)
                 {
                     if (attribute.Identifier.Content != "CodeEntry") continue;
                     GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
@@ -337,7 +249,7 @@ namespace LanguageCore.BBCode.Generator
             if (codeEntry != null && GeneratedCode[entryCallInstruction].ParameterInt == -1)
             { throw new InternalException($"Failed to set code entry call instruction's parameter", CurrentFile); }
 
-            foreach (var function in this.CompiledOperators)
+            foreach (CompiledOperator function in this.CompiledOperators)
             {
                 if (function.IsTemplate)
                 { continue; }
@@ -354,7 +266,7 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = false;
             }
 
-            foreach (var function in this.CompiledGeneralFunctions)
+            foreach (CompiledGeneralFunction function in this.CompiledGeneralFunctions)
             {
                 if (function.IsTemplate)
                 { continue; }
@@ -384,7 +296,7 @@ namespace LanguageCore.BBCode.Generator
                     InFunction = true;
                     function.Function.InstructionOffset = GeneratedCode.Count;
 
-                    foreach (var attribute in function.Function.Attributes)
+                    foreach (Parser.FunctionDefinition.Attribute attribute in function.Function.Attributes)
                     {
                         if (attribute.Identifier.Content != "CodeEntry") continue;
                         GeneratedCode[entryCallInstruction].ParameterInt = GeneratedCode.Count - entryCallInstruction;
@@ -404,7 +316,7 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
-            foreach (var function in this.CompilableOperators)
+            foreach (CompliableTemplate<CompiledOperator> function in this.CompilableOperators)
             {
                 CurrentContext = function.Function;
                 InFunction = true;
@@ -443,7 +355,7 @@ namespace LanguageCore.BBCode.Generator
                 TypeArguments.Clear();
             }
 
-            foreach (var item in UndefinedFunctionOffsets)
+            foreach (UndefinedOffset<CompiledFunction> item in UndefinedFunctionOffsets)
             {
                 CompiledFunction? function = item.Function;
                 if (function is null) throw new InternalException();
@@ -465,7 +377,7 @@ namespace LanguageCore.BBCode.Generator
                 GeneratedCode[item.CallInstructionIndex].ParameterInt = offset;
             }
 
-            foreach (var item in UndefinedOperatorFunctionOffsets)
+            foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
             {
                 if (item.Function.InstructionOffset == -1)
                 { throw new InternalException($"Operator {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
@@ -473,7 +385,7 @@ namespace LanguageCore.BBCode.Generator
                 GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
-            foreach (var item in UndefinedGeneralFunctionOffsets)
+            foreach (UndefinedOffset<CompiledGeneralFunction> item in UndefinedGeneralFunctionOffsets)
             {
                 if (item.Caller == null) { }
                 else if (item.Caller is ConstructorCall constructorCall)
@@ -514,16 +426,10 @@ namespace LanguageCore.BBCode.Generator
                 Code = GeneratedCode.ToArray(),
                 DebugInfo = GeneratedDebugInfo,
 
-                Functions = this.CompiledFunctions,
-                Operators = this.CompiledOperators,
-                GeneralFunctions = this.CompiledGeneralFunctions,
-                Structs = this.CompiledStructs,
-                Classes = this.CompiledClasses,
-
-                Hints = this.Hints.ToArray(),
-                Informations = this.Informations.ToArray(),
-                Warnings = this.Warnings.ToArray(),
-                Errors = this.Errors.ToArray(),
+                Hints = Hints.ToArray(),
+                Informations = Informations.ToArray(),
+                Warnings = Warnings.ToArray(),
+                Errors = Errors.ToArray(),
             };
         }
 

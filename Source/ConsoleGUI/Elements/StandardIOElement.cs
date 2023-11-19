@@ -27,7 +27,7 @@ namespace ConsoleGUI
             ScrollBar = new ScrollBar(GetScrollBarBounds, this);
         }
 
-        private (int Min, int Max) GetScrollBarBounds(Element element)
+        private LanguageCore.Range<int> GetScrollBarBounds(Element element)
         {
             int totalLines = 0;
             for (int i = 0; i < ConsoleTexts.Count; i++)
@@ -41,7 +41,7 @@ namespace ConsoleGUI
                 }
             }
 
-            return (0, Math.Max(1, totalLines));
+            return new LanguageCore.Range<int>(0, Math.Max(1, totalLines));
         }
 
         public void Write(string text, byte color = ByteColor.Silver)
@@ -75,7 +75,7 @@ namespace ConsoleGUI
                     if (line + j < start) continue;
                     if (j == lines.Length - 1 && lines[j] == string.Empty) continue;
 
-                    var line_ = lines[j];
+                    string line_ = lines[j];
                     b.AddText(line_.TrimEnd());
                     if (j < lines.Length - 1)
                     { b.FinishLine(Rect.Width); }

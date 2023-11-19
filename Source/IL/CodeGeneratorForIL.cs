@@ -5,9 +5,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 
-#pragma warning disable CA1822 // Mark members as static
-#pragma warning disable IDE0060 // Remove unused parameter
-
 namespace LanguageCore.IL.Generator
 {
     using BBCode.Generator;
@@ -52,7 +49,6 @@ namespace LanguageCore.IL.Generator
             type = null;
             return false;
         }
-
 
         #region Precompile
         void Precompile(IEnumerable<Statement>? statements)
@@ -147,7 +143,7 @@ namespace LanguageCore.IL.Generator
         }
         int GetValueSize(NewInstance newInstance)
         {
-            if (GetStruct(newInstance, out var @struct))
+            if (GetStruct(newInstance, out CompiledStruct? @struct))
             {
                 return @struct.Size;
             }
@@ -179,7 +175,7 @@ namespace LanguageCore.IL.Generator
 
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
@@ -407,7 +403,7 @@ namespace LanguageCore.IL.Generator
                     {
                         if (statement.Parameters.Length != 0 &&
                             statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (requied 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         throw new NotImplementedException();
                     }
@@ -415,7 +411,7 @@ namespace LanguageCore.IL.Generator
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (requied 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
                         throw new NotImplementedException();
                     }
@@ -433,7 +429,7 @@ namespace LanguageCore.IL.Generator
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is requied for \'{statement.Operator}\' assignment", statement, CurrentFile));
+            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
         void Compile(CompoundAssignment statement)
         {
@@ -507,7 +503,7 @@ namespace LanguageCore.IL.Generator
         }
         void Compile(ConstructorCall constructorCall)
         {
-            var instanceType = FindType(constructorCall.TypeName);
+            CompiledType instanceType = FindType(constructorCall.TypeName);
 
             if (instanceType.IsStruct)
             { throw new NotImplementedException(); }
@@ -522,7 +518,7 @@ namespace LanguageCore.IL.Generator
 
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
-                if (!GetConstructorTemplate(@class, constructorCall, out var compilableGeneralFunction))
+                if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
                     throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
@@ -540,7 +536,7 @@ namespace LanguageCore.IL.Generator
             }
 
             if (constructorCall.Parameters.Length != constructor.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: requied {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to \"{constructorCall.TypeName}\" constructor: required {constructor.ParameterCount} passed {constructorCall.Parameters.Length}", constructorCall, CurrentFile); }
 
             throw new NotImplementedException();
         }
@@ -649,7 +645,6 @@ namespace LanguageCore.IL.Generator
         void GenerateCodeForTopLevelStatements(Statement[] statements, TypeBuilder type)
         {
             MethodBuilder methodBuilder = type.DefineMethod("Main", MethodAttributes.Public | MethodAttributes.Static);
-
 
             System.Type? consoleType = System.Type.GetType("System.Console, System.Console", true);
 

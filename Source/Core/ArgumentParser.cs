@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 
-#pragma warning disable IDE0059 // Unnecessary assignment of a value
-#pragma warning disable IDE0018 // Inline variable declaration
-
 namespace TheProgram
 {
     using LanguageCore;
@@ -52,7 +49,7 @@ namespace TheProgram
 
             void FinishArgument()
             {
-                var currentArg = CurrentArg.Trim();
+                string currentArg = CurrentArg.Trim();
 
                 State = NormalizerState.None;
                 CurrentArg = string.Empty;
@@ -152,21 +149,22 @@ namespace TheProgram
         static Settings ParseArgs(string[] args)
         {
             Settings result = Settings.Default;
+#pragma warning disable IDE0059 // Unnecessary assignment of a value
+            string? arg = null;
+#pragma warning restore IDE0059 // Unnecessary assignment of a value
 
             if (args.Length > 1)
             {
                 int i = 0;
                 while (i < args.Length - 1)
                 {
-                    string? arg;
-
-                    if (ExpectArg(args, ref i, out arg, "--no-nullcheck", "-nn"))
+                    if (ExpectArg(args, ref i, out _, "--no-nullcheck", "-nn"))
                     {
                         result.compilerSettings.CheckNullPointers = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--no-pause", "-np"))
+                    if (ExpectArg(args, ref i, out _, "--no-pause", "-np"))
                     {
                         result.DoNotPause = true;
                         continue;
@@ -180,7 +178,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--brainfuck", "-bf"))
+                    if (ExpectArg(args, ref i, out _, "--brainfuck", "-bf"))
                     {
                         if (result.RunType != RunType.Normal)
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}"); }
@@ -189,7 +187,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--asm"))
+                    if (ExpectArg(args, ref i, out _, "--asm"))
                     {
                         if (result.RunType != RunType.Normal)
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ASM}"); }
@@ -198,7 +196,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--il"))
+                    if (ExpectArg(args, ref i, out _, "--il"))
                     {
                         if (result.RunType != RunType.Normal)
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}"); }
@@ -210,7 +208,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--debug"))
+                    if (ExpectArg(args, ref i, out _, "--debug"))
                     {
                         if (result.RunType != RunType.Normal)
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}"); }
@@ -219,7 +217,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--console-gui", "-cg"))
+                    if (ExpectArg(args, ref i, out _, "--console-gui", "-cg"))
                     {
                         result.ConsoleGUI = true;
                         continue;
@@ -288,49 +286,49 @@ namespace TheProgram
                     }
                     */
 
-                    if (ExpectArg(args, ref i, out arg, "--throw-errors", "-te"))
+                    if (ExpectArg(args, ref i, out _, "--throw-errors", "-te"))
                     {
                         result.ThrowErrors = true;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--hide-debug", "-hd"))
+                    if (ExpectArg(args, ref i, out _, "--hide-debug", "-hd"))
                     {
                         result.LogDebugs = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--hide-system", "-hs"))
+                    if (ExpectArg(args, ref i, out _, "--hide-system", "-hs"))
                     {
                         result.LogSystem = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--hide-warning", "--hide-warnings", "-hw"))
+                    if (ExpectArg(args, ref i, out _, "--hide-warning", "--hide-warnings", "-hw"))
                     {
                         result.LogWarnings = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--hide-info", "-hi"))
+                    if (ExpectArg(args, ref i, out _, "--hide-info", "-hi"))
                     {
                         result.LogInfo = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--dont-optimize", "-do"))
+                    if (ExpectArg(args, ref i, out _, "--dont-optimize", "-do"))
                     {
                         result.compilerSettings.DontOptimize = true;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--no-debug-info", "-ndi"))
+                    if (ExpectArg(args, ref i, out _, "--no-debug-info", "-ndi"))
                     {
                         result.compilerSettings.GenerateDebugInstructions = false;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--remove-unused-functions", "-ruf"))
+                    if (ExpectArg(args, ref i, out _, "--remove-unused-functions", "-ruf"))
                     {
                         if (!ExpectParam(args, ref i, out result.compilerSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
@@ -346,7 +344,7 @@ namespace TheProgram
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out arg, "--print-instructions", "-pi"))
+                    if (ExpectArg(args, ref i, out _, "--print-instructions", "-pi"))
                     {
                         result.compilerSettings.PrintInstructions = true;
                         continue;

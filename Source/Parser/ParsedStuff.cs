@@ -199,7 +199,6 @@ namespace LanguageCore.Parser
 
         public string? FilePath { get; set; }
 
-
         public readonly TemplateInfo? TemplateInfo;
 
         protected FunctionThingDefinition(Token identifier, TemplateInfo? templateInfo, IEnumerable<Token> modifiers)
@@ -330,7 +329,6 @@ namespace LanguageCore.Parser
             Modifiers = modifiers.ToArray();
         }
 
-
         public readonly Token Identifier;
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
@@ -458,7 +456,6 @@ namespace LanguageCore.Parser
             result += ')';
 
             result += Block?.ToString() ?? ";";
-
 
             return result;
         }
@@ -677,7 +674,7 @@ namespace LanguageCore.Parser
                 return result;
             }
         }
-        public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out var uri) && uri.Scheme != "file:";
+        public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out Uri? uri) && uri.Scheme != "file:";
 
         public UsingDefinition(
             Token keyword,

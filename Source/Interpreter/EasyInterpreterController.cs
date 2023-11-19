@@ -5,36 +5,30 @@ namespace LanguageCore.Runtime
 {
     using BBCode.Generator;
 
-    /// <summary>
-    /// A simpler form of <see cref="Interpreter"/><br/>
-    /// Just call <see cref="Run(TheProgram.ArgumentParser.Settings)"/> and that's it
-    /// </summary>
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings) => Run(settings.File, settings.compilerSettings, settings.bytecodeInterpreterSettings, settings.LogDebugs, settings.LogSystem, settings.LogWarnings, settings.LogInfo, !settings.ThrowErrors, settings.compilerSettings.BasePath);
+        public static void Run(TheProgram.ArgumentParser.Settings settings)
+            => Run(
+                settings.File,
+                settings.compilerSettings,
+                settings.bytecodeInterpreterSettings,
+                settings.LogDebugs,
+                settings.LogSystem,
+                settings.LogWarnings,
+                settings.LogInfo,
+                !settings.ThrowErrors);
 
-        /// <summary>
-        /// Compiles and interprets source code
-        /// </summary>
-        /// <param name="path">
-        /// The path to the source code file
-        /// </param>
-        /// <param name="HandleErrors">
-        /// Throw or print exceptions?
-        /// </param>
         public static void Run(
             FileInfo file,
             Compiler.CompilerSettings compilerSettings,
             BytecodeInterpreterSettings bytecodeInterpreterSettings,
-            bool LogDebug = true,
-            bool LogSystem = true,
-            bool LogWarnings = true,
-            bool LogInfo = true,
-            bool HandleErrors = true,
-            string? basePath = null
-            )
+            bool logDebug = true,
+            bool logSystem = true,
+            bool logWarnings = true,
+            bool logInfo = true,
+            bool handleErrors = true)
         {
-            if (LogDebug) Output.LogDebug($"Run file \"{file.FullName}\" ...");
+            if (logDebug) Output.LogDebug($"Run file \"{file.FullName}\" ...");
             string code = File.ReadAllText(file.FullName);
             Interpreter interpreter = new();
 
@@ -46,22 +40,22 @@ namespace LanguageCore.Runtime
                 switch (logType)
                 {
                     case LogType.System:
-                        if (!LogSystem) break;
+                        if (!logSystem) break;
                         Output.Log(message);
                         break;
                     case LogType.Normal:
-                        if (!LogInfo) break;
+                        if (!logInfo) break;
                         Output.Log(message);
                         break;
                     case LogType.Warning:
-                        if (!LogWarnings) break;
+                        if (!logWarnings) break;
                         Output.LogWarning(message);
                         break;
                     case LogType.Error:
                         Output.LogError(message);
                         break;
                     case LogType.Debug:
-                        if (!LogDebug) break;
+                        if (!logDebug) break;
                         Output.LogDebug(message);
                         break;
                 }
@@ -71,14 +65,14 @@ namespace LanguageCore.Runtime
 
             interpreter.OnNeedInput += (sender) =>
             {
-                var input = Console.ReadKey(true);
+                ConsoleKeyInfo input = Console.ReadKey(true);
                 sender.OnInput(input.KeyChar);
             };
 
 #if DEBUG
             interpreter.OnExecuted += (sender, e) =>
             {
-                if (LogSystem) Output.Log(e.ToString());
+                if (logSystem) Output.Log(e.ToString());
 
                 if (sender.BytecodeInterpreter == null) return;
 
@@ -102,7 +96,7 @@ namespace LanguageCore.Runtime
 
             if (interpreter.Initialize())
             {
-                string dllsFolderPath = Path.Combine(file.Directory!.FullName, basePath?.Replace('/', '\\') ?? string.Empty);
+                string dllsFolderPath = Path.Combine(file.Directory!.FullName, compilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
 
 #if AOT
                 Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
@@ -110,9 +104,9 @@ namespace LanguageCore.Runtime
                 if (Directory.Exists(dllsFolderPath))
                 {
                     DirectoryInfo dllsFolder = new(dllsFolderPath);
-                    if (LogDebug) Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                    if (logDebug) Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
                     FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
-                    foreach (var dll in dlls)
+                    foreach (FileInfo dll in dlls)
                     { interpreter.LoadDLL(dll.FullName); }
                 }
                 else
@@ -123,7 +117,7 @@ namespace LanguageCore.Runtime
                 Compiler.CompilerResult compiled;
                 BBCodeGeneratorResult generatedCode;
 
-                if (HandleErrors)
+                if (handleErrors)
                 {
                     try
                     {

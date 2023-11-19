@@ -4,8 +4,8 @@ using System.Linq;
 
 namespace LanguageCore.ASM.Generator
 {
-    using Compiler;
     using BBCode.Generator;
+    using Compiler;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -27,11 +27,24 @@ namespace LanguageCore.ASM.Generator
         public override string ToString() => $"_{Name}@{ParameterSizeBytes}";
     }
 
+    public struct AsmGeneratorSettings
+    {
+
+    }
+
+    public struct AsmGeneratorResult
+    {
+        public Warning[] Warnings;
+        public Error[] Errors;
+
+        public string AssemblyCode;
+    }
+
     public class CodeGeneratorForAsm : CodeGenerator
     {
         #region Fields
 
-        readonly Settings GeneratorSettings;
+        readonly AsmGeneratorSettings GeneratorSettings;
         readonly AssemblyCode Builder;
 
         readonly Dictionary<CompiledFunction, string> FunctionLabels;
@@ -39,7 +52,7 @@ namespace LanguageCore.ASM.Generator
 
         #endregion
 
-        public CodeGeneratorForAsm(CompilerResult compilerResult, Settings settings) : base()
+        public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings) : base()
         {
             this.GeneratorSettings = settings;
             this.CompiledFunctions = compilerResult.Functions;
@@ -52,21 +65,6 @@ namespace LanguageCore.ASM.Generator
 
             this.FunctionLabels = new Dictionary<CompiledFunction, string>();
             this.GeneratedFunctions = new List<CompiledFunction>();
-        }
-
-        public struct Result
-        {
-            public Token[] Tokens;
-
-            public Warning[] Warnings;
-            public Error[] Errors;
-
-            public string AssemblyCode;
-        }
-
-        public struct Settings
-        {
-
         }
 
         #region Memory Helpers
@@ -409,43 +407,24 @@ namespace LanguageCore.ASM.Generator
 
         #endregion
 
-        #region CompileSetter
+        #region GenerateCodeForSetter
 
-        void CompileSetter(Statement statement, StatementWithValue value)
+        void GenerateCodeForSetter(Statement statement, StatementWithValue value)
         {
             if (statement is Identifier variableIdentifier)
-            {
-                CompileSetter(variableIdentifier, value);
-
-                return;
+            { GenerateCodeForSetter(variableIdentifier, value); }
+            else if (statement is Pointer pointerToSet)
+            { GenerateCodeForSetter(pointerToSet, value); }
+            else if (statement is IndexCall index)
+            { GenerateCodeForSetter(index, value); }
+            else if (statement is Field field)
+            { GenerateCodeForSetter(field, value); }
+            else
+            { throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile); }
             }
 
-            if (statement is Pointer pointerToSet)
+        void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
             {
-                CompileSetter(pointerToSet, value);
-
-                return;
-            }
-
-            if (statement is IndexCall index)
-            {
-                CompileSetter(index, value);
-
-                return;
-            }
-
-            if (statement is Field field)
-            {
-                CompileSetter(field, value);
-
-                return;
-            }
-
-            throw new CompilerException($"Setter for statement {statement.GetType().Name} not implemented", statement, CurrentFile);
-        }
-
-        void CompileSetter(Identifier statement, StatementWithValue value)
-        {
             if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
             {
                 statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
@@ -458,22 +437,17 @@ namespace LanguageCore.ASM.Generator
             throw new NotImplementedException();
         }
 
-        void CompileSetter(Field field, StatementWithValue value)
+        void GenerateCodeForSetter(Field field, StatementWithValue value)
         {
             throw new NotImplementedException();
         }
 
-        void CompileSetter(Pointer statement, StatementWithValue value)
+        void GenerateCodeForSetter(Pointer statement, StatementWithValue value)
         {
             throw new NotImplementedException();
         }
 
-        void CompileSetter(int address, StatementWithValue value)
-        {
-            throw new NotImplementedException();
-        }
-
-        void CompileSetter(IndexCall statement, StatementWithValue value)
+        void GenerateCodeForSetter(IndexCall statement, StatementWithValue value)
         {
             throw new NotImplementedException();
         }
@@ -878,7 +852,7 @@ namespace LanguageCore.ASM.Generator
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
-            CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
+            GenerateCodeForSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
         void GenerateCodeForStatement(CompoundAssignment statement)
         {
@@ -922,7 +896,7 @@ namespace LanguageCore.ASM.Generator
 
             if (variable.IsInitialized) return;
 
-            CompileSetter(new Identifier(statement.VariableName), statement.InitialValue);
+            GenerateCodeForSetter(new Identifier(statement.VariableName), statement.InitialValue);
 
             variable.IsInitialized = true;
         }
@@ -1179,7 +1153,7 @@ namespace LanguageCore.ASM.Generator
             for (int i = 0; i < cleanup.Length; i++)
             {
                 CleanupItem item = cleanup[i];
-                for (int j = 0; j < item.Size; j++)
+                for (int j = 0; j < item.SizeOnStack; j++)
                 {
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.ESP, 4.ToString());
                 }
@@ -1315,10 +1289,7 @@ namespace LanguageCore.ASM.Generator
             CompiledParameters.Clear();
         }
 
-        Result GenerateCode(
-            CompilerResult compilerResult,
-            CompilerSettings settings,
-            PrintCallback? printCallback = null)
+        AsmGeneratorResult GenerateCode(CompilerResult compilerResult, PrintCallback? printCallback = null)
         {
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
@@ -1338,10 +1309,8 @@ namespace LanguageCore.ASM.Generator
                 if (shouldExit) break;
             }
 
-            return new Result()
+            return new AsmGeneratorResult()
             {
-                Tokens = compilerResult.Tokens,
-
                 AssemblyCode = Builder.Make(new AssemblyHeader()
                 {
                     Externs = new List<string>()
@@ -1352,20 +1321,12 @@ namespace LanguageCore.ASM.Generator
                     },
                 }),
 
-                Warnings = this.Warnings.ToArray(),
-                Errors = this.Errors.ToArray(),
+                Warnings = Warnings.ToArray(),
+                Errors = Errors.ToArray(),
             };
         }
 
-        public static Result Generate(
-            CompilerResult compilerResult,
-            CompilerSettings settings,
-            Settings generatorSettings,
-            PrintCallback? printCallback = null)
-        => new CodeGeneratorForAsm(compilerResult, generatorSettings).GenerateCode(
-            compilerResult,
-            settings,
-            printCallback
-        );
+        public static AsmGeneratorResult Generate(CompilerResult compilerResult, AsmGeneratorSettings generatorSettings, PrintCallback? printCallback = null)
+            => new CodeGeneratorForAsm(compilerResult, generatorSettings).GenerateCode(compilerResult, printCallback);
     }
 }

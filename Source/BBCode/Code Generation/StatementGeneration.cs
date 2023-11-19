@@ -1143,7 +1143,7 @@ namespace LanguageCore.BBCode.Generator
 
             {
                 CleanupItem cleanupItem = GenerateCodeForVariable(forLoop.VariableDeclaration);
-                if (cleanupItem.Size != 0)
+                if (cleanupItem.SizeOnStack != 0)
                 { CleanupStack[^1] = new List<CleanupItem>(CleanupStack[^1]) { cleanupItem }.ToArray(); }
             }
 
@@ -1689,7 +1689,7 @@ namespace LanguageCore.BBCode.Generator
             foreach (Statement s in block.Statements)
             {
                 CleanupItem item = GenerateCodeForVariable(s);
-                if (item.Size == 0) continue;
+                if (item.SizeOnStack == 0) continue;
 
                 result.Add(item);
             }
@@ -1709,12 +1709,12 @@ namespace LanguageCore.BBCode.Generator
 
                 if (item.ShouldDeallocate)
                 {
-                    if (item.Size != 1) throw new InternalException();
+                    if (item.SizeOnStack != 1) throw new InternalException();
                     GenerateDeallocator(item.Type!);
                 }
                 else
                 {
-                    for (int x = 0; x < item.Size; x++)
+                    for (int x = 0; x < item.SizeOnStack; x++)
                     { AddInstruction(Opcode.POP_VALUE); }
                 }
 
@@ -2200,7 +2200,7 @@ namespace LanguageCore.BBCode.Generator
             for (int i = 0; i < sts.Length; i++)
             {
                 CleanupItem item = GenerateCodeForVariable(sts[i]);
-                if (item.Size == 0) continue;
+                if (item.SizeOnStack == 0) continue;
 
                 result.Add(item);
             }
@@ -2324,7 +2324,7 @@ namespace LanguageCore.BBCode.Generator
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
-                Address = 0,
+                Address = ReturnFlagOffset,
                 BasepointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = 1,
@@ -2333,7 +2333,7 @@ namespace LanguageCore.BBCode.Generator
             });
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
-                Address = -1,
+                Address = SavedBasePointerOffset,
                 BasepointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = 1,
@@ -2342,7 +2342,7 @@ namespace LanguageCore.BBCode.Generator
             });
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
-                Address = -2,
+                Address = SavedCodePointerOffset,
                 BasepointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = 1,

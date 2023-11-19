@@ -332,7 +332,6 @@ namespace LanguageCore.Tokenizing
                     continue;
                 }
 
-
                 result.Add(token);
             }
 

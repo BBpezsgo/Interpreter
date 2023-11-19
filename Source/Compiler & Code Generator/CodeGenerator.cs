@@ -5,8 +5,8 @@ using System.Linq;
 
 namespace LanguageCore.Compiler
 {
-    using ConsoleGUI;
     using BBCode.Generator;
+    using ConsoleGUI;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -51,7 +51,7 @@ namespace LanguageCore.Compiler
             {
                 for (int i = 0; i < compiledFunction.ParameterTypes.Length; i++)
                 {
-                    var parameterType = compiledFunction.ParameterTypes[i];
+                    CompiledType parameterType = compiledFunction.ParameterTypes[i];
 
                     if (parameterType.IsGeneric)
                     {
@@ -637,7 +637,7 @@ namespace LanguageCore.Compiler
                 if (function.Context != @class) continue;
                 if (function.ParameterCount != parameters.Length) continue;
 
-                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out var typeParameters)) continue;
+                if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
                 MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo!.TypeParameters, typeParameters);
 
@@ -1251,7 +1251,7 @@ namespace LanguageCore.Compiler
         {
             for (int i = 0; i < CompiledStructs.Length; i++)
             {
-                var @struct = CompiledStructs[i];
+                CompiledStruct @struct = CompiledStructs[i];
 
                 if (@struct.Name.Content != structName) continue;
 
@@ -1745,7 +1745,7 @@ namespace LanguageCore.Compiler
 
         protected CompiledType FindStatementType(AnyCall anyCall)
         {
-            if (anyCall.ToFunctionCall(out var functionCall))
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
             { return FindStatementType(functionCall); }
 
             CompiledType prevType = FindStatementType(anyCall.PrevStatement);
@@ -1805,7 +1805,7 @@ namespace LanguageCore.Compiler
 
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
-                if (!GetFunctionTemplate(functionCall, out var compiledFunctionTemplate))
+                if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compiledFunctionTemplate))
                 { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compiledFunctionTemplate.Function;
@@ -1895,10 +1895,10 @@ namespace LanguageCore.Compiler
             if (GetLocalSymbolType(identifier.Content, out CompiledType? type))
             { return type; }
 
-            if (GetEnum(identifier.Content, out var @enum))
+            if (GetEnum(identifier.Content, out CompiledEnum? @enum))
             { return new CompiledType(@enum); }
 
-            if (GetFunction(identifier.Name, expectedType, out var function))
+            if (GetFunction(identifier.Name, expectedType, out CompiledFunction? function))
             { return new CompiledType(function); }
 
             try
@@ -2199,8 +2199,8 @@ namespace LanguageCore.Compiler
 
         protected static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         {
-            var left = InlineMacro(operatorCall.Left, parameters);
-            var right = InlineMacro(operatorCall.Right, parameters);
+            StatementWithValue left = InlineMacro(operatorCall.Left, parameters);
+            StatementWithValue right = InlineMacro(operatorCall.Right, parameters);
             return new OperatorCall(operatorCall.Operator, left, right);
         }
 
@@ -2763,7 +2763,7 @@ namespace LanguageCore.Compiler
             else if (statement is OperatorCall @operator)
             { return Collapse(@operator, parameters); }
             else if (statement is LiteralStatement literal)
-            { return Collapse(literal, parameters); }
+            { return literal; }
             else if (statement is Identifier variable)
             { return Collapse(variable, parameters); }
             else if (statement is AddressGetter memoryAddressGetter)
@@ -2803,7 +2803,7 @@ namespace LanguageCore.Compiler
                 Semicolon = block.Semicolon,
             };
         }
-        protected VariableDeclaration Collapse(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+        protected static VariableDeclaration Collapse(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected StatementWithValue Collapse(FunctionCall statement, Dictionary<string, StatementWithValue> parameters)
         {
@@ -2883,11 +2883,9 @@ namespace LanguageCore.Compiler
 
             throw new NotImplementedException();
         }
-        protected LiteralStatement Collapse(LiteralStatement statement, Dictionary<string, StatementWithValue> parameters)
-        { return statement; }
-        protected StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
+        protected static StatementWithValue Collapse(Identifier statement, Dictionary<string, StatementWithValue> parameters)
         {
-            if (parameters.TryGetValue(statement.Content, out var parameter))
+            if (parameters.TryGetValue(statement.Content, out StatementWithValue? parameter))
             { return parameter; }
             return statement;
         }
@@ -2907,9 +2905,9 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
         }
-        protected WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
+        protected static WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
-        protected ForLoop Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
+        protected static ForLoop Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected Statement Collapse(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
         {
@@ -2980,11 +2978,11 @@ namespace LanguageCore.Compiler
 
             return new IfContainer(branches) { Semicolon = statement.Semicolon };
         }
-        protected NewInstance Collapse(NewInstance statement, Dictionary<string, StatementWithValue> parameters)
+        protected static NewInstance Collapse(NewInstance statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
-        protected ConstructorCall Collapse(ConstructorCall statement, Dictionary<string, StatementWithValue> parameters)
+        protected static ConstructorCall Collapse(ConstructorCall statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
-        protected IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
+        protected static IndexCall Collapse(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected Field Collapse(Field statement, Dictionary<string, StatementWithValue> parameters)
         {
@@ -2994,9 +2992,9 @@ namespace LanguageCore.Compiler
                 Semicolon = statement.Semicolon,
             };
         }
-        protected TypeCast Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
+        protected static TypeCast Collapse(TypeCast statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
-        protected ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
+        protected static ModifiedStatement Collapse(ModifiedStatement statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
         protected StatementWithValue Collapse(AnyCall statement, Dictionary<string, StatementWithValue> parameters)
         {

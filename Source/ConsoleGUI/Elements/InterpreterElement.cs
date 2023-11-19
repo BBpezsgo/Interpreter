@@ -55,7 +55,7 @@ namespace ConsoleGUI
 
         void InitElements()
         {
-            var StatePanel = new InlineElement
+            InlineElement StatePanel = new()
             {
                 HasBorder = true,
                 Title = "State",
@@ -63,7 +63,7 @@ namespace ConsoleGUI
             };
             StatePanel.OnBeforeDraw += StateElement_OnBeforeDraw;
 
-            var CodePanel = new InlineElement
+            InlineElement CodePanel = new()
             {
                 HasBorder = true,
                 Title = "Code",
@@ -76,7 +76,7 @@ namespace ConsoleGUI
                 Title = "Console",
             };
 
-            var StackPanel = new InlineElement
+            InlineElement StackPanel = new()
             {
                 HasBorder = true,
                 Title = "Stack",
@@ -89,7 +89,7 @@ namespace ConsoleGUI
             StackPanel.OnMouseEventInvoked += StackScrollBar.FeedEvent;
             StackPanel.OnKeyEventInvoked += StackScrollBar.FeedEvent;
 
-            var HeapPanel = new InlineElement
+            InlineElement HeapPanel = new()
             {
                 HasBorder = true,
                 Title = "HEAP",
@@ -101,7 +101,7 @@ namespace ConsoleGUI
             HeapPanel.OnMouseEventInvoked += HeapScrollBar.FeedEvent;
             HeapPanel.OnKeyEventInvoked += HeapScrollBar.FeedEvent;
 
-            var CallstackPanel = new InlineElement
+            InlineElement CallstackPanel = new()
             {
                 HasBorder = true,
                 Title = "Call Stack",
@@ -156,8 +156,8 @@ namespace ConsoleGUI
             };
             this.InterpreterTimer.Enabled = true;
 
-            var fileInfo = new FileInfo(File);
-            var code = System.IO.File.ReadAllText(fileInfo.FullName);
+            FileInfo fileInfo = new(File);
+            string code = System.IO.File.ReadAllText(fileInfo.FullName);
             this.Interpreter = new InterpreterDebuggabble();
 
             void PrintOutput(string message, LogType logType)
@@ -181,7 +181,7 @@ namespace ConsoleGUI
 
             Interpreter.OnNeedInput += (sender) =>
             {
-                var input = Console.ReadKey();
+                ConsoleKeyInfo input = Console.ReadKey();
                 sender.OnInput(input.KeyChar);
             };
 
@@ -411,7 +411,6 @@ namespace ConsoleGUI
                     sender.DrawBuffer.ForegroundColor = ByteColor.Silver;
                 }
             }
-
         }
 
         private void StateElement_OnBeforeDraw(InlineElement sender)
@@ -448,7 +447,6 @@ namespace ConsoleGUI
 
             b.AddText(' ', 2);
 
-
             if (this.Interpreter.StackOperation)
             {
                 b.BackgroundColor = ByteColor.White;
@@ -463,7 +461,6 @@ namespace ConsoleGUI
             }
 
             b.AddText(' ', 2);
-
 
             if (this.Interpreter.HeapOperation)
             {
@@ -480,7 +477,6 @@ namespace ConsoleGUI
 
             b.AddText(' ', 2);
 
-
             if (this.Interpreter.AluOperation)
             {
                 b.BackgroundColor = ByteColor.White;
@@ -495,7 +491,6 @@ namespace ConsoleGUI
             }
 
             b.AddText(' ', 2);
-
 
             if (this.Interpreter.ExternalFunctionOperation)
             {
@@ -558,7 +553,7 @@ namespace ConsoleGUI
             int nextHeader = 0;
             for (int i = 0; i < this.Interpreter.BytecodeInterpreter.Memory.Heap!.Size; i++)
             {
-                var item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
+                DataItem item = this.Interpreter.BytecodeInterpreter.Memory.Heap[i];
                 bool isHeader = (nextHeader == i) && (!this.Interpreter.BytecodeInterpreter.Memory.Heap[i].IsNull) && (this.Interpreter.BytecodeInterpreter.Memory.Heap is not null);
                 (int, bool) header = (default, default);
 
@@ -985,7 +980,7 @@ namespace ConsoleGUI
             int indent = 0;
             for (int i = 0; i < this.Interpreter.BytecodeInterpreter.CodePointer - 5; i++)
             {
-                if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out var comments))
+                if (Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string> comments))
                 {
                     for (int j = 0; j < comments.Count; j++)
                     {
@@ -1002,9 +997,9 @@ namespace ConsoleGUI
             {
                 if (Interpreter.BytecodeInterpreter != null) if (Interpreter.BytecodeInterpreter.CodePointer == i) IsNextInstruction = true;
 
-                var instruction = this.Interpreter.CompilerResult.Code[i];
+                Instruction instruction = this.Interpreter.CompilerResult.Code[i];
 
-                if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out var comments))
+                if (this.Interpreter.CompilerResult.DebugInfo.CodeComments.TryGetValue(i, out List<string> comments))
                 {
                     for (int j = 0; j < comments.Count; j++)
                     {

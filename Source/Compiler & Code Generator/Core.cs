@@ -456,18 +456,6 @@ namespace LanguageCore.Compiler
             }
         }
         /// <summary>
-        /// Returns the class's size or 0 if it is not a class
-        /// </summary>
-        public int SizeOnHeap
-        {
-            get
-            {
-                if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
-                if (IsClass) return @class.Size;
-                return 0;
-            }
-        }
-        /// <summary>
         /// Returns the struct size or 1 if it is not a struct
         /// </summary>
         public int SizeOnStack

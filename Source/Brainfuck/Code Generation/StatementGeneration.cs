@@ -470,7 +470,7 @@ namespace LanguageCore.Brainfuck.Generator
                 if (elementType != valueType)
                 { throw new CompilerException("Bruh", value, CurrentFile); }
 
-                int elementSize = elementType.Size;
+                int elementSize = elementType.SizeOnStack;
 
                 if (elementSize != 1)
                 { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", value, CurrentFile); }
@@ -617,7 +617,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 CompiledType elementType = arrayType.StackArrayOf;
 
-                int elementSize = elementType.Size;
+                int elementSize = elementType.SizeOnStack;
 
                 if (elementSize != 1)
                 { throw new CompilerException($"Array element size must be 1 :(", indexCall, CurrentFile); }

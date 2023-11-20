@@ -1850,7 +1850,7 @@ namespace LanguageCore.BBCode.Generator
                         { throw new NotImplementedException(); }
 
                         int offset = computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack;
-                        StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.Size);
+                        StackStore(new ValueAddress(variable) + offset, prevType.StackArrayOf.SizeOnStack);
                         return;
                     }
                 }
@@ -1937,21 +1937,11 @@ namespace LanguageCore.BBCode.Generator
             }
 
             variable.IsInitialized = true;
+            int destination = variable.MemoryAddress;
 
-            if (variable.Type.InHEAP)
-            {
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
-            }
-            else
-            {
-                int destination = variable.MemoryAddress;
-                int size = variable.Type.Size;
-
-                for (int offset = 1; offset <= size; offset++)
-                { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, destination + size - offset); }
-
-                return;
-            }
+            int size = variable.Type.SizeOnStack;
+            for (int offset = 1; offset <= size; offset++)
+            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, destination + size - offset); }
         }
 
         void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithValue value)

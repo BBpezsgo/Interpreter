@@ -73,9 +73,9 @@ namespace TheProgram
 #else
                         CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
 
-                        ILGeneratorResult code = CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
+                        ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
 
-                        System.Reflection.Assembly assembly = code.Assembly;
+                        generated.Invoke();
                         break;
 #endif
                     }

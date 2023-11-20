@@ -1,3 +1,3 @@
 ﻿using System;
 
-PrintLine(5 + 10);
+Print(5 * 10);

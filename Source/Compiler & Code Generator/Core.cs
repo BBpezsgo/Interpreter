@@ -486,6 +486,27 @@ namespace LanguageCore.Compiler
             }
         }
 
+        public System.Type SystemType
+        {
+            get
+            {
+                if (IsBuiltin)
+                {
+                    return builtinType switch
+                    {
+                        Type.Void => typeof(void),
+                        Type.Byte => typeof(byte),
+                        Type.Integer => typeof(int),
+                        Type.Float => typeof(float),
+                        Type.Char => typeof(char),
+                        _ => throw new ImpossibleException(),
+                    };
+                }
+
+                throw new NotImplementedException();
+            }
+        }
+
         CompiledType()
         {
             this.builtinType = Type.NotBuiltin;

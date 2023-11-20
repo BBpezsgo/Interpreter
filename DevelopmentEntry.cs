@@ -11,7 +11,7 @@ namespace TheProgram
         [System.Diagnostics.CodeAnalysis.RequiresAssemblyFiles]
         public static bool Start(string[] args)
         {
-            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "donught.bbc");
+            string path = System.IO.Path.Combine(TestConstants.TestFilesPath, "test5.bbc");
 
             string[] generatedArgs = new string[]
             {
@@ -22,6 +22,7 @@ namespace TheProgram
                 // "--dont-optimize",
                 // "--console-gui",
                 // "--brainfuck",
+                "--il",
                 // "--asm",
                 // "--no-nullcheck",
                 "--heap-size 2048",

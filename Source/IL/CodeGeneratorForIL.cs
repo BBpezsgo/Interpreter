@@ -19,6 +19,8 @@ namespace LanguageCore.IL.Generator
     {
         public Assembly Assembly;
 
+        public readonly void Invoke() => Assembly?.GetType("Program")?.GetMethod("Main")?.Invoke(null, Array.Empty<object>());
+
         public Warning[] Warnings;
         public Error[] Errors;
     }
@@ -38,7 +40,7 @@ namespace LanguageCore.IL.Generator
 
         #endregion
 
-        public CodeGeneratorForIL(CompilerResult compilerResult, ILGeneratorSettings settings) : base()
+        public CodeGeneratorForIL(CompilerResult compilerResult, ILGeneratorSettings settings) : base(compilerResult)
         {
             this.GeneratorSettings = settings;
         }
@@ -142,44 +144,46 @@ namespace LanguageCore.IL.Generator
         #endregion
 
         #region Compile
-        void Compile(Statement statement)
+        void Compile(Statement statement, ILGenerator generator)
         {
             if (statement is KeywordCall instructionStatement)
-            { Compile(instructionStatement); }
+            { Compile(instructionStatement, generator); }
             else if (statement is FunctionCall functionCall)
-            { Compile(functionCall); }
+            { Compile(functionCall, generator); }
             else if (statement is IfContainer @if)
-            { Compile(@if.ToLinks()); }
+            { Compile(@if.ToLinks(), generator); }
             else if (statement is WhileLoop @while)
-            { Compile(@while); }
+            { Compile(@while, generator); }
             else if (statement is Literal literal)
-            { Compile(literal); }
+            { Compile(literal, generator); }
             else if (statement is Identifier variable)
-            { Compile(variable); }
+            { Compile(variable, generator); }
             else if (statement is OperatorCall expression)
-            { Compile(expression); }
+            { Compile(expression, generator); }
             else if (statement is AddressGetter addressGetter)
-            { Compile(addressGetter); }
+            { Compile(addressGetter, generator); }
             else if (statement is Pointer pointer)
-            { Compile(pointer); }
+            { Compile(pointer, generator); }
             else if (statement is Assignment assignment)
-            { Compile(assignment); }
+            { Compile(assignment, generator); }
             else if (statement is ShortOperatorCall shortOperatorCall)
-            { Compile(shortOperatorCall); }
+            { Compile(shortOperatorCall, generator); }
             else if (statement is CompoundAssignment compoundAssignment)
-            { Compile(compoundAssignment); }
+            { Compile(compoundAssignment, generator); }
             else if (statement is VariableDeclaration variableDeclaration)
-            { Compile(variableDeclaration); }
+            { Compile(variableDeclaration, generator); }
             else if (statement is TypeCast typeCast)
-            { Compile(typeCast); }
+            { Compile(typeCast, generator); }
             else if (statement is NewInstance newInstance)
-            { Compile(newInstance); }
+            { Compile(newInstance, generator); }
             else if (statement is ConstructorCall constructorCall)
-            { Compile(constructorCall); }
+            { Compile(constructorCall, generator); }
             else if (statement is Field field)
-            { Compile(field); }
+            { Compile(field, generator); }
             else if (statement is IndexCall indexCall)
-            { Compile(indexCall); }
+            { Compile(indexCall, generator); }
+            else if (statement is AnyCall anyCall)
+            { Compile(anyCall, generator); }
             else
             { throw new CompilerException($"Unknown statement {statement.GetType().Name}", statement, CurrentFile); }
 
@@ -191,7 +195,17 @@ namespace LanguageCore.IL.Generator
                 throw new NotImplementedException();
             }
         }
-        void Compile(IndexCall indexCall)
+        void Compile(AnyCall anyCall, ILGenerator generator)
+        {
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            {
+                Compile(functionCall, generator);
+                return;
+            }
+
+            throw new NotImplementedException();
+        }
+        void Compile(IndexCall indexCall, ILGenerator generator)
         {
             CompiledType arrayType = FindStatementType(indexCall.PrevStatement);
 
@@ -211,17 +225,17 @@ namespace LanguageCore.IL.Generator
                 {
                     indexCall.Expression,
                 },
-                indexCall.BracketRight));
+                indexCall.BracketRight), generator);
         }
-        void Compile(LinkedIf @if)
+        void Compile(LinkedIf @if, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(WhileLoop @while)
+        void Compile(WhileLoop @while, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(KeywordCall statement)
+        void Compile(KeywordCall statement, ILGenerator generator)
         {
             switch (statement.Identifier.Content.ToLower())
             {
@@ -250,14 +264,14 @@ namespace LanguageCore.IL.Generator
                 default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
         }
-        void Compile(Assignment statement)
+        void Compile(Assignment statement, ILGenerator generator)
         {
             if (statement.Operator.Content != "=")
             { throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile); }
 
             CompileSetter(statement.Left, statement.Right ?? throw new CompilerException($"Value is required for \'{statement.Operator}\' assignment", statement, CurrentFile));
         }
-        void Compile(CompoundAssignment statement)
+        void Compile(CompoundAssignment statement, ILGenerator generator)
         {
             switch (statement.Operator.Content)
             {
@@ -270,11 +284,11 @@ namespace LanguageCore.IL.Generator
                         throw new NotImplementedException();
                     }
                 default:
-                    Compile(statement.ToAssignment());
+                    Compile(statement.ToAssignment(), generator);
                     break;
             }
         }
-        void Compile(ShortOperatorCall statement)
+        void Compile(ShortOperatorCall statement, ILGenerator generator)
         {
             switch (statement.Operator.Content)
             {
@@ -290,13 +304,13 @@ namespace LanguageCore.IL.Generator
                     throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
         }
-        void Compile(VariableDeclaration statement)
+        void Compile(VariableDeclaration statement, ILGenerator generator)
         {
             if (statement.InitialValue == null) return;
 
             throw new NotImplementedException();
         }
-        void Compile(FunctionCall functionCall)
+        void Compile(FunctionCall functionCall, ILGenerator generator)
         {
             if (false &&
                 functionCall.Identifier == "Alloc" &&
@@ -325,9 +339,30 @@ namespace LanguageCore.IL.Generator
                 compiledFunction = compilableFunction.Function;
             }
 
+            if (compiledFunction.CompiledAttributes.HasAttribute("StandardOutput"))
+            {
+                const string SystemMethodType = $"{"System"}.{nameof(Console)}";
+                const string SystemMethodName = nameof(Console.Write);
+
+                System.Type? consoleType = System.Type.GetType($"{SystemMethodType}, {SystemMethodType}", true);
+
+                StatementWithValue parameter = functionCall.Parameters[0];
+                System.Type parameterType = FindStatementType(parameter).SystemType;
+
+                MethodInfo? methodInfo = consoleType?.GetMethod(SystemMethodName, new System.Type[]
+                { parameterType, });
+
+                if (methodInfo == null)
+                { throw new CompilerException($"System function \"{typeof(void)} {SystemMethodType}.{SystemMethodName}({parameterType})\""); }
+
+                Compile(parameter, generator);
+                generator.Emit(OpCodes.Call, methodInfo);
+                return;
+            }
+
             throw new NotImplementedException();
         }
-        void Compile(ConstructorCall constructorCall)
+        void Compile(ConstructorCall constructorCall, ILGenerator generator)
         {
             CompiledType instanceType = FindType(constructorCall.TypeName);
 
@@ -366,16 +401,40 @@ namespace LanguageCore.IL.Generator
 
             throw new NotImplementedException();
         }
-        void Compile(Literal statement)
+        void Compile(Literal statement, ILGenerator generator)
+        {
+            switch (statement.Type)
+            {
+                case LiteralType.Integer:
+                    generator.Emit(OpCodes.Ldc_I4, statement.GetInt());
+                    break;
+                case LiteralType.Float:
+                    generator.Emit(OpCodes.Ldc_R4, statement.GetFloat());
+                    break;
+                case LiteralType.Boolean:
+                    generator.Emit(OpCodes.Ldc_I4_S, bool.Parse(statement.Value) ? 1 : 0);
+                    break;
+                case LiteralType.String:
+                    generator.Emit(OpCodes.Ldstr, statement.Value);
+                    break;
+                case LiteralType.Char:
+                    generator.Emit(OpCodes.Ldc_I4, statement.Value[0]);
+                    break;
+                default:
+                    throw new ImpossibleException();
+            }
+        }
+        void Compile(Identifier statement, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(Identifier statement)
+        void Compile(OperatorCall statement, ILGenerator generator)
         {
-            throw new NotImplementedException();
-        }
-        void Compile(OperatorCall statement)
-        {
+            if (GetOperator(statement, out _))
+            {
+                throw new NotImplementedException();
+            }
+
             switch (statement.Operator.Content)
             {
                 case "==":
@@ -384,23 +443,38 @@ namespace LanguageCore.IL.Generator
                     }
                 case "+":
                     {
-                        throw new NotImplementedException();
+                        Compile(statement.Left, generator);
+                        Compile(statement.Right!, generator);
+                        generator.Emit(OpCodes.Add);
+                        break;
                     }
                 case "-":
                     {
-                        throw new NotImplementedException();
+                        Compile(statement.Left, generator);
+                        Compile(statement.Right!, generator);
+                        generator.Emit(OpCodes.Sub);
+                        break;
                     }
                 case "*":
                     {
-                        throw new NotImplementedException();
+                        Compile(statement.Left, generator);
+                        Compile(statement.Right!, generator);
+                        generator.Emit(OpCodes.Mul);
+                        break;
                     }
                 case "/":
                     {
-                        throw new NotImplementedException();
+                        Compile(statement.Left, generator);
+                        Compile(statement.Right!, generator);
+                        generator.Emit(OpCodes.Div);
+                        break;
                     }
                 case "^":
                     {
-                        throw new NotImplementedException();
+                        Compile(statement.Left, generator);
+                        Compile(statement.Right!, generator);
+                        generator.Emit(OpCodes.Xor);
+                        break;
                     }
                 case "%":
                     {
@@ -437,34 +511,34 @@ namespace LanguageCore.IL.Generator
                 default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile);
             }
         }
-        void Compile(Block block)
+        void Compile(Block block, ILGenerator generator)
         {
             foreach (Statement statement in block.Statements)
             {
-                Compile(statement);
+                Compile(statement, generator);
             }
         }
-        void Compile(AddressGetter addressGetter)
+        void Compile(AddressGetter addressGetter, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(Pointer pointer)
+        void Compile(Pointer pointer, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(NewInstance newInstance)
+        void Compile(NewInstance newInstance, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(Field field)
+        void Compile(Field field, ILGenerator generator)
         {
             throw new NotImplementedException();
         }
-        void Compile(TypeCast typeCast)
+        void Compile(TypeCast typeCast, ILGenerator generator)
         {
             Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
-            Compile(typeCast.PrevStatement);
+            Compile(typeCast.PrevStatement, generator);
         }
         #endregion
 
@@ -472,17 +546,13 @@ namespace LanguageCore.IL.Generator
         {
             MethodBuilder methodBuilder = type.DefineMethod("Main", MethodAttributes.Public | MethodAttributes.Static);
 
-            System.Type? consoleType = System.Type.GetType("System.Console, System.Console", true);
-
-            MethodInfo? methodInfo = consoleType?.GetMethod(nameof(Console.WriteLine), new System.Type[]
-            {
-                typeof(string),
-            });
-
             ILGenerator il = methodBuilder.GetILGenerator();
 
-            il.Emit(OpCodes.Ldstr, "Hello World!");
-            il.Emit(OpCodes.Call, methodInfo!);
+            foreach (Statement statement in statements)
+            {
+                Compile(statement, il);
+            }
+
             il.Emit(OpCodes.Ret);
         }
 
@@ -496,7 +566,7 @@ namespace LanguageCore.IL.Generator
             CompilerSettings settings,
             PrintCallback? printCallback = null)
         {
-            (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, CompileLevel.Minimal);
+            // (this.CompiledFunctions, this.CompiledOperators, this.CompiledGeneralFunctions) = UnusedFunctionManager.RemoveUnusedFunctions(compilerResult, settings.RemoveUnusedFunctionsMaxIterations, printCallback, CompileLevel.Minimal);
 
             AssemblyName assemblyName = new($"{AssemblyName}Assembly");
 
@@ -508,12 +578,12 @@ namespace LanguageCore.IL.Generator
 
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements, typeBuilder);
 
-            System.Type? type = typeBuilder.CreateType();
-            Assembly? assembly = Assembly.GetAssembly(type!);
+            System.Type type = typeBuilder.CreateType()!;
+            Assembly assembly = Assembly.GetAssembly(type)!;
 
             return new ILGeneratorResult()
             {
-                Assembly = assembly!,
+                Assembly = assembly,
 
                 Warnings = this.Warnings.ToArray(),
                 Errors = this.Errors.ToArray(),
@@ -525,14 +595,11 @@ namespace LanguageCore.IL.Generator
             CompilerSettings settings,
             ILGeneratorSettings generatorSettings,
             PrintCallback? printCallback = null)
-        {
-            CodeGeneratorForIL codeGenerator = new(compilerResult, generatorSettings);
-            return codeGenerator.GenerateCode(
+            => new CodeGeneratorForIL(compilerResult, generatorSettings)
+            .GenerateCode(
                 compilerResult,
                 settings,
-                printCallback
-                );
-        }
+                printCallback);
     }
 }
 #endif

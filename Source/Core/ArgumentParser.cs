@@ -201,9 +201,6 @@ namespace TheProgram
                         if (result.RunType != RunType.Normal)
                         { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}"); }
 
-                        if (!ExpectParam(args, ref i, out result.CompileOutput))
-                        { throw new ArgumentException("Expected string value after argument '-il'"); }
-
                         result.RunType = RunType.IL;
                         continue;
                     }

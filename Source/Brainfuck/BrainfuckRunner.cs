@@ -134,7 +134,6 @@ namespace LanguageCore.Brainfuck
 
                             int heapStart = CompilerSettings.HeapStart;
                             int heapEnd = heapStart + CompilerSettings.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
-                            // heapStart += HeapCodeHelper.BLOCK_SIZE;
 
                             for (int i = 0; i < finalIndex; i++)
                             {

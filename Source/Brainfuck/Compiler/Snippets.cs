@@ -895,7 +895,6 @@ namespace LanguageCore.Brainfuck
         #region ARRAY
 
         public static int ARRAY_SIZE(int elementCount) => (2 * elementCount) + 3;
-
         /// <summary>
         /// <b>Pointer:</b> <paramref name="arrayAddress"/>
         /// <br/>
@@ -903,14 +902,28 @@ namespace LanguageCore.Brainfuck
         /// <see href="https://code.google.com/archive/p/brainfuck-compiler/"/>
         /// <br/>
         /// Attribution: Jeffry Johnston
+        /// <para>
+        /// Each array element requires 2 memory cells.
+        /// </para>
         /// </summary>
         public static void ARRAY_SET(this CompiledCode code, int arrayAddress, int indexAddress, int valueAddress, int temp0)
         {
-            Snippets.ARRAY_SET2(code, arrayAddress, indexAddress, valueAddress, arrayAddress + 1, arrayAddress + 2, temp0);
-            // code.MoveValue(indexAddress, arrayAddress + 2);
-            // code.MoveValue(valueAddress, arrayAddress + 1);
-            // code.SetPointer(arrayAddress);
-            // code += ">>[[>>]+[<<]>>-]+[>>]<[-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]";
+            int temp1 = arrayAddress + 1;
+            int temp2 = arrayAddress + 2;
+
+            code.ClearValue(arrayAddress + 1, temp2, temp0);
+
+            code.CopyValueWithTemp(indexAddress, temp0, temp2);
+            code.CopyValueWithTemp(valueAddress, temp0, temp1);
+
+            code.SetPointer(arrayAddress);
+
+            code += ">>";
+            code += "[[>>] + [<<] >> -]";
+            code += '+';
+            code += "[>>] < [-] < [<<]";
+            code += "> [> [>>] < +< [<<] > -]";
+            code += "> [>>] << [-<<]";
         }
 
         public static void ARRAY_SET_CONST(this CompiledCode code, int arrayAddress, int index, Runtime.DataItem value)
@@ -929,65 +942,13 @@ namespace LanguageCore.Brainfuck
         /// <br/>
         /// Attribution: Jeffry Johnston
         /// <para>
-        /// The cells representing <paramref name="arrayAddress"/>, <paramref name="temp0"/>, and <paramref name="temp1"/> must be contiguous, with <paramref name="arrayAddress"/> being the leftmost cell and <paramref name="temp1"/> the rightmost, followed by adequate
-        /// memory for the array. Each array element requires 2 memory cells.
+        /// Each array element requires 2 memory cells.
         /// </para>
-        /// </summary>
-        public static void ARRAY_SET2(this CompiledCode code, int arrayAddress, int indexAddress, int valueAddress, int temp0, int temp1, int temp2)
-        {
-            code.ClearValue(temp0, temp1, temp2);
-
-            code.CopyValueWithTemp(indexAddress, temp2, temp1);
-            code.CopyValueWithTemp(valueAddress, temp2, temp0);
-
-            code.SetPointer(arrayAddress);
-
-            code += ">>";
-            code += "[[>>] + [<<] >> -]";
-            code += '+';
-            code += "[>>] < [-] < [<<]";
-            code += "> [> [>>] < +< [<<] > -]";
-            code += "> [>>] << [-<<]";
-        }
-
-        /// <summary>
-        /// <b>Pointer:</b> <paramref name="arrayAddress"/>
-        /// <br/>
-        /// <br/>
-        /// <see href="https://code.google.com/archive/p/brainfuck-compiler/"/>
-        /// <br/>
-        /// Attribution: Jeffry Johnston
         /// </summary>
         public static void ARRAY_GET(this CompiledCode code, int arrayAddress, int indexAddress, int resultAddress)
         {
-            Snippets.ARRAY_GET2(code, arrayAddress, indexAddress, resultAddress, arrayAddress + 1, arrayAddress + 2);
-
-            // code.ClearValue(resultAddress);
-
-            // code.MoveValue(indexAddress, arrayAddress + 2);
-            // code.SetPointer(arrayAddress);
-            // code += ">>[[>>]+[<<]>>-]+[>>]<[<[<<]>+<";
-            // code.AddValue(resultAddress, 1);
-            // code.SetPointer(arrayAddress);
-            // code += ">>[>>]<-]<[<<]>[>[>>]<+<[<<]>-]>[>>]<<[-<<]";
-        }
-
-        /// <summary>
-        /// <b>Pointer:</b> <paramref name="arrayAddress"/>
-        /// <br/>
-        /// <br/>
-        /// <see href="https://code.google.com/archive/p/brainfuck-compiler/"/>
-        /// <br/>
-        /// Attribution: Jeffry Johnston
-        /// <para>
-        /// The cells representing <paramref name="arrayAddress"/>, <paramref name="temp0"/>, and <paramref name="temp1"/> must be contiguous, with <paramref name="arrayAddress"/> being the leftmost cell and <paramref name="temp1"/> the rightmost, followed by adequate
-        /// memory for the array. Each array element requires 2 memory cells.
-        /// </para>
-        /// </summary>
-        public static void ARRAY_GET2(this CompiledCode code, int arrayAddress, int indexAddress, int resultAddress, int temp0, int temp1)
-        {
-            code.ClearValue(resultAddress, temp0, temp1);
-            code.CopyValueWithTemp(indexAddress, temp0, temp1);
+            code.ClearValue(resultAddress, arrayAddress + 1, arrayAddress + 2);
+            code.CopyValueWithTemp(indexAddress, arrayAddress + 1, arrayAddress + 2);
 
             code.SetPointer(arrayAddress);
             code += ">> [[>>] + [<<] >> -] + [>>] < [< [<<] > +<"; // pointer is at y

@@ -1,6 +1,13 @@
-int bruh = 0;
-while (bruh - 33)
+int max(int a, int b)
 {
-	bruh = bruh + 1;
-};
-return bruh;
+	return a;
+}
+
+return max(33, 44);
+
+// int bruh = 0;
+// while (bruh - 33)
+// {
+// 	bruh = bruh + 1;
+// };
+// return bruh;

@@ -1774,7 +1774,7 @@ namespace LanguageCore.BBCode.Generator
             }
             else
             {
-                throw new CompilerException($"Variable \"{statementToSet.Content}\" not found", statementToSet, CurrentFile);
+                throw new CompilerException($"Symbol \"{statementToSet.Content}\" not found", statementToSet, CurrentFile);
             }
         }
         void GenerateCodeForValueSetter(Field statementToSet, StatementWithValue value)

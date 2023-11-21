@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace LanguageCore.ASM.Generator
 {
+    using System.Diagnostics.CodeAnalysis;
     using BBCode.Generator;
     using Compiler;
     using Parser;
@@ -47,8 +48,9 @@ namespace LanguageCore.ASM.Generator
         readonly AsmGeneratorSettings GeneratorSettings;
         readonly AssemblyCode Builder;
 
-        readonly Dictionary<CompiledFunction, string> FunctionLabels;
+        readonly List<(CompiledFunction Function, string Label)> FunctionLabels;
         readonly List<CompiledFunction> GeneratedFunctions;
+        readonly Stack<int> FunctionFrameSize;
 
         #endregion
 
@@ -63,11 +65,26 @@ namespace LanguageCore.ASM.Generator
             this.CompiledMacros = compilerResult.Macros;
             this.Builder = new AssemblyCode();
 
-            this.FunctionLabels = new Dictionary<CompiledFunction, string>();
+            this.FunctionLabels = new List<(CompiledFunction Function, string Label)>();
             this.GeneratedFunctions = new List<CompiledFunction>();
+            this.FunctionFrameSize = new Stack<int>();
         }
 
         #region Memory Helpers
+
+        bool TryGetFunctionLabel(CompiledFunction function, [NotNullWhen(true)] out string? label)
+        {
+            for (int i = 0; i < FunctionLabels.Count; i++)
+            {
+                if (ReferenceEquals(FunctionLabels[i].Function, function))
+                {
+                    label = FunctionLabels[i].Label;
+                    return true;
+                }
+            }
+            label = null;
+            return false;
+        }
 
         protected override void StackLoad(ValueAddress address)
         {
@@ -111,7 +128,7 @@ namespace LanguageCore.ASM.Generator
                 case AddressingMode.ABSOLUTE:
                 case AddressingMode.BASEPOINTER_RELATIVE:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]", Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]".Replace("--", "+"), Registers.EAX);
                     break;
                 case AddressingMode.RELATIVE:
                 case AddressingMode.POP:
@@ -153,17 +170,17 @@ namespace LanguageCore.ASM.Generator
             return sum;
         }
 
-        public int ReturnValueOffset => -(ParametersSize + 1);
+        public int ReturnValueOffset => -(ParametersSize + 3);
 
         protected override ValueAddress GetBaseAddress(CompiledParameter parameter)
         {
-            int address = -(ParametersSizeBefore(parameter.Index));
-            return new ValueAddress(parameter, address);
+            int offset = -(2 + ParametersSizeBefore(parameter.Index));
+            return new ValueAddress(parameter, offset);
         }
         protected override ValueAddress GetBaseAddress(CompiledParameter parameter, int offset)
         {
-            int address = -(ParametersSizeBefore(parameter.Index) - offset);
-            return new ValueAddress(parameter, address);
+            int _offset = -(2 + ParametersSizeBefore(parameter.Index) - offset);
+            return new ValueAddress(parameter, _offset);
         }
 
         #endregion
@@ -356,6 +373,9 @@ namespace LanguageCore.ASM.Generator
             if (size != compiledVariable.Type.SizeOnStack)
             { throw new InternalException($"Variable size ({compiledVariable.Type.SizeOnStack}) and initial value size ({size}) mismatch"); }
 
+            if (FunctionFrameSize.Count > 0)
+            { FunctionFrameSize.Last += size; }
+
             return new CleanupItem(size, newVariable.Modifiers.Contains("temp"), compiledVariable.Type);
         }
         CleanupItem GenerateCodeForVariable(Statement st)
@@ -397,16 +417,42 @@ namespace LanguageCore.ASM.Generator
 
         void GenerateCodeForSetter(Identifier statement, StatementWithValue value)
         {
-            if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
+            if (GetConstant(statement.Content, out _))
+            { throw new CompilerException($"Can not set constant value: it is readonly", statement, CurrentFile); }
+
+            if (GetParameter(statement.Content, out CompiledParameter? parameter))
+            {
+                CompiledType valueType = FindStatementType(value, parameter.Type);
+
+                if (parameter.Type != valueType)
+                { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{parameter.Type.Name}\" type parameter.", value, CurrentFile); }
+
+                GenerateCodeForStatement(value);
+
+                if (parameter.IsRef)
+                {
+                    throw new NotImplementedException();
+                }
+                else
+                {
+                    ValueAddress offset = GetBaseAddress(parameter);
+                    StackStore(offset);
+                }
+
+                throw new NotImplementedException();
+            }
+            else if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
             {
                 statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 GenerateCodeForStatement(value);
 
                 StackStore(new ValueAddress(variable), variable.Type.SizeOnStack);
-                return;
             }
-            throw new NotImplementedException();
+            else
+            {
+                throw new CompilerException($"Symbol \"{statement.Content}\" not found", statement, CurrentFile);
+            }
         }
 
         void GenerateCodeForSetter(Field field, StatementWithValue value)
@@ -595,10 +641,10 @@ namespace LanguageCore.ASM.Generator
 
             parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);
 
-            if (!FunctionLabels.TryGetValue(compiledFunction, out string? label))
+            if (!TryGetFunctionLabel(compiledFunction, out string? label))
             {
                 label = Builder.CodeBuilder.NewLabel($"f_{compiledFunction.Identifier}");
-                FunctionLabels.Add(compiledFunction, label);
+                FunctionLabels.Add((compiledFunction, label));
             }
 
             Call(label);
@@ -676,6 +722,19 @@ namespace LanguageCore.ASM.Generator
 
             if (modifier == "ref")
             {
+                ValueAddress address = GetDataAddress(statement);
+
+                if (address.InHeap)
+                { throw new CompilerException($"This value is stored in the heap and not in the stack", statement, CurrentFile); }
+
+                if (address.IsReference)
+                {
+                    StackLoad(address);
+                }
+                else
+                {
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, $"[rbp+{address.Address}]");
+                }
                 throw new NotImplementedException();
             }
 
@@ -796,17 +855,32 @@ namespace LanguageCore.ASM.Generator
             {
                 case "return":
                     {
-                        if (statement.Parameters.Length != 0 &&
-                            statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        if (statement.Parameters.Length > 1)
+                        { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
 
-                        throw new NotImplementedException();
+                        if (statement.Parameters.Length == 1)
+                        {
+                            StatementWithValue returnValue = statement.Parameters[0];
+                            CompiledType returnValueType = FindStatementType(returnValue);
+
+                            GenerateCodeForStatement(returnValue);
+
+                            int offset = ReturnValueOffset;
+                            StackStore(new ValueAddress(offset, true, false, false), returnValueType.SizeOnStack);
+                        }
+
+                        if (InFunction)
+                        { Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.ESP, (FunctionFrameSize.Last * 4).ToString()); }
+
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBP);
+                        Return();
+                        break;
                     }
 
                 case "break":
                     {
                         if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                        { throw new CompilerException($"Wrong number of parameters passed to \"break\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
 
                         throw new NotImplementedException();
                     }
@@ -874,23 +948,6 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(FunctionCall functionCall)
         {
-            if (functionCall.Identifier == "Alloc" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 0)
-            {
-                throw new NotImplementedException();
-            }
-
-            if (functionCall.Identifier == "AllocFrom" &&
-                functionCall.IsMethodCall == false &&
-                functionCall.Parameters.Length == 1 && (
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||
-                    FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Integer
-                ))
-            {
-                throw new NotImplementedException();
-            }
-
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
@@ -969,9 +1026,12 @@ namespace LanguageCore.ASM.Generator
                 return;
             }
 
-            if (GetParameter(statement.Content, out _))
+            if (GetParameter(statement.Content, out CompiledParameter? compiledParameter))
             {
-                throw new NotImplementedException();
+                statement.Name.AnalyzedType = TokenAnalyzedType.ParameterName;
+                ValueAddress address = GetBaseAddress(compiledParameter);
+                StackLoad(address, compiledParameter.Type.SizeOnStack);
+                return;
             }
 
             if (GetVariable(statement.Content, out CompiledVariable? val))
@@ -1226,12 +1286,15 @@ namespace LanguageCore.ASM.Generator
 
             string? label;
 
+            Builder.CodeBuilder.Indent = 0;
+            Builder.CodeBuilder.AppendTextLine();
+
             if (function is CompiledFunction compiledFunction2)
             {
-                if (!FunctionLabels.TryGetValue(compiledFunction2, out label))
+                if (!TryGetFunctionLabel(compiledFunction2, out label))
                 {
                     label = Builder.CodeBuilder.NewLabel($"f_{compiledFunction2.Identifier}");
-                    FunctionLabels.Add(compiledFunction2, label);
+                    FunctionLabels.Add((compiledFunction2, label));
                 }
             }
             else
@@ -1240,6 +1303,11 @@ namespace LanguageCore.ASM.Generator
             }
 
             Builder.CodeBuilder.AppendLabel(label);
+
+            Builder.CodeBuilder.Indent += SectionBuilder.IndentIncrement;
+
+            FunctionFrameSize.Push(0);
+            InFunction = true;
 
             CompiledParameters.Clear();
 
@@ -1259,6 +1327,10 @@ namespace LanguageCore.ASM.Generator
             Return();
 
             CompiledParameters.Clear();
+
+            InFunction = false;
+            FunctionFrameSize.Pop(0);
+            Builder.CodeBuilder.Indent = 0;
         }
 
         AsmGeneratorResult GenerateCode(CompilerResult compilerResult, PrintCallback? printCallback = null)
@@ -1268,9 +1340,11 @@ namespace LanguageCore.ASM.Generator
             while (true)
             {
                 bool shouldExit = true;
-                foreach (KeyValuePair<CompiledFunction, string> pair in FunctionLabels)
+                (CompiledFunction Function, string Label)[] functionLabels = FunctionLabels.ToArray();
+
+                for (int i = functionLabels.Length - 1; i >= 0; i--)
                 {
-                    CompiledFunction function = pair.Key;
+                    CompiledFunction function = functionLabels[i].Function;
                     if (!GeneratedFunctions.Any(other => ReferenceEquals(function, other)))
                     {
                         shouldExit = false;

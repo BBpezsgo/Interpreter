@@ -10,17 +10,17 @@ namespace LanguageCore.BBCode.Generator
     {
         public new CompiledType Type;
 
-        readonly int currentParamsSize;
-
+        public readonly int CurrentParamsSize;
         public readonly int Index;
-        public int RealIndex => -(currentParamsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer);
+        public readonly int RealIndex;
         public bool IsRef => Modifiers.Contains("ref");
 
         public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition) : base(definition.Modifiers, definition.Type, definition.Identifier)
         {
             this.Index = index;
-            this.currentParamsSize = currentParamsSize;
+            this.CurrentParamsSize = currentParamsSize;
             this.Type = type;
+            this.RealIndex = -(currentParamsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer);
         }
 
         public CompiledParameter(CompiledType type, ParameterDefinition definition)

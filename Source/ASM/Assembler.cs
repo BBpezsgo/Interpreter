@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using System.Threading;
 
 namespace LanguageCore.ASM
 {
@@ -57,7 +56,7 @@ namespace LanguageCore.ASM
             LineNumber = info.GetInt32("LineNumber");
             OriginalMessage = info.GetString("OriginalMessage") ?? string.Empty;
         }
-        
+
         public override string ToString()
         {
             StringBuilder result = new(OriginalMessage);
@@ -91,7 +90,7 @@ namespace LanguageCore.ASM
                     }
                 }
             }
-            
+
             return new NasmException(potentialFileName, lineNumber, text, innerException);
         }
     }
@@ -106,10 +105,7 @@ namespace LanguageCore.ASM
             { return; }
 
             if (File.Exists(output))
-            {
-                File.Delete(output);
-                Thread.Sleep(100);
-            }
+            { File.Delete(output); }
 
             Process? process = Process.Start(new ProcessStartInfo(nasm, $"-f win32 {input} -o {output}")
             {
@@ -122,10 +118,8 @@ namespace LanguageCore.ASM
 
             process.WaitForExit();
 
-            if (process.ExitCode == 0) {
-                Thread.Sleep(200);
-                return;
-            }
+            if (process.ExitCode == 0)
+            { return; }
 
             string stdOutput = process.StandardOutput.ReadToEnd();
             string stdError = process.StandardError.ReadToEnd();
@@ -154,10 +148,7 @@ namespace LanguageCore.ASM
             { return; }
 
             if (File.Exists(output))
-            {
-                File.Delete(output);
-                Thread.Sleep(100);
-            }
+            { File.Delete(output); }
 
             // Process? process = Process.Start(new ProcessStartInfo(masm + "Link", $"/SUBSYSTEM:CONSOLE /OUT:\"{OutputFileExe}\" \"{OutputFileObject}\""));
             Process? process = Process.Start(new ProcessStartInfo(ld, $"{input} -o {output} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
@@ -176,8 +167,6 @@ namespace LanguageCore.ASM
 
             if (process.ExitCode != 0)
             { throw new ProcessException(ld, process.ExitCode, stdOutput, stdError); }
-
-            Thread.Sleep(200);
         }
 
         public static void Assemble(string asmSourceCode, string outputFile)
@@ -201,7 +190,6 @@ namespace LanguageCore.ASM
             try
             {
                 File.WriteAllText(fileAsmTemp, asmSourceCode);
-                Thread.Sleep(100);
 
                 Nasm(fileAsmTemp, fileObjTemp);
 
@@ -209,11 +197,6 @@ namespace LanguageCore.ASM
 
                 if (File.Exists(fileExeTemp))
                 { File.Copy(fileExeTemp, fileExeFinal, true); }
-                Thread.Sleep(200);
-            }
-            catch (Exception)
-            {
-                throw;
             }
             finally
             {

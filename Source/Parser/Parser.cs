@@ -2039,6 +2039,8 @@ namespace LanguageCore.Parser
 
             if (possibleType == "macro")
             { return false; }
+            if (possibleType == "return")
+            { return false; }
 
             possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
             type = new TypeInstanceSimple(possibleType);

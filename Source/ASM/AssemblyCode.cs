@@ -4,6 +4,7 @@ using System.Text;
 
 namespace LanguageCore.ASM
 {
+    using System.Diagnostics;
     using Runtime;
 
     public struct AssemblyHeader
@@ -90,6 +91,7 @@ namespace LanguageCore.ASM
         public const string R15 = "r15", R15d = "r15d   ", R15w = "r15w", R15b = "r15b";
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class SectionBuilder
     {
         public const string EOL = "\r\n";
@@ -127,6 +129,8 @@ namespace LanguageCore.ASM
         }
 
         public IndentBlock Block() => new(this);
+
+        string GetDebuggerDisplay() => Builder.ToString();
     }
 
     public readonly struct IndentBlock : IDisposable

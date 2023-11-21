@@ -217,6 +217,7 @@ namespace LanguageCore
             if (CurrentFrame.HasValue)
             { result.Append($"{Environment.NewLine}\t {CurrentFrame.Value.ToString()} (current)"); }
 
+            /*
             result.Append(Environment.NewLine);
             result.Append("System Stack Trace:");
             if (StackTrace == null) { result.Append(" (StackTrace is null)"); }
@@ -237,6 +238,7 @@ namespace LanguageCore
             result.Append("Code:");
             for (int offset = 0; offset < context.Code.Length; offset++)
             { result.Append($"{Environment.NewLine}{offset + context.CodeSampleStart}\t {context.Code[offset]}"); }
+            */
 
             return result.ToString();
         }

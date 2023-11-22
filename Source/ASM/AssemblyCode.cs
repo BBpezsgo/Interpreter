@@ -60,7 +60,32 @@ namespace LanguageCore.ASM
         POR,
         /// <summary>  </summary>
         PAND,
+        /// <summary>  </summary>
         RET,
+        /// <summary>  </summary>
+        SHR,
+        /// <summary>  </summary>
+        SHL,
+        /// <summary>  </summary>
+        CMOVNZ,
+        /// <summary>  </summary>
+        CMP,
+        /// <summary>  </summary>
+        SETE,
+        /// <summary>  </summary>
+        CDQ,
+        /// <summary>  </summary>
+        JNE,
+        /// <summary>  </summary>
+        JGE,
+        /// <summary>  </summary>
+        JG,
+        /// <summary>  </summary>
+        JLE,
+        /// <summary>  </summary>
+        JL,
+        /// <summary>  </summary>
+        JE,
     }
 
     public struct Registers
@@ -182,6 +207,29 @@ namespace LanguageCore.ASM
         }
     }
 
+    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
+    public readonly struct InstructionOperand
+    {
+        readonly string value;
+
+        InstructionOperand(string value) => this.value = value;
+
+        string GetDebuggerDisplay() => value;
+        public override string ToString() => value;
+
+        public static implicit operator InstructionOperand(string v) => new(v);
+        public static implicit operator InstructionOperand(int v) => new(v.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        public static implicit operator InstructionOperand(DataItem v) => new(v.Type switch
+        {
+            RuntimeType.Null => throw new InternalException($"Operand value is null"),
+            RuntimeType.UInt8 => v.ValueUInt8.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.SInt32 => v.ValueSInt32.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.Single => throw new NotImplementedException(),
+            RuntimeType.UInt16 => v.ValueUInt16.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            _ => throw new ImpossibleException(),
+        });
+    }
+
     public class TextSectionBuilder : SectionBuilder
     {
         readonly List<string> Labels;
@@ -239,27 +287,36 @@ namespace LanguageCore.ASM
             Instruction.POR => "por",
             Instruction.PAND => "pand",
             Instruction.RET => "ret",
+            Instruction.SHR => "shr",
+            Instruction.SHL => "shl",
+            Instruction.CMOVNZ => "cmovnz",
+            Instruction.CMP => "cmp",
+            Instruction.SETE => "sete",
+            Instruction.CDQ => "cdq",
+            Instruction.JNE => "jne",
+            Instruction.JGE => "jge",
+            Instruction.JG => "jg",
+            Instruction.JLE => "jle",
+            Instruction.JL => "jl",
+            Instruction.JE => "je",
             _ => throw new ImpossibleException(),
         };
 
-        public void AppendInstruction(Instruction keyword)
+        void AppendInstructionNoEOL(Instruction keyword)
         {
             AppendText(' ', Indent);
             AppendText(StringifyInstruction(keyword));
-            AppendText(EOL);
         }
 
-        public void AppendInstruction(string keyword)
+        public void AppendInstruction(Instruction keyword)
         {
-            AppendText(' ', Indent);
-            AppendText(keyword);
+            AppendInstructionNoEOL(keyword);
             AppendText(EOL);
         }
 
         public void AppendInstruction(Instruction keyword, params string[] operands)
         {
-            AppendText(' ', Indent);
-            AppendText(StringifyInstruction(keyword));
+            AppendInstructionNoEOL(keyword);
             if (operands.Length > 0)
             {
                 AppendText(' ');
@@ -274,36 +331,18 @@ namespace LanguageCore.ASM
             AppendText(EOL);
         }
 
-        public void AppendInstruction(Instruction keyword, params DataItem[] operands)
+        public void AppendInstruction(Instruction keyword, params InstructionOperand[] operands)
         {
-            AppendText(' ', Indent);
-            AppendText(StringifyInstruction(keyword));
+            AppendInstructionNoEOL(keyword);
             if (operands.Length > 0)
             {
                 AppendText(' ');
                 for (int i = 0; i < operands.Length; i++)
                 {
-                    DataItem operand = operands[i];
+                    InstructionOperand operand = operands[i];
                     if (i > 0)
                     { AppendText(", "); }
-                    switch (operand.Type)
-                    {
-                        case RuntimeType.Null:
-                            throw new InternalException($"Operand value is null");
-                        case RuntimeType.UInt8:
-                            AppendText(operand.ValueUInt8.ToString());
-                            break;
-                        case RuntimeType.SInt32:
-                            AppendText(operand.ValueSInt32.ToString());
-                            break;
-                        case RuntimeType.Single:
-                            throw new NotImplementedException();
-                        case RuntimeType.UInt16:
-                            AppendText(operand.ValueUInt16.ToString());
-                            break;
-                        default:
-                            throw new ImpossibleException();
-                    }
+                    AppendText(operand.ToString());
                 }
             }
             AppendText(EOL);

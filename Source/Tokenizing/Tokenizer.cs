@@ -265,7 +265,7 @@ namespace LanguageCore.Tokenizing
                     EndToken(offsetTotal);
                     CurrentToken.TokenType = TokenType.Operator;
                     CurrentToken.Content.Append(currChar);
-                    EndToken(offsetTotal);
+                    EndToken(offsetTotal, true);
                 }
             }
             else if (currChar == '/')
@@ -287,14 +287,14 @@ namespace LanguageCore.Tokenizing
                 EndToken(offsetTotal);
                 CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true);
             }
             else if (SimpleOperators.Contains(currChar))
             {
                 EndToken(offsetTotal);
                 CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true);
             }
             else if (currChar == '=')
             {
@@ -344,7 +344,7 @@ namespace LanguageCore.Tokenizing
                     EndToken(offsetTotal);
                     CurrentToken.TokenType = Settings.DistinguishBetweenSpacesAndNewlines ? TokenType.LineBreak : TokenType.Whitespace;
                     CurrentToken.Content.Append(currChar);
-                    EndToken(offsetTotal);
+                    EndToken(offsetTotal, true);
                 }
             }
             else if (currChar == '"')
@@ -376,7 +376,7 @@ namespace LanguageCore.Tokenizing
                 EndToken(offsetTotal);
                 CurrentToken.TokenType = TokenType.Operator;
                 CurrentToken.Content.Append(currChar);
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true);
             }
             else if (CurrentToken.TokenType == TokenType.LiteralHex)
             {
@@ -406,11 +406,17 @@ namespace LanguageCore.Tokenizing
             }
         }
 
-        protected void EndToken(int offsetTotal)
+        protected void EndToken(int offsetTotal, bool inFuture = false)
         {
             CurrentToken.position.Range.End.Character = CurrentColumn;
             CurrentToken.position.Range.End.Line = CurrentLine;
             CurrentToken.position.AbsoluteRange.End = offsetTotal;
+
+            if (inFuture)
+            {
+                CurrentToken.position.Range.End.Character++;
+                CurrentToken.position.AbsoluteRange.End++;
+            }
 
             // Skip comments if they should be ignored
             if (!Settings.TokenizeComments &&

@@ -204,12 +204,13 @@ namespace LanguageCore.Brainfuck.Generator
                 Position = position;
 
                 if (debugInfo == null) return;
+                if (position == Position.UnknownPosition) return;
 
                 InstructionStart = code.GetFinalCode().Length;
             }
 
-            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IThingWithPosition position)
-                : this(code, debugInfo, position.Position)
+            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IThingWithPosition? position)
+                : this(code, debugInfo, position?.Position ?? Position.UnknownPosition)
             {
 
             }
@@ -217,6 +218,7 @@ namespace LanguageCore.Brainfuck.Generator
             public void Dispose()
             {
                 if (DebugInfo == null) return;
+                if (Position == Position.UnknownPosition) return;
 
                 int end = Code.GetFinalCode().Length;
                 if (InstructionStart == end) return;
@@ -320,7 +322,7 @@ namespace LanguageCore.Brainfuck.Generator
             readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
         }
 
-        DebugInfoBlock DebugBlock(IThingWithPosition position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
+        DebugInfoBlock DebugBlock(IThingWithPosition? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {

@@ -77,12 +77,16 @@ namespace LanguageCore.Compiler
 
             int variablesAdded = AnalyzeNewVariables(statements);
 
-            foreach (Statement st in statements)
+            foreach (Statement statement in statements)
             {
-                AnalyzeStatement(st);
+                AnalyzeStatement(statement);
 
-                if (st is StatementWithBlock pr)
-                { AnalyzeStatements(pr.Block.Statements); }
+                if (statement is StatementWithBlock blockStatement)
+                { AnalyzeStatements(blockStatement.Block.Statements); }
+
+                if (statement is StatementWithAnyBlock anyBlockStatement &&
+                    anyBlockStatement.Block is Block block)
+                { AnalyzeStatements(block.Statements); }
             }
 
             for (int i = 0; i < variablesAdded; i++)
@@ -100,8 +104,12 @@ namespace LanguageCore.Compiler
 
                 AnalyzeStatement(statements[i], expectedType);
 
-                if (statements[i] is StatementWithBlock pr)
-                { AnalyzeStatements(pr.Block.Statements); }
+                if (statements[i] is StatementWithBlock blockStatement)
+                { AnalyzeStatements(blockStatement.Block.Statements); }
+
+                if (statements[i] is StatementWithAnyBlock anyBlockStatement &&
+                    anyBlockStatement.Block is Block block)
+                { AnalyzeStatements(block.Statements); }
             }
 
             for (int i = 0; i < variablesAdded; i++)

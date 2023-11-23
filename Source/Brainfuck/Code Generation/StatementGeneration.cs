@@ -677,29 +677,29 @@ namespace LanguageCore.Brainfuck.Generator
 
                 if (@if.NextLink == null)
                 {
-                    using (this.DebugBlock(@if.Block.BracketEnd))
+                    // using (this.DebugBlock(@if.Block.BracketEnd))
+                    // {
+                    using (Code.Block("Cleanup condition"))
                     {
-                        using (Code.Block("Cleanup condition"))
-                        {
-                            Code.ClearValue(conditionAddress);
-                            Code.JumpEnd(conditionAddress);
-                            Stack.PopVirtual();
-                        }
+                        Code.ClearValue(conditionAddress);
+                        Code.JumpEnd(conditionAddress);
+                        Stack.PopVirtual();
                     }
+                    // }
                 }
                 else
                 {
                     using (Code.Block("Else"))
                     {
-                        using (this.DebugBlock(@if.Block.BracketEnd))
+                        // using (this.DebugBlock(@if.Block.BracketEnd))
+                        // {
+                        using (Code.Block("Finish if statement"))
                         {
-                            using (Code.Block("Finish if statement"))
-                            {
-                                Code.MoveValue(conditionAddress, conditionAddress + 1);
-                                Code.JumpEnd(conditionAddress);
-                            }
-                            Code.MoveValue(conditionAddress + 1, conditionAddress);
+                            Code.MoveValue(conditionAddress, conditionAddress + 1);
+                            Code.JumpEnd(conditionAddress);
                         }
+                        Code.MoveValue(conditionAddress + 1, conditionAddress);
+                        // }
 
                         using (this.DebugBlock(@if.NextLink.Keyword))
                         {
@@ -763,7 +763,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 if (!linked)
                 {
-                    using (this.DebugBlock(@if.Semicolon ?? @if.Block.Semicolon ?? @if.Block.BracketEnd))
+                    using (this.DebugBlock(@if.Semicolon ?? @if.Block.Semicolon/* ?? @if.Block.BracketEnd*/))
                     {
                         ContinueReturnStatements();
                         ContinueBreakStatements();

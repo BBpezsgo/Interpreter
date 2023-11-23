@@ -110,6 +110,7 @@ namespace LanguageCore
     public class SyntaxException : LanguageException
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
+        public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition, null) { }
         public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
         public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 

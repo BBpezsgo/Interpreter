@@ -160,11 +160,21 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public abstract class LinkedIfThing : StatementWithBlock
+    public abstract class StatementWithAnyBlock : Statement
+    {
+        public readonly Statement Block;
+
+        protected StatementWithAnyBlock(Statement block)
+        {
+            Block = block;
+        }
+    }
+
+    public abstract class LinkedIfThing : StatementWithAnyBlock
     {
         public readonly Token Keyword;
 
-        public LinkedIfThing(Token keyword, Block block) : base(block)
+        public LinkedIfThing(Token keyword, Statement block) : base(block)
         {
             Keyword = keyword;
         }
@@ -183,7 +193,7 @@ namespace LanguageCore.Parser.Statement
         /// </summary>
         public LinkedIfThing? NextLink;
 
-        public LinkedIf(Token keyword, StatementWithValue condition, Block block) : base(keyword, block)
+        public LinkedIf(Token keyword, StatementWithValue condition, Statement block) : base(keyword, block)
         {
             Condition = condition;
         }
@@ -197,7 +207,7 @@ namespace LanguageCore.Parser.Statement
 
     public class LinkedElse : LinkedIfThing
     {
-        public LinkedElse(Token keyword, Block block) : base(keyword, block)
+        public LinkedElse(Token keyword, Statement block) : base(keyword, block)
         {
 
         }
@@ -1059,12 +1069,12 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public abstract class BaseBranch : StatementWithBlock
+    public abstract class BaseBranch : StatementWithAnyBlock
     {
         public readonly Token Keyword;
         public readonly IfPart Type;
 
-        protected BaseBranch(Token keyword, IfPart type, Block block)
+        protected BaseBranch(Token keyword, IfPart type, Statement block)
             : base(block)
         {
             Keyword = keyword;
@@ -1094,7 +1104,7 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly StatementWithValue Condition;
 
-        public IfBranch(Token keyword, StatementWithValue condition, Block block)
+        public IfBranch(Token keyword, StatementWithValue condition, Statement block)
             : base(keyword, IfPart.If, block)
         {
             this.Condition = condition;
@@ -1111,7 +1121,7 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly StatementWithValue Condition;
 
-        public ElseIfBranch(Token keyword, StatementWithValue condition, Block block)
+        public ElseIfBranch(Token keyword, StatementWithValue condition, Statement block)
             : base(keyword, IfPart.ElseIf, block)
         {
             this.Condition = condition;
@@ -1126,7 +1136,7 @@ namespace LanguageCore.Parser.Statement
 
     public class ElseBranch : BaseBranch
     {
-        public ElseBranch(Token keyword, Block block)
+        public ElseBranch(Token keyword, Statement block)
             : base(keyword, IfPart.Else, block)
         { }
 

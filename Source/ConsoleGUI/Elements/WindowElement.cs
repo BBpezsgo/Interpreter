@@ -20,13 +20,13 @@ namespace ConsoleGUI
             Elements.BeforeDraw();
         }
 
-        public override CharInfo DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
+        public override ConsoleChar DrawContent(int x, int y) => Elements.DrawContent(x, y) ?? DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
 
         public void OnMouseEventBase(MouseEvent mouse)
         {
             if (!CanDrag) return;
 
-            if (mouse.ButtonState != MouseButton.Left)
+            if ((mouse.ButtonState & (uint)MouseButton.Left) != 0)
             {
                 MouseDragStart = Point.Empty;
                 MouseDragStartPos = Point.Empty;
@@ -38,8 +38,8 @@ namespace ConsoleGUI
 
             if (IsDragging)
             {
-                var offset = new Point(mouse.MousePosition.X - MouseDragStart.X, mouse.MousePosition.Y - MouseDragStart.Y);
-                var newRect = Rect;
+                Point offset = new(mouse.MousePosition.X - MouseDragStart.X, mouse.MousePosition.Y - MouseDragStart.Y);
+                System.Drawing.Rectangle newRect = Rect;
                 newRect.X = MouseDragStartPos.X + offset.X;
                 newRect.Y = MouseDragStartPos.Y + offset.Y;
                 Rect = newRect;

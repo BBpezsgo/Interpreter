@@ -92,15 +92,8 @@ namespace ConsoleGUI
         const int TIMER_AUTO_REFRESH_CONSOLE = 500;
         const int TIMER_REFRESH_CONSOLE = 100;
 
-        public static CharInfo NullCharacter => new()
-        {
-            Char = ' ',
-            Foreground = ByteColor.Black,
-            Background = ByteColor.Black,
-        };
-
         public Element[] Elements = Array.Empty<Element>();
-        public Element? FilledElement = null;
+        public Element? FilledElement;
 
         readonly SafeFileHandle ConsoleHandle;
         readonly bool DebugLogs;
@@ -116,14 +109,14 @@ namespace ConsoleGUI
 
         short Width;
         short Height;
-        CharInfo[] ConsoleBuffer;
+        ConsoleChar[] ConsoleBuffer;
         SmallRect ConsoleRect;
         Coord MousePosition;
 
         bool ResizeElements;
         public bool NextRefreshConsole;
 
-        public static ConsoleGUI? Instance = null;
+        public static ConsoleGUI? Instance;
 
         double LastTick;
         public bool Destroyed { get; private set; }
@@ -162,7 +155,7 @@ namespace ConsoleGUI
             {
                 TimerOnStart.Stop();
 
-                foreach (var _element in Elements)
+                foreach (Element _element in Elements)
                 {
                     if (_element is Element element) element.OnStart();
                 }
@@ -210,7 +203,7 @@ namespace ConsoleGUI
             Width = (short)Console.WindowWidth;
             Height = (short)Console.WindowHeight;
 
-            ConsoleBuffer = new CharInfo[Width * Height];
+            ConsoleBuffer = new ConsoleChar[Width * Height];
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 ConsoleBuffer[i].Char = ' ';
@@ -249,7 +242,7 @@ namespace ConsoleGUI
         {
             Log("Clear console");
 
-            ConsoleBuffer = new CharInfo[Width * Height];
+            ConsoleBuffer = new ConsoleChar[Width * Height];
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
                 ConsoleBuffer[i].Char = ' ';
@@ -267,7 +260,7 @@ namespace ConsoleGUI
                 Clear();
 
                 ResizeElements = false;
-                foreach (var Element in Elements) Element.RefreshSize();
+                foreach (Element Element in Elements) Element.RefreshSize();
                 if (FilledElement != null)
                 {
                     FilledElement.Rect = new System.Drawing.Rectangle(0, 0, Width - 1, Height - 1);
@@ -309,7 +302,7 @@ namespace ConsoleGUI
 
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
-                ConsoleBuffer[i] = new CharInfo((char)0x2591, ByteColor.Gray, ByteColor.Black);
+                ConsoleBuffer[i] = new ConsoleChar((char)0x2591, ByteColor.Gray, ByteColor.Black);
             }
 
             try
@@ -324,7 +317,7 @@ namespace ConsoleGUI
                 else
                 {
                     Elements.BeforeDraw();
-                    foreach (var Element in Elements)
+                    foreach (Element Element in Elements)
                     {
                         DrawElement(Element);
                     }
@@ -348,7 +341,7 @@ namespace ConsoleGUI
                     int i = y * Width + x;
                     if (ConsoleBuffer.IsOutside(i)) continue;
 
-                    CharInfo chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
+                    ConsoleChar chr = IsFilled ? Element.DrawContent(x, y) : Element.DrawContentWithBorders(x, y);
                     ConsoleBuffer[i] = chr;
                 }
             }
@@ -370,7 +363,7 @@ namespace ConsoleGUI
                 new Coord((short)Console.WindowWidth, (short)Console.WindowHeight),
                 new Coord(0, 0),
                 ref rect) == 0)
-            { throw WindowsException.Get(); }
+            { throw Win32.Common.WindowsException.Get(); }
         }
 
         void KeyEventThread(KeyEvent e) => KeyEvents.Add(e);

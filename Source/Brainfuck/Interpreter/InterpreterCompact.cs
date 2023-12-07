@@ -9,6 +9,7 @@ using Win32.LowLevel;
 namespace LanguageCore.Brainfuck
 {
     using Runtime;
+    using Thread = System.Threading.Thread;
 
     public class InterpreterCompact
     {
@@ -325,7 +326,7 @@ namespace LanguageCore.Brainfuck
             {
                 for (int _y = y; _y < height + y; _y++)
                 {
-                    renderer[_x, _y] = new CharInfo(' ');
+                    renderer[_x, _y] = new ConsoleChar(' ');
                 }
             }
 
@@ -414,7 +415,7 @@ namespace LanguageCore.Brainfuck
                     if (sourceLocation.SourcePosition.Range.Contains(token.Position.Range.Start))
                     { backgroundColor = ByteColor.Gray; }
 
-                    renderer[currentX + offset - 1, currentY] = new CharInfo(text[offset], foregroundColor, backgroundColor);
+                    renderer[currentX + offset - 1, currentY] = new ConsoleChar(text[offset], foregroundColor, backgroundColor);
                 }
             }
         }
@@ -453,7 +454,7 @@ namespace LanguageCore.Brainfuck
                         _ => ByteColor.Silver,
                     };
 
-                    renderer[x, y] = new CharInfo(c, fg, bg);
+                    renderer[x, y] = new ConsoleChar(c, fg, bg);
                     if (x++ >= width) return;
                 }
 
@@ -466,7 +467,7 @@ namespace LanguageCore.Brainfuck
 
             while (x < width)
             {
-                renderer[x, y] = new CharInfo(' ');
+                renderer[x, y] = new ConsoleChar(' ');
                 x++;
             }
         }
@@ -497,7 +498,7 @@ namespace LanguageCore.Brainfuck
 
             while (x < width)
             {
-                renderer[x, y] = new CharInfo(' ');
+                renderer[x, y] = new ConsoleChar(' ');
                 x++;
             }
         }
@@ -523,7 +524,7 @@ namespace LanguageCore.Brainfuck
 
             while (x < width)
             {
-                renderer[x, y] = new CharInfo(' ');
+                renderer[x, y] = new ConsoleChar(' ');
                 x++;
             }
         }
@@ -545,7 +546,7 @@ namespace LanguageCore.Brainfuck
 
             while (x < width)
             {
-                renderer[x, y] = new CharInfo(' ');
+                renderer[x, y] = new ConsoleChar(' ');
                 x++;
             }
         }
@@ -570,15 +571,15 @@ namespace LanguageCore.Brainfuck
                 }
                 else if (text[i] == '\t')
                 {
-                    renderer[_x, _y] = new CharInfo(' ', ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(' ', ByteColor.White, ByteColor.Black);
                 }
                 else if (text[i] < 32 || text[i] > 127)
                 {
-                    renderer[_x, _y] = new CharInfo(' ', ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(' ', ByteColor.White, ByteColor.Black);
                 }
                 else
                 {
-                    renderer[_x, _y] = new CharInfo(text[i], ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(text[i], ByteColor.White, ByteColor.Black);
                 }
 
                 _x++;

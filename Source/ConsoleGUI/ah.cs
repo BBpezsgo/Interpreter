@@ -122,7 +122,7 @@ namespace LanguageCore
                         c = text[i];
                     }
 
-                    ConsoleRenderer[x, y] = new CharInfo(c, fg, bg);
+                    ConsoleRenderer[x, y] = new ConsoleChar(c, fg, bg);
                 }
             }
 
@@ -151,7 +151,7 @@ namespace LanguageCore
 
             if (active)
             {
-                if (Keyboard.IsKeyDown(VirtualKeyCodes.BACK))
+                if (Keyboard.IsKeyDown(VirtualKeyCode.BACK))
                 {
                     if (value.Length > 0)
                     { value.Remove(value.Length - 1, 1); }
@@ -163,7 +163,7 @@ namespace LanguageCore
                         if (!Keyboard.IsKeyDown(Keys[i]))
                         { continue; }
 
-                        if (Keyboard.IsKeyPressed(VirtualKeyCodes.SHIFT))
+                        if (Keyboard.IsKeyPressed(VirtualKeyCode.SHIFT))
                         { value.Append(ShiftedChars[i]); }
                         else
                         { value.Append(Chars[i]); }
@@ -190,7 +190,7 @@ namespace LanguageCore
                         c = value[i];
                     }
 
-                    ConsoleRenderer[x, y] = new CharInfo(c, fg, bg);
+                    ConsoleRenderer[x, y] = new ConsoleChar(c, fg, bg);
                 }
             }
         }

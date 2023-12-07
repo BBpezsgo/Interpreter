@@ -15,7 +15,7 @@ namespace ConsoleGUI
             Elements.BeforeDraw();
         }
 
-        public override CharInfo DrawContent(int x, int y)
+        public override ConsoleChar DrawContent(int x, int y)
         {
             return Elements.DrawContent(x, y) ?? CharacterBrush.ErrorChar;
         }
@@ -57,7 +57,7 @@ namespace ConsoleGUI
 
                 if (Elements[i] is IInlineLayoutElement inlineLayoutElement)
                 {
-                    var layout = inlineLayoutElement.Layout;
+                    InlineLayout layout = inlineLayoutElement.Layout;
                     switch (layout.SizeMode)
                     {
                         case InlineLayoutSizeMode.Fixed:
@@ -112,7 +112,7 @@ namespace ConsoleGUI
 
                 if (Elements[i] is IInlineLayoutElement inlineLayoutElement)
                 {
-                    var layout = inlineLayoutElement.Layout;
+                    InlineLayout layout = inlineLayoutElement.Layout;
                     switch (layout.SizeMode)
                     {
                         case InlineLayoutSizeMode.Fixed:

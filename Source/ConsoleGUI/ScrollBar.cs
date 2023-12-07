@@ -40,11 +40,11 @@ namespace ConsoleGUI
             {
                 if (y == scrollY)
                 {
-                    buffer[x, y] = new CharInfo(' ', ByteColor.Black, ByteColor.White);
+                    buffer[x, y] = new ConsoleChar(' ', ByteColor.Black, ByteColor.White);
                 }
                 else
                 {
-                    buffer[x, y] = new CharInfo((char)0x2592, ByteColor.Gray, ByteColor.Black);
+                    buffer[x, y] = new ConsoleChar((char)0x2592, ByteColor.Gray, ByteColor.Black);
                 }
             }
         }
@@ -52,13 +52,13 @@ namespace ConsoleGUI
         public void FeedEvent(Element sender, MouseEvent e)
         {
             LanguageCore.Range<int> range = GetRange.Invoke(sender);
-            if (e.ButtonState == MouseButton.ScrollDown)
+            if ((e.ButtonState & (uint)MouseButton.ScrollDown) != 0)
             {
                 offset = Math.Clamp(offset + 1, range.Start, range.End);
                 return;
             }
 
-            if (e.ButtonState == MouseButton.ScrollUp)
+            if ((e.ButtonState & (uint)MouseButton.ScrollUp) != 0)
             {
                 offset = Math.Clamp(offset - 1, range.Start, range.End);
                 return;
@@ -75,7 +75,7 @@ namespace ConsoleGUI
             if (pressedPos.X != Parent.Rect.Width - 1)
             { return; }
 
-            if (e.ButtonState == MouseButton.Left)
+            if ((e.ButtonState & (uint)MouseButton.Left) != 0)
             {
                 int height = Parent.Rect.Height - 1;
 

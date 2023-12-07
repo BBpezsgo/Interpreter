@@ -7,7 +7,7 @@ namespace ConsoleGUI
 {
     public class DrawBuffer
     {
-        readonly CharInfo[] v;
+        readonly ConsoleChar[] v;
 
         int currentIndex;
         public readonly int Width;
@@ -17,13 +17,13 @@ namespace ConsoleGUI
 
         public DrawBuffer()
         {
-            this.v = Array.Empty<CharInfo>();
+            this.v = Array.Empty<ConsoleChar>();
             this.currentIndex = 0;
         }
 
         public DrawBuffer(int width, int height)
         {
-            this.v = new CharInfo[Math.Max(width * height, 0)];
+            this.v = new ConsoleChar[Math.Max(width * height, 0)];
             this.currentIndex = 0;
             this.Width = width;
             this.Height = height;
@@ -31,13 +31,13 @@ namespace ConsoleGUI
 
         public int Length => v.Length;
 
-        public CharInfo this[int index]
+        public ConsoleChar this[int index]
         {
             get => v[index];
             set => v[index] = value;
         }
 
-        public CharInfo this[int x, int y]
+        public ConsoleChar this[int x, int y]
         {
             get => this[x + (y * Width)];
             set => this[x + (y * Width)] = value;
@@ -176,7 +176,7 @@ namespace ConsoleGUI
                         }
                     }
 
-                    this[x, y] = new CharInfo(c, color, ByteColor.Black);
+                    this[x, y] = new ConsoleChar(c, color, ByteColor.Black);
 
                     prev = (x, y);
                 }
@@ -215,7 +215,7 @@ namespace ConsoleGUI
             if (currentIndex >= this.v.Length) return false;
             if (currentIndex < 0) return false;
 
-            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new CharInfo(v, currentFgColor, currentBgColor);
+            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, currentFgColor, currentBgColor);
 
             currentIndex++;
             if (currentIndex >= this.v.Length) return false;
@@ -244,7 +244,7 @@ namespace ConsoleGUI
         {
             if (currentIndex >= this.v.Length) return false;
 
-            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new CharInfo(v, fg, bg);
+            this.v[Math.Clamp(currentIndex, 0, this.v.Length - 1)] = new ConsoleChar(v, fg, bg);
 
             currentIndex++;
             if (currentIndex >= this.v.Length) return false;
@@ -347,9 +347,9 @@ namespace ConsoleGUI
 
     public static class Extensions
     {
-        public static CharInfo DrawBorder(this Element element, int x, int y)
+        public static ConsoleChar DrawBorder(this Element element, int x, int y)
         {
-            if (!element.Contains(x, y)) return ConsoleGUI.NullCharacter;
+            if (!element.Contains(x, y)) return ConsoleChar.Empty;
             Side side = element.Rect.GetSide(x, y);
             if (!string.IsNullOrEmpty(element.Title))
             {
@@ -375,7 +375,7 @@ namespace ConsoleGUI
                 Side.Bottom => '━'.Details(),
                 Side.BottomLeft => '┕'.Details(),
                 Side.Left => '│'.Details(),
-                _ => ConsoleGUI.NullCharacter,
+                _ => ConsoleChar.Empty,
             };
         }
 
@@ -409,7 +409,7 @@ namespace ConsoleGUI
             }
         }
 
-        public static CharInfo DrawContentWithBorders(this Element element, int x, int y)
+        public static ConsoleChar DrawContentWithBorders(this Element element, int x, int y)
         {
             if (element.HasBorder)
             {
@@ -425,7 +425,7 @@ namespace ConsoleGUI
             return element.DrawContent(x, y);
         }
 
-        public static CharInfo? DrawContent(this Element[] elements, int x, int y)
+        public static ConsoleChar? DrawContent(this Element[] elements, int x, int y)
         {
             for (int i = 0; i < elements.Length; i++)
             {
@@ -440,21 +440,21 @@ namespace ConsoleGUI
         { for (int i = 0; i < elements.Length; i++) elements[i].BeforeDraw(); }
 
         public static void BeforeDraw(this IEnumerable<Element> elements)
-        { foreach (var element in elements) element.BeforeDraw(); }
+        { foreach (Element element in elements) element.BeforeDraw(); }
 
         public static void RefreshSize(this Element[] elements)
         { for (int i = 0; i < elements.Length; i++) elements[i].RefreshSize(); }
 
         public static void RefreshSize(this IEnumerable<Element> elements)
-        { foreach (var element in elements) element.RefreshSize(); }
+        { foreach (Element element in elements) element.RefreshSize(); }
 
         public static bool IsOutside<T>(this T[] v, int i) => (i < 0) || (i >= v.Length);
         public static T Clamp<T>(this T[] v, int i, T @default) => v.IsOutside(i) ? @default : v[i];
         public static T? Clamp<T>(this T[] v, int i) where T : struct => v.IsOutside(i) ? null : v[i];
 
         public static bool IsOutside(this DrawBuffer v, int i) => (i < 0) || (i >= v.Length);
-        public static CharInfo Clamp(this DrawBuffer v, int i, CharInfo @default) => v.IsOutside(i) ? @default : v[i];
-        public static CharInfo? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
+        public static ConsoleChar Clamp(this DrawBuffer v, int i, ConsoleChar @default) => v.IsOutside(i) ? @default : v[i];
+        public static ConsoleChar? Clamp(this DrawBuffer v, int i) => v.IsOutside(i) ? null : v[i];
 
         public static Side GetSide(this Rectangle v, int x, int y)
         {
@@ -493,7 +493,7 @@ namespace ConsoleGUI
             return Side.None;
         }
 
-        public static CharInfo Details(this char v) => new(v, ByteColor.Silver, ByteColor.Black);
+        public static ConsoleChar Details(this char v) => new(v, ByteColor.Silver, ByteColor.Black);
     }
 
     public static class Utils

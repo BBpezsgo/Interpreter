@@ -13,7 +13,7 @@ namespace ConsoleGUI
         public DrawBuffer DrawBuffer = new();
         protected MouseEvent LastMouse;
 
-        public virtual CharInfo DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleGUI.NullCharacter);
+        public virtual ConsoleChar DrawContent(int x, int y) => DrawBuffer.Clamp(Utils.GetIndex(x, y, Rect.Width), ConsoleChar.Empty);
 
         public void ClearBuffer() => DrawBuffer = new(Rect.Width, Rect.Height);
 

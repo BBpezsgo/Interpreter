@@ -142,8 +142,8 @@ namespace LanguageCore.Compiler
 
         readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
         {
-            { "alloc", (new CompiledType(Type.Integer), new CompiledType[] { new CompiledType(Type.Integer) }) },
-            { "free", (new CompiledType(Type.Void), new CompiledType[] { new CompiledType(Type.Integer) }) },
+            { "alloc", (new CompiledType(Type.Integer), [ new CompiledType(Type.Integer) ]) },
+            { "free", (new CompiledType(Type.Void), [ new CompiledType(Type.Integer) ]) },
         };
 
         Compiler(Dictionary<string, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, string? basePath)
@@ -627,56 +627,56 @@ namespace LanguageCore.Compiler
                 switch (hash.HashName.Content)
                 {
                     case "bf":
+                    {
+                        if (hash.Parameters.Length < 2)
+                        { Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
+                        string name = hash.Parameters[0].Value;
+
+                        if (ExternalFunctions.ContainsKey(name)) break;
+
+                        string[] bfParams = new string[hash.Parameters.Length - 1];
+                        for (int i = 1; i < hash.Parameters.Length; i++)
+                        { bfParams[i - 1] = hash.Parameters[i].Value; }
+
+                        Type[] parameterTypes = new Type[bfParams.Length];
+                        for (int i = 0; i < bfParams.Length; i++)
                         {
-                            if (hash.Parameters.Length < 2)
-                            { Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
-                            string name = hash.Parameters[0].Value;
-
-                            if (ExternalFunctions.ContainsKey(name)) break;
-
-                            string[] bfParams = new string[hash.Parameters.Length - 1];
-                            for (int i = 1; i < hash.Parameters.Length; i++)
-                            { bfParams[i - 1] = hash.Parameters[i].Value; }
-
-                            Type[] parameterTypes = new Type[bfParams.Length];
-                            for (int i = 0; i < bfParams.Length; i++)
+                            if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out Type paramType))
                             {
-                                if (LanguageConstants.BuiltinTypeMap3.TryGetValue(bfParams[i], out Type paramType))
-                                {
-                                    parameterTypes[i] = paramType;
+                                parameterTypes[i] = paramType;
 
-                                    if (paramType == Type.Void && i > 0)
-                                    { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
-                                }
-                                else
-                                {
-                                    Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
-                                    goto ExitBreak;
-                                }
-                            }
-
-                            Type returnType = parameterTypes[0];
-                            List<Type> x = parameterTypes.ToList();
-                            x.RemoveAt(0);
-                            Type[] pTypes = x.ToArray();
-
-                            if (parameterTypes[0] == Type.Void)
-                            {
-                                ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
-                                {
-                                    Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                                });
+                                if (paramType == Type.Void && i > 0)
+                                { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
                             }
                             else
                             {
-                                ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
-                                {
-                                    Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
-                                    return DataItem.GetDefaultValue(returnType);
-                                });
+                                Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
+                                goto ExitBreak;
                             }
                         }
-                        break;
+
+                        Type returnType = parameterTypes[0];
+                        List<Type> x = parameterTypes.ToList();
+                        x.RemoveAt(0);
+                        Type[] pTypes = x.ToArray();
+
+                        if (parameterTypes[0] == Type.Void)
+                        {
+                            ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                            {
+                                Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
+                            });
+                        }
+                        else
+                        {
+                            ExternalFunctions.AddSimpleExternalFunction(name, pTypes, (BytecodeProcessor sender, DataItem[] p) =>
+                            {
+                                Output.LogDebug($"External function \"{name}\" called with params:\n  {string.Join(", ", p)}");
+                                return DataItem.GetDefaultValue(returnType);
+                            });
+                        }
+                    }
+                    break;
                     default:
                         Warnings.Add(new Warning($"Hash '{hash.HashName}' does not exists, so this is ignored", hash.HashName, hash.FilePath));
                         break;

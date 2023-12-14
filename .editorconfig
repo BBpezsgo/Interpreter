@@ -106,7 +106,7 @@ dotnet_style_null_propagation = true:suggestion
 dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
 dotnet_style_prefer_auto_properties = false:silent
 dotnet_style_object_initializer = true:suggestion
-dotnet_style_collection_initializer = true:suggestion
+dotnet_style_collection_initializer = 
 dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
 dotnet_style_prefer_conditional_expression_over_assignment = true:silent
 dotnet_style_prefer_conditional_expression_over_return = true:silent
@@ -158,3 +158,15 @@ dotnet_diagnostic.CA5384.severity = suggestion
 dotnet_diagnostic.CA5385.severity = suggestion
 dotnet_diagnostic.CA5397.severity = suggestion
 dotnet_diagnostic.CA2215.severity = suggestion
+
+# IDE0028: Simplify collection initialization
+dotnet_diagnostic.IDE0028.severity = silent
+
+# IDE0300: Simplify collection initialization
+dotnet_diagnostic.IDE0300.severity = silent
+
+# IDE0305: Simplify collection initialization
+dotnet_diagnostic.IDE0305.severity = silent
+
+# IDE0301: Simplify collection initialization
+dotnet_diagnostic.IDE0301.severity = silent

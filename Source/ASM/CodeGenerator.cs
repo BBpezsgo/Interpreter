@@ -2,6 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 
+#pragma warning disable IDE0051 // Remove unused private members
+#pragma warning disable IDE0052 // Remove unread private members
+#pragma warning disable IDE0060 // Remove unused parameter
+
 namespace LanguageCore.ASM.Generator
 {
     using System.Diagnostics.CodeAnalysis;
@@ -631,12 +635,13 @@ namespace LanguageCore.ASM.Generator
 
             if (compiledFunction.IsExternal)
             {
-                switch (compiledFunction.ExternalFunctionName)
-                {
-                    case "stdout":
-                    default:
-                        throw new NotImplementedException();
-                }
+                throw new NotImplementedException();
+                // switch (compiledFunction.ExternalFunctionName)
+                // {
+                //     case "stdout":
+                //     default:
+                //         throw new NotImplementedException();
+                // }
             }
 
             parameterCleanup = GenerateCodeForParameterPassing(functionCall, compiledFunction);

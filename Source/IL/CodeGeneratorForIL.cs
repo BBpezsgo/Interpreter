@@ -1,13 +1,14 @@
-﻿#if !AOT
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
 
+#pragma warning disable IDE0060 // Remove unused parameter
+#pragma warning disable CA1822 // Mark members as static
+
 namespace LanguageCore.IL.Generator
 {
-    using BBCode.Generator;
     using LanguageCore.Compiler;
     using Parser;
     using Parser.Statement;
@@ -602,4 +603,3 @@ namespace LanguageCore.IL.Generator
                 printCallback);
     }
 }
-#endif

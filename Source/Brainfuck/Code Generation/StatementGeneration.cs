@@ -1481,7 +1481,7 @@ namespace LanguageCore.Brainfuck.Generator
                 return;
             }
 
-            if (GetFunction(statement.Name, out _))
+            if (GetFunction(statement.Token, out _))
             { throw new NotSupportedException($"Function pointers not supported by brainfuck", statement, CurrentFile); }
 
             throw new CompilerException($"Symbol \"{statement}\" not found", statement, CurrentFile);

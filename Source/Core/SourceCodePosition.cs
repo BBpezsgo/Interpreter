@@ -145,7 +145,7 @@ namespace LanguageCore
 
         public override readonly int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
-        public readonly (Position, Position) CutInHalf()
+        public readonly (Position Left, Position Right) CutInHalf()
         {
             if (Range.Start.Line != Range.End.Line)
             { throw new NotImplementedException(); }

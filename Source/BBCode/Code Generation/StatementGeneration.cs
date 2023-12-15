@@ -738,7 +738,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (inlined is Identifier identifier)
                 {
-                    functionCall = new FunctionCall(null, identifier.Name, anyCall.BracketLeft, anyCall.Parameters, anyCall.BracketRight)
+                    functionCall = new FunctionCall(null, identifier.Token, anyCall.BracketLeft, anyCall.Parameters, anyCall.BracketRight)
                     {
                         SaveValue = anyCall.SaveValue,
                         Semicolon = anyCall.Semicolon,
@@ -1023,7 +1023,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetParameter(variable.Content, out CompiledParameter? param))
             {
-                variable.Name.AnalyzedType = TokenAnalyzedType.ParameterName;
+                variable.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
                 ValueAddress address = GetBaseAddress(param);
 
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
@@ -1036,22 +1036,22 @@ namespace LanguageCore.BBCode.Generator
 
             if (GetVariable(variable.Content, out CompiledVariable? val))
             {
-                variable.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
             if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
             {
-                variable.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                variable.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeOnStack);
                 return;
             }
 
-            if (GetFunction(variable.Name, expectedType, out CompiledFunction? compiledFunction))
+            if (GetFunction(variable.Token, expectedType, out CompiledFunction? compiledFunction))
             {
                 compiledFunction.AddReference(variable, CurrentFile);
-                variable.Name.AnalyzedType = TokenAnalyzedType.FunctionName;
+                variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (compiledFunction.InstructionOffset == -1)
                 { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, variable, compiledFunction, CurrentFile)); }

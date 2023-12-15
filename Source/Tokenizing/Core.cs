@@ -5,12 +5,27 @@ using System.Text;
 
 namespace LanguageCore.Tokenizing
 {
-    public abstract class BaseToken : IThingWithPosition
+    public enum TokenType
     {
-        public abstract Position Position { get; }
+        Whitespace,
+        LineBreak,
+
+        Identifier,
+
+        LiteralNumber,
+        LiteralHex,
+        LiteralBinary,
+        LiteralString,
+        LiteralCharacter,
+        LiteralFloat,
+
+        Operator,
+
+        Comment,
+        CommentMultiline,
     }
 
-    public enum TokenType
+    public enum PreparationTokenType
     {
         Whitespace,
         LineBreak,
@@ -83,7 +98,7 @@ namespace LanguageCore.Tokenizing
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class Token : BaseToken, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
+    public class Token : IThingWithPosition, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
     {
         readonly Position position;
 
@@ -105,7 +120,7 @@ namespace LanguageCore.Tokenizing
             this.position = position;
         }
 
-        public override Position Position => position;
+        public Position Position => position;
 
         public override string ToString() => Content;
         public string ToOriginalString() => TokenType switch
@@ -181,35 +196,53 @@ namespace LanguageCore.Tokenizing
     public readonly struct SimpleToken : IThingWithPosition
     {
         public readonly string Content;
+        readonly Position position;
 
         public SimpleToken(string content, Position position)
         {
-            Content = content;
-            Position = position;
+            this.Content = content;
+            this.position = position;
         }
 
         public override string ToString() => Content;
-        public readonly Position Position { get; }
+
+        public Position Position => position;
     }
 
-    class PreparationToken : BaseToken
+    class PreparationToken : IThingWithPosition
     {
-        public Position position;
-        public TokenType TokenType;
+        Position position;
+        public PreparationTokenType TokenType;
         public readonly StringBuilder Content;
 
-        public PreparationToken(Position position) : base()
+        public ref Position Position => ref position;
+        Position IThingWithPosition.Position => position;
+
+        public PreparationToken(Position position)
         {
             this.position = position;
-            TokenType = Tokenizing.TokenType.Whitespace;
-            Content = new StringBuilder();
+            this.TokenType = PreparationTokenType.Whitespace;
+            this.Content = new StringBuilder();
         }
-
-        public override Position Position => position;
 
         public override string ToString() => Content.ToString();
 
-        public Token Instantiate() => new(TokenType, Content.ToString(), false, Position);
+        public Token Instantiate() => new(TokenType switch
+        {
+            PreparationTokenType.Whitespace => Tokenizing.TokenType.Whitespace,
+            PreparationTokenType.LineBreak => Tokenizing.TokenType.LineBreak,
+            PreparationTokenType.Identifier => Tokenizing.TokenType.Identifier,
+            PreparationTokenType.LiteralNumber => Tokenizing.TokenType.LiteralNumber,
+            PreparationTokenType.LiteralHex => Tokenizing.TokenType.LiteralHex,
+            PreparationTokenType.LiteralBinary => Tokenizing.TokenType.LiteralBinary,
+            PreparationTokenType.LiteralString => Tokenizing.TokenType.LiteralString,
+            PreparationTokenType.LiteralCharacter => Tokenizing.TokenType.LiteralCharacter,
+            PreparationTokenType.LiteralFloat => Tokenizing.TokenType.LiteralFloat,
+            PreparationTokenType.Operator => Tokenizing.TokenType.Operator,
+            PreparationTokenType.Comment => Tokenizing.TokenType.Comment,
+            PreparationTokenType.CommentMultiline => Tokenizing.TokenType.CommentMultiline,
+            _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
+        }, Content.ToString(), false, Position);
     }
 
     public readonly struct TokenizerResult
@@ -289,16 +322,16 @@ namespace LanguageCore.Tokenizing
             }
         }
 
-        void RefreshTokenPosition(int OffsetTotal)
+        void RefreshTokenPosition(int offsetTotal)
         {
-            CurrentToken.position.Range.End.Character = CurrentColumn;
-            CurrentToken.position.Range.End.Line = CurrentLine;
-            CurrentToken.position.AbsoluteRange.End = OffsetTotal;
+            CurrentToken.Position.Range.End.Character = CurrentColumn;
+            CurrentToken.Position.Range.End.Line = CurrentLine;
+            CurrentToken.Position.AbsoluteRange.End = offsetTotal;
         }
 
         protected static List<Token> NormalizeTokens(List<Token> tokens, TokenizerSettings settings)
         {
-            List<Token> result = new();
+            List<Token> result = new(tokens.Count);
 
             for (int i = 0; i < tokens.Count; i++)
             {

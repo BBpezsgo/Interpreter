@@ -450,9 +450,9 @@ namespace LanguageCore.ASM.Generator
 
                 throw new NotImplementedException();
             }
-            else if (GetVariable(statement.Name.Content, out CompiledVariable? variable))
+            else if (GetVariable(statement.Token.Content, out CompiledVariable? variable))
             {
-                statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                statement.Token.AnalyzedType = TokenAnalyzedType.VariableName;
 
                 GenerateCodeForStatement(value);
 
@@ -1048,7 +1048,7 @@ namespace LanguageCore.ASM.Generator
 
             if (GetParameter(statement.Content, out CompiledParameter? compiledParameter))
             {
-                statement.Name.AnalyzedType = TokenAnalyzedType.ParameterName;
+                statement.Token.AnalyzedType = TokenAnalyzedType.ParameterName;
                 ValueAddress address = GetBaseAddress(compiledParameter);
                 StackLoad(address, compiledParameter.Type.SizeOnStack);
                 return;
@@ -1056,12 +1056,12 @@ namespace LanguageCore.ASM.Generator
 
             if (GetVariable(statement.Content, out CompiledVariable? val))
             {
-                statement.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                statement.Token.AnalyzedType = TokenAnalyzedType.VariableName;
                 StackLoad(new ValueAddress(val), val.Type.SizeOnStack);
                 return;
             }
 
-            if (GetFunction(statement.Name, expectedType, out _))
+            if (GetFunction(statement.Token, expectedType, out _))
             {
                 throw new NotImplementedException();
             }

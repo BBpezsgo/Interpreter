@@ -1,4 +1,7 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
+using System.Numerics;
 
 namespace LanguageCore.Runtime
 {
@@ -11,337 +14,312 @@ namespace LanguageCore.Runtime
         IComparisonOperators<DataItem, DataItem, bool>,
         IUnaryPlusOperators<DataItem, DataItem>,
         IUnaryNegationOperators<DataItem, DataItem>,
-        IBitwiseOperators<DataItem, DataItem, DataItem>
+        IBitwiseOperators<DataItem, DataItem, DataItem>,
+        IShiftOperators<DataItem, DataItem, DataItem>
     {
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator +(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator +(DataItem a, DataItem b)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value + right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value + right.Value); }
-            }
-
-            {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value + right.Value); }
-            }
-
-            throw new RuntimeException("Can't do + operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 + b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 + b.valueSInt32)),
+                RuntimeType.Single => new DataItem((float)(a.valueSingle + b.valueSingle)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 + b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do + operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator -(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator -(DataItem a, DataItem b)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value - right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value - right.Value); }
-            }
-
-            {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value - right.Value); }
-            }
-
-            throw new RuntimeException("Can't do - operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 - b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 - b.valueSInt32)),
+                RuntimeType.Single => new DataItem((float)(a.valueSingle - b.valueSingle)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 - b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do - operation with type {a_} and {b_}"),
+            };
         }
 
         /// <exception cref="RuntimeException"/>
-        public static DataItem BitshiftLeft(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator <<(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            int? _offset = rightSide.Integer;
+            if (!_offset.HasValue)
+            { throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"); }
+            int offset = _offset.Value;
+
+            return leftSide.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value << right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value << right.Value); }
-            }
-
-            throw new RuntimeException("Can't do << operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 << offset))),
+                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 << offset))),
+                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 << offset))),
+                _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem BitshiftRight(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator >>(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            int? _offset = rightSide.Integer;
+            if (!_offset.HasValue)
+            { throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"); }
+            int offset = _offset.Value;
+
+            return leftSide.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value >> right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value >> right.Value); }
-            }
-
-            throw new RuntimeException("Can't do >> operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
-        }
-
-        /// <exception cref="RuntimeException"/>
-        public static DataItem operator *(DataItem leftSide, DataItem rightSide)
-        {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
-            {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value * right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value * right.Value); }
-            }
-
-            {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value * right.Value); }
-            }
-
-            throw new RuntimeException("Can't do * operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >> offset))),
+                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >> offset))),
+                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >> offset))),
+                _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator /(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator >>>(DataItem leftSide, DataItem rightSide)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            int? _offset = rightSide.Integer;
+            if (!_offset.HasValue)
+            { throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"); }
+            int offset = _offset.Value;
+
+            return leftSide.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value / right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value / right.Value); }
-            }
-
-            {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value / right.Value); }
-            }
-
-            throw new RuntimeException("Can't do / operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem(unchecked((byte)(leftSide.valueUInt8 >>> offset))),
+                RuntimeType.SInt32 => new DataItem(unchecked((int)(leftSide.valueSInt32 >>> offset))),
+                RuntimeType.UInt16 => new DataItem(unchecked((char)(leftSide.valueUInt16 >>> offset))),
+                _ => throw new RuntimeException($"Can't do >>> operation with type {leftSide.Type} and {rightSide.Type}"),
+            };
         }
-        /// <exception cref="RuntimeException"/>
-        public static DataItem operator %(DataItem leftSide, DataItem rightSide)
+
+        public readonly override bool Equals(object? obj) => obj is DataItem value && this.Equals(value);
+
+        public readonly bool Equals(DataItem other)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            if (type != other.type) return false;
+            return type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
+                RuntimeType.Null => false,
+                RuntimeType.UInt8 => valueUInt8 == other.valueUInt8,
+                RuntimeType.SInt32 => valueSInt32 == other.valueSInt32,
+                RuntimeType.Single => valueSingle == other.valueSingle,
+                RuntimeType.UInt16 => valueUInt16 == other.valueUInt16,
+                _ => throw new ImpossibleException(),
+            };
+        }
 
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value % right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
+        /// <exception cref="InternalException"/>
+        public static void MakeSameType(ref DataItem x, ref DataItem y)
+        {
+            if (x.type == y.type) return;
+
+            DataItem xBefore = x;
+            DataItem yBefore = y;
+
+            switch (x.type)
+            {
+                case RuntimeType.UInt8:
+                    switch (y.type)
+                    {
+                        case RuntimeType.SInt32:
+                            x = new DataItem((int)x.valueUInt8);
+                            break;
+                        case RuntimeType.Single:
+                            x = new DataItem((float)x.valueUInt8);
+                            break;
+                        case RuntimeType.UInt16:
+                            x = new DataItem((char)x.valueUInt8);
+                            break;
+                        default: break;
+                    }
+                    break;
+                case RuntimeType.SInt32:
+                    switch (y.type)
+                    {
+                        case RuntimeType.UInt8:
+                            y = new DataItem((int)y.valueUInt8);
+                            break;
+                        case RuntimeType.Single:
+                            x = new DataItem((float)x.valueSInt32);
+                            break;
+                        case RuntimeType.UInt16:
+                            y = new DataItem((int)y.valueUInt16);
+                            break;
+                        default: break;
+                    }
+                    break;
+                case RuntimeType.Single:
+                    switch (y.type)
+                    {
+                        case RuntimeType.UInt8:
+                            y = new DataItem((float)y.valueUInt8);
+                            break;
+                        case RuntimeType.SInt32:
+                            y = new DataItem((float)y.valueSInt32);
+                            break;
+                        case RuntimeType.UInt16:
+                            y = new DataItem((float)y.valueUInt16);
+                            break;
+                        default: break;
+                    }
+                    break;
+                case RuntimeType.UInt16:
+                    switch (y.type)
+                    {
+                        case RuntimeType.UInt8:
+                            y = new DataItem((char)y.valueUInt8);
+                            break;
+                        case RuntimeType.SInt32:
+                            x = new DataItem((int)x.valueUInt16);
+                            break;
+                        case RuntimeType.Single:
+                            x = new DataItem((float)x.valueUInt16);
+                            break;
+                        default: break;
+                    }
+                    break;
             }
 
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
+            if (!xBefore.Equals(x) &&
+                !yBefore.Equals(y))
+            { throw new InternalException(); }
 
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value % right.Value); }
-            }
+            if (x.type != y.type)
+            { throw new InternalException(); }
+        }
 
-            {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value % right.Value); }
-            }
-
-            throw new RuntimeException("Can't do % operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+        /// <exception cref="InternalException"/>
+        public static (RuntimeType, RuntimeType) MakeSameTypeAndKeep(ref DataItem x, ref DataItem y)
+        {
+            (RuntimeType, RuntimeType) result = (x.type, y.type);
+            DataItem.MakeSameType(ref x, ref y);
+            return result;
         }
 
         /// <exception cref="RuntimeException"/>
-        public static bool operator <(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator *(DataItem a, DataItem b)
         {
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return left.Value < right.Value; }
-            }
-
-            throw new RuntimeException("Can't do < operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 * b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 * b.valueSInt32)),
+                RuntimeType.Single => new DataItem((float)(a.valueSingle * b.valueSingle)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 * b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do * operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static bool operator >(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator /(DataItem a, DataItem b)
         {
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return left.Value > right.Value; }
-            }
-
-            throw new RuntimeException("Can't do > operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
-        }
-
-        /// <exception cref="RuntimeException"/>
-        public static bool operator <=(DataItem leftSide, DataItem rightSide)
-        {
-            try
-            { return (leftSide < rightSide) || (leftSide == rightSide); }
-            catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do <= operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 / b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 / b.valueSInt32)),
+                RuntimeType.Single => new DataItem((float)(a.valueSingle / b.valueSingle)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 / b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do / operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static bool operator >=(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator %(DataItem a, DataItem b)
         {
-            try
-            { return (leftSide > rightSide) || (leftSide == rightSide); }
-            catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do >= operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
-        }
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
-        /// <exception cref="RuntimeException"/>
-        public static bool operator ==(DataItem leftSide, DataItem rightSide)
-        {
+            return a.type switch
             {
-                float? left = leftSide.Float;
-                float? right = rightSide.Float;
-
-                if (left.HasValue && right.HasValue)
-                { return left.Value == right.Value; }
-            }
-
-            throw new RuntimeException("Can't do == operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString());
-        }
-        /// <exception cref="RuntimeException"/>
-        public static bool operator !=(DataItem leftSide, DataItem rightSide)
-        {
-            try
-            { return !(leftSide == rightSide); }
-            catch (RuntimeException ex)
-            { throw new RuntimeException("Can't do != operation with type " + leftSide.Type.ToString() + " and " + rightSide.Type.ToString(), ex); }
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 % b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 % b.valueSInt32)),
+                RuntimeType.Single => new DataItem((float)(a.valueSingle % b.valueSingle)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 % b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do % operation with type {a_} and {b_}"),
+            };
         }
 
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator !(DataItem leftSide)
+        public static bool operator <(DataItem a, DataItem b)
         {
+            if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
+
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                int? left = leftSide.Integer;
-
-                if (left.HasValue)
-                { return new DataItem((left.Value == 0) ? 1 : 0); }
-            }
-
-            {
-                float? left = leftSide.Float;
-
-                if (left.HasValue)
-                { return new DataItem((left.Value == 0f) ? 1f : 0f); }
-            }
-
-            throw new RuntimeException($"Can't do ! operation with type {leftSide.Type}");
+                RuntimeType.Null => false,
+                RuntimeType.UInt8 => a.valueUInt8 < b.valueUInt8,
+                RuntimeType.SInt32 => a.valueSInt32 < b.valueSInt32,
+                RuntimeType.Single => a.valueSingle < b.valueSingle,
+                RuntimeType.UInt16 => a.valueUInt16 < b.valueUInt16,
+                _ => throw new RuntimeException($"Can't do < operation with type {a_} and {b_}"),
+            };
         }
+        /// <exception cref="RuntimeException"/>
+        public static bool operator >(DataItem a, DataItem b)
+        {
+            if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
+
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
+            {
+                RuntimeType.Null => false,
+                RuntimeType.UInt8 => a.valueUInt8 > b.valueUInt8,
+                RuntimeType.SInt32 => a.valueSInt32 > b.valueSInt32,
+                RuntimeType.Single => a.valueSingle > b.valueSingle,
+                RuntimeType.UInt16 => a.valueUInt16 > b.valueUInt16,
+                _ => throw new RuntimeException($"Can't do > operation with type {a_} and {b_}"),
+            };
+        }
+
+        /// <exception cref="RuntimeException"/>
+        public static bool operator <=(DataItem a, DataItem b)
+            => (a < b) || (a == b);
+        /// <exception cref="RuntimeException"/>
+        public static bool operator >=(DataItem a, DataItem b)
+            => (a > b) || (a == b);
+
+        /// <exception cref="RuntimeException"/>
+        public static bool operator ==(DataItem a, DataItem b)
+        {
+            if (a.type == RuntimeType.Null && b.type == RuntimeType.Null) return true;
+            if (a.type == RuntimeType.Null && DataItem.IsZero(b)) return true;
+            if (b.type == RuntimeType.Null && DataItem.IsZero(a)) return true;
+
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
+            {
+                RuntimeType.Null => b.IsNull,
+                RuntimeType.UInt8 => a.valueUInt8 == b.valueUInt8,
+                RuntimeType.SInt32 => a.valueSInt32 == b.valueSInt32,
+                RuntimeType.Single => a.valueSingle == b.valueSingle,
+                RuntimeType.UInt16 => a.valueUInt16 == b.valueUInt16,
+                _ => throw new RuntimeException($"Can't do == operation with type {a_} and {b_}"),
+            };
+        }
+        /// <exception cref="RuntimeException"/>
+        public static bool operator !=(DataItem a, DataItem b)
+            => !(a == b);
+
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator !(DataItem value) => value.type switch
+        {
+            RuntimeType.UInt8 => new DataItem((byte)((value.valueUInt8 == 0) ? (byte)1 : (byte)0)),
+            RuntimeType.SInt32 => new DataItem((int)((value.valueSInt32 == 0) ? (int)1 : (int)0)),
+            RuntimeType.Single => new DataItem((float)((value.valueSingle == 0) ? (float)1f : (float)0f)),
+            RuntimeType.UInt16 => new DataItem((char)((value.valueSingle == 0) ? (ushort)1 : (ushort)0)),
+            _ => throw new RuntimeException($"Can't do ! operation with type {value.Type}"),
+        };
 
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem value) => value.type switch
         {
-            RuntimeType.Null => value,
             RuntimeType.UInt8 => new DataItem((byte)(+value.valueUInt8)),
             RuntimeType.SInt32 => new DataItem((int)(+value.valueSInt32)),
             RuntimeType.Single => new DataItem((float)(+value.valueSingle)),
@@ -352,7 +330,6 @@ namespace LanguageCore.Runtime
         /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem value) => value.type switch
         {
-            RuntimeType.Null => value,
             RuntimeType.UInt8 => new DataItem((byte)(-value.valueUInt8)),
             RuntimeType.SInt32 => new DataItem((int)(-value.valueSInt32)),
             RuntimeType.Single => new DataItem((float)(-value.valueSingle)),
@@ -361,95 +338,50 @@ namespace LanguageCore.Runtime
         };
 
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator |(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator |(DataItem a, DataItem b)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value | right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value | right.Value); }
-            }
-
-            throw new RuntimeException($"Can't do | operation with type {leftSide.Type} and {rightSide.Type}");
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 | b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 | b.valueSInt32)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 | b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do | operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator &(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator &(DataItem a, DataItem b)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value & right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value & right.Value); }
-            }
-
-            throw new RuntimeException($"Can't do & operation with type {leftSide.Type} and {rightSide.Type}");
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 & b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 & b.valueSInt32)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 & b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do & operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator ^(DataItem leftSide, DataItem rightSide)
+        public static DataItem operator ^(DataItem a, DataItem b)
         {
-            if (leftSide.Type == RuntimeType.UInt8 && rightSide.Type == RuntimeType.UInt8)
+            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
+
+            return a.type switch
             {
-                byte? left = leftSide.Byte;
-                byte? right = rightSide.Byte;
-
-                if (left.HasValue && right.HasValue)
-                {
-                    int r = left.Value ^ right.Value;
-                    if (r < byte.MinValue || r > byte.MaxValue)
-                    { return new DataItem(r); }
-                    else
-                    { return new DataItem((byte)r); }
-                }
-            }
-
-            {
-                int? left = leftSide.Integer;
-                int? right = rightSide.Integer;
-
-                if (left.HasValue && right.HasValue)
-                { return new DataItem(left.Value ^ right.Value); }
-            }
-
-            throw new RuntimeException($"Can't do ^ operation with type {leftSide.Type} and {rightSide.Type}");
+                RuntimeType.UInt8 => new DataItem((byte)(a.valueUInt8 ^ b.valueUInt8)),
+                RuntimeType.SInt32 => new DataItem((int)(a.valueSInt32 ^ b.valueSInt32)),
+                RuntimeType.UInt16 => new DataItem((ushort)(a.valueUInt16 ^ b.valueUInt16)),
+                _ => throw new RuntimeException($"Can't do ^ operation with type {a_} and {b_}"),
+            };
         }
         /// <exception cref="RuntimeException"/>
-        public static DataItem operator ~(DataItem leftSide)
+        public static DataItem operator ~(DataItem value)
         {
-            if (leftSide.Type == RuntimeType.UInt8)
+            if (value.Type == RuntimeType.UInt8)
             {
-                byte? left = leftSide.Byte;
+                byte? left = value.Byte;
 
                 if (left.HasValue)
                 {
@@ -462,13 +394,23 @@ namespace LanguageCore.Runtime
             }
 
             {
-                int? left = leftSide.Integer;
+                int? left = value.Integer;
 
                 if (left.HasValue)
                 { return new DataItem(~left.Value); }
             }
 
-            throw new RuntimeException($"Can't do ~ operation with type {leftSide.Type}");
+            throw new RuntimeException($"Can't do ~ operation with type {value.Type}");
+        }
+
+        public static DataItem operator --(DataItem value)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static DataItem operator ++(DataItem value)
+        {
+            throw new NotImplementedException();
         }
     }
 }

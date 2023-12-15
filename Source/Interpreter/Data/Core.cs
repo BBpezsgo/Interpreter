@@ -143,17 +143,10 @@ namespace LanguageCore.Runtime
 
         #endregion
 
-        /// <exception cref="ImpossibleException"></exception>
-        public readonly bool Boolean => this.Type switch
-        {
-            RuntimeType.UInt8 => this.valueUInt8 != 0,
-            RuntimeType.SInt32 => this.valueSInt32 != 0,
-            RuntimeType.Single => this.valueSingle != 0f,
-            RuntimeType.UInt16 => this.valueUInt16 != 0,
-            RuntimeType.Null => false,
-            _ => throw new ImpossibleException(),
-        };
-        /// <exception cref="ImpossibleException"></exception>
+        /// <exception cref="ImpossibleException"/>
+        public readonly bool Boolean => this.ToBoolean(null);
+
+        /// <exception cref="ImpossibleException"/>
         public readonly int? Integer => Type switch
         {
             RuntimeType.UInt8 => this.ValueUInt8,
@@ -163,31 +156,39 @@ namespace LanguageCore.Runtime
             RuntimeType.Null => null,
             _ => throw new ImpossibleException(),
         };
+
         public readonly byte? Byte
         {
             get
             {
-                int? integer_ = this.Integer;
-
-                if (!integer_.HasValue)
-                { return null; }
-
-                if (integer_.Value < byte.MinValue || integer_.Value > byte.MaxValue)
-                { return null; }
-
-                return (byte)integer_.Value;
+                switch (type)
+                {
+                    case RuntimeType.UInt8:
+                        return valueUInt8;
+                    case RuntimeType.SInt32:
+                        if (valueSInt32 is >= byte.MinValue and <= byte.MaxValue)
+                        { return (byte)valueSInt32; }
+                        else
+                        { return null; }
+                    case RuntimeType.Single:
+                        if (!float.IsInteger(valueSingle)) return null;
+                        if (valueSingle is >= byte.MinValue and <= byte.MaxValue)
+                        { return (byte)valueSingle; }
+                        else
+                        { return null; }
+                    case RuntimeType.UInt16:
+                        if ((ushort)valueUInt16 is >= byte.MinValue and <= byte.MaxValue)
+                        { return (byte)valueUInt16; }
+                        else
+                        { return null; }
+                    default:
+                        return null;
+                }
             }
         }
-        /// <exception cref="ImpossibleException"></exception>
-        public readonly float Float => Type switch
-        {
-            RuntimeType.UInt8 => this.ValueUInt8,
-            RuntimeType.SInt32 => this.ValueSInt32,
-            RuntimeType.Single => this.ValueSingle,
-            RuntimeType.UInt16 => this.ValueUInt16,
-            RuntimeType.Null => 0f,
-            _ => throw new ImpossibleException(),
-        };
+
+        /// <exception cref="ImpossibleException"/>
+        public readonly float Float => this.ToSingle(null);
 
         public readonly object? GetValue() => type switch
         {
@@ -200,30 +201,15 @@ namespace LanguageCore.Runtime
         };
 
         /// <exception cref="ImpossibleException"/>
-        public readonly override string ToString() => this.IsNull ? "null" : Type switch
+        public readonly string GetDebuggerDisplay() => Type switch
         {
-            RuntimeType.SInt32 => ValueSInt32.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.UInt8 => ValueUInt8.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.Single => ValueSingle.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            RuntimeType.UInt16 => ValueUInt16.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            RuntimeType.SInt32 => ValueSInt32.ToString(),
+            RuntimeType.UInt8 => ValueUInt8.ToString(),
+            RuntimeType.Single => ValueSingle.ToString().Replace(',', '.') + "f",
+            RuntimeType.UInt16 => $"'{ValueUInt16.Escape()}'",
             RuntimeType.Null => "null",
             _ => throw new ImpossibleException(),
         };
-
-        /// <exception cref="ImpossibleException"/>
-        public readonly string GetDebuggerDisplay()
-        {
-            if (IsNull) return "null";
-            return Type switch
-            {
-                RuntimeType.SInt32 => ValueSInt32.ToString(),
-                RuntimeType.UInt8 => ValueUInt8.ToString(),
-                RuntimeType.Single => ValueSingle.ToString().Replace(',', '.') + "f",
-                RuntimeType.UInt16 => $"'{ValueUInt16.Escape()}'",
-                RuntimeType.Null => "null",
-                _ => throw new ImpossibleException(),
-            };
-        }
 
         public readonly override int GetHashCode()
         {
@@ -247,20 +233,6 @@ namespace LanguageCore.Runtime
             }
             return hash.ToHashCode();
         }
-
-        /// <exception cref="NotImplementedException"/>
-        public readonly override bool Equals(object? obj)
-            => obj is DataItem value &&
-            this.Type == value.Type &&
-            this.Type switch
-            {
-                RuntimeType.UInt8 => valueUInt8 == value.valueUInt8,
-                RuntimeType.SInt32 => valueSInt32 == value.valueSInt32,
-                RuntimeType.Single => valueSingle == value.valueSingle,
-                RuntimeType.UInt16 => valueUInt16 == value.valueUInt16,
-                RuntimeType.Null => false,
-                _ => throw new ImpossibleException(),
-            };
 
         public readonly void DebugPrint()
         {
@@ -354,29 +326,27 @@ namespace LanguageCore.Runtime
             throw new NotImplementedException($"Type conversion for type {value.GetType()} not implemented");
         }
 
-        public static DataItem GetDefaultValue(RuntimeType type)
-            => type switch
-            {
-                RuntimeType.UInt8 => new DataItem((byte)0),
-                RuntimeType.SInt32 => new DataItem((int)0),
-                RuntimeType.Single => new DataItem((float)0f),
-                RuntimeType.UInt16 => new DataItem((char)'\0'),
-                _ => DataItem.Null,
-            };
+        public static DataItem GetDefaultValue(RuntimeType type) => type switch
+        {
+            RuntimeType.UInt8 => new DataItem((byte)0),
+            RuntimeType.SInt32 => new DataItem((int)0),
+            RuntimeType.Single => new DataItem((float)0f),
+            RuntimeType.UInt16 => new DataItem((char)'\0'),
+            _ => DataItem.Null,
+        };
 
         /// <exception cref="InternalException"/>
-        public static DataItem GetDefaultValue(Compiler.Type type)
-            => type switch
-            {
-                Compiler.Type.Byte => new DataItem((byte)0),
-                Compiler.Type.Integer => new DataItem((int)0),
-                Compiler.Type.Float => new DataItem((float)0f),
-                Compiler.Type.Char => new DataItem((char)'\0'),
-                Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-                _ => DataItem.Null,
-            };
+        public static DataItem GetDefaultValue(Compiler.Type type) => type switch
+        {
+            Compiler.Type.Byte => new DataItem((byte)0),
+            Compiler.Type.Integer => new DataItem((int)0),
+            Compiler.Type.Float => new DataItem((float)0f),
+            Compiler.Type.Char => new DataItem((char)'\0'),
+            Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+            Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+            Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+            _ => DataItem.Null,
+        };
 
         public static bool TryShrinkToByte(DataItem value, out DataItem result)
         {

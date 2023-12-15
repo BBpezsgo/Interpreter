@@ -50,6 +50,7 @@ namespace LanguageCore
         public bool Equals(Range<T> other) => Start.Equals(other.Start) && End.Equals(other.End);
         public bool Equals(T start, T end) => Start.Equals(start) && End.Equals(end);
         public bool Equals(T? both) => Start.Equals(both) && End.Equals(both);
+
         public bool Equals(ValueTuple<T, T> other) => Start.Equals(other.Item1) && End.Equals(other.Item2);
         public override readonly int GetHashCode() => HashCode.Combine(Start, End);
 

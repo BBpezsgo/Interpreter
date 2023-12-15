@@ -450,7 +450,7 @@ namespace LanguageCore.Compiler
             { AnalyzeStatement(field.PrevStatement); }
             else if (statement is Identifier variable)
             {
-                if (GetFunction(variable.Name, expectedType, out CompiledFunction? function))
+                if (GetFunction(variable.Token, expectedType, out CompiledFunction? function))
                 {
                     if (CurrentFunction == null || !function.IsSame(CurrentFunction))
                     { function.TimesUsed++; }
@@ -527,6 +527,26 @@ namespace LanguageCore.Compiler
         {
             CurrentFunction = null;
 
+            {
+                int variablesAdded = AnalyzeNewVariables(topLevelStatements);
+
+                foreach (Statement statement in topLevelStatements)
+                {
+                    AnalyzeStatement(statement);
+
+                    if (statement is StatementWithBlock blockStatement)
+                    { AnalyzeStatements(blockStatement.Block.Statements); }
+
+                    if (statement is StatementWithAnyBlock anyBlockStatement &&
+                        anyBlockStatement.Block is Block block)
+                    { AnalyzeStatements(block.Statements); }
+                }
+
+                CompiledGlobalVariables.AddRange(CompiledVariables.GetRange(CompiledVariables.Count - variablesAdded, variablesAdded));
+                for (int i = 0; i < variablesAdded; i++)
+                { this.CompiledVariables.RemoveAt(this.CompiledVariables.Count - 1); }
+            }
+
             for (int i = 0; i < this.CompiledFunctions.Length; i++)
             {
                 CompiledFunction function = this.CompiledFunctions[i];
@@ -586,8 +606,6 @@ namespace LanguageCore.Compiler
                 CurrentFile = null;
                 CompiledParameters.Clear();
             }
-
-            AnalyzeStatements(topLevelStatements);
 
             for (int i = 0; i < this.CompilableFunctions.Count; i++)
             {

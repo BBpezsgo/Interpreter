@@ -160,7 +160,7 @@ namespace LanguageCore.Runtime
         void HEAP_GET()
         {
             int address = GetData().ValueSInt32;
-            var value = Memory.Heap[address];
+            DataItem value = Memory.Heap[address];
             Memory.Stack.Push(value);
             Step();
         }
@@ -168,7 +168,7 @@ namespace LanguageCore.Runtime
         void HEAP_SET()
         {
             int address = GetData().ValueSInt32;
-            var value = Memory.Stack.Pop();
+            DataItem value = Memory.Stack.Pop();
             Memory.Heap[address] = value;
             Step();
         }
@@ -218,7 +218,7 @@ namespace LanguageCore.Runtime
         {
             int relativeAddress = GetData().ValueSInt32;
 
-            var condition = Memory.Stack.Pop();
+            DataItem condition = Memory.Stack.Pop();
 
             if (condition.Boolean)
             { Step(); }
@@ -240,7 +240,7 @@ namespace LanguageCore.Runtime
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(DataItem.BitshiftLeft(leftSide, rightSide));
+            Memory.Stack.Push(leftSide << rightSide);
 
             Step();
         }
@@ -250,15 +250,15 @@ namespace LanguageCore.Runtime
             DataItem rightSide = Memory.Stack.Pop();
             DataItem leftSide = Memory.Stack.Pop();
 
-            Memory.Stack.Push(DataItem.BitshiftRight(leftSide, rightSide));
+            Memory.Stack.Push(leftSide >> rightSide);
 
             Step();
         }
 
         void LOGIC_LT()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide < rightSide));
 
@@ -267,15 +267,15 @@ namespace LanguageCore.Runtime
 
         void LOGIC_NOT()
         {
-            var v = Memory.Stack.Pop();
+            DataItem v = Memory.Stack.Pop();
             Memory.Stack.Push(!v);
             Step();
         }
 
         void LOGIC_MT()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide > rightSide));
 
@@ -284,8 +284,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_AND()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide.Boolean && rightSide.Boolean));
 
@@ -294,8 +294,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_OR()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide.Boolean || rightSide.Boolean));
 
@@ -304,8 +304,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_EQ()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide == rightSide));
 
@@ -314,8 +314,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_NEQ()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide != rightSide));
 
@@ -324,8 +324,8 @@ namespace LanguageCore.Runtime
 
         void BITS_OR()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(leftSide | rightSide);
 
@@ -334,8 +334,8 @@ namespace LanguageCore.Runtime
 
         void BITS_XOR()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(leftSide ^ rightSide);
 
@@ -344,7 +344,7 @@ namespace LanguageCore.Runtime
 
         void BITS_NOT()
         {
-            var rightSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(~rightSide);
 
@@ -353,8 +353,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_LTEQ()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide <= rightSide));
 
@@ -363,8 +363,8 @@ namespace LanguageCore.Runtime
 
         void LOGIC_MTEQ()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(new DataItem(leftSide >= rightSide));
 
@@ -373,8 +373,8 @@ namespace LanguageCore.Runtime
 
         void BITS_AND()
         {
-            var rightSide = Memory.Stack.Pop();
-            var leftSide = Memory.Stack.Pop();
+            DataItem rightSide = Memory.Stack.Pop();
+            DataItem leftSide = Memory.Stack.Pop();
 
             Memory.Stack.Push(leftSide & rightSide);
 
@@ -455,7 +455,7 @@ namespace LanguageCore.Runtime
         void STORE_VALUE()
         {
             int address = GetStackAddress();
-            var value = Memory.Stack.Pop();
+            DataItem value = Memory.Stack.Pop();
 
             Memory.Stack[address] = value;
 

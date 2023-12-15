@@ -6,6 +6,7 @@ using System.Text;
 
 namespace LanguageCore.Parser.Statement
 {
+    using System.Diagnostics;
     using Compiler;
     using Tokenizing;
 
@@ -388,7 +389,7 @@ namespace LanguageCore.Parser.Statement
 
             if (PrevStatement is Identifier functionIdentifier)
             {
-                functionCall = new FunctionCall(null, functionIdentifier.Name, BracketLeft, Parameters, BracketRight)
+                functionCall = new FunctionCall(null, functionIdentifier.Token, BracketLeft, Parameters, BracketRight)
                 {
                     Semicolon = Semicolon,
                     SaveValue = SaveValue,
@@ -720,28 +721,28 @@ namespace LanguageCore.Parser.Statement
             switch (Operator.Content)
             {
                 case "++":
-                    {
-                        Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                        one.SaveValue = true;
+                {
+                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                    one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
+                    OperatorCall operatorCall = new(Token.CreateAnonymous("+", TokenType.Operator, Operator.Position), Left, one);
 
-                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
+                    Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
 
-                        return new Assignment(assignmentToken, Left, operatorCall);
-                    }
+                    return new Assignment(assignmentToken, Left, operatorCall);
+                }
 
                 case "--":
-                    {
-                        Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
-                        one.SaveValue = true;
+                {
+                    Literal one = Literal.CreateAnonymous(LiteralType.Integer, "1", Operator.Position);
+                    one.SaveValue = true;
 
-                        OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
+                    OperatorCall operatorCall = new(Token.CreateAnonymous("-", TokenType.Operator, Operator.Position), Left, one);
 
-                        Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
+                    Token assignmentToken = Token.CreateAnonymous("=", TokenType.Operator, Operator.Position);
 
-                        return new Assignment(assignmentToken, Left, operatorCall);
-                    }
+                    return new Assignment(assignmentToken, Left, operatorCall);
+                }
 
                 default: throw new NotImplementedException();
             }
@@ -858,15 +859,6 @@ namespace LanguageCore.Parser.Statement
             _ => throw new ImpossibleException(),
         };
 
-        public object? TryGetValue()
-            => Type switch
-            {
-                LiteralType.Integer => GetInt(),
-                LiteralType.Float => GetFloat(),
-                LiteralType.Boolean => bool.Parse(Value),
-                _ => null,
-            };
-
         public static int GetInt(string value)
         {
             value = value.Trim();
@@ -901,19 +893,19 @@ namespace LanguageCore.Parser.Statement
 
     public class Identifier : StatementWithValue
     {
-        public readonly Token Name;
-        public string Content => Name.Content;
+        public readonly Token Token;
 
-        public Identifier(Token identifier)
+        public string Content
         {
-            Name = identifier;
+            [DebuggerStepThrough]
+            get => Token.Content;
         }
 
-        public override string ToString()
-            => Name.Content;
+        public Identifier(Token token) => Token = token;
 
-        public override Position Position
-            => new(Name);
+        public override string ToString() => Token.Content;
+
+        public override Position Position => Token.Position;
     }
 
     public class AddressGetter : StatementWithValue

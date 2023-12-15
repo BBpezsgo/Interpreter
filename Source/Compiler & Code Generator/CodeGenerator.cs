@@ -1912,11 +1912,11 @@ namespace LanguageCore.Compiler
             if (GetEnum(identifier.Content, out CompiledEnum? @enum))
             { return new CompiledType(@enum); }
 
-            if (GetFunction(identifier.Name, expectedType, out CompiledFunction? function))
+            if (GetFunction(identifier.Token, expectedType, out CompiledFunction? function))
             { return new CompiledType(function); }
 
             try
-            { return FindType(identifier.Name); }
+            { return FindType(identifier.Token); }
             catch (CompilerException)
             { }
 
@@ -2013,7 +2013,7 @@ namespace LanguageCore.Compiler
                 throw new CompilerException($"Enum member \"{prevStatementType}\" not found in enum \"{prevStatementType.Enum.Identifier.Content}\"", field.FieldName, CurrentFile);
             }
 
-            throw new CompilerException($"Class/struct/enum definition \"{prevStatementType}\" not found", field, CurrentFile);
+            throw new CompilerException($"Type \"{prevStatementType}\" does not have a field \"{field.FieldName}\"", field, CurrentFile);
         }
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
         protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType? expectedType)
@@ -2295,7 +2295,7 @@ namespace LanguageCore.Compiler
             {
                 if (parameters.TryGetValue(identifier.Content, out StatementWithValue? inlinedStatement))
                 { return inlinedStatement; }
-                return new Identifier(identifier.Name);
+                return new Identifier(identifier.Token);
             }
 
             if (statement is OperatorCall operatorCall)
@@ -2351,8 +2351,8 @@ namespace LanguageCore.Compiler
                 "|" => left | right,
                 "^" => left ^ right,
 
-                "<<" => DataItem.BitshiftLeft(left, right),
-                ">>" => DataItem.BitshiftRight(left, right),
+                "<<" => left << right,
+                ">>" => left >> right,
 
                 "<" => new DataItem(left < right),
                 ">" => new DataItem(left > right),
@@ -2360,7 +2360,7 @@ namespace LanguageCore.Compiler
                 "!=" => new DataItem(left != right),
                 "<=" => new DataItem(left <= right),
                 ">=" => new DataItem(left >= right),
-                _ => throw new NotImplementedException($"Unknown operator '{@operator}'"),
+                _ => throw new NotImplementedException($"Unknown operator \"{@operator}\""),
             };
         }
 
@@ -2397,23 +2397,23 @@ namespace LanguageCore.Compiler
                 switch (op)
                 {
                     case "&&":
+                    {
+                        if (!leftValue.Boolean)
                         {
-                            if (!leftValue.Boolean)
-                            {
-                                value = new DataItem(false);
-                                return true;
-                            }
-                            break;
+                            value = new DataItem(false);
+                            return true;
                         }
+                        break;
+                    }
                     case "||":
+                    {
+                        if (leftValue.Boolean)
                         {
-                            if (leftValue.Boolean)
-                            {
-                                value = new DataItem(true);
-                                return true;
-                            }
-                            break;
+                            value = new DataItem(true);
+                            return true;
                         }
+                        break;
+                    }
                     default:
                         value = DataItem.Null;
                         return false;
@@ -2450,23 +2450,23 @@ namespace LanguageCore.Compiler
                 switch (op)
                 {
                     case "&&":
+                    {
+                        if (!leftValue.Boolean)
                         {
-                            if (!leftValue.Boolean)
-                            {
-                                value = new DataItem(false);
-                                return true;
-                            }
-                            break;
+                            value = new DataItem(false);
+                            return true;
                         }
+                        break;
+                    }
                     case "||":
+                    {
+                        if (leftValue.Boolean)
                         {
-                            if (leftValue.Boolean)
-                            {
-                                value = new DataItem(true);
-                                return true;
-                            }
-                            break;
+                            value = new DataItem(true);
+                            return true;
                         }
+                        break;
+                    }
                     default:
                         value = DataItem.Null;
                         return false;

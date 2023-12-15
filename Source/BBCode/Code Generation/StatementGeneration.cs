@@ -2238,7 +2238,7 @@ namespace LanguageCore.BBCode.Generator
             CompiledVariables.Clear();
             ReturnInstructions.Clear();
 
-            CompileParameters(function.Parameters);
+            CompileParameters(function.Parameters.ToArray());
 
             CurrentFile = function.FilePath;
 

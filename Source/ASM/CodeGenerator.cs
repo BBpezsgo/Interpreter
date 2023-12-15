@@ -1488,7 +1488,7 @@ namespace LanguageCore.ASM.Generator
 
             CompiledParameters.Clear();
 
-            CompileParameters(function.Parameters);
+            CompileParameters(function.Parameters.ToArray());
 
             CurrentFile = function.FilePath;
 

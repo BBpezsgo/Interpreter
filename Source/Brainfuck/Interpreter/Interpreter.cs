@@ -178,14 +178,11 @@ namespace LanguageCore.Brainfuck
         {
             Console.Clear();
 
-            ConsoleHandler.GetHandles();
-
             short width = ConsoleHandler.WindowWidth;
             short height = ConsoleHandler.WindowHeight;
 
             ConsoleRenderer renderer = new(width, height);
             ConsoleListener.Start();
-            GUI.ConsoleRenderer = renderer;
 
             Queue<byte> inputBuffer = new();
             string outputBuffer = string.Empty;
@@ -226,25 +223,25 @@ namespace LanguageCore.Brainfuck
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
 
-                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOriginalCode(renderer, 0, line, width, 15);
                 height -= 15;
                 line += 15;
 
-                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
 
                 DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
-                GUI.Label(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
 
-                GUI.Label(0, line, new string(' ', width), 0);
+                renderer.Text(0, line, new string(' ', width));
 
                 if (DebugInfo != null)
                 {
                     FunctionInformations functionInfo = DebugInfo.GetFunctionInformations(codePointer);
                     if (functionInfo.IsValid)
-                    { GUI.Label(0, line++, functionInfo.ReadableIdentifier, ByteColor.White); }
+                    { renderer.Text(0, line++, functionInfo.ReadableIdentifier, ByteColor.White); }
                 }
 
                 renderer.Render();
@@ -429,7 +426,7 @@ namespace LanguageCore.Brainfuck
                 };
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
-                GUI.Label(x, y, textToPrint, ByteColor.Silver);
+                renderer.Text(x, y, textToPrint, ByteColor.Silver);
                 x += textToPrint.Length;
 
                 if (x >= width)
@@ -450,11 +447,11 @@ namespace LanguageCore.Brainfuck
                 string textToPrint = Memory[m].ToString().PadRight(4, ' ');
 
                 if (memoryPointer == m)
-                { GUI.Label(x, y, textToPrint, ByteColor.BrightRed); }
+                { renderer.Text(x, y, textToPrint, ByteColor.BrightRed); }
                 else if (Memory[m] == 0)
-                { GUI.Label(x, y, textToPrint, ByteColor.Silver); }
+                { renderer.Text(x, y, textToPrint, ByteColor.Silver); }
                 else
-                { GUI.Label(x, y, textToPrint, ByteColor.White); }
+                { renderer.Text(x, y, textToPrint, ByteColor.White); }
 
                 x += textToPrint.Length;
 
@@ -474,9 +471,9 @@ namespace LanguageCore.Brainfuck
             for (int m = start; m <= end; m++)
             {
                 if (memoryPointer == m)
-                { GUI.Label(x, y, "^   ", ByteColor.BrightRed); }
+                { renderer.Text(x, y, "^   ", ByteColor.BrightRed); }
                 else
-                { GUI.Label(x, y, "    ", ByteColor.White); }
+                { renderer.Text(x, y, "    ", ByteColor.White); }
 
                 x += 4;
 

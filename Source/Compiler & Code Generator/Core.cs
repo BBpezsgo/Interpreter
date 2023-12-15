@@ -264,7 +264,7 @@ namespace LanguageCore.Compiler
         {
             ReturnType = function.Type;
             Parameters = new CompiledType[function.ParameterTypes.Length];
-            Array.Copy(function.ParameterTypes, Parameters, function.Parameters.Length);
+            Array.Copy(function.ParameterTypes, Parameters, function.Parameters.Count);
         }
 
         public FunctionType(CompiledType returnType, CompiledType[] parameters)

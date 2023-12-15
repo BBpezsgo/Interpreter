@@ -43,10 +43,10 @@ namespace LanguageCore.Runtime
     {
         int _absoluteBreakpoint = int.MinValue;
 
-        bool _stackOperation = false;
-        bool _heapOperation = false;
-        bool _externalFunctionOperation = false;
-        bool _aluOperation = false;
+        bool _stackOperation;
+        bool _heapOperation;
+        bool _externalFunctionOperation;
+        bool _aluOperation;
 
         public int AbsoluteBreakpoint
         {
@@ -77,7 +77,6 @@ namespace LanguageCore.Runtime
         public readonly Records<float> HeapUsage = new();
 
         DebugInformation DebugInfo => CompilerResult.DebugInfo;
-        Instruction[] Code => CompilerResult.Code;
 
         public void DoUpdate()
         {

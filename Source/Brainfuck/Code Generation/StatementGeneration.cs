@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 
+#pragma warning disable IDE0051
+
 namespace LanguageCore.Brainfuck.Generator
 {
     using Compiler;

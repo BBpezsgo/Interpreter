@@ -226,7 +226,7 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
                 if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
 
@@ -243,7 +243,7 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
                 if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
 
@@ -260,7 +260,7 @@ namespace LanguageCore.BBCode.Generator
                 InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
 
-                AddComment(function.Identifier.Content + ((function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function);
 
@@ -283,7 +283,7 @@ namespace LanguageCore.BBCode.Generator
 
                     SetTypeArguments(function.TypeArguments);
 
-                    AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                    AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                     GenerateCodeForFunction(function.Function);
 
@@ -303,7 +303,7 @@ namespace LanguageCore.BBCode.Generator
 
                 SetTypeArguments(function.TypeArguments);
 
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 
@@ -323,7 +323,7 @@ namespace LanguageCore.BBCode.Generator
 
                 SetTypeArguments(function.TypeArguments);
 
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Length > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
+                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
 
                 GenerateCodeForFunction(function.Function);
 

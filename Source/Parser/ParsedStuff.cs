@@ -4,12 +4,71 @@ using System.Linq;
 
 namespace LanguageCore.Parser
 {
+    using System.Collections;
     using Compiler;
     using Tokenizing;
 
     public interface IDefinition
     {
         public string? FilePath { get; set; }
+    }
+
+    public class ParametersDefinition :
+        IThingWithPosition,
+        IReadOnlyCollection<ParameterDefinition>,
+        IEquatable<ParametersDefinition>
+    {
+        public readonly Token LeftParenthesis;
+        public readonly Token RightParenthesis;
+        readonly ParameterDefinition[] Parameters;
+
+        public ParameterDefinition this[int index] => Parameters[index];
+
+        public ParametersDefinition(IEnumerable<ParameterDefinition> parameters, Token leftParenthesis, Token rightParenthesis)
+        {
+            this.Parameters = parameters.ToArray();
+            this.LeftParenthesis = leftParenthesis;
+            this.RightParenthesis = rightParenthesis;
+        }
+
+        public Position Position => Position.Union(Parameters).Union(LeftParenthesis, RightParenthesis);
+
+        public int Count => Parameters.Length;
+
+        public IEnumerator<ParameterDefinition> GetEnumerator() => ((IEnumerable<ParameterDefinition>)Parameters).GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => Parameters.GetEnumerator();
+
+        public bool TypeEquals(ParametersDefinition? other)
+        {
+            if (other is null) return false;
+            if (Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < Parameters.Length; i++)
+            { if (!Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
+            return true;
+        }
+
+        public bool Equals(ParametersDefinition? other)
+        {
+            if (other is null) return false;
+            if (Parameters.Length != other.Parameters.Length) return false;
+            for (int i = 0; i < Parameters.Length; i++)
+            {
+                if (!Parameters[i].Type.Equals(other.Parameters[i].Type)) return false;
+                if (!Parameters[i].Identifier.Equals(other.Parameters[i].Identifier)) return false;
+                if (Parameters[i].Modifiers.Length != other.Parameters[i].Modifiers.Length) return false;
+                for (int j = 0; j < Parameters[i].Modifiers.Length; j++)
+                {
+                    if (!Parameters[i].Modifiers[j].Equals(other.Parameters[i].Modifiers[j])) return false;
+                }
+            }
+            return true;
+        }
+
+        public ParameterDefinition[] ToArray() => Parameters;
+
+        public override bool Equals(object? obj) => Equals(obj as ParametersDefinition);
+
+        public override int GetHashCode() => HashCode.Combine(LeftParenthesis, RightParenthesis, Parameters);
     }
 
     public class ParameterDefinition : IHaveKey<string>, IThingWithPosition
@@ -182,16 +241,16 @@ namespace LanguageCore.Parser
 
     public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
     {
-        public ParameterDefinition[] Parameters;
+        public ParametersDefinition Parameters;
         public Token[] Modifiers;
         public Statement.Block? Block;
 
         /// <summary>
         /// The first parameter is labeled as 'this'
         /// </summary>
-        public bool IsMethod => (Parameters.Length > 0) && Parameters[0].Modifiers.Contains("this");
+        public bool IsMethod => (Parameters.Count > 0) && Parameters[0].Modifiers.Contains("this");
 
-        public int ParameterCount => Parameters.Length;
+        public int ParameterCount => Parameters.Count;
 
         public bool IsExport => Modifiers.Contains("export");
 
@@ -201,13 +260,16 @@ namespace LanguageCore.Parser
 
         public readonly TemplateInfo? TemplateInfo;
 
-        protected FunctionThingDefinition(Token identifier, TemplateInfo? templateInfo, IEnumerable<Token> modifiers)
+        protected FunctionThingDefinition(
+            IEnumerable<Token> modifiers,
+            Token identifier,
+            ParametersDefinition parameters,
+            TemplateInfo? templateInfo)
         {
-            Identifier = identifier;
-            TemplateInfo = templateInfo;
-
-            Parameters = Array.Empty<ParameterDefinition>();
             Modifiers = modifiers.ToArray();
+            Identifier = identifier;
+            Parameters = parameters;
+            TemplateInfo = templateInfo;
         }
 
         public virtual bool IsTemplate => TemplateInfo is not null;
@@ -220,7 +282,7 @@ namespace LanguageCore.Parser
         {
             string result = this.Identifier.ToString();
             result += "(";
-            for (int j = 0; j < this.Parameters.Length; j++)
+            for (int j = 0; j < this.Parameters.Count; j++)
             {
                 if (j > 0) { result += ", "; }
                 result += this.Parameters[j].Type.ToString();
@@ -234,7 +296,7 @@ namespace LanguageCore.Parser
             if (typeArguments == null) return ReadableID();
             string result = this.Identifier.ToString();
             result += "(";
-            for (int j = 0; j < this.Parameters.Length; j++)
+            for (int j = 0; j < this.Parameters.Count; j++)
             {
                 if (j > 0) { result += ", "; }
                 result += this.Parameters[j].Type.ToString(typeArguments);
@@ -254,8 +316,8 @@ namespace LanguageCore.Parser
             if (other is null) return false;
             if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
 
-            if (this.Parameters.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
+            if (this.Parameters.Count != other.Parameters.Count) return false;
+            for (int i = 0; i < this.Parameters.Count; i++)
             { if (!this.Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
 
             if (this.Modifiers.Length != other.Modifiers.Length) return false;
@@ -284,9 +346,7 @@ namespace LanguageCore.Parser
 
             if (!string.Equals(a.Identifier.Content, b.Identifier.Content)) return false;
 
-            if (a.Parameters.Length != b.Parameters.Length) return false;
-            for (int i = 0; i < a.Parameters.Length; i++)
-            { if (!a.Parameters[i].Type.Equals(b.Parameters[i].Type)) return false; }
+            if (!a.Parameters.TypeEquals(b.Parameters)) return false;
 
             return true;
         }
@@ -297,7 +357,7 @@ namespace LanguageCore.Parser
             get
             {
                 Position result = new(Identifier);
-                result.Union(Parameters);
+                result.Union(Parameters.Position);
                 result.Union(Block);
                 result.Union(Modifiers);
                 return result;
@@ -416,19 +476,21 @@ namespace LanguageCore.Parser
             public Position Position => new(Identifier);
         }
 
-        public Attribute[] Attributes;
+        public readonly Attribute[] Attributes;
 
         public readonly TypeInstance Type;
 
         public FunctionDefinition(
+            IEnumerable<Attribute> attributes,
             IEnumerable<Token> modifiers,
             TypeInstance type,
             Token identifier,
+            ParametersDefinition parameters,
             TemplateInfo? templateInfo)
-            : base(identifier, templateInfo, modifiers)
+            : base(modifiers, identifier, parameters, templateInfo)
         {
+            Attributes = attributes.ToArray();
             Type = type;
-            Attributes = Array.Empty<Attribute>();
         }
 
         public override string ToString()
@@ -445,9 +507,9 @@ namespace LanguageCore.Parser
             result += this.Identifier.Content;
 
             result += '(';
-            if (this.Parameters.Length > 0)
+            if (this.Parameters.Count > 0)
             {
-                for (int i = 0; i < Parameters.Length; i++)
+                for (int i = 0; i < Parameters.Count; i++)
                 {
                     if (i > 0) result += ", ";
                     result += Parameters[i].Type.ToString();
@@ -463,11 +525,7 @@ namespace LanguageCore.Parser
         public bool IsSame(FunctionDefinition other)
         {
             if (this.Identifier.Content != other.Identifier.Content) return false;
-            if (this.Parameters.Length != other.Parameters.Length) return false;
-            for (int i = 0; i < this.Parameters.Length; i++)
-            {
-                if (!this.Parameters[i].Type.Equals(other.Parameters[i])) return false;
-            }
+            if (!this.Parameters.TypeEquals(other.Parameters)) return false;
             return true;
         }
 
@@ -488,8 +546,9 @@ namespace LanguageCore.Parser
     {
         public GeneralFunctionDefinition(
             Token identifier,
-            IEnumerable<Token> modifiers)
-            : base(identifier, null, modifiers)
+            IEnumerable<Token> modifiers,
+            ParametersDefinition parameters)
+            : base(modifiers, identifier, parameters, null)
         { }
 
         public override string ToString()
@@ -502,9 +561,9 @@ namespace LanguageCore.Parser
             result += this.Identifier.Content;
 
             result += '(';
-            if (this.Parameters.Length > 0)
+            if (this.Parameters.Count > 0)
             {
-                for (int i = 0; i < Parameters.Length; i++)
+                for (int i = 0; i < Parameters.Count; i++)
                 {
                     if (i > 0) result += ", ";
                     result += Parameters[i].Type;

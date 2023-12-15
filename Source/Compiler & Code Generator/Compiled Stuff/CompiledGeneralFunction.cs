@@ -45,12 +45,11 @@ namespace LanguageCore.Compiler
             set => context = value;
         }
 
-        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers)
+        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.Parameters)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
 
-            base.Parameters = functionDefinition.Parameters;
             base.Block = functionDefinition.Block;
 
             base.FilePath = functionDefinition.FilePath;
@@ -75,7 +74,6 @@ namespace LanguageCore.Compiler
         public CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
         {
             context = this.context,
-            Modifiers = this.Modifiers,
             TimesUsed = this.TimesUsed,
             TimesUsedTotal = this.TimesUsedTotal,
         };
@@ -109,7 +107,6 @@ namespace LanguageCore.Compiler
         {
             CompiledGeneralFunctionTemplateInstance result = new(Type, ParameterTypes, this, this)
             {
-                Modifiers = this.Modifiers,
                 TimesUsed = this.TimesUsed,
                 TimesUsedTotal = this.TimesUsedTotal,
             };

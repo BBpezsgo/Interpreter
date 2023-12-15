@@ -596,7 +596,7 @@ namespace LanguageCore.Compiler
                 SetTypeArguments(function.TypeArguments);
 
                 CompiledParameters.Clear();
-                for (int j = 0; j < function.Function.Parameters.Length; j++)
+                for (int j = 0; j < function.Function.Parameters.Count; j++)
                 {
                     CompiledParameters.Add(new CompiledParameter(function.Function.ParameterTypes[j], function.Function.Parameters[j]));
                 }

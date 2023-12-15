@@ -1169,7 +1169,7 @@ namespace LanguageCore.Compiler
                 if (!_function.CanUse(CurrentFile))
                 { continue; }
 
-                if (_function.Parameters.Length != 1)
+                if (_function.Parameters.Count != 1)
                 { continue; }
 
                 if (type != _function.ParameterTypes[0])

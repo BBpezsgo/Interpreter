@@ -82,8 +82,8 @@ namespace LanguageCore.TerminalInterface
     public class TerminalInterface
     {
         string Input = string.Empty;
-        int CurrentLineWidth = 0;
-        bool ShouldClose = false;
+        int CurrentLineWidth;
+        bool ShouldClose;
 
         bool TryGetSuggestion([NotNullWhen(true)] out string? suggestion)
         {

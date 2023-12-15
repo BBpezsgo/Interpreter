@@ -43,14 +43,12 @@ namespace LanguageCore.Compiler
 
         public CompiledClass? Context { get; set; }
 
-        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.TemplateInfo)
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Attributes, functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.Parameters, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
 
-            base.Attributes = functionDefinition.Attributes;
-            base.Parameters = functionDefinition.Parameters;
             base.Block = functionDefinition.Block;
             base.FilePath = functionDefinition.FilePath;
         }

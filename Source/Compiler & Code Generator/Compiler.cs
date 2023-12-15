@@ -313,7 +313,7 @@ namespace LanguageCore.Compiler
                 { Errors.Add(new Error($"External function \"{externalName}\" not found", function, function.FilePath)); }
                 else
                 {
-                    if (externalFunction.ParameterCount != function.Parameters.Length)
+                    if (externalFunction.ParameterCount != function.Parameters.Count)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.Void))
                     { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
@@ -348,7 +348,7 @@ namespace LanguageCore.Compiler
                 { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", function, function.FilePath)); }
                 else
                 {
-                    if (builtinFunction.Parameters.Length != function.Parameters.Length)
+                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
                     { throw new CompilerException($"Wrong number of parameters passed to function \"{builtinName}\"", function.Identifier, function.FilePath); }
 
                     if (builtinFunction.ReturnValue != type)
@@ -372,7 +372,7 @@ namespace LanguageCore.Compiler
 
             CompiledFunction result = new(
                 type,
-                CompileTypes(function.Parameters, GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), GetCustomType),
                 function
                 )
             {
@@ -396,7 +396,7 @@ namespace LanguageCore.Compiler
             {
                 if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
                 {
-                    if (externalFunction.ParameterCount != function.Parameters.Length)
+                    if (externalFunction.ParameterCount != function.Parameters.Count)
                     { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.Void))
                     { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
@@ -423,7 +423,7 @@ namespace LanguageCore.Compiler
 
             return new CompiledOperator(
                 type,
-                CompileTypes(function.Parameters, GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), GetCustomType),
                 function
                 )
             {
@@ -435,7 +435,7 @@ namespace LanguageCore.Compiler
         {
             return new CompiledGeneralFunction(
                 returnType,
-                CompileTypes(function.Parameters, GetCustomType),
+                CompileTypes(function.Parameters.ToArray(), GetCustomType),
                 function
                 );
         }
@@ -798,7 +798,7 @@ namespace LanguageCore.Compiler
                                     TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                     Token.CreateAnonymous("this"))
                                 );
-                            method.Parameters = parameters.ToArray();
+                            method.Parameters = new ParametersDefinition(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
                             returnType = new CompiledType(Type.Void);
                         }
 
@@ -825,7 +825,7 @@ namespace LanguageCore.Compiler
                                 TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                 Token.CreateAnonymous("this"))
                             );
-                        method.Parameters = parameters.ToArray();
+                        method.Parameters = new ParametersDefinition(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
 
                         CompiledFunction methodInfo = CompileFunction(method);
 

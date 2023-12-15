@@ -51,7 +51,7 @@ namespace LanguageCore.Compiler
         {
             get
             {
-                if (CompiledAttributes.TryGetValue("External", out var attributeValues))
+                if (CompiledAttributes.TryGetValue("External", out AttributeValues attributeValues))
                 {
                     if (attributeValues.TryGetValue(0, out string name))
                     { return name; }
@@ -66,7 +66,7 @@ namespace LanguageCore.Compiler
         {
             get
             {
-                if (CompiledAttributes.TryGetValue("Builtin", out var attributeValues))
+                if (CompiledAttributes.TryGetValue("Builtin", out AttributeValues attributeValues))
                 {
                     if (attributeValues.TryGetValue(0, out string name))
                     { return name; }
@@ -77,14 +77,12 @@ namespace LanguageCore.Compiler
 
         public CompiledClass? Context { get; set; }
 
-        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.TemplateInfo)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Attributes, functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.Parameters, functionDefinition.TemplateInfo)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
 
-            base.Attributes = functionDefinition.Attributes;
-            base.Parameters = functionDefinition.Parameters;
             base.Block = functionDefinition.Block;
             base.FilePath = functionDefinition.FilePath;
         }

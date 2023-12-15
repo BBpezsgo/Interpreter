@@ -1,6 +1,17 @@
-﻿namespace LanguageCore.Runtime
+﻿using System.Numerics;
+
+namespace LanguageCore.Runtime
 {
-    public partial struct DataItem
+    public partial struct DataItem :
+        IAdditionOperators<DataItem, DataItem, DataItem>,
+        ISubtractionOperators<DataItem, DataItem, DataItem>,
+        IMultiplyOperators<DataItem, DataItem, DataItem>,
+        IDivisionOperators<DataItem, DataItem, DataItem>,
+        IModulusOperators<DataItem, DataItem, DataItem>,
+        IComparisonOperators<DataItem, DataItem, bool>,
+        IUnaryPlusOperators<DataItem, DataItem>,
+        IUnaryNegationOperators<DataItem, DataItem>,
+        IBitwiseOperators<DataItem, DataItem, DataItem>
     {
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem leftSide, DataItem rightSide)
@@ -326,6 +337,29 @@
 
             throw new RuntimeException($"Can't do ! operation with type {leftSide.Type}");
         }
+
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator +(DataItem value) => value.type switch
+        {
+            RuntimeType.Null => value,
+            RuntimeType.UInt8 => new DataItem((byte)(+value.valueUInt8)),
+            RuntimeType.SInt32 => new DataItem((int)(+value.valueSInt32)),
+            RuntimeType.Single => new DataItem((float)(+value.valueSingle)),
+            RuntimeType.UInt16 => new DataItem((char)(+value.valueUInt16)),
+            _ => throw new RuntimeException($"Can't do + operation with type {value.Type}"),
+        };
+
+        /// <exception cref="RuntimeException"/>
+        public static DataItem operator -(DataItem value) => value.type switch
+        {
+            RuntimeType.Null => value,
+            RuntimeType.UInt8 => new DataItem((byte)(-value.valueUInt8)),
+            RuntimeType.SInt32 => new DataItem((int)(-value.valueSInt32)),
+            RuntimeType.Single => new DataItem((float)(-value.valueSingle)),
+            RuntimeType.UInt16 => new DataItem((char)(-value.valueUInt16)),
+            _ => throw new RuntimeException($"Can't do - operation with type {value.Type}"),
+        };
+
         /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem leftSide, DataItem rightSide)
         {

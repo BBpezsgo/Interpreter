@@ -76,6 +76,11 @@ namespace LanguageCore.ASM.Generator
 
         #region Memory Helpers
 
+        protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        {
+            throw new NotImplementedException();
+        }
+
         bool TryGetFunctionLabel(CompiledFunction function, [NotNullWhen(true)] out string? label)
         {
             for (int i = 0; i < FunctionLabels.Count; i++)

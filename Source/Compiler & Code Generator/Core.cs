@@ -34,6 +34,14 @@ namespace LanguageCore.BBCode.Generator
             InHeap = false;
         }
 
+        public ValueAddress(CompiledVariable variable, bool basepointerRelative)
+        {
+            Address = variable.MemoryAddress;
+            BasepointerRelative = basepointerRelative;
+            IsReference = false;
+            InHeap = false;
+        }
+
         public ValueAddress(CompiledParameter parameter, int address)
         {
             Address = address;

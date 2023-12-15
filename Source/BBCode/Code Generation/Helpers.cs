@@ -187,6 +187,11 @@ namespace LanguageCore.BBCode.Generator
 
         #region Memory Helpers
 
+        protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        {
+            return new ValueAddress(variable, false) + ExternalFunctionsCache.Count + 1;
+        }
+
         protected override void StackLoad(ValueAddress address)
         {
             if (address.IsReference)

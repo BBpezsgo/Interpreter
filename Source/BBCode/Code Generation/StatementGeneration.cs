@@ -1041,6 +1041,13 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
+            if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+            {
+                variable.Name.AnalyzedType = TokenAnalyzedType.VariableName;
+                StackLoad(GetGlobalVariableAddress(globalVariable), globalVariable.Type.SizeOnStack);
+                return;
+            }
+
             if (GetFunction(variable.Name, expectedType, out CompiledFunction? compiledFunction))
             {
                 compiledFunction.AddReference(variable, CurrentFile);
@@ -1772,6 +1779,16 @@ namespace LanguageCore.BBCode.Generator
                 GenerateCodeForStatement(value);
                 AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
             }
+            else if (GetGlobalVariable(statementToSet.Content, out CompiledVariable? globalVariable))
+            {
+                CompiledType valueType = FindStatementType(value, globalVariable.Type);
+
+                if (globalVariable.Type != valueType)
+                { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{globalVariable.Type.Name}\" type variable.", value, CurrentFile); }
+
+                GenerateCodeForStatement(value);
+                AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, GetGlobalVariableAddress(globalVariable).Address);
+            }
             else
             {
                 throw new CompilerException($"Symbol \"{statementToSet.Content}\" not found", statementToSet, CurrentFile);
@@ -2396,6 +2413,7 @@ namespace LanguageCore.BBCode.Generator
             FinishJumpInstructions(ReturnInstructions.Last);
             ReturnInstructions.Pop();
 
+            CompiledGlobalVariables.AddRange(CompiledVariables);
             CleanupVariables(CleanupStack.Pop());
 
             CleanupConstants();

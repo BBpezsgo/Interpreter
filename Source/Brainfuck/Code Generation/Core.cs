@@ -6,10 +6,10 @@ using System.Diagnostics.CodeAnalysis;
 namespace LanguageCore.Brainfuck.Generator
 {
     using Compiler;
+    using LanguageCore.BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
-    using Tokenizing;
 
     readonly struct CleanupItem
     {
@@ -340,6 +340,11 @@ namespace LanguageCore.Brainfuck.Generator
 
             type = null;
             return false;
+        }
+
+        protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
+        {
+            throw new NotImplementedException();
         }
 
         static bool GetVariable(IEnumerable<Variable> variables, string name, out Variable variable)

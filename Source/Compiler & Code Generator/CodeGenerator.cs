@@ -172,6 +172,7 @@ namespace LanguageCore.Compiler
 
         protected readonly List<CompiledParameter> CompiledParameters;
         protected readonly List<CompiledVariable> CompiledVariables;
+        protected readonly List<CompiledVariable> CompiledGlobalVariables;
 
         protected IReadOnlyList<CompliableTemplate<CompiledFunction>> CompilableFunctions => compilableFunctions;
         protected IReadOnlyList<CompliableTemplate<CompiledOperator>> CompilableOperators => compilableOperators;
@@ -213,6 +214,7 @@ namespace LanguageCore.Compiler
             ConstantsStack = new Stack<int>();
 
             CompiledVariables = new List<CompiledVariable>();
+            CompiledGlobalVariables = new List<CompiledVariable>();
             CompiledParameters = new List<CompiledParameter>();
 
             compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
@@ -1361,6 +1363,9 @@ namespace LanguageCore.Compiler
             if (GetFunction(name, out CompiledFunction? function))
             { return new CompiledType(new FunctionType(function)); }
 
+            if (GetGlobalVariable(name, out CompiledVariable? globalVariable))
+            { return globalVariable.Type; }
+
             throw new CompilerException($"Type \"{name}\" not found", position, CurrentFile);
         }
 
@@ -1391,6 +1396,20 @@ namespace LanguageCore.Compiler
         protected bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
         {
             foreach (CompiledVariable compiledVariable_ in CompiledVariables)
+            {
+                if (compiledVariable_.VariableName.Content == variableName)
+                {
+                    compiledVariable = compiledVariable_;
+                    return true;
+                }
+            }
+            compiledVariable = null;
+            return false;
+        }
+
+        protected bool GetGlobalVariable(string variableName, [NotNullWhen(true)] out CompiledVariable? compiledVariable)
+        {
+            foreach (CompiledVariable compiledVariable_ in CompiledGlobalVariables)
             {
                 if (compiledVariable_.VariableName.Content == variableName)
                 {
@@ -1436,15 +1455,14 @@ namespace LanguageCore.Compiler
             if (GetConstant(variable.Content, out _))
             { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
-            if (GetParameter(variable.Content, out CompiledParameter? param))
-            {
-                return GetBaseAddress(param);
-            }
+            if (GetParameter(variable.Content, out CompiledParameter? parameter))
+            { return GetBaseAddress(parameter); }
 
-            if (GetVariable(variable.Content, out CompiledVariable? val))
-            {
-                return new ValueAddress(val);
-            }
+            if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+            { return new ValueAddress(localVariable); }
+
+            if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+            { return GetGlobalVariableAddress(globalVariable); }
 
             throw new CompilerException($"Local symbol \"{variable.Content}\" not found", variable, CurrentFile);
         }
@@ -1536,20 +1554,20 @@ namespace LanguageCore.Compiler
         }
         protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter);
         protected abstract ValueAddress GetBaseAddress(CompiledParameter parameter, int offset);
+        protected abstract ValueAddress GetGlobalVariableAddress(CompiledVariable variable);
         protected ValueAddress GetBaseAddress(Identifier variable)
         {
             if (GetConstant(variable.Content, out _))
             { throw new CompilerException($"Constant does not have a memory address", variable, CurrentFile); }
 
-            if (GetParameter(variable.Content, out CompiledParameter? param))
-            {
-                return GetBaseAddress(param);
-            }
+            if (GetParameter(variable.Content, out CompiledParameter? parameter))
+            { return GetBaseAddress(parameter); }
 
-            if (GetVariable(variable.Content, out CompiledVariable? val))
-            {
-                return new ValueAddress(val);
-            }
+            if (GetVariable(variable.Content, out CompiledVariable? localVariable))
+            { return new ValueAddress(localVariable); }
+
+            if (GetGlobalVariable(variable.Content, out CompiledVariable? globalVariable))
+            { return GetGlobalVariableAddress(globalVariable); }
 
             throw new CompilerException($"Variable \"{variable.Content}\" not found", variable, CurrentFile);
         }

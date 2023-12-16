@@ -4,31 +4,37 @@ namespace LanguageCore.BBCode.Generator
 {
     using LanguageCore.Compiler;
 
-    public class UnusedFunctionManager : CodeGeneratorNonGeneratorBase
+    public class UnusedFunctionManager
     {
         #region Fields
 
         readonly CompileLevel CompileLevel;
 
         readonly List<Information> Informations;
+        readonly PrintCallback? PrintCallback;
 
         #endregion
 
-        public UnusedFunctionManager(CompileLevel compileLevel) : base()
+        public UnusedFunctionManager(CompileLevel compileLevel, PrintCallback? printCallback) : base()
         {
             CompileLevel = compileLevel;
+            PrintCallback = printCallback;
 
             Informations = new List<Information>();
         }
 
-        int DoTheThing(PrintCallback? printCallback = null)
+        int DoTheThing(ref CompilerResult compilerResult)
         {
-            printCallback?.Invoke($"  Remove unused functions ...", LogType.Debug);
+            PrintCallback?.Invoke($"  Remove unused functions ...", LogType.Debug);
 
             int functionsRemoved = 0;
 
+            List<CompiledFunction> newFunctions;
+            List<CompiledOperator> newOperators;
+            List<CompiledGeneralFunction> newGeneralFunctions;
+
             {
-                List<CompiledFunction> newFunctions = new(this.CompiledFunctions);
+                newFunctions = new(compilerResult.Functions);
 
                 for (int i = newFunctions.Count - 1; i >= 0; i--)
                 {
@@ -43,18 +49,16 @@ namespace LanguageCore.BBCode.Generator
 
                     string readableID = function.ReadableID();
 
-                    printCallback?.Invoke($"      Remove function {readableID}", LogType.Debug);
+                    PrintCallback?.Invoke($"      Remove function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
 
                     newFunctions.RemoveAt(i);
                     functionsRemoved++;
                 }
-
-                this.CompiledFunctions = newFunctions.ToArray();
             }
 
             {
-                List<CompiledOperator> newOperators = new(this.CompiledOperators);
+                newOperators = new(compilerResult.Operators);
 
                 for (int i = newOperators.Count - 1; i >= 0; i--)
                 {
@@ -67,18 +71,16 @@ namespace LanguageCore.BBCode.Generator
 
                     string readableID = @operator.ReadableID();
 
-                    printCallback?.Invoke($"      Remove operator {readableID}", LogType.Debug);
+                    PrintCallback?.Invoke($"      Remove operator {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
 
                     newOperators.RemoveAt(i);
                     functionsRemoved++;
                 }
-
-                this.CompiledOperators = newOperators.ToArray();
             }
 
             {
-                List<CompiledGeneralFunction> newGeneralFunctions = new(this.CompiledGeneralFunctions);
+                newGeneralFunctions = new(compilerResult.GeneralFunctions);
 
                 for (int i = newGeneralFunctions.Count - 1; i >= 0; i--)
                 {
@@ -91,15 +93,27 @@ namespace LanguageCore.BBCode.Generator
 
                     string readableID = generalFunction.ReadableID();
 
-                    printCallback?.Invoke($"      Remove general function {readableID}", LogType.Debug);
+                    PrintCallback?.Invoke($"      Remove general function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));
 
                     newGeneralFunctions.RemoveAt(i);
                     functionsRemoved++;
                 }
-
-                this.CompiledGeneralFunctions = newGeneralFunctions.ToArray();
             }
+
+            compilerResult = new CompilerResult(
+                newFunctions.ToArray(),
+                compilerResult.Macros,
+                newGeneralFunctions.ToArray(),
+                newOperators.ToArray(),
+                compilerResult.ExternalFunctions,
+                compilerResult.Structs,
+                compilerResult.Classes,
+                compilerResult.Hashes,
+                compilerResult.Enums,
+                compilerResult.Errors,
+                compilerResult.Warnings,
+                compilerResult.TopLevelStatements);
 
             return functionsRemoved;
         }
@@ -110,24 +124,13 @@ namespace LanguageCore.BBCode.Generator
             PrintCallback? printCallback = null,
             CompileLevel level = CompileLevel.Minimal)
         {
-            UnusedFunctionManager unusedFunctionManager = new(level)
-            {
-                CompiledClasses = compilerResult.Classes,
-                CompiledStructs = compilerResult.Structs,
-
-                CompiledFunctions = compilerResult.Functions,
-                CompiledMacros = compilerResult.Macros,
-                CompiledOperators = compilerResult.Operators,
-                CompiledGeneralFunctions = compilerResult.GeneralFunctions,
-
-                CompiledEnums = compilerResult.Enums,
-            };
+            UnusedFunctionManager unusedFunctionManager = new(level, printCallback);
 
             for (int iteration = 0; iteration < iterations; iteration++)
             {
                 ReferenceCollector.CollectReferences(compilerResult, printCallback);
 
-                int functionsRemoved = unusedFunctionManager.DoTheThing(printCallback);
+                int functionsRemoved = unusedFunctionManager.DoTheThing(ref compilerResult);
 
                 if (functionsRemoved == 0)
                 {
@@ -140,7 +143,7 @@ namespace LanguageCore.BBCode.Generator
 
             ReferenceCollector.ClearReferences(compilerResult);
 
-            return (unusedFunctionManager.CompiledFunctions, unusedFunctionManager.CompiledOperators, unusedFunctionManager.CompiledGeneralFunctions);
+            return (compilerResult.Functions, compilerResult.Operators, compilerResult.GeneralFunctions);
         }
     }
 }

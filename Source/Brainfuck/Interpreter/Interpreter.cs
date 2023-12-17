@@ -223,17 +223,17 @@ namespace LanguageCore.Brainfuck
                 DrawMemoryRaw(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
                 DrawMemoryPointer(renderer, memoryPrintStart, memoryPrintEnd, 0, line++, width);
 
-                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), Win32.ConsoleColor.Gray);
 
                 DrawOriginalCode(renderer, 0, line, width, 15);
                 height -= 15;
                 line += 15;
 
-                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), Win32.ConsoleColor.Gray);
 
                 DrawOutput(renderer, outputBuffer, 0, line++, width, height);
 
-                renderer.Text(0, line++, new string('─', width), ByteColor.Gray);
+                renderer.Text(0, line++, new string('─', width), Win32.ConsoleColor.Gray);
 
                 renderer.Text(0, line, new string(' ', width));
 
@@ -241,7 +241,7 @@ namespace LanguageCore.Brainfuck
                 {
                     FunctionInformations functionInfo = DebugInfo.GetFunctionInformations(codePointer);
                     if (functionInfo.IsValid)
-                    { renderer.Text(0, line++, functionInfo.ReadableIdentifier, ByteColor.White); }
+                    { renderer.Text(0, line++, functionInfo.ReadableIdentifier, Win32.ConsoleColor.White); }
                 }
 
                 renderer.Render();
@@ -340,7 +340,7 @@ namespace LanguageCore.Brainfuck
                 {
                     if (currentX + offset - 1 >= width) return;
 
-                    byte foregroundColor = ByteColor.Silver;
+                    byte foregroundColor = Win32.ConsoleColor.Silver;
 
                     /*
                     byte foregroundColor = token.TokenType switch
@@ -374,9 +374,9 @@ namespace LanguageCore.Brainfuck
                     };
                     */
 
-                    byte backgroundColor = ByteColor.Black;
+                    byte backgroundColor = Win32.ConsoleColor.Black;
                     if (sourceLocation.SourcePosition.Range.Contains(token.Position.Range.Start))
-                    { backgroundColor = ByteColor.Gray; }
+                    { backgroundColor = Win32.ConsoleColor.Gray; }
 
                     renderer[currentX + offset - 1, currentY] = new ConsoleChar(text[offset], foregroundColor, backgroundColor);
                 }
@@ -387,14 +387,14 @@ namespace LanguageCore.Brainfuck
         {
             for (int i = start; i <= end; i++)
             {
-                byte bg = (i == codePointer) ? ByteColor.Silver : ByteColor.Black;
+                byte bg = (i == codePointer) ? Win32.ConsoleColor.Silver : Win32.ConsoleColor.Black;
                 byte fg = CompactCode.OpCode(Code[i]) switch
                 {
-                    '>' or '<' => ByteColor.BrightRed,
-                    '+' or '-' => ByteColor.BrightBlue,
-                    '[' or ']' => ByteColor.BrightGreen,
-                    '.' or ',' => ByteColor.BrightMagenta,
-                    _ => ByteColor.Silver,
+                    '>' or '<' => Win32.ConsoleColor.BrightRed,
+                    '+' or '-' => Win32.ConsoleColor.BrightBlue,
+                    '[' or ']' => Win32.ConsoleColor.BrightGreen,
+                    '.' or ',' => Win32.ConsoleColor.BrightMagenta,
+                    _ => Win32.ConsoleColor.Silver,
                 };
                 renderer[x, y] = new ConsoleChar(CompactCode.OpCode(Code[i]), fg, bg);
 
@@ -426,7 +426,7 @@ namespace LanguageCore.Brainfuck
                 };
 
                 string textToPrint = chr.ToString().PadRight(4, ' ');
-                renderer.Text(x, y, textToPrint, ByteColor.Silver);
+                renderer.Text(x, y, textToPrint, Win32.ConsoleColor.Silver);
                 x += textToPrint.Length;
 
                 if (x >= width)
@@ -447,11 +447,11 @@ namespace LanguageCore.Brainfuck
                 string textToPrint = Memory[m].ToString().PadRight(4, ' ');
 
                 if (memoryPointer == m)
-                { renderer.Text(x, y, textToPrint, ByteColor.BrightRed); }
+                { renderer.Text(x, y, textToPrint, Win32.ConsoleColor.BrightRed); }
                 else if (Memory[m] == 0)
-                { renderer.Text(x, y, textToPrint, ByteColor.Silver); }
+                { renderer.Text(x, y, textToPrint, Win32.ConsoleColor.Silver); }
                 else
-                { renderer.Text(x, y, textToPrint, ByteColor.White); }
+                { renderer.Text(x, y, textToPrint, Win32.ConsoleColor.White); }
 
                 x += textToPrint.Length;
 
@@ -471,9 +471,9 @@ namespace LanguageCore.Brainfuck
             for (int m = start; m <= end; m++)
             {
                 if (memoryPointer == m)
-                { renderer.Text(x, y, "^   ", ByteColor.BrightRed); }
+                { renderer.Text(x, y, "^   ", Win32.ConsoleColor.BrightRed); }
                 else
-                { renderer.Text(x, y, "    ", ByteColor.White); }
+                { renderer.Text(x, y, "    ", Win32.ConsoleColor.White); }
 
                 x += 4;
 
@@ -508,15 +508,15 @@ namespace LanguageCore.Brainfuck
                 }
                 else if (text[i] == '\t')
                 {
-                    renderer[_x, _y] = new ConsoleChar(' ', ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(' ', Win32.ConsoleColor.White, Win32.ConsoleColor.Black);
                 }
                 else if (text[i] < 32 || text[i] > 127)
                 {
-                    renderer[_x, _y] = new ConsoleChar(' ', ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(' ', Win32.ConsoleColor.White, Win32.ConsoleColor.Black);
                 }
                 else
                 {
-                    renderer[_x, _y] = new ConsoleChar(text[i], ByteColor.White, ByteColor.Black);
+                    renderer[_x, _y] = new ConsoleChar(text[i], Win32.ConsoleColor.White, Win32.ConsoleColor.Black);
                 }
 
                 _x++;

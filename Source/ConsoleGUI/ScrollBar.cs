@@ -40,11 +40,11 @@ namespace ConsoleGUI
             {
                 if (y == scrollY)
                 {
-                    buffer[x, y] = new ConsoleChar(' ', ByteColor.Black, ByteColor.White);
+                    buffer[x, y] = new ConsoleChar(' ', Win32.ConsoleColor.Black, Win32.ConsoleColor.White);
                 }
                 else
                 {
-                    buffer[x, y] = new ConsoleChar((char)0x2592, ByteColor.Gray, ByteColor.Black);
+                    buffer[x, y] = new ConsoleChar((char)0x2592, Win32.ConsoleColor.Gray, Win32.ConsoleColor.Black);
                 }
             }
         }

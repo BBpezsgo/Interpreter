@@ -302,7 +302,7 @@ namespace ConsoleGUI
 
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {
-                ConsoleBuffer[i] = new ConsoleChar((char)0x2591, ByteColor.Gray, ByteColor.Black);
+                ConsoleBuffer[i] = new ConsoleChar((char)0x2591, Win32.ConsoleColor.Gray, Win32.ConsoleColor.Black);
             }
 
             try

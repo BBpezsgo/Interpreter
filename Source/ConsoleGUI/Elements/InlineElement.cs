@@ -1,7 +1,9 @@
-﻿using Win32;
+﻿using System.Runtime.Versioning;
+using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class InlineElement : Element, IInlineLayoutElement
     {
         public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();

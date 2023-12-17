@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Drawing;
+using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class LayoutElement : Element, IElementWithSubelements, IInlineLayoutElement
     {
         public Element[] Elements { get; set; } = Array.Empty<Element>();
@@ -33,6 +35,7 @@ namespace ConsoleGUI
         }
     }
 
+    [SupportedOSPlatform("windows")]
     public class VerticalLayoutElement : LayoutElement
     {
         public override void RefreshSize()
@@ -95,6 +98,7 @@ namespace ConsoleGUI
         }
     }
 
+    [SupportedOSPlatform("windows")]
     public class HorizontalLayoutElement : LayoutElement
     {
         public override void RefreshSize()

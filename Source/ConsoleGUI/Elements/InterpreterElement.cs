@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.Versioning;
 using LanguageCore;
 using LanguageCore.Runtime;
 using Win32;
@@ -12,6 +13,7 @@ using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public sealed class InterpreterElement : WindowElement
     {
         public string File;

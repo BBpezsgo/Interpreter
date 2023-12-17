@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class StandardIOElement : InlineElement
     {
         readonly struct ConsoleText

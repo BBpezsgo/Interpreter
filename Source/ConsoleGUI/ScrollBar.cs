@@ -1,8 +1,10 @@
 ﻿using System;
+using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class ScrollBar
     {
         readonly Func<Element, LanguageCore.Range<int>> GetRange;

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 using Win32;
 using Win32.LowLevel;
@@ -86,6 +87,7 @@ namespace ConsoleGUI
         public void Add(T parameter) => EventQueue.Enqueue(parameter);
     }
 
+    [SupportedOSPlatform("windows")]
     internal class ConsoleGUI
     {
         const int TIMER_RESIZE_ELEMENTS = 1000;

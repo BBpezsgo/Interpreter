@@ -187,6 +187,7 @@ namespace LanguageCore.Brainfuck
         public void Run()
         { while (Step()) ; }
 
+        [SupportedOSPlatform("windows")]
         public void RunWithUI(bool autoTick = true, int wait = 0)
         {
             Console.Clear();
@@ -323,6 +324,7 @@ namespace LanguageCore.Brainfuck
         }
 
         int StartToken;
+        [SupportedOSPlatform("windows")]
         void DrawOriginalCode(ConsoleRenderer renderer, int x, int y, int width, int height)
         {
             for (int _x = x; _x < width + x; _x++)
@@ -423,6 +425,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        [SupportedOSPlatform("windows")]
         void DrawCode(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
@@ -475,6 +478,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        [SupportedOSPlatform("windows")]
         void DrawMemoryChars(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int i = start; i <= end; i++)
@@ -506,6 +510,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        [SupportedOSPlatform("windows")]
         void DrawMemoryRaw(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
@@ -532,6 +537,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        [SupportedOSPlatform("windows")]
         void DrawMemoryPointer(ConsoleRenderer renderer, int start, int end, int x, int y, int width)
         {
             for (int m = start; m <= end; m++)
@@ -554,6 +560,7 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        [SupportedOSPlatform("windows")]
         static void DrawOutput(ConsoleRenderer renderer, string text, int x, int y, int width, int height)
         {
             int _x = x;

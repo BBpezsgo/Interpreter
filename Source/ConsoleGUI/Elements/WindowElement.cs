@@ -1,8 +1,10 @@
-﻿using Win32;
+﻿using System.Runtime.Versioning;
+using Win32;
 using Point = System.Drawing.Point;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class WindowElement : Element
     {
         public bool IsFocused { get; private set; }

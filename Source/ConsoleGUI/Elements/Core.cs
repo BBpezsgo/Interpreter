@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI
@@ -347,6 +348,7 @@ namespace ConsoleGUI
 
     public static class Extensions
     {
+        [SupportedOSPlatform("windows")]
         public static ConsoleChar DrawBorder(this Element element, int x, int y)
         {
             if (!element.Contains(x, y)) return ConsoleChar.Empty;
@@ -379,15 +381,18 @@ namespace ConsoleGUI
             };
         }
 
+        [SupportedOSPlatform("windows")]
         public static bool Contains(this Element element, int x, int y)
             =>
             element.Rect.Contains(x, y) ||
             element.Rect.Contains(x - 1, y) ||
             element.Rect.Contains(x, y - 1) ||
             element.Rect.Contains(x - 1, y - 1);
+        [SupportedOSPlatform("windows")]
         public static bool Contains(this Element element, Coord position)
             => element.Contains(position.X, position.Y);
 
+        [SupportedOSPlatform("windows")]
         public static void OnMouseEvent(this Element[] elements, MouseEvent e)
         {
             for (int i = 0; i < elements.Length; i++)
@@ -399,6 +404,7 @@ namespace ConsoleGUI
             }
         }
 
+        [SupportedOSPlatform("windows")]
         public static void OnKeyEvent(this Element[] elements, KeyEvent e)
         {
             for (int i = 0; i < elements.Length; i++)
@@ -409,6 +415,7 @@ namespace ConsoleGUI
             }
         }
 
+        [SupportedOSPlatform("windows")]
         public static ConsoleChar DrawContentWithBorders(this Element element, int x, int y)
         {
             if (element.HasBorder)
@@ -425,6 +432,7 @@ namespace ConsoleGUI
             return element.DrawContent(x, y);
         }
 
+        [SupportedOSPlatform("windows")]
         public static ConsoleChar? DrawContent(this Element[] elements, int x, int y)
         {
             for (int i = 0; i < elements.Length; i++)
@@ -436,15 +444,19 @@ namespace ConsoleGUI
             return null;
         }
 
+        [SupportedOSPlatform("windows")]
         public static void BeforeDraw(this Element[] elements)
         { for (int i = 0; i < elements.Length; i++) elements[i].BeforeDraw(); }
 
+        [SupportedOSPlatform("windows")]
         public static void BeforeDraw(this IEnumerable<Element> elements)
         { foreach (Element element in elements) element.BeforeDraw(); }
 
+        [SupportedOSPlatform("windows")]
         public static void RefreshSize(this Element[] elements)
         { for (int i = 0; i < elements.Length; i++) elements[i].RefreshSize(); }
 
+        [SupportedOSPlatform("windows")]
         public static void RefreshSize(this IEnumerable<Element> elements)
         { foreach (Element element in elements) element.RefreshSize(); }
 

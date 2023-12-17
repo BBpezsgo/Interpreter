@@ -1,8 +1,10 @@
 ﻿using System.Drawing;
+using System.Runtime.Versioning;
 using Win32;
 
 namespace ConsoleGUI
 {
+    [SupportedOSPlatform("windows")]
     public class Element : IMainThreadThing
     {
         public Rectangle Rect { get; set; } = Rectangle.Empty;

@@ -82,6 +82,27 @@ namespace LanguageCore
             }
         }
 
+        static class Colors
+        {
+            public static readonly Color Error = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+
+            public static readonly Color Comment = Color.FromArgb(int.Parse("57a64a", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color LiteralNumber = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color LiteralString = Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color Operator = Color.FromArgb(int.Parse("b4b4b4", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            
+            public static readonly Color Type = Color.FromArgb(int.Parse("4ec9b0", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color Struct = Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color Keyword = Color.FromArgb(int.Parse("569cd6", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color FunctionName = Color.FromArgb(int.Parse("dcdcaa", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color FieldName = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color LocalSymbol = Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color Statement = Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color Enum = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color EnumMember = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            public static readonly Color TypeParameter = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        }
+
         readonly AnsiBuilder Renderer;
         readonly StringBuilder Input;
         Colorized ColorizedInput;
@@ -406,7 +427,7 @@ namespace LanguageCore
             catch (LanguageException ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber)) };
+                { ForegroundColor = Colors.Error };
 
                 string? arrows = LanguageException.GetArrows(ex.Position, Input.ToString());
 
@@ -426,7 +447,7 @@ namespace LanguageCore
             catch (Exception ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber)) };
+                { ForegroundColor = Colors.Error };
 
                 output.Append(ex.Message);
                 output.AppendLine();
@@ -456,32 +477,32 @@ namespace LanguageCore
                                 TokenType.Identifier => Color.White,
                                 TokenType.LiteralNumber or
                                 TokenType.LiteralHex or TokenType.LiteralBinary or
-                                TokenType.LiteralFloat => Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber)),
+                                TokenType.LiteralFloat => Colors.LiteralNumber,
                                 TokenType.LiteralString or
-                                TokenType.LiteralCharacter => Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber)),
-                                TokenType.Operator => Color.FromArgb(int.Parse("b4b4b4", NumberStyles.HexNumber)),
+                                TokenType.LiteralCharacter => Colors.LiteralString,
+                                TokenType.Operator => Colors.Operator,
                                 TokenType.Comment or
-                                TokenType.CommentMultiline => Color.FromArgb(int.Parse("57a64a", NumberStyles.HexNumber)),
+                                TokenType.CommentMultiline => Colors.Comment,
                                 _ => Color.White,
                             },
                             TokenAnalyzedType.Attribute or
                             TokenAnalyzedType.Type or
-                            TokenAnalyzedType.Class => Color.FromArgb(int.Parse("4ec9b0", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.Struct => Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber)),
+                            TokenAnalyzedType.Class => Colors.Type,
+                            TokenAnalyzedType.Struct => Colors.Struct,
                             TokenAnalyzedType.Keyword or
-                            TokenAnalyzedType.BuiltinType => Color.FromArgb(int.Parse("569cd6", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.FunctionName => Color.FromArgb(int.Parse("dcdcaa", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.FieldName => Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber)),
+                            TokenAnalyzedType.BuiltinType => Colors.Keyword,
+                            TokenAnalyzedType.FunctionName => Colors.FunctionName,
+                            TokenAnalyzedType.FieldName => Colors.FieldName,
                             TokenAnalyzedType.VariableName or
-                            TokenAnalyzedType.ParameterName => Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber)),
+                            TokenAnalyzedType.ParameterName => Colors.LocalSymbol,
                             TokenAnalyzedType.Namespace => Color.White,
                             TokenAnalyzedType.Hash => Color.White,
                             TokenAnalyzedType.HashParameter => Color.White,
                             TokenAnalyzedType.Library => Color.White,
-                            TokenAnalyzedType.Statement => Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.Enum => Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.EnumMember => Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber)),
-                            TokenAnalyzedType.TypeParameter => Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber)),
+                            TokenAnalyzedType.Statement => Colors.Statement,
+                            TokenAnalyzedType.Enum => Colors.Enum,
+                            TokenAnalyzedType.EnumMember => Colors.EnumMember,
+                            TokenAnalyzedType.TypeParameter => Colors.TypeParameter,
                             _ => Color.White,
                         };
                     }
@@ -542,7 +563,7 @@ namespace LanguageCore
             catch (LanguageException ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber)) };
+                { ForegroundColor = Colors.Error };
 
                 string? arrows = LanguageException.GetArrows(ex.Position, source);
 
@@ -569,7 +590,7 @@ namespace LanguageCore
             catch (Exception ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber)) };
+                { ForegroundColor = Colors.Error };
 
                 output.Append(ex.ToString());
                 output.AppendLine();
@@ -595,24 +616,24 @@ namespace LanguageCore
                 switch (exitCode.Type)
                 {
                     case RuntimeType.UInt8:
-                        output.ForegroundColor = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber));
+                        output.ForegroundColor = Colors.LiteralNumber;
                         output.Append(exitCode.ValueUInt8);
                         break;
                     case RuntimeType.SInt32:
-                        output.ForegroundColor = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber));
+                        output.ForegroundColor = Colors.LiteralNumber;
                         output.Append(exitCode.ValueSInt32);
                         break;
                     case RuntimeType.Single:
-                        output.ForegroundColor = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber));
+                        output.ForegroundColor = Colors.LiteralNumber;
                         output.Append($"{exitCode.ValueSingle}f");
                         break;
                     case RuntimeType.UInt16:
-                        output.ForegroundColor = Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber));
+                        output.ForegroundColor = Colors.LiteralString;
                         output.Append($"'{exitCode.ValueUInt16}'");
                         break;
                     case RuntimeType.Null:
                     default:
-                        output.ForegroundColor = Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber));
+                        output.ForegroundColor = Colors.Keyword;
                         output.Append("null");
                         break;
                 }

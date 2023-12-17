@@ -142,9 +142,9 @@ namespace LanguageCore.Parser
 
         public readonly Token Identifier;
         public readonly EnumMemberDefinition[] Members;
-        public readonly FunctionDefinition.Attribute[] Attributes;
+        public readonly AttributeUsage[] Attributes;
 
-        public EnumDefinition(Token identifier, FunctionDefinition.Attribute[] attributes, EnumMemberDefinition[] members)
+        public EnumDefinition(Token identifier, AttributeUsage[] attributes, EnumMemberDefinition[] members)
         {
             Identifier = identifier;
             Attributes = attributes;
@@ -451,30 +451,30 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class FunctionDefinition : FunctionThingDefinition
+    public class AttributeUsage : IHaveKey<string>, IThingWithPosition
     {
-        public class Attribute : IHaveKey<string>, IThingWithPosition
+        public readonly Token Identifier;
+        public readonly object[] Parameters;
+
+        public string Key => Identifier.Content;
+
+        public AttributeUsage(Token identifier, object[] parameters)
         {
-            public readonly Token Identifier;
-            public readonly object[] Parameters;
-
-            public string Key => Identifier.Content;
-
-            public Attribute(Token identifier, object[] parameters)
-            {
-                Identifier = identifier;
-                Parameters = parameters;
-            }
-
-            public Position Position => new(Identifier);
+            Identifier = identifier;
+            Parameters = parameters;
         }
 
-        public readonly Attribute[] Attributes;
+        public Position Position => new(Identifier);
+    }
+
+    public class FunctionDefinition : FunctionThingDefinition
+    {
+        public readonly AttributeUsage[] Attributes;
 
         public readonly TypeInstance Type;
 
         public FunctionDefinition(
-            IEnumerable<Attribute> attributes,
+            IEnumerable<AttributeUsage> attributes,
             IEnumerable<Token> modifiers,
             TypeInstance type,
             Token identifier,
@@ -522,7 +522,7 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        public Attribute? GetAttribute(string identifier)
+        public AttributeUsage? GetAttribute(string identifier)
         {
             for (int i = 0; i < Attributes.Length; i++)
             {
@@ -572,7 +572,7 @@ namespace LanguageCore.Parser
 
     public class ClassDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
     {
-        public readonly FunctionDefinition.Attribute[] Attributes;
+        public readonly AttributeUsage[] Attributes;
         public readonly Token Name;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
@@ -598,7 +598,7 @@ namespace LanguageCore.Parser
             Token name,
             Token bracketStart,
             Token bracketEnd,
-            IEnumerable<FunctionDefinition.Attribute> attributes,
+            IEnumerable<AttributeUsage> attributes,
             IEnumerable<Token> modifiers,
             IEnumerable<FieldDefinition> fields,
             IEnumerable<FunctionDefinition> methods,
@@ -649,7 +649,7 @@ namespace LanguageCore.Parser
 
     public class StructDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
     {
-        public readonly FunctionDefinition.Attribute[] Attributes;
+        public readonly AttributeUsage[] Attributes;
         public readonly Token Name;
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
@@ -670,7 +670,7 @@ namespace LanguageCore.Parser
             Token name,
             Token bracketStart,
             Token bracketEnd,
-            IEnumerable<FunctionDefinition.Attribute> attributes,
+            IEnumerable<AttributeUsage> attributes,
             IEnumerable<FieldDefinition> fields,
             IEnumerable<KeyValuePair<string, FunctionDefinition>> methods,
             IEnumerable<Token> modifiers)

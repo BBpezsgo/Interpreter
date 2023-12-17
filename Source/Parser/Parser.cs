@@ -310,7 +310,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             enumDefinition = null;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            AttributeUsage[] attributes = ExpectAttributes();
 
             if (!ExpectIdentifier("enum", out Token? keyword))
             { CurrentTokenIndex = parseStart; return false; }
@@ -363,7 +363,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             function = null;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            AttributeUsage[] attributes = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 
@@ -521,7 +521,7 @@ namespace LanguageCore.Parser
             int parseStart = CurrentTokenIndex;
             function = null;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            AttributeUsage[] attributes = ExpectAttributes();
 
             ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
@@ -651,7 +651,7 @@ namespace LanguageCore.Parser
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            AttributeUsage[] attributes = ExpectAttributes();
 
             ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
@@ -726,7 +726,7 @@ namespace LanguageCore.Parser
         {
             int startTokenIndex = CurrentTokenIndex;
 
-            FunctionDefinition.Attribute[] attributes = ExpectAttributes();
+            AttributeUsage[] attributes = ExpectAttributes();
 
             Token[] modifiers = ParseModifiers();
 
@@ -1767,7 +1767,7 @@ namespace LanguageCore.Parser
 
         #endregion
 
-        bool ExpectAttribute([NotNullWhen(true)] out FunctionDefinition.Attribute? attribute)
+        bool ExpectAttribute([NotNullWhen(true)] out AttributeUsage? attribute)
         {
             int parseStart = CurrentTokenIndex;
             attribute = null;
@@ -1802,16 +1802,16 @@ namespace LanguageCore.Parser
             if (!ExpectOperator("]"))
             { throw new SyntaxException("Unbalanced ]", t0); }
 
-            attribute = new FunctionDefinition.Attribute(attributeT, parameters.ToArray());
+            attribute = new AttributeUsage(attributeT, parameters.ToArray());
             return true;
         }
-        FunctionDefinition.Attribute[] ExpectAttributes()
+        AttributeUsage[] ExpectAttributes()
         {
-            List<FunctionDefinition.Attribute> attributes = new();
-            while (ExpectAttribute(out FunctionDefinition.Attribute? attr))
+            List<AttributeUsage> attributes = new();
+            while (ExpectAttribute(out AttributeUsage? attr))
             {
                 bool alreadyHave = false;
-                foreach (FunctionDefinition.Attribute attribute in attributes)
+                foreach (AttributeUsage attribute in attributes)
                 {
                     if (attribute.Identifier == attr.Identifier)
                     {

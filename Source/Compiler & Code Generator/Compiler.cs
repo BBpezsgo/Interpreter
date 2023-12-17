@@ -231,13 +231,13 @@ namespace LanguageCore.Compiler
             return null;
         }
 
-        static CompiledAttributeCollection CompileAttributes(FunctionDefinition.Attribute[] attributes)
+        static CompiledAttributeCollection CompileAttributes(AttributeUsage[] attributes)
         {
             CompiledAttributeCollection result = new();
 
             for (int i = 0; i < attributes.Length; i++)
             {
-                FunctionDefinition.Attribute attribute = attributes[i];
+                AttributeUsage attribute = attributes[i];
 
                 attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
 
@@ -447,7 +447,7 @@ namespace LanguageCore.Compiler
         {
             CompiledAttributeCollection attributes = new();
 
-            foreach (FunctionDefinition.Attribute attribute in @enum.Attributes)
+            foreach (AttributeUsage attribute in @enum.Attributes)
             {
                 attribute.Identifier.AnalyzedType = TokenAnalyzedType.Attribute;
 

@@ -189,7 +189,7 @@ namespace LanguageCore.BBCode.Generator
 
         protected override ValueAddress GetGlobalVariableAddress(CompiledVariable variable)
         {
-            return new ValueAddress(variable, false) + ExternalFunctionsCache.Count + 1;
+            return new ValueAddress(variable, false) + (ExternalFunctionsCache.Count + 2);
         }
 
         protected override void StackLoad(ValueAddress address)

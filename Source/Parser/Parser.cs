@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Globalization;
 
 namespace LanguageCore.Parser
 {
@@ -83,7 +84,9 @@ namespace LanguageCore.Parser
             "!", "~",
         };
 
+#pragma warning disable IDE0052 // Remove unread private members
         static readonly string[] UnaryPostfixOperators = Array.Empty<string>();
+#pragma warning restore IDE0052
 
         // === Result ===
         readonly List<Error> Errors = new();
@@ -122,6 +125,9 @@ namespace LanguageCore.Parser
         public static ParserResultHeader ParseHeader(Token[] tokens)
             => new Parser(tokens).ParseHeaderInternal();
 
+        public static Statement.Statement ParseInteractive(Token[] tokens)
+            => new Parser(tokens).ParseInteractiveInternal();
+
         ParserResult ParseInternal()
         {
             CurrentTokenIndex = 0;
@@ -158,6 +164,14 @@ namespace LanguageCore.Parser
             return new ParserResultHeader(this.Usings, this.Hashes);
         }
 
+        Statement.Statement ParseInteractiveInternal()
+        {
+            if (ExpectStatementUnchecked(out Statement.Statement? statement))
+            { return statement; }
+            else
+            { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken); }
+        }
+
         #region Parse top level
 
         bool ExpectHash([NotNullWhen(true)] out CompileTag? hashStatement)
@@ -170,7 +184,7 @@ namespace LanguageCore.Parser
             hashT.AnalyzedType = TokenAnalyzedType.Hash;
 
             if (!ExpectIdentifier(out Token? hashName))
-            { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType.ToString().ToLower()} \"{CurrentToken?.Content}\"", hashT); }
+            { throw new SyntaxException($"There should be an identifier (after \"#\"), but you wrote {CurrentToken?.TokenType.ToString().ToLowerInvariant()} \"{CurrentToken?.Content}\"", hashT); }
 
             hashName.AnalyzedType = TokenAnalyzedType.Hash;
 
@@ -187,7 +201,7 @@ namespace LanguageCore.Parser
                     }
                     else
                     {
-                        throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken.TokenType.ToString().ToLower()} \"{CurrentToken.Content}\"", CurrentToken.Position);
+                        throw new SyntaxException($"There should be a literal or \";\", but you wrote {CurrentToken.TokenType.ToString().ToLowerInvariant()} \"{CurrentToken.Content}\"", CurrentToken.Position);
                     }
                 }
 
@@ -400,7 +414,7 @@ namespace LanguageCore.Parser
                 modifiers,
                 possibleType,
                 possibleName,
-                new ParametersDefinition(parameters, leftParenthesis, rightParenthesis),
+                new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
                 null);
 
             Block? block = null;
@@ -561,7 +575,7 @@ namespace LanguageCore.Parser
                 modifiers,
                 possibleType,
                 possibleNameT,
-                new ParametersDefinition(parameters, leftParenthesis, rightParenthesis),
+                new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis),
                 templateInfo);
 
             Block? block = null;
@@ -623,7 +637,7 @@ namespace LanguageCore.Parser
             function = new GeneralFunctionDefinition(
                 possibleNameT,
                 modifiers,
-                new ParametersDefinition(parameters, leftParenthesis, rightParenthesis));
+                new ParameterDefinitionCollection(parameters, leftParenthesis, rightParenthesis));
 
             if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out Block? block))
             { throw new SyntaxException($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After()); }
@@ -810,7 +824,7 @@ namespace LanguageCore.Parser
 
             if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
             {
-                v = v.Replace("_", "");
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
                 Literal literal = new(LiteralType.Float, v, CurrentToken);
 
@@ -821,7 +835,7 @@ namespace LanguageCore.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralNumber)
             {
-                v = v.Replace("_", "");
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
                 Literal literal = new(LiteralType.Integer, v, CurrentToken);
 
@@ -833,9 +847,9 @@ namespace LanguageCore.Parser
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralHex)
             {
                 v = v[2..];
-                v = v.Replace("_", "");
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(), CurrentToken);
+                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 16).ToString(CultureInfo.InvariantCulture), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -845,9 +859,9 @@ namespace LanguageCore.Parser
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
             {
                 v = v[2..];
-                v = v.Replace("_", "");
+                v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
-                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(), CurrentToken);
+                Literal literal = new(LiteralType.Integer, Convert.ToInt32(v, 2).ToString(CultureInfo.InvariantCulture), CurrentToken);
 
                 CurrentTokenIndex++;
 
@@ -1866,7 +1880,7 @@ namespace LanguageCore.Parser
             }
             else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
             {
-                value = Convert.ToInt32(CurrentToken.Content.Replace("_", ""), 2);
+                value = Convert.ToInt32(CurrentToken.Content.Replace("_", string.Empty, StringComparison.Ordinal), 2);
 
                 CurrentTokenIndex++;
             }
@@ -2006,11 +2020,11 @@ namespace LanguageCore.Parser
             if (possibleType == "return")
             { return false; }
 
-            possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
             type = new TypeInstanceSimple(possibleType);
 
             if (possibleType.Content == "any")
             {
+                possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
                 if ((flags & AllowedType.ExplicitAny) == 0)
                 {
                     Errors.Add(new Error($"Type \"{possibleType.Content}\" is not valid in the current context", possibleType));
@@ -2025,6 +2039,7 @@ namespace LanguageCore.Parser
 
             if (possibleType.Content == "var")
             {
+                possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
                 if ((flags & AllowedType.Implicit) == 0)
                 {
                     Errors.Add(new Error($"implicit type not allowed in the current context", possibleType));
@@ -2035,6 +2050,11 @@ namespace LanguageCore.Parser
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
                 return true;
+            }
+
+            if (LanguageConstants.BuiltinTypes.Contains(possibleType.Content))
+            {
+                possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
             }
 
             int afterIdentifier = CurrentTokenIndex;

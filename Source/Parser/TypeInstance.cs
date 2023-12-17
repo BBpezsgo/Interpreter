@@ -34,7 +34,7 @@ namespace LanguageCore.Parser
             return this.Equals(other);
         }
 
-        public abstract bool Equals(TypeInstance? obj);
+        public abstract bool Equals(TypeInstance? other);
 
         public abstract override int GetHashCode();
         public abstract override string ToString();
@@ -84,7 +84,7 @@ namespace LanguageCore.Parser
         public abstract void SetAnalyzedType(CompiledType type);
     }
 
-    public class TypeInstanceStackArray : TypeInstance
+    public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStackArray?>
     {
         public readonly StatementWithValue? StackArraySize;
         public readonly TypeInstance StackArrayOf;
@@ -95,10 +95,11 @@ namespace LanguageCore.Parser
             this.StackArraySize = sizeValue;
         }
 
-        public override bool Equals(TypeInstance? obj)
+        public override bool Equals(object? obj) => obj is TypeInstanceStackArray other && Equals(other);
+        public override bool Equals(TypeInstance? other) => other is TypeInstanceStackArray other_ && Equals(other_);
+        public bool Equals(TypeInstanceStackArray? other)
         {
-            if (obj is not TypeInstanceStackArray other) return false;
-
+            if (other is null) return false;
             if (!this.StackArrayOf.Equals(other.StackArrayOf)) return false;
 
             if (this.StackArraySize is null != other.StackArraySize is null) return false;
@@ -121,7 +122,7 @@ namespace LanguageCore.Parser
         public override string ToString(TypeArguments typeArguments) => $"{StackArrayOf.ToString(typeArguments)}[{StackArraySize}]";
     }
 
-    public class TypeInstanceFunction : TypeInstance
+    public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunction?>
     {
         public readonly TypeInstance FunctionReturnType;
         public readonly TypeInstance[] FunctionParameterTypes;
@@ -132,10 +133,11 @@ namespace LanguageCore.Parser
             FunctionParameterTypes = parameters.ToArray();
         }
 
-        public override bool Equals(TypeInstance? obj)
+        public override bool Equals(object? obj) => obj is TypeInstanceFunction other && Equals(other);
+        public override bool Equals(TypeInstance? other) => other is TypeInstanceFunction other_ && Equals(other_);
+        public bool Equals(TypeInstanceFunction? other)
         {
-            if (obj is not TypeInstanceFunction other) return false;
-
+            if (other is null) return false;
             if (!this.FunctionReturnType.Equals(other.FunctionReturnType)) return false;
             if (this.FunctionParameterTypes.Length != other.FunctionParameterTypes.Length) return false;
             for (int i = 0; i < this.FunctionParameterTypes.Length; i++)
@@ -189,7 +191,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class TypeInstanceSimple : TypeInstance
+    public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>
     {
         public readonly Token Identifier;
         public readonly TypeInstance[]? GenericTypes;
@@ -200,9 +202,11 @@ namespace LanguageCore.Parser
             this.GenericTypes = genericTypes?.ToArray();
         }
 
-        public override bool Equals(TypeInstance? obj)
+        public override bool Equals(object? obj) => obj is TypeInstanceSimple other && Equals(other);
+        public override bool Equals(TypeInstance? other) => other is TypeInstanceSimple other_ && Equals(other_);
+        public bool Equals(TypeInstanceSimple? other)
         {
-            if (obj is not TypeInstanceSimple other) return false;
+            if (other is null) return false;
             if (this.Identifier.Content != other.Identifier.Content) return false;
 
             if (this.GenericTypes is null) return other.GenericTypes is null;

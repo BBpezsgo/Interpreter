@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Numerics;
 using System.Text;
 
@@ -9,17 +10,17 @@ namespace LanguageCore
     {
         readonly struct EscapedCharacters
         {
-            public static readonly string QuotationMark = "\\\"";
-            public static readonly string Backslash = @"\\";
-            public static readonly string Null = @"\0";
-            public static readonly string A = @"\a";
-            public static readonly string B = @"\b";
-            public static readonly string F = @"\f";
-            public static readonly string N = @"\n";
-            public static readonly string R = @"\r";
-            public static readonly string Tab = @"\t";
-            public static readonly string V = @"\v";
-            public static readonly string U = @"\u";
+            public const string QuotationMark = "\\\"";
+            public const string Backslash = @"\\";
+            public const string Null = @"\0";
+            public const string A = @"\a";
+            public const string B = @"\b";
+            public const string F = @"\f";
+            public const string N = @"\n";
+            public const string R = @"\r";
+            public const string Tab = @"\t";
+            public const string V = @"\v";
+            public const string U = @"\u";
         }
 
         public static string Escape(this char v)
@@ -40,7 +41,7 @@ namespace LanguageCore
                     if (v >= 0x20 && v <= 0x7e)
                     { return v.ToString(); }
                     else
-                    { return EscapedCharacters.U + ((int)v).ToString("x4"); }
+                    { return EscapedCharacters.U + ((int)v).ToString("x4", CultureInfo.InvariantCulture); }
             }
         }
         public static string Escape(this string v)

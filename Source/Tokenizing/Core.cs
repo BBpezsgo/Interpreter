@@ -259,6 +259,11 @@ namespace LanguageCore.Tokenizing
             Warnings = warnings;
         }
 
+        public static TokenizerResult Empty => new(
+            Array.Empty<Token>(),
+            Array.Empty<SimpleToken>(),
+            Array.Empty<Warning>());
+
         public static implicit operator Token[](TokenizerResult result) => result.Tokens;
     }
 
@@ -286,7 +291,7 @@ namespace LanguageCore.Tokenizing
 
         protected Tokenizer(TokenizerSettings settings)
         {
-            CurrentToken = new(new Position(Range<SinglePosition>.Default, Range<int>.Default));
+            CurrentToken = new(default);
             CurrentColumn = 0;
             CurrentLine = 0;
 

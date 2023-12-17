@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace TheProgram
 {
+    using LanguageCore;
     using LanguageCore.ASM.Generator;
     using LanguageCore.BBCode.Generator;
     using LanguageCore.Brainfuck;
@@ -19,6 +21,12 @@ namespace TheProgram
         /// <exception cref="NotImplementedException"/>
         public static void Run(ArgumentParser.Settings arguments)
         {
+            if (arguments.IsEmpty)
+            {
+                new Interactive().Run();
+                return;
+            }
+
             switch (arguments.RunType)
             {
                 case ArgumentParser.RunType.Debugger:
@@ -29,8 +37,12 @@ namespace TheProgram
                     break;
 #endif
                 case ArgumentParser.RunType.Normal:
+                {
                     if (arguments.ConsoleGUI)
                     {
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
+
                         ConsoleGUI.ConsoleGUI gui = new()
                         {
                             FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.compilerSettings, arguments.bytecodeInterpreterSettings, arguments.HandleErrors)
@@ -43,72 +55,75 @@ namespace TheProgram
                         LanguageCore.Runtime.EasyInterpreter.Run(arguments);
                     }
                     break;
+                }
                 case ArgumentParser.RunType.Compile:
-                    {
-                        CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.compilerSettings.BasePath);
-                        BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.compilerSettings);
-                        File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
-                        break;
-                    }
+                {
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.compilerSettings.BasePath);
+                    BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.compilerSettings);
+                    File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
+                    break;
+                }
                 case ArgumentParser.RunType.Brainfuck:
-                    {
-                        BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
+                {
+                    BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
-                        EasyBrainfuckCompilerFlags compileOptions;
-                        if (arguments.compilerSettings.PrintInstructions)
-                        { compileOptions = EasyBrainfuckCompilerFlags.PrintCompiledMinimized; }
-                        else
-                        { compileOptions = EasyBrainfuckCompilerFlags.None; }
+                    EasyBrainfuckCompilerFlags compileOptions;
+                    if (arguments.compilerSettings.PrintInstructions)
+                    { compileOptions = EasyBrainfuckCompilerFlags.PrintCompiledMinimized; }
+                    else
+                    { compileOptions = EasyBrainfuckCompilerFlags.None; }
 
-                        if (arguments.ConsoleGUI)
-                        { BrainfuckRunner.Run(arguments, BrainfuckRunKind.UI, printFlags, compileOptions); }
-                        else
-                        { BrainfuckRunner.Run(arguments, BrainfuckRunKind.Default, printFlags, compileOptions); }
-                        break;
-                    }
+                    if (arguments.ConsoleGUI)
+                    { BrainfuckRunner.Run(arguments, BrainfuckRunKind.UI, printFlags, compileOptions); }
+                    else
+                    { BrainfuckRunner.Run(arguments, BrainfuckRunKind.Default, printFlags, compileOptions); }
+                    break;
+                }
                 case ArgumentParser.RunType.IL:
-                    {
+                {
 #if AOT
                         throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
 #else
-                        CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
 
-                        ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
+                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
 
-                        generated.Invoke();
-                        break;
+                    generated.Invoke();
+                    break;
 #endif
-                    }
+                }
                 case ArgumentParser.RunType.ASM:
+                {
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
+
+                    AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, null);
+
+                    string? fileDirectoryPath = arguments.File.DirectoryName;
+                    string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);
+
+                    fileDirectoryPath ??= ".\\";
+
+                    string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
+
+                    LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
+
+                    outputFile += ".exe";
+
+                    if (File.Exists(outputFile))
                     {
-                        CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
+                        Process? process = Process.Start(new ProcessStartInfo(outputFile));
+                        if (process == null)
+                        { throw new InternalException($"Failed to start process \"{outputFile}\""); }
+                        process.WaitForExit();
+                        Console.WriteLine();
+                        Console.WriteLine($"Exit code: {process.ExitCode}");
 
-                        AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, null);
-
-                        string? fileDirectoryPath = arguments.File.DirectoryName;
-                        string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);
-
-                        fileDirectoryPath ??= ".\\";
-
-                        string outputFile = Path.Combine(fileDirectoryPath, fileNameNoExt);
-
-                        LanguageCore.ASM.Assembler.Assemble(code.AssemblyCode, outputFile);
-
-                        if (File.Exists(outputFile + ".exe"))
-                        {
-                            Process? process = Process.Start(new ProcessStartInfo(outputFile + ".exe"));
-                            if (process == null)
-                            { throw new Exception($"Failed to start process \"{outputFile + ".exe"}\""); }
-                            process.WaitForExit();
-                            Console.WriteLine();
-                            Console.WriteLine($"Exit code: {process.ExitCode}");
-
-                            if (LanguageCore.ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out LanguageCore.ProcessRuntimeException? runtimeException))
-                            { throw runtimeException; }
-                        }
-
-                        break;
+                        if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out LanguageCore.ProcessRuntimeException? runtimeException))
+                        { throw runtimeException; }
                     }
+
+                    break;
+                }
                 default: throw new NotImplementedException($"Mode \"{arguments.RunType}\" isn't implemented for some reason");
             }
         }

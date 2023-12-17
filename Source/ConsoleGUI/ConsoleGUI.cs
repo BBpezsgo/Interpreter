@@ -96,7 +96,7 @@ namespace ConsoleGUI
         public Element? FilledElement;
 
         readonly SafeFileHandle ConsoleHandle;
-        readonly bool DebugLogs;
+
         readonly MainThreadTimer TimerRefreshConsole;
         readonly MainThreadTimer TimerAutoRefreshConsole;
         readonly MainThreadTimer TimerRefreshSizes;
@@ -121,18 +121,9 @@ namespace ConsoleGUI
         double LastTick;
         public bool Destroyed { get; private set; }
 
-        void Log(string message)
-        {
-            if (!DebugLogs) return;
-            System.Diagnostics.Debug.WriteLine(message);
-        }
-
-        public ConsoleGUI(bool DebugLogs = false)
+        public ConsoleGUI()
         {
             Instance = this;
-            this.DebugLogs = DebugLogs;
-
-            Log("Setup timers");
 
             TimerAutoRefreshConsole = new MainThreadTimer(TIMER_AUTO_REFRESH_CONSOLE);
             TimerAutoRefreshConsole.Elapsed += RefreshConsole;
@@ -181,17 +172,14 @@ namespace ConsoleGUI
                 this.MouseEvents,
             };
 
-            Log("Setup console");
             ConsoleHandler.Setup();
 
             ConsoleListener.MouseEvent += MouseEventThread;
             ConsoleListener.KeyEvent += KeyEventThread;
             ConsoleListener.WindowBufferSizeEvent += WindowBufferSizeEvent;
 
-            Log("Start console listener");
             ConsoleListener.Start();
 
-            Log("Setup console handler");
             unsafe
             {
                 fixed (char* fileNamePtr = "CONOUT$")
@@ -210,7 +198,6 @@ namespace ConsoleGUI
             }
             ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = Width, Bottom = Height };
 
-            Log("Start");
             Start();
         }
 
@@ -231,22 +218,15 @@ namespace ConsoleGUI
         {
             Clear();
 
-            Log("Refresh elements size");
             RefreshElementsSize(true);
 
-            Log("Refresh console");
             RefreshConsole();
         }
 
         void Clear()
         {
-            Log("Clear console");
-
             ConsoleBuffer = new ConsoleChar[Width * Height];
-            for (int i = 0; i < ConsoleBuffer.Length; i++)
-            {
-                ConsoleBuffer[i].Char = ' ';
-            }
+            Array.Fill(ConsoleBuffer, ConsoleChar.Empty);
             ConsoleRect = new SmallRect() { Left = 0, Top = 0, Right = Width, Bottom = Height };
         }
 
@@ -279,7 +259,7 @@ namespace ConsoleGUI
 
             if (FilledElement != null)
             {
-                FilledElement?.Tick(deltaTime);
+                FilledElement.Tick(deltaTime);
             }
             else
             {
@@ -295,10 +275,7 @@ namespace ConsoleGUI
             NextRefreshConsole = false;
 
             if (ConsoleHandle.IsInvalid)
-            {
-                Log("Console handler is invalid");
-                return;
-            }
+            { return; }
 
             for (int i = 0; i < ConsoleBuffer.Length; i++)
             {

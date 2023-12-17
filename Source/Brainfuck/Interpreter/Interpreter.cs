@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
+using System.Runtime.Versioning;
 using Win32;
-using Win32.LowLevel;
+using Thread = System.Threading.Thread;
 
 namespace LanguageCore.Brainfuck
 {
     using Runtime;
-    using Thread = System.Threading.Thread;
 
     public delegate void OutputCallback(byte data);
     public delegate byte InputCallback();
@@ -43,7 +43,13 @@ namespace LanguageCore.Brainfuck
 
         public Interpreter(Uri url, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
             : this(OnOutput, OnInput)
-            => new System.Net.Http.HttpClient().GetStringAsync(url).ContinueWith((code) => this.Code = CompactCode.OpCode(ParseCode(code.Result))).Wait();
+        {
+            using System.Net.Http.HttpClient client = new();
+            client.GetStringAsync(url).ContinueWith((code) =>
+            {
+                this.Code = CompactCode.OpCode(ParseCode(code.Result));
+            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
+        }
         public Interpreter(FileInfo file, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
             : this(File.ReadAllText(file.FullName), OnOutput, OnInput) { }
         public Interpreter(string? code, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
@@ -109,11 +115,11 @@ namespace LanguageCore.Brainfuck
                     break;
                 case OpCodes.POINTER_R:
                     if (memoryPointer++ >= Memory.Length)
-                    { throw new BrainfuckRuntimeException($"Memory overflow", GetContext()); }
+                    { throw new BrainfuckRuntimeException($"Memory overflow", Context); }
                     break;
                 case OpCodes.POINTER_L:
                     if (memoryPointer-- <= 0)
-                    { throw new BrainfuckRuntimeException($"Memory underflow", GetContext()); }
+                    { throw new BrainfuckRuntimeException($"Memory underflow", Context); }
                     break;
                 case OpCodes.BRANCH_START:
                     if (Memory[memoryPointer] == 0)
@@ -126,12 +132,12 @@ namespace LanguageCore.Brainfuck
                             if (Code[codePointer] == OpCodes.BRANCH_END)
                             {
                                 if (depth == 0) goto FinishInstruction;
-                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", GetContext());
+                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", Context);
                                 depth--;
                             }
                             else if (Code[codePointer] == OpCodes.BRANCH_START) depth++;
                         }
-                        throw new BrainfuckRuntimeException($"Unclosed bracket", GetContext());
+                        throw new BrainfuckRuntimeException($"Unclosed bracket", Context);
                     }
                     break;
                 case OpCodes.BRANCH_END:
@@ -145,12 +151,12 @@ namespace LanguageCore.Brainfuck
                             if (Code[codePointer] == OpCodes.BRANCH_START)
                             {
                                 if (depth == 0) goto FinishInstruction;
-                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", GetContext());
+                                if (depth < 0) throw new BrainfuckRuntimeException($"Wat", Context);
                                 depth--;
                             }
                             else if (Code[codePointer] == OpCodes.BRANCH_END) depth++;
                         }
-                        throw new BrainfuckRuntimeException($"Unexpected closing bracket", GetContext());
+                        throw new BrainfuckRuntimeException($"Unexpected closing bracket", Context);
                     }
                     break;
                 case OpCodes.OUT:
@@ -163,7 +169,7 @@ namespace LanguageCore.Brainfuck
                     isPaused = true;
                     break;
                 default:
-                    throw new BrainfuckRuntimeException($"Unknown instruction {Code[codePointer]}", GetContext());
+                    throw new BrainfuckRuntimeException($"Unknown instruction {Code[codePointer]}", Context);
             }
 
         FinishInstruction:
@@ -444,7 +450,7 @@ namespace LanguageCore.Brainfuck
         {
             for (int m = start; m <= end; m++)
             {
-                string textToPrint = Memory[m].ToString().PadRight(4, ' ');
+                string textToPrint = Memory[m].ToString(CultureInfo.InvariantCulture).PadRight(4, ' ');
 
                 if (memoryPointer == m)
                 { renderer.Text(x, y, textToPrint, Win32.ConsoleColor.BrightRed); }
@@ -536,6 +542,6 @@ namespace LanguageCore.Brainfuck
             Array.Clear(this.Memory);
         }
 
-        public RuntimeContext GetContext() => new(memoryPointer, codePointer);
+        public RuntimeContext Context => new(memoryPointer, codePointer);
     }
 }

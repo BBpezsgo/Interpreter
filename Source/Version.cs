@@ -8,6 +8,9 @@ namespace TheProgram
         public static string Current => Convert(DateTime.Now);
         static DateTime UploadedSavedD;
 
+        static Uri ProjectGithubUri => new("https://api.github.com/repos/BBpezsgo/Interpreter/branches/master");
+        const string Cookies = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36";
+
         public static string? UploadedSaved { get; private set; }
         public static string Uploaded
         {
@@ -16,10 +19,10 @@ namespace TheProgram
                 if (!string.IsNullOrEmpty(UploadedSaved))
                 { return UploadedSaved; }
 
-                System.Net.Http.HttpClient httpClient = new();
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
+                using System.Net.Http.HttpClient httpClient = new();
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(Cookies);
 
-                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync("https://api.github.com/repos/BBpezsgo/Interpreter/branches/master").Result;
+                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(ProjectGithubUri).Result;
                 
                 string res = result.Content.ReadAsStringAsync().Result;
 
@@ -38,10 +41,10 @@ namespace TheProgram
             {
                 StateCallback?.Invoke("Prepare for download");
                 System.Net.Http.HttpClient httpClient = new();
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36");
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(Cookies);
 
                 StateCallback?.Invoke("Send GET request");
-                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync("https://api.github.com/repos/BBpezsgo/Interpreter/branches/master").Result;
+                System.Net.Http.HttpResponseMessage result = httpClient.GetAsync(ProjectGithubUri).Result;
 
                 StateCallback?.Invoke("Download content");
                 string res = result.Content.ReadAsStringAsync().Result;

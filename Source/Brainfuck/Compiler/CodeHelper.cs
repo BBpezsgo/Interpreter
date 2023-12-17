@@ -109,7 +109,9 @@ namespace LanguageCore.Brainfuck
         public void StartBlock(string label)
         {
             LineBreak();
-            this.Code.Append($"{BrainfuckCode.ReplaceCodes(label, '_')} {{");
+            this.Code.Append(BrainfuckCode.ReplaceCodes(label, '_'));
+            this.Code.Append(' ');
+            this.Code.Append('{');
             this.indent += 2;
             LineBreak();
         }
@@ -424,11 +426,11 @@ namespace LanguageCore.Brainfuck
 
             while (true)
             {
-                if (result.Contains("\r\n\r\n"))
-                { result = result.Replace("\r\n\r\n", "\r\n"); }
+                if (result.Contains("\r\n\r\n", StringComparison.Ordinal))
+                { result = result.Replace("\r\n\r\n", "\r\n", StringComparison.Ordinal); }
 
-                if (result.Contains(" \r\n"))
-                { result = result.Replace(" \r\n", "\r\n"); }
+                if (result.Contains(" \r\n", StringComparison.Ordinal))
+                { result = result.Replace(" \r\n", "\r\n", StringComparison.Ordinal); }
 
                 else break;
             }
@@ -763,8 +765,7 @@ namespace LanguageCore.Brainfuck
         /// </summary>
         public int Push(string v)
         {
-            if (v is null)
-            { throw new ArgumentNullException(nameof(v)); }
+            ArgumentNullException.ThrowIfNull(v, nameof(v));
 
             int size = v.Length;
             int address = PushVirtual(size);

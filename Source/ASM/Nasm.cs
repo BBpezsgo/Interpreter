@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -31,30 +32,30 @@ namespace LanguageCore.ASM
         {
             StringBuilder result = new(OriginalMessage);
 
-            result.Append($" (at line {LineNumber})");
+            result.Append(CultureInfo.InvariantCulture, $" (at line {LineNumber})");
 
             if (File != null)
-            { result.Append($" (in {File})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
 
             return result.ToString();
         }
 
         public static NasmException? Parse(string text, Exception? innerException = null)
         {
-            if (!text.Contains(':')) return null;
+            if (!text.Contains(':', StringComparison.Ordinal)) return null;
 
             string potentialFileName = text.Split(':')[0];
             text = text[(potentialFileName.Length + 1)..];
 
             int lineNumber = -1;
 
-            if (text.Contains(':'))
+            if (text.Contains(':', StringComparison.Ordinal))
             {
                 string potentialLine = text.Split(':')[0];
                 if (int.TryParse(potentialLine, out lineNumber))
                 {
                     text = text[(potentialLine.Length + 1)..].TrimStart();
-                    if (text.StartsWith("error:"))
+                    if (text.StartsWith("error:", StringComparison.Ordinal))
                     {
                         text = text["error:".Length..].TrimStart();
                     }
@@ -98,7 +99,7 @@ namespace LanguageCore.ASM
             string stdOutput = process.StandardOutput.ReadToEnd();
             string stdError = process.StandardError.ReadToEnd();
 
-            string[] errorLines = stdError.Replace("\r\n", "\n").Replace("\r", "").Split('\n');
+            string[] errorLines = stdError.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n');
 
             for (int i = 0; i < errorLines.Length; i++)
             {

@@ -17,6 +17,8 @@ namespace LanguageCore.Runtime
         IBitwiseOperators<DataItem, DataItem, DataItem>,
         IShiftOperators<DataItem, DataItem, DataItem>
     {
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem a, DataItem b)
         {
@@ -31,6 +33,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do + operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem a, DataItem b)
         {
@@ -46,6 +50,7 @@ namespace LanguageCore.Runtime
             };
         }
 
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator <<(DataItem leftSide, DataItem rightSide)
         {
@@ -62,6 +67,7 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do << operation with type {leftSide.Type} and {rightSide.Type}"),
             };
         }
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator >>(DataItem leftSide, DataItem rightSide)
         {
@@ -78,6 +84,7 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do >> operation with type {leftSide.Type} and {rightSide.Type}"),
             };
         }
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator >>>(DataItem leftSide, DataItem rightSide)
         {
@@ -199,6 +206,8 @@ namespace LanguageCore.Runtime
             return result;
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator *(DataItem a, DataItem b)
         {
@@ -213,6 +222,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do * operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator /(DataItem a, DataItem b)
         {
@@ -227,6 +238,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do / operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator %(DataItem a, DataItem b)
         {
@@ -242,6 +255,8 @@ namespace LanguageCore.Runtime
             };
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator <(DataItem a, DataItem b)
         {
@@ -259,6 +274,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do < operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator >(DataItem a, DataItem b)
         {
@@ -277,13 +294,19 @@ namespace LanguageCore.Runtime
             };
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator <=(DataItem a, DataItem b)
             => (a < b) || (a == b);
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator >=(DataItem a, DataItem b)
             => (a > b) || (a == b);
 
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator ==(DataItem a, DataItem b)
         {
@@ -303,10 +326,13 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do == operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static bool operator !=(DataItem a, DataItem b)
             => !(a == b);
 
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator !(DataItem value) => value.type switch
         {
@@ -317,6 +343,7 @@ namespace LanguageCore.Runtime
             _ => throw new RuntimeException($"Can't do ! operation with type {value.Type}"),
         };
 
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator +(DataItem value) => value.type switch
         {
@@ -327,6 +354,7 @@ namespace LanguageCore.Runtime
             _ => throw new RuntimeException($"Can't do + operation with type {value.Type}"),
         };
 
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator -(DataItem value) => value.type switch
         {
@@ -337,6 +365,8 @@ namespace LanguageCore.Runtime
             _ => throw new RuntimeException($"Can't do - operation with type {value.Type}"),
         };
 
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator |(DataItem a, DataItem b)
         {
@@ -350,6 +380,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do | operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator &(DataItem a, DataItem b)
         {
@@ -363,6 +395,8 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do & operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
+        /// <exception cref="InternalException"/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator ^(DataItem a, DataItem b)
         {
@@ -376,6 +410,7 @@ namespace LanguageCore.Runtime
                 _ => throw new RuntimeException($"Can't do ^ operation with type {a_} and {b_}"),
             };
         }
+        /// <inheritdoc/>
         /// <exception cref="RuntimeException"/>
         public static DataItem operator ~(DataItem value)
         {
@@ -403,11 +438,17 @@ namespace LanguageCore.Runtime
             throw new RuntimeException($"Can't do ~ operation with type {value.Type}");
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
         public static DataItem operator --(DataItem value)
         {
             throw new NotImplementedException();
         }
 
+        /// <inheritdoc/>
+        /// <exception cref="NotImplementedException"/>
+        [DoesNotReturn]
         public static DataItem operator ++(DataItem value)
         {
             throw new NotImplementedException();

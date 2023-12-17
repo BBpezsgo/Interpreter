@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace LanguageCore.Runtime
 {
@@ -46,7 +47,7 @@ namespace LanguageCore.Runtime
                 for (int j = 0; j < ParameterTypes.Length; j++)
                 {
                     if (j > 0) { result += ", "; }
-                    result += ParameterTypes[j].ToString().ToLower();
+                    result += ParameterTypes[j].ToString().ToLowerInvariant();
                 }
                 result += ")";
                 return result;
@@ -126,12 +127,12 @@ namespace LanguageCore.Runtime
             callback.Invoke(parameters);
         }
 
-        public void Return(DataItem returnValue) => OnReturn?.Invoke(returnValue);
+        public void ReturnValue(DataItem returnValue) => OnReturn?.Invoke(returnValue);
     }
 
     public interface IReturnValueConsumer
     {
-        public void Return(DataItem returnValue);
+        public void ReturnValue(DataItem returnValue);
     }
 
     unsafe public static class ExternalFunctionGenerator
@@ -184,11 +185,7 @@ namespace LanguageCore.Runtime
 
         static void AddExternalFunction(this Dictionary<string, ExternalFunctionBase> functions, string name, ExternalFunctionBase function)
         {
-            if (!functions.ContainsKey(name))
-            {
-                functions.Add(name, function);
-            }
-            else
+            if (!functions.TryAdd(name, function))
             {
                 functions[name] = function;
                 Output.LogWarning($"External function function \"{name}\" is already defined, so I'll override it");
@@ -414,7 +411,7 @@ namespace LanguageCore.Runtime
             {
                 if (values[i].Type != types[i])
                 {
-                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLower()}: expected {types[i].ToString().ToLower()}");
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLowerInvariant()}: expected {types[i].ToString().ToLowerInvariant()}");
                 }
             }
         }
@@ -427,7 +424,7 @@ namespace LanguageCore.Runtime
             {
                 if (values[i].Type.Convert() != types[i])
                 {
-                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLower()}: expected {types[i].ToString().ToLower()}");
+                    throw new RuntimeException($"Invalid parameter type {values[i].Type.ToString().ToLowerInvariant()}: expected {types[i].ToString().ToLowerInvariant()}");
                 }
             }
         }

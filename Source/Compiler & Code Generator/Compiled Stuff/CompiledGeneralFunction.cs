@@ -55,8 +55,8 @@ namespace LanguageCore.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(KeywordCall statement, string? file) => references.Add((statement, file));
-        public void AddReference(ConstructorCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(KeywordCall referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(ConstructorCall referencedBy, string? file) => references.Add((referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledGeneralFunction other)

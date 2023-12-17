@@ -9,7 +9,7 @@
         public abstract string? FilePath { get; }
         public abstract Position Position { get; }
 
-        public CompiledConstant(DataItem value)
+        protected CompiledConstant(DataItem value)
         {
             Value = value;
         }

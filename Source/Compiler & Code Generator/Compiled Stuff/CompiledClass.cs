@@ -91,9 +91,6 @@ namespace LanguageCore.Compiler
 
             for (int i = 0; i < typeParameters.Length; i++)
             {
-                if (TemplateInfo == null)
-                { throw new CompilerException("Ah"); }
-
                 CompiledType value = typeParameters[i];
                 string key = typeParameterNames[i];
 
@@ -165,7 +162,7 @@ namespace LanguageCore.Compiler
                         if (i > 0) result += ", ";
 
                         string typeParameterName = this.TemplateInfo.TypeParameters[i].Content;
-                        if (this.currentTypeArguments.TryGetValue(typeParameterName, out var typeParameterValue))
+                        if (this.currentTypeArguments.TryGetValue(typeParameterName, out CompiledType? typeParameterValue))
                         {
                             result += typeParameterValue.ToString();
                         }

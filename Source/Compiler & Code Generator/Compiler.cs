@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace LanguageCore.Compiler
 {
-    using LanguageCore.BBCode.Generator;
+    using BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -52,6 +52,9 @@ namespace LanguageCore.Compiler
             Array.Empty<Error>(),
             Array.Empty<Warning>(),
             Array.Empty<Statement>());
+
+        public static CompilerResult FromInteractive(Statement statement, Dictionary<string, ExternalFunctionBase> externalFunctions)
+            => new([], [], [], [], externalFunctions, [], [], [], [], [], [], [statement]);
 
         public CompilerResult(
             CompiledFunction[] functions,
@@ -329,7 +332,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
@@ -365,7 +368,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLower()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
                 }
             }
@@ -406,10 +409,10 @@ namespace LanguageCore.Compiler
                         if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLower()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                     }
 
                     return new CompiledOperator(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
@@ -529,7 +532,7 @@ namespace LanguageCore.Compiler
             return false;
         }
 
-        void CompileFile(SourceCodeManager.CollectedAST collectedAST)
+        void CompileFile(CollectedAST collectedAST)
         {
             foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
             {
@@ -599,24 +602,62 @@ namespace LanguageCore.Compiler
             Functions.AddRange(parserResult.Functions);
             Macros.AddRange(parserResult.Macros);
 
-            SourceCodeManager.Result collectorResult;
+            CollectorResult collectorResult;
             if (file != null)
             {
-                collectorResult = SourceCodeManager.Collect(parserResult, file, PrintCallback, BasePath);
+                collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, BasePath);
+
+                this.Warnings.AddRange(collectorResult.Warnings);
+                this.Errors.AddRange(collectorResult.Errors);
             }
             else
             {
-                collectorResult = new SourceCodeManager.Result()
-                {
-                    CollectedASTs = Array.Empty<SourceCodeManager.CollectedAST>(),
-                    Errors = Array.Empty<Error>(),
-                    Warnings = Array.Empty<Warning>(),
-                };
+                collectorResult = CollectorResult.Empty;
             }
+
+            CompileInternal(collectorResult);
+
+            return new CompilerResult(
+                CompiledFunctions,
+                Macros.ToArray(),
+                CompiledGeneralFunctions,
+                CompiledOperators,
+                ExternalFunctions,
+                CompiledStructs,
+                CompiledClasses,
+                Hashes.ToArray(),
+                CompiledEnums,
+                Errors.ToArray(),
+                Warnings.ToArray(),
+                parserResult.TopLevelStatements);
+        }
+
+        CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
+        {
+            CollectorResult collectorResult = SourceCodeManager.Collect(usings, null, PrintCallback, BasePath);
 
             this.Warnings.AddRange(collectorResult.Warnings);
             this.Errors.AddRange(collectorResult.Errors);
 
+            CompileInternal(collectorResult);
+
+            return new CompilerResult(
+                CompiledFunctions,
+                Macros.ToArray(),
+                CompiledGeneralFunctions,
+                CompiledOperators,
+                ExternalFunctions,
+                CompiledStructs,
+                CompiledClasses,
+                Hashes.ToArray(),
+                CompiledEnums,
+                Errors.ToArray(),
+                Warnings.ToArray(),
+                [statement]);
+        }
+
+        void CompileInternal(CollectorResult collectorResult)
+        {
             for (int i = 0; i < collectorResult.CollectedASTs.Length; i++)
             { CompileFile(collectorResult.CollectedASTs[i]); }
 
@@ -798,7 +839,7 @@ namespace LanguageCore.Compiler
                                     TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                     Token.CreateAnonymous("this"))
                                 );
-                            method.Parameters = new ParametersDefinition(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
+                            method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
                             returnType = new CompiledType(Type.Void);
                         }
 
@@ -825,7 +866,7 @@ namespace LanguageCore.Compiler
                                 TypeInstanceSimple.CreateAnonymous(compiledClass.Name.Content, compiledClass.TemplateInfo?.TypeParameters, TypeDefinitionReplacer),
                                 Token.CreateAnonymous("this"))
                             );
-                        method.Parameters = new ParametersDefinition(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
+                        method.Parameters = new ParameterDefinitionCollection(parameters, method.Parameters.LeftParenthesis, method.Parameters.RightParenthesis);
 
                         CompiledFunction methodInfo = CompileFunction(method);
 
@@ -855,21 +896,6 @@ namespace LanguageCore.Compiler
             }
 
             #endregion
-
-            return new CompilerResult(
-                CompiledFunctions,
-                Macros.ToArray(),
-                CompiledGeneralFunctions,
-                CompiledOperators,
-                ExternalFunctions,
-                CompiledStructs,
-                CompiledClasses,
-                Hashes.ToArray(),
-                CompiledEnums,
-                Errors.ToArray(),
-                Warnings.ToArray(),
-                parserResult.TopLevelStatements
-                );
         }
 
         /// <summary>
@@ -892,5 +918,13 @@ namespace LanguageCore.Compiler
             string? basePath,
             PrintCallback? printCallback = null)
             => new Compiler(externalFunctions, printCallback, basePath).CompileMainFile(parserResult, file);
+
+        public static CompilerResult CompileInteractive(
+            Statement statement,
+            Dictionary<string, ExternalFunctionBase>? externalFunctions,
+            string? basePath,
+            UsingDefinition[] usings,
+            PrintCallback? printCallback = null)
+            => new Compiler(externalFunctions, printCallback, basePath).CompileInteractiveInternal(statement, usings);
     }
 }

@@ -8,6 +8,9 @@ using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
+#pragma warning disable IDE0051 // Remove unused private members
+#pragma warning disable IDE0052 // Remove unread private members
+
 #nullable disable
 
 namespace TheProgram
@@ -33,12 +36,12 @@ namespace TheProgram
 
         private bool NeedStdin;
 
-        public Debugger(ArgumentParser.Settings settings_)
+        public Debugger(ArgumentParser.Settings settings)
         {
             Ipc = new InterProcessCommunication();
             Ipc.OnReceived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
 
-            ArgumentParser.Settings settings = ModifySettings(settings_);
+            ModifySettings(ref settings);
             SourceCode = File.ReadAllText(settings.File.FullName);
             NeedStdin = false;
             InitInterpreter(settings);
@@ -72,10 +75,9 @@ namespace TheProgram
             }
         }
 
-        static ArgumentParser.Settings ModifySettings(ArgumentParser.Settings settings)
+        static void ModifySettings(ref ArgumentParser.Settings settings)
         {
-            ArgumentParser.Settings result = settings;
-            return result;
+
         }
 
         void OnMessage(IPCMessage<object> message)
@@ -83,81 +85,81 @@ namespace TheProgram
             switch (message.Type)
             {
                 case "debug/step":
-                    {
-                        Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
-                        Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
+                {
+                    Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
+                    Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
 
-                        Interpreter.Breakpoint = Math.Max(1, Interpreter.Breakpoint + 1);
+                    Interpreter.Breakpoint = Math.Max(1, Interpreter.Breakpoint + 1);
 
-                        Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
-                        Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
+                    Ipc.Log($"Abs Breakpoint: {Interpreter.AbsoluteBreakpoint}");
+                    Ipc.Log($"Breakpoint: {Interpreter.Breakpoint}");
 
-                        try
-                        { Interpreter.Continue(2); }
-                        catch (EndlessLoopException) { }
-                        Ipc.Reply("interpreter/updated", "null", message);
-                    }
-                    break;
+                    try
+                    { Interpreter.Continue(2); }
+                    catch (EndlessLoopException) { }
+                    Ipc.Reply("interpreter/updated", "null", message);
+                }
+                break;
                 case "debug/stepinto":
-                    {
-                        Interpreter.StepInto();
-                        Ipc.Reply("interpreter/updated", "null", message);
-                    }
-                    break;
+                {
+                    Interpreter.StepInto();
+                    Ipc.Reply("interpreter/updated", "null", message);
+                }
+                break;
 
                 case "interpreter/tick":
-                    {
-                        Interpreter.Update();
-                        Ipc.Reply("interpreter/updated", "null", message);
-                    }
-                    break;
+                {
+                    Interpreter.Update();
+                    Ipc.Reply("interpreter/updated", "null", message);
+                }
+                break;
 
                 case "compiler/debuginfo":
                     throw new NotImplementedException();
                 case "compiler/code":
-                    {
-                        Ipc.Reply("compiler/code",
-                            (Interpreter.CompilerResult.Code == null) ?
-                                Array.Empty<Data_Instruction>() :
-                                Interpreter.CompilerResult.Code.ToData(v => new Data_Instruction(v)),
-                            message);
-                    }
-                    break;
+                {
+                    Ipc.Reply("compiler/code",
+                        (Interpreter.CompilerResult.Code == null) ?
+                            Array.Empty<Data_Instruction>() :
+                            Interpreter.CompilerResult.Code.ToData(v => new Data_Instruction(v)),
+                        message);
+                }
+                break;
 
                 case "interpreter/details":
-                    {
-                        if (Interpreter.BytecodeInterpreter == null) return;
-                        Ipc.Reply("interpreter/details", new Data_BytecodeInterpreterDetails(Interpreter.BytecodeInterpreter), message);
-                    }
-                    break;
+                {
+                    if (Interpreter.BytecodeInterpreter == null) return;
+                    Ipc.Reply("interpreter/details", new Data_BytecodeInterpreterDetails(Interpreter.BytecodeInterpreter), message);
+                }
+                break;
                 case "interpreter/registers":
-                    {
-                        if (Interpreter.BytecodeInterpreter == null) return;
-                        Ipc.Reply("interpreter/registers", new BytecodeProcessorRegisters(Interpreter.BytecodeInterpreter), message);
-                    }
-                    break;
+                {
+                    if (Interpreter.BytecodeInterpreter == null) return;
+                    Ipc.Reply("interpreter/registers", new BytecodeProcessorRegisters(Interpreter.BytecodeInterpreter), message);
+                }
+                break;
                 case "interpreter/stack":
-                    {
-                        if (Interpreter.BytecodeInterpreter == null) return;
-                        Ipc.Reply("interpreter/stack", new Stack_(Interpreter.BytecodeInterpreter), message);
-                    }
-                    break;
+                {
+                    if (Interpreter.BytecodeInterpreter == null) return;
+                    Ipc.Reply("interpreter/stack", new Stack_(Interpreter.BytecodeInterpreter), message);
+                }
+                break;
                 case "interpreter/state":
-                    {
-                        Ipc.Reply("interpreter/state", Interpreter.State.ToString(), message);
-                    }
-                    break;
+                {
+                    Ipc.Reply("interpreter/state", Interpreter.State.ToString(), message);
+                }
+                break;
                 case "interpreter/callstack":
-                    {
-                        Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.TraceCalls(), message);
-                    }
-                    break;
+                {
+                    Ipc.Reply("interpreter/callstack", Interpreter.BytecodeInterpreter.TraceCalls(), message);
+                }
+                break;
 
                 case "eval":
-                    {
-                        if (Interpreter.BytecodeInterpreter == null) return;
-                    }
-                    break;
+                {
+                    if (Interpreter.BytecodeInterpreter == null) return;
+                }
+                break;
                 case "stdin":
                     if (!NeedStdin) break;
                     Interpreter.OnInput(message.Data.ToString()[0]);

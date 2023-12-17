@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
+
+#pragma warning disable CA1822 // Mark members as static
 
 #nullable disable
 
@@ -43,11 +46,11 @@ namespace Communicating
 
         private void OnReceive(string data)
         {
-            var message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
+            IPCMessage<object> message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
 
             if (message.Type == "base/ping/req")
             {
-                Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(), message.Id);
+                Reply("base/ping/res", Math.Round(DateTime.Now.ToUnix()).ToString(CultureInfo.InvariantCulture), message.Id);
                 return;
             }
 
@@ -153,7 +156,7 @@ namespace Communicating
 
         void Listen(Stream @in, Stream @out, Encoding inEncoding, Encoding outEncoding)
         {
-            var outputWriter = new StreamWriter(@out, outEncoding);
+            StreamWriter outputWriter = new(@out, outEncoding);
 
             while (@in.CanRead && @out.CanWrite)
             {
@@ -186,8 +189,8 @@ namespace Communicating
 
             Log($"CanWrite: {@out.CanWrite} CanRead: {@in.CanRead}");
 
-            outputWriter?.Close();
-            outputWriter?.Dispose();
+            outputWriter.Close();
+            outputWriter.Dispose();
 
             @out?.Close();
             @out?.Dispose();

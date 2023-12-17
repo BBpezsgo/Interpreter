@@ -56,7 +56,7 @@ namespace LanguageCore.BBCode.Generator
         {
             StringBuilder result = new();
             result.Append('(');
-            result.Append($"{Address}");
+            result.Append(Address);
             if (BasepointerRelative)
             { result.Append(" (BPR)"); }
             else
@@ -230,7 +230,7 @@ namespace LanguageCore.Compiler
 
     public interface IReferenceable<T>
     {
-        public void AddReference(T reference, string? file);
+        public void AddReference(T referencedBy, string? file);
         public void ClearReferences();
     }
 
@@ -530,7 +530,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledType? other, TypeArguments? typeArguments) : this()
         {
-            if (other is null) throw new ArgumentNullException(nameof(other));
+            ArgumentNullException.ThrowIfNull(other, nameof(other));
 
             this.Set(other);
 
@@ -654,7 +654,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(string type, Func<string, CompiledType>? typeFinder) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
 
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
             { return; }
@@ -668,7 +668,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstance type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
 
             if (type is TypeInstanceSimple simpleType)
             {
@@ -695,7 +695,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceSimple type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
 
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
@@ -737,7 +737,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceFunction type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
 
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
             CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
@@ -749,10 +749,8 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceStackArray type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
-
-            if (constComputer == null)
-            { throw new ArgumentNullException(nameof(constComputer)); }
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
+            ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
             stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
             stackArraySizeStatement = type.StackArraySize!;
@@ -764,7 +762,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledType other)
         {
-            if (other is null) throw new ArgumentNullException(nameof(other));
+            ArgumentNullException.ThrowIfNull(other, nameof(other));
 
             this.builtinType = other.builtinType;
             this.@class = other.@class;
@@ -782,7 +780,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(ITypeDefinition type) : this()
         {
-            if (type is null) throw new ArgumentNullException(nameof(type));
+            ArgumentNullException.ThrowIfNull(type, nameof(type));
 
             if (type is CompiledStruct @struct)
             {
@@ -815,7 +813,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         void Set(CompiledType other)
         {
-            if (other is null) throw new ArgumentNullException(nameof(other));
+            ArgumentNullException.ThrowIfNull(other, nameof(other));
 
             this.builtinType = other.builtinType;
             this.@class = other.@class;

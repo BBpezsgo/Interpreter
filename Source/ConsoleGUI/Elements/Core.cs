@@ -156,7 +156,7 @@ namespace ConsoleGUI
                 for (int y = y1; y <= y2; y++)
                 {
                     char c = '+';
-                    if (prev != null)
+                    if (prev.HasValue)
                     {
                         int dx = x - prev.Value.Item1;
                         int dy = y - prev.Value.Item2;

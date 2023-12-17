@@ -190,7 +190,7 @@ namespace LanguageCore.Tokenizing
             }
             else if (currChar == 'e' && (CurrentToken.TokenType is PreparationTokenType.LiteralNumber or PreparationTokenType.LiteralFloat))
             {
-                if (CurrentToken.ToString().Contains(currChar))
+                if (CurrentToken.ToString().Contains(currChar, StringComparison.Ordinal))
                 { throw new TokenizerException($"Am I stupid or this is not a float number?", CurrentToken.Position); }
                 CurrentToken.Content.Append(currChar);
                 CurrentToken.TokenType = PreparationTokenType.LiteralFloat;

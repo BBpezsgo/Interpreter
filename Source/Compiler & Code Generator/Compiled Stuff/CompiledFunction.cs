@@ -87,10 +87,10 @@ namespace LanguageCore.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(FunctionCall statement, string? file) => references.Add((statement, file));
-        public void AddReference(Identifier statement, string? file) => references.Add((statement, file));
-        public void AddReference(KeywordCall statement, string? file) => references.Add((statement, file));
-        public void AddReference(IndexCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(FunctionCall referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(Identifier referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(KeywordCall referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(IndexCall referencedBy, string? file) => references.Add((referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledFunction other)

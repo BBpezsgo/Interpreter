@@ -238,7 +238,7 @@ namespace LanguageCore.IL.Generator
         }
         void Compile(KeywordCall statement, ILGenerator generator)
         {
-            switch (statement.Identifier.Content.ToLower())
+            switch (statement.Identifier.Content.ToLowerInvariant())
             {
                 case "return":
                     {

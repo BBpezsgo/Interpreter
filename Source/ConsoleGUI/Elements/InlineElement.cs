@@ -6,8 +6,6 @@ namespace ConsoleGUI
     {
         public InlineLayout Layout { get; set; } = InlineLayout.Stretchy();
 
-        public class BeforeDrawEvent { }
-
         public delegate void EventHandler<T>(InlineElement sender, T e);
         public delegate void EventHandler(InlineElement sender);
 

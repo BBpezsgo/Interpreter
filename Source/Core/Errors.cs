@@ -2,6 +2,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Globalization;
 
 namespace LanguageCore
 {
@@ -33,13 +34,13 @@ namespace LanguageCore
         {
             StringBuilder result = new(Message);
 
-            result.Append(Position.ToStringCool(" (at ", ")") ?? string.Empty);
+            result.Append(Position.ToStringCool(" (at ", ")"));
 
             if (File != null)
-            { result.Append($" (in {File})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
 
             if (InnerException != null)
-            { result.Append($" {InnerException}"); }
+            { result.Append(CultureInfo.InvariantCulture, $" {InnerException}"); }
 
             return result.ToString();
         }
@@ -57,17 +58,17 @@ namespace LanguageCore
             if (position.Range.Start.Line != position.Range.End.Line)
             { return null; }
 
-            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+            string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
 
-            if (position.Range.Start.Line - 1 >= lines.Length)
+            if (position.Range.Start.Line >= lines.Length)
             { return null; }
 
-            string line = lines[position.Range.Start.Line - 1];
+            string line = lines[position.Range.Start.Line];
 
             StringBuilder result = new();
 
             result.Append(line.Replace('\t', ' '));
-            result.Append("\r\n");
+            result.AppendLine();
             result.Append(' ', Math.Max(0, position.Range.Start.Character - 2));
             result.Append('^', Math.Max(1, position.Range.End.Character - position.Range.Start.Character));
             return result.ToString();
@@ -201,7 +202,8 @@ namespace LanguageCore
             { result.Append($" (in {SourceFile})"); }
 
             result.Append(Environment.NewLine);
-            result.Append($"Code Pointer: {context.CodePointer}");
+            result.Append($"Code Pointer: ");
+            result.Append(context.CodePointer);
 
             result.Append(Environment.NewLine);
             result.Append("Call Stack:");
@@ -209,14 +211,23 @@ namespace LanguageCore
             { result.Append(" (CallTrace is empty)"); }
             else
             {
+                result.AppendLine();
+                result.Append('\t');
+                result.Append(' ');
                 if (CallStack == null)
-                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", context.CallTrace)}"); }
+                { result.Append(string.Join("\n   ", context.CallTrace)); }
                 else
-                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", CallStack)}"); }
+                { result.Append(string.Join("\n   ", CallStack)); }
             }
 
             if (CurrentFrame.HasValue)
-            { result.Append($"{Environment.NewLine}\t {CurrentFrame.Value.ToString()} (current)"); }
+            {
+                result.AppendLine();
+                result.Append('\t');
+                result.Append(' ');
+                result.Append(CurrentFrame.Value.ToString());
+                result.Append(" (current)");
+            }
 
             /*
             result.Append(Environment.NewLine);
@@ -264,18 +275,29 @@ namespace LanguageCore
             result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
 
             if (SourceFile != null)
-            { result.Append($" (in {SourceFile})"); }
+            {
+                result.Append($" (in {SourceFile})");
+            }
 
             if (context.CallTrace.Length != 0)
             {
+                result.AppendLine();
+                result.Append('\t');
+                result.Append(' ');
                 if (CallStack == null)
-                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", context.CallTrace)}"); }
+                { result.Append(string.Join("\n   ", context.CallTrace)); }
                 else
-                { result.Append($"{Environment.NewLine}\t {string.Join("\n   ", CallStack)}"); }
+                { result.Append(string.Join("\n   ", CallStack)); }
             }
 
             if (CurrentFrame.HasValue)
-            { result.Append($"{Environment.NewLine}\t {CurrentFrame.Value.ToString()} (current)"); }
+            {
+                result.AppendLine();
+                result.Append('\t');
+                result.Append(' ');
+                result.Append(CurrentFrame.Value.ToString());
+                result.Append(" (current)");
+            }
 
             return result.ToString();
         }

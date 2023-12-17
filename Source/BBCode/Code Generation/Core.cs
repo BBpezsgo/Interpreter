@@ -147,32 +147,34 @@ namespace LanguageCore.BBCode.Generator
                     level
                     );
 
-            List<string> UsedExternalFunctions = new();
+            List<string> usedExternalFunctions = new();
 
             foreach (CompiledFunction function in this.CompiledFunctions)
             {
                 if (function.IsExternal)
-                { UsedExternalFunctions.Add(function.ExternalFunctionName); }
+                { usedExternalFunctions.Add(function.ExternalFunctionName); }
             }
 
             foreach (CompiledOperator @operator in this.CompiledOperators)
             {
                 if (@operator.IsExternal)
-                { UsedExternalFunctions.Add(@operator.ExternalFunctionName); }
+                { usedExternalFunctions.Add(@operator.ExternalFunctionName); }
             }
+
+            AddInstruction(Opcode.PUSH_VALUE, new DataItem(0));
 
             if (settings.ExternalFunctionsCache)
             {
                 int offset = 0;
                 AddComment($"Create external functions cache {{");
-                foreach (string function in UsedExternalFunctions)
+                foreach (string function in usedExternalFunctions)
                 {
                     AddComment($"Create string \"{function}\" {{");
 
                     AddInstruction(Opcode.PUSH_VALUE, function.Length + 1);
                     AddInstruction(Opcode.HEAP_ALLOC);
 
-                    ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count);
+                    ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
                     offset += function.Length;
 
                     {

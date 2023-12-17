@@ -53,7 +53,7 @@ namespace LanguageCore.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(OperatorCall statement, string? file) => references.Add((statement, file));
+        public void AddReference(OperatorCall referencedBy, string? file) => references.Add((referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledOperator other)
@@ -68,7 +68,7 @@ namespace LanguageCore.Compiler
         }
         public bool IsSame(ICanBeSame? other) => other is CompiledOperator other2 && IsSame(other2);
 
-        CompiledOperator IDuplicatable<CompiledOperator>.Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
+        public CompiledOperator Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {
             CompiledAttributes = this.CompiledAttributes,
             Modifiers = this.Modifiers,

@@ -71,7 +71,7 @@ namespace LanguageCore.Tokenizing
 
         public string? ConsumeUntil(string end)
         {
-            int i = text.IndexOf(end, position);
+            int i = text.IndexOf(end, position, StringComparison.Ordinal);
             if (i == 0)
             { return null; }
             return Consume(i - position);

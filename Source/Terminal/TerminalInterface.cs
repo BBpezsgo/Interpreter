@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
 
 namespace LanguageCore
 {
@@ -21,8 +18,8 @@ namespace LanguageCore
             Console.ResetColor();
         }
 
-        public static async Task Write(string data) => await Console.Out.WriteAsync(data);
-        public static async Task WriteError(string data) => await Console.Error.WriteAsync(data);
+        public static void Write(string data) => Console.Out.Write(data);
+        public static void WriteError(string data) => Console.Error.Write(data);
     }
 
     public enum LogType
@@ -74,125 +71,5 @@ namespace LanguageCore
         /// </list>
         /// </summary>
         Debug,
-    }
-}
-
-namespace LanguageCore.TerminalInterface
-{
-    public class TerminalInterface
-    {
-        string Input = string.Empty;
-        int CurrentLineWidth;
-        bool ShouldClose;
-
-        bool TryGetSuggestion([NotNullWhen(true)] out string? suggestion)
-        {
-            suggestion = null;
-            if (Input.Length == 0) return false;
-
-            List<string> suggestions = new();
-
-            if (Input.StartsWith("run "))
-            {
-
-            }
-            else
-            {
-                suggestions.Add("run");
-            }
-
-            foreach (string item in suggestions)
-            {
-                if (!item.StartsWith(Input)) continue;
-
-                suggestion = item;
-                return true;
-            }
-
-            return false;
-        }
-
-        void Tick()
-        {
-            char inp = Console.ReadKey().KeyChar;
-            if (inp == '\r')
-            {
-                if (!string.IsNullOrEmpty(Input))
-                {
-                    Console.Write(" > ");
-                    Console.WriteLine(Input);
-                    ProcessInput(Input);
-                    Console.Write(" > ");
-                }
-                Input = string.Empty;
-                return;
-            }
-
-            string? suggestion;
-
-            ClearLastLine(CurrentLineWidth + 3);
-
-            CurrentLineWidth = 0;
-
-            if (inp == '\b')
-            {
-                if (Input.Length > 0) Input = Input[..^1];
-            }
-            else if (inp == '\t')
-            {
-                TryGetSuggestion(out suggestion);
-
-                if (suggestion != null)
-                {
-                    Input = suggestion + " ";
-                }
-            }
-            else if (char.IsControl(inp))
-            { }
-            else
-            {
-                Input += inp;
-            }
-
-            TryGetSuggestion(out suggestion);
-
-            Console.Write(" > ");
-            CurrentLineWidth += 3;
-
-            Console.Write(Input);
-            CurrentLineWidth += Input.Length;
-
-            if (suggestion != null)
-            {
-                int cur = Console.CursorLeft;
-                Console.ForegroundColor = ConsoleColor.DarkCyan;
-
-                Console.Write(suggestion[Input.Length..]);
-                CurrentLineWidth += suggestion[Input.Length..].Length;
-
-                Console.ResetColor();
-                Console.CursorLeft = cur;
-            }
-        }
-
-        void ProcessInput(string input)
-        {
-            Console.WriteLine($"Processing input \"{input}\"");
-        }
-
-        static void ClearLastLine() => ClearLastLine(Console.BufferWidth);
-        static void ClearLastLine(int width)
-        {
-            Console.Write('\r');
-            Console.Write(new string(' ', width));
-            Console.Write('\r');
-        }
-
-        public static void Start()
-        {
-            TerminalInterface terminalInterface = new();
-            Console.Write(" > ");
-            while (!terminalInterface.ShouldClose) terminalInterface.Tick();
-        }
     }
 }

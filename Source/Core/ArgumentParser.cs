@@ -389,10 +389,17 @@ namespace TheProgram
                 }
             }
 
-            string file = args[^1];
-            if (!System.IO.File.Exists(file))
-            { throw new ArgumentException($"File \"{file}\" not found"); }
-            result.File = new System.IO.FileInfo(file);
+            if (args.Length > 0)
+            {
+                string file = args[^1];
+                if (!System.IO.File.Exists(file))
+                { throw new ArgumentException($"File \"{file}\" not found"); }
+                result.File = new System.IO.FileInfo(file);
+            }
+            else
+            {
+                result.File = null;
+            }
 
             return result;
         }
@@ -402,7 +409,10 @@ namespace TheProgram
         /// </summary>
         public struct Settings
         {
-            public System.IO.FileInfo File;
+            [MemberNotNullWhen(false, nameof(File))]
+            public readonly bool IsEmpty => File is null;
+
+            public System.IO.FileInfo? File;
 
             public LanguageCore.Compiler.CompilerSettings compilerSettings;
             public BytecodeInterpreterSettings bytecodeInterpreterSettings;
@@ -446,6 +456,7 @@ namespace TheProgram
                 IsTest = false,
                 ConsoleGUI = false,
                 DoNotPause = false,
+                File = null,
             };
         }
 
@@ -466,10 +477,7 @@ namespace TheProgram
         public static Settings? Parse(params string[] args)
         {
             if (args.Length == 0)
-            {
-                Output.LogError("No arguments passed!");
-                return null;
-            }
+            { return Settings.Default; }
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);

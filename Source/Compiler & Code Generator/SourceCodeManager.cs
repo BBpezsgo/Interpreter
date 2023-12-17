@@ -3,8 +3,40 @@ using System.IO;
 
 namespace LanguageCore.Compiler
 {
+    using System.Linq;
     using Parser;
     using Tokenizing;
+
+    public readonly struct CollectedAST
+    {
+        public readonly ParserResult ParserResult;
+        public readonly string Path;
+        public readonly UsingDefinition UsingDefinition;
+
+        public CollectedAST(ParserResult parserResult, string path, UsingDefinition usingDefinition)
+        {
+            ParserResult = parserResult;
+            Path = path;
+            UsingDefinition = usingDefinition;
+        }
+    }
+
+    public readonly struct CollectorResult
+    {
+        public readonly CollectedAST[] CollectedASTs;
+
+        public readonly Warning[] Warnings;
+        public readonly Error[] Errors;
+
+        public CollectorResult(IEnumerable<CollectedAST> collectedASTs, Warning[] warnings, Error[] errors)
+        {
+            CollectedASTs = collectedASTs.ToArray();
+            Warnings = warnings;
+            Errors = errors;
+        }
+
+        public static CollectorResult Empty => new([], [], []);
+    }
 
     public class SourceCodeManager
     {
@@ -21,30 +53,15 @@ namespace LanguageCore.Compiler
             Print = null;
         }
 
-        public struct CollectedAST
-        {
-            public ParserResult ParserResult;
-            public string Path;
-            public UsingDefinition UsingDefinition;
-        }
-
-        public struct Result
-        {
-            public CollectedAST[] CollectedASTs;
-
-            public Warning[] Warnings;
-            public Error[] Errors;
-        }
-
         (string? Text, string? Path) LoadSourceCode(
-            UsingDefinition @using,
-            FileInfo file,
-            string? basePath)
+    UsingDefinition @using,
+    FileInfo? file,
+    string? basePath)
         {
             if (@using.IsUrl)
             {
-                if (!System.Uri.TryCreate(@using.Path[0].Content, System.UriKind.Absolute, out var uri))
-                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].Content}\"", @using.Path[0], file.FullName); }
+                if (!System.Uri.TryCreate(@using.Path[0].Content, System.UriKind.Absolute, out System.Uri? uri))
+                { throw new SyntaxException($"Invalid uri \"{@using.Path[0].Content}\"", @using.Path[0], file?.FullName); }
 
                 string path = uri.ToString();
 
@@ -59,7 +76,7 @@ namespace LanguageCore.Compiler
 
                 Print?.Invoke($" Download file \"{path}\" ...", LogType.Debug);
                 System.DateTime started = System.DateTime.Now;
-                System.Net.Http.HttpClient httpClient = new();
+                using System.Net.Http.HttpClient httpClient = new();
                 System.Threading.Tasks.Task<string> req;
                 try
                 {
@@ -78,15 +95,13 @@ namespace LanguageCore.Compiler
             }
             else
             {
-                string? path = null;
-
                 if (string.IsNullOrEmpty(basePath))
                 {
-                    FileInfo[]? configFiles = file.Directory?.GetFiles("config.json");
+                    FileInfo[]? configFiles = file?.Directory?.GetFiles("config.json");
                     if (configFiles != null && configFiles.Length == 1)
                     {
                         System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(configFiles[0].FullName));
-                        if (document.RootElement.TryGetProperty("base", out var v))
+                        if (document.RootElement.TryGetProperty("base", out System.Text.Json.JsonElement v))
                         {
                             string? b = v.GetString();
                             if (b != null) basePath = b;
@@ -94,29 +109,50 @@ namespace LanguageCore.Compiler
                     }
                 }
 
-                string filename = @using.PathString.Replace("/", "\\");
-                if (!filename.EndsWith(".bbc")) filename += ".bbc";
+                string filename = @using.PathString.Replace('/', '\\');
+                if (!filename.EndsWith(".bbc", System.StringComparison.Ordinal)) filename += ".bbc";
 
                 List<string> searchForThese = new();
-                try
-                { searchForThese.Add(Path.GetFullPath((basePath?.Replace("/", "\\") ?? string.Empty) + filename, file.Directory!.FullName!)); }
-                catch (System.Exception) { }
-                try
-                { searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName!)); }
-                catch (System.Exception) { }
+
+                if (file != null)
+                {
+                    if (basePath != null)
+                    {
+                        try
+                        { searchForThese.Add(Path.GetFullPath(basePath.Replace('/', '\\') + filename, file.Directory!.FullName!)); }
+                        catch (System.Exception) { }
+                    }
+
+                    try
+                    { searchForThese.Add(Path.GetFullPath(filename, file.Directory!.FullName!)); }
+                    catch (System.Exception) { }
+                }
+                else
+                {
+                    if (basePath != null)
+                    {
+                        try
+                        { searchForThese.Add(Path.GetFullPath(basePath.Replace('/', '\\') + filename, System.Environment.CurrentDirectory)); }
+                        catch (System.Exception) { }
+                    }
+
+                    try
+                    { searchForThese.Add(Path.GetFullPath(filename, System.Environment.CurrentDirectory)); }
+                    catch (System.Exception) { }
+                }
+
+                string? path = null;
 
                 for (int i = 0; i < searchForThese.Count; i++)
                 {
                     path = searchForThese[i];
-                    if (!File.Exists(path))
-                    { path = null; }
-                    else
+                    if (File.Exists(path))
                     { break; }
                 }
 
                 if (path == null)
                 {
-                    Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file.FullName));
+                    Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file?.FullName));
                     return (null, path);
                 }
 
@@ -135,7 +171,7 @@ namespace LanguageCore.Compiler
 
         CollectedAST[] ProcessFile(
             UsingDefinition @using,
-            FileInfo file,
+            FileInfo? file,
             string? basePath)
         {
             (string? content, string? path) = LoadSourceCode(@using, file, basePath);
@@ -165,12 +201,7 @@ namespace LanguageCore.Compiler
 
             parserResult2.SetFile(path);
 
-            collectedASTs.Add(new CollectedAST()
-            {
-                ParserResult = parserResult2,
-                Path = path,
-                UsingDefinition = @using,
-            });
+            collectedASTs.Add(new CollectedAST(parserResult2, path, @using));
 
             foreach (UsingDefinition using_ in parserResult2.Usings)
             {
@@ -180,46 +211,39 @@ namespace LanguageCore.Compiler
             return collectedASTs.ToArray();
         }
 
-        Result Entry(
-            ParserResult parserResult,
-            FileInfo file,
+        CollectorResult Entry(
+            UsingDefinition[] usings,
+            FileInfo? file,
             string? basePath)
         {
-            if (parserResult.Usings.Length > 0)
+            if (usings.Length > 0)
             { Print?.Invoke("Parse usings ...", LogType.Debug); }
 
             List<CollectedAST> collectedASTs = new();
 
-            foreach (UsingDefinition usingItem in parserResult.Usings)
+            foreach (UsingDefinition usingItem in usings)
             {
                 collectedASTs.AddRange(ProcessFile(usingItem, file, basePath));
                 if (Errors.Count > 0)
-                { throw new System.Exception($"Failed to compile file {usingItem.PathString}", Errors[0].ToException()); }
+                { throw Errors[0].ToException(); }
             }
 
-            return new Result()
-            {
-                CollectedASTs = collectedASTs.ToArray(),
-
-                Warnings = Warnings.ToArray(),
-                Errors = Errors.ToArray(),
-            };
+            return new CollectorResult(collectedASTs, Warnings.ToArray(), Errors.ToArray());
         }
 
-        public static Result Collect(
-            ParserResult parserResult,
-            FileInfo file,
+        public static CollectorResult Collect(
+            UsingDefinition[] usings,
+            FileInfo? file,
             PrintCallback? printCallback = null,
             string? basePath = null)
         {
             SourceCodeManager sourceCodeManager = new()
             { Print = printCallback, };
-            sourceCodeManager.AlreadyCompiledCodes.Add(file.FullName);
+            if (file != null) sourceCodeManager.AlreadyCompiledCodes.Add(file.FullName);
             return sourceCodeManager.Entry(
-                parserResult,
+                usings,
                 file,
-                basePath
-                );
+                basePath);
         }
     }
 }

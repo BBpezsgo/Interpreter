@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Globalization;
 
 #pragma warning disable IDE0051
 
@@ -907,7 +908,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
-            switch (statement.Identifier.Content.ToLower())
+            switch (statement.Identifier.Content.ToLowerInvariant())
             {
                 case "return":
                     {
@@ -2502,7 +2503,7 @@ namespace LanguageCore.Brainfuck.Generator
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
 
             int pointerAddress = Stack.NextAddress;
-            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(), position) }, null, position);
+            GenerateCodeForMacro(allocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, size.ToString(CultureInfo.InvariantCulture), position) }, null, position);
             return pointerAddress;
         }
 
@@ -2511,7 +2512,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", position, CurrentFile); }
 
-            GenerateCodeForMacro(deallocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, pointer.ToString(), position) }, null, position);
+            GenerateCodeForMacro(deallocator, new StatementWithValue[] { Literal.CreateAnonymous(LiteralType.Integer, pointer.ToString(CultureInfo.InvariantCulture), position) }, null, position);
 
             if (deallocator.ReturnSomething)
             { Stack.Pop(); }

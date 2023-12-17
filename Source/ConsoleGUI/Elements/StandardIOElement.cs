@@ -73,7 +73,7 @@ namespace ConsoleGUI
                 for (int j = 0; j < lines.Length; j++)
                 {
                     if (line + j < start) continue;
-                    if (j == lines.Length - 1 && lines[j] == string.Empty) continue;
+                    if (j == lines.Length - 1 && string.IsNullOrEmpty(lines[j])) continue;
 
                     string line_ = lines[j];
                     b.AddText(line_.TrimEnd());

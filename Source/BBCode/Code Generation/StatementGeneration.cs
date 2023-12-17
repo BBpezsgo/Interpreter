@@ -81,9 +81,19 @@ namespace LanguageCore.BBCode.Generator
 
                     GenerateCodeForStatement(returnValue);
 
-                    int offset = ReturnValueOffset;
-                    for (int i = 0; i < returnValueType.SizeOnStack; i++)
-                    { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset - i); }
+                    if (InFunction || InMacro.Last)
+                    {
+                        int offset = ReturnValueOffset;
+                        for (int i = 0; i < returnValueType.SizeOnStack; i++)
+                        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset - i); }
+                    }
+                    else
+                    {
+                        if (!returnValueType.IsBuiltin)
+                        { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
+
+                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, 0);
+                    }
                 }
 
                 AddComment(" .:");
@@ -2367,6 +2377,16 @@ namespace LanguageCore.BBCode.Generator
             });
 
             AddComment("TopLevelStatements {");
+
+            CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
+            {
+                Address = 0,
+                BasepointerRelative = false,
+                Kind = StackElementKind.Internal,
+                Size = 1,
+                Tag = "Exit Code",
+                Type = StackElementType.Value,
+            });
 
             AddInstruction(Opcode.GET_BASEPOINTER);
             AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);

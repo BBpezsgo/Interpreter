@@ -97,7 +97,7 @@ namespace LanguageCore.Brainfuck
                         expectNumber = false;
                         break;
                     default:
-                        if (expectNumber && (new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' }).Contains(code[i]))
+                        if (expectNumber && char.IsAsciiDigit(code[i]))
                         {
                             if (Console.ForegroundColor != ConsoleColor.Yellow) Console.ForegroundColor = ConsoleColor.Yellow;
                         }

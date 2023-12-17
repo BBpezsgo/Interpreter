@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace LanguageCore.ASM
 {
-    using System.Diagnostics;
     using Runtime;
 
     public struct AssemblyHeader
@@ -88,7 +88,7 @@ namespace LanguageCore.ASM
         JE,
     }
 
-    public struct Registers
+    public static class Registers
     {
         /// <summary>Accumulator register. Used in arithmetic operations.</summary>
         public const string RAX = "rax", EAX = "eax", AX = "ax", AL = "al";
@@ -187,7 +187,7 @@ namespace LanguageCore.ASM
         {
             for (int i = 0; i < DataLabels.Count; i++)
             {
-                if (string.Equals(DataLabels[i], dataLabel))
+                if (string.Equals(DataLabels[i], dataLabel, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -243,7 +243,7 @@ namespace LanguageCore.ASM
         {
             for (int i = 0; i < Labels.Count; i++)
             {
-                if (string.Equals(Labels[i], dataLabel))
+                if (string.Equals(Labels[i], dataLabel, StringComparison.Ordinal))
                 {
                     return true;
                 }
@@ -554,7 +554,7 @@ namespace LanguageCore.ASM
         {
             for (int i = 0; i < ReservedWords.Length; i++)
             {
-                if (string.Equals(ReservedWords[i], word, StringComparison.InvariantCultureIgnoreCase))
+                if (string.Equals(ReservedWords[i], word, StringComparison.OrdinalIgnoreCase))
                 { return true; }
             }
             return false;

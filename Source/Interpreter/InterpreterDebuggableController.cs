@@ -138,15 +138,13 @@ namespace LanguageCore.Runtime
         public void SampleHeap()
         {
             if (this.BytecodeInterpreter == null) return;
-            if (this.BytecodeInterpreter.Memory.Heap == null) return;
-            if (this.BytecodeInterpreter.Memory.Heap is HEAP heap)
             {
-                (int, int, int) heapDiagnostics = heap.Diagnostics();
-                HeapUsage.Add((float)heapDiagnostics.Item1 / (float)heap.Size);
+                (int, int, int) heapDiagnostics = this.BytecodeInterpreter.Memory.Heap.Diagnostics();
+                HeapUsage.Add((float)heapDiagnostics.Item1 / (float)this.BytecodeInterpreter.Memory.Heap.Size);
             }
         }
 
-        /// <exception cref="Errors.EndlessLoopException"></exception>
+        /// <exception cref="EndlessLoopException"/>
         public void Continue(int endlessSafe = 1024)
         {
             while (true)
@@ -158,12 +156,5 @@ namespace LanguageCore.Runtime
                 if (endlessSafe-- < 0) throw new EndlessLoopException();
             }
         }
-
-        /// <summary>
-        /// It prepares the interpreter to run some code
-        /// </summary>
-        /// <param name="compiledCode"></param>
-        public override void ExecuteProgram(Instruction[] compiledCode, BytecodeInterpreterSettings bytecodeInterpreterSettings)
-            => base.ExecuteProgram(compiledCode, bytecodeInterpreterSettings);
     }
 }

@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
 namespace LanguageCore.Parser.Statement
 {
-    using System.Diagnostics;
     using Compiler;
     using Tokenizing;
 
@@ -175,7 +175,7 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token Keyword;
 
-        public LinkedIfThing(Token keyword, Statement block) : base(block)
+        protected LinkedIfThing(Token keyword, Statement block) : base(block)
         {
             Keyword = keyword;
         }
@@ -665,7 +665,6 @@ namespace LanguageCore.Parser.Statement
         public readonly StatementWithValue Left;
 
         public StatementWithValue[] Parameters => new StatementWithValue[] { this.Left };
-        public int ParameterCount => 1;
 
         public ShortOperatorCall(Token op, StatementWithValue left)
         {
@@ -807,7 +806,7 @@ namespace LanguageCore.Parser.Statement
 
         public override Assignment ToAssignment()
         {
-            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", ""), TokenType.Operator, Operator.Position), Left, Right);
+            OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position), Left, Right);
             return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
         }
     }
@@ -863,23 +862,23 @@ namespace LanguageCore.Parser.Statement
         {
             value = value.Trim();
             int @base = 10;
-            if (value.StartsWith("0b"))
+            if (value.StartsWith("0b", StringComparison.Ordinal))
             {
                 value = value[2..];
                 @base = 2;
             }
-            if (value.StartsWith("0x"))
+            if (value.StartsWith("0x", StringComparison.Ordinal))
             {
                 value = value[2..];
                 @base = 16;
             }
-            value = value.Replace("_", "");
+            value = value.Replace("_", string.Empty, StringComparison.Ordinal);
             return Convert.ToInt32(value, @base);
         }
         public static float GetFloat(string value)
         {
             value = value.Trim();
-            value = value.Replace("_", "");
+            value = value.Replace("_", string.Empty, StringComparison.Ordinal);
             value = value.EndsWith('f') ? value[..^1] : value;
             return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         }

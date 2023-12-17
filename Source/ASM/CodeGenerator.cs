@@ -137,7 +137,7 @@ namespace LanguageCore.ASM.Generator
                 case AddressingMode.ABSOLUTE:
                 case AddressingMode.BASEPOINTER_RELATIVE:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]".Replace("--", "+"), Registers.EAX);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]".Replace("--", "+", StringComparison.Ordinal), Registers.EAX);
                     break;
                 case AddressingMode.RELATIVE:
                 case AddressingMode.POP:
@@ -743,7 +743,7 @@ namespace LanguageCore.ASM.Generator
                 }
                 else
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, $"[rbp+{address.Address}]".Replace("+-", "-"));
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, $"[rbp+{address.Address}]".Replace("+-", "-", StringComparison.Ordinal));
                 }
                 return;
             }
@@ -861,7 +861,7 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(KeywordCall statement)
         {
-            switch (statement.Identifier.Content.ToLower())
+            switch (statement.Identifier.Content.ToLowerInvariant())
             {
                 case "return":
                     {

@@ -9,7 +9,7 @@ namespace LanguageCore.Runtime
     {
         public static void Run(TheProgram.ArgumentParser.Settings settings)
             => Run(
-                settings.File,
+                settings.File!,
                 settings.compilerSettings,
                 settings.bytecodeInterpreterSettings,
                 settings.LogDebugs,
@@ -32,8 +32,8 @@ namespace LanguageCore.Runtime
             string code = File.ReadAllText(file.FullName);
             Interpreter interpreter = new();
 
-            interpreter.OnStdOut += (sender, data) => Output.Write(data).Wait();
-            interpreter.OnStdError += (sender, data) => Output.WriteError(data).Wait();
+            interpreter.OnStdOut += (sender, data) => Output.Write(data);
+            interpreter.OnStdError += (sender, data) => Output.WriteError(data);
 
             void PrintOutput(string message, LogType logType)
             {

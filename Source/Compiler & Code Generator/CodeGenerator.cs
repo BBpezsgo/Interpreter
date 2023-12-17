@@ -1651,7 +1651,7 @@ namespace LanguageCore.Compiler
             return new CompiledVariable(memoryOffset, type, newVariable);
         }
 
-        protected CompiledFunction? GetCodeEntry()
+        protected CompiledFunction? FindCodeEntry()
         {
             for (int i = 0; i < CompiledFunctions.Length; i++)
             {

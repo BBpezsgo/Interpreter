@@ -1,8 +1,10 @@
-﻿using DataUtilities.ReadableFileFormat;
+﻿using System;
+using DataUtilities.ReadableFileFormat;
 using DataUtilities.Serializer;
 
 namespace LanguageCore.Runtime
 {
+    [Serializable]
     public partial struct DataItem : ISerializable<DataItem>, IFullySerializableText
     {
         public readonly void Serialize(Serializer serializer)

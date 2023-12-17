@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime
 {
-    using LanguageCore.BBCode.Generator;
-    using LanguageCore.Compiler;
+    using BBCode.Generator;
+    using Compiler;
 
     /// <summary>
     /// This compiles and runs the code
@@ -27,7 +28,7 @@ namespace LanguageCore.Runtime
             public int MemoryAddress;
             public int BufferSize;
 
-            public Stream(int id, int memoryAddress, int bufferSize)
+            protected Stream(int id, int memoryAddress, int bufferSize)
             {
                 ID = id;
                 MemoryAddress = memoryAddress;
@@ -259,7 +260,7 @@ namespace LanguageCore.Runtime
         {
             if (ReturnValueConsumer != null)
             {
-                ReturnValueConsumer.Return(new DataItem(key));
+                ReturnValueConsumer.ReturnValue(new DataItem(key));
                 ReturnValueConsumer = null;
             }
 
@@ -319,7 +320,7 @@ namespace LanguageCore.Runtime
                 (char @char, int x, int y) =>
                 {
                     if (x < 0 || y < 0) return;
-                    var (lx, ly) = Console.GetCursorPosition();
+                    (int lx, int ly) = Console.GetCursorPosition();
                     Console.SetCursorPosition(x, y);
                     Console.Write(@char);
                     Console.SetCursorPosition(lx, ly);
@@ -461,7 +462,10 @@ namespace LanguageCore.Runtime
 
             #region Win32
 
-            externalFunctions.AddExternalFunction<IntPtr, string, string, uint, Win32.MessageBoxResult>("MessageBox", Win32.LowLevel.User32.MessageBox);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                externalFunctions.AddExternalFunction<IntPtr, string, string, uint, Win32.MessageBoxResult>("MessageBox", Win32.LowLevel.User32.MessageBox);
+            }
 
             #endregion
 
@@ -470,7 +474,7 @@ namespace LanguageCore.Runtime
 
         protected void OnCodeExecuted()
         {
-            var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+            double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
             OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
             IsExecutingCode = false;
 
@@ -506,7 +510,7 @@ namespace LanguageCore.Runtime
 
                 OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
                 IsExecutingCode = false;
 
@@ -518,7 +522,7 @@ namespace LanguageCore.Runtime
 
                 OnOutput?.Invoke(this, "Runtime Exception: " + error.ToString(), LogType.Error);
 
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
                 IsExecutingCode = false;
 
@@ -528,7 +532,7 @@ namespace LanguageCore.Runtime
             {
                 OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
 
-                var elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
+                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
                 OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
                 IsExecutingCode = false;
 

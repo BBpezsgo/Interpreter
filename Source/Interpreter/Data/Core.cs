@@ -58,7 +58,7 @@ namespace LanguageCore.Runtime
                 if (Type == RuntimeType.UInt8)
                 { return valueUInt8; }
 
-                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to byte");
+                throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to byte");
             }
             set
             {
@@ -73,7 +73,7 @@ namespace LanguageCore.Runtime
                 if (Type == RuntimeType.SInt32)
                 { return valueSInt32; }
 
-                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to integer");
+                throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to integer");
             }
             set
             {
@@ -88,7 +88,7 @@ namespace LanguageCore.Runtime
                 if (Type == RuntimeType.Single)
                 { return valueSingle; }
 
-                throw new RuntimeException("Can't cast " + Type.ToString().ToLower() + " to float");
+                throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to float");
             }
             set
             {
@@ -106,7 +106,7 @@ namespace LanguageCore.Runtime
                 if (Type == RuntimeType.SInt32)
                 { return (char)valueSInt32; }
 
-                throw new RuntimeException($"Can't cast {Type.ToString().ToLower()} to char");
+                throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to char");
             }
             set
             {

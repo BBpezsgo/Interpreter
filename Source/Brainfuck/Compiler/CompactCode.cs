@@ -45,7 +45,7 @@ namespace LanguageCore.Brainfuck
         public const int CLEAR = 10;
     }
 
-    public class CompactCode
+    public static class CompactCode
     {
         public static byte OpCode(char c) => c switch
         {
@@ -105,7 +105,7 @@ namespace LanguageCore.Brainfuck
 
             for (int i = 0; i < code.Length; i++)
             {
-                var c = OpCode(code[i]);
+                byte c = OpCode(code[i]);
 
                 if (i < code.Length - 3 && code.Substring(i, 3) == "[-]")
                 {

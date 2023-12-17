@@ -22,6 +22,7 @@ namespace LanguageCore.ASM
             this.stdOutput = stdOutput;
             this.stdError = stdError;
         }
+
         protected ProcessException(
           System.Runtime.Serialization.SerializationInfo info,
           System.Runtime.Serialization.StreamingContext context) : base(info, context)

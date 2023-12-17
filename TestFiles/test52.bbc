@@ -1,0 +1,10 @@
+using System; 
+
+int a = 1;
+
+int Bruh() {
+	a++;
+	return a;
+}
+
+Print(a + Bruh());

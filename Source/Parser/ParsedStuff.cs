@@ -13,10 +13,10 @@ namespace LanguageCore.Parser
         public string? FilePath { get; set; }
     }
 
-    public class ParametersDefinition :
+    public class ParameterDefinitionCollection :
         IThingWithPosition,
         IReadOnlyCollection<ParameterDefinition>,
-        IEquatable<ParametersDefinition>
+        IEquatable<ParameterDefinitionCollection>
     {
         public readonly Token LeftParenthesis;
         public readonly Token RightParenthesis;
@@ -24,21 +24,21 @@ namespace LanguageCore.Parser
 
         public ParameterDefinition this[int index] => Parameters[index];
 
-        public ParametersDefinition(IEnumerable<ParameterDefinition> parameters, Token leftParenthesis, Token rightParenthesis)
+        public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameters, Token leftParenthesis, Token rightParenthesis)
         {
             this.Parameters = parameters.ToArray();
             this.LeftParenthesis = leftParenthesis;
             this.RightParenthesis = rightParenthesis;
         }
 
-        public Position Position => Position.Union(Parameters).Union(LeftParenthesis, RightParenthesis);
+        public Position Position => new Position(Parameters).Union(LeftParenthesis, RightParenthesis);
 
         public int Count => Parameters.Length;
 
         public IEnumerator<ParameterDefinition> GetEnumerator() => ((IEnumerable<ParameterDefinition>)Parameters).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => Parameters.GetEnumerator();
 
-        public bool TypeEquals(ParametersDefinition? other)
+        public bool TypeEquals(ParameterDefinitionCollection? other)
         {
             if (other is null) return false;
             if (Parameters.Length != other.Parameters.Length) return false;
@@ -47,7 +47,7 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        public bool Equals(ParametersDefinition? other)
+        public bool Equals(ParameterDefinitionCollection? other)
         {
             if (other is null) return false;
             if (Parameters.Length != other.Parameters.Length) return false;
@@ -66,7 +66,7 @@ namespace LanguageCore.Parser
 
         public ParameterDefinition[] ToArray() => Parameters;
 
-        public override bool Equals(object? obj) => Equals(obj as ParametersDefinition);
+        public override bool Equals(object? obj) => Equals(obj as ParameterDefinitionCollection);
 
         public override int GetHashCode() => HashCode.Combine(LeftParenthesis, RightParenthesis, Parameters);
     }
@@ -241,7 +241,7 @@ namespace LanguageCore.Parser
 
     public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
     {
-        public ParametersDefinition Parameters;
+        public ParameterDefinitionCollection Parameters;
         public Token[] Modifiers;
         public Statement.Block? Block;
 
@@ -263,7 +263,7 @@ namespace LanguageCore.Parser
         protected FunctionThingDefinition(
             IEnumerable<Token> modifiers,
             Token identifier,
-            ParametersDefinition parameters,
+            ParameterDefinitionCollection parameters,
             TemplateInfo? templateInfo)
         {
             Modifiers = modifiers.ToArray();
@@ -314,7 +314,7 @@ namespace LanguageCore.Parser
         public bool Equals(FunctionThingDefinition? other)
         {
             if (other is null) return false;
-            if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
+            if (!string.Equals(this.Identifier.Content, other.Identifier.Content, StringComparison.Ordinal)) return false;
 
             if (this.Parameters.Count != other.Parameters.Count) return false;
             for (int i = 0; i < this.Parameters.Count; i++)
@@ -344,7 +344,7 @@ namespace LanguageCore.Parser
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
 
-            if (!string.Equals(a.Identifier.Content, b.Identifier.Content)) return false;
+            if (!string.Equals(a.Identifier.Content, b.Identifier.Content, StringComparison.Ordinal)) return false;
 
             if (!a.Parameters.TypeEquals(b.Parameters)) return false;
 
@@ -352,17 +352,10 @@ namespace LanguageCore.Parser
         }
         public static bool operator !=(FunctionThingDefinition? a, FunctionThingDefinition? b) => !(a == b);
 
-        public virtual Position Position
-        {
-            get
-            {
-                Position result = new(Identifier);
-                result.Union(Parameters.Position);
-                result.Union(Block);
-                result.Union(Modifiers);
-                return result;
-            }
-        }
+        public virtual Position Position => new Position(Identifier)
+            .Union((IThingWithPosition?)Parameters)
+            .Union(Block)
+            .Union(Modifiers);
     }
 
     public class MacroDefinition : IExportable, IEquatable<MacroDefinition>
@@ -415,7 +408,7 @@ namespace LanguageCore.Parser
         public bool Equals(MacroDefinition? other)
         {
             if (other is null) return false;
-            if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
+            if (!string.Equals(this.Identifier.Content, other.Identifier.Content, StringComparison.Ordinal)) return false;
 
             if (this.Parameters.Length != other.Parameters.Length) return false;
             for (int i = 0; i < this.Parameters.Length; i++)
@@ -440,7 +433,7 @@ namespace LanguageCore.Parser
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
 
-            if (!string.Equals(a.Identifier.Content, b.Identifier.Content)) return false;
+            if (!string.Equals(a.Identifier.Content, b.Identifier.Content, StringComparison.Ordinal)) return false;
 
             if (a.Parameters.Length != b.Parameters.Length) return false;
             for (int i = 0; i < a.Parameters.Length; i++)
@@ -485,7 +478,7 @@ namespace LanguageCore.Parser
             IEnumerable<Token> modifiers,
             TypeInstance type,
             Token identifier,
-            ParametersDefinition parameters,
+            ParameterDefinitionCollection parameters,
             TemplateInfo? templateInfo)
             : base(modifiers, identifier, parameters, templateInfo)
         {
@@ -547,7 +540,7 @@ namespace LanguageCore.Parser
         public GeneralFunctionDefinition(
             Token identifier,
             IEnumerable<Token> modifiers,
-            ParametersDefinition parameters)
+            ParameterDefinitionCollection parameters)
             : base(modifiers, identifier, parameters, null)
         { }
 
@@ -743,6 +736,24 @@ namespace LanguageCore.Parser
             Keyword = keyword;
             CompiledUri = null;
             DownloadTime = null;
+        }
+
+        public static UsingDefinition CreateAnonymous(params string[] path)
+        {
+            Token[] pathTokens = new Token[path.Length];
+            for (int i = 0; i < path.Length; i++)
+            {
+                pathTokens[i] = Token.CreateAnonymous(path[i]);
+            }
+            return new UsingDefinition(Token.CreateAnonymous("using"), pathTokens);
+        }
+
+        public static UsingDefinition CreateAnonymous(Uri uri)
+        {
+            return new UsingDefinition(Token.CreateAnonymous("using"), new Token[]
+            {
+                Token.CreateAnonymous(uri.ToString())
+            });
         }
     }
 }

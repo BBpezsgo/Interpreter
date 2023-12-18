@@ -453,7 +453,7 @@ namespace LanguageCore.Runtime
             { return (float)(data.Float); }
 
             if (type == typeof(bool))
-            { return (bool)data.Boolean; }
+            { return (bool)data; }
 
             if (type == typeof(char))
             { return (char)(data.Integer ?? 0); }

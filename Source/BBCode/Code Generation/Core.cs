@@ -204,10 +204,10 @@ namespace LanguageCore.BBCode.Generator
                         AddInstruction(Opcode.PUSH_VALUE, function.Length);
 
                         // Calculate pointer
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
 
                         // Set value
-                        AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
                     }
 
                     for (int i = 0; i < function.Length; i++)
@@ -216,12 +216,12 @@ namespace LanguageCore.BBCode.Generator
                         AddInstruction(Opcode.PUSH_VALUE, new DataItem(function[i]));
 
                         // Calculate pointer
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
                         AddInstruction(Opcode.PUSH_VALUE, i + 1);
                         AddInstruction(Opcode.MATH_ADD);
 
                         // Set value
-                        AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
                     }
 
                     AddComment("}");
@@ -380,7 +380,7 @@ namespace LanguageCore.BBCode.Generator
                 { throw new InternalException($"Function {function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
                 int offset = useAbsolute ? function.InstructionOffset : function.InstructionOffset - item.CallInstructionIndex;
-                GeneratedCode[item.CallInstructionIndex].ParameterInt = offset;
+                GeneratedCode[item.CallInstructionIndex].Parameter = offset;
             }
 
             foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
@@ -388,7 +388,7 @@ namespace LanguageCore.BBCode.Generator
                 if (item.Function.InstructionOffset == -1)
                 { throw new InternalException($"Operator {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].Parameter = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
             foreach (UndefinedOffset<CompiledGeneralFunction> item in UndefinedGeneralFunctionOffsets)
@@ -424,7 +424,7 @@ namespace LanguageCore.BBCode.Generator
                 else
                 { throw new NotImplementedException(); }
 
-                GeneratedCode[item.CallInstructionIndex].ParameterInt = item.Function.InstructionOffset - item.CallInstructionIndex;
+                GeneratedCode[item.CallInstructionIndex].Parameter = item.Function.InstructionOffset - item.CallInstructionIndex;
             }
 
             return new BBCodeGeneratorResult()

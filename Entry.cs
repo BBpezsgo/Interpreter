@@ -45,21 +45,112 @@ namespace TheProgram
 
                         ConsoleGUI.ConsoleGUI gui = new()
                         {
-                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.compilerSettings, arguments.bytecodeInterpreterSettings, arguments.HandleErrors)
+                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.CompilerSettings, arguments.BytecodeInterpreterSettings, arguments.HandleErrors)
                         };
                         while (!gui.Destroyed)
                         { gui.Tick(); }
                     }
                     else
                     {
-                        LanguageCore.Runtime.EasyInterpreter.Run(arguments);
+                        Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
+                        LanguageCore.Runtime.Interpreter interpreter = new();
+
+                        interpreter.OnStdOut += (sender, data) => Output.Write(data);
+                        interpreter.OnStdError += (sender, data) => Output.WriteError(data);
+
+                        interpreter.OnOutput += (_, message, logType) => Output.Log(message, logType);
+
+                        interpreter.OnNeedInput += (sender) =>
+                        {
+                            ConsoleKeyInfo input = Console.ReadKey(true);
+                            sender.OnInput(input.KeyChar);
+                        };
+
+#if DEBUG
+                        interpreter.OnExecuted += (sender) =>
+                        {
+                            if (sender.BytecodeInterpreter == null) return;
+
+                            Console.WriteLine();
+                            Console.WriteLine($" ===== HEAP ===== ");
+                            Console.WriteLine();
+
+                            sender.BytecodeInterpreter.Memory.Heap.DebugPrint();
+
+                            if (sender.BytecodeInterpreter.Memory.Stack.Count > 0)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine($" ===== STACK ===== ");
+                                Console.WriteLine();
+
+                                for (int i = 0; i < sender.BytecodeInterpreter.Memory.Stack.Count; i++)
+                                {
+                                    sender.BytecodeInterpreter.Memory.Stack[i].DebugPrint();
+                                    Console.WriteLine();
+                                }
+                            }
+                        };
+#endif
+
+#if AOT
+                        Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+#else
+                        string dllsFolderPath = Path.Combine(arguments.File.Directory!.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
+                        if (Directory.Exists(dllsFolderPath))
+                        {
+                            DirectoryInfo dllsFolder = new(dllsFolderPath);
+                            Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                            FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
+                            foreach (FileInfo dll in dlls)
+                            { interpreter.LoadDLL(dll.FullName); }
+                        }
+                        else
+                        {
+                            Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+                        }
+#endif
+
+                        BBCodeGeneratorResult generatedCode;
+
+                        if (arguments.HandleErrors)
+                        {
+                            try
+                            {
+                                CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), interpreter.GenerateExternalFunctions(), arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
+                                generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
+
+                                generatedCode.ThrowErrors();
+                                generatedCode.Print(Output.Log);
+                            }
+                            catch (Exception ex)
+                            {
+                                Output.LogError(ex.ToString());
+                                return;
+                            }
+                        }
+                        else
+                        {
+                            CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), interpreter.GenerateExternalFunctions(), arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
+                            generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
+
+                            generatedCode.ThrowErrors();
+                            generatedCode.Print(Output.Log);
+                        }
+
+                        interpreter.CompilerResult = generatedCode;
+                        interpreter.Initialize(generatedCode.Code, arguments.BytecodeInterpreterSettings);
+
+                        while (interpreter.IsExecutingCode)
+                        {
+                            interpreter.Update();
+                        }
                     }
                     break;
                 }
                 case ProgramRunType.Compile:
                 {
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.compilerSettings.BasePath);
-                    BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.compilerSettings);
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.CompilerSettings.BasePath);
+                    BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings);
                     File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
                     break;
                 }
@@ -68,7 +159,7 @@ namespace TheProgram
                     BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
                     EasyBrainfuckCompilerFlags compileOptions;
-                    if (arguments.compilerSettings.PrintInstructions)
+                    if (arguments.CompilerSettings.PrintInstructions)
                     { compileOptions = EasyBrainfuckCompilerFlags.PrintCompiledMinimized; }
                     else
                     { compileOptions = EasyBrainfuckCompilerFlags.None; }
@@ -86,7 +177,7 @@ namespace TheProgram
 #else
                     CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
 
-                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.compilerSettings, default, null);
+                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.CompilerSettings, default, null);
 
                     generated.Invoke();
                     break;

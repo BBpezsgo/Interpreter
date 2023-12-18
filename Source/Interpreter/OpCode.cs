@@ -47,7 +47,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetStackAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
         /// </para>
         /// </summary>
         LOAD_VALUE,
@@ -67,7 +67,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetStackAddress"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchStackAddress"/>)
         /// </para>
         /// </summary>
         STORE_VALUE,
@@ -91,7 +91,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
         /// </para>
         /// </summary>
         CALL,
@@ -116,7 +116,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
         /// </para>
         /// </summary>
         JUMP_BY_IF_FALSE,
@@ -129,7 +129,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
         /// </para>
         /// </summary>
         JUMP_BY,
@@ -173,7 +173,7 @@
         ///     <list type="table">
         ///         <item>
         ///             <term>
-        ///                 <see cref="AddressingMode.RUNTIME"/>
+        ///                 <see cref="AddressingMode.Runtime"/>
         ///             </term>
         ///             <description>
         ///                 Pops an element from the stack and uses it as a new value
@@ -181,7 +181,7 @@
         ///         </item>
         ///         <item>
         ///             <term>
-        ///                 <see cref="AddressingMode.ABSOLUTE"/>
+        ///                 <see cref="AddressingMode.Absolute"/>
         ///             </term>
         ///             <description>
         ///                 Uses the instruction's parameter as a new value
@@ -189,7 +189,7 @@
         ///         </item>
         ///         <item>
         ///             <term>
-        ///                 <see cref="AddressingMode.RELATIVE"/>
+        ///                 <see cref="AddressingMode.StackRelative"/>
         ///             </term>
         ///             <description>
         ///                 Uses the stack's size as a new value and adds the instruction's parameter as an offset
@@ -211,7 +211,7 @@
         ///     <list type="table">
         ///         <item>
         ///             <term>
-        ///                 <see cref="AddressingMode.RUNTIME"/>
+        ///                 <see cref="AddressingMode.Runtime"/>
         ///             </term>
         ///             <description>
         ///                 Pops an element from the stack and uses it as a new value
@@ -219,7 +219,7 @@
         ///         </item>
         ///         <item>
         ///             <term>
-        ///                 <see cref="AddressingMode.ABSOLUTE"/>
+        ///                 <see cref="AddressingMode.Absolute"/>
         ///             </term>
         ///             <description>
         ///                 Uses the instruction's parameter as a new value
@@ -690,7 +690,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
         /// </para>
         /// </summary>
         HEAP_GET,
@@ -710,7 +710,7 @@
         /// <br/><br/>
         /// 
         /// <para>
-        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.GetData"/>)
+        /// <b>Uses</b> <see cref="AddressingMode"/> (<see cref="BytecodeProcessor.FetchData"/>)
         /// </para>
         /// </summary>
         HEAP_SET,

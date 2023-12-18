@@ -86,14 +86,14 @@ namespace LanguageCore.BBCode.Generator
                     {
                         int offset = ReturnValueOffset;
                         for (int i = 0; i < returnValueType.SizeOnStack; i++)
-                        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset - i); }
+                        { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, offset - i); }
                     }
                     else
                     {
                         if (!returnValueType.IsBuiltin)
                         { throw new CompilerException($"Exit code must be a built-in type (not {returnValueType})", returnValue, CurrentFile); }
 
-                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, 0);
+                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, 0);
                     }
                 }
 
@@ -102,7 +102,7 @@ namespace LanguageCore.BBCode.Generator
                 if (CanReturn)
                 {
                     AddInstruction(Opcode.PUSH_VALUE, new DataItem(true));
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, ReturnFlagOffset);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, ReturnFlagOffset);
                 }
 
                 ReturnInstructions.Last.Add(GeneratedCode.Count);
@@ -566,7 +566,7 @@ namespace LanguageCore.BBCode.Generator
                     { returnValueOffset -= parameterCleanup[i].Size; }
 
                     AddComment($" Function name string pointer (cache):");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Absolute, cacheAddress);
 
                     AddComment(" .:");
                     AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
@@ -577,7 +577,7 @@ namespace LanguageCore.BBCode.Generator
                         {
                             AddComment($" Store return value:");
                             for (int i = 0; i < returnValueSize; i++)
-                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, returnValueOffset); }
+                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, returnValueOffset); }
                         }
                         else
                         {
@@ -604,7 +604,7 @@ namespace LanguageCore.BBCode.Generator
                     }
 
                     AddComment($" Load Function Name String Pointer:");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, functionNameOffset);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, functionNameOffset);
 
                     AddComment(" .:");
                     AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
@@ -615,7 +615,7 @@ namespace LanguageCore.BBCode.Generator
                         {
                             AddComment($" Store return value:");
                             for (int i = 0; i < returnValueSize; i++)
-                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, returnValueOffset); }
+                            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, returnValueOffset); }
                         }
                         else
                         {
@@ -847,7 +847,7 @@ namespace LanguageCore.BBCode.Generator
 
                     AddComment(" Function Name:");
                     if (ExternalFunctionsCache.TryGetValue(operatorDefinition.ExternalFunctionName, out int cacheAddress))
-                    { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.ABSOLUTE, cacheAddress); }
+                    { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Absolute, cacheAddress); }
                     else
                     { GenerateCodeForLiteralString(operatorDefinition.ExternalFunctionName); }
 
@@ -858,7 +858,7 @@ namespace LanguageCore.BBCode.Generator
                     { offset -= parameterCleanup[i].Size; }
 
                     AddComment($" Function name string pointer:");
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, offset);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, offset);
 
                     AddComment(" .:");
                     AddInstruction(Opcode.CALL_EXTERNAL, externalFunction.ParameterCount);
@@ -876,16 +876,16 @@ namespace LanguageCore.BBCode.Generator
 
                     AddComment(" Deallocate Function Name String:");
 
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
-                    AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
+                    AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
                     AddInstruction(Opcode.HEAP_DEALLOC);
 
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, thereIsReturnValue ? -2 : -1);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, thereIsReturnValue ? -2 : -1);
                     AddInstruction(Opcode.HEAP_DEALLOC);
 
                     if (thereIsReturnValue)
                     {
-                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, -2);
+                        AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, -2);
                     }
                     else
                     {
@@ -929,13 +929,13 @@ namespace LanguageCore.BBCode.Generator
 
                 if (opcode == Opcode.LOGIC_AND)
                 {
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
                     jumpInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE);
                 }
                 else if (opcode == Opcode.LOGIC_OR)
                 {
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1);
                     AddInstruction(Opcode.LOGIC_NOT);
                     jumpInstruction = GeneratedCode.Count;
                     AddInstruction(Opcode.JUMP_BY_IF_FALSE);
@@ -945,7 +945,7 @@ namespace LanguageCore.BBCode.Generator
                 AddInstruction(opcode);
 
                 if (jumpInstruction != -1)
-                { GeneratedCode[jumpInstruction].ParameterInt = GeneratedCode.Count - jumpInstruction; }
+                { GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction; }
             }
             else if (@operator.Operator.Content == "=")
             {
@@ -1000,8 +1000,8 @@ namespace LanguageCore.BBCode.Generator
             // Set String.length
             {
                 AddInstruction(Opcode.PUSH_VALUE, literal.Length);
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
             }
             AddComment("}");
 
@@ -1012,12 +1012,12 @@ namespace LanguageCore.BBCode.Generator
                 AddInstruction(Opcode.PUSH_VALUE, new DataItem(literal[i]));
 
                 // Calculate pointer
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -2);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
                 AddInstruction(Opcode.PUSH_VALUE, 1 + i);
                 AddInstruction(Opcode.MATH_ADD);
 
                 // Set value
-                AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
             }
             AddComment("}");
 
@@ -1040,7 +1040,7 @@ namespace LanguageCore.BBCode.Generator
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
 
                 if (address.IsReference)
-                { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME); }
+                { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime); }
 
                 return;
             }
@@ -1105,12 +1105,12 @@ namespace LanguageCore.BBCode.Generator
         void GenerateCodeForStatement(Pointer memoryAddressFinder)
         {
             GenerateCodeForStatement(memoryAddressFinder.PrevStatement);
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
         }
         void GenerateCodeForStatement(WhileLoop whileLoop)
         {
             bool conditionIsComputed = TryCompute(whileLoop.Condition, null, out DataItem computedCondition);
-            if (conditionIsComputed && !computedCondition.Boolean && TrimUnreachableCode)
+            if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
                 Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
@@ -1137,7 +1137,7 @@ namespace LanguageCore.BBCode.Generator
 
             FinishJumpInstructions(BreakInstructions.Last);
 
-            GeneratedCode[conditionJumpOffset].ParameterInt = GeneratedCode.Count - conditionJumpOffset;
+            GeneratedCode[conditionJumpOffset].Parameter = GeneratedCode.Count - conditionJumpOffset;
 
             OnScopeExit();
 
@@ -1145,7 +1145,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (conditionIsComputed)
             {
-                if (!computedCondition.Boolean)
+                if (!(bool)computedCondition)
                 { Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
                 else if (BreakInstructions.Last.Count == 0)
                 { Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }
@@ -1186,7 +1186,7 @@ namespace LanguageCore.BBCode.Generator
 
             AddComment("Jump back");
             AddInstruction(Opcode.JUMP_BY, conditionOffsetFor - GeneratedCode.Count);
-            GeneratedCode[conditionJumpOffsetFor].ParameterInt = GeneratedCode.Count - conditionJumpOffsetFor;
+            GeneratedCode[conditionJumpOffsetFor].Parameter = GeneratedCode.Count - conditionJumpOffsetFor;
 
             FinishJumpInstructions(BreakInstructions.Pop());
 
@@ -1218,7 +1218,7 @@ namespace LanguageCore.BBCode.Generator
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].ParameterInt = GeneratedCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is ElseIfBranch partElseif)
                 {
@@ -1238,7 +1238,7 @@ namespace LanguageCore.BBCode.Generator
 
                     AddComment("}");
 
-                    GeneratedCode[jumpNextInstruction].ParameterInt = GeneratedCode.Count - jumpNextInstruction;
+                    GeneratedCode[jumpNextInstruction].Parameter = GeneratedCode.Count - jumpNextInstruction;
                 }
                 else if (ifSegment is ElseBranch partElse)
                 {
@@ -1252,7 +1252,7 @@ namespace LanguageCore.BBCode.Generator
 
             foreach (int item in jumpOutInstructions)
             {
-                GeneratedCode[item].ParameterInt = GeneratedCode.Count - item;
+                GeneratedCode[item].Parameter = GeneratedCode.Count - item;
             }
         }
         void GenerateCodeForStatement(NewInstance newObject)
@@ -1310,9 +1310,9 @@ namespace LanguageCore.BBCode.Generator
                     {
                         AddComment($"Save Chunk {j}:");
                         AddInstruction(Opcode.PUSH_VALUE, currentOffset);
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -3);
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -3);
                         AddInstruction(Opcode.MATH_ADD);
-                        AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
                         currentOffset++;
                     });
                     AddComment("}");
@@ -1491,7 +1491,7 @@ namespace LanguageCore.BBCode.Generator
                         { throw new NotImplementedException(); }
 
                         ValueAddress offset = GetBaseAddress(param, (computedIndexData.ValueSInt32 * prevType.StackArrayOf.SizeOnStack));
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
+                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
 
                         if (offset.IsReference)
                         { throw new NotImplementedException(); }
@@ -1528,7 +1528,7 @@ namespace LanguageCore.BBCode.Generator
                     GenerateCodeForStatement(index.Expression);
                     AddInstruction(Opcode.MATH_ADD);
 
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime);
                     return;
                 }
 
@@ -1772,12 +1772,12 @@ namespace LanguageCore.BBCode.Generator
                 if (parameter.IsRef)
                 {
                     ValueAddress offset = GetBaseAddress(parameter);
-                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.Runtime);
                 }
                 else
                 {
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, parameter.RealIndex);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, parameter.RealIndex);
                 }
             }
             else if (GetVariable(statementToSet.Content, out CompiledVariable? variable))
@@ -1788,7 +1788,7 @@ namespace LanguageCore.BBCode.Generator
                 { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{variable.Type.Name}\" type variable.", value, CurrentFile); }
 
                 GenerateCodeForStatement(value);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, variable.MemoryAddress);
+                AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, variable.MemoryAddress);
             }
             else if (GetGlobalVariable(statementToSet.Content, out CompiledVariable? globalVariable))
             {
@@ -1798,7 +1798,7 @@ namespace LanguageCore.BBCode.Generator
                 { throw new CompilerException($"Can not set a \"{valueType.Name}\" type value to the \"{globalVariable.Type.Name}\" type variable.", value, CurrentFile); }
 
                 GenerateCodeForStatement(value);
-                AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, GetGlobalVariableAddress(globalVariable).Address);
+                AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, GetGlobalVariableAddress(globalVariable).Address);
             }
             else
             {
@@ -1921,7 +1921,7 @@ namespace LanguageCore.BBCode.Generator
             GenerateCodeForStatement(value);
             GenerateCodeForStatement(statementToSet.PrevStatement);
 
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
         }
         void GenerateCodeForValueSetter(VariableDeclaration statementToSet, StatementWithValue value)
         {
@@ -1969,7 +1969,7 @@ namespace LanguageCore.BBCode.Generator
 
             int size = variable.Type.SizeOnStack;
             for (int offset = 1; offset <= size; offset++)
-            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, destination + size - offset); }
+            { AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, destination + size - offset); }
         }
 
         void AssignTypeCheck(CompiledType destination, CompiledType valueType, StatementWithValue value)
@@ -2102,7 +2102,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (CanReturn)
             {
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, ReturnFlagOffset);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, ReturnFlagOffset);
                 AddInstruction(Opcode.LOGIC_NOT);
                 ReturnInstructions.Last.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.JUMP_BY_IF_FALSE, 0);
@@ -2239,7 +2239,7 @@ namespace LanguageCore.BBCode.Generator
         {
             foreach (int jumpInstruction in jumpInstructions)
             {
-                GeneratedCode[jumpInstruction].ParameterInt = jumpTo - jumpInstruction;
+                GeneratedCode[jumpInstruction].Parameter = jumpTo - jumpInstruction;
             }
         }
 
@@ -2390,7 +2390,7 @@ namespace LanguageCore.BBCode.Generator
             });
 
             AddInstruction(Opcode.GET_BASEPOINTER);
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, 0);
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
@@ -2446,7 +2446,7 @@ namespace LanguageCore.BBCode.Generator
             InMacro.Pop();
             TagCount.Pop();
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RUNTIME, 0);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.Runtime, 0);
 
             AddComment("}");
 

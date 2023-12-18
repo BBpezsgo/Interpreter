@@ -701,5 +701,101 @@ namespace LanguageCore.Runtime
                     throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt64)}");
             }
         }
+
+        public static void Cast(ref DataItem value, RuntimeType targetType)
+        {
+            value = targetType switch
+            {
+                RuntimeType.UInt8 => value.Type switch
+                {
+                    RuntimeType.UInt8 => new DataItem((byte)value.ValueUInt8),
+                    RuntimeType.SInt32 => new DataItem((byte)(value.ValueSInt32 % byte.MaxValue)),
+                    RuntimeType.Single => new DataItem((byte)value.ValueSingle),
+                    RuntimeType.UInt16 => new DataItem((byte)value.ValueUInt16),
+                    _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
+                },
+                RuntimeType.SInt32 => value.Type switch
+                {
+                    RuntimeType.UInt8 => new DataItem((int)value.ValueUInt8),
+                    RuntimeType.SInt32 => new DataItem((int)value.ValueSInt32),
+                    RuntimeType.Single => new DataItem((int)value.ValueSingle),
+                    RuntimeType.UInt16 => new DataItem((int)value.ValueUInt16),
+                    _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
+                },
+                RuntimeType.Single => value.Type switch
+                {
+                    RuntimeType.UInt8 => new DataItem((float)value.ValueUInt8),
+                    RuntimeType.SInt32 => new DataItem((float)value.ValueSInt32),
+                    RuntimeType.Single => new DataItem((float)value.ValueSingle),
+                    RuntimeType.UInt16 => new DataItem((float)value.ValueUInt16),
+                    _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
+                },
+                RuntimeType.UInt16 => value.Type switch
+                {
+                    RuntimeType.UInt8 => new DataItem((char)value.ValueUInt8),
+                    RuntimeType.SInt32 => new DataItem((char)value.ValueSInt32),
+                    RuntimeType.Single => new DataItem((char)value.ValueSingle),
+                    RuntimeType.UInt16 => new DataItem((char)value.ValueUInt16),
+                    _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
+                },
+                _ => throw new InvalidCastException($"Can't cast {value.type} to {targetType}"),
+            };
+        }
+
+        public static bool operator true(DataItem v) => v.ToBoolean(null);
+        public static bool operator false(DataItem v) => !v.ToBoolean(null);
+
+        public static explicit operator bool(DataItem v) => v.ToBoolean(null);
+        public static implicit operator DataItem(bool v) => new(v);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator byte(DataItem v) => v.ToByte(null);
+        public static implicit operator DataItem(byte v) => new(v);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator sbyte(DataItem v) => v.ToSByte(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator short(DataItem v) => v.ToInt16(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator ushort(DataItem v) => v.ToUInt16(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator int(DataItem v) => v.ToInt32(null);
+        public static implicit operator DataItem(int v) => new(v);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator uint(DataItem v) => v.ToUInt32(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator long(DataItem v) => v.ToInt64(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator ulong(DataItem v) => v.ToUInt64(null);
+
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator float(DataItem v) => v.ToSingle(null);
+        public static implicit operator DataItem(float v) => new(v);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator decimal(DataItem v) => v.ToDecimal(null);
+
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator double(DataItem v) => v.ToDouble(null);
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public static explicit operator char(DataItem v) => v.ToChar(null);
+        public static implicit operator DataItem(char v) => new(v);
     }
 }

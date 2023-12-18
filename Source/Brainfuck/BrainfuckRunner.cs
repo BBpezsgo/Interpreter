@@ -28,35 +28,7 @@ namespace LanguageCore.Brainfuck
 
         public static void Run(TheProgram.ProgramArguments args, BrainfuckRunKind runKind, BrainfuckPrintFlags runFlags, EasyBrainfuckCompilerFlags flags = EasyBrainfuckCompilerFlags.None)
         {
-            void PrintCallback(string message, LogType level)
-            {
-                switch (level)
-                {
-                    case LogType.System:
-                        if (!args.LogSystem) break;
-                        Output.Log(message);
-                        break;
-                    case LogType.Normal:
-                        Output.Log(message);
-                        break;
-                    case LogType.Warning:
-                        if (!args.LogWarnings) break;
-                        Output.LogWarning(message);
-                        break;
-                    case LogType.Error:
-                        Output.LogError(message);
-                        break;
-                    case LogType.Debug:
-                        if (!args.LogDebugs) break;
-                        Output.LogDebug(message);
-                        break;
-                    default:
-                        Output.Log(message);
-                        break;
-                }
-            }
-
-            EasyBrainfuckCompilerResult? _code = EasyBrainfuckCompiler.Compile(args.File!, flags, PrintCallback);
+            EasyBrainfuckCompilerResult? _code = EasyBrainfuckCompiler.Compile(args.File!, flags, Output.Log);
             if (!_code.HasValue)
             { return; }
 

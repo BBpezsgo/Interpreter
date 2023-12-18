@@ -18,8 +18,8 @@ namespace TheProgram
 
         public System.IO.FileInfo? File;
 
-        public LanguageCore.Compiler.CompilerSettings compilerSettings;
-        public BytecodeInterpreterSettings bytecodeInterpreterSettings;
+        public LanguageCore.Compiler.CompilerSettings CompilerSettings;
+        public BytecodeInterpreterSettings BytecodeInterpreterSettings;
         public bool ThrowErrors;
         public readonly bool HandleErrors => !ThrowErrors;
         public string? PipeName;
@@ -49,8 +49,8 @@ namespace TheProgram
             LogWarnings = true,
             LogInfo = true,
             RunType = ProgramRunType.Normal,
-            compilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
-            bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
+            CompilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
+            BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
             CompileOutput = null,
             CompressionLevel = CompressionLevel.Optimal,
             PipeName = null,
@@ -216,7 +216,7 @@ namespace TheProgram
                 {
                     if (ExpectArg(args, ref i, out _, "--no-nullcheck", "-nn"))
                     {
-                        result.compilerSettings.CheckNullPointers = false;
+                        result.CompilerSettings.CheckNullPointers = false;
                         continue;
                     }
 
@@ -228,7 +228,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--heap-size", "-hs"))
                     {
-                        if (!ExpectParam(args, ref i, out result.bytecodeInterpreterSettings.HeapSize))
+                        if (!ExpectParam(args, ref i, out result.BytecodeInterpreterSettings.HeapSize))
                         { throw new ArgumentException($"Expected number value after argument \"{arg}\""); }
 
                         continue;
@@ -303,7 +303,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--basepath", "-bp"))
                     {
-                        if (!ExpectParam(args, ref i, out result.compilerSettings.BasePath))
+                        if (!ExpectParam(args, ref i, out result.CompilerSettings.BasePath))
                         { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
 
                         continue;
@@ -371,19 +371,19 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out _, "--dont-optimize", "-do"))
                     {
-                        result.compilerSettings.DontOptimize = true;
+                        result.CompilerSettings.DontOptimize = true;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--no-debug-info", "-ndi"))
                     {
-                        result.compilerSettings.GenerateDebugInstructions = false;
+                        result.CompilerSettings.GenerateDebugInstructions = false;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--remove-unused-functions", "-ruf"))
                     {
-                        if (!ExpectParam(args, ref i, out result.compilerSettings.RemoveUnusedFunctionsMaxIterations))
+                        if (!ExpectParam(args, ref i, out result.CompilerSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
 
                         continue;
@@ -391,7 +391,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out arg, "--stack-size", "-ss"))
                     {
-                        if (!ExpectParam(args, ref i, out result.bytecodeInterpreterSettings.StackMaxSize))
+                        if (!ExpectParam(args, ref i, out result.BytecodeInterpreterSettings.StackMaxSize))
                         { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
 
                         continue;
@@ -399,7 +399,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out _, "--print-instructions", "-pi"))
                     {
-                        result.compilerSettings.PrintInstructions = true;
+                        result.CompilerSettings.PrintInstructions = true;
                         continue;
                     }
 

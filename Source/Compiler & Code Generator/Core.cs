@@ -16,7 +16,7 @@ namespace LanguageCore.BBCode.Generator
         public readonly bool BasepointerRelative;
         public readonly bool IsReference;
         public readonly bool InHeap;
-        public AddressingMode AddressingMode => BasepointerRelative ? AddressingMode.BASEPOINTER_RELATIVE : AddressingMode.ABSOLUTE;
+        public AddressingMode AddressingMode => BasepointerRelative ? AddressingMode.BasePointerRelative : AddressingMode.Absolute;
 
         public ValueAddress(int address, bool basepointerRelative, bool isReference, bool inHeap)
         {

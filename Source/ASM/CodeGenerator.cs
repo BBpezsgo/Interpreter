@@ -106,21 +106,18 @@ namespace LanguageCore.ASM.Generator
 
             switch (address.AddressingMode)
             {
-                case AddressingMode.ABSOLUTE:
-                case AddressingMode.BASEPOINTER_RELATIVE:
+                case AddressingMode.Absolute:
+                case AddressingMode.BasePointerRelative:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]");
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                     break;
 
-                case AddressingMode.RELATIVE:
+                case AddressingMode.StackRelative:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.ESP}+{(address.Address + 1) * 4}]");
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                     throw new NotImplementedException();
 
-                case AddressingMode.POP:
-                    throw new NotImplementedException();
-
-                case AddressingMode.RUNTIME:
+                case AddressingMode.Runtime:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }
@@ -135,14 +132,13 @@ namespace LanguageCore.ASM.Generator
 
             switch (address.AddressingMode)
             {
-                case AddressingMode.ABSOLUTE:
-                case AddressingMode.BASEPOINTER_RELATIVE:
+                case AddressingMode.Absolute:
+                case AddressingMode.BasePointerRelative:
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}-{(address.Address + 1) * 4}]".Replace("--", "+", StringComparison.Ordinal), Registers.EAX);
                     break;
-                case AddressingMode.RELATIVE:
-                case AddressingMode.POP:
-                case AddressingMode.RUNTIME:
+                case AddressingMode.StackRelative:
+                case AddressingMode.Runtime:
                     throw new NotImplementedException();
                 default: throw new UnreachableException();
             }

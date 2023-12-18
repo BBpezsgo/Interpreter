@@ -534,21 +534,21 @@ namespace ConsoleGUI
             {
                 if (instruction.opcode == Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == AddressingMode.Runtime)
                     { storeIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
                     else
-                    { storeIndicators.Add(instruction.ParameterInt); }
+                    { storeIndicators.Add((int)instruction.Parameter); }
                 }
 
                 if (instruction.opcode == Opcode.HEAP_GET)
                 {
-                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == AddressingMode.Runtime)
                     {
                         if (this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].Type == RuntimeType.SInt32)
                         { loadIndicators.Add(this.Interpreter.BytecodeInterpreter.Memory.Stack[^1].ValueSInt32); }
                     }
                     else
-                    { loadIndicators.Add(instruction.ParameterInt); }
+                    { loadIndicators.Add((int)instruction.Parameter); }
                 }
             }
 
@@ -696,7 +696,7 @@ namespace ConsoleGUI
                 if (instruction.opcode == Opcode.STORE_VALUE ||
                     instruction.opcode == Opcode.HEAP_SET)
                 {
-                    if (instruction.AddressingMode == AddressingMode.RUNTIME)
+                    if (instruction.AddressingMode == AddressingMode.Runtime)
                     { loadIndicators.Add(stackSize - 2); }
                     else
                     { loadIndicators.Add(stackSize - 1); }

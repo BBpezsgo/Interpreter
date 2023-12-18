@@ -323,19 +323,6 @@ namespace LanguageCore
 
     #region InternalException
 
-
-    [Serializable]
-    [Obsolete]
-    public class ImpossibleException : Exception
-    {
-        public ImpossibleException() { }
-        public ImpossibleException(string message) : base(message) { }
-        public ImpossibleException(string message, Exception inner) : base(message, inner) { }
-        protected ImpossibleException(
-          SerializationInfo info,
-          StreamingContext context) : base(info, context) { }
-    }
-
     /// <summary> If this exception raised, it's a <b>big</b> problem. </summary>
     [Serializable]
     public class InternalException : LanguageException

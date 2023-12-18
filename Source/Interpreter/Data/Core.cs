@@ -145,8 +145,6 @@ namespace LanguageCore.Runtime
 
         #endregion
 
-        public readonly bool Boolean => this.ToBoolean(null);
-
         public readonly int? Integer => Type switch
         {
             RuntimeType.UInt8 => this.ValueUInt8,

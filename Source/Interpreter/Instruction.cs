@@ -6,15 +6,29 @@ namespace LanguageCore.Runtime
 {
     public enum AddressingMode : byte
     {
-        ABSOLUTE,
-        RUNTIME,
+        /// <summary>
+        /// <c>CurrentInstruction.ParameterInt</c>
+        /// </summary>
+        Absolute,
 
-        /// <summary><b>Only for stack!</b></summary>
-        BASEPOINTER_RELATIVE,
-        /// <summary><b>Only for stack!</b></summary>
-        RELATIVE,
-        /// <summary><b>Only for stack!</b></summary>
-        POP,
+        /// <summary>
+        /// <c>Memory.Stack.Pop().ToInt32(null)</c>
+        /// </summary>
+        Runtime,
+
+        /// <summary>
+        /// <b>Only for stack!</b>
+        /// <br/>
+        /// <c>BasePointer + CurrentInstruction.ParameterInt</c>
+        /// </summary>
+        BasePointerRelative,
+
+        /// <summary>
+        /// <b>Only for stack!</b>
+        /// <br/>
+        /// <c>Memory.Stack.Count + CurrentInstruction.ParameterInt</c>
+        /// </summary>
+        StackRelative,
     }
 
     [Serializable]
@@ -25,12 +39,6 @@ namespace LanguageCore.Runtime
         public Opcode opcode;
         DataItem parameter;
 
-        /// <exception cref="Errors.InternalException"/>
-        public int ParameterInt
-        {
-            get => parameter.ToInt32(null);
-            set => parameter = new DataItem(value);
-        }
         public DataItem Parameter
         {
             get => parameter;
@@ -41,20 +49,20 @@ namespace LanguageCore.Runtime
         public Instruction()
         {
             this.opcode = Opcode.UNKNOWN;
-            this.AddressingMode = AddressingMode.ABSOLUTE;
+            this.AddressingMode = AddressingMode.Absolute;
             this.parameter = DataItem.Null;
         }
 
         public Instruction(Opcode opcode)
         {
             this.opcode = opcode;
-            this.AddressingMode = AddressingMode.ABSOLUTE;
+            this.AddressingMode = AddressingMode.Absolute;
             this.parameter = DataItem.Null;
         }
         public Instruction(Opcode opcode, DataItem parameter)
         {
             this.opcode = opcode;
-            this.AddressingMode = AddressingMode.ABSOLUTE;
+            this.AddressingMode = AddressingMode.Absolute;
             this.parameter = parameter;
         }
 

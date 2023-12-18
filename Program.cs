@@ -8,15 +8,17 @@
 
             bool pauseAtEnd = true;
 
-            if (ArgumentParser.Parse(out ProgramArguments settings, args))
+            if (ArgumentParser.Parse(out ProgramArguments arguments, args))
             {
+                LanguageCore.Output.SetProgramArguments(arguments);
+
                 try
-                { Entry.Run(settings); }
+                { Entry.Run(arguments); }
                 catch (System.Exception exception)
                 { LanguageCore.Output.LogError($"Unhandled exception: {exception}"); }
 
-                if (settings.IsTest) pauseAtEnd = false;
-                if (settings.DoNotPause) pauseAtEnd = false;
+                if (arguments.IsTest) pauseAtEnd = false;
+                if (arguments.DoNotPause) pauseAtEnd = false;
             }
 
             if (pauseAtEnd)

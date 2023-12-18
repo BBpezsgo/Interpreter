@@ -27,7 +27,7 @@ namespace LanguageCore.Runtime
         public int[] CallTrace;
         public int CodePointer;
         public Instruction[] Code;
-        public DataStack Stack;
+        public Stack<DataItem> Stack;
         public int CodeSampleStart;
     }
 
@@ -291,11 +291,10 @@ namespace LanguageCore.Runtime
 
         public int GetAddress(int offset, AddressingMode addressingMode) => addressingMode switch
         {
-            AddressingMode.ABSOLUTE => offset,
-            AddressingMode.BASEPOINTER_RELATIVE => BasePointer + offset,
-            AddressingMode.RELATIVE => Memory.Stack.Count + offset,
-            AddressingMode.POP => Memory.Stack.Count - 1,
-            AddressingMode.RUNTIME => Memory.Stack.Last.ValueSInt32,
+            AddressingMode.Absolute => offset,
+            AddressingMode.BasePointerRelative => BasePointer + offset,
+            AddressingMode.StackRelative => Memory.Stack.Count + offset,
+            AddressingMode.Runtime => Memory.Stack.Last.ValueSInt32,
             _ => offset,
         };
     }

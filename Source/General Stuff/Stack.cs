@@ -32,6 +32,7 @@ namespace LanguageCore
         }
 
         public Stack() => stack = new List<T>();
+        public Stack(IEnumerable<T> items) => stack = new List<T>(items);
 
         public void Pop(int count)
         {
@@ -110,7 +111,7 @@ namespace LanguageCore
         public bool Remove(T item) => stack.Remove(item);
     }
 
-    public interface IReadOnlyStack<T> : IReadOnlyCollection<T>, IReadOnlyList<T>
+    public interface IReadOnlyStack<T> : IReadOnlyList<T>
     {
         public T Last { get; }
 

@@ -2345,8 +2345,8 @@ namespace LanguageCore.Compiler
                 "/" => left,
                 "%" => left,
 
-                "&&" => new DataItem(left.Boolean && right.Boolean),
-                "||" => new DataItem(left.Boolean || right.Boolean),
+                "&&" => new DataItem((bool)left && (bool)right),
+                "||" => new DataItem((bool)left || (bool)right),
 
                 "&" => left & right,
                 "|" => left | right,
@@ -2399,7 +2399,7 @@ namespace LanguageCore.Compiler
                 {
                     case "&&":
                     {
-                        if (!leftValue.Boolean)
+                        if (!(bool)leftValue)
                         {
                             value = new DataItem(false);
                             return true;
@@ -2408,7 +2408,7 @@ namespace LanguageCore.Compiler
                     }
                     case "||":
                     {
-                        if (leftValue.Boolean)
+                        if ((bool)leftValue)
                         {
                             value = new DataItem(true);
                             return true;
@@ -2452,7 +2452,7 @@ namespace LanguageCore.Compiler
                 {
                     case "&&":
                     {
-                        if (!leftValue.Boolean)
+                        if (!(bool)leftValue)
                         {
                             value = new DataItem(false);
                             return true;
@@ -2461,7 +2461,7 @@ namespace LanguageCore.Compiler
                     }
                     case "||":
                     {
-                        if (leftValue.Boolean)
+                        if ((bool)leftValue)
                         {
                             value = new DataItem(true);
                             return true;
@@ -2936,7 +2936,7 @@ namespace LanguageCore.Compiler
                     condition = Collapse(condition, parameters);
                     if (TryCompute(condition, null, out DataItem conditionValue))
                     {
-                        if (conditionValue.Boolean)
+                        if ((bool)conditionValue)
                         {
                             Statement result = ifBranch.Block;
                             result = Collapse(result, parameters);
@@ -2957,7 +2957,7 @@ namespace LanguageCore.Compiler
                     condition = Collapse(condition, parameters);
                     if (prevIsCollapsed && TryCompute(condition, null, out DataItem conditionValue))
                     {
-                        if (conditionValue.Boolean)
+                        if ((bool)conditionValue)
                         {
                             Statement result = elseIfBranch.Block;
                             result = Collapse(result, parameters);

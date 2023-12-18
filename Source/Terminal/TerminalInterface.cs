@@ -1,4 +1,5 @@
 ﻿using System;
+using TheProgram;
 
 namespace LanguageCore
 {
@@ -6,10 +7,48 @@ namespace LanguageCore
 
     public static class Output
     {
-        public static void LogDebug(string message) => LogColor(message, ConsoleColor.DarkGray);
-        public static void Log(string message) => Console.WriteLine(message);
-        public static void LogError(string message) => LogColor(message, ConsoleColor.Red);
-        public static void LogWarning(string message) => LogColor(message, ConsoleColor.DarkYellow);
+        static ProgramArguments arguments;
+
+        public static bool LogDebugs => arguments.LogDebugs;
+        public static bool LogInfos => arguments.LogInfo;
+        public static bool LogSystems => arguments.LogSystem;
+        public static bool LogWarnings => arguments.LogWarnings;
+
+        public static void SetProgramArguments(ProgramArguments arguments) => Output.arguments = arguments;
+
+        public static void Log(string message, LogType logType)
+        {
+            switch (logType)
+            {
+                case LogType.System:
+                    if (LogSystems) Console.WriteLine(message);
+                    break;
+                case LogType.Normal:
+                    Output.LogInfo(message);
+                    break;
+                case LogType.Warning:
+                    Output.LogWarning(message);
+                    break;
+                case LogType.Error:
+                    Output.LogError(message);
+                    break;
+                case LogType.Debug:
+                    Output.LogDebug(message);
+                    break;
+            }
+        }
+
+        public static void LogInfo(string message)
+        { if (LogInfos) LogColor(message, ConsoleColor.Blue); }
+
+        public static void LogError(string message)
+        { LogColor(message, ConsoleColor.Red); }
+
+        public static void LogWarning(string message)
+        { if (LogWarnings) LogColor(message, ConsoleColor.DarkYellow); }
+
+        public static void LogDebug(string message)
+        { if (LogDebugs) LogColor(message, ConsoleColor.DarkGray); }
 
         static void LogColor(string message, ConsoleColor color)
         {

@@ -22,7 +22,7 @@ namespace LanguageCore.BBCode.Generator
             AddInstruction(Opcode.GET_BASEPOINTER);
 
             if (address.Type.InHEAP)
-            { AddInstruction(Opcode.HEAP_GET, AddressingMode.ABSOLUTE, address.MemoryAddress); }
+            { AddInstruction(Opcode.HEAP_GET, AddressingMode.Absolute, address.MemoryAddress); }
             else
             { StackLoad(new ValueAddress(address), address.Type.SizeOnStack); }
 
@@ -30,12 +30,12 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.MATH_SUB);
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, -1);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
 
-            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
+            GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -51,18 +51,18 @@ namespace LanguageCore.BBCode.Generator
             AddInstruction(Opcode.GET_BASEPOINTER);
 
             ValueAddress offset = GetBaseAddress(address);
-            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BASEPOINTER_RELATIVE, offset.Address);
+            AddInstruction(Opcode.LOAD_VALUE, AddressingMode.BasePointerRelative, offset.Address);
 
             AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
 
             AddInstruction(Opcode.MATH_SUB);
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, -1);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
 
-            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
+            GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -84,12 +84,12 @@ namespace LanguageCore.BBCode.Generator
             AddInstruction(Opcode.PUSH_VALUE, GeneratedCode.Count + 3);
             AddInstruction(Opcode.MATH_SUB);
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, -1);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, -1);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.Runtime);
 
-            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
+            GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
             return jumpInstruction;
         }
@@ -101,20 +101,20 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.GET_BASEPOINTER);
 
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RELATIVE, 0);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.StackRelative, 0);
 
             int jumpInstruction = GeneratedCode.Count;
-            AddInstruction(Opcode.JUMP_BY, AddressingMode.ABSOLUTE, absoluteAddress - GeneratedCode.Count);
+            AddInstruction(Opcode.JUMP_BY, AddressingMode.Absolute, absoluteAddress - GeneratedCode.Count);
 
-            GeneratedCode[returnToValueInstruction].ParameterInt = GeneratedCode.Count;
+            GeneratedCode[returnToValueInstruction].Parameter = GeneratedCode.Count;
 
             return jumpInstruction;
         }
 
         void Return()
         {
-            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.RUNTIME, 0);
-            AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.SET_BASEPOINTER, AddressingMode.Runtime, 0);
+            AddInstruction(Opcode.SET_CODEPOINTER, AddressingMode.Runtime);
         }
 
         /// <exception cref="NotImplementedException"/>
@@ -198,7 +198,7 @@ namespace LanguageCore.BBCode.Generator
             if (address.IsReference)
             {
                 AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
-                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RUNTIME);
+                AddInstruction(Opcode.LOAD_VALUE, AddressingMode.Runtime);
                 throw new NotImplementedException();
             }
 
@@ -209,17 +209,13 @@ namespace LanguageCore.BBCode.Generator
 
             switch (address.AddressingMode)
             {
-                case AddressingMode.ABSOLUTE:
-                case AddressingMode.BASEPOINTER_RELATIVE:
-                case AddressingMode.RELATIVE:
+                case AddressingMode.Absolute:
+                case AddressingMode.BasePointerRelative:
+                case AddressingMode.StackRelative:
                     AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode, address.Address);
                     break;
 
-                case AddressingMode.POP:
-                    AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
-                    break;
-
-                case AddressingMode.RUNTIME:
+                case AddressingMode.Runtime:
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
                     AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
                     break;
@@ -240,21 +236,18 @@ namespace LanguageCore.BBCode.Generator
 
             switch (address.AddressingMode)
             {
-                case AddressingMode.ABSOLUTE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.ABSOLUTE, address.Address);
+                case AddressingMode.Absolute:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.Absolute, address.Address);
                     break;
-                case AddressingMode.BASEPOINTER_RELATIVE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BASEPOINTER_RELATIVE, address.Address);
+                case AddressingMode.BasePointerRelative:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, address.Address);
                     break;
-                case AddressingMode.RELATIVE:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RELATIVE, address.Address);
+                case AddressingMode.StackRelative:
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.StackRelative, address.Address);
                     break;
-                case AddressingMode.POP:
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.POP);
-                    break;
-                case AddressingMode.RUNTIME:
+                case AddressingMode.Runtime:
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.Runtime);
                     break;
                 default: throw new UnreachableException();
             }
@@ -297,13 +290,13 @@ namespace LanguageCore.BBCode.Generator
             if (!CheckNullPointers) return;
             AddComment($"Check for pointer zero {{");
             if (preservePointer)
-            { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.RELATIVE, -1); }
+            { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1); }
             AddInstruction(Opcode.LOGIC_NOT);
             int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.JUMP_BY_IF_FALSE);
             GenerateCodeForLiteralString(exceptionMessage);
             AddInstruction(Opcode.THROW);
-            GeneratedCode[jumpInstruction].ParameterInt = GeneratedCode.Count - jumpInstruction;
+            GeneratedCode[jumpInstruction].Parameter = GeneratedCode.Count - jumpInstruction;
             AddComment($"}}");
         }
 
@@ -315,7 +308,7 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
-            AddInstruction(Opcode.HEAP_GET, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.HEAP_GET, AddressingMode.Runtime);
         }
         void HeapStore(ValueAddress pointerAddress, int offset)
         {
@@ -325,7 +318,7 @@ namespace LanguageCore.BBCode.Generator
 
             AddInstruction(Opcode.PUSH_VALUE, offset);
             AddInstruction(Opcode.MATH_ADD);
-            AddInstruction(Opcode.HEAP_SET, AddressingMode.RUNTIME);
+            AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
         }
 
         #endregion

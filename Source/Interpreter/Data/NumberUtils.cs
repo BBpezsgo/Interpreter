@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Numerics;
@@ -20,10 +21,13 @@ namespace LanguageCore.Runtime
         public static DataItem One => new(1);
         public static DataItem NegativeOne => new(-1);
         public static DataItem Zero => new(0);
-        public static int Radix => throw new NotImplementedException();
+        /// <exception cref="System.NotSupportedException"/>
+        public static int Radix => throw new System.NotSupportedException("What is Radix???");
 
-        public static DataItem AdditiveIdentity => throw new NotImplementedException();
-        public static DataItem MultiplicativeIdentity => throw new NotImplementedException();
+        /// <exception cref="System.NotSupportedException"/>
+        public static DataItem AdditiveIdentity => throw new System.NotSupportedException("What is AdditiveIdentity???");
+        /// <exception cref="System.NotSupportedException"/>
+        public static DataItem MultiplicativeIdentity => throw new System.NotSupportedException("What is MultiplicativeIdentity???");
 
         public static DataItem Abs(DataItem value) => value.type switch
         {
@@ -32,10 +36,12 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => new DataItem(Math.Abs(value.valueSInt32)),
             RuntimeType.Single => new DataItem(Math.Abs(value.valueSingle)),
             RuntimeType.UInt16 => value,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
-        public static bool IsCanonical(DataItem value) => throw new NotImplementedException();
+        /// <exception cref="System.NotSupportedException"/>
+        [DoesNotReturn]
+        public static bool IsCanonical(DataItem value) => throw new System.NotSupportedException("What is IsCanonical???");
         public static bool IsComplexNumber(DataItem value) => false;
         public static bool IsImaginaryNumber(DataItem value) => false;
         public static bool IsNormal(DataItem value) => value.type switch
@@ -50,6 +56,7 @@ namespace LanguageCore.Runtime
             RuntimeType.Single => float.IsRealNumber(value.valueSingle),
             _ => true,
         };
+        /// <exception cref="NotImplementedException"/>
         public static bool IsSubnormal(DataItem value) => value.type switch
         {
             RuntimeType.Null => false,
@@ -64,7 +71,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => int.IsEvenInteger(value.valueSInt32),
             RuntimeType.Single => float.IsEvenInteger(value.valueSingle),
             RuntimeType.UInt16 => ushort.IsEvenInteger(value.valueUInt16),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
         public static bool IsOddInteger(DataItem value) => value.type switch
         {
@@ -73,7 +80,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => int.IsOddInteger(value.valueSInt32),
             RuntimeType.Single => float.IsOddInteger(value.valueSingle),
             RuntimeType.UInt16 => ushort.IsOddInteger(value.valueUInt16),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public static bool IsFinite(DataItem value) => value.type switch
@@ -109,7 +116,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => value.valueSInt32 == 0,
             RuntimeType.Single => value.valueSingle == 0,
             RuntimeType.UInt16 => value.valueUInt16 == 0,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public static bool IsNegative(DataItem value) => value.type switch
@@ -147,7 +154,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => int.IsPow2(value.valueSInt32),
             RuntimeType.Single => float.IsPow2(value.valueSingle),
             RuntimeType.UInt16 => ushort.IsPow2(value.valueUInt16),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public static DataItem Log2(DataItem value) => value.type switch
@@ -157,7 +164,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => new DataItem(int.Log2(value.valueSInt32)),
             RuntimeType.Single => new DataItem(float.Log2(value.valueSingle)),
             RuntimeType.UInt16 => new DataItem(ushort.Log2(value.valueUInt16)),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         /// <inheritdoc/>
@@ -192,7 +199,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => new DataItem(int.MaxMagnitude(x.valueSInt32, y.valueSInt32)),
                 RuntimeType.Single => new DataItem(float.MaxMagnitude(x.valueSingle, y.valueSingle)),
                 RuntimeType.UInt16 => new DataItem(ushort.Max(x.valueUInt16, y.valueUInt16)),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
         /// <inheritdoc/>
@@ -207,7 +214,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => new DataItem(int.MaxMagnitude(x.valueSInt32, y.valueSInt32)),
                 RuntimeType.Single => new DataItem(float.MaxMagnitudeNumber(x.valueSingle, y.valueSingle)),
                 RuntimeType.UInt16 => new DataItem(ushort.Max(x.valueUInt16, y.valueUInt16)),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
 
@@ -223,7 +230,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => new DataItem(int.MinMagnitude(x.valueSInt32, y.valueSInt32)),
                 RuntimeType.Single => new DataItem(float.MinMagnitude(x.valueSingle, y.valueSingle)),
                 RuntimeType.UInt16 => new DataItem(ushort.Min(x.valueUInt16, y.valueUInt16)),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
         /// <inheritdoc/>
@@ -238,7 +245,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => new DataItem(int.MinMagnitude(x.valueSInt32, y.valueSInt32)),
                 RuntimeType.Single => new DataItem(float.MinMagnitudeNumber(x.valueSingle, y.valueSingle)),
                 RuntimeType.UInt16 => new DataItem(ushort.Min(x.valueUInt16, y.valueUInt16)),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
 
@@ -418,7 +425,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => TypeCode.Int32,
             RuntimeType.Single => TypeCode.Single,
             RuntimeType.UInt16 => TypeCode.UInt16,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public readonly bool ToBoolean(IFormatProvider? provider) => Type switch
@@ -428,7 +435,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => valueSInt32 != 0,
             RuntimeType.Single => valueSingle != 0f,
             RuntimeType.UInt16 => valueUInt16 != 0,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         /// <inheritdoc/>
@@ -611,7 +618,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => valueSInt32.ToString(provider),
             RuntimeType.UInt16 => valueUInt16.ToString(provider),
             RuntimeType.Single => valueSingle.ToString(provider),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public readonly string ToString(string? format, IFormatProvider? formatProvider) => type switch
@@ -621,7 +628,7 @@ namespace LanguageCore.Runtime
             RuntimeType.SInt32 => valueSInt32.ToString(format, formatProvider),
             RuntimeType.Single => valueSingle.ToString(format, formatProvider),
             RuntimeType.UInt16 => valueUInt16.ToString(formatProvider),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         /// <inheritdoc/>

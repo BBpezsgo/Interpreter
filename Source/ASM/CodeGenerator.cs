@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 #pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable IDE0052 // Remove unread private members
@@ -8,7 +10,6 @@ using System.Linq;
 
 namespace LanguageCore.ASM.Generator
 {
-    using System.Diagnostics.CodeAnalysis;
     using BBCode.Generator;
     using Compiler;
     using Parser;
@@ -121,7 +122,7 @@ namespace LanguageCore.ASM.Generator
 
                 case AddressingMode.RUNTIME:
                     throw new NotImplementedException();
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
         protected override void StackStore(ValueAddress address)
@@ -143,7 +144,7 @@ namespace LanguageCore.ASM.Generator
                 case AddressingMode.POP:
                 case AddressingMode.RUNTIME:
                     throw new NotImplementedException();
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
 
@@ -214,7 +215,7 @@ namespace LanguageCore.ASM.Generator
             {
                 if (LanguageConstants.BuiltinTypeMap3.TryGetValue(simpleType.Identifier.Content, out Type builtinType))
                 {
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(builtinType));
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(builtinType));
                     return 1;
                 }
 
@@ -226,7 +227,7 @@ namespace LanguageCore.ASM.Generator
                     foreach (FieldDefinition field in instanceType.Struct.Fields)
                     {
                         size++;
-                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(field.Type));
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(field.Type));
                     }
                     throw new NotImplementedException();
                 }
@@ -241,7 +242,7 @@ namespace LanguageCore.ASM.Generator
                     if (instanceType.Enum.Members.Length == 0)
                     { throw new CompilerException($"Could not get enum \"{instanceType.Enum.Identifier.Content}\" initial value: enum has no members", instanceType.Enum.Identifier, instanceType.Enum.FilePath); }
 
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, instanceType.Enum.Members[0].ComputedValue);
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)instanceType.Enum.Members[0].ComputedValue);
                     return 1;
                 }
 
@@ -253,7 +254,7 @@ namespace LanguageCore.ASM.Generator
                 throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", simpleType, CurrentFile);
             }
 
-            throw new ImpossibleException();
+            throw new UnreachableException();
         }
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="CompilerException"/>
@@ -287,7 +288,7 @@ namespace LanguageCore.ASM.Generator
                 throw new NotImplementedException();
             }
 
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(type));
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(type));
             return 1;
         }
         /// <exception cref="NotImplementedException"></exception>
@@ -301,7 +302,7 @@ namespace LanguageCore.ASM.Generator
                 foreach (CompiledField field in type.Struct.Fields)
                 {
                     size++;
-                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(field.Type));
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(field.Type));
                     afterValue?.Invoke(size);
                 }
                 throw new NotImplementedException();
@@ -314,7 +315,7 @@ namespace LanguageCore.ASM.Generator
                 throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
             }
 
-            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, GetInitialValue(type));
+            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)GetInitialValue(type));
             afterValue?.Invoke(0);
             return 1;
         }
@@ -364,7 +365,7 @@ namespace LanguageCore.ASM.Generator
             {
                 size = 1;
 
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, computedInitialValue);
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)computedInitialValue);
                 compiledVariable.IsInitialized = true;
 
                 if (size <= 0)
@@ -823,7 +824,7 @@ namespace LanguageCore.ASM.Generator
                 }
                 else
                 {
-                    throw new ImpossibleException();
+                    throw new UnreachableException();
                 }
             }
             Builder.CodeBuilder.AppendLabel(endLabel);
@@ -1035,14 +1036,14 @@ namespace LanguageCore.ASM.Generator
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, statement.Value[0]);
                     break;
                 default:
-                    throw new ImpossibleException();
+                    throw new UnreachableException();
             }
         }
         void GenerateCodeForStatement(Identifier statement, CompiledType? expectedType = null)
         {
             if (GetConstant(statement.Content, out DataItem constant))
             {
-                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, constant);
+                Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, (InstructionOperand)constant);
                 return;
             }
 
@@ -1074,10 +1075,10 @@ namespace LanguageCore.ASM.Generator
             {
                 throw new NotImplementedException();
             }
-            else if (LanguageConstants.Operators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
+            else if (LanguageOperators.OpCodes.TryGetValue(statement.Operator.Content, out Opcode opcode))
             {
-                if (LanguageConstants.Operators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageConstants.Operators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
+                if (LanguageOperators.ParameterCounts[statement.Operator.Content] != statement.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator \"{statement.Operator.Content}\": required {LanguageOperators.ParameterCounts[statement.Operator.Content]} passed {statement.ParameterCount}", statement.Operator, CurrentFile); }
 
                 GenerateCodeForStatement(statement.Left);
 

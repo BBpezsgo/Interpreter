@@ -408,12 +408,10 @@ namespace LanguageCore
                     Statement statement = Parser.Parser.ParseInteractive(tokens);
 
                     Interpreter interpreter = new();
-                    interpreter.Initialize();
-                    Dictionary<string, ExternalFunctionBase> externalFunctions = interpreter.GenerateExternalFunctions();
 
                     CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                         statement,
-                        externalFunctions,
+                        interpreter.GenerateExternalFunctions(),
                         @"D:\Program Files\BBCodeProject\BBCode\CodeFiles\",
                         [Parser.UsingDefinition.CreateAnonymous("System")],
                         null);
@@ -541,12 +539,10 @@ namespace LanguageCore
                 Statement statement = Parser.Parser.ParseInteractive(tokens);
 
                 interpreter = new();
-                interpreter.Initialize();
-                Dictionary<string, ExternalFunctionBase> externalFunctions = interpreter.GenerateExternalFunctions();
 
                 CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                     statement,
-                    externalFunctions,
+                    interpreter.GenerateExternalFunctions(),
                     @"D:\Program Files\BBCodeProject\BBCode\CodeFiles\",
                     [Parser.UsingDefinition.CreateAnonymous("System")],
                     null);
@@ -555,7 +551,7 @@ namespace LanguageCore
 
                 interpreter.CompilerResult = generated;
 
-                interpreter.ExecuteProgram(generated.Code, BytecodeInterpreterSettings.Default);
+                interpreter.Initialize(generated.Code, BytecodeInterpreterSettings.Default);
 
                 while (interpreter.IsExecutingCode)
                 { interpreter.Update(); }

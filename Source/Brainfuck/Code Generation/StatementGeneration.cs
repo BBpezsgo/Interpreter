@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
+using System.Diagnostics;
 
 #pragma warning disable IDE0051
 
@@ -12,6 +13,7 @@ namespace LanguageCore.Brainfuck.Generator
     using Parser.Statement;
     using Runtime;
     using Tokenizing;
+    using Ansi = Win32.Ansi;
     using Literal = Parser.Statement.Literal;
 
     public partial class CodeGeneratorForBrainfuck : CodeGeneratorNonGeneratorBase
@@ -751,7 +753,7 @@ namespace LanguageCore.Brainfuck.Generator
                                 { GenerateCodeForStatement(elseIf, true); }
                             }
                             else
-                            { throw new ImpossibleException(); }
+                            { throw new UnreachableException(); }
 
                             using (Code.Block($"Reset ELSE flag"))
                             { Code.ClearValue(conditionAddress); }
@@ -1081,9 +1083,9 @@ namespace LanguageCore.Brainfuck.Generator
                     {
                         if (statement.Parameters.Length != 1)
                         { throw new CompilerException($"Wrong number of parameters passed to instruction \"{statement.Identifier}\" (required 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
-                        GenerateCodeForPrinter(ANSI.Generator.Generate(ANSI.ForegroundColor.BRIGHT_RED));
+                        GenerateCodeForPrinter(Ansi.Style(Ansi.BrightForegroundRed));
                         GenerateCodeForPrinter(statement.Parameters[0]);
-                        GenerateCodeForPrinter(ANSI.Generator.Generate(0));
+                        GenerateCodeForPrinter(Ansi.Reset);
                         Code.SetPointer(Stack.Push(1));
                         Code += "[]";
                         Stack.PopVirtual();
@@ -1141,7 +1143,7 @@ namespace LanguageCore.Brainfuck.Generator
                                     Code.AddValue(variable.Address, constantValue.ValueUInt16);
                                     break;
                                 default:
-                                    throw new ImpossibleException();
+                                    throw new UnreachableException();
                             }
 
                             Optimizations++;
@@ -1199,7 +1201,7 @@ namespace LanguageCore.Brainfuck.Generator
                                     Code.AddValue(variable.Address, -constantValue.ValueUInt16);
                                     break;
                                 default:
-                                    throw new ImpossibleException();
+                                    throw new UnreachableException();
                             }
 
                             Optimizations++;

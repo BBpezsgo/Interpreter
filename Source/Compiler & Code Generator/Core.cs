@@ -397,7 +397,7 @@ namespace LanguageCore.Compiler
                     Type.Char => "char",
 
                     Type.Unknown => "unknown",
-                    Type.NotBuiltin => throw new ImpossibleException(),
+                    Type.NotBuiltin => throw new UnreachableException(),
 
                     _ => throw new NotImplementedException($"Type conversion for {builtinType} is not implemented"),
                 };
@@ -407,22 +407,27 @@ namespace LanguageCore.Compiler
                 if (@enum is not null) return @enum.Identifier.Content;
                 if (function is not null) return function.ToString();
 
-                throw new ImpossibleException();
+                throw new UnreachableException();
             }
         }
         /// <summary><c><see cref="Class"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@class))]
         public bool IsClass => @class is not null;
+
         /// <summary><c><see cref="Enum"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@enum))]
         public bool IsEnum => @enum is not null;
+
         /// <summary><c><see cref="Struct"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(@struct))]
         public bool IsStruct => @struct is not null;
+
         /// <summary><c><see cref="Function"/> != <see langword="null"/></c></summary>
         [MemberNotNullWhen(true, nameof(function))]
         public bool IsFunction => function is not null;
+
         public bool IsBuiltin => builtinType != Type.NotBuiltin;
+
         public bool CanBeBuiltin
         {
             get
@@ -507,7 +512,7 @@ namespace LanguageCore.Compiler
                         Type.Integer => typeof(int),
                         Type.Float => typeof(float),
                         Type.Char => typeof(char),
-                        _ => throw new ImpossibleException(),
+                        _ => throw new UnreachableException(),
                     };
                 }
 
@@ -646,7 +651,7 @@ namespace LanguageCore.Compiler
                 RuntimeType.SInt32 => Type.Integer,
                 RuntimeType.Single => Type.Float,
                 RuntimeType.UInt16 => Type.Char,
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
 
@@ -688,7 +693,7 @@ namespace LanguageCore.Compiler
                 return;
             }
 
-            throw new ImpossibleException();
+            throw new UnreachableException();
         }
 
         /// <exception cref="ArgumentNullException"/>
@@ -858,8 +863,8 @@ namespace LanguageCore.Compiler
                     Type.Float => "float",
                     Type.Char => "char",
                     Type.Unknown => "?",
-                    Type.NotBuiltin => throw new ImpossibleException(),
-                    _ => throw new ImpossibleException(),
+                    Type.NotBuiltin => throw new UnreachableException(),
+                    _ => throw new UnreachableException(),
                 };
             }
 

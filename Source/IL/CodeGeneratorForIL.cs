@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -9,7 +10,7 @@ using System.Reflection.Emit;
 
 namespace LanguageCore.IL.Generator
 {
-    using LanguageCore.Compiler;
+    using Compiler;
     using Parser;
     using Parser.Statement;
     using Tokenizing;
@@ -69,9 +70,9 @@ namespace LanguageCore.IL.Generator
             switch (instruction.Identifier.Content)
             {
                 case "const":
-                    {
-                        break;
-                    }
+                {
+                    break;
+                }
                 default:
                     break;
             }
@@ -241,26 +242,26 @@ namespace LanguageCore.IL.Generator
             switch (statement.Identifier.Content.ToLowerInvariant())
             {
                 case "return":
-                    {
-                        if (statement.Parameters.Length != 0 &&
-                            statement.Parameters.Length != 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                {
+                    if (statement.Parameters.Length != 0 &&
+                        statement.Parameters.Length != 1)
+                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"return\" (required 0 or 1, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        throw new NotImplementedException();
-                    }
+                    throw new NotImplementedException();
+                }
 
                 case "break":
-                    {
-                        if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
+                {
+                    if (statement.Parameters.Length != 0)
+                    { throw new CompilerException($"Wrong number of parameters passed to instruction \"break\" (required 0, passed {statement.Parameters.Length})", statement, CurrentFile); }
 
-                        throw new NotImplementedException();
-                    }
+                    throw new NotImplementedException();
+                }
 
                 case "delete":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
 
                 default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
@@ -277,13 +278,13 @@ namespace LanguageCore.IL.Generator
             switch (statement.Operator.Content)
             {
                 case "+=":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "-=":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 default:
                     Compile(statement.ToAssignment(), generator);
                     break;
@@ -294,13 +295,13 @@ namespace LanguageCore.IL.Generator
             switch (statement.Operator.Content)
             {
                 case "++":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "--":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 default:
                     throw new CompilerException($"Unknown assignment operator \'{statement.Operator}\'", statement.Operator, CurrentFile);
             }
@@ -422,7 +423,7 @@ namespace LanguageCore.IL.Generator
                     generator.Emit(OpCodes.Ldc_I4, statement.Value[0]);
                     break;
                 default:
-                    throw new ImpossibleException();
+                    throw new UnreachableException();
             }
         }
         void Compile(Identifier statement, ILGenerator generator)
@@ -439,76 +440,76 @@ namespace LanguageCore.IL.Generator
             switch (statement.Operator.Content)
             {
                 case "==":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "+":
-                    {
-                        Compile(statement.Left, generator);
-                        Compile(statement.Right!, generator);
-                        generator.Emit(OpCodes.Add);
-                        break;
-                    }
+                {
+                    Compile(statement.Left, generator);
+                    Compile(statement.Right!, generator);
+                    generator.Emit(OpCodes.Add);
+                    break;
+                }
                 case "-":
-                    {
-                        Compile(statement.Left, generator);
-                        Compile(statement.Right!, generator);
-                        generator.Emit(OpCodes.Sub);
-                        break;
-                    }
+                {
+                    Compile(statement.Left, generator);
+                    Compile(statement.Right!, generator);
+                    generator.Emit(OpCodes.Sub);
+                    break;
+                }
                 case "*":
-                    {
-                        Compile(statement.Left, generator);
-                        Compile(statement.Right!, generator);
-                        generator.Emit(OpCodes.Mul);
-                        break;
-                    }
+                {
+                    Compile(statement.Left, generator);
+                    Compile(statement.Right!, generator);
+                    generator.Emit(OpCodes.Mul);
+                    break;
+                }
                 case "/":
-                    {
-                        Compile(statement.Left, generator);
-                        Compile(statement.Right!, generator);
-                        generator.Emit(OpCodes.Div);
-                        break;
-                    }
+                {
+                    Compile(statement.Left, generator);
+                    Compile(statement.Right!, generator);
+                    generator.Emit(OpCodes.Div);
+                    break;
+                }
                 case "^":
-                    {
-                        Compile(statement.Left, generator);
-                        Compile(statement.Right!, generator);
-                        generator.Emit(OpCodes.Xor);
-                        break;
-                    }
+                {
+                    Compile(statement.Left, generator);
+                    Compile(statement.Right!, generator);
+                    generator.Emit(OpCodes.Xor);
+                    break;
+                }
                 case "%":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "<":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case ">":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case ">=":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "<=":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "!=":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "&&":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 case "||":
-                    {
-                        throw new NotImplementedException();
-                    }
+                {
+                    throw new NotImplementedException();
+                }
                 default: throw new CompilerException($"Unknown operator \"{statement.Operator}\"", statement.Operator, CurrentFile);
             }
         }

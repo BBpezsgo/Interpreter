@@ -1,13 +1,13 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 
 namespace LanguageCore.ASM
 {
     public static class Linker
     {
-        /// <exception cref="Exception"/>
         /// <exception cref="ProcessException"/>
+        /// <exception cref="FileNotFoundException"/>
+        /// <exception cref="ProcessNotStartedException"/>
         public static void Link(string inputFile, string outputFile)
         {
             if (!File.Exists(inputFile))
@@ -17,14 +17,14 @@ namespace LanguageCore.ASM
             { File.Delete(outputFile); }
 
             string ld = @"C:\MinGW\bin\ld.exe"; // @$"C:\users\{Environment.UserName}\MinGW\bin\ld.exe";
-            Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
+            using Process? process = Process.Start(new ProcessStartInfo(ld, $"{inputFile} -o {outputFile} -L \"C:\\Windows\\System32\" -l \"kernel32\"")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             });
 
             if (process == null)
-            { throw new Exception($"Failed to start process \"{ld}\""); }
+            { throw new ProcessNotStartedException(ld); }
 
             process.WaitForExit();
 

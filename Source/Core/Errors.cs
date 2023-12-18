@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Globalization;
 
 namespace LanguageCore
 {
@@ -16,12 +16,28 @@ namespace LanguageCore
         public readonly Position Position;
         public readonly string? File;
 
+        public override string? StackTrace
+        {
+            get
+            {
+                if (_capturedStackTrace != null) return _capturedStackTrace.ToString();
+                return base.StackTrace;
+            }
+        }
+
+        readonly System.Diagnostics.StackTrace? _capturedStackTrace;
+
         protected LanguageException(string message, Position position, string? file) : base(message)
         {
             this.Position = position;
             this.File = file;
         }
-        public LanguageException(Error error) : this(error.Message, error.Position, error.File) { }
+
+        public LanguageException(Error error) : this(error.Message, error.Position, error.File)
+        {
+            _capturedStackTrace = error.StackTrace;
+        }
+
         public LanguageException(string message, Exception inner) : base(message, inner) { }
 
         protected LanguageException(SerializationInfo info, StreamingContext context) : base(info, context)
@@ -199,7 +215,7 @@ namespace LanguageCore
             result.Append(SourcePosition.ToStringCool(" (at ", ")") ?? string.Empty);
 
             if (SourceFile != null)
-            { result.Append($" (in {SourceFile})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (in {SourceFile})"); }
 
             result.Append(Environment.NewLine);
             result.Append($"Code Pointer: ");
@@ -276,7 +292,7 @@ namespace LanguageCore
 
             if (SourceFile != null)
             {
-                result.Append($" (in {SourceFile})");
+                result.Append(CultureInfo.InvariantCulture, $" (in {SourceFile})");
             }
 
             if (context.CallTrace.Length != 0)
@@ -307,17 +323,20 @@ namespace LanguageCore
 
     #region InternalException
 
+
     [Serializable]
+    [Obsolete]
     public class ImpossibleException : Exception
     {
-        public ImpossibleException()
-            : base("This should be impossible. WTF??? Bruh. Uh nuh :) °_° AAAAAAA") { }
-        public ImpossibleException(string details)
-            : base($"This should be impossible. ({details}) WTF??? Bruh. Uh nuh :) °_° AAAAAAA") { }
-        protected ImpossibleException(SerializationInfo info, StreamingContext context) : base(info, context) { }
+        public ImpossibleException() { }
+        public ImpossibleException(string message) : base(message) { }
+        public ImpossibleException(string message, Exception inner) : base(message, inner) { }
+        protected ImpossibleException(
+          SerializationInfo info,
+          StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>
+    /// <summary> If this exception raised, it's a <b>big</b> problem. </summary>
     [Serializable]
     public class InternalException : LanguageException
     {
@@ -329,7 +348,7 @@ namespace LanguageCore
         protected InternalException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> If this gets thrown away, it's a <b>big</b> problem. </summary>
+    /// <inheritdoc/>
     [Serializable]
     public class EndlessLoopException : InternalException
     {
@@ -346,6 +365,8 @@ namespace LanguageCore
         public readonly Position Position;
         public readonly string? File;
 
+        public readonly System.Diagnostics.StackTrace StackTrace;
+
         protected NotExceptionBut(string message, Position position) : this(message, position, null)
         { }
         protected NotExceptionBut(string message, Position position, string? file)
@@ -353,6 +374,7 @@ namespace LanguageCore
             this.Message = message;
             this.Position = position;
             this.File = file;
+            this.StackTrace = new System.Diagnostics.StackTrace(0, true);
         }
 
         public override string ToString()
@@ -362,12 +384,12 @@ namespace LanguageCore
             if (Position.Range.Start.Line == -1)
             { }
             else if (Position.Range.Start.Character == -1)
-            { result.Append($" (at line {Position.Range.Start.Character})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (at line {Position.Range.Start.Character})"); }
             else
-            { result.Append($" (at line {Position.Range.Start.Line} and column {Position.Range.Start.Character})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (at line {Position.Range.Start.Line} and column {Position.Range.Start.Character})"); }
 
             if (File != null)
-            { result.Append($" (in {File})"); }
+            { result.Append(CultureInfo.InvariantCulture, $" (in {File})"); }
 
             return result.ToString();
         }
@@ -384,14 +406,14 @@ namespace LanguageCore
     /// <summary> It's an exception, but not. </summary>
     public class Error : NotExceptionBut
     {
-        public Error(string message, Position position)
-            : base(message, position, null) { }
-        public Error(string message, Position position, string? file)
+        public Error(string message, Position position, string? file = null)
             : base(message, position, file) { }
-        public Error(string message, IThingWithPosition? position)
-            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, null) { }
-        public Error(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
+
+        public Error(string message, IThingWithPosition? position, string? file = null)
+            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+
+        public Error(string message, string file)
+            : base(message, Position.UnknownPosition, file) { }
 
         public LanguageException ToException() => new(this);
     }

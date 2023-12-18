@@ -34,6 +34,26 @@ namespace LanguageCore.ASM
         }
     }
 
+    [Serializable]
+    public class ProcessNotStartedException : Exception
+    {
+        readonly string processName;
+
+        public override string Message => $"Failed to start process \"{processName}\"";
+
+        public ProcessNotStartedException(string processName) : base()
+        {
+            this.processName = processName;
+        }
+
+        protected ProcessNotStartedException(
+          System.Runtime.Serialization.SerializationInfo info,
+          System.Runtime.Serialization.StreamingContext context) : base(info, context)
+        {
+            this.processName = info.GetString("processName") ?? string.Empty;
+        }
+    }
+
     public static class Assembler
     {
         public static void Assemble(string asmSourceCode, string outputFile)

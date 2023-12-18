@@ -2,16 +2,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Compiler
 {
     using Tokenizing;
 
-    public struct AttributeValues
+    public struct AttributeValues : IThingWithPosition
     {
         public List<CompiledLiteral> parameters;
         public Token Identifier;
+
+        public readonly Position Position => new Position((IEnumerable<IThingWithPosition>)parameters).Union(Identifier);
 
         public readonly bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)
         {
@@ -25,7 +28,7 @@ namespace LanguageCore.Compiler
                 CompiledLiteralType.Float => (T)(object)parameters[index].ValueFloat,
                 CompiledLiteralType.String => (T)(object)parameters[index].ValueString,
                 CompiledLiteralType.Boolean => (T)(object)parameters[index].ValueBool,
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
             return true;
         }
@@ -84,7 +87,7 @@ namespace LanguageCore.Compiler
         Boolean,
     }
 
-    public readonly struct CompiledLiteral
+    public readonly struct CompiledLiteral : IThingWithPosition
     {
         public readonly int ValueInt;
         public readonly float ValueFloat;
@@ -92,74 +95,40 @@ namespace LanguageCore.Compiler
         public readonly bool ValueBool;
         public readonly CompiledLiteralType type;
 
-        public CompiledLiteral(int value)
-        {
-            this.type = CompiledLiteralType.Integer;
+        readonly Parser.Statement.Literal _literal;
 
-            this.ValueInt = value;
-            this.ValueFloat = 0;
-            this.ValueString = string.Empty;
-            this.ValueBool = false;
-        }
-        public CompiledLiteral(float value)
-        {
-            this.type = CompiledLiteralType.Float;
-
-            this.ValueInt = 0;
-            this.ValueFloat = value;
-            this.ValueString = string.Empty;
-            this.ValueBool = false;
-        }
-        public CompiledLiteral(string value)
-        {
-            this.type = CompiledLiteralType.String;
-
-            this.ValueInt = 0;
-            this.ValueFloat = 0;
-            this.ValueString = value;
-            this.ValueBool = false;
-        }
-        public CompiledLiteral(bool value)
-        {
-            this.type = CompiledLiteralType.Boolean;
-
-            this.ValueInt = 0;
-            this.ValueFloat = 0;
-            this.ValueString = string.Empty;
-            this.ValueBool = value;
-        }
-        public CompiledLiteral(object value)
+        public CompiledLiteral(Parser.Statement.Literal value)
         {
             this.ValueInt = 0;
             this.ValueFloat = 0;
             this.ValueString = string.Empty;
             this.ValueBool = false;
+            this._literal = value;
 
-            if (value is int @int)
+            switch (value.Type)
             {
-                this.type = CompiledLiteralType.Integer;
-                this.ValueInt = @int;
-            }
-            else if (value is float @float)
-            {
-                this.type = CompiledLiteralType.Float;
-                this.ValueFloat = @float;
-            }
-            else if (value is string @string)
-            {
-                this.type = CompiledLiteralType.String;
-                this.ValueString = @string;
-            }
-            else if (value is bool @bool)
-            {
-                this.type = CompiledLiteralType.Boolean;
-                this.ValueBool = @bool;
-            }
-            else
-            {
-                throw new InternalException($"Invalid type '{value.GetType().FullName}'");
+                case Parser.LiteralType.Integer:
+                    type = CompiledLiteralType.Integer;
+                    ValueInt = value.GetInt();
+                    break;
+                case Parser.LiteralType.Float:
+                    type = CompiledLiteralType.Float;
+                    ValueFloat = value.GetFloat();
+                    break;
+                case Parser.LiteralType.String:
+                    type = CompiledLiteralType.String;
+                    ValueString = value.Value;
+                    break;
+                case Parser.LiteralType.Boolean:
+                    type = CompiledLiteralType.Boolean;
+                    ValueBool = value.GetBoolean();
+                    break;
+                default:
+                    throw new InternalException($"Invalid type \"{value.Type}\"");
             }
         }
+
+        public Position Position => _literal.Position;
 
         public readonly bool TryConvert<T>([NotNullWhen(true)] out T? value)
         {
@@ -181,7 +150,7 @@ namespace LanguageCore.Compiler
                 CompiledLiteralType.Float => (T)(object)ValueFloat,
                 CompiledLiteralType.String => (T)(object)ValueString,
                 CompiledLiteralType.Boolean => (T)(object)ValueBool,
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
             return true;
         }
@@ -201,7 +170,7 @@ namespace LanguageCore.Compiler
             value1 = default;
             value2 = default;
 
-            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
 
             if (!values.TryGetValue<T0>(0, out value0)) return false;
             if (!values.TryGetValue<T1>(1, out value1)) return false;
@@ -220,7 +189,7 @@ namespace LanguageCore.Compiler
             value0 = default;
             value1 = default;
 
-            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
 
             if (!values.TryGetValue<T0>(0, out value0)) return false;
             if (!values.TryGetValue<T1>(1, out value1)) return false;
@@ -236,7 +205,70 @@ namespace LanguageCore.Compiler
         {
             value0 = default;
 
-            if (!attributes.TryGetValue(attributeName, out var values)) return false;
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+
+            return true;
+        }
+
+        public static bool TryGetAttribute<T0, T1, T2>(
+            this CompiledAttributeCollection attributes,
+            string attributeName,
+            [NotNullWhen(true)] out T0? value0,
+            [NotNullWhen(true)] out T1? value1,
+            [NotNullWhen(true)] out T2? value2,
+            [NotNullWhen(true)] out AttributeValues? attribute
+            )
+        {
+            value0 = default;
+            value1 = default;
+            value2 = default;
+            attribute = null;
+
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            attribute = values;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+            if (!values.TryGetValue<T1>(1, out value1)) return false;
+            if (!values.TryGetValue<T2>(2, out value2)) return false;
+
+            return true;
+        }
+
+        public static bool TryGetAttribute<T0, T1>(
+            this CompiledAttributeCollection attributes,
+            string attributeName,
+            [NotNullWhen(true)] out T0? value0,
+            [NotNullWhen(true)] out T1? value1,
+            [NotNullWhen(true)] out AttributeValues? attribute
+            )
+        {
+            value0 = default;
+            value1 = default;
+            attribute = null;
+
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            attribute = values;
+
+            if (!values.TryGetValue<T0>(0, out value0)) return false;
+            if (!values.TryGetValue<T1>(1, out value1)) return false;
+
+            return true;
+        }
+
+        public static bool TryGetAttribute<T0>(
+            this CompiledAttributeCollection attributes,
+            string attributeName,
+            [NotNullWhen(true)] out T0? value0,
+            [NotNullWhen(true)] out AttributeValues? attribute
+            )
+        {
+            value0 = default;
+            attribute = null;
+
+            if (!attributes.TryGetValue(attributeName, out AttributeValues values)) return false;
+            attribute = values;
 
             if (!values.TryGetValue<T0>(0, out value0)) return false;
 

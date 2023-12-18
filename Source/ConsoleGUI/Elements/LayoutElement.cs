@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.Versioning;
 using Win32;
@@ -76,7 +77,7 @@ namespace ConsoleGUI
                                 { rect.Height = (int)Math.Round((float)currentHeight * ((float)layout.Value / 100f)); }
                                 break;
                             }
-                        default: throw new LanguageCore.ImpossibleException();
+                        default: throw new UnreachableException();
                     }
                     rect.Y = currentPosition;
                 }
@@ -132,7 +133,7 @@ namespace ConsoleGUI
                                 { rect.Width = (int)Math.Round((float)total / (float)elementCount * ((float)layout.Value / 100f)); }
                                 break;
                             }
-                        default: throw new LanguageCore.ImpossibleException();
+                        default: throw new UnreachableException();
                     }
                     rect.X = currentPosition;
                 }

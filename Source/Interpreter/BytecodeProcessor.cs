@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace LanguageCore.Runtime
@@ -96,7 +97,7 @@ namespace LanguageCore.Runtime
                 case Opcode.TYPE_GET: TYPE_GET(); break;
                 case Opcode.TYPE_SET: TYPE_SET(); break;
 
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
 
@@ -522,7 +523,7 @@ namespace LanguageCore.Runtime
                         RuntimeType.SInt32 => new DataItem((byte)(value.ValueSInt32 % byte.MaxValue)),
                         RuntimeType.Single => new DataItem((byte)MathF.Round(value.ValueSingle)),
                         RuntimeType.UInt16 => new DataItem((byte)value.ValueUInt16),
-                        _ => throw new ImpossibleException(),
+                        _ => throw new UnreachableException(),
                     },
                     RuntimeType.SInt32 => value.Type switch
                     {
@@ -530,7 +531,7 @@ namespace LanguageCore.Runtime
                         RuntimeType.SInt32 => new DataItem((int)value.ValueSInt32),
                         RuntimeType.Single => new DataItem((int)MathF.Round(value.ValueSingle)),
                         RuntimeType.UInt16 => new DataItem((int)value.ValueUInt16),
-                        _ => throw new ImpossibleException(),
+                        _ => throw new UnreachableException(),
                     },
                     RuntimeType.Single => value.Type switch
                     {
@@ -538,7 +539,7 @@ namespace LanguageCore.Runtime
                         RuntimeType.SInt32 => new DataItem((float)value.ValueSInt32),
                         RuntimeType.Single => new DataItem((float)MathF.Round(value.ValueSingle)),
                         RuntimeType.UInt16 => new DataItem((float)value.ValueUInt16),
-                        _ => throw new ImpossibleException(),
+                        _ => throw new UnreachableException(),
                     },
                     RuntimeType.UInt16 => value.Type switch
                     {
@@ -546,9 +547,9 @@ namespace LanguageCore.Runtime
                         RuntimeType.SInt32 => new DataItem((char)value.ValueSInt32),
                         RuntimeType.Single => new DataItem((char)MathF.Round(value.ValueSingle)),
                         RuntimeType.UInt16 => new DataItem((char)value.ValueUInt16),
-                        _ => throw new ImpossibleException(),
+                        _ => throw new UnreachableException(),
                     },
-                    _ => throw new ImpossibleException(),
+                    _ => throw new UnreachableException(),
                 };
             }
 
@@ -606,13 +607,13 @@ namespace LanguageCore.Runtime
             {
                 if (function.ReturnSomething)
                 {
-                    DataItem returnValue = simpleFunction.Callback(this, parameters.ToArray());
+                    DataItem returnValue = simpleFunction.Call(this, parameters.ToArray());
                     // returnValue.Tag ??= $"{function.Name}() result";
                     Memory.Stack.Push(returnValue);
                 }
                 else
                 {
-                    simpleFunction.Callback(this, parameters.ToArray());
+                    simpleFunction.Call(this, parameters.ToArray());
                 }
             }
 

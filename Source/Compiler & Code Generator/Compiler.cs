@@ -39,6 +39,8 @@ namespace LanguageCore.Compiler
         public readonly Warning[] Warnings;
         public readonly Statement[] TopLevelStatements;
 
+        public readonly FileInfo? File;
+
         public static CompilerResult Empty => new(
             Array.Empty<CompiledFunction>(),
             Array.Empty<MacroDefinition>(),
@@ -51,10 +53,8 @@ namespace LanguageCore.Compiler
             Array.Empty<CompiledEnum>(),
             Array.Empty<Error>(),
             Array.Empty<Warning>(),
-            Array.Empty<Statement>());
-
-        public static CompilerResult FromInteractive(Statement statement, Dictionary<string, ExternalFunctionBase> externalFunctions)
-            => new([], [], [], [], externalFunctions, [], [], [], [], [], [], [statement]);
+            Array.Empty<Statement>(),
+            null);
 
         public CompilerResult(
             CompiledFunction[] functions,
@@ -68,7 +68,8 @@ namespace LanguageCore.Compiler
             CompiledEnum[] enums,
             Error[] errors,
             Warning[] warnings,
-            Statement[] topLevelStatements)
+            Statement[] topLevelStatements,
+            FileInfo? file)
         {
             Functions = functions;
             Macros = macros;
@@ -82,6 +83,7 @@ namespace LanguageCore.Compiler
             Errors = errors;
             Warnings = warnings;
             TopLevelStatements = topLevelStatements;
+            File = file;
         }
     }
 
@@ -310,10 +312,10 @@ namespace LanguageCore.Compiler
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
 
-            if (attributes.TryGetAttribute("External", out string? externalName))
+            if (attributes.TryGetAttribute<string>("External", out string? externalName, out AttributeValues? attribute))
             {
                 if (!ExternalFunctions.TryGetValue(externalName, out ExternalFunctionBase? externalFunction))
-                { Errors.Add(new Error($"External function \"{externalName}\" not found", function, function.FilePath)); }
+                { Errors.Add(new Error($"External function \"{externalName}\" not found", attribute.Value, function.FilePath)); }
                 else
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Count)
@@ -345,10 +347,10 @@ namespace LanguageCore.Compiler
                 }
             }
 
-            if (attributes.TryGetAttribute("Builtin", out string? builtinName))
+            if (attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
             {
                 if (!BuiltinFunctions.TryGetValue(builtinName, out (CompiledType ReturnValue, CompiledType[] Parameters) builtinFunction))
-                { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", function, function.FilePath)); }
+                { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute.Value, function.FilePath)); }
                 else
                 {
                     if (builtinFunction.Parameters.Length != function.Parameters.Count)
@@ -395,7 +397,7 @@ namespace LanguageCore.Compiler
             CompiledType type = new(function.Type, GetCustomType);
             function.Type.SetAnalyzedType(type);
 
-            if (attributes.TryGetAttribute("External", out string? name))
+            if (attributes.TryGetAttribute<string>("External", out string? name, out AttributeValues? attribute))
             {
                 if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
                 {
@@ -421,7 +423,7 @@ namespace LanguageCore.Compiler
                     };
                 }
 
-                Errors.Add(new Error($"External function \"{name}\" not found", Position.UnknownPosition, function.FilePath));
+                Errors.Add(new Error($"External function \"{name}\" not found", attribute.Value.Identifier, function.FilePath));
             }
 
             return new CompiledOperator(
@@ -456,7 +458,7 @@ namespace LanguageCore.Compiler
 
                 if (attribute.Parameters != null)
                 {
-                    foreach (object parameter in attribute.Parameters)
+                    foreach (Literal parameter in attribute.Parameters)
                     {
                         newAttribute.parameters.Add(new CompiledLiteral(parameter));
                     }
@@ -629,7 +631,8 @@ namespace LanguageCore.Compiler
                 CompiledEnums,
                 Errors.ToArray(),
                 Warnings.ToArray(),
-                parserResult.TopLevelStatements);
+                parserResult.TopLevelStatements,
+                file);
         }
 
         CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
@@ -653,7 +656,8 @@ namespace LanguageCore.Compiler
                 CompiledEnums,
                 Errors.ToArray(),
                 Warnings.ToArray(),
-                [statement]);
+                [statement],
+                null);
         }
 
         void CompileInternal(CollectorResult collectorResult)

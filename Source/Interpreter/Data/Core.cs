@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime
@@ -143,10 +145,8 @@ namespace LanguageCore.Runtime
 
         #endregion
 
-        /// <exception cref="ImpossibleException"/>
         public readonly bool Boolean => this.ToBoolean(null);
 
-        /// <exception cref="ImpossibleException"/>
         public readonly int? Integer => Type switch
         {
             RuntimeType.UInt8 => this.ValueUInt8,
@@ -154,7 +154,7 @@ namespace LanguageCore.Runtime
             RuntimeType.UInt16 => this.ValueUInt16,
             RuntimeType.Single => null,
             RuntimeType.Null => null,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         public readonly byte? Byte
@@ -187,28 +187,27 @@ namespace LanguageCore.Runtime
             }
         }
 
-        /// <exception cref="ImpossibleException"/>
+        /// <exception cref="InvalidCastException"/>
         public readonly float Float => this.ToSingle(null);
 
         public readonly object? GetValue() => type switch
         {
+            RuntimeType.Null => (object?)null,
             RuntimeType.UInt8 => (object)valueUInt8,
             RuntimeType.SInt32 => (object)valueSInt32,
             RuntimeType.Single => (object)valueSingle,
             RuntimeType.UInt16 => (object)valueUInt16,
-            RuntimeType.Null => (object?)null,
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
-        /// <exception cref="ImpossibleException"/>
         public readonly string GetDebuggerDisplay() => Type switch
         {
-            RuntimeType.SInt32 => ValueSInt32.ToString(),
-            RuntimeType.UInt8 => ValueUInt8.ToString(),
-            RuntimeType.Single => ValueSingle.ToString().Replace(',', '.') + "f",
-            RuntimeType.UInt16 => $"'{ValueUInt16.Escape()}'",
             RuntimeType.Null => "null",
-            _ => throw new ImpossibleException(),
+            RuntimeType.SInt32 => ValueSInt32.ToString(CultureInfo.InvariantCulture),
+            RuntimeType.UInt8 => ValueUInt8.ToString(CultureInfo.InvariantCulture),
+            RuntimeType.Single => ValueSingle.ToString(CultureInfo.InvariantCulture) + "f",
+            RuntimeType.UInt16 => $"'{ValueUInt16.Escape()}'",
+            _ => throw new UnreachableException(),
         };
 
         public readonly override int GetHashCode()
@@ -229,7 +228,7 @@ namespace LanguageCore.Runtime
                 case RuntimeType.UInt16:
                     hash.Add(valueUInt16);
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
             return hash.ToHashCode();
         }
@@ -238,7 +237,7 @@ namespace LanguageCore.Runtime
         {
             ConsoleColor savedFgColor = Console.ForegroundColor;
             ConsoleColor savedBgColor = Console.BackgroundColor;
-            IFormatProvider ci = System.Globalization.CultureInfo.InvariantCulture;
+            IFormatProvider ci = CultureInfo.InvariantCulture;
 
             if (IsNull)
             {
@@ -265,7 +264,7 @@ namespace LanguageCore.Runtime
                         Console.ForegroundColor = ConsoleColor.Yellow;
                         Console.Write("'" + this.valueUInt16.ToString(ci) + "'");
                         break;
-                    default: throw new ImpossibleException();
+                    default: throw new UnreachableException();
                 }
             }
 
@@ -276,9 +275,9 @@ namespace LanguageCore.Runtime
 
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="ArgumentNullException"/>
-        public static DataItem GetValue(object value)
+        public static DataItem GetValue(object? value)
         {
-            if (value is null) throw new ArgumentNullException(nameof(value));
+            ArgumentNullException.ThrowIfNull(value, nameof(value));
 
             if (value is byte @byte)
             { return new DataItem(@byte); }
@@ -318,7 +317,7 @@ namespace LanguageCore.Runtime
                     TypeCode.Decimal => (System.Decimal)value,
                     TypeCode.DateTime => (System.DateTime)value,
                     TypeCode.String => (System.String)value,
-                    _ => throw new ImpossibleException(),
+                    _ => throw new UnreachableException(),
                 };
                 return DataItem.GetValue(enumValue);
             }
@@ -342,9 +341,9 @@ namespace LanguageCore.Runtime
             Compiler.Type.Integer => new DataItem((int)0),
             Compiler.Type.Float => new DataItem((float)0f),
             Compiler.Type.Char => new DataItem((char)'\0'),
-            Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-            Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
-            Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLower()}\" does not have a default value"),
+            Compiler.Type.NotBuiltin => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
+            Compiler.Type.Void => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
+            Compiler.Type.Unknown => throw new InternalException($"Type \"{type.ToString().ToLowerInvariant()}\" does not have a default value"),
             _ => DataItem.Null,
         };
 

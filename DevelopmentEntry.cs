@@ -20,10 +20,10 @@ namespace TheProgram
                 // "--hide-debug",
                 "--hide-system",
                 // "--dont-optimize",
-                // "--console-gui",
+                "--console-gui",
                 // "--brainfuck",
                 // "--il",
-                "--asm",
+                // "--asm",
                 // "--no-nullcheck",
                 "--heap-size 2048",
                 "--no-pause",
@@ -34,7 +34,7 @@ namespace TheProgram
             args.CopyTo(concatenatedArgs, 0);
             generatedArgs.CopyTo(concatenatedArgs, args.Length);
 
-            if (!ArgumentParser.Parse(out ArgumentParser.Settings settings, concatenatedArgs)) return true;
+            if (!ArgumentParser.Parse(out ProgramArguments settings, concatenatedArgs)) return true;
 
             try
             { Entry.Run(settings); }

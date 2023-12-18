@@ -219,14 +219,14 @@ namespace LanguageCore.ASM
 
         public static implicit operator InstructionOperand(string v) => new(v);
         public static implicit operator InstructionOperand(int v) => new(v.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        public static implicit operator InstructionOperand(DataItem v) => new(v.Type switch
+        public static explicit operator InstructionOperand(DataItem v) => new(v.Type switch
         {
             RuntimeType.Null => throw new InternalException($"Operand value is null"),
             RuntimeType.UInt8 => v.ValueUInt8.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.SInt32 => v.ValueSInt32.ToString(System.Globalization.CultureInfo.InvariantCulture),
             RuntimeType.Single => throw new NotImplementedException(),
             RuntimeType.UInt16 => v.ValueUInt16.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         });
     }
 
@@ -299,7 +299,7 @@ namespace LanguageCore.ASM
             Instruction.JLE => "jle",
             Instruction.JL => "jl",
             Instruction.JE => "je",
-            _ => throw new ImpossibleException(),
+            _ => throw new UnreachableException(),
         };
 
         void AppendInstructionNoEOL(Instruction keyword)

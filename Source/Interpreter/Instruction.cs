@@ -28,12 +28,7 @@ namespace LanguageCore.Runtime
         /// <exception cref="Errors.InternalException"/>
         public int ParameterInt
         {
-            get
-            {
-                if (parameter.IsNull) throw new InternalException($"Can't cast null to {nameof(Int32)}");
-                if (parameter is DataItem dataItem && dataItem.Type == RuntimeType.SInt32) return dataItem.ValueSInt32;
-                throw new InternalException($"Can't cast {parameter.GetType().Name} to {nameof(Int32)}"); ;
-            }
+            get => parameter.ToInt32(null);
             set => parameter = new DataItem(value);
         }
         public DataItem Parameter

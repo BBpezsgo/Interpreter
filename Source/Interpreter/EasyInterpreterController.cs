@@ -7,7 +7,7 @@ namespace LanguageCore.Runtime
 
     class EasyInterpreter
     {
-        public static void Run(TheProgram.ArgumentParser.Settings settings)
+        public static void Run(TheProgram.ProgramArguments settings)
             => Run(
                 settings.File!,
                 settings.compilerSettings,
@@ -70,10 +70,8 @@ namespace LanguageCore.Runtime
             };
 
 #if DEBUG
-            interpreter.OnExecuted += (sender, e) =>
+            interpreter.OnExecuted += (sender) =>
             {
-                if (logSystem) Output.Log(e.ToString());
-
                 if (sender.BytecodeInterpreter == null) return;
 
                 Console.WriteLine();
@@ -94,51 +92,51 @@ namespace LanguageCore.Runtime
             };
 #endif
 
-            if (interpreter.Initialize())
-            {
-                string dllsFolderPath = Path.Combine(file.Directory!.FullName, compilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
-
 #if AOT
-                Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+            Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
 #else
-                if (Directory.Exists(dllsFolderPath))
-                {
-                    DirectoryInfo dllsFolder = new(dllsFolderPath);
-                    if (logDebug) Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
-                    FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
-                    foreach (FileInfo dll in dlls)
-                    { interpreter.LoadDLL(dll.FullName); }
-                }
-                else
-                {
-                    Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
-                }
+            string dllsFolderPath = Path.Combine(file.Directory!.FullName, compilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
+            if (Directory.Exists(dllsFolderPath))
+            {
+                DirectoryInfo dllsFolder = new(dllsFolderPath);
+                if (logDebug) Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
+                FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
+                foreach (FileInfo dll in dlls)
+                { interpreter.LoadDLL(dll.FullName); }
+            }
+            else
+            {
+                Output.LogWarning($"Folder \"{dllsFolderPath}\" doesn't exists!");
+            }
 #endif
-                Compiler.CompilerResult compiled;
-                BBCodeGeneratorResult generatedCode;
 
-                if (handleErrors)
+            Compiler.CompilerResult compiled;
+            BBCodeGeneratorResult generatedCode;
+
+            if (handleErrors)
+            {
+                try
                 {
-                    try
-                    {
-                        compiled = LanguageCore.Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
-                    }
-                    catch (Exception ex)
-                    {
-                        PrintOutput(ex.ToString(), LogType.Error);
-                        return;
-                    }
-                }
-                else
-                {
-                    compiled = LanguageCore.Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
+                    compiled = Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
                 }
-
-                interpreter.CompilerResult = generatedCode;
-                interpreter.ExecuteProgram(generatedCode.Code, bytecodeInterpreterSettings);
+                catch (Exception ex)
+                {
+                    PrintOutput(ex.ToString(), LogType.Error);
+                    return;
+                }
             }
+            else
+            {
+                compiled = Compiler.Compiler.Compile(Parser.Parser.ParseFile(file.FullName), interpreter.GenerateExternalFunctions(), file, compilerSettings.BasePath, PrintOutput);
+                generatedCode = CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+            }
+
+            // generatedCode.ThrowErrors();
+            // generatedCode.Print(PrintOutput);
+
+            interpreter.CompilerResult = generatedCode;
+            interpreter.Initialize(generatedCode.Code, bytecodeInterpreterSettings);
 
             while (interpreter.IsExecutingCode)
             {

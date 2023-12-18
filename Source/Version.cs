@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.Threading;
 
 namespace TheProgram
@@ -29,7 +30,7 @@ namespace TheProgram
                 System.Text.Json.JsonDocument resJson = System.Text.Json.JsonDocument.Parse(res);
                 string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString()!;
                 
-                DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr);
+                DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr, CultureInfo.CurrentCulture);
                 UploadedSaved = Convert(lastCommitDate);
                 return UploadedSaved;
             }
@@ -53,7 +54,7 @@ namespace TheProgram
                 System.Text.Json.JsonDocument resJson = System.Text.Json.JsonDocument.Parse(res);
                 string lastCommitDateStr = resJson.RootElement.GetProperty("commit").GetProperty("commit").GetProperty("author").GetProperty("date").GetString()!;
 
-                DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr);
+                DateTime lastCommitDate = DateTime.Parse(lastCommitDateStr, CultureInfo.CurrentCulture);
                 UploadedSavedD = lastCommitDate;
                 UploadedSaved = Convert(lastCommitDate);
 
@@ -67,7 +68,7 @@ namespace TheProgram
 
         public static bool HasNewVersion()
         {
-            var Current = DateTime.Now;
+            DateTime Current = DateTime.Now;
 
             if (Current.Year < UploadedSavedD.Year) return true;
             if (Current.Month < UploadedSavedD.Month) return true;

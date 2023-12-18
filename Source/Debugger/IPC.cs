@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if false
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -10,8 +11,6 @@ using System.Threading;
 
 #pragma warning disable CA1822 // Mark members as static
 
-#nullable disable
-
 namespace Communicating
 {
     [RequiresDynamicCode("Uses System.Text.Json.JsonSerializer")]
@@ -21,7 +20,7 @@ namespace Communicating
         readonly List<IPCMessage<object>> OutgoingMessages = new();
 
         public delegate void OnReceivedEventHandler(InterProcessCommunication sender, IPCMessage<object> message);
-        public event OnReceivedEventHandler OnReceived;
+        public event OnReceivedEventHandler? OnReceived;
 
         readonly Interface @interface;
         public Interface.Type CommunicationType => @interface.CommunicationType;
@@ -46,7 +45,9 @@ namespace Communicating
 
         private void OnReceive(string data)
         {
-            IPCMessage<object> message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
+            IPCMessage<object>? message = JsonSerializer.Deserialize<IPCMessage<object>>(data.Trim(), SerializerOptions);
+
+            if (message == null) return;
 
             if (message.Type == "base/ping/req")
             {
@@ -62,8 +63,9 @@ namespace Communicating
             OnReceived?.Invoke(this, message);
         }
 
-        public void Reply<T>(string messageType, T messageData, string replyToId)
+        public void Reply<T>(string messageType, T messageData, string? replyToId)
         {
+            if (replyToId is null) return;
             OutgoingMessages.Add(new IPCMessage<object>(messageType, null, messageData, replyToId));
             TrySendNext();
         }
@@ -101,10 +103,10 @@ namespace Communicating
     public class Interface
     {
         public delegate void OnReceivedEventHandler(string message);
-        public event OnReceivedEventHandler OnReceived;
+        public event OnReceivedEventHandler? OnReceived;
 
         static readonly char EOM = Convert.ToChar(4);
-        Thread Listener;
+        Thread? Listener;
         const int BufferSize = 1024;
         string Incoming = string.Empty;
 
@@ -206,14 +208,14 @@ namespace Communicating
             Incoming = Incoming.TrimStart(EOM);
 
             int endlessSafe = 8;
-            while (data.Contains(EOM))
+            while (data.Contains(EOM, StringComparison.Ordinal))
             {
                 if (endlessSafe-- <= 0) { Console.Error.WriteLine($"Endless loop!!!"); break; }
 
-                Incoming = Incoming.Shift(Incoming.IndexOf(EOM), out string message);
-                if (string.IsNullOrWhiteSpace(message) || string.IsNullOrEmpty(message)) break;
+                Incoming = Incoming.Shift(Incoming.IndexOf(EOM, StringComparison.Ordinal), out string message);
+                if (string.IsNullOrWhiteSpace(message)) break;
 
-                if (message.Contains(EOM))
+                if (message.Contains(EOM, StringComparison.Ordinal))
                 {
                     Console.Error.WriteLine($" WTF: {message}");
                     continue;
@@ -231,13 +233,13 @@ namespace Communicating
         [JsonInclude, JsonPropertyName("type")]
         public string Type;
         [JsonInclude, JsonPropertyName("id")]
-        public string Id;
+        public string? Id;
         [JsonInclude, JsonPropertyName("reply")]
-        public string Reply;
+        public string? Reply;
         [JsonInclude, JsonPropertyName("data")]
-        public T Data;
+        public T? Data;
 
-        public IPCMessage(string type, string id, T data, string reply = null)
+        public IPCMessage(string type, string? id, T? data, string? reply = null)
         {
             this.Id = id;
             this.Type = type;
@@ -246,17 +248,19 @@ namespace Communicating
         }
 
         public string Serialize() => JsonSerializer.Serialize(this, InterProcessCommunication.SerializerOptions);
-        public static IPCMessage<T> Deserialize(string data) => JsonSerializer.Deserialize<IPCMessage<T>>(data, InterProcessCommunication.SerializerOptions);
+        public static IPCMessage<T>? Deserialize(string data) => JsonSerializer.Deserialize<IPCMessage<T>>(data, InterProcessCommunication.SerializerOptions);
 
-        public override string ToString() => $"IPCMessage<{typeof(T)}>{{ type: {Type ?? "null"}, id: {Id ?? "null"}, reply: {Reply ?? "null"}, data: {{{Data.ToString() ?? "null"}}} }}";
+        public override string ToString() => $"IPCMessage<{typeof(T)}>{{ type: {Type ?? "null"}, id: {Id ?? "null"}, reply: {Reply ?? "null"}, data: {{{Data?.ToString() ?? "null"}}} }}";
     }
 
     static class Extensions
     {
         public static double ToUnix(this DateTime v) => v.ToUniversalTime().Subtract(new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds;
-        public static string Shift(this string v, int length, out string deleted)
+        /// <exception cref="ArgumentException"/>
+        /// <exception cref="ArgumentNullException"/>
+        public static string Shift(this string? v, int length, out string deleted)
         {
-            if (v is null) throw new ArgumentNullException(nameof(v));
+            ArgumentNullException.ThrowIfNull(v, nameof(v));
             if (length < 0) throw new ArgumentException($"{nameof(length)} ({length}) can't negative");
             if (length == 0)
             {
@@ -269,3 +273,4 @@ namespace Communicating
         }
     }
 }
+#endif

@@ -113,7 +113,8 @@ namespace LanguageCore.BBCode.Generator
                 compilerResult.Enums,
                 compilerResult.Errors,
                 compilerResult.Warnings,
-                compilerResult.TopLevelStatements);
+                compilerResult.TopLevelStatements,
+                compilerResult.File);
 
             return functionsRemoved;
         }

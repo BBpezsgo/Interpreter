@@ -41,6 +41,28 @@ namespace LanguageCore.BBCode.Generator
         public Information[] Informations;
         public Warning[] Warnings;
         public Error[] Errors;
+
+        /// <exception cref="LanguageException"/>
+        public readonly void ThrowErrors()
+        {
+            if (Errors.Length <= 0) return;
+            throw Errors[0].ToException();
+        }
+
+        public readonly void Print(PrintCallback callback)
+        {
+            for (int i = 0; i < Errors.Length; i++)
+            { callback.Invoke(Errors[i].ToString(), LogType.Error); }
+
+            for (int i = 0; i < Warnings.Length; i++)
+            { callback.Invoke(Warnings[i].ToString(), LogType.Warning); }
+
+            for (int i = 0; i < Informations.Length; i++)
+            { callback.Invoke(Informations[i].ToString(), LogType.Normal); }
+
+            for (int i = 0; i < Hints.Length; i++)
+            { callback.Invoke(Hints[i].ToString(), LogType.Normal); }
+        }
     }
 
     public partial class CodeGeneratorForMain : CodeGenerator
@@ -207,6 +229,9 @@ namespace LanguageCore.BBCode.Generator
                 AddComment("}");
             }
 
+            CurrentFile = compilerResult.File?.FullName;
+            if (CurrentFile == null)
+            { Warnings.Add(new Warning($"{nameof(CurrentFile)} is null", null, null)); }
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
             if (ExternalFunctionsCache.Count > 0)

@@ -454,17 +454,17 @@ namespace LanguageCore.Parser
     public class AttributeUsage : IHaveKey<string>, IThingWithPosition
     {
         public readonly Token Identifier;
-        public readonly object[] Parameters;
+        public readonly Statement.Literal[] Parameters;
 
         public string Key => Identifier.Content;
 
-        public AttributeUsage(Token identifier, object[] parameters)
+        public AttributeUsage(Token identifier, Statement.Literal[] parameters)
         {
             Identifier = identifier;
             Parameters = parameters;
         }
 
-        public Position Position => new(Identifier);
+        public Position Position => new Position(Parameters).Union(Identifier);
     }
 
     public class FunctionDefinition : FunctionThingDefinition

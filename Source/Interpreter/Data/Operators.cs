@@ -114,7 +114,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => valueSInt32 == other.valueSInt32,
                 RuntimeType.Single => valueSingle == other.valueSingle,
                 RuntimeType.UInt16 => valueUInt16 == other.valueUInt16,
-                _ => throw new ImpossibleException(),
+                _ => false,
             };
         }
 
@@ -256,13 +256,9 @@ namespace LanguageCore.Runtime
         }
 
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator <(DataItem a, DataItem b)
         {
             if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
-
-            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
             return a.type switch
             {
@@ -271,17 +267,13 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => a.valueSInt32 < b.valueSInt32,
                 RuntimeType.Single => a.valueSingle < b.valueSingle,
                 RuntimeType.UInt16 => a.valueUInt16 < b.valueUInt16,
-                _ => throw new RuntimeException($"Can't do < operation with type {a_} and {b_}"),
+                _ => false,
             };
         }
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator >(DataItem a, DataItem b)
         {
             if (a.type == RuntimeType.Null || b.type == RuntimeType.Null) return false;
-
-            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
             return a.type switch
             {
@@ -290,31 +282,23 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => a.valueSInt32 > b.valueSInt32,
                 RuntimeType.Single => a.valueSingle > b.valueSingle,
                 RuntimeType.UInt16 => a.valueUInt16 > b.valueUInt16,
-                _ => throw new RuntimeException($"Can't do > operation with type {a_} and {b_}"),
+                _ => false,
             };
         }
 
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator <=(DataItem a, DataItem b)
             => (a < b) || (a == b);
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator >=(DataItem a, DataItem b)
             => (a > b) || (a == b);
 
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator ==(DataItem a, DataItem b)
         {
             if (a.type == RuntimeType.Null && b.type == RuntimeType.Null) return true;
             if (a.type == RuntimeType.Null && DataItem.IsZero(b)) return true;
             if (b.type == RuntimeType.Null && DataItem.IsZero(a)) return true;
-
-            (RuntimeType a_, RuntimeType b_) = DataItem.MakeSameTypeAndKeep(ref a, ref b);
 
             return a.type switch
             {
@@ -323,12 +307,10 @@ namespace LanguageCore.Runtime
                 RuntimeType.SInt32 => a.valueSInt32 == b.valueSInt32,
                 RuntimeType.Single => a.valueSingle == b.valueSingle,
                 RuntimeType.UInt16 => a.valueUInt16 == b.valueUInt16,
-                _ => throw new RuntimeException($"Can't do == operation with type {a_} and {b_}"),
+                _ => false,
             };
         }
         /// <inheritdoc/>
-        /// <exception cref="InternalException"/>
-        /// <exception cref="RuntimeException"/>
         public static bool operator !=(DataItem a, DataItem b)
             => !(a == b);
 

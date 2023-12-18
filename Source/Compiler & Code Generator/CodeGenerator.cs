@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
@@ -1830,10 +1831,10 @@ namespace LanguageCore.Compiler
 
         protected CompiledType FindStatementType(OperatorCall @operator, CompiledType? expectedType)
         {
-            if (LanguageConstants.Operators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
+            if (LanguageOperators.OpCodes.TryGetValue(@operator.Operator.Content, out Opcode opcode))
             {
-                if (LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageConstants.Operators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
+                if (LanguageOperators.ParameterCounts[@operator.Operator.Content] != @operator.ParameterCount)
+                { throw new CompilerException($"Wrong number of parameters passed to operator '{@operator.Operator.Content}': required {LanguageOperators.ParameterCounts[@operator.Operator.Content]} passed {@operator.ParameterCount}", @operator.Operator, CurrentFile); }
             }
             else
             { opcode = Opcode.UNKNOWN; }
@@ -1895,7 +1896,7 @@ namespace LanguageCore.Compiler
                 case LiteralType.Char:
                     return new CompiledType(Type.Char);
                 default:
-                    throw new ImpossibleException($"Unknown literal type {literal.Type}");
+                    throw new UnreachableException($"Unknown literal type {literal.Type}");
             }
         }
         protected CompiledType FindStatementType(Identifier identifier, CompiledType? expectedType = null)

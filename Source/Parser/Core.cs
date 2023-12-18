@@ -4,8 +4,6 @@ using System.Linq;
 
 namespace LanguageCore.Parser
 {
-    using LanguageCore.Tokenizing;
-
     public enum LiteralType
     {
         Integer,

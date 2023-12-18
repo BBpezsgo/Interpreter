@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace LanguageCore.BBCode.Generator
 {
@@ -222,7 +223,7 @@ namespace LanguageCore.BBCode.Generator
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
                     AddInstruction(Opcode.LOAD_VALUE, address.AddressingMode);
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
         protected override void StackStore(ValueAddress address)
@@ -255,7 +256,7 @@ namespace LanguageCore.BBCode.Generator
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
                     AddInstruction(Opcode.STORE_VALUE, AddressingMode.RUNTIME);
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
 

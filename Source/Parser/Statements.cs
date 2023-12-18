@@ -567,15 +567,12 @@ namespace LanguageCore.Parser.Statement
         {
             get
             {
-                StatementWithValue? left = this.Left;
-                StatementWithValue? right = this.Right;
-
-                if (left is null && right is not null)
-                { return new StatementWithValue[] { right }; }
-                else if (left is not null && right is null)
-                { return new StatementWithValue[] { left }; }
-                else if (left is not null && right is not null)
-                { return new StatementWithValue[] { left, right }; }
+                if (Left is null && Right is not null)
+                { return new StatementWithValue[] { Right }; }
+                else if (Left is not null && Right is null)
+                { return new StatementWithValue[] { Left }; }
+                else if (Left is not null && Right is not null)
+                { return new StatementWithValue[] { Left, Right }; }
                 else
                 { throw new InternalException($"{nameof(Left)} and {nameof(Right)} are both null"); }
             }
@@ -829,6 +826,13 @@ namespace LanguageCore.Parser.Statement
             ValueToken = valueToken;
         }
 
+        public Literal(LiteralType type, Token value)
+        {
+            Type = type;
+            Value = value.Content;
+            ValueToken = value;
+        }
+
         public static Literal CreateAnonymous(LiteralType type, string value, IThingWithPosition position)
             => Literal.CreateAnonymous(type, value, position.Position);
         public static Literal CreateAnonymous(LiteralType type, string value, Position position)
@@ -850,12 +854,9 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => Type switch
         {
-            LiteralType.Integer => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            LiteralType.Float => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            LiteralType.Boolean => Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
             LiteralType.String => $"\"{Value}\"",
             LiteralType.Char => $"'{Value}'",
-            _ => throw new ImpossibleException(),
+            _ => Value,
         };
 
         public static int GetInt(string value)
@@ -882,9 +883,15 @@ namespace LanguageCore.Parser.Statement
             value = value.EndsWith('f') ? value[..^1] : value;
             return float.Parse(value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture);
         }
+        public static bool GetBoolean(string value)
+        {
+            value = value.Trim();
+            return value == "true";
+        }
 
         public int GetInt() => Literal.GetInt(Value);
         public float GetFloat() => Literal.GetFloat(Value);
+        public bool GetBoolean() => Literal.GetBoolean(Value);
 
         public override Position Position
             => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);

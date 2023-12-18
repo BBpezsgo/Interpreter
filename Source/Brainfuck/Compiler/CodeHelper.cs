@@ -257,8 +257,8 @@ namespace LanguageCore.Brainfuck
         /// <summary>
         /// <b>Pointer:</b> <paramref name="address"/>
         /// </summary>
-        /// <exception cref="Errors.CompilerException"/>
-        /// <exception cref="Errors.ImpossibleException"/>
+        /// <exception cref="CompilerException"/>
+        /// <exception cref="InternalException"/>
         public void SetValue(int address, Runtime.DataItem value)
         {
             switch (value.Type)
@@ -274,8 +274,10 @@ namespace LanguageCore.Brainfuck
                 case Runtime.RuntimeType.UInt16:
                     SetValue(address, value.ValueUInt16);
                     return;
+                case Runtime.RuntimeType.Null:
+                    throw new InternalException();
                 default:
-                    throw new ImpossibleException();
+                    throw new UnreachableException();
             }
         }
 
@@ -722,7 +724,7 @@ namespace LanguageCore.Brainfuck
                 Runtime.RuntimeType.SInt32 => Push(v.ValueSInt32),
                 Runtime.RuntimeType.Single => throw new NotSupportedException("Floats are not supported by the brainfuck compiler"),
                 Runtime.RuntimeType.UInt16 => Push(v.ValueUInt16),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
         }
 
@@ -735,7 +737,7 @@ namespace LanguageCore.Brainfuck
 
             if (Size > MaxSize)
             {
-                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
                 Code.Append("[-]+[]");
             }
 
@@ -752,7 +754,7 @@ namespace LanguageCore.Brainfuck
 
             if (Size > MaxSize)
             {
-                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
                 Code.Append("[-]+[]");
             }
 
@@ -772,7 +774,7 @@ namespace LanguageCore.Brainfuck
 
             if (Size > MaxSize)
             {
-                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
                 Code.Append("[-]+[]");
             }
 
@@ -791,7 +793,7 @@ namespace LanguageCore.Brainfuck
 
             if (Size >= MaxSize)
             {
-                Code.OUT_STRING(address, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Stack overflow")}\n");
+                Code.OUT_STRING(address, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Stack overflow")}\n");
                 Code.Append("[-]+[]");
             }
 
@@ -1337,7 +1339,7 @@ namespace LanguageCore.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
+            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry
@@ -1377,7 +1379,7 @@ namespace LanguageCore.Brainfuck
 
             // Out of memory check
             Code.JumpStartUnsafe(OFFSET_ADDRESS_CARRY);
-            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{ANSI.Generator.Generate(ANSI.ForegroundColor.RED, "Not enough of memory")}\n");
+            Code.OUT_STRING_UNSAFE(OFFSET_ADDRESS_CARRY, $"\n{Win32.Ansi.StyleText(Win32.Ansi.BrightForegroundRed, "Not enough of memory")}\n");
             Code.JumpEndUnsafe(OFFSET_ADDRESS_CARRY);
 
             // Increment address carry

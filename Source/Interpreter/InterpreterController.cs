@@ -125,7 +125,7 @@ namespace LanguageCore.Runtime
         public delegate void OnStdErrorEventHandler(Interpreter sender, string data);
         public delegate void OnStdOutEventHandler(Interpreter sender, string data);
         public delegate void OnInputEventHandler(Interpreter sender);
-        public delegate void OnExecutedEventHandler(Interpreter sender, OnExecutedEventArgs e);
+        public delegate void OnExecutedEventHandler(Interpreter sender);
 
         public event OnOutputEventHandler? OnOutput;
         public event OnStdOutEventHandler? OnStdOut;
@@ -136,19 +136,6 @@ namespace LanguageCore.Runtime
         /// </summary>
         public event OnInputEventHandler? OnNeedInput;
         public event OnExecutedEventHandler? OnExecuted;
-
-        public struct OnExecutedEventArgs
-        {
-            public double ElapsedMilliseconds;
-
-            public OnExecutedEventArgs(double elapsedMilliseconds)
-            {
-                ElapsedMilliseconds = elapsedMilliseconds;
-            }
-
-            public override readonly string ToString() => $"Code executed in {ElapsedTime}";
-            public readonly string ElapsedTime => LanguageCore.Utils.GetElapsedTime(ElapsedMilliseconds);
-        }
 
         protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
 
@@ -168,7 +155,6 @@ namespace LanguageCore.Runtime
         public bool IsExecutingCode;
 
         public BytecodeInterpreter? BytecodeInterpreter;
-        protected TimeSpan CodeStartedTimespan;
 
         protected bool IsPaused;
         IReturnValueConsumer? ReturnValueConsumer;
@@ -177,37 +163,14 @@ namespace LanguageCore.Runtime
 
         protected bool HandleErrors;
 
-        public Interpreter() : base()
+        public Interpreter()
         {
             Streams = new List<Stream>();
             HandleErrors = true;
         }
 
-        /// <summary>
-        /// It prepares the interpreter to run some code
-        /// </summary>
-        public virtual void ExecuteProgram(Instruction[] program, BytecodeInterpreterSettings settings)
-        {
-            CodeStartedTimespan = DateTime.Now.TimeOfDay;
-            BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions, settings);
-            externalFunctions.SetInterpreter(BytecodeInterpreter);
-
-            State = InterpreterState.Initialized;
-
-            OnOutput?.Invoke(this, "Start code ...", LogType.Debug);
-        }
-
-        /// <summary>
-        /// Initializes the compiler
-        /// <list type="bullet">
-        /// <item>It checks if any code is running</item>
-        /// <item>Adds external functions</item>
-        /// </list>
-        /// </summary>
-        /// <returns>
-        /// True, if you can run some code
-        /// </returns>
-        public bool Initialize()
+        [MemberNotNullWhen(true, nameof(BytecodeInterpreter))]
+        public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings)
         {
             if (IsExecutingCode)
             {
@@ -228,12 +191,15 @@ namespace LanguageCore.Runtime
             externalFunctions.Clear();
             externalFunctions.AddRange(GenerateExternalFunctions());
 
+            BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions, settings);
+            externalFunctions.SetInterpreter(BytecodeInterpreter);
+
             State = InterpreterState.Initialized;
 
             return true;
         }
 
-        public void Destroy()
+        public void Dispose()
         {
             IsExecutingCode = false;
 
@@ -474,8 +440,7 @@ namespace LanguageCore.Runtime
 
         protected void OnCodeExecuted()
         {
-            double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
-            OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+            OnExecuted?.Invoke(this);
             IsExecutingCode = false;
 
             State = InterpreterState.CodeExecuted;
@@ -510,8 +475,7 @@ namespace LanguageCore.Runtime
 
                 OnOutput?.Invoke(this, $"User Exception: {error}", LogType.Error);
 
-                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                OnExecuted?.Invoke(this);
                 IsExecutingCode = false;
 
                 if (!HandleErrors) throw;
@@ -522,8 +486,7 @@ namespace LanguageCore.Runtime
 
                 OnOutput?.Invoke(this, "Runtime Exception: " + error.ToString(), LogType.Error);
 
-                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                OnExecuted?.Invoke(this);
                 IsExecutingCode = false;
 
                 if (!HandleErrors) throw;
@@ -532,8 +495,7 @@ namespace LanguageCore.Runtime
             {
                 OnOutput?.Invoke(this, "Internal Exception: " + error.Message, LogType.Error);
 
-                double elapsedMilliseconds = (DateTime.Now.TimeOfDay - CodeStartedTimespan).TotalMilliseconds;
-                OnExecuted?.Invoke(this, new OnExecutedEventArgs(elapsedMilliseconds));
+                OnExecuted?.Invoke(this);
                 IsExecutingCode = false;
 
                 if (!HandleErrors) throw;

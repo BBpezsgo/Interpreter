@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace LanguageCore.Runtime
 {
@@ -87,7 +86,7 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="InternalException"></exception>
-        public DataItem Callback(BytecodeProcessor sender, DataItem[] parameters)
+        public DataItem Call(BytecodeProcessor sender, DataItem[] parameters)
         {
             base.BeforeCallback(parameters);
 

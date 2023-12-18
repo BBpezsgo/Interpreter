@@ -8,25 +8,81 @@ namespace TheProgram
     using LanguageCore;
     using LanguageCore.Runtime;
 
+    /// <summary>
+    /// Argument parser result
+    /// </summary>
+    public struct ProgramArguments
+    {
+        [MemberNotNullWhen(false, nameof(File))]
+        public readonly bool IsEmpty => File is null;
+
+        public System.IO.FileInfo? File;
+
+        public LanguageCore.Compiler.CompilerSettings compilerSettings;
+        public BytecodeInterpreterSettings bytecodeInterpreterSettings;
+        public bool ThrowErrors;
+        public readonly bool HandleErrors => !ThrowErrors;
+        public string? PipeName;
+        public int Port;
+
+        public bool LogDebugs;
+        public bool LogSystem;
+        public bool LogWarnings;
+        public bool LogInfo;
+
+        public ProgramRunType RunType;
+        public string? CompileOutput;
+        public CompressionLevel CompressionLevel;
+        public string? TestID;
+        public ProgramInputFileType CompileToFileType;
+        public bool IsTest;
+
+        public bool ConsoleGUI;
+
+        public bool DoNotPause;
+
+        public static ProgramArguments Default => new()
+        {
+            ThrowErrors = false,
+            LogDebugs = true,
+            LogSystem = true,
+            LogWarnings = true,
+            LogInfo = true,
+            RunType = ProgramRunType.Normal,
+            compilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
+            bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
+            CompileOutput = null,
+            CompressionLevel = CompressionLevel.Optimal,
+            PipeName = null,
+            Port = -1,
+            TestID = null,
+            CompileToFileType = ProgramInputFileType.Binary,
+            IsTest = false,
+            ConsoleGUI = false,
+            DoNotPause = false,
+            File = null,
+        };
+    }
+
+    public enum ProgramRunType
+    {
+        Normal,
+        // Debugger,
+        Compile,
+        Decompile,
+        Brainfuck,
+        IL,
+        ASM,
+    }
+
+    public enum ProgramInputFileType
+    {
+        Binary,
+        Readable,
+    }
+
     public static class ArgumentParser
     {
-        public enum RunType
-        {
-            Normal,
-            Debugger,
-            Compile,
-            Decompile,
-            Brainfuck,
-            IL,
-            ASM,
-        }
-
-        public enum FileType
-        {
-            Binary,
-            Readable,
-        }
-
         class ArgumentNormalizer
         {
             public readonly List<string> Result;
@@ -146,9 +202,9 @@ namespace TheProgram
             return true;
         }
 
-        static Settings ParseArgs(string[] args)
+        static ProgramArguments ParseArgs(string[] args)
         {
-            Settings result = Settings.Default;
+            ProgramArguments result = ProgramArguments.Default;
 #pragma warning disable IDE0059 // Unnecessary assignment of a value
             string? arg = null;
 #pragma warning restore IDE0059 // Unnecessary assignment of a value
@@ -180,39 +236,39 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out _, "--brainfuck", "-bf"))
                     {
-                        if (result.RunType != RunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Brainfuck}"); }
+                        if (result.RunType != ProgramRunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Brainfuck}"); }
 
-                        result.RunType = RunType.Brainfuck;
+                        result.RunType = ProgramRunType.Brainfuck;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--asm"))
                     {
-                        if (result.RunType != RunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.ASM}"); }
+                        if (result.RunType != ProgramRunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.ASM}"); }
 
-                        result.RunType = RunType.ASM;
+                        result.RunType = ProgramRunType.ASM;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--il"))
                     {
-                        if (result.RunType != RunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.IL}"); }
+                        if (result.RunType != ProgramRunType.Normal)
+                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.IL}"); }
 
-                        result.RunType = RunType.IL;
+                        result.RunType = ProgramRunType.IL;
                         continue;
                     }
 
-                    if (ExpectArg(args, ref i, out _, "--debug"))
-                    {
-                        if (result.RunType != RunType.Normal)
-                        { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Debugger}"); }
-
-                        result.RunType = RunType.Debugger;
-                        continue;
-                    }
+                    // if (ExpectArg(args, ref i, out _, "--debug"))
+                    // {
+                    //     if (result.RunType != ProgramRunType.Normal)
+                    //     { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Debugger}"); }
+                    // 
+                    //     result.RunType = ProgramRunType.Debugger;
+                    //     continue;
+                    // }
 
                     if (ExpectArg(args, ref i, out _, "--console-gui", "-cg"))
                     {
@@ -378,8 +434,8 @@ namespace TheProgram
 
                         result.CompileToFileType = compileType switch
                         {
-                            "binary" => FileType.Binary,
-                            "readable" => FileType.Readable,
+                            "binary" => ProgramInputFileType.Binary,
+                            "readable" => ProgramInputFileType.Readable,
                             _ => throw new ArgumentException($"Unknown compiler type \"{compileType}\". Possible values: \"binary\", \"readable\""),
                         };
                         continue;
@@ -404,66 +460,10 @@ namespace TheProgram
             return result;
         }
 
-        /// <summary>
-        /// Argument parser result
-        /// </summary>
-        public struct Settings
+        public static bool Parse(out ProgramArguments settings, params string[] args)
         {
-            [MemberNotNullWhen(false, nameof(File))]
-            public readonly bool IsEmpty => File is null;
-
-            public System.IO.FileInfo? File;
-
-            public LanguageCore.Compiler.CompilerSettings compilerSettings;
-            public BytecodeInterpreterSettings bytecodeInterpreterSettings;
-            public bool ThrowErrors;
-            public readonly bool HandleErrors => !ThrowErrors;
-            public string? PipeName;
-            public int Port;
-
-            public bool LogDebugs;
-            public bool LogSystem;
-            public bool LogWarnings;
-            public bool LogInfo;
-
-            public RunType RunType;
-            public string? CompileOutput;
-            public CompressionLevel CompressionLevel;
-            public string? TestID;
-            public FileType CompileToFileType;
-            public bool IsTest;
-
-            public bool ConsoleGUI;
-
-            public bool DoNotPause;
-
-            public static Settings Default => new()
-            {
-                ThrowErrors = false,
-                LogDebugs = true,
-                LogSystem = true,
-                LogWarnings = true,
-                LogInfo = true,
-                RunType = RunType.Normal,
-                compilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
-                bytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
-                CompileOutput = null,
-                CompressionLevel = CompressionLevel.Optimal,
-                PipeName = null,
-                Port = -1,
-                TestID = null,
-                CompileToFileType = FileType.Binary,
-                IsTest = false,
-                ConsoleGUI = false,
-                DoNotPause = false,
-                File = null,
-            };
-        }
-
-        public static bool Parse(out Settings settings, params string[] args)
-        {
-            settings = Settings.Default;
-            Settings? _settings = ArgumentParser.Parse(args);
+            settings = ProgramArguments.Default;
+            ProgramArguments? _settings = ArgumentParser.Parse(args);
             if (_settings.HasValue)
             {
                 settings = _settings.Value;
@@ -474,16 +474,16 @@ namespace TheProgram
                 return false;
             }
         }
-        public static Settings? Parse(params string[] args)
+        public static ProgramArguments? Parse(params string[] args)
         {
             if (args.Length == 0)
-            { return Settings.Default; }
+            { return ProgramArguments.Default; }
 
             ArgumentNormalizer normalizer = new();
             normalizer.NormalizeArgs(args);
             string[] normalizedArgs = normalizer.Result.ToArray();
 
-            Settings settings;
+            ProgramArguments settings;
 
             try
             {

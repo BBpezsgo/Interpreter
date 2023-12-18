@@ -8,7 +8,7 @@
 
             bool pauseAtEnd = true;
 
-            if (ArgumentParser.Parse(out ArgumentParser.Settings settings, args))
+            if (ArgumentParser.Parse(out ProgramArguments settings, args))
             {
                 try
                 { Entry.Run(settings); }

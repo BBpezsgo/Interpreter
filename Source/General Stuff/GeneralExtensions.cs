@@ -52,7 +52,7 @@ namespace LanguageCore
             return literal.ToString();
         }
 
-        public static T Sum<T>(this IEnumerable<T> list) where T : INumber<T>
+        public static T Sum<T>(this IEnumerable<T> list) where T : INumberBase<T>
         {
             T result = T.Zero;
             foreach (T item in list)

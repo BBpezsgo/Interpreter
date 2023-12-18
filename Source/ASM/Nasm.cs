@@ -68,7 +68,7 @@ namespace LanguageCore.ASM
 
     public static class Nasm
     {
-        /// <exception cref="Exception"/>
+        /// <exception cref="ProcessNotStartedException"/>
         /// <exception cref="NotImplementedException"/>
         /// <exception cref="NasmException"/>
         /// <exception cref="FileNotFoundException"/>
@@ -82,14 +82,14 @@ namespace LanguageCore.ASM
             { File.Delete(outputFile); }
 
             string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
-            Process? process = Process.Start(new ProcessStartInfo(nasm, $"-f win32 {inputFile} -o {outputFile}")
+            using Process? process = Process.Start(new ProcessStartInfo(nasm, $"-f win32 {inputFile} -o {outputFile}")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
             });
 
             if (process == null)
-            { throw new Exception($"Failed to start process \"{nasm}\""); }
+            { throw new ProcessNotStartedException(nasm); }
 
             process.WaitForExit();
 

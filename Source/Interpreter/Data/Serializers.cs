@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using DataUtilities.ReadableFileFormat;
 using DataUtilities.Serializer;
 
@@ -26,7 +27,7 @@ namespace LanguageCore.Runtime
                     break;
                 case RuntimeType.Null:
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
 
@@ -49,7 +50,7 @@ namespace LanguageCore.Runtime
                     break;
                 case RuntimeType.Null:
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
 
@@ -65,7 +66,7 @@ namespace LanguageCore.Runtime
                 RuntimeType.Single => Value.Literal(valueSingle),
                 RuntimeType.UInt16 => Value.Literal(valueUInt16),
                 RuntimeType.Null => "null",
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
 
             return result;
@@ -92,7 +93,7 @@ namespace LanguageCore.Runtime
                     break;
                 case RuntimeType.Null:
                     break;
-                default: throw new ImpossibleException();
+                default: throw new UnreachableException();
             }
         }
     }

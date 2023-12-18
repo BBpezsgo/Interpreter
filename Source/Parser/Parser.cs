@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Globalization;
+using System.Linq;
 
 namespace LanguageCore.Parser
 {
@@ -84,9 +85,9 @@ namespace LanguageCore.Parser
             "!", "~",
         };
 
-#pragma warning disable IDE0052 // Remove unread private members
+#pragma warning disable IDE0052, CA1823 // Remove unread private members
         static readonly string[] UnaryPostfixOperators = Array.Empty<string>();
-#pragma warning restore IDE0052
+#pragma warning restore IDE0052, CA1823
 
         // === Result ===
         readonly List<Error> Errors = new();
@@ -107,7 +108,7 @@ namespace LanguageCore.Parser
 
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="ImpossibleException"/>
+        /// <exception cref="UnreachableException"/>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         public static ParserResult ParseFile(string filePath)
@@ -118,7 +119,7 @@ namespace LanguageCore.Parser
 
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="ImpossibleException"/>
+        /// <exception cref="UnreachableException"/>
         public static ParserResult Parse(Token[] tokens)
             => new Parser(tokens).ParseInternal();
 
@@ -1325,7 +1326,7 @@ namespace LanguageCore.Parser
                 BaseBranch.IfPart.If => new IfBranch(tokenIf, condition!, block),
                 BaseBranch.IfPart.ElseIf => new ElseIfBranch(tokenIf, condition!, block),
                 BaseBranch.IfPart.Else => new ElseBranch(tokenIf, block),
-                _ => throw new ImpossibleException(),
+                _ => throw new UnreachableException(),
             };
             return true;
         }
@@ -1675,7 +1676,7 @@ namespace LanguageCore.Parser
 
         static int OperatorPrecedence(string @operator)
         {
-            if (LanguageConstants.Operators.Precedencies.TryGetValue(@operator, out int precedence))
+            if (LanguageOperators.Precedencies.TryGetValue(@operator, out int precedence))
             { return precedence; }
             throw new InternalException($"Precedence for operator \"{@operator}\" not found");
         }
@@ -1780,13 +1781,13 @@ namespace LanguageCore.Parser
 
             attributeT.AnalyzedType = TokenAnalyzedType.Attribute;
 
-            List<object> parameters = new();
+            List<Literal> parameters = new();
             if (ExpectOperator("(", out Token? t3))
             {
                 int endlessSafe = 50;
                 while (!ExpectOperator(")"))
                 {
-                    ExpectOneLiteral(out object? param);
+                    ExpectLiteral(out Literal? param);
                     if (param == null)
                     { throw new SyntaxException("Expected parameter", t3); }
                     ExpectOperator(",");
@@ -2009,6 +2010,8 @@ namespace LanguageCore.Parser
             StackArrayWithoutLength = 0b_0001_0000,
         }
 
+        static readonly string[] TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType = new string[] { "<", "(", "[" };
+
         bool ExpectType(AllowedType flags, [NotNullWhen(true)] out TypeInstance? type)
         {
             type = default;
@@ -2031,7 +2034,7 @@ namespace LanguageCore.Parser
                     return false;
                 }
 
-                if (ExpectOperator(new string[] { "<", "(", "[" }, out Token? illegalT))
+                if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
                 return true;
@@ -2046,7 +2049,7 @@ namespace LanguageCore.Parser
                     return false;
                 }
 
-                if (ExpectOperator(new string[] { "<", "(", "[" }, out Token? illegalT))
+                if (ExpectOperator(TheseCharactersIndicateThatTheIdentifierWillBeFollowedByAComplexType, out Token? illegalT))
                 { throw new SyntaxException($"This is not allowed", illegalT); }
 
                 return true;

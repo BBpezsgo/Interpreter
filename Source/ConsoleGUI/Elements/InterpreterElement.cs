@@ -188,7 +188,7 @@ namespace ConsoleGUI
                 sender.OnInput(input.KeyChar);
             };
 
-            if (Interpreter.Initialize())
+            if (!Interpreter.IsExecutingCode)
             {
                 LanguageCore.Compiler.CompilerResult compiled;
                 LanguageCore.BBCode.Generator.BBCodeGeneratorResult generatedCode;
@@ -213,7 +213,7 @@ namespace ConsoleGUI
                 }
 
                 Interpreter.CompilerResult = generatedCode;
-                Interpreter.ExecuteProgram(generatedCode.Code, new BytecodeInterpreterSettings()
+                Interpreter.Initialize(generatedCode.Code, new BytecodeInterpreterSettings()
                 {
                     StackMaxSize = interpreterSettings.StackMaxSize,
                     HeapSize = interpreterSettings.HeapSize,
@@ -1169,7 +1169,7 @@ namespace ConsoleGUI
 
         public override void OnDestroy()
         {
-            this.Interpreter?.Destroy();
+            this.Interpreter?.Dispose();
         }
 
         public override void RefreshSize()

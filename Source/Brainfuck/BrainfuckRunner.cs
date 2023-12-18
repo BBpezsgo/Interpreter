@@ -26,7 +26,7 @@ namespace LanguageCore.Brainfuck
     {
         static BrainfuckGeneratorSettings CompilerSettings => BrainfuckGeneratorSettings.Default;
 
-        public static void Run(TheProgram.ArgumentParser.Settings args, BrainfuckRunKind runKind, BrainfuckPrintFlags runFlags, EasyBrainfuckCompilerFlags flags = EasyBrainfuckCompilerFlags.None)
+        public static void Run(TheProgram.ProgramArguments args, BrainfuckRunKind runKind, BrainfuckPrintFlags runFlags, EasyBrainfuckCompilerFlags flags = EasyBrainfuckCompilerFlags.None)
         {
             void PrintCallback(string message, LogType level)
             {

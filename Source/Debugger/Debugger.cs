@@ -1,4 +1,5 @@
-﻿using System;
+﻿#if false
+using System;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Communicating;
@@ -36,21 +37,20 @@ namespace TheProgram
 
         private bool NeedStdin;
 
-        public Debugger(ArgumentParser.Settings settings)
+        public Debugger(ProgramArguments settings)
         {
             Ipc = new InterProcessCommunication();
             Ipc.OnReceived += (manager, message) => { if (Interpreter == null) return; OnMessage(message); };
 
-            ModifySettings(ref settings);
             SourceCode = File.ReadAllText(settings.File.FullName);
             NeedStdin = false;
             InitInterpreter(settings);
             Ipc.Start();
         }
 
-        void InitInterpreter(ArgumentParser.Settings settings)
+        void InitInterpreter(ProgramArguments settings)
         {
-            Interpreter?.Destroy();
+            Interpreter?.Dispose();
             Interpreter = new InterpreterDebuggabble();
 
             Interpreter.OnOutput += (sender, message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(sender)));
@@ -58,7 +58,7 @@ namespace TheProgram
             Interpreter.OnStdError += (_, message) => Ipc.Send("stderr", message);
             Interpreter.OnNeedInput += _ => NeedStdin = true;
 
-            if (!Interpreter.Initialize()) return;
+            if (Interpreter.IsExecutingCode) return;
 
             try
             {
@@ -66,18 +66,13 @@ namespace TheProgram
                 BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, settings.compilerSettings, (message, logType) => Ipc.Send("console/out", new Data_Log(logType, message, new Data_Context(Interpreter))));
 
                 Interpreter.CompilerResult = generatedCode;
-                Interpreter.ExecuteProgram(generatedCode.Code, settings.bytecodeInterpreterSettings);
+                Interpreter.Initialize(generatedCode.Code, settings.bytecodeInterpreterSettings);
             }
             catch (Exception ex)
             {
                 Ipc.Send("console/out", new Data_Log(LogType.Error, ex.ToString(), new Data_Context(Interpreter)));
                 return;
             }
-        }
-
-        static void ModifySettings(ref ArgumentParser.Settings settings)
-        {
-
         }
 
         void OnMessage(IPCMessage<object> message)
@@ -329,3 +324,5 @@ namespace TheProgram
         }
     }
 }
+
+#endif

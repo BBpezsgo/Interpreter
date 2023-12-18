@@ -19,7 +19,7 @@ namespace TheProgram
     {
         /// <exception cref="NotSupportedException"/>
         /// <exception cref="NotImplementedException"/>
-        public static void Run(ArgumentParser.Settings arguments)
+        public static void Run(ProgramArguments arguments)
         {
             if (arguments.IsEmpty)
             {
@@ -29,14 +29,14 @@ namespace TheProgram
 
             switch (arguments.RunType)
             {
-                case ArgumentParser.RunType.Debugger:
-#if AOT
-                    throw new NotSupportedException($"The compiler compiled in AOT mode so System.Text.Json isn't available");
-#else
-                    _ = new Debugger(arguments);
-                    break;
-#endif
-                case ArgumentParser.RunType.Normal:
+//              case ProgramRunType.Debugger:
+// #if AOT
+//                  throw new NotSupportedException($"The compiler compiled in AOT mode so System.Text.Json isn't available");
+// #else
+//                  _ = new Debugger(arguments);
+//                  break;
+// #endif
+                case ProgramRunType.Normal:
                 {
                     if (arguments.ConsoleGUI)
                     {
@@ -56,14 +56,14 @@ namespace TheProgram
                     }
                     break;
                 }
-                case ArgumentParser.RunType.Compile:
+                case ProgramRunType.Compile:
                 {
                     CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.compilerSettings.BasePath);
                     BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.compilerSettings);
                     File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
                     break;
                 }
-                case ArgumentParser.RunType.Brainfuck:
+                case ProgramRunType.Brainfuck:
                 {
                     BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
@@ -79,7 +79,7 @@ namespace TheProgram
                     { BrainfuckRunner.Run(arguments, BrainfuckRunKind.Default, printFlags, compileOptions); }
                     break;
                 }
-                case ArgumentParser.RunType.IL:
+                case ProgramRunType.IL:
                 {
 #if AOT
                         throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
@@ -92,7 +92,7 @@ namespace TheProgram
                     break;
 #endif
                 }
-                case ArgumentParser.RunType.ASM:
+                case ProgramRunType.ASM:
                 {
                     CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
 

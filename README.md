@@ -59,7 +59,7 @@ showing how to make a parser and a compiler. I basically copied the code with mi
 ## Hello World:
 ```cs
 // This imports the local System.bbc file along with its functions and structures.
-using "../CodeFiles/System";
+using "../StandardLibrary/System";
 
 // Prints a message to the console
 PrintLine("hello, world");

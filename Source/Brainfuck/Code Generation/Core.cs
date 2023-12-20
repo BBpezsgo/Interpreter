@@ -285,7 +285,7 @@ namespace LanguageCore.Brainfuck.Generator
             this.DebugInfo = new DebugInformation();
             this.PrintCallback = printCallback;
             this.GenerateDebugInformation = settings.GenerateDebugInformation;
-            this.ShowProgress = false;
+            this.ShowProgress = settings.ShowProgress;
         }
 
         [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]

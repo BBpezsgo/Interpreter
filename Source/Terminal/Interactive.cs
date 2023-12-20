@@ -412,7 +412,7 @@ namespace LanguageCore
                     CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                         statement,
                         interpreter.GenerateExternalFunctions(),
-                        @"D:\Program Files\BBCodeProject\BBCode\CodeFiles\",
+                        @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
                         [Parser.UsingDefinition.CreateAnonymous("System")],
                         null);
 
@@ -543,7 +543,7 @@ namespace LanguageCore
                 CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                     statement,
                     interpreter.GenerateExternalFunctions(),
-                    @"D:\Program Files\BBCodeProject\BBCode\CodeFiles\",
+                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
                     [Parser.UsingDefinition.CreateAnonymous("System")],
                     null);
 

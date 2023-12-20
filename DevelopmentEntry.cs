@@ -16,7 +16,7 @@ namespace TheProgram
             string[] generatedArgs = new string[]
             {
                 // "--throw-errors",
-                "--basepath \"../CodeFiles/\"",
+                "--basepath \"../StandardLibrary/\"",
                 // "--hide-debug",
                 "--hide-system",
                 // "--dont-optimize",

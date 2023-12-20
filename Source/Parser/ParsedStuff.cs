@@ -31,7 +31,7 @@ namespace LanguageCore.Parser
             this.RightParenthesis = rightParenthesis;
         }
 
-        public Position Position => new Position(Parameters).Union(LeftParenthesis, RightParenthesis);
+        public Position Position => new Position(LeftParenthesis, RightParenthesis).Union(Parameters);
 
         public int Count => Parameters.Length;
 

@@ -861,6 +861,13 @@ namespace LanguageCore.Brainfuck
             }
         }
 
+        /// <inheritdoc cref="Pop()" />
+        public void Pop(int count)
+        {
+            for (int i = 0; i < count; i++)
+            { Pop(); }
+        }
+
         public int PopVirtual() => TheStack.Pop();
 
         internal string GetDebuggerDisplay() => TheStack.GetDebuggerDisplay();

@@ -177,7 +177,7 @@ namespace ConsoleGUI
                         }
                     }
 
-                    this[x, y] = new ConsoleChar(c, color, Win32.ConsoleColor.Black);
+                    this[x, y] = new ConsoleChar(c, color, CharColor.Black);
 
                     prev = (x, y);
                 }
@@ -207,8 +207,8 @@ namespace ConsoleGUI
 
         public void ResetColor()
         {
-            this.ForegroundColor = Win32.ConsoleColor.Silver;
-            this.BackgroundColor = Win32.ConsoleColor.Black;
+            this.ForegroundColor = CharColor.Silver;
+            this.BackgroundColor = CharColor.Black;
         }
 
         public bool AddChar(char v)
@@ -505,7 +505,7 @@ namespace ConsoleGUI
             return Side.None;
         }
 
-        public static ConsoleChar Details(this char v) => new(v, Win32.ConsoleColor.Silver, Win32.ConsoleColor.Black);
+        public static ConsoleChar Details(this char v) => new(v, CharColor.Silver, CharColor.Black);
     }
 
     public static class Utils

@@ -167,12 +167,12 @@ namespace ConsoleGUI
             {
                 ConsolePanel.Write(message, logType switch
                 {
-                    LogType.System => Win32.ConsoleColor.Silver,
-                    LogType.Normal => Win32.ConsoleColor.Silver,
-                    LogType.Warning => Win32.ConsoleColor.BrightYellow,
-                    LogType.Error => Win32.ConsoleColor.BrightRed,
-                    LogType.Debug => Win32.ConsoleColor.Silver,
-                    _ => Win32.ConsoleColor.Silver,
+                    LogType.System => CharColor.Silver,
+                    LogType.Normal => CharColor.Silver,
+                    LogType.Warning => CharColor.BrightYellow,
+                    LogType.Error => CharColor.BrightRed,
+                    LogType.Debug => CharColor.Silver,
+                    _ => CharColor.Silver,
                 });
                 ConsolePanel.Write("\n");
             }
@@ -180,7 +180,7 @@ namespace ConsoleGUI
             Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
             Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(data);
-            Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(data, Win32.ConsoleColor.BrightRed);
+            Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(data, CharColor.BrightRed);
 
             Interpreter.OnNeedInput += (sender) =>
             {
@@ -239,7 +239,7 @@ namespace ConsoleGUI
             {
                 FunctionInformations callframe = callstack[i];
 
-                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                 sender.DrawBuffer.AddText(' ');
 
                 sender.DrawBuffer.AddText(' ', 3 - i.ToString(CultureInfo.InvariantCulture).Length);
@@ -247,31 +247,31 @@ namespace ConsoleGUI
                 sender.DrawBuffer.AddText(i.ToString(CultureInfo.InvariantCulture));
                 sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
 
-                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
-                sender.DrawBuffer.BackgroundColor = Win32.ConsoleColor.Black;
+                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                sender.DrawBuffer.BackgroundColor = CharColor.Black;
 
                 if (!callframe.IsValid)
                 {
-                    sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                    sender.DrawBuffer.ForegroundColor = CharColor.BrightCyan;
                     sender.DrawBuffer.AddText(calltraceRaw[i].ToString(CultureInfo.InvariantCulture));
                 }
                 else
                 {
                     if (callframe.IsMacro)
                     {
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                        sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                         sender.DrawBuffer.AddText("macro ");
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                     }
 
                     if (callframe.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
                     {
                         string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                        sender.DrawBuffer.ForegroundColor = CharColor.BrightYellow;
                         sender.DrawBuffer.AddText(functionName);
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                         sender.DrawBuffer.AddChar('(');
 
                         string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callframe.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
@@ -293,7 +293,7 @@ namespace ConsoleGUI
                         {
                             if (j > 0)
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                                 sender.DrawBuffer.AddText(',');
                                 sender.DrawBuffer.AddText(' ');
                             }
@@ -301,16 +301,16 @@ namespace ConsoleGUI
                             string param = parameters2[j];
                             if (LanguageConstants.BuiltinTypes.Contains(param))
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                                sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                             }
                             else
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                             }
                             sender.DrawBuffer.AddText(param);
                         }
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                         sender.DrawBuffer.AddChar(')');
 
                         sender.DrawBuffer.ResetColor();
@@ -321,9 +321,9 @@ namespace ConsoleGUI
                     }
                 }
 
-                sender.DrawBuffer.BackgroundColor = Win32.ConsoleColor.Black;
+                sender.DrawBuffer.BackgroundColor = CharColor.Black;
                 sender.DrawBuffer.FinishLine(sender.Rect.Width);
-                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
             }
 
             {
@@ -331,7 +331,7 @@ namespace ConsoleGUI
 
                 if (callframe.IsValid)
                 {
-                    sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                     sender.DrawBuffer.AddText(' ');
 
                     sender.DrawBuffer.AddText(' ', 3 - (i + 1).ToString(CultureInfo.InvariantCulture).Length);
@@ -339,24 +339,24 @@ namespace ConsoleGUI
                     sender.DrawBuffer.AddText((i + 1).ToString(CultureInfo.InvariantCulture));
                     sender.DrawBuffer.AddSpace(5, sender.Rect.Width);
 
-                    sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
-                    sender.DrawBuffer.BackgroundColor = Win32.ConsoleColor.Black;
+                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
+                    sender.DrawBuffer.BackgroundColor = CharColor.Black;
 
                     if (callframe.IsMacro)
                     {
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                        sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                         sender.DrawBuffer.AddText("macro ");
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                     }
 
                     if (callframe.ReadableIdentifier.Contains('(', StringComparison.Ordinal))
                     {
                         string functionName = callframe.ReadableIdentifier[..callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal)];
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                        sender.DrawBuffer.ForegroundColor = CharColor.BrightYellow;
                         sender.DrawBuffer.AddText(functionName);
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                         sender.DrawBuffer.AddChar('(');
 
                         string parameters = callframe.ReadableIdentifier[(callframe.ReadableIdentifier.IndexOf('(', StringComparison.Ordinal) + 1)..callframe.ReadableIdentifier.IndexOf(')', StringComparison.Ordinal)];
@@ -378,7 +378,7 @@ namespace ConsoleGUI
                         {
                             if (j > 0)
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                                 sender.DrawBuffer.AddText(',');
                                 sender.DrawBuffer.AddText(' ');
                             }
@@ -386,16 +386,16 @@ namespace ConsoleGUI
                             string param = parameters2[j];
                             if (LanguageConstants.BuiltinTypes.Contains(param))
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                                sender.DrawBuffer.ForegroundColor = CharColor.BrightBlue;
                             }
                             else
                             {
-                                sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                                sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                             }
                             sender.DrawBuffer.AddText(param);
                         }
 
-                        sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                        sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                         sender.DrawBuffer.AddChar(')');
 
                         sender.DrawBuffer.ResetColor();
@@ -405,12 +405,12 @@ namespace ConsoleGUI
                         sender.DrawBuffer.AddText(callframe.ReadableIdentifier);
                     }
 
-                    sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Gray;
+                    sender.DrawBuffer.ForegroundColor = CharColor.Gray;
                     sender.DrawBuffer.AddText(" (current)");
 
-                    sender.DrawBuffer.BackgroundColor = Win32.ConsoleColor.Black;
+                    sender.DrawBuffer.BackgroundColor = CharColor.Black;
                     sender.DrawBuffer.FinishLine(sender.Rect.Width);
-                    sender.DrawBuffer.ForegroundColor = Win32.ConsoleColor.Silver;
+                    sender.DrawBuffer.ForegroundColor = CharColor.Silver;
                 }
             }
         }
@@ -429,9 +429,9 @@ namespace ConsoleGUI
             b.AddText(' ', 2);
             b.AddText("IsRunning: ");
             b.AddText((!this.Interpreter.BytecodeInterpreter.IsDone).ToString());
-            b.BackgroundColor = Win32.ConsoleColor.Black;
+            b.BackgroundColor = CharColor.Black;
             b.FinishLine(sender.Rect.Width);
-            b.ForegroundColor = Win32.ConsoleColor.Silver;
+            b.ForegroundColor = CharColor.Silver;
 
             b.AddText(' ', 2);
             if (this.Interpreter.BytecodeInterpreter.CodePointer == this.Interpreter.CompilerResult.Code.Length)
@@ -443,19 +443,19 @@ namespace ConsoleGUI
             {
                 b.AddText("State: Running...");
             }
-            b.BackgroundColor = Win32.ConsoleColor.Black;
+            b.BackgroundColor = CharColor.Black;
             b.FinishLine(sender.Rect.Width);
-            b.ForegroundColor = Win32.ConsoleColor.Silver;
+            b.ForegroundColor = CharColor.Silver;
 
             b.AddText(' ', 2);
 
             if (this.Interpreter.StackOperation)
             {
-                b.BackgroundColor = Win32.ConsoleColor.White;
-                b.ForegroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.White;
+                b.ForegroundColor = CharColor.Black;
                 b.AddText("STACK");
-                b.BackgroundColor = Win32.ConsoleColor.Black;
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.BackgroundColor = CharColor.Black;
+                b.ForegroundColor = CharColor.Silver;
             }
             else
             {
@@ -466,11 +466,11 @@ namespace ConsoleGUI
 
             if (this.Interpreter.HeapOperation)
             {
-                b.BackgroundColor = Win32.ConsoleColor.White;
-                b.ForegroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.White;
+                b.ForegroundColor = CharColor.Black;
                 b.AddText("HEAP");
-                b.BackgroundColor = Win32.ConsoleColor.Black;
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.BackgroundColor = CharColor.Black;
+                b.ForegroundColor = CharColor.Silver;
             }
             else
             {
@@ -481,11 +481,11 @@ namespace ConsoleGUI
 
             if (this.Interpreter.AluOperation)
             {
-                b.BackgroundColor = Win32.ConsoleColor.White;
-                b.ForegroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.White;
+                b.ForegroundColor = CharColor.Black;
                 b.AddText("ALU");
-                b.BackgroundColor = Win32.ConsoleColor.Black;
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.BackgroundColor = CharColor.Black;
+                b.ForegroundColor = CharColor.Silver;
             }
             else
             {
@@ -496,11 +496,11 @@ namespace ConsoleGUI
 
             if (this.Interpreter.ExternalFunctionOperation)
             {
-                b.BackgroundColor = Win32.ConsoleColor.White;
-                b.ForegroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.White;
+                b.ForegroundColor = CharColor.Black;
                 b.AddText("EXTERNAL");
-                b.BackgroundColor = Win32.ConsoleColor.Black;
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.BackgroundColor = CharColor.Black;
+                b.ForegroundColor = CharColor.Silver;
             }
             else
             {
@@ -509,9 +509,9 @@ namespace ConsoleGUI
 
             b.AddText(' ', 2);
 
-            b.BackgroundColor = Win32.ConsoleColor.Black;
+            b.BackgroundColor = CharColor.Black;
             b.FinishLine(sender.Rect.Width);
-            b.ForegroundColor = Win32.ConsoleColor.Silver;
+            b.ForegroundColor = CharColor.Silver;
         }
 
         private void HeapElement_OnBeforeDraw(InlineElement sender)
@@ -573,9 +573,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('○');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -584,9 +584,9 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('●');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
@@ -594,26 +594,26 @@ namespace ConsoleGUI
 
                 if (((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length > 0) b.AddText(' ', ((addStoreIndicator || addLoadIndicator) ? 2 : 3) - i.ToString(CultureInfo.InvariantCulture).Length);
 
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
                 b.AddText(i.ToString(CultureInfo.InvariantCulture));
-                b.ForegroundColor = Win32.ConsoleColor.White;
+                b.ForegroundColor = CharColor.White;
                 b.AddSpace(5, sender.Rect.Width);
 
                 if (isHeader)
                 {
-                    b.BackgroundColor = Win32.ConsoleColor.Gray;
+                    b.BackgroundColor = CharColor.Gray;
                     b.AddText("HEADER | ");
                     b.AddText(header.Item1.ToString(CultureInfo.InvariantCulture));
                     b.AddText(" | ");
                     if (header.Item2)
                     {
-                        b.BackgroundColor = Win32.ConsoleColor.BrightYellow;
-                        b.ForegroundColor = Win32.ConsoleColor.Black;
+                        b.BackgroundColor = CharColor.BrightYellow;
+                        b.ForegroundColor = CharColor.Black;
                     }
                     else
                     {
-                        b.BackgroundColor = Win32.ConsoleColor.BrightGreen;
-                        b.ForegroundColor = Win32.ConsoleColor.White;
+                        b.BackgroundColor = CharColor.BrightGreen;
+                        b.ForegroundColor = CharColor.White;
                     }
                     b.AddText(header.Item2 ? "USED" : "FREE");
                 }
@@ -621,7 +621,7 @@ namespace ConsoleGUI
                 {
                     if (item.IsNull)
                     {
-                        b.ForegroundColor = Win32.ConsoleColor.Gray;
+                        b.ForegroundColor = CharColor.Gray;
                         b.AddText("<null>");
                     }
                     else
@@ -629,35 +629,35 @@ namespace ConsoleGUI
                         switch (item.Type)
                         {
                             case RuntimeType.UInt8:
-                                b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                                b.ForegroundColor = CharColor.BrightCyan;
                                 b.AddText(item.ValueUInt8.ToString(CultureInfo.InvariantCulture));
                                 break;
                             case RuntimeType.SInt32:
-                                b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                                b.ForegroundColor = CharColor.BrightCyan;
                                 b.AddText(item.ValueSInt32.ToString(CultureInfo.InvariantCulture));
                                 break;
                             case RuntimeType.Single:
-                                b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                                b.ForegroundColor = CharColor.BrightCyan;
                                 b.AddText(item.ValueSingle.ToString(CultureInfo.InvariantCulture));
                                 b.AddText('f');
                                 break;
                             case RuntimeType.UInt16:
-                                b.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                                b.ForegroundColor = CharColor.BrightYellow;
                                 b.AddText('\'');
                                 b.AddText(item.ValueUInt16.Escape());
                                 b.AddText('\'');
                                 break;
                             default:
-                                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                                b.ForegroundColor = CharColor.Silver;
                                 b.AddText('?');
                                 break;
                         }
                     }
                 }
 
-                b.BackgroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.Black;
                 b.FinishLine(sender.Rect.Width);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
             }
 
             HeapScrollBar.Draw(b);
@@ -742,20 +742,20 @@ namespace ConsoleGUI
             {
                 if (this.Interpreter.BytecodeInterpreter.BasePointer == address)
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                    b.ForegroundColor = CharColor.BrightBlue;
                     b.AddText('►');
                     basepointerShown = true;
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                 }
                 else if (savedBasePointers.Contains(address))
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     b.AddText('►');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                 }
                 else
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     b.AddText(' ');
                 }
 
@@ -765,9 +765,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != address) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('○');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -776,9 +776,9 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != address) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('●');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
@@ -789,12 +789,12 @@ namespace ConsoleGUI
                 b.AddText(address.ToString(CultureInfo.InvariantCulture));
                 b.AddSpace(5, sender.Rect.Width);
 
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
-                b.BackgroundColor = Win32.ConsoleColor.Black;
+                b.ForegroundColor = CharColor.Silver;
+                b.BackgroundColor = CharColor.Black;
 
                 if (item.IsNull)
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.Gray;
+                    b.ForegroundColor = CharColor.Gray;
                     b.AddText("<null>");
                     return;
                 }
@@ -802,26 +802,26 @@ namespace ConsoleGUI
                 switch (item.Type)
                 {
                     case RuntimeType.UInt8:
-                        b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                        b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(item.ValueUInt8.ToString(CultureInfo.InvariantCulture));
                         break;
                     case RuntimeType.SInt32:
-                        b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                        b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(item.ValueSInt32.ToString(CultureInfo.InvariantCulture));
                         break;
                     case RuntimeType.Single:
-                        b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                        b.ForegroundColor = CharColor.BrightCyan;
                         b.AddText(item.ValueSingle.ToString(CultureInfo.InvariantCulture));
                         b.AddText('f');
                         break;
                     case RuntimeType.UInt16:
-                        b.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                        b.ForegroundColor = CharColor.BrightYellow;
                         b.AddText('\'');
                         b.AddText(item.ValueUInt16.Escape());
                         b.AddText('\'');
                         break;
                     default:
-                        b.ForegroundColor = Win32.ConsoleColor.Silver;
+                        b.ForegroundColor = CharColor.Silver;
                         b.AddText('?');
                         break;
                 }
@@ -841,21 +841,21 @@ namespace ConsoleGUI
                     {
                         if (range.Start == range.End)
                         {
-                            b.ForegroundColor = Win32.ConsoleColor.Silver;
+                            b.ForegroundColor = CharColor.Silver;
 
                             DrawElement(i, item);
 
-                            b.ForegroundColor = Win32.ConsoleColor.Gray;
+                            b.ForegroundColor = CharColor.Gray;
                             b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag}");
                         }
                         else if (range.Start == i)
                         {
-                            b.ForegroundColor = Win32.ConsoleColor.Gray;
+                            b.ForegroundColor = CharColor.Gray;
                             b.AddText($" ({itemDebugInfo.Kind.ToString().ToLowerInvariant()}) {itemDebugInfo.Tag} {{");
 
-                            b.BackgroundColor = Win32.ConsoleColor.Black;
+                            b.BackgroundColor = CharColor.Black;
                             b.FinishLine(sender.Rect.Width);
-                            b.ForegroundColor = Win32.ConsoleColor.Silver;
+                            b.ForegroundColor = CharColor.Silver;
 
                             DrawElement(i, item);
                         }
@@ -863,9 +863,9 @@ namespace ConsoleGUI
                         {
                             DrawElement(i, item);
 
-                            b.BackgroundColor = Win32.ConsoleColor.Black;
+                            b.BackgroundColor = CharColor.Black;
                             b.FinishLine(sender.Rect.Width);
-                            b.ForegroundColor = Win32.ConsoleColor.Gray;
+                            b.ForegroundColor = CharColor.Gray;
                             b.AddText(' ');
                             b.AddText('}');
                         }
@@ -878,7 +878,7 @@ namespace ConsoleGUI
                     {
                         DrawElement(i, item);
 
-                        b.ForegroundColor = Win32.ConsoleColor.Gray;
+                        b.ForegroundColor = CharColor.Gray;
                         b.AddText(' ');
                         b.AddText(itemDebugInfo.Tag);
                     }
@@ -892,9 +892,9 @@ namespace ConsoleGUI
                     DrawElement(i, item);
                 }
 
-                b.BackgroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.Black;
                 b.FinishLine(sender.Rect.Width);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
             }
 
             while (
@@ -907,14 +907,14 @@ namespace ConsoleGUI
             {
                 if (this.Interpreter.BytecodeInterpreter.BasePointer == i)
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.BrightBlue;
+                    b.ForegroundColor = CharColor.BrightBlue;
                     b.AddText('►');
                     // basepointerShown = true;
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                 }
                 else
                 {
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     b.AddText(' ');
                 }
 
@@ -924,9 +924,9 @@ namespace ConsoleGUI
                 for (int j = loadIndicators.Count - 1; j >= 0; j--)
                 {
                     if (loadIndicators[j] != i) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('○');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     loadIndicators.RemoveAt(j);
                     addLoadIndicator = true;
                     break;
@@ -935,9 +935,9 @@ namespace ConsoleGUI
                 for (int j = storeIndicators.Count - 1; j >= 0; j--)
                 {
                     if (storeIndicators[j] != i) continue;
-                    b.ForegroundColor = Win32.ConsoleColor.BrightRed;
+                    b.ForegroundColor = CharColor.BrightRed;
                     b.AddText('●');
-                    b.ForegroundColor = Win32.ConsoleColor.Silver;
+                    b.ForegroundColor = CharColor.Silver;
                     storeIndicators.RemoveAt(j);
                     addStoreIndicator = true;
                     break;
@@ -948,9 +948,9 @@ namespace ConsoleGUI
                 b.AddText(i.ToString(CultureInfo.InvariantCulture));
                 b.AddSpace(5, sender.Rect.Width);
 
-                b.BackgroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.Black;
                 b.FinishLine(sender.Rect.Width);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
 
                 // i++;
 
@@ -973,9 +973,9 @@ namespace ConsoleGUI
             void LinePrefix(string lineNumber)
             {
                 b.AddText(' ', 4 - lineNumber.Length);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
                 b.AddText(lineNumber);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
                 b.AddSpace(5, sender.Rect.Width);
             }
 
@@ -1013,11 +1013,11 @@ namespace ConsoleGUI
                         }
 
                         LinePrefix(string.Empty);
-                        b.ForegroundColor = Win32.ConsoleColor.Gray;
+                        b.ForegroundColor = CharColor.Gray;
                         b.AddText(' ', Math.Max(0, indent * 2));
                         b.AddText(comment);
-                        b.ForegroundColor = Win32.ConsoleColor.Silver;
-                        b.BackgroundColor = Win32.ConsoleColor.Black;
+                        b.ForegroundColor = CharColor.Silver;
+                        b.BackgroundColor = CharColor.Black;
                         b.FinishLine(sender.Rect.Width);
 
                         if (!comment.EndsWith("{ }", StringComparison.Ordinal) && comment.EndsWith('{'))
@@ -1028,13 +1028,13 @@ namespace ConsoleGUI
                 }
 
                 LinePrefix((i + 1).ToString(CultureInfo.InvariantCulture));
-                b.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                b.ForegroundColor = CharColor.BrightYellow;
                 b.AddText(' ', Math.Max(0, indent * 2));
                 b.AddText(' ');
                 if (IsNextInstruction)
                 {
                     IsNextInstruction = false;
-                    b.BackgroundColor = Win32.ConsoleColor.BrightRed;
+                    b.BackgroundColor = CharColor.BrightRed;
                 }
                 b.AddText(instruction.opcode.ToString());
                 b.AddText(' ');
@@ -1051,45 +1051,45 @@ namespace ConsoleGUI
                 if (!instruction.Parameter.IsNull) switch (instruction.Parameter.Type)
                     {
                         case RuntimeType.UInt8:
-                            b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                            b.ForegroundColor = CharColor.BrightCyan;
                             b.AddText(instruction.Parameter.ValueUInt8.ToString(CultureInfo.InvariantCulture));
                             b.AddText(' ');
                             break;
                         case RuntimeType.SInt32:
-                            b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                            b.ForegroundColor = CharColor.BrightCyan;
                             b.AddText(instruction.Parameter.ValueSInt32.ToString(CultureInfo.InvariantCulture));
                             b.AddText(' ');
                             break;
                         case RuntimeType.Single:
-                            b.ForegroundColor = Win32.ConsoleColor.BrightCyan;
+                            b.ForegroundColor = CharColor.BrightCyan;
                             b.AddText(instruction.Parameter.ValueSingle.ToString(CultureInfo.InvariantCulture));
                             b.AddText('f');
                             b.AddText(' ');
                             break;
                         case RuntimeType.UInt16:
-                            b.ForegroundColor = Win32.ConsoleColor.BrightYellow;
+                            b.ForegroundColor = CharColor.BrightYellow;
                             b.AddText('\'');
                             b.AddText(instruction.Parameter.ValueUInt16.Escape());
                             b.AddText('\'');
                             b.AddText(' ');
                             break;
                         default:
-                            b.ForegroundColor = Win32.ConsoleColor.White;
+                            b.ForegroundColor = CharColor.White;
                             b.AddText(instruction.Parameter.ToString(CultureInfo.InvariantCulture));
                             b.AddText(' ');
                             break;
                     }
 
-                b.BackgroundColor = Win32.ConsoleColor.Black;
+                b.BackgroundColor = CharColor.Black;
 
                 b.FinishLine(sender.Rect.Width);
-                b.ForegroundColor = Win32.ConsoleColor.Silver;
+                b.ForegroundColor = CharColor.Silver;
             }
 
             {
                 string t = CurrentlyJumping == 0 ? $" Jump Count: {NextCodeJumpCount} " : $" Jumping: {CurrentlyJumping} ";
-                b.ForegroundColor = Win32.ConsoleColor.Black;
-                b.BackgroundColor = Win32.ConsoleColor.White;
+                b.ForegroundColor = CharColor.Black;
+                b.BackgroundColor = CharColor.White;
                 b.SetText(t, sender.Rect.Right - (2 + t.Length));
             }
 

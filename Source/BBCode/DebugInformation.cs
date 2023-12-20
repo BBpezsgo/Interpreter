@@ -264,5 +264,74 @@ namespace LanguageCore.Runtime
 
             return new CollectedScopeInfo(result.ToArray());
         }
+
+        /*
+        public void RemoveCode(int start, int count)
+        {
+            for (int i = 0; i < SourceCodeLocations.Count; i++)
+            {
+                SourceCodeLocation item = SourceCodeLocations[i];
+
+                // Before
+                if (item.Instructions.End <= start) continue;
+
+                // After
+                if (item.Instructions.Start > start + count)
+                {
+                    item.Instructions = new Range<int>(item.Instructions.Start - count, item.Instructions.End - count);
+                    goto Finish;
+                }
+
+                // Inside
+                if (item.Instructions.Contains(start) && item.Instructions.Contains(start + count))
+                {
+                    item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
+                    goto Finish;
+                }
+
+                item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
+
+            Finish:
+                SourceCodeLocations[i] = item;
+            }
+
+            for (int i = 0; i < FunctionInformations.Count; i++)
+            {
+                FunctionInformations item = FunctionInformations[i];
+
+                // Before
+                if (item.Instructions.End <= start) continue;
+
+                // After
+                if (item.Instructions.Start > start + count)
+                {
+                    item.Instructions = new Range<int>(item.Instructions.Start - count, item.Instructions.End - count);
+                    goto Finish;
+                }
+
+                // Inside
+                if (item.Instructions.Contains(start) && item.Instructions.Contains(start + count))
+                {
+                    item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
+                    goto Finish;
+                }
+
+                item.Instructions = new Range<int>(item.Instructions.Start, item.Instructions.End - count);
+
+            Finish:
+                FunctionInformations[i] = item;
+            }
+
+            KeyValuePair<int, List<string>>[] codeComments = CodeComments.ToArray();
+            for (int i = 0; i < codeComments.Length; i++)
+            {
+                KeyValuePair<int, List<string>> item = codeComments[i];
+                if (item.Key <= start) continue;
+                codeComments[i] = new KeyValuePair<int, List<string>>(item.Key - count, item.Value);
+            }
+            CodeComments.Clear();
+            CodeComments.AddRange(codeComments);
+        }
+        */
     }
 }

@@ -32,38 +32,81 @@ namespace LanguageCore
         }
 
         public Stack() => stack = new List<T>();
+        public Stack(int capacity) => stack = new List<T>(capacity);
         public Stack(IEnumerable<T> items) => stack = new List<T>(items);
 
+        /// <exception cref="System.InvalidOperationException"/>
         public void Pop(int count)
         {
+            if (stack.Count < count)
+            { throw new System.InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({stack.Count})"); }
+
+            for (int i = 0; i < count; i++)
+            { stack.RemoveAt(stack.Count - 1); }
+        }
+
+        /// <exception cref="System.InvalidOperationException"/>
+        public void Pop(int count, ref T[] buffer)
+        {
+            if (stack.Count < count)
+            { throw new System.InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({stack.Count})"); }
+
+            buffer = new T[count];
+
             for (int i = 0; i < count; i++)
             {
+                buffer[i] = stack[^1];
+                stack.RemoveAt(stack.Count - 1);
+            }
+        }
+
+        /// <exception cref="System.ArgumentOutOfRangeException"/>
+        /// <exception cref="System.InvalidOperationException"/>
+        public void Pop(int count, T[] buffer)
+        {
+            if (buffer.Length < count)
+            { throw new System.ArgumentOutOfRangeException(nameof(count), count, $"Count ({count}) is larger than the size of the buffer ({buffer.Length})"); }
+
+            if (stack.Count < count)
+            { throw new System.InvalidOperationException($"Count ({count}) is larger than the number of items in the stack ({stack.Count})"); }
+
+            for (int i = 0; i < count; i++)
+            {
+                buffer[i] = stack[^1];
                 stack.RemoveAt(stack.Count - 1);
             }
         }
 
         public virtual void Push(T item) => stack.Add(item);
+
+        public virtual void PushIf<TItem>(System.Nullable<TItem> item) where TItem : struct, T
+        {
+            if (!item.HasValue) return;
+            stack.Add(item.Value);
+        }
+
+        /// <exception cref="System.InvalidOperationException"/>
         public virtual T Pop()
         {
+            if (stack.Count == 0)
+            { throw new System.InvalidOperationException($"Stack is empty"); }
+
             T val = stack[^1];
             stack.RemoveAt(stack.Count - 1);
             return val;
         }
 
-        public void Add(T item) => Push(item);
+        public void Add(T item) => stack.Add(item);
 
+        /// <exception cref="System.ArgumentOutOfRangeException"/>
         public void RemoveAt(int index) => stack.RemoveAt(index);
 
-        public void PushRange(IEnumerable<T> list)
+        public void PushRange(IEnumerable<T> values) => stack.AddRange(values);
+
+        public void Set(IEnumerable<T> newValues)
         {
-            foreach (T item in list)
-            { Push(item); }
-        }
-        public void PushRange(List<T> list) => PushRange(list.ToArray());
-        public void PushRange(T[] list)
-        {
-            for (int i = 0; i < list.Length; i++)
-            { Push(list[i]); }
+            stack.Clear();
+            stack.AddRange(newValues);
         }
 
         public T[] ToArray() => stack.ToArray();
@@ -115,8 +158,12 @@ namespace LanguageCore
     {
         public T Last { get; }
 
+        T this[System.Index index] { get; }
+
         public T[] ToArray();
 
         public bool Contains(T item);
+
+        public void CopyTo(T[] array, int arrayIndex);
     }
 }

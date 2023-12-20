@@ -1857,42 +1857,6 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        void ExpectOneLiteral(out object? value)
-        {
-            value = null;
-
-            if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralFloat)
-            {
-                value = Literal.GetFloat(CurrentToken.Content);
-
-                CurrentTokenIndex++;
-            }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralNumber)
-            {
-                value = Literal.GetInt(CurrentToken.Content);
-
-                CurrentTokenIndex++;
-            }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralHex)
-            {
-                value = Convert.ToInt32(CurrentToken.Content, 16);
-
-                CurrentTokenIndex++;
-            }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralBinary)
-            {
-                value = Convert.ToInt32(CurrentToken.Content.Replace("_", string.Empty, StringComparison.Ordinal), 2);
-
-                CurrentTokenIndex++;
-            }
-            else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralString)
-            {
-                value = CurrentToken.Content;
-
-                CurrentTokenIndex++;
-            }
-        }
-
         #region Basic parsing
 
         Token[] ParseParameterModifiers(int parameterIndex)

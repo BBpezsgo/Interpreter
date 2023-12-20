@@ -46,7 +46,7 @@ namespace ConsoleGUI
             return new LanguageCore.Range<int>(0, Math.Max(1, totalLines));
         }
 
-        public void Write(string text, byte color = Win32.ConsoleColor.Silver)
+        public void Write(string text, byte color = Win32.CharColor.Silver)
         {
             ConsoleTexts.Add(new ConsoleText(text, color));
         }

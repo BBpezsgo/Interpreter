@@ -167,6 +167,7 @@ namespace LanguageCore.Brainfuck.Generator
         public int HeapStart;
         public int HeapSize;
         public bool GenerateDebugInformation;
+        public bool ShowProgress;
 
         public static BrainfuckGeneratorSettings Default
         {
@@ -389,11 +390,8 @@ namespace LanguageCore.Brainfuck.Generator
             if (n == 0) return;
             using (Code.Block($"Clean up variables ({n})"))
             {
-                for (int i = 0; i < n; i++)
-                {
-                    Variables.Pop();
-                    Stack.Pop();
-                }
+                Variables.Pop(n);
+                Stack.Pop(n);
             }
         }
 

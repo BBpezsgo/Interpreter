@@ -422,17 +422,11 @@ namespace LanguageCore.Runtime
         /// <inheritdoc/>
         /// <exception cref="NotImplementedException"/>
         [DoesNotReturn]
-        public static DataItem operator --(DataItem value)
-        {
-            throw new NotImplementedException();
-        }
+        public static DataItem operator --(DataItem value) => throw new NotImplementedException();
 
         /// <inheritdoc/>
         /// <exception cref="NotImplementedException"/>
         [DoesNotReturn]
-        public static DataItem operator ++(DataItem value)
-        {
-            throw new NotImplementedException();
-        }
+        public static DataItem operator ++(DataItem value) => throw new NotImplementedException();
     }
 }

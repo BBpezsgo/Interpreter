@@ -1,60 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
 
 namespace LanguageCore.Tokenizing
 {
-    public enum TokenType
-    {
-        Whitespace,
-        LineBreak,
-
-        Identifier,
-
-        LiteralNumber,
-        LiteralHex,
-        LiteralBinary,
-        LiteralString,
-        LiteralCharacter,
-        LiteralFloat,
-
-        Operator,
-
-        Comment,
-        CommentMultiline,
-    }
-
-    public enum PreparationTokenType
-    {
-        Whitespace,
-        LineBreak,
-
-        Identifier,
-
-        LiteralNumber,
-        LiteralHex,
-        LiteralBinary,
-        LiteralString,
-        LiteralCharacter,
-        LiteralFloat,
-
-        Operator,
-
-        Comment,
-        CommentMultiline,
-
-        STRING_EscapeSequence,
-        STRING_UnicodeCharacter,
-
-        CHAR_EscapeSequence,
-        CHAR_UnicodeCharacter,
-
-        POTENTIAL_COMMENT,
-        POTENTIAL_END_MULTILINE_COMMENT,
-        POTENTIAL_FLOAT,
-    }
-
     public enum TokenAnalyzedType
     {
         None,
@@ -97,154 +45,6 @@ namespace LanguageCore.Tokenizing
         };
     }
 
-    [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class Token : IThingWithPosition, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
-    {
-        readonly Position position;
-
-        public TokenAnalyzedType AnalyzedType;
-
-        public readonly TokenType TokenType;
-        public readonly bool IsAnonymous;
-
-        public readonly string Content;
-
-        public static Token Empty => new(TokenType.Whitespace, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
-
-        public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
-        {
-            TokenType = type;
-            AnalyzedType = TokenAnalyzedType.None;
-            Content = content;
-            IsAnonymous = isAnonymous;
-            this.position = position;
-        }
-
-        public Position Position => position;
-
-        public override string ToString() => Content;
-        public string ToOriginalString() => TokenType switch
-        {
-            TokenType.LiteralString => $"\"{Content}\"",
-            TokenType.LiteralCharacter => $"\'{Content}\'",
-            TokenType.Comment => $"//{Content}",
-            _ => Content,
-        };
-
-        public static Token CreateAnonymous(string content, TokenType type = TokenType.Identifier)
-            => new(type, content, true, Position.UnknownPosition);
-
-        public static Token CreateAnonymous(string content, TokenType type, Position position)
-            => new(type, content, true, position);
-
-        public override bool Equals(object? obj) => obj is Token other && Equals(other);
-        public bool Equals(Token? other) =>
-            other is not null &&
-            Position.Equals(other.Position) &&
-            TokenType == other.TokenType &&
-            Content == other.Content &&
-            IsAnonymous == other.IsAnonymous;
-        public bool Equals(string? other) =>
-            other is not null &&
-            Content == other;
-
-        public override int GetHashCode() => HashCode.Combine(Position, TokenType, Content);
-
-        public Token Duplicate() => new(TokenType, new string(Content), IsAnonymous, Position)
-        { AnalyzedType = AnalyzedType };
-
-        public static bool operator ==(Token? a, string? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-            return a.Equals(b);
-        }
-        public static bool operator !=(Token? a, string? b) => !(a == b);
-
-        string GetDebuggerDisplay() => TokenType switch
-        {
-            TokenType.LiteralString => $"\"{Content.Escape()}\"",
-            TokenType.LiteralCharacter => $"\'{Content.Escape()}\'",
-            _ => Content.Escape(),
-        };
-
-        public (Token?, Token?) CutInHalf()
-        {
-            if (string.IsNullOrEmpty(Content))
-            { return (null, null); }
-
-            Token left;
-            Token right;
-
-            if (Content.Length == 1)
-            {
-                left = Duplicate();
-                return (left, null);
-            }
-
-            int leftSize = Content.Length / 2;
-
-            (Position leftPosition, Position rightPosition) = position.CutInHalf();
-
-            left = new Token(TokenType, Content[..leftSize], IsAnonymous, leftPosition);
-            right = new Token(TokenType, Content[leftSize..], IsAnonymous, rightPosition);
-
-            return (left, right);
-        }
-    }
-
-    public readonly struct SimpleToken : IThingWithPosition
-    {
-        public readonly string Content;
-        readonly Position position;
-
-        public SimpleToken(string content, Position position)
-        {
-            this.Content = content;
-            this.position = position;
-        }
-
-        public override string ToString() => Content;
-
-        public Position Position => position;
-    }
-
-    class PreparationToken : IThingWithPosition
-    {
-        Position position;
-        public PreparationTokenType TokenType;
-        public readonly StringBuilder Content;
-
-        public ref Position Position => ref position;
-        Position IThingWithPosition.Position => position;
-
-        public PreparationToken(Position position)
-        {
-            this.position = position;
-            this.TokenType = PreparationTokenType.Whitespace;
-            this.Content = new StringBuilder();
-        }
-
-        public override string ToString() => Content.ToString();
-
-        public Token Instantiate() => new(TokenType switch
-        {
-            PreparationTokenType.Whitespace => Tokenizing.TokenType.Whitespace,
-            PreparationTokenType.LineBreak => Tokenizing.TokenType.LineBreak,
-            PreparationTokenType.Identifier => Tokenizing.TokenType.Identifier,
-            PreparationTokenType.LiteralNumber => Tokenizing.TokenType.LiteralNumber,
-            PreparationTokenType.LiteralHex => Tokenizing.TokenType.LiteralHex,
-            PreparationTokenType.LiteralBinary => Tokenizing.TokenType.LiteralBinary,
-            PreparationTokenType.LiteralString => Tokenizing.TokenType.LiteralString,
-            PreparationTokenType.LiteralCharacter => Tokenizing.TokenType.LiteralCharacter,
-            PreparationTokenType.LiteralFloat => Tokenizing.TokenType.LiteralFloat,
-            PreparationTokenType.Operator => Tokenizing.TokenType.Operator,
-            PreparationTokenType.Comment => Tokenizing.TokenType.Comment,
-            PreparationTokenType.CommentMultiline => Tokenizing.TokenType.CommentMultiline,
-            _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
-        }, Content.ToString(), false, Position);
-    }
-
     public readonly struct TokenizerResult
     {
         public readonly Warning[] Warnings;
@@ -269,12 +69,12 @@ namespace LanguageCore.Tokenizing
 
     public abstract partial class Tokenizer
     {
-        static readonly char[] Bracelets = new char[] { '{', '}', '(', ')', '[', ']' };
-        static readonly char[] Operators = new char[] { '+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~' };
-        static readonly string[] DoubleOperators = new string[] { "++", "--", "<<", ">>", "&&", "||" };
-        static readonly char[] SimpleOperators = new char[] { ';', ',', '#' };
-        static readonly char[] Whitespaces = new char[] { ' ', '\t', '\u200B', '\r' };
-        static readonly char[] DigitsHex = new char[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+        static readonly char[] Bracelets = ['{', '}', '(', ')', '[', ']'];
+        static readonly char[] Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
+        static readonly string[] DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
+        static readonly char[] SimpleOperators = [';', ',', '#'];
+        static readonly char[] Whitespaces = [' ', '\t', '\u200B', '\r'];
+        static readonly char[] DigitsHex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
         readonly PreparationToken CurrentToken;
         protected int CurrentColumn;

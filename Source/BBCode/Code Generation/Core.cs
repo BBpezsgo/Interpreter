@@ -199,16 +199,14 @@ namespace LanguageCore.BBCode.Generator
                     ExternalFunctionsCache.Add(function, ExternalFunctionsCache.Count + 1);
                     offset += function.Length;
 
-                    {
-                        // Prepare value
-                        AddInstruction(Opcode.PUSH_VALUE, function.Length);
+                    // Prepare value
+                    AddInstruction(Opcode.PUSH_VALUE, function.Length);
 
-                        // Calculate pointer
-                        AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
+                    // Calculate pointer
+                    AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -2);
 
-                        // Set value
-                        AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
-                    }
+                    // Set value
+                    AddInstruction(Opcode.HEAP_SET, AddressingMode.Runtime);
 
                     for (int i = 0; i < function.Length; i++)
                     {
@@ -249,16 +247,8 @@ namespace LanguageCore.BBCode.Generator
                 if (function.IsTemplate)
                 { continue; }
 
-                CurrentContext = function;
-                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
-
-                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
-
-                CurrentContext = null;
-                InFunction = false;
             }
 
             foreach (CompiledOperator function in this.CompiledOperators)
@@ -266,16 +256,8 @@ namespace LanguageCore.BBCode.Generator
                 if (function.IsTemplate)
                 { continue; }
 
-                CurrentContext = function;
-                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
-
-                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
                 GenerateCodeForFunction(function);
-                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
-
-                CurrentContext = null;
-                InFunction = false;
             }
 
             foreach (CompiledGeneralFunction function in this.CompiledGeneralFunctions)
@@ -283,18 +265,8 @@ namespace LanguageCore.BBCode.Generator
                 if (function.IsTemplate)
                 { continue; }
 
-                CurrentContext = function;
-                InFunction = true;
                 function.InstructionOffset = GeneratedCode.Count;
-
-                AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
-
                 GenerateCodeForFunction(function);
-
-                if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
-
-                CurrentContext = null;
-                InFunction = false;
             }
 
             {
@@ -304,83 +276,30 @@ namespace LanguageCore.BBCode.Generator
                     CompliableTemplate<CompiledFunction> function = CompilableFunctions[i];
                     i++;
 
-                    CurrentContext = function.Function;
-                    InFunction = true;
                     function.Function.InstructionOffset = GeneratedCode.Count;
-
-                    SetTypeArguments(function.TypeArguments);
-
-                    AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
-
-                    GenerateCodeForFunction(function.Function);
-
-                    if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
-
-                    CurrentContext = null;
-                    InFunction = false;
-                    TypeArguments.Clear();
+                    GenerateCodeForCompilableFunction(function);
                 }
             }
 
             foreach (CompliableTemplate<CompiledOperator> function in this.CompilableOperators)
             {
-                CurrentContext = function.Function;
-                InFunction = true;
                 function.Function.InstructionOffset = GeneratedCode.Count;
-
-                SetTypeArguments(function.TypeArguments);
-
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
-
-                GenerateCodeForFunction(function.Function);
-
-                if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
-
-                CurrentContext = null;
-                InFunction = false;
-                TypeArguments.Clear();
+                GenerateCodeForCompilableFunction(function);
             }
 
-            for (int i = 0; i < CompilableGeneralFunctions.Count; i++)
+            foreach (CompliableTemplate<CompiledGeneralFunction> function in CompilableGeneralFunctions)
             {
-                CompliableTemplate<CompiledGeneralFunction> function = this.CompilableGeneralFunctions[i];
-                CurrentContext = function.Function;
-                InFunction = true;
                 function.Function.InstructionOffset = GeneratedCode.Count;
-
-                SetTypeArguments(function.TypeArguments);
-
-                AddComment(function.Function.Identifier.Content + ((function.Function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Function.Block == null || function.Function.Block.Statements.Length > 0) ? string.Empty : " }"));
-
-                GenerateCodeForFunction(function.Function);
-
-                if (function.Function.Block != null && function.Function.Block.Statements.Length > 0) AddComment("}");
-
-                CurrentContext = null;
-                InFunction = false;
-                TypeArguments.Clear();
+                GenerateCodeForCompilableFunction(function);
             }
 
             foreach (UndefinedOffset<CompiledFunction> item in UndefinedFunctionOffsets)
             {
-                CompiledFunction? function = item.Function;
-                if (function is null) throw new InternalException();
+                if (item.Function.InstructionOffset == -1)
+                { throw new InternalException($"Function {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                bool useAbsolute;
-                if (item.Caller is FunctionCall)
-                { useAbsolute = false; }
-                else if (item.Caller is Identifier)
-                { useAbsolute = true; }
-                else if (item.Caller is IndexCall)
-                { useAbsolute = false; }
-                else
-                { throw new InternalException(); }
-
-                if (function.InstructionOffset == -1)
-                { throw new InternalException($"Function {function.ReadableID()} does not have instruction offset", item.CurrentFile); }
-
-                int offset = useAbsolute ? function.InstructionOffset : function.InstructionOffset - item.CallInstructionIndex;
-                GeneratedCode[item.CallInstructionIndex].Parameter = offset;
+                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
             foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
@@ -388,43 +307,27 @@ namespace LanguageCore.BBCode.Generator
                 if (item.Function.InstructionOffset == -1)
                 { throw new InternalException($"Operator {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
 
-                GeneratedCode[item.CallInstructionIndex].Parameter = item.Function.InstructionOffset - item.CallInstructionIndex;
+                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
             foreach (UndefinedOffset<CompiledGeneralFunction> item in UndefinedGeneralFunctionOffsets)
             {
-                if (item.Caller == null) { }
-                else if (item.Caller is ConstructorCall constructorCall)
+                if (item.Function.InstructionOffset == -1)
                 {
-                    if (item.Function.InstructionOffset == -1)
-                    { throw new InternalException($"Constructor for type \"{constructorCall.TypeName}\" does not have instruction offset", item.CurrentFile); }
+                    throw item.Function.Identifier.Content switch
+                    {
+                        BuiltinFunctionNames.Cloner => new InternalException($"Cloner for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.Constructor => new InternalException($"Constructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        _ => new NotImplementedException(),
+                    };
                 }
-                else if (item.Caller is KeywordCall functionCall)
-                {
-                    if (functionCall.Identifier.Content == "delete")
-                    {
-                        if (item.Function.InstructionOffset == -1)
-                        { throw new InternalException($"Constructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile); }
-                    }
-                    else if (functionCall.Identifier.Content == "clone")
-                    {
-                        if (item.Function.InstructionOffset == -1)
-                        { throw new InternalException($"Cloner for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile); }
-                    }
-                    /*
-                    else if (functionCall.Identifier.Content == "out")
-                    {
-                        if (item.Function.InstructionOffset == -1)
-                        { throw new InternalException($"Function {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
-                    }
-                    */
-                    else
-                    { throw new NotImplementedException(); }
-                }
-                else
-                { throw new NotImplementedException(); }
 
-                GeneratedCode[item.CallInstructionIndex].Parameter = item.Function.InstructionOffset - item.CallInstructionIndex;
+                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
             return new BBCodeGeneratorResult()

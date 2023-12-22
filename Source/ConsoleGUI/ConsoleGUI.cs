@@ -24,7 +24,7 @@ namespace ConsoleGUI
         public void Tick(double deltaTime);
     }
 
-    internal class MainThreadTimer : IMainThreadThing
+    internal sealed class MainThreadTimer : IMainThreadThing
     {
         double Timer;
         readonly double Interval;
@@ -56,7 +56,7 @@ namespace ConsoleGUI
         }
     }
 
-    internal class MainThreadEvents<T> : IMainThreadThing
+    internal sealed class MainThreadEvents<T> : IMainThreadThing
     {
         readonly Queue<T> EventQueue;
 
@@ -88,7 +88,7 @@ namespace ConsoleGUI
     }
 
     [SupportedOSPlatform("windows")]
-    internal class ConsoleGUI
+    internal sealed class ConsoleGUI
     {
         const int TIMER_RESIZE_ELEMENTS = 1000;
         const int TIMER_AUTO_REFRESH_CONSOLE = 500;

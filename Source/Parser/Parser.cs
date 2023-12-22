@@ -743,7 +743,7 @@ namespace LanguageCore.Parser
             keyword.AnalyzedType = TokenAnalyzedType.Keyword;
 
             List<FieldDefinition> fields = new();
-            Dictionary<string, FunctionDefinition> methods = new();
+            List<FunctionDefinition> methods = new();
 
             int endlessSafe = 0;
             Token? braceletEnd;

@@ -207,7 +207,7 @@ namespace LanguageCore.BBCode.Generator
                 int jumpInstruction = Call(destructor.InstructionOffset);
 
                 if (destructor.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, keywordCall, destructor, CurrentFile)); }
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, keywordCall, destructor, CurrentFile)); }
 
                 AddComment(" Clear Param0:");
 
@@ -255,7 +255,7 @@ namespace LanguageCore.BBCode.Generator
                 int jumpInstruction = Call(cloner.InstructionOffset);
 
                 if (cloner.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, keywordCall, cloner, CurrentFile)); }
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, keywordCall, cloner, CurrentFile)); }
 
                 AddComment(" Clear Params:");
 
@@ -643,7 +643,7 @@ namespace LanguageCore.BBCode.Generator
             int jumpInstruction = Call(compiledFunction.InstructionOffset);
 
             if (compiledFunction.InstructionOffset == -1)
-            { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, functionCall, compiledFunction, CurrentFile)); }
+            { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(jumpInstruction, false, functionCall, compiledFunction, CurrentFile)); }
 
             GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -905,7 +905,7 @@ namespace LanguageCore.BBCode.Generator
                 int jumpInstruction = Call(operatorDefinition.InstructionOffset);
 
                 if (operatorDefinition.InstructionOffset == -1)
-                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, @operator, operatorDefinition, CurrentFile)); }
+                { UndefinedOperatorFunctionOffsets.Add(new UndefinedOffset<CompiledOperator>(jumpInstruction, false, @operator, operatorDefinition, CurrentFile)); }
 
                 GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1065,7 +1065,7 @@ namespace LanguageCore.BBCode.Generator
                 variable.Token.AnalyzedType = TokenAnalyzedType.FunctionName;
 
                 if (compiledFunction.InstructionOffset == -1)
-                { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, variable, compiledFunction, CurrentFile)); }
+                { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunction>(GeneratedCode.Count, true, variable, compiledFunction, CurrentFile)); }
 
                 AddInstruction(Opcode.PUSH_VALUE, compiledFunction.InstructionOffset);
 
@@ -1397,7 +1397,7 @@ namespace LanguageCore.BBCode.Generator
             int jumpInstruction = Call(constructor.InstructionOffset);
 
             if (constructor.InstructionOffset == -1)
-            { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, constructorCall, constructor, CurrentFile)); }
+            { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, constructorCall, constructor, CurrentFile)); }
 
             AddComment(" Clear Params:");
             for (int i = 0; i < paramsSize; i++)
@@ -2041,7 +2041,7 @@ namespace LanguageCore.BBCode.Generator
                 int jumpInstruction = Call(destructor.InstructionOffset);
 
                 if (destructor.InstructionOffset == -1)
-                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, null, destructor, CurrentFile)); }
+                { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunction>(jumpInstruction, false, null, destructor, CurrentFile)); }
 
                 AddComment(" Clear Param:");
 
@@ -2259,6 +2259,12 @@ namespace LanguageCore.BBCode.Generator
                 }
             }
 
+            AddComment(function.Identifier.Content + ((function.Parameters.Count > 0) ? "(...)" : "()") + " {" + ((function.Block == null || function.Block.Statements.Length > 0) ? string.Empty : " }"));
+
+            if (function is IAmInContext<CompiledClass> functionInContext)
+            { CurrentContext = functionInContext; }
+            InFunction = true;
+
             TagCount.Push(0);
             InMacro.Push(false);
 
@@ -2344,6 +2350,8 @@ namespace LanguageCore.BBCode.Generator
             AddComment("Return");
             Return();
 
+            if (function.Block != null && function.Block.Statements.Length > 0) AddComment("}");
+
             GeneratedDebugInfo.FunctionInformations.Add(new FunctionInformations()
             {
                 IsValid = true,
@@ -2361,6 +2369,19 @@ namespace LanguageCore.BBCode.Generator
 
             InMacro.Pop();
             TagCount.Pop();
+
+            CurrentContext = null;
+            InFunction = false;
+        }
+
+        void GenerateCodeForCompilableFunction<T>(CompliableTemplate<T> function)
+            where T : FunctionThingDefinition, IDuplicatable<T>, IAmInContext<CompiledClass>
+        {
+            SetTypeArguments(function.TypeArguments);
+
+            GenerateCodeForFunction(function.Function);
+
+            TypeArguments.Clear();
         }
 
         void GenerateCodeForTopLevelStatements(Statement[] statements)

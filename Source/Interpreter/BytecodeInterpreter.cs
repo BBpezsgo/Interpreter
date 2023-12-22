@@ -31,7 +31,7 @@ namespace LanguageCore.Runtime
         public int CodeSampleStart;
     }
 
-    class UserInvoke
+    sealed class UserInvoke
     {
         public readonly int InstructionOffset;
         public readonly DataItem[] Arguments;

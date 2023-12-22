@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -20,7 +21,7 @@ namespace LanguageCore.Parser
         public double ParseTime;
     }
 
-    public readonly struct ParserResult
+    public readonly struct ParserResult : IEnumerable<Statement.Statement>
     {
         public readonly Error[] Errors;
 
@@ -78,8 +79,8 @@ namespace LanguageCore.Parser
             {
                 this.Structs[i].FilePath = path;
 
-                foreach (KeyValuePair<string, FunctionDefinition> method in this.Structs[i].Methods)
-                { method.Value.FilePath = path; }
+                foreach (FunctionDefinition method in this.Structs[i].Methods)
+                { method.FilePath = path; }
             }
 
             for (int i = 0; i < this.Classes.Length; i++)
@@ -99,12 +100,10 @@ namespace LanguageCore.Parser
             for (int i = 0; i < this.Hashes.Length; i++)
             { this.Hashes[i].FilePath = path; }
 
-            Statement.StatementFinder.GetAllStatement(this, statement =>
+            foreach (IDefinition item in Statement.StatementExtensions.GetStatements<IDefinition>(this))
             {
-                if (statement is IDefinition def)
-                { def.FilePath = path; }
-                return false;
-            });
+                item.FilePath = path;
+            }
         }
 
         public void CheckFilePaths(Action<string> NotSetCallback)
@@ -130,16 +129,99 @@ namespace LanguageCore.Parser
                 else
                 { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
             }
-            Statement.StatementFinder.GetAllStatement(this, statement =>
+
+            foreach (IDefinition def in Statement.StatementExtensions.GetStatements<IDefinition>(this))
             {
-                if (statement is not IDefinition def) return false;
                 if (string.IsNullOrEmpty(def.FilePath))
                 { NotSetCallback?.Invoke($"IDefinition.FilePath {def} is null"); }
                 else
                 { NotSetCallback?.Invoke($"IDefinition.FilePath {def} : {def.FilePath}"); }
-                return false;
-            });
+            }
         }
+
+        public IEnumerator<Statement.Statement> GetEnumerator()
+        {
+            for (int i = 0; i < TopLevelStatements.Length; i++)
+            {
+                yield return TopLevelStatements[i];
+            }
+
+            for (int i = 0; i < Functions.Length; i++)
+            {
+                if (Functions[i].Block != null)
+                {
+                    yield return Functions[i].Block!;
+                    foreach (Statement.Statement statement in Functions[i].Block!)
+                    { yield return statement; }
+                }
+            }
+
+            for (int i = 0; i < Macros.Length; i++)
+            {
+                if (Macros[i].Block != null)
+                {
+                    yield return Macros[i].Block!;
+                    foreach (Statement.Statement statement in Macros[i].Block!)
+                    { yield return statement; }
+                }
+            }
+
+            for (int i = 0; i < Classes.Length; i++)
+            {
+                ClassDefinition @class = Classes[i];
+                foreach (GeneralFunctionDefinition method in @class.GeneralMethods)
+                {
+                    if (method.Block != null)
+                    {
+                        yield return method.Block!;
+                        foreach (Statement.Statement statement in method.Block!)
+                        { yield return statement; }
+                    }
+                }
+                foreach (FunctionDefinition method in @class.Methods)
+                {
+                    if (method.Block != null)
+                    {
+                        yield return method.Block!;
+                        foreach (Statement.Statement statement in method.Block!)
+                        { yield return statement; }
+                    }
+                }
+                foreach (FunctionDefinition method in @class.Operators)
+                {
+                    if (method.Block != null)
+                    {
+                        yield return method.Block!;
+                        foreach (Statement.Statement statement in method.Block!)
+                        { yield return statement; }
+                    }
+                }
+                foreach (Statement.Statement statement in @class.Statements)
+                {
+                    yield return statement;
+                }
+            }
+
+            for (int i = 0; i < Structs.Length; i++)
+            {
+                StructDefinition @struct = Structs[i];
+                foreach (FunctionDefinition method in @struct.Methods)
+                {
+                    if (method.Block != null)
+                    {
+                        yield return method.Block!;
+                        foreach (Statement.Statement statement in method.Block!)
+                        { yield return statement; }
+                    }
+                }
+                foreach (Statement.Statement statement in @struct.Statements)
+                {
+                    yield return statement;
+                }
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     public readonly struct ParserResultHeader

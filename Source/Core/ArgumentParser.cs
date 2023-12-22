@@ -83,7 +83,7 @@ namespace TheProgram
 
     public static class ArgumentParser
     {
-        class ArgumentNormalizer
+        sealed class ArgumentNormalizer
         {
             public readonly List<string> Result;
 

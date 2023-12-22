@@ -62,10 +62,7 @@ namespace LanguageCore.Runtime
 
                 throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to byte");
             }
-            set
-            {
-                valueUInt8 = value;
-            }
+            set => valueUInt8 = value;
         }
         /// <exception cref="RuntimeException"/>
         public int ValueSInt32
@@ -77,10 +74,7 @@ namespace LanguageCore.Runtime
 
                 throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to integer");
             }
-            set
-            {
-                valueSInt32 = value;
-            }
+            set => valueSInt32 = value;
         }
         /// <exception cref="RuntimeException"/>
         public float ValueSingle
@@ -92,10 +86,7 @@ namespace LanguageCore.Runtime
 
                 throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to float");
             }
-            set
-            {
-                valueSingle = value;
-            }
+            set => valueSingle = value;
         }
         /// <exception cref="RuntimeException"/>
         public char ValueUInt16
@@ -110,10 +101,7 @@ namespace LanguageCore.Runtime
 
                 throw new RuntimeException($"Can't cast {Type.ToString().ToLowerInvariant()} to char");
             }
-            set
-            {
-                valueUInt16 = value;
-            }
+            set => valueUInt16 = value;
         }
 
         #endregion
@@ -300,21 +288,21 @@ namespace LanguageCore.Runtime
                     TypeCode.Empty => throw new NotImplementedException(),
                     TypeCode.Object => throw new NotImplementedException(),
                     TypeCode.DBNull => throw new NotImplementedException(),
-                    TypeCode.Boolean => (System.Boolean)value,
-                    TypeCode.Char => (System.Char)value,
-                    TypeCode.SByte => (System.SByte)value,
-                    TypeCode.Byte => (System.Byte)value,
-                    TypeCode.Int16 => (System.Int16)value,
-                    TypeCode.UInt16 => (System.UInt16)value,
-                    TypeCode.Int32 => (System.Int32)value,
-                    TypeCode.UInt32 => (System.UInt32)value,
-                    TypeCode.Int64 => (System.Int64)value,
-                    TypeCode.UInt64 => (System.UInt64)value,
-                    TypeCode.Single => (System.Single)value,
-                    TypeCode.Double => (System.Double)value,
-                    TypeCode.Decimal => (System.Decimal)value,
-                    TypeCode.DateTime => (System.DateTime)value,
-                    TypeCode.String => (System.String)value,
+                    TypeCode.Boolean => (bool)value,
+                    TypeCode.Char => (char)value,
+                    TypeCode.SByte => (sbyte)value,
+                    TypeCode.Byte => (byte)value,
+                    TypeCode.Int16 => (short)value,
+                    TypeCode.UInt16 => (ushort)value,
+                    TypeCode.Int32 => (int)value,
+                    TypeCode.UInt32 => (uint)value,
+                    TypeCode.Int64 => (long)value,
+                    TypeCode.UInt64 => (ulong)value,
+                    TypeCode.Single => (float)value,
+                    TypeCode.Double => (double)value,
+                    TypeCode.Decimal => (decimal)value,
+                    TypeCode.DateTime => (DateTime)value,
+                    TypeCode.String => (string)value,
                     _ => throw new UnreachableException(),
                 };
                 return DataItem.GetValue(enumValue);

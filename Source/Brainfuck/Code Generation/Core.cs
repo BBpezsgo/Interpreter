@@ -180,6 +180,7 @@ namespace LanguageCore.Brainfuck.Generator
                     HeapStart = 64,
                     HeapSize = 8,
                     GenerateDebugInformation = false,
+                    ShowProgress = false,
                 };
                 result.StackSize = result.HeapStart - 1;
                 return result;
@@ -399,8 +400,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             int usages = 0;
 
-            IEnumerable<Statement> statements = statement.GetStatements();
-            foreach (Statement _statement in statements)
+            foreach (Statement _statement in statement)
             {
                 if (_statement == null) continue;
 

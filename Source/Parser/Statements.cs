@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -15,74 +16,103 @@ namespace LanguageCore.Parser.Statement
         public const int CozyLength = 30;
     }
 
-    public static class StatementFinder
+    public static class StatementExtensions
     {
-        public static bool GetAllStatement(Statement? st, Func<Statement, bool>? callback)
+        public static T? GetStatementAt<T>(this ParserResult parserResult, int absolutePosition)
+            where T : IThingWithPosition
+            => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.AbsoluteRange.Contains(absolutePosition));
+
+        public static T? GetStatementAt<T>(this ParserResult parserResult, SinglePosition position)
+            where T : IThingWithPosition
+            => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
+
+        public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult)
         {
-            if (st == null) return false;
-            if (callback == null) return false;
-
-            if (callback.Invoke(st) == true) return true;
-
-            IEnumerable<Statement> statements = st.GetStatements();
-            return GetAllStatement(statements, callback);
-        }
-        public static bool GetAllStatement(IEnumerable<Statement>? statements, Func<Statement, bool>? callback)
-        {
-            if (statements is null) return false;
-            if (callback == null) return false;
-
-            foreach (Statement statement in statements)
+            foreach (Statement statement in parserResult)
             {
-                if (GetAllStatement(statement, callback)) return true;
-            }
-            return false;
-        }
-        public static bool GetAllStatement(Statement[]? statements, Func<Statement, bool>? callback)
-        {
-            if (statements is null) return false;
-            if (callback == null) return false;
-
-            for (int i = 0; i < statements.Length; i++)
-            {
-                if (GetAllStatement(statements[i], callback))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-        public static void GetAllStatement(ParserResult parserResult, Func<Statement, bool>? callback)
-        {
-            if (callback == null) return;
-
-            for (int i = 0; i < parserResult.TopLevelStatements.Length; i++)
-            {
-                if (parserResult.TopLevelStatements[i] == null) continue;
-                GetAllStatement(parserResult.TopLevelStatements[i], callback);
-            }
-
-            for (int i = 0; i < parserResult.Functions.Length; i++)
-            {
-                GetAllStatement(parserResult.Functions[i].Block?.Statements, callback);
+                if (statement is T _statement)
+                { yield return _statement; }
             }
         }
-        public static void GetAllStatement(IEnumerable<FunctionDefinition>? functions, Func<Statement, bool>? callback)
-        {
-            if (callback == null) return;
-            if (functions == null) return;
 
-            foreach (FunctionDefinition item in functions)
-            { GetAllStatement(item.Block?.Statements, callback); }
-        }
-        public static void GetAllStatement(IEnumerable<GeneralFunctionDefinition>? functions, Func<Statement, bool>? callback)
+        public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult, Func<T, bool> condition)
         {
-            if (callback == null) return;
-            if (functions == null) return;
-
-            foreach (GeneralFunctionDefinition item in functions)
-            { GetAllStatement(item.Block?.Statements, callback); }
+            foreach (Statement statement in parserResult)
+            {
+                if (statement is T _statement && condition.Invoke(_statement))
+                { yield return _statement; }
+            }
         }
+
+        public static IEnumerable<T> GetStatements<T>(this Statement statement)
+        {
+            foreach (Statement subStatement in statement)
+            {
+                if (subStatement is T _subStatement)
+                { yield return _subStatement; }
+            }
+        }
+
+        public static IEnumerable<T> GetStatements<T>(this Statement statement, Func<T, bool> condition)
+        {
+            foreach (Statement subStatement in statement)
+            {
+                if (subStatement is T _subStatement && condition.Invoke(_subStatement))
+                { yield return _subStatement; }
+            }
+        }
+
+        public static T? GetStatement<T>(this ParserResult parserResult)
+        {
+            foreach (Statement statement in parserResult)
+            {
+                if (statement is T _statement)
+                { return _statement; }
+            }
+            return default;
+        }
+
+        public static T? GetStatement<T>(this ParserResult parserResult, Func<T, bool> condition)
+        {
+            foreach (Statement statement in parserResult)
+            {
+                if (statement is T statement_ && condition.Invoke(statement_))
+                { return statement_; }
+            }
+            return default;
+        }
+
+        public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result)
+            => (result = GetStatement<T>(parserResult)) != null;
+
+        public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
+            => (result = GetStatement<T>(parserResult, condition)) != null;
+
+        public static T? GetStatement<T>(this Statement statement)
+        {
+            foreach (Statement subStatement in statement)
+            {
+                if (subStatement is T _subStatement)
+                { return _subStatement; }
+            }
+            return default;
+        }
+
+        public static T? GetStatement<T>(this Statement statement, Func<T, bool> condition)
+        {
+            foreach (Statement subStatement in statement)
+            {
+                if (subStatement is T _subStatement && condition.Invoke(_subStatement))
+                { return _subStatement; }
+            }
+            return default;
+        }
+
+        public static bool TryGetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result)
+            => (result = GetStatement<T>(statement)) != null;
+
+        public static bool TryGetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
+            => (result = GetStatement<T>(statement, condition)) != null;
     }
 
     public interface IReadableID
@@ -90,7 +120,7 @@ namespace LanguageCore.Parser.Statement
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch);
     }
 
-    public abstract class Statement : IThingWithPosition
+    public abstract class Statement : IThingWithPosition, IEnumerable<Statement>
     {
         public Token? Semicolon;
 
@@ -99,8 +129,8 @@ namespace LanguageCore.Parser.Statement
 
         public abstract Position Position { get; }
 
-        public virtual IEnumerable<Statement> GetStatements()
-        { yield break; }
+        public abstract IEnumerator<Statement> GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
     public abstract class AnyAssignment : Statement
@@ -113,6 +143,20 @@ namespace LanguageCore.Parser.Statement
         public bool SaveValue = true;
     }
 
+    public abstract class StatementWithBlock : Statement
+    {
+        public readonly Block Block;
+
+        protected StatementWithBlock(Block block) => Block = block;
+    }
+
+    public abstract class StatementWithAnyBlock : Statement
+    {
+        public readonly Statement Block;
+
+        protected StatementWithAnyBlock(Statement block) => Block = block;
+    }
+
     public class Block : Statement
     {
         public readonly Statement[] Statements;
@@ -120,15 +164,15 @@ namespace LanguageCore.Parser.Statement
         public readonly Token BracketStart;
         public readonly Token BracketEnd;
 
+        public override Position Position
+            => new(BracketStart, BracketEnd);
+
         public Block(Token bracketStart, IEnumerable<Statement> statements, Token bracketEnd)
         {
             this.BracketStart = bracketStart;
             this.Statements = statements.ToArray();
             this.BracketEnd = bracketEnd;
         }
-
-        public override Position Position
-            => new(BracketStart, BracketEnd);
 
         public override string ToString()
         {
@@ -144,30 +188,14 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            for (int i = 0; i < Statements.Length; i++)
-            { yield return Statements[i]; }
-        }
-    }
-
-    public abstract class StatementWithBlock : Statement
-    {
-        public readonly Block Block;
-
-        protected StatementWithBlock(Block block)
-        {
-            Block = block;
-        }
-    }
-
-    public abstract class StatementWithAnyBlock : Statement
-    {
-        public readonly Statement Block;
-
-        protected StatementWithAnyBlock(Statement block)
-        {
-            Block = block;
+            foreach (Statement statement in Statements)
+            {
+                yield return statement;
+                foreach (Statement substatement in statement)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -184,37 +212,54 @@ namespace LanguageCore.Parser.Statement
     public class LinkedIf : LinkedIfThing
     {
         public readonly StatementWithValue Condition;
-        /// <summary>
-        /// Can be:
-        /// <list type="bullet">
-        /// <item><see cref="LinkedIf"/> (else if)</item>
-        /// <item><see cref="LinkedElse"/></item>
-        /// <item><see langword="null"/></item>
-        /// </list>
-        /// </summary>
         public LinkedIfThing? NextLink;
+
+        public override Position Position
+            => new(Keyword, Condition, Block);
 
         public LinkedIf(Token keyword, StatementWithValue condition, Statement block) : base(keyword, block)
         {
             Condition = condition;
         }
 
-        public override Position Position
-            => new(Keyword, Condition, Block);
-
         public override string ToString()
             => $"{Keyword} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            yield return Condition;
+            foreach (Statement substatement in Condition)
+            { yield return substatement; }
+
+            yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
+
+            if (NextLink != null)
+            {
+                yield return NextLink;
+                foreach (Statement substatement in NextLink)
+                { yield return substatement; }
+            }
+        }
     }
 
     public class LinkedElse : LinkedIfThing
     {
+        public override Position Position
+            => new(Keyword, Block);
+
         public LinkedElse(Token keyword, Statement block) : base(keyword, block)
         {
 
         }
 
-        public override Position Position
-            => new(Keyword, Block);
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
+        }
     }
 
     public class CompileTag : Statement, IDefinition
@@ -224,6 +269,9 @@ namespace LanguageCore.Parser.Statement
         public readonly Literal[] Parameters;
 
         public string? FilePath { get; set; }
+
+        public override Position Position
+            => new Position(HashToken, HashName).Union(Parameters);
 
         public CompileTag(Token hashToken, Token hashName, Literal[] parameters)
         {
@@ -235,8 +283,15 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{HashToken}{HashName}{(Parameters.Length > 0 ? string.Join<Literal>(' ', Parameters) : string.Empty)}{Semicolon}";
 
-        public override Position Position
-            => new Position(HashToken, HashName).Union(Parameters);
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            foreach (Literal parameter in Parameters)
+            {
+                yield return parameter;
+                foreach (Statement substatement in parameter)
+                { yield return substatement; }
+            }
+        }
     }
 
     public class LiteralList : StatementWithValue
@@ -245,7 +300,8 @@ namespace LanguageCore.Parser.Statement
         public readonly Token BracketRight;
         public readonly StatementWithValue[] Values;
 
-        public int Size => Values.Length;
+        public override Position Position
+            => new(BracketLeft, BracketRight);
 
         public LiteralList(Token bracketLeft, StatementWithValue[] values, Token bracketRight)
         {
@@ -254,13 +310,14 @@ namespace LanguageCore.Parser.Statement
             Values = values;
         }
 
-        public override Position Position
-            => new(BracketLeft, BracketRight);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            for (int i = 0; i < Values.Length; i++)
-            { yield return Values[i]; }
+            foreach (StatementWithValue value in Values)
+            {
+                yield return value;
+                foreach (Statement substatement in value)
+                { yield return substatement; }
+            }
         }
 
         public override string ToString()
@@ -298,6 +355,9 @@ namespace LanguageCore.Parser.Statement
 
         public string? FilePath { get; set; }
 
+        public override Position Position
+            => new Position(Type, VariableName, InitialValue).Union(Modifiers);
+
         public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
         {
             Type = type;
@@ -309,12 +369,14 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{string.Join<Token>(' ', Modifiers)} {Type} {VariableName}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
-        public override Position Position
-            => new Position(Type, VariableName, InitialValue).Union(Modifiers);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            if (InitialValue != null) yield return InitialValue;
+            if (InitialValue != null)
+            {
+                yield return InitialValue;
+                foreach (Statement substatement in InitialValue)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -324,6 +386,13 @@ namespace LanguageCore.Parser.Statement
         public readonly Token BracketLeft;
         public readonly StatementWithValue[] Parameters;
         public readonly Token BracketRight;
+
+        public override Position Position
+            => new(PrevStatement, BracketLeft, BracketRight);
+
+        public bool IsFunctionCall => PrevStatement is Identifier;
+        public bool IsMethodCall => PrevStatement is Field;
+        public bool IsFunctionOrMethodCall => IsFunctionCall || IsMethodCall;
 
         public AnyCall(StatementWithValue prevStatement, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
@@ -353,9 +422,6 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position Position
-            => new(PrevStatement, BracketLeft, BracketRight);
-
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new(2);
@@ -368,17 +434,6 @@ namespace LanguageCore.Parser.Statement
             result.Append(')');
             return result.ToString();
         }
-
-        public override IEnumerable<Statement> GetStatements()
-        {
-            if (PrevStatement != null) yield return PrevStatement;
-            for (int i = 0; i < Parameters.Length; i++)
-            { yield return Parameters[i]; }
-        }
-
-        public bool IsFunctionCall => PrevStatement is Identifier;
-        public bool IsMethodCall => PrevStatement is Field;
-        public bool IsFunctionOrMethodCall => IsFunctionCall || IsMethodCall;
 
         public bool ToFunctionCall([NotNullWhen(true)] out FunctionCall? functionCall)
         {
@@ -409,6 +464,23 @@ namespace LanguageCore.Parser.Statement
 
             return false;
         }
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            if (PrevStatement != null)
+            {
+                yield return PrevStatement;
+                foreach (Statement substatement in PrevStatement)
+                { yield return substatement; }
+            }
+
+            foreach (StatementWithValue parameter in Parameters)
+            {
+                yield return parameter;
+                foreach (Statement substatement in parameter)
+                { yield return substatement; }
+            }
+        }
     }
 
     public class FunctionCall : StatementWithValue, IReadableID
@@ -434,6 +506,9 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
+        public override Position Position
+            => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
+
         public FunctionCall(StatementWithValue? prevStatement, Token identifier, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
             PrevStatement = prevStatement;
@@ -445,51 +520,64 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
         {
-            string paramsString = "";
+            StringBuilder result = new();
+            if (PrevStatement != null)
+            {
+                result.Append(PrevStatement);
+                result.Append('.');
+            }
+            result.Append(FunctionName);
+            result.Append('(');
             for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) paramsString += ", ";
-                paramsString += Parameters[i].ToString();
-                if (paramsString.Length >= 10 && i - 1 != Parameters.Length)
+                if (i > 0) result.Append(", ");
+
+                result.Append(Parameters[i].ToString());
+
+                if (result.Length >= 10 && i - 1 != Parameters.Length)
                 {
-                    paramsString += ", ...";
+                    result.Append(", ...");
                     break;
                 }
             }
-            string result = "";
-            if (PrevStatement != null)
-            { result += $"{PrevStatement}."; }
-            result += $"{FunctionName}({paramsString})";
-            return result;
+            result.Append(')');
+            return result.ToString();
         }
-
-        public override Position Position
-            => new Position(BracketLeft, BracketRight, Identifier).Union(MethodParameters);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = "";
-            if (this.PrevStatement != null)
+            StringBuilder result = new();
+            if (PrevStatement != null)
             {
-                result += TypeSearch.Invoke(this.PrevStatement).ToString();
-                result += ".";
+                result.Append(TypeSearch.Invoke(PrevStatement).ToString());
+                result.Append('.');
             }
-            result += this.FunctionName;
-            result += "(";
-            for (int i = 0; i < this.Parameters.Length; i++)
+            result.Append(FunctionName);
+            result.Append('(');
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) { result += ", "; }
-                result += TypeSearch.Invoke(this.Parameters[i]).ToString();
+                if (i > 0) result.Append(", ");
+                result.Append(TypeSearch.Invoke(Parameters[i]).ToString());
             }
-            result += ")";
-            return result;
+            result.Append(')');
+            return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            if (PrevStatement != null) yield return PrevStatement;
-            for (int i = 0; i < Parameters.Length; i++)
-            { yield return Parameters[i]; }
+            if (PrevStatement != null)
+            {
+                yield return PrevStatement;
+                foreach (Statement substatement in PrevStatement)
+                { yield return substatement; }
+            }
+
+            foreach (StatementWithValue parameter in Parameters)
+            {
+                yield return parameter;
+                foreach (Statement substatement in parameter)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -499,6 +587,9 @@ namespace LanguageCore.Parser.Statement
         public readonly StatementWithValue[] Parameters;
 
         public string FunctionName => Identifier.Content;
+
+        public override Position Position
+            => new Position(Identifier).Union(Parameters);
 
         public KeywordCall(Token identifier, IEnumerable<StatementWithValue> parameters)
         {
@@ -530,29 +621,30 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position Position
-            => new Position(Identifier).Union(Parameters);
-
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = "";
-            result += this.Identifier.Content;
-            result += "(";
-            for (int i = 0; i < this.Parameters.Length; i++)
+            StringBuilder result = new();
+            result.Append(Identifier.Content);
+            result.Append('(');
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) { result += ", "; }
+                if (i > 0) result.Append(", ");
 
-                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+                result.Append(TypeSearch.Invoke(Parameters[i]).Name);
             }
-            result += ")";
+            result.Append(')');
 
-            return result;
+            return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            for (int i = 0; i < Parameters.Length; i++)
-            { yield return Parameters[i]; }
+            foreach (StatementWithValue parameter in Parameters)
+            {
+                yield return parameter;
+                foreach (Statement substatement in parameter)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -588,8 +680,10 @@ namespace LanguageCore.Parser.Statement
             }
         }
 
-        public OperatorCall(Token op, StatementWithValue left) : this(op, left, null) { }
-        public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right)
+        public override Position Position
+            => new(Operator, Left, Right);
+
+        public OperatorCall(Token op, StatementWithValue left, StatementWithValue? right = null)
         {
             this.Operator = op;
             this.Left = left;
@@ -631,9 +725,6 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position Position
-            => new(Operator, Left, Right);
-
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new(this.Operator.Content);
@@ -649,10 +740,21 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            yield return Left;
-            if (Right != null) yield return Right;
+            if (Left != null)
+            {
+                yield return Left;
+                foreach (Statement substatement in Left)
+                { yield return substatement; }
+            }
+
+            if (Right != null)
+            {
+                yield return Right;
+                foreach (Statement substatement in Right)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -662,6 +764,9 @@ namespace LanguageCore.Parser.Statement
         public readonly StatementWithValue Left;
 
         public StatementWithValue[] Parameters => new StatementWithValue[] { this.Left };
+
+        public override Position Position
+            => new(Operator, Left);
 
         public ShortOperatorCall(Token op, StatementWithValue left)
         {
@@ -681,7 +786,6 @@ namespace LanguageCore.Parser.Statement
 
                 result.Append(' ');
                 result.Append(Operator.ToString());
-
             }
             else
             { result.Append(Operator.ToString()); }
@@ -690,26 +794,21 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override Position Position
-            => new(Operator, Left);
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ReadableID(Func<StatementWithValue, CompiledType> typeSearch)
         {
-            string result = this.Operator.Content;
-            result += "(";
-            for (int i = 0; i < this.Parameters.Length; i++)
+            StringBuilder result = new();
+
+            result.Append(Operator.Content);
+
+            result.Append('(');
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) { result += ", "; }
-
-                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+                if (i > 0) result.Append(", ");
+                result.Append(typeSearch.Invoke(Parameters[i]).Name);
             }
-            result += ")";
+            result.Append(')');
 
-            return result;
-        }
-
-        public override IEnumerable<Statement> GetStatements()
-        {
-            yield return Left;
+            return result.ToString();
         }
 
         public override Assignment ToAssignment()
@@ -743,6 +842,16 @@ namespace LanguageCore.Parser.Statement
                 default: throw new NotImplementedException();
             }
         }
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            if (Left != null)
+            {
+                yield return Left;
+                foreach (Statement substatement in Left)
+                { yield return substatement; }
+            }
+        }
     }
 
     public class Assignment : AnyAssignment
@@ -754,6 +863,9 @@ namespace LanguageCore.Parser.Statement
         public readonly StatementWithValue Left;
         public readonly StatementWithValue Right;
 
+        public override Position Position
+            => new(Operator, Left, Right);
+
         public Assignment(Token @operator, StatementWithValue left, StatementWithValue right)
         {
             this.Operator = @operator;
@@ -764,16 +876,24 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"... {Operator} ...{Semicolon}";
 
-        public override Position Position
-            => new(Operator, Left, Right);
-
-        public override IEnumerable<Statement> GetStatements()
-        {
-            yield return Left;
-            yield return Right;
-        }
-
         public override Assignment ToAssignment() => this;
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            if (Left != null)
+            {
+                yield return Left;
+                foreach (Statement substatement in Left)
+                { yield return substatement; }
+            }
+
+            if (Right != null)
+            {
+                yield return Right;
+                foreach (Statement substatement in Right)
+                { yield return substatement; }
+            }
+        }
     }
 
     public class CompoundAssignment : AnyAssignment
@@ -782,6 +902,9 @@ namespace LanguageCore.Parser.Statement
         public readonly Token Operator;
         public readonly StatementWithValue Left;
         public readonly StatementWithValue Right;
+
+        public override Position Position
+            => new(Operator, Left, Right);
 
         public CompoundAssignment(Token @operator, StatementWithValue left, StatementWithValue right)
         {
@@ -792,19 +915,27 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => $"... {Operator} ...{Semicolon}";
 
-        public override Position Position
-            => new(Operator, Left, Right);
-
-        public override IEnumerable<Statement> GetStatements()
-        {
-            yield return Left;
-            yield return Right;
-        }
-
         public override Assignment ToAssignment()
         {
             OperatorCall statementToAssign = new(Token.CreateAnonymous(Operator.Content.Replace("=", string.Empty, StringComparison.Ordinal), TokenType.Operator, Operator.Position), Left, Right);
             return new Assignment(Token.CreateAnonymous("=", TokenType.Operator, Operator.Position), Left, statementToAssign);
+        }
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            if (Left != null)
+            {
+                yield return Left;
+                foreach (Statement substatement in Left)
+                { yield return substatement; }
+            }
+
+            if (Right != null)
+            {
+                yield return Right;
+                foreach (Statement substatement in Right)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -812,12 +943,11 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly LiteralType Type;
         public readonly string Value;
-        /// <summary>
-        /// If there is no <c>ValueToken</c>:<br/>
-        /// i.e in <c>i++</c> statement
-        /// </summary>
         public Position ImaginaryPosition;
         public readonly Token ValueToken;
+
+        public override Position Position
+            => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);
 
         public Literal(LiteralType type, string value, Token valueToken)
         {
@@ -893,8 +1023,8 @@ namespace LanguageCore.Parser.Statement
         public float GetFloat() => Literal.GetFloat(Value);
         public bool GetBoolean() => Literal.GetBoolean(Value);
 
-        public override Position Position
-            => ValueToken is null ? ImaginaryPosition : new Position(ValueToken);
+        public override IEnumerator<Statement> GetEnumerator()
+        { yield break; }
     }
 
     public class Identifier : StatementWithValue
@@ -907,17 +1037,23 @@ namespace LanguageCore.Parser.Statement
             get => Token.Content;
         }
 
+        public override Position Position => Token.Position;
+
         public Identifier(Token token) => Token = token;
 
         public override string ToString() => Token.Content;
 
-        public override Position Position => Token.Position;
+        public override IEnumerator<Statement> GetEnumerator()
+        { yield break; }
     }
 
     public class AddressGetter : StatementWithValue
     {
         public readonly Token OperatorToken;
         public readonly StatementWithValue PrevStatement;
+
+        public override Position Position
+            => new(OperatorToken, PrevStatement);
 
         public AddressGetter(Token operatorToken, StatementWithValue prevStatement)
         {
@@ -928,12 +1064,14 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override Position Position
-            => new(OperatorToken, PrevStatement);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            yield return PrevStatement;
+            if (PrevStatement != null)
+            {
+                yield return PrevStatement;
+                foreach (Statement substatement in PrevStatement)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -941,6 +1079,9 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token OperatorToken;
         public readonly StatementWithValue PrevStatement;
+
+        public override Position Position
+            => new(OperatorToken, PrevStatement);
 
         public Pointer(Token operatorToken, StatementWithValue prevStatement)
         {
@@ -951,12 +1092,14 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{OperatorToken.Content}{PrevStatement}{Semicolon}";
 
-        public override Position Position
-            => new(OperatorToken, PrevStatement);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            yield return PrevStatement;
+            if (PrevStatement != null)
+            {
+                yield return PrevStatement;
+                foreach (Statement substatement in PrevStatement)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -964,6 +1107,9 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token Keyword;
         public readonly StatementWithValue Condition;
+
+        public override Position Position
+            => new(Keyword, Block);
 
         public WhileLoop(Token keyword, StatementWithValue condition, Block block)
             : base(block)
@@ -975,13 +1121,15 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} ({Condition}) {Block}{Semicolon}";
 
-        public override Position Position
-            => new(Keyword, Block);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return Condition;
+            foreach (Statement substatement in Condition)
+            { yield return substatement; }
+
             yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
         }
     }
 
@@ -991,6 +1139,9 @@ namespace LanguageCore.Parser.Statement
         public readonly VariableDeclaration VariableDeclaration;
         public readonly StatementWithValue Condition;
         public readonly AnyAssignment Expression;
+
+        public override Position Position
+            => new(Keyword, Block);
 
         public ForLoop(Token keyword, VariableDeclaration variableDeclaration, StatementWithValue condition, AnyAssignment expression, Block block)
             : base(block)
@@ -1004,15 +1155,23 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Keyword} (...) {Block}{Semicolon}";
 
-        public override Position Position
-            => new(Keyword, Block);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return VariableDeclaration;
+            foreach (Statement substatement in VariableDeclaration)
+            { yield return substatement; }
+
             yield return Condition;
+            foreach (Statement substatement in Condition)
+            { yield return substatement; }
+
             yield return Expression;
+            foreach (Statement substatement in Expression)
+            { yield return substatement; }
+
             yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
         }
     }
 
@@ -1020,20 +1179,12 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly BaseBranch[] Parts;
 
-        public IfContainer(IEnumerable<BaseBranch> parts)
-        {
-            Parts = parts.ToArray();
-        }
-
         public override Position Position
             => new(Parts);
 
-        public override IEnumerable<Statement> GetStatements()
+        public IfContainer(IEnumerable<BaseBranch> parts)
         {
-            for (int i = 0; i < Parts.Length; i++)
-            {
-                yield return Parts[i];
-            }
+            Parts = parts.ToArray();
         }
 
         LinkedIfThing? ToLinks(int i)
@@ -1056,6 +1207,7 @@ namespace LanguageCore.Parser.Statement
 
             throw new NotImplementedException();
         }
+
         public LinkedIf ToLinks()
         {
             if (Parts.Length == 0) throw new InternalException();
@@ -1065,12 +1217,25 @@ namespace LanguageCore.Parser.Statement
                 NextLink = ToLinks(1),
             };
         }
+
+        public override IEnumerator<Statement> GetEnumerator()
+        {
+            foreach (BaseBranch part in Parts)
+            {
+                yield return part;
+                foreach (Statement substatement in part)
+                { yield return substatement; }
+            }
+        }
     }
 
     public abstract class BaseBranch : StatementWithAnyBlock
     {
         public readonly Token Keyword;
         public readonly IfPart Type;
+
+        public override Position Position
+            => new(Keyword, Block);
 
         protected BaseBranch(Token keyword, IfPart type, Statement block)
             : base(block)
@@ -1088,14 +1253,6 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
             => $"{Keyword}{((Type != IfPart.Else) ? " (...)" : "")} {Block}{Semicolon}";
-
-        public override Position Position
-            => new(Keyword, Block);
-
-        public override IEnumerable<Statement> GetStatements()
-        {
-            yield return Block;
-        }
     }
 
     public class IfBranch : BaseBranch
@@ -1108,10 +1265,15 @@ namespace LanguageCore.Parser.Statement
             this.Condition = condition;
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return Condition;
+            foreach (Statement substatement in Condition)
+            { yield return substatement; }
+
             yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
         }
     }
 
@@ -1125,10 +1287,15 @@ namespace LanguageCore.Parser.Statement
             this.Condition = condition;
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return Condition;
+            foreach (Statement substatement in Condition)
+            { yield return substatement; }
+
             yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
         }
     }
 
@@ -1138,9 +1305,11 @@ namespace LanguageCore.Parser.Statement
             : base(keyword, IfPart.Else, block)
         { }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return Block;
+            foreach (Statement substatement in Block)
+            { yield return substatement; }
         }
     }
 
@@ -1148,6 +1317,9 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token Keyword;
         public readonly TypeInstance TypeName;
+
+        public override Position Position
+            => new(Keyword, TypeName);
 
         public NewInstance(Token keyword, TypeInstance typeName)
         {
@@ -1157,8 +1329,9 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
             => $"{Keyword} {TypeName}{Semicolon}";
-        public override Position Position
-            => new(Keyword, TypeName);
+
+        public override IEnumerator<Statement> GetEnumerator()
+        { yield break; }
     }
 
     public class ConstructorCall : StatementWithValue, IReadableID
@@ -1170,6 +1343,9 @@ namespace LanguageCore.Parser.Statement
 
         public readonly Token BracketLeft;
         public readonly Token BracketRight;
+
+        public override Position Position
+            => new Position(Keyword, TypeName, BracketLeft, BracketRight).Union(Parameters);
 
         public ConstructorCall(Token keyword, TypeInstance typeName, Token bracketLeft, IEnumerable<StatementWithValue> parameters, Token bracketRight)
         {
@@ -1189,49 +1365,51 @@ namespace LanguageCore.Parser.Statement
             result.Append(' ');
 
             result.Append(TypeName.ToString());
-            result.Append('(');
+            result.Append(BracketLeft.ToString());
 
             for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0)
-                { result.Append(", "); }
+                if (i > 0) result.Append(", ");
+
                 if (result.Length >= Stringify.CozyLength)
                 { result.Append("..."); break; }
 
                 result.Append(Parameters[i].ToString());
             }
 
-            result.Append(')');
+            result.Append(BracketRight.ToString());
 
             if (Semicolon != null) result.Append(Semicolon.ToString());
 
             return result.ToString();
         }
-        public override Position Position
-            => new Position(Keyword, TypeName, BracketLeft, BracketRight).Union(Parameters);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
-            string result = "";
-            result += TypeName.ToString();
-            result += ".";
-            result += this.Keyword.Content;
-            result += "(";
-            for (int i = 0; i < this.Parameters.Length; i++)
+            StringBuilder result = new();
+            result.Append(TypeName.ToString());
+            result.Append('.');
+            result.Append(Keyword.Content);
+            result.Append(BracketLeft.ToString());
+            for (int i = 0; i < Parameters.Length; i++)
             {
-                if (i > 0) { result += ", "; }
+                if (i > 0) result.Append(", ");
 
-                result += TypeSearch.Invoke(this.Parameters[i]).Name;
+                result.Append(TypeSearch.Invoke(Parameters[i]).Name);
             }
-            result += ")";
+            result.Append(BracketRight.ToString());
 
-            return result;
+            return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            for (int i = 0; i < Parameters.Length; i++)
-            { yield return Parameters[i]; }
+            foreach (StatementWithValue parameter in Parameters)
+            {
+                yield return parameter;
+                foreach (Statement substatement in parameter)
+                { yield return substatement; }
+            }
         }
     }
 
@@ -1243,6 +1421,9 @@ namespace LanguageCore.Parser.Statement
         public readonly Token BracketLeft;
         public readonly Token BracketRight;
 
+        public override Position Position
+            => new(PrevStatement, Expression);
+
         public IndexCall(StatementWithValue prevStatement, Token bracketLeft, StatementWithValue indexStatement, Token bracketRight)
         {
             this.PrevStatement = prevStatement;
@@ -1253,9 +1434,6 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString()
             => $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}{Semicolon}";
-
-        public override Position Position
-            => new(PrevStatement, Expression);
 
         public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
         {
@@ -1273,10 +1451,15 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
-            if (PrevStatement != null) yield return PrevStatement;
+            yield return PrevStatement;
+            foreach (Statement substatement in PrevStatement)
+            { yield return substatement; }
+
             yield return Expression;
+            foreach (Statement substatement in Expression)
+            { yield return substatement; }
         }
     }
 
@@ -1284,6 +1467,9 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly Token FieldName;
         public readonly StatementWithValue PrevStatement;
+
+        public override Position Position
+            => new(PrevStatement, FieldName);
 
         public Field(StatementWithValue prevStatement, Token fieldName)
         {
@@ -1294,12 +1480,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement}.{FieldName}{Semicolon}";
 
-        public override Position Position
-            => new(PrevStatement, FieldName);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return PrevStatement;
+            foreach (Statement substatement in PrevStatement)
+            { yield return substatement; }
         }
     }
 
@@ -1308,6 +1493,9 @@ namespace LanguageCore.Parser.Statement
         public readonly StatementWithValue PrevStatement;
         public readonly Token Keyword;
         public readonly TypeInstance Type;
+
+        public override Position Position
+            => new(PrevStatement, Keyword, Type);
 
         public TypeCast(StatementWithValue prevStatement, Token keyword, TypeInstance type)
         {
@@ -1319,12 +1507,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement} {Keyword} {Type}{Semicolon}";
 
-        public override Position Position
-            => new(PrevStatement, Keyword, Type);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return PrevStatement;
+            foreach (Statement substatement in PrevStatement)
+            { yield return substatement; }
         }
     }
 
@@ -1332,6 +1519,9 @@ namespace LanguageCore.Parser.Statement
     {
         public readonly StatementWithValue Statement;
         public readonly Token Modifier;
+
+        public override Position Position
+            => new(Modifier, Statement);
 
         public ModifiedStatement(Token modifier, StatementWithValue statement)
         {
@@ -1342,12 +1532,11 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{Modifier} {Statement}{Semicolon}";
 
-        public override Position Position
-            => new(Modifier, Statement);
-
-        public override IEnumerable<Statement> GetStatements()
+        public override IEnumerator<Statement> GetEnumerator()
         {
             yield return Statement;
+            foreach (Statement substatement in Statement)
+            { yield return substatement; }
         }
     }
 }

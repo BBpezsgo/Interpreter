@@ -538,7 +538,7 @@ namespace LanguageCore.Compiler
         {
             foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
             {
-                if (Functions.Any(other => function.IsSame(other)))
+                if (Functions.Any(function.IsSame))
                 { Errors.Add(new Error($"Function {function.ReadableID()} already defined", function.Identifier, function.FilePath)); continue; }
 
                 Functions.Add(function);
@@ -546,7 +546,7 @@ namespace LanguageCore.Compiler
 
             foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
             {
-                if (Macros.Any(other => macro.IsSame(other)))
+                if (Macros.Any(macro.IsSame))
                 { Errors.Add(new Error($"Macro {macro.ReadableID()} already defined", macro.Identifier, macro.FilePath)); continue; }
 
                 Macros.Add(macro);
@@ -579,7 +579,7 @@ namespace LanguageCore.Compiler
 
                 foreach (FunctionDefinition @operator in @class.Operators)
                 {
-                    if (Operators.Any(other => @operator.IsSame(other)))
+                    if (Operators.Any(@operator.IsSame))
                     { Errors.Add(new Error($"Operator {@operator.ReadableID()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
                     else
                     { Operators.Add(@operator); }
@@ -798,7 +798,7 @@ namespace LanguageCore.Compiler
                 {
                     CompiledOperator compiledFunction = CompileOperator(function);
 
-                    if (compiledOperators.Any(other => compiledFunction.IsSame(other)))
+                    if (compiledOperators.Any(compiledFunction.IsSame))
                     { throw new CompilerException($"Operator '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledOperators.Add(compiledFunction);
@@ -849,7 +849,7 @@ namespace LanguageCore.Compiler
 
                         CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, returnType);
 
-                        if (compiledGeneralFunctions.Any(other => methodInfo.IsSame(other)))
+                        if (compiledGeneralFunctions.Any(methodInfo.IsSame))
                         { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
@@ -874,7 +874,7 @@ namespace LanguageCore.Compiler
 
                         CompiledFunction methodInfo = CompileFunction(method);
 
-                        if (compiledFunctions.Any(other => methodInfo.IsSame(other)))
+                        if (compiledFunctions.Any(methodInfo.IsSame))
                         { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
@@ -889,7 +889,7 @@ namespace LanguageCore.Compiler
                 {
                     CompiledFunction compiledFunction = CompileFunction(function);
 
-                    if (compiledFunctions.Any(other => compiledFunction.IsSame(other)))
+                    if (compiledFunctions.Any(compiledFunction.IsSame))
                     { throw new CompilerException($"Function with name '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledFunctions.Add(compiledFunction);

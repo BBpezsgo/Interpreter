@@ -44,6 +44,7 @@ namespace LanguageCore
                     { return EscapedCharacters.U + ((int)v).ToString("x4", CultureInfo.InvariantCulture); }
             }
         }
+
         public static string Escape(this string v)
         {
             StringBuilder literal = new(v.Length);
@@ -51,26 +52,10 @@ namespace LanguageCore
             { literal.Append(v[i].Escape()); }
             return literal.ToString();
         }
-
-        public static T Sum<T>(this IEnumerable<T> list) where T : INumberBase<T>
-        {
-            T result = T.Zero;
-            foreach (T item in list)
-            { result += item; }
-            return result;
-        }
     }
 
     public static class RangeExtensions
     {
-        public static Range<T> Union<T>(this ref Range<T> self, Range<T> range)
-            where T : IEquatable<T>, INumber<T>
-            => new(T.Min(self.Start, range.Start), T.Max(self.End, range.End));
-
-        public static Range<T> Union<T>(this ref Range<T> self, T start, T end)
-            where T : IEquatable<T>, INumber<T>
-            => new(T.Min(self.Start, start), T.Max(self.End, end));
-
         public static T Size<T>(this Range<T> range) where T : INumber<T>
             => T.Max(range.Start, range.End) - T.Min(range.Start, range.End);
 

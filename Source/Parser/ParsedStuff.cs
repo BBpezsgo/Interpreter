@@ -24,9 +24,9 @@ namespace LanguageCore.Parser
 
         public ParameterDefinition this[int index] => Parameters[index];
 
-        public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameters, Token leftParenthesis, Token rightParenthesis)
+        public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, Token leftParenthesis, Token rightParenthesis)
         {
-            this.Parameters = parameters.ToArray();
+            this.Parameters = parameterDefinitions.ToArray();
             this.LeftParenthesis = leftParenthesis;
             this.RightParenthesis = rightParenthesis;
         }
@@ -69,6 +69,9 @@ namespace LanguageCore.Parser
         public override bool Equals(object? obj) => Equals(obj as ParameterDefinitionCollection);
 
         public override int GetHashCode() => HashCode.Combine(LeftParenthesis, RightParenthesis, Parameters);
+
+        public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
+            => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
     }
 
     public class ParameterDefinition : IHaveKey<string>, IThingWithPosition
@@ -213,12 +216,7 @@ namespace LanguageCore.Parser
             }
         }
 
-        public override bool Equals(object? obj)
-        {
-            if (obj is not TemplateInfo other) return false;
-            return this.Equals(other);
-        }
-
+        public override bool Equals(object? obj) => obj is TemplateInfo other && this.Equals(other);
         public bool Equals(TemplateInfo? other)
         {
             if (other is null) return false;
@@ -226,17 +224,14 @@ namespace LanguageCore.Parser
             return true;
         }
 
-        public override int GetHashCode() => TypeParameters.GetHashCode();
-
-        public static bool operator ==(TemplateInfo? a, TemplateInfo? b)
+        public static bool Equals(TemplateInfo? a, TemplateInfo? b)
         {
             if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-
+            if (a is null || b is null) return true;
             return a.Equals(b);
         }
 
-        public static bool operator !=(TemplateInfo? a, TemplateInfo? b) => !(a == b);
+        public override int GetHashCode() => TypeParameters.GetHashCode();
     }
 
     public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
@@ -295,6 +290,7 @@ namespace LanguageCore.Parser
         {
             if (typeArguments == null) return ReadableID();
             string result = this.Identifier.ToString();
+
             result += "(";
             for (int j = 0; j < this.Parameters.Count; j++)
             {
@@ -314,19 +310,18 @@ namespace LanguageCore.Parser
         public bool Equals(FunctionThingDefinition? other)
         {
             if (other is null) return false;
-            if (!string.Equals(this.Identifier.Content, other.Identifier.Content, StringComparison.Ordinal)) return false;
+            if (!string.Equals(this.Identifier.Content, other.Identifier.Content)) return false;
 
-            if (this.Parameters.Count != other.Parameters.Count) return false;
-            for (int i = 0; i < this.Parameters.Count; i++)
-            { if (!this.Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
+            if (!this.Parameters.TypeEquals(other.Parameters)) return false;
 
             if (this.Modifiers.Length != other.Modifiers.Length) return false;
             for (int i = 0; i < this.Modifiers.Length; i++)
-            { if (this.Modifiers[i].Content != other.Modifiers[i].Content) return false; }
+            {
+                if (!string.Equals(this.Modifiers[i].Content, other.Modifiers[i].Content)) return false;
+            }
 
-            if (this.TemplateInfo is null != other.TemplateInfo is null) return false;
-            if (this.TemplateInfo is null) return false;
-            if (!this.TemplateInfo.Equals(other.TemplateInfo)) return false;
+            if (!TemplateInfo.Equals(this.TemplateInfo, other.TemplateInfo))
+            { return false; }
 
             return true;
         }
@@ -353,7 +348,7 @@ namespace LanguageCore.Parser
         public static bool operator !=(FunctionThingDefinition? a, FunctionThingDefinition? b) => !(a == b);
 
         public virtual Position Position => new Position(Identifier)
-            .Union((IThingWithPosition?)Parameters)
+            .Union(Parameters)
             .Union(Block)
             .Union(Modifiers);
     }
@@ -663,8 +658,8 @@ namespace LanguageCore.Parser
 
         public bool IsExport => Modifiers.Contains("export");
 
-        public IReadOnlyDictionary<string, FunctionDefinition> Methods => methods;
-        readonly Dictionary<string, FunctionDefinition> methods;
+        public IReadOnlyCollection<FunctionDefinition> Methods => methods;
+        readonly FunctionDefinition[] methods;
 
         public StructDefinition(
             Token name,
@@ -672,14 +667,14 @@ namespace LanguageCore.Parser
             Token bracketEnd,
             IEnumerable<AttributeUsage> attributes,
             IEnumerable<FieldDefinition> fields,
-            IEnumerable<KeyValuePair<string, FunctionDefinition>> methods,
+            IEnumerable<FunctionDefinition> methods,
             IEnumerable<Token> modifiers)
         {
             this.Name = name;
             this.BracketStart = bracketStart;
             this.BracketEnd = bracketEnd;
             this.Fields = fields.ToArray();
-            this.methods = new Dictionary<string, FunctionDefinition>(methods);
+            this.methods = methods.ToArray();
             this.Attributes = attributes.ToArray();
             this.Statements = new List<Statement.Statement>();
             this.Modifiers = modifiers.ToArray();
@@ -692,16 +687,10 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
 
-        public virtual Position Position
-        {
-            get
-            {
-                Position result = new(Name);
-                result.Union(BracketStart);
-                result.Union(BracketEnd);
-                return result;
-            }
-        }
+        public virtual Position Position =>
+            new Position(Name)
+            .Union(BracketStart)
+            .Union(BracketEnd);
     }
 
     public class UsingDefinition

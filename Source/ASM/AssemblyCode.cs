@@ -236,7 +236,7 @@ namespace LanguageCore.ASM
 
         public TextSectionBuilder() : base()
         {
-            this.Labels = new List<string>();
+            this.Labels = [];
         }
 
         bool HasLabel(string dataLabel)

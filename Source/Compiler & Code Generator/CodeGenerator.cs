@@ -2109,18 +2109,14 @@ namespace LanguageCore.Compiler
             { return FindStatementType(statementWithValue); }
 
             List<CompiledType> result = new();
-            StatementFinder.GetAllStatement(inlinedMacro, (statement) =>
+
+            if (inlinedMacro.TryGetStatement(out KeywordCall? keywordCall, s => s.Identifier == "return"))
             {
-                if (statement is KeywordCall keywordCall &&
-                    keywordCall.Identifier == "return")
-                {
-                    if (keywordCall.Parameters.Length == 0)
-                    { result.Add(new CompiledType(Type.Void)); }
-                    else
-                    { result.Add(FindStatementType(keywordCall.Parameters[0])); }
-                }
-                return false;
-            });
+                if (keywordCall.Parameters.Length == 0)
+                { result.Add(new CompiledType(Type.Void)); }
+                else
+                { result.Add(FindStatementType(keywordCall.Parameters[0])); }
+            }
 
             if (result.Count == 0)
             { return new CompiledType(Type.Void); }

@@ -110,16 +110,19 @@ namespace LanguageCore.Compiler
 
     readonly struct UndefinedOffset<T>
     {
-        public readonly int CallInstructionIndex;
+        public readonly int InstructionIndex;
+        public readonly bool IsAbsoluteAddress;
 
         public readonly Statement? Caller;
         public readonly T Function;
 
         public readonly string? CurrentFile;
 
-        public UndefinedOffset(int callInstructionIndex, Statement? statement, T called, string? file)
+        public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? statement, T called, string? file)
         {
-            this.CallInstructionIndex = callInstructionIndex;
+            this.InstructionIndex = callInstructionIndex;
+            this.IsAbsoluteAddress = isAbsoluteAddress;
+
             this.Caller = statement;
             this.CurrentFile = file;
 

@@ -100,15 +100,6 @@ namespace LanguageCore
 
             return this;
         }
-        public Position Union(IEnumerable<IThingWithPosition?>? elements)
-        {
-            if (elements == null) return this;
-
-            foreach (IThingWithPosition? element in elements)
-            { Union(element); }
-
-            return this;
-        }
 
         public readonly string ToStringRange()
         {

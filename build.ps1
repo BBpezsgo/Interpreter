@@ -15,8 +15,8 @@ if (Test-Path -Path ./Interpreter) { } else {
 
 (Get-Content "./Interpreter/BBCodeInterpreter.csproj") -replace 'C:\\Users\\bazsi\\source\\repos', '..' | Set-Content "./Interpreter/BBCodeInterpreter.csproj"
 
-if (Test-Path -Path ./Output) {
-    Remove-Item -LiteralPath ./Output -Force -Recurse
+if (Test-Path -Path ./Published) {
+    Remove-Item -LiteralPath ./Published -Force -Recurse
 }
 
 if (Test-Path -Path ./Interpreter/post-build.bat) {

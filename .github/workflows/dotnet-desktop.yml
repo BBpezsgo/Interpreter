@@ -24,9 +24,10 @@ jobs:
         dotnet-version: 8.0.x
 
     - name: Build
-      shell: pwsh
+      # shell: pwsh
       run: |
-        .\build.ps1
+        echo Bruh >release.txt  
+      # .\build.ps1
 
 #    - name: Upload Artifacts
 #      uses: actions/upload-artifact@v4
@@ -38,7 +39,7 @@ jobs:
       with:
         # You can change the name of the tag or branch with this input.
         # Default: 'latest'
-        # ref: someCustomTagName
+        ref: latest
 
         # If a description is provided, the action will use it to create an annotated tag. If none is given, the action will create a lightweight tag.
         # Default: ''
@@ -55,8 +56,9 @@ jobs:
     - name: Publish Release
       uses: softprops/action-gh-release@v1
       with:
-        files: ./Published/JIT.zip
-        tag_name: latest
+        files: ./release.txt
+        #files: ./Published/JIT.zip
+        #tag_name: latest
 
     - name: Cleanup
       shell: pwsh

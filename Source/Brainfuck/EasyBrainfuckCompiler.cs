@@ -32,7 +32,7 @@ namespace LanguageCore.Brainfuck
 
             try
             {
-                tokens = FileTokenizer.Tokenize(file.FullName);
+                tokens = StreamTokenizer.Tokenize(file.FullName);
                 ParserResult ast = Parser.Parse(tokens);
                 CompilerResult compiled = Compiler.Compile(ast, null, file, null, printCallback);
                 generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, printCallback);

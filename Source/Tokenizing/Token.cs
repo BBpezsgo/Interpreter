@@ -24,7 +24,12 @@ namespace LanguageCore.Tokenizing
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class Token : IThingWithPosition, IEquatable<Token>, IEquatable<string>, IDuplicatable<Token>
+    public class Token :
+        IThingWithPosition,
+        IEquatable<Token>,
+        IEquatable<string>,
+        IDuplicatable<Token>,
+        System.Numerics.IAdditionOperators<Token, Token, Token>
     {
         readonly Position position;
 
@@ -37,6 +42,8 @@ namespace LanguageCore.Tokenizing
 
         public static Token Empty => new(TokenType.Whitespace, string.Empty, true, new Position(new Range<SinglePosition>(new SinglePosition(0, 0), new SinglePosition(0, 0)), new Range<int>(0, 0)));
 
+        public Position Position => position;
+
         public Token(TokenType type, string content, bool isAnonymous, Position position) : base()
         {
             TokenType = type;
@@ -46,8 +53,6 @@ namespace LanguageCore.Tokenizing
             this.position = position;
         }
 
-        public Position Position => position;
-
         public override string ToString() => Content;
         public string ToOriginalString() => TokenType switch
         {
@@ -56,6 +61,8 @@ namespace LanguageCore.Tokenizing
             TokenType.Comment => $"//{Content}",
             _ => Content,
         };
+
+        #region CreateAnonymous
 
         public static Token CreateAnonymous(string content, TokenType type = TokenType.Identifier)
             => new(type, content, true, Position.UnknownPosition);
@@ -72,16 +79,18 @@ namespace LanguageCore.Tokenizing
         public static explicit operator Token(char v)
             => Token.CreateAnonymous(char.ToString(v), TokenType.LiteralCharacter);
 
+        #endregion
+
         public override bool Equals(object? obj) => obj is Token other && Equals(other);
         public bool Equals(Token? other) =>
             other is not null &&
             Position.Equals(other.Position) &&
             TokenType == other.TokenType &&
-            Content == other.Content &&
+            string.Equals(Content, other.Content) &&
             IsAnonymous == other.IsAnonymous;
         public bool Equals(string? other) =>
             other is not null &&
-            Content == other;
+            string.Equals(Content, other);
 
         public override int GetHashCode() => HashCode.Combine(Position, TokenType, Content);
 
@@ -125,6 +134,21 @@ namespace LanguageCore.Tokenizing
             right = new Token(TokenType, Content[leftSize..], IsAnonymous, rightPosition);
 
             return (left, right);
+        }
+
+        public static Token operator +(Token a, Token b)
+        {
+            if (a.TokenType != b.TokenType)
+            { throw new Exception(); }
+
+            if (a.IsAnonymous != b.IsAnonymous)
+            { throw new Exception(); }
+
+            return new Token(
+                a.TokenType,
+                a.Content + b.Content,
+                a.IsAnonymous,
+                a.position.Union(b.position));
         }
     }
 }

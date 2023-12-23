@@ -4,7 +4,11 @@ using System.Diagnostics;
 namespace LanguageCore
 {
     [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
-    public partial struct Range<T> : IEquatable<Range<T>>, IEquatable<ValueTuple<T, T>>, IEquatable<T> where T : IEquatable<T>
+    public partial struct Range<T> :
+        IEquatable<Range<T>>,
+        IEquatable<ValueTuple<T, T>>,
+        IEquatable<T>
+        where T : IEquatable<T>
     {
         public T Start;
         public T End;

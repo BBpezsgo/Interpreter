@@ -9,30 +9,24 @@
             Text = text ?? string.Empty;
         }
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
-        public static TokenizerResult Tokenize(string? sourceCode)
-            => new StringTokenizer(TokenizerSettings.Default, sourceCode).TokenizeInternal();
+        /// <inheritdoc cref="Tokenize(string?, TokenizerSettings)"/>
+        public static TokenizerResult Tokenize(string? text)
+            => Tokenize(text, TokenizerSettings.Default);
 
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public static TokenizerResult Tokenize(string? sourceCode, TokenizerSettings settings)
-            => new StringTokenizer(settings, sourceCode).TokenizeInternal();
+        public static TokenizerResult Tokenize(string? text, TokenizerSettings settings)
+            => new StringTokenizer(settings, text).TokenizeInternal();
 
-        /// <exception cref="InternalException"/>
-        /// <exception cref="TokenizerException"/>
         protected override TokenizerResult TokenizeInternal()
         {
             for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
             {
-                ProcessCharacter(Text[offsetTotal], offsetTotal, out bool breakLine);
+                ProcessCharacter(Text[offsetTotal], offsetTotal, out bool breakLine, out bool returnLine);
 
                 CurrentColumn++;
-                if (breakLine)
-                {
-                    CurrentColumn = 0;
-                    CurrentLine++;
-                }
+                if (breakLine) CurrentLine++;
+                if (returnLine) CurrentLine = 0;
             }
 
             EndToken(Text.Length);

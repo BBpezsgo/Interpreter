@@ -7,16 +7,30 @@ namespace LanguageCore.Tokenizing
 {
     public abstract partial class Tokenizer
     {
-        protected void ProcessCharacter(char currChar, int offsetTotal, out bool breakLine)
+        protected void ProcessCharacter(char currChar, int offsetTotal, out bool breakLine, out bool returnLine)
         {
             breakLine = false;
+            returnLine = false;
 
-            if (currChar == '\n')
+            char prevChar = PreviousChar;
+            PreviousChar = currChar;
+
+            if (currChar == '\r' && prevChar != '\n')
             {
                 breakLine = true;
+                returnLine = true;
             }
 
-            if (currChar == '\n' && CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
+            if (currChar == '\n' && prevChar != '\r')
+            {
+                breakLine = true;
+                returnLine = true;
+            }
+
+            if (currChar is '\r' or '\n')
+            { returnLine = true; }
+
+            if (breakLine && CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
             {
                 EndToken(offsetTotal);
                 CurrentToken.Content.Clear();
@@ -132,7 +146,7 @@ namespace LanguageCore.Tokenizing
                 EndToken(offsetTotal);
                 return;
             }
-            else if (CurrentToken.TokenType == PreparationTokenType.Comment && currChar != '\n')
+            else if (CurrentToken.TokenType == PreparationTokenType.Comment && (currChar is not '\n' and not '\r'))
             {
                 CurrentToken.Content.Append(currChar);
                 return;
@@ -334,7 +348,7 @@ namespace LanguageCore.Tokenizing
                 CurrentToken.TokenType = PreparationTokenType.Whitespace;
                 CurrentToken.Content.Append(currChar);
             }
-            else if (currChar == '\n')
+            else if (currChar is '\r' or '\n')
             {
                 if (CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
                 {
@@ -471,7 +485,7 @@ namespace LanguageCore.Tokenizing
 
             Tokens.Add(CurrentToken.Instantiate());
 
-        Finish:
+Finish:
             CurrentToken.TokenType = PreparationTokenType.Whitespace;
             CurrentToken.Content.Clear();
             CurrentToken.Position.Range.Start = new SinglePosition(CurrentLine, CurrentColumn);

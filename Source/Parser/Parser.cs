@@ -113,7 +113,7 @@ namespace LanguageCore.Parser
         /// <exception cref="TokenizerException"/>
         public static ParserResult ParseFile(string filePath)
         {
-            TokenizerResult tokens = FileTokenizer.Tokenize(filePath);
+            TokenizerResult tokens = StreamTokenizer.Tokenize(filePath);
             return new Parser(tokens.Tokens).ParseInternal();
         }
 

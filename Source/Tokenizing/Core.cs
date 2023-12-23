@@ -73,12 +73,13 @@ namespace LanguageCore.Tokenizing
         static readonly char[] Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
         static readonly string[] DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
         static readonly char[] SimpleOperators = [';', ',', '#'];
-        static readonly char[] Whitespaces = [' ', '\t', '\u200B', '\r'];
+        static readonly char[] Whitespaces = [' ', '\t', '\u200B'];
         static readonly char[] DigitsHex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
         readonly PreparationToken CurrentToken;
         protected int CurrentColumn;
         protected int CurrentLine;
+        char PreviousChar;
 
         protected readonly List<Token> Tokens;
         protected readonly List<SimpleToken> UnicodeCharacters;
@@ -94,6 +95,7 @@ namespace LanguageCore.Tokenizing
             CurrentToken = new(default);
             CurrentColumn = 0;
             CurrentLine = 0;
+            PreviousChar = default;
 
             Tokens = new();
             UnicodeCharacters = new();
@@ -109,13 +111,12 @@ namespace LanguageCore.Tokenizing
 
         Position GetCurrentPosition(int offsetTotal) => new(new Range<SinglePosition>(new SinglePosition(CurrentLine, CurrentColumn), new SinglePosition(CurrentLine, CurrentColumn + 1)), new Range<int>(offsetTotal, offsetTotal + 1));
 
-        /// <exception cref="TokenizerException"/>
         protected static void CheckTokens(Token[] tokens)
         {
             for (int i = 0; i < tokens.Length; i++)
             { CheckToken(tokens[i]); }
         }
-        /// <exception cref="TokenizerException"/>
+
         static void CheckToken(Token token)
         {
             if (token.TokenType == TokenType.LiteralCharacter)
@@ -150,23 +151,18 @@ namespace LanguageCore.Tokenizing
 
                 Token lastToken = result[^1];
 
-                if (token.TokenType == TokenType.Whitespace && lastToken.TokenType == TokenType.Whitespace)
+                if (token.TokenType == TokenType.Whitespace &&
+                    lastToken.TokenType == TokenType.Whitespace)
                 {
-                    result[^1] = new Token(
-                        lastToken.TokenType,
-                        lastToken.Content + token.Content,
-                        lastToken.IsAnonymous,
-                        lastToken.Position);
+                    result[^1] = lastToken + token;
                     continue;
                 }
 
-                if (token.TokenType == TokenType.LineBreak && lastToken.TokenType == TokenType.LineBreak && settings.JoinLinebreaks)
+                if (settings.JoinLinebreaks &&
+                    token.TokenType == TokenType.LineBreak &&
+                    lastToken.TokenType == TokenType.LineBreak)
                 {
-                    result[^1] = new Token(
-                        lastToken.TokenType,
-                        lastToken.Content + token.Content,
-                        lastToken.IsAnonymous,
-                        lastToken.Position);
+                    result[^1] = lastToken + token;
                     continue;
                 }
 

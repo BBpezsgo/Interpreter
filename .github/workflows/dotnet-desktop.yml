@@ -28,6 +28,11 @@ jobs:
       run: |
         .\build.ps1
 
+    - name: Zip
+      shell: pwsh
+      run: |
+        .\zip.ps1
+
 #    - name: Upload Artifacts
 #      uses: actions/upload-artifact@v4
 #      with:
@@ -57,6 +62,7 @@ jobs:
       with:
         files: ./Published/JIT.zip
         tag_name: latest
+        fail_on_unmatched_files: true
 
     - name: Cleanup
       shell: pwsh

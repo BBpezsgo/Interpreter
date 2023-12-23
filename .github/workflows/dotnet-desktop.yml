@@ -58,7 +58,7 @@ jobs:
       with:
         files: ./release.txt
         #files: ./Published/JIT.zip
-        #tag_name: latest
+        tag_name: latest
 
     - name: Cleanup
       shell: pwsh

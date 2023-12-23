@@ -62,6 +62,7 @@ jobs:
       with:
         files: ./Published/JIT.zip
         tag_name: latest
+        name: The Release
         fail_on_unmatched_files: true
 
     - name: Cleanup

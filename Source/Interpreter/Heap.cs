@@ -333,17 +333,18 @@ namespace LanguageCore.Runtime
             StringBuilder result = new(length);
             for (int i = start; i < end; i++)
             {
-                if (heap[i].Type != RuntimeType.UInt16)
-                {
-                    throw new InternalException($"Unexpected data type {heap[i].Type}, expected {nameof(RuntimeType.UInt16)} (reading string from heap (start: {start} length: {length}) )");
-                }
-                result.Append(heap[i].ValueUInt16);
+                if (i < 0 || i >= heap.Size)
+                { result.Append('\0'); }
+                else
+                { result.Append(heap[i].ToChar(null)); }
             }
             return result.ToString();
         }
-        public static string GetStringByPointer(this IReadOnlyHeap heap, int pointer)
+        public static string? GetStringByPointer(this IReadOnlyHeap heap, int pointer)
         {
-            int length = heap[pointer].ValueSInt32;
+            if (pointer < 0 || pointer >= heap.Size)
+            { return null; }
+            int length = heap[pointer].ToInt32(null);
             return heap.GetString(pointer + 1, length);
         }
     }

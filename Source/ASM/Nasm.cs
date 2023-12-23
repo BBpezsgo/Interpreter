@@ -6,7 +6,6 @@ using System.Text;
 
 namespace LanguageCore.ASM
 {
-    [Serializable]
     public class NasmException : Exception
     {
         public readonly string? File;
@@ -18,14 +17,6 @@ namespace LanguageCore.ASM
             this.File = file;
             this.LineNumber = lineNumber;
             this.OriginalMessage = originalMessage;
-        }
-        protected NasmException(
-            System.Runtime.Serialization.SerializationInfo info,
-            System.Runtime.Serialization.StreamingContext context) : base(info, context)
-        {
-            File = info.GetString("File");
-            LineNumber = info.GetInt32("LineNumber");
-            OriginalMessage = info.GetString("OriginalMessage") ?? string.Empty;
         }
 
         public override string ToString()

@@ -28,7 +28,7 @@ namespace LanguageCore.Compiler
         public readonly CompiledGeneralFunction[] GeneralFunctions;
         public readonly CompiledOperator[] Operators;
 
-        public readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        public readonly ExternalFunctionCollection ExternalFunctions;
 
         public readonly CompiledStruct[] Structs;
         public readonly CompiledClass[] Classes;
@@ -46,7 +46,7 @@ namespace LanguageCore.Compiler
             Array.Empty<MacroDefinition>(),
             Array.Empty<CompiledGeneralFunction>(),
             Array.Empty<CompiledOperator>(),
-            new Dictionary<string, ExternalFunctionBase>(),
+            new ExternalFunctionCollection(),
             Array.Empty<CompiledStruct>(),
             Array.Empty<CompiledClass>(),
             Array.Empty<CompileTag>(),
@@ -61,7 +61,7 @@ namespace LanguageCore.Compiler
             MacroDefinition[] macros,
             CompiledGeneralFunction[] generalFunctions,
             CompiledOperator[] operators,
-            Dictionary<string, ExternalFunctionBase> externalFunctions,
+            ExternalFunctionCollection externalFunctions,
             CompiledStruct[] structs,
             CompiledClass[] classes,
             CompileTag[] hashes,
@@ -142,7 +142,7 @@ namespace LanguageCore.Compiler
         readonly List<CompileTag> Hashes;
 
         readonly string? BasePath;
-        readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        readonly ExternalFunctionCollection ExternalFunctions;
         readonly PrintCallback? PrintCallback;
 
         readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
@@ -151,7 +151,7 @@ namespace LanguageCore.Compiler
             { "free", (new CompiledType(Type.Void), [ new CompiledType(Type.Integer) ]) },
         };
 
-        Compiler(Dictionary<string, ExternalFunctionBase>? externalFunctions, PrintCallback? printCallback, string? basePath)
+        Compiler(ExternalFunctionCollection? externalFunctions, PrintCallback? printCallback, string? basePath)
         {
             Functions = new List<FunctionDefinition>();
             Macros = new List<MacroDefinition>();
@@ -172,7 +172,7 @@ namespace LanguageCore.Compiler
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
-            ExternalFunctions = externalFunctions ?? new Dictionary<string, ExternalFunctionBase>();
+            ExternalFunctions = externalFunctions ?? new ExternalFunctionCollection();
             BasePath = basePath;
             PrintCallback = printCallback;
         }
@@ -917,7 +917,7 @@ namespace LanguageCore.Compiler
         /// <exception cref="System.Exception"/>
         public static CompilerResult Compile(
             ParserResult parserResult,
-            Dictionary<string, ExternalFunctionBase>? externalFunctions,
+            ExternalFunctionCollection? externalFunctions,
             FileInfo? file,
             string? basePath,
             PrintCallback? printCallback = null)
@@ -925,7 +925,7 @@ namespace LanguageCore.Compiler
 
         public static CompilerResult CompileInteractive(
             Statement statement,
-            Dictionary<string, ExternalFunctionBase>? externalFunctions,
+            ExternalFunctionCollection? externalFunctions,
             string? basePath,
             UsingDefinition[] usings,
             PrintCallback? printCallback = null)

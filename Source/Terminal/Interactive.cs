@@ -398,7 +398,7 @@ namespace LanguageCore
         void CompileAndColorizeInput()
         {
             TokenizerResult tokens = TokenizerResult.Empty;
-
+            
             try
             {
                 tokens = StringTokenizer.Tokenize(Input.ToString());
@@ -407,11 +407,12 @@ namespace LanguageCore
                 {
                     Statement statement = Parser.Parser.ParseInteractive(tokens);
 
-                    Interpreter interpreter = new();
+                    ExternalFunctionCollection externalFunctions = new();
+                    new Interpreter().GenerateExternalFunctions(externalFunctions);
 
                     CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                         statement,
-                        interpreter.GenerateExternalFunctions(),
+                        externalFunctions,
                         @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
                         [Parser.UsingDefinition.CreateAnonymous("System")],
                         null);
@@ -540,9 +541,12 @@ namespace LanguageCore
 
                 interpreter = new();
 
+                ExternalFunctionCollection externalFunctions = new();
+                interpreter.GenerateExternalFunctions(externalFunctions);
+
                 CompilerResult compiled = Compiler.Compiler.CompileInteractive(
                     statement,
-                    interpreter.GenerateExternalFunctions(),
+                    externalFunctions,
                     @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
                     [Parser.UsingDefinition.CreateAnonymous("System")],
                     null);
@@ -551,7 +555,7 @@ namespace LanguageCore
 
                 interpreter.CompilerResult = generated;
 
-                interpreter.Initialize(generated.Code, BytecodeInterpreterSettings.Default);
+                interpreter.Initialize(generated.Code, BytecodeInterpreterSettings.Default, externalFunctions);
 
                 while (interpreter.IsExecutingCode)
                 { interpreter.Update(); }

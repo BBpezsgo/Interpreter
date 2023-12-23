@@ -2,7 +2,9 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Net;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace LanguageCore.Runtime
 {
@@ -632,9 +634,106 @@ namespace LanguageCore.Runtime
         };
 
         /// <inheritdoc/>
+        /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>
-        [DoesNotReturn]
-        public readonly object ToType(Type conversionType, IFormatProvider? provider) => throw new InvalidCastException($"Can't cast {type} to {conversionType}");
+        public readonly object ToType(Type conversionType, IFormatProvider? provider)
+        {
+            if (conversionType == typeof(byte)) return ToByte(provider);
+            if (conversionType == typeof(sbyte)) return ToSByte(provider);
+            if (conversionType == typeof(short)) return ToInt16(provider);
+            if (conversionType == typeof(ushort)) return ToUInt16(provider);
+            if (conversionType == typeof(int)) return ToInt32(provider);
+            if (conversionType == typeof(uint)) return ToUInt32(provider);
+            if (conversionType == typeof(long)) return ToInt64(provider);
+            if (conversionType == typeof(ulong)) return ToUInt64(provider);
+            if (conversionType == typeof(float)) return ToSingle(provider);
+            if (conversionType == typeof(decimal)) return ToDecimal(provider);
+            if (conversionType == typeof(double)) return ToDouble(provider);
+            if (conversionType == typeof(bool)) return ToBoolean(provider);
+            if (conversionType == typeof(char)) return ToChar(provider);
+            if (conversionType == typeof(DateTime)) return ToDateTime(provider);
+
+            if (conversionType == typeof(IntPtr))
+            {
+                if (IntPtr.Size == 4)
+                { return new IntPtr(ToInt32(provider)); }
+                else
+                { return new IntPtr(ToInt64(provider)); }
+            }
+
+            if (conversionType == typeof(UIntPtr))
+            {
+                if (UIntPtr.Size == 4)
+                { return new UIntPtr(ToUInt32(provider)); }
+                else
+                { return new UIntPtr(ToUInt64(provider)); }
+            }
+
+            throw new InvalidCastException($"Can't cast {type} to {conversionType}");
+        }
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public readonly object ToType(TypeCode conversionType, IFormatProvider? provider) => conversionType switch
+        {
+            TypeCode.Byte => ToByte(provider),
+            TypeCode.SByte => ToSByte(provider),
+            TypeCode.Int16 => ToInt16(provider),
+            TypeCode.UInt16 => ToUInt16(provider),
+            TypeCode.Int32 => ToInt32(provider),
+            TypeCode.UInt32 => ToUInt32(provider),
+            TypeCode.Int64 => ToInt64(provider),
+            TypeCode.UInt64 => ToUInt64(provider),
+            TypeCode.Single => ToSingle(provider),
+            TypeCode.Decimal => ToDecimal(provider),
+            TypeCode.Double => ToDouble(provider),
+            TypeCode.Boolean => ToBoolean(provider),
+            TypeCode.Char => ToChar(provider),
+            TypeCode.Empty => throw new InvalidCastException($"Can't cast {type} to null"),
+            TypeCode.Object => throw new InvalidCastException($"Can't cast {type} to {nameof(Object)}"),
+            TypeCode.DBNull => throw new InvalidCastException($"Can't cast {type} to {nameof(DBNull)}"),
+            TypeCode.DateTime => ToDateTime(provider),
+            TypeCode.String => throw new InvalidCastException($"Can't cast {type} to {nameof(String)}"),
+            _ => throw new InvalidCastException($"Can't cast {type} to {conversionType}")
+        };
+
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public readonly T ToType<T>(IFormatProvider? provider)
+        {
+            if (typeof(T) == typeof(byte)) return (T)(object)ToByte(provider);
+            if (typeof(T) == typeof(sbyte)) return (T)(object)ToSByte(provider);
+            if (typeof(T) == typeof(short)) return (T)(object)ToInt16(provider);
+            if (typeof(T) == typeof(ushort)) return (T)(object)ToUInt16(provider);
+            if (typeof(T) == typeof(int)) return (T)(object)ToInt32(provider);
+            if (typeof(T) == typeof(uint)) return (T)(object)ToUInt32(provider);
+            if (typeof(T) == typeof(long)) return (T)(object)ToInt64(provider);
+            if (typeof(T) == typeof(ulong)) return (T)(object)ToUInt64(provider);
+            if (typeof(T) == typeof(float)) return (T)(object)ToSingle(provider);
+            if (typeof(T) == typeof(decimal)) return (T)(object)ToDecimal(provider);
+            if (typeof(T) == typeof(double)) return (T)(object)ToDouble(provider);
+            if (typeof(T) == typeof(bool)) return (T)(object)ToBoolean(provider);
+            if (typeof(T) == typeof(char)) return (T)(object)ToChar(provider);
+            if (typeof(T) == typeof(DateTime)) return (T)(object)ToDateTime(provider);
+
+            if (typeof(T) == typeof(IntPtr))
+            {
+                if (IntPtr.Size == 4)
+                { return (T)(object)new IntPtr(ToInt32(provider)); }
+                else
+                { return (T)(object)new IntPtr(ToInt64(provider)); }
+            }
+
+            if (typeof(T) == typeof(UIntPtr))
+            {
+                if (UIntPtr.Size == 4)
+                { return (T)(object)new UIntPtr(ToUInt32(provider)); }
+                else
+                { return (T)(object)new UIntPtr(ToUInt64(provider)); }
+            }
+
+            throw new InvalidCastException($"Can't cast {type} to {typeof(T)}");
+        }
 
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
@@ -654,7 +753,7 @@ namespace LanguageCore.Runtime
                     { return checked((ushort)valueSingle); }
                     throw new OverflowException();
                 default:
-                    throw new InvalidCastException($"Can't cast {type} to {nameof(System.UInt16)}");
+                    throw new InvalidCastException($"Can't cast {type} to {nameof(UInt16)}");
             }
         }
 

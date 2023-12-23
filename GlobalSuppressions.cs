@@ -25,3 +25,4 @@ using System.Diagnostics.CodeAnalysis;
 [assembly: SuppressMessage("Design", "CA1065:Do not raise exceptions in unexpected locations", Justification = "<Pending>")]
 [assembly: SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "<Pending>")]
 [assembly: SuppressMessage("Security", "CA5394:Do not use insecure randomness", Justification = "<Pending>")]
+[assembly: SuppressMessage("Design", "CA1041:Provide ObsoleteAttribute message", Justification = "<Pending>")]

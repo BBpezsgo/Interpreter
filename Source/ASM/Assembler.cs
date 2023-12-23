@@ -3,7 +3,6 @@ using System.IO;
 
 namespace LanguageCore.ASM
 {
-    [Serializable]
     public class ProcessException : Exception
     {
         readonly string processName;
@@ -22,19 +21,8 @@ namespace LanguageCore.ASM
             this.stdOutput = stdOutput;
             this.stdError = stdError;
         }
-
-        protected ProcessException(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context)
-        {
-            this.exitCode = info.GetInt32("exitCode");
-            this.stdOutput = info.GetString("stdOutput") ?? string.Empty;
-            this.stdError = info.GetString("stdError") ?? string.Empty;
-            this.processName = info.GetString("processName") ?? string.Empty;
-        }
     }
 
-    [Serializable]
     public class ProcessNotStartedException : Exception
     {
         readonly string processName;
@@ -44,13 +32,6 @@ namespace LanguageCore.ASM
         public ProcessNotStartedException(string processName) : base()
         {
             this.processName = processName;
-        }
-
-        protected ProcessNotStartedException(
-          System.Runtime.Serialization.SerializationInfo info,
-          System.Runtime.Serialization.StreamingContext context) : base(info, context)
-        {
-            this.processName = info.GetString("processName") ?? string.Empty;
         }
     }
 

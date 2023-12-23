@@ -21,6 +21,7 @@ namespace LanguageCore.IL.Generator
     {
         public Assembly Assembly;
 
+        [RequiresUnreferencedCode("Dynamically calling methods")]
         public readonly void Invoke() => Assembly?.GetType("Program")?.GetMethod("Main")?.Invoke(null, Array.Empty<object>());
 
         public Warning[] Warnings;

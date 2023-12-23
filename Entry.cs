@@ -29,13 +29,6 @@ namespace TheProgram
 
             switch (arguments.RunType)
             {
-//              case ProgramRunType.Debugger:
-// #if AOT
-//                  throw new NotSupportedException($"The compiler compiled in AOT mode so System.Text.Json isn't available");
-// #else
-//                  _ = new Debugger(arguments);
-//                  break;
-// #endif
                 case ProgramRunType.Normal:
                 {
                     if (arguments.ConsoleGUI)
@@ -92,8 +85,11 @@ namespace TheProgram
                         };
 #endif
 
+                        ExternalFunctionCollection externalFunctions = new();
+                        interpreter.GenerateExternalFunctions(externalFunctions);
+
 #if AOT
-                        Output.Log($"Skipping loading DLL-s because the compiler compiled in AOT mode");
+                        Output.LogDebug($"Skipping loading DLL-s because the compiler compiled in AOT mode");
 #else
                         string dllsFolderPath = Path.Combine(arguments.File.Directory!.FullName, arguments.CompilerSettings.BasePath?.Replace('/', '\\') ?? string.Empty);
                         if (Directory.Exists(dllsFolderPath))
@@ -102,7 +98,7 @@ namespace TheProgram
                             Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
                             FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
                             foreach (FileInfo dll in dlls)
-                            { interpreter.LoadDLL(dll.FullName); }
+                            { interpreter.LoadDLL(externalFunctions, dll.FullName); }
                         }
                         else
                         {
@@ -116,7 +112,7 @@ namespace TheProgram
                         {
                             try
                             {
-                                CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), interpreter.GenerateExternalFunctions(), arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
+                                CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), externalFunctions, arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
                                 generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
 
                                 generatedCode.ThrowErrors();
@@ -130,7 +126,7 @@ namespace TheProgram
                         }
                         else
                         {
-                            CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), interpreter.GenerateExternalFunctions(), arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
+                            CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), externalFunctions, arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
                             generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
 
                             generatedCode.ThrowErrors();
@@ -138,20 +134,13 @@ namespace TheProgram
                         }
 
                         interpreter.CompilerResult = generatedCode;
-                        interpreter.Initialize(generatedCode.Code, arguments.BytecodeInterpreterSettings);
+                        interpreter.Initialize(generatedCode.Code, arguments.BytecodeInterpreterSettings, externalFunctions);
 
                         while (interpreter.IsExecutingCode)
                         {
                             interpreter.Update();
                         }
                     }
-                    break;
-                }
-                case ProgramRunType.Compile:
-                {
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, arguments.CompilerSettings.BasePath);
-                    BBCodeGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings);
-                    File.WriteAllBytes(arguments.CompileOutput ?? string.Empty, DataUtilities.Serializer.SerializerStatic.Serialize(generatedCode.Code));
                     break;
                 }
                 case ProgramRunType.Brainfuck:
@@ -173,7 +162,7 @@ namespace TheProgram
                 case ProgramRunType.IL:
                 {
 #if AOT
-                        throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
+                    throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
 #else
                     CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
 
@@ -209,7 +198,7 @@ namespace TheProgram
                         Console.WriteLine();
                         Console.WriteLine($"Exit code: {process.ExitCode}");
 
-                        if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out LanguageCore.ProcessRuntimeException? runtimeException))
+                        if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
                         { throw runtimeException; }
                     }
 

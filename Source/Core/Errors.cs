@@ -10,7 +10,6 @@ namespace LanguageCore
 
     #region Exception
 
-    [Serializable]
     public class LanguageException : Exception
     {
         public readonly Position Position;
@@ -39,12 +38,6 @@ namespace LanguageCore
         }
 
         public LanguageException(string message, Exception inner) : base(message, inner) { }
-
-        protected LanguageException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-            Position = (Position?)info.GetValue("position", typeof(Position)) ?? Position.UnknownPosition;
-            File = info.GetString("File");
-        }
 
         public override string ToString()
         {
@@ -91,50 +84,35 @@ namespace LanguageCore
         }
     }
 
-    [Serializable]
     public class CompilerException : LanguageException
     {
         public CompilerException(string message, Position position, string? file) : base(message, position, file) { }
         public CompilerException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
         public CompilerException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
-
-        protected CompilerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    [Serializable]
     public class NotSupportedException : CompilerException
     {
         public NotSupportedException(string message, Position position, string? file) : base(message, position, file) { }
         public NotSupportedException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public NotSupportedException(string message) : base(message) { }
         public NotSupportedException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
-
-        protected NotSupportedException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="BBCode.Tokenizer"/> </summary>
-    [Serializable]
     public class TokenizerException : LanguageException
     {
         public TokenizerException(string message, Position position) : base(message, position, null) { }
-
-        protected TokenizerException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    /// <summary> Thrown by the <see cref="BBCode.Parser.Parser"/> </summary>
-    [Serializable]
     public class SyntaxException : LanguageException
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
         public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition, null) { }
         public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
         public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
-
-        protected SyntaxException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
-    [Serializable]
     public class ProcessRuntimeException : Exception
     {
         readonly uint exitCode;
@@ -143,12 +121,6 @@ namespace LanguageCore
         ProcessRuntimeException(uint exitCode, string message) : base(message)
         {
             this.exitCode = exitCode;
-        }
-        protected ProcessRuntimeException(
-          SerializationInfo info,
-          StreamingContext context) : base(info, context)
-        {
-            this.exitCode = info.GetUInt32("exitCode");
         }
 
         public static bool TryGetFromExitCode(int exitCode, [NotNullWhen(true)] out ProcessRuntimeException? processRuntimeException)
@@ -165,11 +137,9 @@ namespace LanguageCore
         }
     }
 
-    /// <summary> Thrown by the <see cref="Bytecode.BytecodeInterpreter"/> </summary>
-    [Serializable]
     public class RuntimeException : LanguageException
     {
-        public Context? Context;
+        public RuntimeContext? Context;
         public Position SourcePosition;
         public string? SourceFile;
         public FunctionInformations[]? CallStack;
@@ -178,7 +148,7 @@ namespace LanguageCore
         public void FeedDebugInfo(DebugInformation debugInfo)
         {
             if (!Context.HasValue) return;
-            Context context = Context.Value;
+            RuntimeContext context = Context.Value;
 
             if (!debugInfo.TryGetSourceLocation(context.CodePointer, out SourceCodeLocation sourcePosition))
             { SourcePosition = Position.UnknownPosition; }
@@ -194,21 +164,19 @@ namespace LanguageCore
 
         public RuntimeException(string message) : base(message, Position.UnknownPosition, null) { }
         public RuntimeException(string message, Exception inner) : base(message, inner) { }
-        public RuntimeException(string message, Context context) : base(message, Position.UnknownPosition, null)
+        public RuntimeException(string message, RuntimeContext context) : base(message, Position.UnknownPosition, null)
         {
             this.Context = context;
         }
-        public RuntimeException(string message, Exception inner, Context context) : this(message, inner)
+        public RuntimeException(string message, Exception inner, RuntimeContext context) : this(message, inner)
         {
             this.Context = context;
         }
-
-        protected RuntimeException(SerializationInfo info, StreamingContext context) : base(info, context) { }
 
         public override string ToString()
         {
             if (!Context.HasValue) return Message + " (no context)";
-            Context context = Context.Value;
+            RuntimeContext context = Context.Value;
 
             StringBuilder result = new(Message);
 
@@ -272,19 +240,15 @@ namespace LanguageCore
         }
     }
 
-    [Serializable]
     public class UserException : RuntimeException
     {
         public UserException(string message) : base(message)
         { }
 
-        protected UserException(SerializationInfo info, StreamingContext context) : base(info, context)
-        { }
-
         public override string ToString()
         {
             if (!Context.HasValue) return Message + " (no context)";
-            Context context = Context.Value;
+            RuntimeContext context = Context.Value;
 
             StringBuilder result = new(Message);
 
@@ -324,19 +288,15 @@ namespace LanguageCore
     #region InternalException
 
     /// <summary> If this exception raised, it's a <b>big</b> problem. </summary>
-    [Serializable]
     public class InternalException : LanguageException
     {
         public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }
         public InternalException(string message) : base(message, Position.UnknownPosition, null) { }
         public InternalException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public InternalException(string message, IThingWithPosition position, string? file) : base(message, position.Position, file) { }
-
-        protected InternalException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }
 
     /// <inheritdoc/>
-    [Serializable]
     public class EndlessLoopException : InternalException
     {
         public EndlessLoopException() : base("Endless loop") { }
@@ -387,7 +347,7 @@ namespace LanguageCore
         public Warning(string message, Position position, string? file)
             : base(message, position, file) { }
         public Warning(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     /// <summary> It's an exception, but not. </summary>
@@ -408,13 +368,13 @@ namespace LanguageCore
     public class Hint : NotExceptionBut
     {
         public Hint(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     public class Information : NotExceptionBut
     {
         public Information(string message, IThingWithPosition? position, string? file)
-            : base(message, position?.Position ?? LanguageCore.Position.UnknownPosition, file) { }
+            : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     #endregion

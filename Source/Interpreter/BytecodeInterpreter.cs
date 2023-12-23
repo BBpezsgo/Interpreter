@@ -1,28 +1,10 @@
 ﻿using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace LanguageCore.Runtime
 {
-    public readonly struct CallStackFrame
-    {
-        public readonly string Function;
-        public readonly string File;
-        public readonly string InstructionOffset;
-        public readonly string Line;
-
-        public CallStackFrame(string frame)
-        {
-            string[] parts = frame.Split(';');
-            this.Function = parts[0];
-            this.File = parts[1];
-            this.InstructionOffset = parts[2];
-            this.Line = parts[3];
-        }
-
-        public override string ToString() => $"at {Function} in {File}:line {Line} instruction {InstructionOffset}";
-    }
-
-    public struct Context
+    public struct RuntimeContext
     {
         public int[] CallTrace;
         public int CodePointer;
@@ -36,28 +18,24 @@ namespace LanguageCore.Runtime
         public readonly int InstructionOffset;
         public readonly DataItem[] Arguments;
         public readonly Action<DataItem> Callback;
-        public bool NeedReturnValue;
+        public readonly bool NeedReturnValue;
 
         public bool IsInvoking;
 
         public UserInvoke(int instructionOffset, DataItem[] arguments, Action<DataItem> callback)
         {
-            this.InstructionOffset = instructionOffset;
-            this.Arguments = arguments;
-            this.Callback = callback;
-            this.NeedReturnValue = true;
+            InstructionOffset = instructionOffset;
+            Arguments = arguments;
+            Callback = callback;
+            NeedReturnValue = true;
 
-            this.IsInvoking = false;
+            IsInvoking = false;
         }
 
         public UserInvoke(int instructionOffset, DataItem[] arguments, Action callback)
+            : this(instructionOffset, arguments, _ => callback.Invoke())
         {
-            this.InstructionOffset = instructionOffset;
-            this.Arguments = arguments;
-            this.Callback = (_) => callback?.Invoke();
-            this.NeedReturnValue = false;
-
-            this.IsInvoking = false;
+            NeedReturnValue = false;
         }
     }
 
@@ -67,7 +45,7 @@ namespace LanguageCore.Runtime
 
         // User Invoke
         bool IsUserInvoking => UserInvokes.Count > 0 && UserInvokes.Peek().IsInvoking;
-        readonly Queue<UserInvoke> UserInvokes = new();
+        readonly Queue<UserInvoke> UserInvokes;
 
         // Tick Sleeping
         int SleepTickCounter;
@@ -78,16 +56,14 @@ namespace LanguageCore.Runtime
         Action? SleepTimeCallback;
 
         // Safety
-        int LastInstructionPointer = -1;
+        int LastInstructionPointer;
 
-        public BytecodeInterpreter(Instruction[] code, Dictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
+        public BytecodeInterpreter(Instruction[] code, FrozenDictionary<string, ExternalFunctionBase> externalFunctions, BytecodeInterpreterSettings settings) : base(code, settings.HeapSize, externalFunctions)
         {
-            this.Settings = settings;
-
-            this.LastInstructionPointer = -1;
+            UserInvokes = new Queue<UserInvoke>();
+            Settings = settings;
+            LastInstructionPointer = -1;
         }
-
-        #region Public Methods
 
         public void SleepTicks(int ticks, Action? callback)
         {
@@ -117,13 +93,17 @@ namespace LanguageCore.Runtime
         }
 
         public bool Call(int instructionOffset, Action<DataItem> callback, params DataItem[] arguments)
+            => Call(new UserInvoke(instructionOffset, arguments, callback));
+        public bool Call(int instructionOffset, Action callback, params DataItem[] arguments)
+            => Call(new UserInvoke(instructionOffset, arguments, callback));
+        bool Call(UserInvoke userInvoke)
         {
-            UserInvokes.Enqueue(new UserInvoke(instructionOffset, arguments, callback));
+            UserInvokes.Enqueue(userInvoke);
             TryUserInvoke();
             return true;
         }
 
-        public Context GetContext() => new()
+        public RuntimeContext GetContext() => new()
         {
             CallTrace = TraceCalls(),
             CodePointer = this.CodePointer,
@@ -171,8 +151,6 @@ namespace LanguageCore.Runtime
             TraceCalls(callTrace, savedBasePointer);
         }
 
-        #endregion
-
         void DoUserInvoke(UserInvoke userInvoke)
         {
             CodePointer = userInvoke.InstructionOffset;
@@ -198,6 +176,8 @@ namespace LanguageCore.Runtime
         }
 
         /// <exception cref="RuntimeException"/>
+        /// <exception cref="UserException"/>
+        /// <exception cref="InternalException"/>
         public bool Tick()
         {
             if (Memory.Stack.Count > Settings.StackMaxSize)
@@ -264,6 +244,7 @@ namespace LanguageCore.Runtime
             return true;
         }
 
+        /// <exception cref="InternalException"/>
         void OnStop()
         {
             if (IsUserInvoking)

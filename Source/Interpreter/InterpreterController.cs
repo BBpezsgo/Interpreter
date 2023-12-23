@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -137,8 +138,6 @@ namespace LanguageCore.Runtime
         public event OnInputEventHandler? OnNeedInput;
         public event OnExecutedEventHandler? OnExecuted;
 
-        protected readonly Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-
         public BBCodeGeneratorResult CompilerResult;
         public Instruction? NextInstruction
         {
@@ -157,7 +156,7 @@ namespace LanguageCore.Runtime
         public BytecodeInterpreter? BytecodeInterpreter;
 
         protected bool IsPaused;
-        IReturnValueConsumer? ReturnValueConsumer;
+        ExternalFunctionManaged? ReturnValueConsumer;
 
         protected List<Stream> Streams;
 
@@ -170,7 +169,7 @@ namespace LanguageCore.Runtime
         }
 
         [MemberNotNullWhen(true, nameof(BytecodeInterpreter))]
-        public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings)
+        public bool Initialize(Instruction[] program, BytecodeInterpreterSettings settings, ExternalFunctionCollection externalFunctions)
         {
             if (IsExecutingCode)
             {
@@ -188,10 +187,7 @@ namespace LanguageCore.Runtime
                 Streams.Clear();
             }
 
-            externalFunctions.Clear();
-            externalFunctions.AddRange(GenerateExternalFunctions());
-
-            BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions, settings);
+            BytecodeInterpreter = new BytecodeInterpreter(program, externalFunctions.ToFrozenDictionary(), settings);
             externalFunctions.SetInterpreter(BytecodeInterpreter);
 
             State = InterpreterState.Initialized;
@@ -226,7 +222,7 @@ namespace LanguageCore.Runtime
         {
             if (ReturnValueConsumer != null)
             {
-                ReturnValueConsumer.ReturnValue(new DataItem(key));
+                ReturnValueConsumer.OnReturn?.Invoke(new DataItem(key));
                 ReturnValueConsumer = null;
             }
 
@@ -234,7 +230,7 @@ namespace LanguageCore.Runtime
         }
 
         [RequiresUnreferencedCode("Importing DLL-s")]
-        public void LoadDLL(string path)
+        public void LoadDLL(ExternalFunctionCollection externalFunctions, string path)
         {
 #if AOT
             OnOutput?.Invoke(this, $"Skipping loading DLL \"{path}\" because the compiler compiled in AOT mode", LogType.Warning);
@@ -259,10 +255,8 @@ namespace LanguageCore.Runtime
 #endif
         }
 
-        public Dictionary<string, ExternalFunctionBase> GenerateExternalFunctions()
+        public void GenerateExternalFunctions(ExternalFunctionCollection externalFunctions)
         {
-            Dictionary<string, ExternalFunctionBase> externalFunctions = new();
-
             #region Console
 
             externalFunctions.AddManagedExternalFunction("stdin", Array.Empty<Type>(), (DataItem[] parameters, ExternalFunctionManaged function) =>
@@ -434,8 +428,6 @@ namespace LanguageCore.Runtime
             }
 
             #endregion
-
-            return externalFunctions;
         }
 
         protected void OnCodeExecuted()

@@ -193,11 +193,14 @@ namespace ConsoleGUI
                 LanguageCore.Compiler.CompilerResult compiled;
                 LanguageCore.BBCode.Generator.BBCodeGeneratorResult generatedCode;
 
+                ExternalFunctionCollection externalFunctions = new();
+                Interpreter.GenerateExternalFunctions(externalFunctions);
+
                 if (handleErrors)
                 {
                     try
                     {
-                        compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), Interpreter.GenerateExternalFunctions(), fileInfo, compilerSettings.BasePath, PrintOutput);
+                        compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), externalFunctions, fileInfo, compilerSettings.BasePath, PrintOutput);
                         generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
                     }
                     catch (Exception ex)
@@ -208,7 +211,7 @@ namespace ConsoleGUI
                 }
                 else
                 {
-                    compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), Interpreter.GenerateExternalFunctions(), fileInfo, compilerSettings.BasePath, PrintOutput);
+                    compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), externalFunctions, fileInfo, compilerSettings.BasePath, PrintOutput);
                     generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
                 }
 
@@ -217,7 +220,7 @@ namespace ConsoleGUI
                 {
                     StackMaxSize = interpreterSettings.StackMaxSize,
                     HeapSize = interpreterSettings.HeapSize,
-                });
+                }, externalFunctions);
             }
         }
 

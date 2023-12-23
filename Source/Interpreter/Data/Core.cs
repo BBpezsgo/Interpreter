@@ -14,7 +14,7 @@ namespace LanguageCore.Runtime
         UInt16,
     }
 
-    [System.Diagnostics.DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
+    [DebuggerDisplay("{" + nameof(GetDebuggerDisplay) + "(),nq}")]
     [StructLayout(LayoutKind.Explicit)]
     public partial struct DataItem
     {

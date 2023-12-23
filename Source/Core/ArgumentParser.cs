@@ -1,16 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO.Compression;
 
 namespace TheProgram
 {
     using LanguageCore;
     using LanguageCore.Runtime;
 
-    /// <summary>
-    /// Argument parser result
-    /// </summary>
     public struct ProgramArguments
     {
         [MemberNotNullWhen(false, nameof(File))]
@@ -22,8 +18,6 @@ namespace TheProgram
         public BytecodeInterpreterSettings BytecodeInterpreterSettings;
         public bool ThrowErrors;
         public readonly bool HandleErrors => !ThrowErrors;
-        public string? PipeName;
-        public int Port;
 
         public bool LogDebugs;
         public bool LogSystem;
@@ -31,11 +25,6 @@ namespace TheProgram
         public bool LogInfo;
 
         public ProgramRunType RunType;
-        public string? CompileOutput;
-        public CompressionLevel CompressionLevel;
-        public string? TestID;
-        public ProgramInputFileType CompileToFileType;
-        public bool IsTest;
 
         public bool ConsoleGUI;
 
@@ -51,13 +40,6 @@ namespace TheProgram
             RunType = ProgramRunType.Normal,
             CompilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
             BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
-            CompileOutput = null,
-            CompressionLevel = CompressionLevel.Optimal,
-            PipeName = null,
-            Port = -1,
-            TestID = null,
-            CompileToFileType = ProgramInputFileType.Binary,
-            IsTest = false,
             ConsoleGUI = false,
             DoNotPause = false,
             File = null,
@@ -67,18 +49,9 @@ namespace TheProgram
     public enum ProgramRunType
     {
         Normal,
-        // Debugger,
-        Compile,
-        Decompile,
         Brainfuck,
         IL,
         ASM,
-    }
-
-    public enum ProgramInputFileType
-    {
-        Binary,
-        Readable,
     }
 
     public static class ArgumentParser
@@ -205,9 +178,9 @@ namespace TheProgram
         static ProgramArguments ParseArgs(string[] args)
         {
             ProgramArguments result = ProgramArguments.Default;
-#pragma warning disable IDE0059 // Unnecessary assignment of a value
-            string? arg = null;
-#pragma warning restore IDE0059 // Unnecessary assignment of a value
+#pragma warning disable IDE0018 // Inline variable declaration
+            string? arg;
+#pragma warning restore IDE0018
 
             if (args.Length > 1)
             {
@@ -261,45 +234,11 @@ namespace TheProgram
                         continue;
                     }
 
-                    // if (ExpectArg(args, ref i, out _, "--debug"))
-                    // {
-                    //     if (result.RunType != ProgramRunType.Normal)
-                    //     { throw new ArgumentException($"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {ProgramRunType.Debugger}"); }
-                    // 
-                    //     result.RunType = ProgramRunType.Debugger;
-                    //     continue;
-                    // }
-
                     if (ExpectArg(args, ref i, out _, "--console-gui", "-cg"))
                     {
                         result.ConsoleGUI = true;
                         continue;
                     }
-
-                    /*
-                    if (args[i] == "-decompile")
-                    {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Decompile}");
-                        result.RunType = RunType.Decompile;
-                        goto ArgParseDone;
-                    }
-
-                    if (args[i] == "-compile")
-                    {
-                        if (result.RunType != RunType.Normal) throw new ArgumentException(
-                            $"The \"RunType\" is already defined ({result.RunType}), but you tried to set it to {RunType.Compile}");
-                        result.RunType = RunType.Compile;
-
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-compile'"); }
-
-                        result.CompileOutput = args[i];
-
-                        goto ArgParseDone;
-                    }
-                    */
 
                     if (ExpectArg(args, ref i, out arg, "--basepath", "-bp"))
                     {
@@ -308,36 +247,6 @@ namespace TheProgram
 
                         continue;
                     }
-
-                    /*
-                    if (args[i] == "-compression")
-                    {
-                        if (result.RunType != RunType.Normal && result.RunType != RunType.Compile)
-                        { Output.Warning($"\"-compression\" argument is valid only in Compile mode"); }
-
-                        i++;
-                        if (i >= args.Length - 1)
-                        { throw new ArgumentException("Expected string value after argument '-compression'"); }
-
-                        result.CompressionLevel = args[i].ToLower() switch
-                        {
-                            "no" => CompressionLevel.NoCompression,
-                            "none" => CompressionLevel.NoCompression,
-                            "fast" => CompressionLevel.Fastest,
-                            "fastest" => CompressionLevel.Fastest,
-                            "optimal" => CompressionLevel.Optimal,
-                            "smallest" => CompressionLevel.SmallestSize,
-                            _ => throw new ArgumentException($"Unknown compression level '{args[i]}'"),
-                        };
-
-                        goto ArgParseDone;
-                    }
-
-                    if (args[i] == "-code-editor")
-                    {
-                        goto ArgParseDone;
-                    }
-                    */
 
                     if (ExpectArg(args, ref i, out _, "--throw-errors", "-te"))
                     {
@@ -402,45 +311,7 @@ namespace TheProgram
                         result.CompilerSettings.PrintInstructions = true;
                         continue;
                     }
-
-                    if (ExpectArg(args, ref i, out arg, "--pipe", "-pp"))
-                    {
-                        if (!ExpectParam(args, ref i, out result.PipeName))
-                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
-
-                        continue;
-                    }
-
-                    if (ExpectArg(args, ref i, out arg, "--port", "-pr"))
-                    {
-                        if (!ExpectParam(args, ref i, out result.Port))
-                        { throw new ArgumentException($"Expected int value after argument \"{arg}\""); }
-
-                        continue;
-                    }
-
-                    if (ExpectArg(args, ref i, out arg, "--test-id", "-ti"))
-                    {
-                        if (!ExpectParam(args, ref i, out result.TestID))
-                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
-
-                        continue;
-                    }
-
-                    if (ExpectArg(args, ref i, out arg, "--compiler-type", "-ct"))
-                    {
-                        if (!ExpectParam(args, ref i, out string? compileType))
-                        { throw new ArgumentException($"Expected string value after argument \"{arg}\""); }
-
-                        result.CompileToFileType = compileType switch
-                        {
-                            "binary" => ProgramInputFileType.Binary,
-                            "readable" => ProgramInputFileType.Readable,
-                            _ => throw new ArgumentException($"Unknown compiler type \"{compileType}\". Possible values: \"binary\", \"readable\""),
-                        };
-                        continue;
-                    }
-
+           
                     throw new ArgumentException($"Unknown argument \"{args[i]}\"");
                 }
             }

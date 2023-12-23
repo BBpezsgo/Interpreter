@@ -97,7 +97,7 @@ namespace LanguageCore.BBCode.Generator
 
         #region Fields
 
-        readonly Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        readonly ExternalFunctionCollection ExternalFunctions;
         readonly Dictionary<string, int> ExternalFunctionsCache;
 
         readonly Stack<CleanupItem[]> CleanupStack;
@@ -127,7 +127,7 @@ namespace LanguageCore.BBCode.Generator
 
         public CodeGeneratorForMain(CompilerSettings settings) : base()
         {
-            this.ExternalFunctions = new Dictionary<string, ExternalFunctionBase>();
+            this.ExternalFunctions = new ExternalFunctionCollection();
             this.CheckNullPointers = settings.CheckNullPointers;
             this.GeneratedCode = new List<Instruction>();
             this.ExternalFunctionsCache = new Dictionary<string, int>();

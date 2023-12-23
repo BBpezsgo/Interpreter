@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -8,7 +9,7 @@ namespace LanguageCore.Runtime
     {
         public readonly Memory Memory;
 
-        public Dictionary<string, ExternalFunctionBase> ExternalFunctions;
+        public readonly FrozenDictionary<string, ExternalFunctionBase> ExternalFunctions;
 
         public int CodePointer;
         public int BasePointer;
@@ -16,7 +17,7 @@ namespace LanguageCore.Runtime
         public Instruction CurrentInstruction => Memory.Code[CodePointer];
         public bool IsDone => CodePointer >= Memory.Code.Length;
 
-        public BytecodeProcessor(Instruction[] code, int heapSize, Dictionary<string, ExternalFunctionBase> externalFunctions)
+        public BytecodeProcessor(Instruction[] code, int heapSize, FrozenDictionary<string, ExternalFunctionBase> externalFunctions)
         {
             ExternalFunctions = externalFunctions;
 
@@ -29,10 +30,10 @@ namespace LanguageCore.Runtime
         public void Step() => CodePointer++;
         public void Step(int num) => CodePointer += num;
 
-        /// <exception cref="RuntimeException"></exception>
-        /// <exception cref="UserException"></exception>
-        /// <exception cref="InternalException"></exception>
-        /// <exception cref="Exception"></exception>
+        /// <exception cref="RuntimeException"/>
+        /// <exception cref="UserException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="Exception"/>
         public void Process()
         {
             switch (CurrentInstruction.opcode)

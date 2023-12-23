@@ -4,7 +4,9 @@
     {
         public static void Main(string[] args)
         {
+#if !AOT
             if (DevelopmentEntry.Start(args)) return;
+#endif
 
             bool pauseAtEnd = true;
 
@@ -17,7 +19,6 @@
                 catch (System.Exception exception)
                 { LanguageCore.Output.LogError($"Unhandled exception: {exception}"); }
 
-                if (arguments.IsTest) pauseAtEnd = false;
                 if (arguments.DoNotPause) pauseAtEnd = false;
             }
 

@@ -1,9 +1,7 @@
 ﻿using System;
-using System.Runtime.Serialization;
 
 namespace LanguageCore.Brainfuck
 {
-    [Serializable]
     public readonly struct RuntimeContext
     {
         public readonly int MemoryPointer;
@@ -16,7 +14,6 @@ namespace LanguageCore.Brainfuck
         }
     }
 
-    [Serializable]
     public class BrainfuckRuntimeException : Exception
     {
         public readonly RuntimeContext RuntimeContext;
@@ -24,11 +21,6 @@ namespace LanguageCore.Brainfuck
         public BrainfuckRuntimeException(string message, RuntimeContext context) : base(message)
         {
             RuntimeContext = context;
-        }
-
-        protected BrainfuckRuntimeException(SerializationInfo info, StreamingContext context) : base(info, context)
-        {
-            RuntimeContext = (RuntimeContext)info.GetValue("RuntimeContext", typeof(RuntimeContext))!;
         }
     }
 }

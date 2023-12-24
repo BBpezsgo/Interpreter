@@ -2,10 +2,6 @@ name: .NET Core Desktop
 
 on:
   workflow_dispatch:
-#  push:
-#    branches: [ "master" ]
-#  pull_request:
-#    branches: [ "master" ]
 
 jobs:
 
@@ -23,49 +19,68 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
-    - name: Build
+    - name: Prepare build
       shell: pwsh
+      run: |
+        mkdir BuildJob
+
+    - name: Cloning repositories
+      shell: pwsh
+      working-directory: ./BuildJob
+      run: |
+        .\clone-repos.ps1
+
+    - name: Building
+      shell: pwsh
+      working-directory: ./BuildJob
       run: |
         .\build.ps1
 
-    - name: Zip
+    - name: Cleaning up the projects
       shell: pwsh
+      working-directory: ./BuildJob
       run: |
-        .\zip.ps1
+        .\cleanup-projects.ps1
 
-#    - name: Upload Artifacts
+    - name: Compressing
+      shell: pwsh
+      working-directory: ./BuildJob
+      run: |
+        .\compress.ps1
+
+    - name: Cleaning up
+      shell: pwsh
+      working-directory: ./BuildJob
+      run: |
+        if (Test-Path -Path ./Published) { Remove-Item -LiteralPath ./Published -Force -Recurse }
+
+#    - name: Upload artifacts
 #      uses: actions/upload-artifact@v4
 #      with:
 #        path: .\Published\JIT
 
-    - name: Create Tag
+    - name: Create tag
       uses: EndBug/latest-tag@latest
       with:
-        # You can change the name of the tag or branch with this input.
         # Default: 'latest'
         ref: latest
 
-        # If a description is provided, the action will use it to create an annotated tag. If none is given, the action will create a lightweight tag.
         # Default: ''
         # description: Description for the tag
 
-        # Force-update a branch instead of using a tag.
         # Default: false
         force-branch: true
 
-        # Directory to use when executing git commands
         # Default: '${{ github.workspace }}'
         # git-directory: 'path/to/repo/dir'
 
     - name: Publish Release
       uses: softprops/action-gh-release@v1
       with:
-        files: ./Published/JIT.zip
+        files: |
+          ./BuildJob/Windows_x64_RuntimeIndependent.zip
+          ./BuildJob/Windows_x64_RuntimeDependent.zip
+          ./BuildJob/Windows_x64_AOT.zip
         tag_name: latest
         name: The Release
         fail_on_unmatched_files: true
-
-    - name: Cleanup
-      shell: pwsh
-      run: |
-        .\cleanup.ps1

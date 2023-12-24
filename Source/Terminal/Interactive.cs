@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using Win32;
 using Win32.LowLevel;
 using Color = System.Drawing.Color;
@@ -11,102 +12,211 @@ namespace LanguageCore
 {
     using BBCode.Generator;
     using Compiler;
+    using Parser;
     using Parser.Statement;
     using Runtime;
     using Tokenizing;
 
+    readonly struct InteractiveSession
+    {
+        public readonly string Input;
+        public readonly string Output;
+        public readonly string InterpreterStdOutput;
+
+        public InteractiveSession(
+            string input,
+            string output,
+            string interpreterStdOutput)
+        {
+            Input = input;
+            Output = output;
+            InterpreterStdOutput = interpreterStdOutput;
+        }
+    }
+
+    struct ActiveInteractiveSession
+    {
+        public string? ColorizedText;
+        public string? CurrentError;
+        public bool FailedToColorize;
+
+        public AnsiBuilder InterpreterStandardOutput;
+
+        public static ActiveInteractiveSession Null => new()
+        {
+            ColorizedText = null,
+            FailedToColorize = false,
+            CurrentError = null,
+            InterpreterStandardOutput = new AnsiBuilder(),
+        };
+
+        public void Success(string colorized)
+        {
+            ColorizedText = colorized;
+            FailedToColorize = false;
+            CurrentError = null;
+        }
+
+        public void Error(string error)
+        {
+            ColorizedText = null;
+            FailedToColorize = true;
+            CurrentError = error;
+        }
+
+        public void Clear()
+        {
+            ColorizedText = null;
+            FailedToColorize = false;
+            InterpreterStandardOutput.Clear();
+        }
+    }
+
+    class InteractiveCompiler
+    {
+        string? _text;
+        Token[]? _tokens;
+        Statement? _parsed;
+        CompilerResult _compiled;
+        BBCodeGeneratorResult _generated;
+        Task? _task;
+        readonly Action<Task> _onCompiledAsync;
+        readonly Queue<Task> _completedTasks;
+
+        public IReadOnlyList<Token>? Tokens => _tokens;
+        public Statement? Statement => _parsed;
+        public CompilerResult Compiled => _compiled;
+        public BBCodeGeneratorResult Generated => _generated;
+        public ParserResult InteractiveAST => new([], [], [], [], [], [], [], _parsed != null ? [_parsed] : [], []);
+
+        public InteractiveCompiler(Action<Task> onCompiledAsync)
+        {
+            _text = null;
+            _tokens = null;
+            _parsed = null;
+            _compiled = CompilerResult.Empty;
+            _generated = default;
+            _task = null;
+            _onCompiledAsync = onCompiledAsync;
+            _completedTasks = new Queue<Task>();
+        }
+
+        public void Compile(string text)
+        {
+            if (_tokens != null && _parsed != null && string.Equals(text, _text))
+            { return; }
+
+            _text = text;
+            _tokens = StringTokenizer.Tokenize(_text);
+            _parsed = default;
+            _compiled = default;
+            _generated = default;
+
+            if (_tokens.Length != 0)
+            {
+                _parsed = Parser.Parser.ParseInteractive(_tokens);
+
+                ExternalFunctionCollection externalFunctions = new();
+                new Interpreter().GenerateExternalFunctions(externalFunctions);
+
+                Statement parsed2 = _parsed;
+                if (parsed2 is StatementWithValue statementWithValue)
+                { parsed2 = new KeywordCall((Token)"return", new StatementWithValue[] { statementWithValue }); }
+
+                _compiled = Compiler.Compiler.CompileInteractive(
+                    parsed2,
+                    externalFunctions,
+                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
+                    [UsingDefinition.CreateAnonymous("System")],
+                    null);
+
+                _generated = CodeGeneratorForMain.Generate(_compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+            }
+        }
+
+        public void CompileAsync(string text)
+        {
+            if (_tokens != null && _parsed != null && string.Equals(text, _text))
+            { return; }
+
+            if (_task != null && !_task.IsCompleted)
+            { return; }
+
+            _text = text;
+            _task = Task.Run(CompileTask);
+            _task.ContinueWith(OnTaskCompleted);
+        }
+
+        void OnTaskCompleted(Task task)
+        {
+            _completedTasks.Enqueue(task);
+        }
+
+        void CompileTask()
+        {
+            _tokens = StringTokenizer.Tokenize(_text);
+            _parsed = default;
+            _compiled = default;
+            _generated = default;
+
+            if (_tokens.Length != 0)
+            {
+                _parsed = Parser.Parser.ParseInteractive(_tokens);
+
+                ExternalFunctionCollection externalFunctions = new();
+                new Interpreter().GenerateExternalFunctions(externalFunctions);
+
+                Statement parsed2 = _parsed;
+                if (parsed2 is StatementWithValue statementWithValue)
+                { parsed2 = new KeywordCall((Token)"return", new StatementWithValue[] { statementWithValue }); }
+
+                _compiled = Compiler.Compiler.CompileInteractive(
+                    parsed2,
+                    externalFunctions,
+                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
+                    [UsingDefinition.CreateAnonymous("System")],
+                    null);
+
+                _generated = CodeGeneratorForMain.Generate(_compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+            }
+        }
+
+        public void Tick()
+        {
+            while (_completedTasks.TryDequeue(out Task? task))
+            { _onCompiledAsync.Invoke(task); }
+        }
+    }
+
+    static class InteractiveColors
+    {
+        public static readonly Color Error = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+
+        public static readonly Color Comment = Color.FromArgb(int.Parse("57a64a", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color LiteralNumber = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color LiteralString = Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color Operator = Color.FromArgb(int.Parse("b4b4b4", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+
+        public static readonly Color Type = Color.FromArgb(int.Parse("4ec9b0", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color Struct = Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color Keyword = Color.FromArgb(int.Parse("569cd6", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color FunctionName = Color.FromArgb(int.Parse("dcdcaa", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color FieldName = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color LocalSymbol = Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color Statement = Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color Enum = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color EnumMember = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        public static readonly Color TypeParameter = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+    }
+
     public class Interactive
     {
-        struct Session
-        {
-            public string Input;
-            public string Output;
-        }
-
-        struct Colorized
-        {
-            public string? ColorizedText;
-            public int[] ColorizedCharacterPositions;
-            public string? CurrentError;
-            public bool FailedToColorize;
-
-            public static Colorized Null => new()
-            {
-                ColorizedText = null,
-                ColorizedCharacterPositions = Array.Empty<int>(),
-                FailedToColorize = false,
-                CurrentError = null,
-            };
-
-            public static Colorized Success(string colorized, int originalLength) => new()
-            {
-                ColorizedText = colorized,
-                ColorizedCharacterPositions = new int[originalLength],
-                FailedToColorize = false,
-                CurrentError = null,
-            };
-
-            public static Colorized Error(string error) => new()
-            {
-                ColorizedText = null,
-                ColorizedCharacterPositions = Array.Empty<int>(),
-                FailedToColorize = true,
-                CurrentError = error,
-            };
-
-            public void Clear()
-            {
-                ColorizedText = null;
-                ColorizedCharacterPositions = Array.Empty<int>();
-                FailedToColorize = false;
-            }
-
-            public readonly void Render(AnsiBuilder renderer, int cursorPosition)
-            {
-                int bruh = (cursorPosition >= 0 && cursorPosition < ColorizedCharacterPositions.Length) ? ColorizedCharacterPositions[cursorPosition] : -1;
-                for (int i = 0; i < ColorizedText!.Length; i++)
-                {
-                    if (bruh == i)
-                    { renderer.Underline = true; }
-                    renderer.Append(ColorizedText[i]);
-                    if (bruh == i)
-                    { renderer.Underline = false; }
-                }
-                renderer.ResetStyle();
-            }
-
-            public readonly void Render(AnsiBuilder renderer)
-            {
-                renderer.Append(ColorizedText);
-                renderer.ResetStyle();
-            }
-        }
-
-        static class Colors
-        {
-            public static readonly Color Error = Color.FromArgb(int.Parse("fc3e36", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-
-            public static readonly Color Comment = Color.FromArgb(int.Parse("57a64a", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color LiteralNumber = Color.FromArgb(int.Parse("b5cea8", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color LiteralString = Color.FromArgb(int.Parse("d69d85", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color Operator = Color.FromArgb(int.Parse("b4b4b4", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            
-            public static readonly Color Type = Color.FromArgb(int.Parse("4ec9b0", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color Struct = Color.FromArgb(int.Parse("86c691", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color Keyword = Color.FromArgb(int.Parse("569cd6", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color FunctionName = Color.FromArgb(int.Parse("dcdcaa", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color FieldName = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color LocalSymbol = Color.FromArgb(int.Parse("9cdcfe", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color Statement = Color.FromArgb(int.Parse("d8a0df", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color Enum = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color EnumMember = Color.FromArgb(int.Parse("dcdcdc", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-            public static readonly Color TypeParameter = Color.FromArgb(int.Parse("b8d7a3", NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-        }
+        readonly InteractiveCompiler CompilerCache;
 
         readonly AnsiBuilder Renderer;
         readonly StringBuilder Input;
-        Colorized ColorizedInput;
-        readonly List<Session> Sessions;
+        ActiveInteractiveSession CurrentSession;
+        readonly List<InteractiveSession> Sessions;
         int LastRendererLength;
         bool ForceClear;
         bool ShouldRender;
@@ -119,17 +229,18 @@ namespace LanguageCore
         bool EnableInput;
 
         static bool Blinker => DateTime.UtcNow.TimeOfDay.TotalSeconds % 1d < 0.5d;
-        bool lastBlinked;
+        bool LastBlinked;
 
         public Interactive()
         {
+            CompilerCache = new InteractiveCompiler(OnCompiledAsync);
             Input = new StringBuilder();
             CursorPosition = 0;
             Entered = false;
             Escaped = false;
             EnableInput = true;
-            Sessions = new List<Session>();
-            ColorizedInput = Colorized.Null;
+            Sessions = new List<InteractiveSession>();
+            CurrentSession = ActiveInteractiveSession.Null;
             LastInput = DateTime.UtcNow.TimeOfDay.TotalSeconds;
             LastRendererLength = 0;
             ForceClear = false;
@@ -173,7 +284,7 @@ namespace LanguageCore
                 else
                 { Input.Insert(CursorPosition, e.UnicodeChar); }
                 CursorPosition++;
-                ColorizedInput.Clear();
+                CurrentSession.Clear();
                 LastInput = DateTime.UtcNow.TimeOfDay.TotalSeconds;
                 ShouldRender = true;
                 return;
@@ -185,7 +296,7 @@ namespace LanguageCore
                 {
                     CursorPosition--;
                     Input.Remove(CursorPosition, 1);
-                    ColorizedInput.Clear();
+                    CurrentSession.Clear();
                     LastInput = DateTime.UtcNow.TimeOfDay.TotalSeconds;
                     ForceClear = true;
                     ShouldRender = true;
@@ -248,28 +359,29 @@ namespace LanguageCore
             {
                 {
                     bool blinker = Blinker;
-                    if (lastBlinked != blinker)
+                    if (LastBlinked != blinker)
                     {
-                        lastBlinked = blinker;
+                        LastBlinked = blinker;
                         ShouldRender = true;
                     }
                 }
 
                 if (EnableInput &&
-                    ColorizedInput.ColorizedText == null &&
+                    CurrentSession.ColorizedText == null &&
                     DateTime.UtcNow.TimeOfDay.TotalSeconds - LastInput > 1d &&
-                    !ColorizedInput.FailedToColorize)
+                    !CurrentSession.FailedToColorize)
                 {
-                    CompileAndColorizeInput();
+                    CompilerCache.Tick();
+                    CompileAndColorizeInput(CursorPosition);
                     ShouldRender = true;
                 }
 
                 if (EnableInput &&
                     DateTime.UtcNow.TimeOfDay.TotalSeconds - LastInput > 1d &&
                     Input.Length == 0 &&
-                    !string.IsNullOrEmpty(ColorizedInput.CurrentError))
+                    !string.IsNullOrEmpty(CurrentSession.CurrentError))
                 {
-                    ColorizedInput = Colorized.Null;
+                    CurrentSession = ActiveInteractiveSession.Null;
                     ShouldRender = true;
                     ForceClear = true;
                 }
@@ -278,7 +390,7 @@ namespace LanguageCore
                 {
                     Evaluate(Input.ToString());
                     Input.Clear();
-                    ColorizedInput = Colorized.Null;
+                    CurrentSession = ActiveInteractiveSession.Null;
                     Entered = false;
                     EnableInput = true;
                     ForceClear = true;
@@ -312,6 +424,11 @@ namespace LanguageCore
                 Renderer.Append(' ');
                 Renderer.Append(Sessions[i].Input);
                 Renderer.AppendLine(); line++;
+                if (Sessions[i].InterpreterStdOutput.Length > 0)
+                {
+                    Renderer.Append(Sessions[i].InterpreterStdOutput);
+                    Renderer.AppendLine(); line++;
+                }
                 Renderer.Append(Sessions[i].Output);
                 Renderer.AppendLine(); line++;
             }
@@ -322,18 +439,57 @@ namespace LanguageCore
                 Renderer.Append('>');
                 Renderer.Append(' ');
 
-                if (ColorizedInput.ColorizedText != null)
+                /*
+                Token? token = compilerCache.Tokens?.GetTokenAt(CursorPosition);
+                if (token != null)
                 {
+                    bool searching = true;
+                    if (searching)
+                    {
+                        foreach (CompiledFunction function in compilerCache.Compiled.Functions)
+                        {
+                            if (function.Identifier.Content.StartsWith(token.Content, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Renderer.ForegroundColor = Colors.FunctionName;
+                                Renderer.Append(function.Identifier.Content.AsSpan(token.Content.Length));
+                                Renderer.ResetStyle();
+                                searching = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (searching)
+                    {
+                        foreach (MacroDefinition macro in compilerCache.Compiled.Macros)
+                        {
+                            if (macro.Identifier.Content.StartsWith(token.Content, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Renderer.ForegroundColor = Colors.FunctionName;
+                                Renderer.Append(macro.Identifier.Content.AsSpan(token.Content.Length));
+                                Renderer.ResetStyle();
+                                searching = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                */
+
+                CompileAndColorizeInput(CursorPosition);
+
+                if (CurrentSession.ColorizedText != null)
+                {
+                    Renderer.Append(CurrentSession.ColorizedText);
+                    Renderer.ResetStyle();
+
                     if (Blinker)
                     {
-                        ColorizedInput.Render(Renderer, CursorPosition);
                         if (CursorPosition == Input.Length)
                         { Renderer.Append('_'); }
                         else
                         { Renderer.Append(' '); }
                     }
-                    else
-                    { ColorizedInput.Render(Renderer); }
                 }
                 else
                 {
@@ -349,10 +505,15 @@ namespace LanguageCore
                     { RenderInput(Input, Renderer); }
                 }
 
-                if (ColorizedInput.CurrentError != null)
+                if (CurrentSession.CurrentError != null)
                 {
                     Renderer.AppendLine();
-                    Renderer.Append(ColorizedInput.CurrentError);
+                    Renderer.Append(CurrentSession.CurrentError);
+                }
+                else
+                {
+                    Renderer.AppendLine();
+                    Renderer.Append(CurrentSession.InterpreterStandardOutput);
                 }
             }
 
@@ -367,10 +528,10 @@ namespace LanguageCore
             }
             else
             {
-                int l = Renderer.Length;
-                if (l < LastRendererLength)
-                { Renderer.Append(' ', LastRendererLength - l + 1); }
-                LastRendererLength = l;
+                // int l = Renderer.Length;
+                // if (l < LastRendererLength)
+                // { Renderer.Append(' ', LastRendererLength - l + 1); }
+                // LastRendererLength = l;
             }
 
             Console.Out.Write((StringBuilder)Renderer);
@@ -395,38 +556,58 @@ namespace LanguageCore
             renderer.ResetStyle();
         }
 
-        void CompileAndColorizeInput()
+        void OnCompiledAsync(Task task)
         {
-            TokenizerResult tokens = TokenizerResult.Empty;
-            
-            try
+            if (task.IsFaulted)
             {
-                tokens = StringTokenizer.Tokenize(Input.ToString());
+                Exception ex = task.Exception.GetBaseException();
 
-                if (tokens.Tokens.Length != 0)
+                AnsiBuilder output = new()
+                { ForegroundColor = InteractiveColors.Error };
+
+                if (ex is LanguageException languageException)
                 {
-                    Statement statement = Parser.Parser.ParseInteractive(tokens);
+                    string? arrows = LanguageException.GetArrows(languageException.Position, Input.ToString());
 
-                    ExternalFunctionCollection externalFunctions = new();
-                    new Interpreter().GenerateExternalFunctions(externalFunctions);
+                    if (arrows != null)
+                    {
+                        output.Append(arrows);
+                        output.AppendLine();
+                    }
 
-                    CompilerResult compiled = Compiler.Compiler.CompileInteractive(
-                        statement,
-                        externalFunctions,
-                        @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
-                        [Parser.UsingDefinition.CreateAnonymous("System")],
-                        null);
-
-                    BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+                    output.Append(languageException.ToString());
+                }
+                else
+                {
+                    output.Append(ex.Message);
                 }
 
-                ColorizedInput.ColorizedCharacterPositions = new int[Input.Length];
-                ColorizedInput = Colorized.Success(ColorizeSource(Input.ToString(), tokens, ColorizedInput.ColorizedCharacterPositions), Input.Length);
+                output.AppendLine();
+                output.ResetStyle();
+
+                CurrentSession.Error(output.ToString());
+            }
+            else
+            {
+                CurrentSession.Success(ColorizeSource(Input.ToString(), CompilerCache.Tokens));
+            }
+        }
+
+        void CompileAndColorizeInput(int cursorPosition = -1)
+        {
+            CompilerCache.CompileAsync(Input.ToString());
+            return;
+
+            try
+            {
+                CompilerCache.Compile(Input.ToString());
+
+                CurrentSession.Success(ColorizeSource(Input.ToString(), CompilerCache.Tokens, cursorPosition));
             }
             catch (LanguageException ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Colors.Error };
+                { ForegroundColor = InteractiveColors.Error };
 
                 string? arrows = LanguageException.GetArrows(ex.Position, Input.ToString());
 
@@ -441,29 +622,31 @@ namespace LanguageCore
 
                 output.ResetStyle();
 
-                ColorizedInput = Colorized.Error(output.ToString());
+                CurrentSession.Error(output.ToString());
             }
             catch (Exception ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Colors.Error };
+                { ForegroundColor = InteractiveColors.Error };
 
                 output.Append(ex.Message);
                 output.AppendLine();
 
                 output.ResetStyle();
 
-                ColorizedInput = Colorized.Error(output.ToString());
+                CurrentSession.Error(output.ToString());
             }
         }
 
-        static string ColorizeSource(string source, Token[] tokens, int[]? characterPositions = null)
+        static string ColorizeSource(string source, IReadOnlyList<Token>? tokens, int cursorPosition = -1)
         {
+            if (tokens == null) return source;
+
             AnsiBuilder result = new(source.Length);
 
             Color GetColorAt(int i)
             {
-                for (int j = 0; j < tokens.Length; j++)
+                for (int j = 0; j < tokens.Count; j++)
                 {
                     if (tokens[j].Position.AbsoluteRange.Contains(i))
                     {
@@ -476,32 +659,32 @@ namespace LanguageCore
                                 TokenType.Identifier => Color.White,
                                 TokenType.LiteralNumber or
                                 TokenType.LiteralHex or TokenType.LiteralBinary or
-                                TokenType.LiteralFloat => Colors.LiteralNumber,
+                                TokenType.LiteralFloat => InteractiveColors.LiteralNumber,
                                 TokenType.LiteralString or
-                                TokenType.LiteralCharacter => Colors.LiteralString,
-                                TokenType.Operator => Colors.Operator,
+                                TokenType.LiteralCharacter => InteractiveColors.LiteralString,
+                                TokenType.Operator => InteractiveColors.Operator,
                                 TokenType.Comment or
-                                TokenType.CommentMultiline => Colors.Comment,
+                                TokenType.CommentMultiline => InteractiveColors.Comment,
                                 _ => Color.White,
                             },
                             TokenAnalyzedType.Attribute or
                             TokenAnalyzedType.Type or
-                            TokenAnalyzedType.Class => Colors.Type,
-                            TokenAnalyzedType.Struct => Colors.Struct,
+                            TokenAnalyzedType.Class => InteractiveColors.Type,
+                            TokenAnalyzedType.Struct => InteractiveColors.Struct,
                             TokenAnalyzedType.Keyword or
-                            TokenAnalyzedType.BuiltinType => Colors.Keyword,
-                            TokenAnalyzedType.FunctionName => Colors.FunctionName,
-                            TokenAnalyzedType.FieldName => Colors.FieldName,
+                            TokenAnalyzedType.BuiltinType => InteractiveColors.Keyword,
+                            TokenAnalyzedType.FunctionName => InteractiveColors.FunctionName,
+                            TokenAnalyzedType.FieldName => InteractiveColors.FieldName,
                             TokenAnalyzedType.VariableName or
-                            TokenAnalyzedType.ParameterName => Colors.LocalSymbol,
+                            TokenAnalyzedType.ParameterName => InteractiveColors.LocalSymbol,
                             TokenAnalyzedType.Namespace => Color.White,
                             TokenAnalyzedType.Hash => Color.White,
                             TokenAnalyzedType.HashParameter => Color.White,
                             TokenAnalyzedType.Library => Color.White,
-                            TokenAnalyzedType.Statement => Colors.Statement,
-                            TokenAnalyzedType.Enum => Colors.Enum,
-                            TokenAnalyzedType.EnumMember => Colors.EnumMember,
-                            TokenAnalyzedType.TypeParameter => Colors.TypeParameter,
+                            TokenAnalyzedType.Statement => InteractiveColors.Statement,
+                            TokenAnalyzedType.Enum => InteractiveColors.Enum,
+                            TokenAnalyzedType.EnumMember => InteractiveColors.EnumMember,
+                            TokenAnalyzedType.TypeParameter => InteractiveColors.TypeParameter,
                             _ => Color.White,
                         };
                     }
@@ -513,10 +696,10 @@ namespace LanguageCore
             for (int i = 0; i < source.Length; i++)
             {
                 result.ForegroundColor = GetColorAt(i);
-
-                if (characterPositions != null)
-                { characterPositions[i] = result.Length; }
+                if (cursorPosition == i)
+                { result.Underline = true; }
                 result.Append(source[i]);
+                result.Underline = false;
             }
 
             result.ResetStyle();
@@ -529,29 +712,24 @@ namespace LanguageCore
             source ??= string.Empty;
 
             Interpreter interpreter;
-            TokenizerResult tokens = TokenizerResult.Empty;
 
             try
             {
-                tokens = StringTokenizer.Tokenize(source);
+                CompilerCache.Compile(Input.ToString());
 
-                if (tokens.Tokens.Length == 0) return;
-
-                Statement statement = Parser.Parser.ParseInteractive(tokens);
+                if (CompilerCache.Tokens == null || CompilerCache.Tokens.Count == 0) return;
 
                 interpreter = new();
+
+                interpreter.OnStdOut += OnInterpreterStandardOut;
+                interpreter.OnStdError += OnInterpreterStandardError;
+                interpreter.OnOutput += OnInterpreterOutput;
+                interpreter.OnNeedInput += OnInterpreterNeedInput;
 
                 ExternalFunctionCollection externalFunctions = new();
                 interpreter.GenerateExternalFunctions(externalFunctions);
 
-                CompilerResult compiled = Compiler.Compiler.CompileInteractive(
-                    statement,
-                    externalFunctions,
-                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
-                    [Parser.UsingDefinition.CreateAnonymous("System")],
-                    null);
-
-                BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+                BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
 
                 interpreter.CompilerResult = generated;
 
@@ -563,7 +741,7 @@ namespace LanguageCore
             catch (LanguageException ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Colors.Error };
+                { ForegroundColor = InteractiveColors.Error };
 
                 string? arrows = LanguageException.GetArrows(ex.Position, source);
 
@@ -578,11 +756,11 @@ namespace LanguageCore
 
                 output.ResetStyle();
 
-                Sessions.Add(new Session()
-                {
-                    Input = ColorizeSource(source, tokens),
-                    Output = output.ToString(),
-                });
+                CurrentSession.InterpreterStandardOutput.ResetStyle();
+                Sessions.Add(new InteractiveSession(
+                    ColorizeSource(source, CompilerCache.Tokens),
+                    output.ToString(),
+                    CurrentSession.InterpreterStandardOutput.ToString()));
 
                 ShouldRender = true;
                 return;
@@ -590,18 +768,18 @@ namespace LanguageCore
             catch (Exception ex)
             {
                 AnsiBuilder output = new()
-                { ForegroundColor = Colors.Error };
+                { ForegroundColor = InteractiveColors.Error };
 
                 output.Append(ex.ToString());
                 output.AppendLine();
 
                 output.ResetStyle();
 
-                Sessions.Add(new Session()
-                {
-                    Input = ColorizeSource(source, tokens),
-                    Output = output.ToString(),
-                });
+                CurrentSession.InterpreterStandardOutput.ResetStyle();
+                Sessions.Add(new InteractiveSession(
+                    ColorizeSource(source, CompilerCache.Tokens),
+                    output.ToString(),
+                    CurrentSession.InterpreterStandardOutput.ToString()));
 
                 ShouldRender = true;
                 return;
@@ -616,45 +794,58 @@ namespace LanguageCore
                 switch (exitCode.Type)
                 {
                     case RuntimeType.UInt8:
-                        output.ForegroundColor = Colors.LiteralNumber;
+                        output.ForegroundColor = InteractiveColors.LiteralNumber;
                         output.Append(exitCode.ValueUInt8);
                         break;
                     case RuntimeType.SInt32:
-                        output.ForegroundColor = Colors.LiteralNumber;
+                        output.ForegroundColor = InteractiveColors.LiteralNumber;
                         output.Append(exitCode.ValueSInt32);
                         break;
                     case RuntimeType.Single:
-                        output.ForegroundColor = Colors.LiteralNumber;
+                        output.ForegroundColor = InteractiveColors.LiteralNumber;
                         output.Append($"{exitCode.ValueSingle}f");
                         break;
                     case RuntimeType.UInt16:
-                        output.ForegroundColor = Colors.LiteralString;
+                        output.ForegroundColor = InteractiveColors.LiteralString;
                         output.Append($"'{exitCode.ValueUInt16}'");
                         break;
                     case RuntimeType.Null:
                     default:
-                        output.ForegroundColor = Colors.Keyword;
+                        output.ForegroundColor = InteractiveColors.Keyword;
                         output.Append("null");
                         break;
                 }
 
                 output.ResetStyle();
 
-                Sessions.Add(new Session()
-                {
-                    Input = ColorizeSource(source, tokens),
-                    Output = output.ToString(),
-                });
+                CurrentSession.InterpreterStandardOutput.ResetStyle();
+                Sessions.Add(new InteractiveSession(
+                    ColorizeSource(source, CompilerCache.Tokens),
+                    output.ToString(),
+                    CurrentSession.InterpreterStandardOutput.ToString()));
             }
             else
             {
-                Sessions.Add(new Session()
-                {
-                    Input = ColorizeSource(source, tokens),
-                    Output = string.Empty,
-                });
+                CurrentSession.InterpreterStandardOutput.ResetStyle();
+                Sessions.Add(new InteractiveSession(
+                    ColorizeSource(source, CompilerCache.Tokens),
+                    string.Empty,
+                    CurrentSession.InterpreterStandardOutput.ToString()));
             }
             ShouldRender = true;
+        }
+
+        void OnInterpreterNeedInput(Interpreter sender) { throw new NotImplementedException(); }
+        void OnInterpreterOutput(Interpreter sender, string message, LogType logType) { }
+        void OnInterpreterStandardError(Interpreter sender, string data)
+        {
+            CurrentSession.InterpreterStandardOutput.ForegroundColor = InteractiveColors.Error;
+            CurrentSession.InterpreterStandardOutput.Append(data);
+        }
+        void OnInterpreterStandardOut(Interpreter sender, string data)
+        {
+            CurrentSession.InterpreterStandardOutput.ForegroundColor = Color.Silver;
+            CurrentSession.InterpreterStandardOutput.Append(data);
         }
     }
 }

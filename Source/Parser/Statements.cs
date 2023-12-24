@@ -26,6 +26,12 @@ namespace LanguageCore.Parser.Statement
             where T : IThingWithPosition
             => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
 
+        public static Statement? GetStatementAt(this ParserResult parserResult, int absolutePosition)
+            => StatementExtensions.GetStatement(parserResult, statement => statement.Position.AbsoluteRange.Contains(absolutePosition));
+
+        public static Statement? GetStatementAt(this ParserResult parserResult, SinglePosition position)
+            => StatementExtensions.GetStatement(parserResult, statement => statement.Position.Range.Contains(position));
+
         public static IEnumerable<T> GetStatements<T>(this ParserResult parserResult)
         {
             foreach (Statement statement in parserResult)
@@ -72,6 +78,13 @@ namespace LanguageCore.Parser.Statement
             return default;
         }
 
+        public static Statement? GetStatement(this ParserResult parserResult)
+        {
+            foreach (Statement statement in parserResult)
+            { return statement; }
+            return default;
+        }
+
         public static T? GetStatement<T>(this ParserResult parserResult, Func<T, bool> condition)
         {
             foreach (Statement statement in parserResult)
@@ -82,8 +95,21 @@ namespace LanguageCore.Parser.Statement
             return default;
         }
 
+        public static Statement? GetStatement(this ParserResult parserResult, Func<Statement, bool> condition)
+        {
+            foreach (Statement statement in parserResult)
+            {
+                if (condition.Invoke(statement))
+                { return statement; }
+            }
+            return default;
+        }
+
         public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result)
             => (result = GetStatement<T>(parserResult)) != null;
+
+        public static bool TryGetStatement(this ParserResult parserResult, [NotNullWhen(true)] out Statement? result)
+            => (result = GetStatement(parserResult)) != null;
 
         public static bool TryGetStatement<T>(this ParserResult parserResult, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
             => (result = GetStatement<T>(parserResult, condition)) != null;

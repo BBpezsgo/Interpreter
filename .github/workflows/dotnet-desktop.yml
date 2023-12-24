@@ -28,25 +28,25 @@ jobs:
       shell: pwsh
       working-directory: ./BuildJob
       run: |
-        .\clone-repos.ps1
+        ..\clone-repos.ps1
 
     - name: Building
       shell: pwsh
       working-directory: ./BuildJob
       run: |
-        .\build.ps1
+        ..\build.ps1
 
     - name: Cleaning up the projects
       shell: pwsh
       working-directory: ./BuildJob
       run: |
-        .\cleanup-projects.ps1
+        ..\cleanup-projects.ps1
 
     - name: Compressing
       shell: pwsh
       working-directory: ./BuildJob
       run: |
-        .\compress.ps1
+        ..\compress.ps1
 
     - name: Cleaning up
       shell: pwsh

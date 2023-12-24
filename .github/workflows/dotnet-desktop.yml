@@ -28,6 +28,11 @@ jobs:
       run: |
         .\build.ps1
 
+    - name: Zip
+      shell: pwsh
+      run: |
+        .\zip.ps1
+
 #    - name: Upload Artifacts
 #      uses: actions/upload-artifact@v4
 #      with:
@@ -38,7 +43,7 @@ jobs:
       with:
         # You can change the name of the tag or branch with this input.
         # Default: 'latest'
-        # ref: someCustomTagName
+        ref: latest
 
         # If a description is provided, the action will use it to create an annotated tag. If none is given, the action will create a lightweight tag.
         # Default: ''
@@ -56,6 +61,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: ./Published/JIT.zip
+        tag_name: latest
+        name: The Release
+        fail_on_unmatched_files: true
 
     - name: Cleanup
       shell: pwsh

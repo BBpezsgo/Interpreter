@@ -59,17 +59,21 @@ jobs:
 #      with:
 #        path: .\Published\JIT
 
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        
     - name: Create tag
       uses: EndBug/latest-tag@latest
       with:
         # Default: 'latest'
-        ref: latest
+        ref: ${{ steps.date.outputs.date }}
 
         # Default: ''
         # description: Description for the tag
 
         # Default: false
-        force-branch: true
+        # force-branch: true
 
         # Default: '${{ github.workspace }}'
         # git-directory: 'path/to/repo/dir'
@@ -81,6 +85,6 @@ jobs:
           ./BuildJob/Windows_x64_RuntimeIndependent.zip
           ./BuildJob/Windows_x64_RuntimeDependent.zip
           ./BuildJob/Windows_x64_AOT.zip
-        tag_name: latest
+        tag_name: ${{ steps.date.outputs.date }}
         name: The Release
         fail_on_unmatched_files: true

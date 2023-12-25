@@ -20,36 +20,36 @@ jobs:
         dotnet-version: 8.0.x
 
     - name: Prepare build
-      shell: pwsh
+      shell: powershell
       run: |
         mkdir BuildJob
 
     - name: Cloning repositories
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\clone-repos.ps1
 
     - name: Building
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\build.ps1
 
     - name: Cleaning up the projects
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\cleanup-projects.ps1
 
     - name: Compressing
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\compress.ps1
 
     - name: Cleaning up
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         if (Test-Path -Path ./Published) { Remove-Item -LiteralPath ./Published -Force -Recurse }

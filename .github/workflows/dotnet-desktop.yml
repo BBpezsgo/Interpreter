@@ -19,6 +19,13 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+# https://github.com/actions/runner/issues/686#issuecomment-1636899369
+    - name: Allow powershell
+      shell: cmd
+      run: powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser"
+    - name: Check powershell version
+      run: $host.Version
+      
     - name: Prepare build
       shell: powershell
       run: |

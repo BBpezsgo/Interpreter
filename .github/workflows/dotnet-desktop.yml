@@ -67,7 +67,7 @@ jobs:
       uses: EndBug/latest-tag@latest
       with:
         # Default: 'latest'
-        ref: ${{ steps.date.outputs.date }}
+        ref: $CURRENT_DATE
 
         # Default: ''
         # description: Description for the tag
@@ -77,6 +77,8 @@ jobs:
 
         # Default: '${{ github.workspace }}'
         # git-directory: 'path/to/repo/dir'
+      env:
+          CURRENT_DATE: ${{ steps.date.outputs.date }}
 
     - name: Publish Release
       uses: softprops/action-gh-release@v1
@@ -85,6 +87,8 @@ jobs:
           ./BuildJob/Windows_x64_RuntimeIndependent.zip
           ./BuildJob/Windows_x64_RuntimeDependent.zip
           ./BuildJob/Windows_x64_AOT.zip
-        tag_name: ${{ steps.date.outputs.date }}
-        name: The Release
+        tag_name: $CURRENT_DATE
+        name: Release $CURRENT_DATE
         fail_on_unmatched_files: true
+      env:
+          CURRENT_DATE: ${{ steps.date.outputs.date }}

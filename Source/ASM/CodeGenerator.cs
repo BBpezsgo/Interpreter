@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 
 #pragma warning disable IDE0051 // Remove unused private members
 #pragma warning disable IDE0052 // Remove unread private members
@@ -727,7 +727,7 @@ namespace LanguageCore.ASM.Generator
             StatementWithValue statement = modifiedStatement.Statement;
             Token modifier = modifiedStatement.Modifier;
 
-            if (modifier == "ref")
+            if (modifier.Equals("ref"))
             {
                 ValueAddress address = GetDataAddress(statement);
 
@@ -745,7 +745,7 @@ namespace LanguageCore.ASM.Generator
                 return;
             }
 
-            if (modifier == "temp")
+            if (modifier.Equals("temp"))
             {
                 GenerateCodeForStatement(statement);
                 return;
@@ -861,41 +861,41 @@ namespace LanguageCore.ASM.Generator
             switch (statement.Identifier.Content.ToLowerInvariant())
             {
                 case "return":
+                {
+                    if (statement.Parameters.Length > 1)
+                    { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
+
+                    if (statement.Parameters.Length == 1)
                     {
-                        if (statement.Parameters.Length > 1)
-                        { throw new CompilerException($"Wrong number of parameters passed to \"return\": required {0} or {1} passed {statement.Parameters.Length}", statement, CurrentFile); }
+                        StatementWithValue returnValue = statement.Parameters[0];
+                        CompiledType returnValueType = FindStatementType(returnValue);
 
-                        if (statement.Parameters.Length == 1)
-                        {
-                            StatementWithValue returnValue = statement.Parameters[0];
-                            CompiledType returnValueType = FindStatementType(returnValue);
+                        GenerateCodeForStatement(returnValue);
 
-                            GenerateCodeForStatement(returnValue);
-
-                            int offset = ReturnValueOffset;
-                            StackStore(new ValueAddress(offset, true, false, false), returnValueType.SizeOnStack);
-                        }
-
-                        if (InFunction)
-                        { Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.ESP, FunctionFrameSize.Last * 4); }
-
-                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBP);
-                        Return();
-                        break;
+                        int offset = ReturnValueOffset;
+                        StackStore(new ValueAddress(offset, true, false, false), returnValueType.SizeOnStack);
                     }
+
+                    if (InFunction)
+                    { Builder.CodeBuilder.AppendInstruction(ASM.Instruction.ADD, Registers.ESP, FunctionFrameSize.Last * 4); }
+
+                    Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBP);
+                    Return();
+                    break;
+                }
 
                 case "break":
-                    {
-                        if (statement.Parameters.Length != 0)
-                        { throw new CompilerException($"Wrong number of parameters passed to \"break\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
+                {
+                    if (statement.Parameters.Length != 0)
+                    { throw new CompilerException($"Wrong number of parameters passed to \"break\": required {0}, passed {statement.Parameters.Length}", statement, CurrentFile); }
 
-                        throw new NotImplementedException();
-                    }
+                    throw new NotImplementedException();
+                }
 
                 case "delete":
-                    {
-                        throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
-                    }
+                {
+                    throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly");
+                }
 
                 default: throw new CompilerException($"Unknown instruction command \"{statement.Identifier}\"", statement.Identifier, CurrentFile);
             }
@@ -1086,163 +1086,163 @@ namespace LanguageCore.ASM.Generator
                 switch (opcode)
                 {
                     case Opcode.LOGIC_LT:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JGE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JGE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_MT:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JLE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JLE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_LTEQ:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JG, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JG, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_MTEQ:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JL, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JL, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_OR:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EBX, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EBX, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_AND:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EBX, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EBX, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
 
-                            break;
-                        }
+                        break;
+                    }
                     case Opcode.LOGIC_EQ:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_NEQ:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
                     case Opcode.LOGIC_NOT:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CMP, Registers.EAX, 0);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JNE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        break;
+                    }
 
                     case Opcode.BITS_AND:
                         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
@@ -1304,28 +1304,28 @@ namespace LanguageCore.ASM.Generator
                         Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
                         break;
                     case Opcode.MATH_MOD:
-                        {
-                            string label1 = Builder.CodeBuilder.NewLabel();
-                            string label2 = Builder.CodeBuilder.NewLabel();
+                    {
+                        string label1 = Builder.CodeBuilder.NewLabel();
+                        string label2 = Builder.CodeBuilder.NewLabel();
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CDQ);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.CDQ);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EBX);
 
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IDIV, Registers.EAX, Registers.EBX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, Registers.EDX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, 1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
-                            Builder.CodeBuilder.AppendLabel(label1);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, 0);
-                            Builder.CodeBuilder.AppendLabel(label2);
-                            Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
-                            break;
-                        }
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.IDIV, Registers.EAX, Registers.EBX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, Registers.EDX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.TEST, Registers.EAX, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JE, label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, 1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.JMP, label2);
+                        Builder.CodeBuilder.AppendLabel(label1);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, 0);
+                        Builder.CodeBuilder.AppendLabel(label2);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        break;
+                    }
                     default:
                         throw new NotImplementedException();
                 }
@@ -1396,7 +1396,7 @@ namespace LanguageCore.ASM.Generator
             for (int i = 0; i < statements.Length; i++)
             {
                 if (statements[i] is KeywordCall keywordCall &&
-                    keywordCall.Identifier == "return")
+                    keywordCall.Identifier.Equals("return"))
                 {
                     if (keywordCall.Parameters.Length != 0 &&
                         keywordCall.Parameters.Length != 1)
@@ -1455,7 +1455,7 @@ namespace LanguageCore.ASM.Generator
             {
                 for (int i = 0; i < functionDefinition.Attributes.Length; i++)
                 {
-                    if (functionDefinition.Attributes[i].Identifier == "External")
+                    if (functionDefinition.Attributes[i].Identifier.Equals("External"))
                     { return; }
                 }
             }

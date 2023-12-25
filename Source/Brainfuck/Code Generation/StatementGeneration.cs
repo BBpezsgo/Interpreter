@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Globalization;
 using System.Diagnostics;
+using System.Globalization;
+using System.Linq;
 
 #pragma warning disable IDE0051
 
@@ -574,12 +574,12 @@ namespace LanguageCore.Brainfuck.Generator
             StatementWithValue statement = modifiedStatement.Statement;
             Token modifier = modifiedStatement.Modifier;
 
-            if (modifier == "ref")
+            if (modifier.Equals("ref"))
             {
                 throw new NotImplementedException();
             }
 
-            if (modifier == "temp")
+            if (modifier.Equals("temp"))
             {
                 GenerateCodeForStatement(statement);
                 return;
@@ -2132,7 +2132,7 @@ namespace LanguageCore.Brainfuck.Generator
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
-            if (prevType.IsStackArray && field.FieldName == "Length")
+            if (prevType.IsStackArray && field.FieldName.Equals("Length"))
             {
                 Stack.Push(prevType.StackArraySize);
                 return;

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace LanguageCore.Compiler
 {
@@ -149,36 +150,38 @@ namespace LanguageCore.Compiler
 
         public override string ToString()
         {
-            string result = $"class";
-            result += ' ';
-            result += $"{this.Name.Content}";
+            StringBuilder result = new();
+            result.Append("class ");
+
+            result.Append(this.Name.Content);
+
             if (this.TemplateInfo != null)
             {
-                result += '<';
+                result.Append('<');
                 if (this.currentTypeArguments.Count > 0)
                 {
                     for (int i = 0; i < this.TemplateInfo.TypeParameters.Length; i++)
                     {
-                        if (i > 0) result += ", ";
+                        if (i > 0) result.Append(", ");
 
                         string typeParameterName = this.TemplateInfo.TypeParameters[i].Content;
                         if (this.currentTypeArguments.TryGetValue(typeParameterName, out CompiledType? typeParameterValue))
                         {
-                            result += typeParameterValue.ToString();
+                            result.Append(typeParameterValue.ToString());
                         }
                         else
                         {
-                            result += "?";
+                            result.Append('?');
                         }
                     }
                 }
                 else
                 {
-                    result += string.Join<Token>(", ", this.TemplateInfo.TypeParameters);
+                    result.Append(string.Join<Token>(", ", this.TemplateInfo.TypeParameters));
                 }
-                result += '>';
+                result.Append('>');
             }
-            return result;
+            return result.ToString();
         }
     }
 }

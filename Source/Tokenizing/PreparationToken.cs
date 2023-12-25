@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System;
+using System.Text;
 
 namespace LanguageCore.Tokenizing
 {
@@ -32,7 +33,9 @@ namespace LanguageCore.Tokenizing
         POTENTIAL_FLOAT,
     }
 
-    sealed class PreparationToken : IThingWithPosition
+    sealed class PreparationToken :
+        IThingWithPosition,
+        IDuplicatable<PreparationToken>
     {
         Position position;
         public PreparationTokenType TokenType;
@@ -46,6 +49,13 @@ namespace LanguageCore.Tokenizing
             this.position = position;
             this.TokenType = PreparationTokenType.Whitespace;
             this.Content = new StringBuilder();
+        }
+
+        PreparationToken(Position position, PreparationTokenType tokenType, string content)
+        {
+            this.position = position;
+            this.TokenType = tokenType;
+            this.Content = new StringBuilder(content);
         }
 
         public override string ToString() => Content.ToString();
@@ -66,5 +76,39 @@ namespace LanguageCore.Tokenizing
             PreparationTokenType.CommentMultiline => Tokenizing.TokenType.CommentMultiline,
             _ => throw new InternalException($"Token {this} isn't finished (type is {TokenType})"),
         }, Content.ToString(), false, Position);
+
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="ArgumentOutOfRangeException"/>
+        public (PreparationToken?, PreparationToken?) Slice(int at)
+        {
+            if (Content.Length == 0)
+            { return (null, null); }
+
+            if (at < 0)
+            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
+
+            if (at > Content.Length)
+            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
+
+            PreparationToken left;
+            PreparationToken right;
+
+            if (Content.Length == 1)
+            {
+                left = Duplicate();
+                return (left, null);
+            }
+
+            (Position leftPosition, Position rightPosition) = position.Slice(at);
+
+            string content = Content.ToString();
+
+            left = new PreparationToken(leftPosition, TokenType, content[..at]);
+            right = new PreparationToken(rightPosition, TokenType, content[at..]);
+
+            return (left, right);
+        }
+
+        public PreparationToken Duplicate() => new(position, TokenType, Content.ToString());
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace LanguageCore.Compiler
 {
@@ -80,27 +81,27 @@ namespace LanguageCore.Compiler
 
         public override string ToString()
         {
-            string result = string.Empty;
-            if (IsExport)
-            {
-                result += "export ";
-            }
-            result += this.Identifier.Content;
+            StringBuilder result = new();
 
-            result += '(';
+            if (IsExport)
+            { result.Append("export "); }
+
+            result.Append(this.Identifier.Content);
+
+            result.Append('(');
             if (this.ParameterTypes.Length > 0)
             {
                 for (int i = 0; i < ParameterTypes.Length; i++)
                 {
-                    if (i > 0) result += ", ";
-                    result += ParameterTypes[i].ToString();
+                    if (i > 0) result.Append(", ");
+                    result.Append(ParameterTypes[i].ToString());
                 }
             }
-            result += ')';
+            result.Append(')');
 
-            result += Block?.ToString() ?? ";";
+            result.Append(Block?.ToString() ?? ";");
 
-            return result;
+            return result.ToString();
         }
 
         public CompiledGeneralFunctionTemplateInstance InstantiateTemplate(TypeArguments typeParameters)

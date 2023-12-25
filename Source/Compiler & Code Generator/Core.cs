@@ -871,14 +871,15 @@ namespace LanguageCore.Compiler
                 };
             }
 
-            string result = Name;
+            StringBuilder result = new();
+            result.Append(Name);
 
             if (TypeParameters.Length > 0)
-            { result += $"<{string.Join<CompiledType>(", ", TypeParameters)}>"; }
+            { result.Append($"<{string.Join<CompiledType>(", ", TypeParameters)}>"); }
             else if (@class != null && @class.TemplateInfo is not null)
-            { result += $"<{string.Join<Token>(", ", @class.TemplateInfo.TypeParameters)}>"; }
+            { result.Append($"<{string.Join<Token>(", ", @class.TemplateInfo.TypeParameters)}>"); }
 
-            return result;
+            return result.ToString();
         }
         string GetDebuggerDisplay() => ToString();
 

@@ -73,8 +73,6 @@ namespace LanguageCore.Tokenizing
         static readonly char[] Operators = ['+', '-', '*', '/', '=', '<', '>', '!', '%', '^', '|', '&', '~'];
         static readonly string[] DoubleOperators = ["++", "--", "<<", ">>", "&&", "||"];
         static readonly char[] SimpleOperators = [';', ',', '#'];
-        static readonly char[] Whitespaces = [' ', '\t', '\u200B'];
-        static readonly char[] DigitsHex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'];
 
         readonly PreparationToken CurrentToken;
         protected int CurrentColumn;

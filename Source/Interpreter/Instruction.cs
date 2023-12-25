@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 using DataUtilities.ReadableFileFormat;
 using DataUtilities.Serializer;
 
@@ -81,16 +82,21 @@ namespace LanguageCore.Runtime
 
         public override string ToString()
         {
-            string result = $"{opcode}";
+            StringBuilder result = new();
+
+            result.Append(opcode.ToString());
 
             if (opcode == Opcode.LOAD_VALUE ||
                 opcode == Opcode.STORE_VALUE)
-            { result += " " + AddressingMode.ToString(); }
+            {
+                result.Append(' ');
+                result.Append(AddressingMode.ToString());
+            }
 
             if (!this.parameter.IsNull)
-            { result += $" {{ {parameter} }}"; }
+            { result.Append($" {{ {parameter} }}"); }
 
-            return result;
+            return result.ToString();
         }
 
         #region Serialize

@@ -302,7 +302,7 @@ namespace LanguageCore.Compiler
         protected bool StatementCanBeDeallocated(StatementWithValue statement, out bool explicitly)
         {
             if (statement is ModifiedStatement modifiedStatement &&
-                modifiedStatement.Modifier == "temp")
+                modifiedStatement.Modifier.Equals("temp"))
             {
                 if (modifiedStatement.Statement is LiteralStatement ||
                     modifiedStatement.Statement is OperatorCall)
@@ -607,7 +607,7 @@ namespace LanguageCore.Compiler
 
                 if (!element.IsTemplate) continue;
 
-                if (element.Identifier != functionCallStatement.FunctionName) continue;
+                if (!element.Identifier.Equals(functionCallStatement.FunctionName)) continue;
 
                 if (!CompiledType.TryGetTypeParameters(element.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
@@ -873,7 +873,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
-                if (function.Identifier != name) continue;
+                if (!function.Identifier.Equals(name)) continue;
 
                 if (compiledFunction is not null)
                 { return false; }
@@ -894,7 +894,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
-                if (function.Identifier != name) continue;
+                if (!function.Identifier.Equals(name)) continue;
 
                 if (function.ParameterCount != parameterCount) continue;
 
@@ -936,7 +936,7 @@ namespace LanguageCore.Compiler
             {
                 MacroDefinition _macro = this.CompiledMacros[i];
 
-                if (_macro.Identifier != name) continue;
+                if (!_macro.Identifier.Equals(name)) continue;
 
                 if (_macro.ParameterCount != parameterCount) continue;
 
@@ -979,7 +979,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
-                if (function.Identifier != name) continue;
+                if (!function.Identifier.Equals(name)) continue;
 
                 if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
@@ -998,7 +998,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
-                if (function.Identifier != name.Content) continue;
+                if (!function.Identifier.Equals(name.Content)) continue;
 
                 if (compiledFunction is not null)
                 { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
@@ -1027,7 +1027,7 @@ namespace LanguageCore.Compiler
             {
                 CompiledFunction function = this.CompiledFunctions[i];
 
-                if (function.Identifier != name.Content) continue;
+                if (!function.Identifier.Equals(name.Content)) continue;
 
                 if (type.ReturnType.Equals(function.Type) &&
                     CompiledType.Equals(function.ParameterTypes, type.Parameters))
@@ -1103,7 +1103,7 @@ namespace LanguageCore.Compiler
                 CompiledGeneralFunction function = CompiledGeneralFunctions[i];
 
                 if (function.IsTemplate) continue;
-                if (function.Identifier != name) continue;
+                if (!function.Identifier.Equals(name)) continue;
                 if (function.Context != @class) continue;
                 if (!CompiledType.Equals(function.ParameterTypes, parameters)) continue;
 
@@ -1148,7 +1148,7 @@ namespace LanguageCore.Compiler
             foreach (CompiledGeneralFunction function in CompiledGeneralFunctions)
             {
                 if (!function.IsTemplate) continue;
-                if (function.Identifier != name) continue;
+                if (!function.Identifier.Equals(name)) continue;
                 if (function.Context != @class) continue;
                 if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
@@ -1931,7 +1931,7 @@ namespace LanguageCore.Compiler
         {
             CompiledType prevStatementType = FindStatementType(field.PrevStatement);
 
-            if (prevStatementType.IsStackArray && field.FieldName == "Length")
+            if (prevStatementType.IsStackArray && field.FieldName.Equals("Length"))
             {
                 return new CompiledType(Type.Integer);
             }
@@ -2019,12 +2019,12 @@ namespace LanguageCore.Compiler
         protected CompiledType FindStatementType(TypeCast @as) => new(@as.Type, FindType);
         protected CompiledType FindStatementType(ModifiedStatement modifiedStatement, CompiledType? expectedType)
         {
-            if (modifiedStatement.Modifier == "ref")
+            if (modifiedStatement.Modifier.Equals("ref"))
             {
                 return FindStatementType(modifiedStatement.Statement, expectedType);
             }
 
-            if (modifiedStatement.Modifier == "temp")
+            if (modifiedStatement.Modifier.Equals("temp"))
             {
                 return FindStatementType(modifiedStatement.Statement, expectedType);
             }
@@ -2110,7 +2110,7 @@ namespace LanguageCore.Compiler
 
             List<CompiledType> result = new();
 
-            if (inlinedMacro.TryGetStatement(out KeywordCall? keywordCall, s => s.Identifier == "return"))
+            if (inlinedMacro.TryGetStatement(out KeywordCall? keywordCall, s => s.Identifier.Equals("return")))
             {
                 if (keywordCall.Parameters.Length == 0)
                 { result.Add(new CompiledType(Type.Void)); }
@@ -2184,7 +2184,7 @@ namespace LanguageCore.Compiler
             result = Collapse(result, parameters);
 
             if (result is KeywordCall keywordCall &&
-                keywordCall.Identifier == "return" &&
+                keywordCall.Identifier.Equals("return") &&
                 keywordCall.Parameters.Length == 1)
             {
                 result = keywordCall.Parameters[0];
@@ -2202,7 +2202,7 @@ namespace LanguageCore.Compiler
                 statements[i] = InlineMacro(statement, parameters);
 
                 if (statement is KeywordCall keywordCall &&
-                    keywordCall.Identifier == "return")
+                    keywordCall.Identifier.Equals("return"))
                 { break; }
             }
             return new Block(block.BracketStart, statements, block.BracketEnd);
@@ -2561,7 +2561,7 @@ namespace LanguageCore.Compiler
         {
             CompiledType prevType = FindStatementType(field.PrevStatement);
 
-            if (prevType.IsStackArray && field.FieldName == "Length")
+            if (prevType.IsStackArray && field.FieldName.Equals("Length"))
             {
                 value = new DataItem(prevType.StackArraySize);
                 Convert(ref value, expectedType);

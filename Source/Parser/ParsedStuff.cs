@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace LanguageCore.Parser
 {
-    using System.Collections;
     using Compiler;
     using Tokenizing;
 
@@ -275,30 +276,32 @@ namespace LanguageCore.Parser
 
         public string ReadableID()
         {
-            string result = this.Identifier.ToString();
-            result += "(";
+            StringBuilder result = new();
+            result.Append(Identifier.ToString());
+            result.Append("(");
             for (int j = 0; j < this.Parameters.Count; j++)
             {
-                if (j > 0) { result += ", "; }
-                result += this.Parameters[j].Type.ToString();
+                if (j > 0) result.Append(", ");
+                result.Append(this.Parameters[j].Type.ToString());
             }
-            result += ")";
-            return result;
+            result.Append(")");
+            return result.ToString();
         }
 
         public string ReadableID(TypeArguments? typeArguments)
         {
             if (typeArguments == null) return ReadableID();
-            string result = this.Identifier.ToString();
+            StringBuilder result = new();
+            result.Append(this.Identifier.ToString());
 
-            result += "(";
+            result.Append("(");
             for (int j = 0; j < this.Parameters.Count; j++)
             {
-                if (j > 0) { result += ", "; }
-                result += this.Parameters[j].Type.ToString(typeArguments);
+                if (j > 0) { result.Append(", "); }
+                result.Append(this.Parameters[j].Type.ToString(typeArguments));
             }
-            result += ")";
-            return result;
+            result.Append(")");
+            return result.ToString();
         }
 
         public override bool Equals(object? obj)
@@ -333,19 +336,6 @@ namespace LanguageCore.Parser
             FilePath,
             TemplateInfo,
             Identifier);
-
-        public static bool operator ==(FunctionThingDefinition? a, FunctionThingDefinition? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-
-            if (!string.Equals(a.Identifier.Content, b.Identifier.Content, StringComparison.Ordinal)) return false;
-
-            if (!a.Parameters.TypeEquals(b.Parameters)) return false;
-
-            return true;
-        }
-        public static bool operator !=(FunctionThingDefinition? a, FunctionThingDefinition? b) => !(a == b);
 
         public virtual Position Position => new Position(Identifier)
             .Union(Parameters)
@@ -383,15 +373,16 @@ namespace LanguageCore.Parser
 
         public string ReadableID()
         {
-            string result = this.Identifier.ToString();
-            result += "(";
-            for (int j = 0; j < this.Parameters.Length; j++)
+            StringBuilder result = new();
+            result.Append(Identifier.ToString());
+            result.Append('(');
+            for (int j = 0; j < Parameters.Length; j++)
             {
-                if (j > 0) { result += ", "; }
-                result += "any"; // this.Parameters[j].ToString();
+                if (j > 0) { result.Append(", "); }
+                result.Append("any"); // this.Parameters[j].ToString();
             }
-            result += ")";
-            return result;
+            result.Append(')');
+            return result.ToString();
         }
 
         public override bool Equals(object? obj)
@@ -483,31 +474,29 @@ namespace LanguageCore.Parser
 
         public override string ToString()
         {
-            string result = "";
+            StringBuilder result = new();
             if (IsExport)
-            {
-                result += "export ";
-            }
+            { result.Append("export "); }
 
-            result += this.Type.ToString();
-            result += ' ';
+            result.Append(Type.ToString());
+            result.Append(' ');
 
-            result += this.Identifier.Content;
+            result.Append(Identifier.Content);
 
-            result += '(';
-            if (this.Parameters.Count > 0)
+            result.Append('(');
+            if (Parameters.Count > 0)
             {
                 for (int i = 0; i < Parameters.Count; i++)
                 {
-                    if (i > 0) result += ", ";
-                    result += Parameters[i].Type.ToString();
+                    if (i > 0) result.Append(", ");
+                    result.Append(Parameters[i].Type.ToString());
                 }
             }
-            result += ')';
+            result.Append(')');
 
-            result += Block?.ToString() ?? ";";
+            result.Append(Block?.ToString() ?? ";");
 
-            return result;
+            return result.ToString();
         }
 
         public bool IsSame(FunctionDefinition other)
@@ -541,27 +530,25 @@ namespace LanguageCore.Parser
 
         public override string ToString()
         {
-            string result = "";
+            StringBuilder result = new();
             if (IsExport)
-            {
-                result += "export ";
-            }
-            result += this.Identifier.Content;
+            { result.Append("export "); }
+            result.Append(Identifier.Content);
 
-            result += '(';
-            if (this.Parameters.Count > 0)
+            result.Append('(');
+            if (Parameters.Count > 0)
             {
                 for (int i = 0; i < Parameters.Count; i++)
                 {
-                    if (i > 0) result += ", ";
-                    result += Parameters[i].Type;
+                    if (i > 0) result.Append(", ");
+                    result.Append(Parameters[i].Type);
                 }
             }
-            result += ')';
+            result.Append(')');
 
-            result += Block?.ToString() ?? ";";
+            result.Append(Block?.ToString() ?? ";");
 
-            return result;
+            return result.ToString();
         }
     }
 
@@ -614,18 +601,19 @@ namespace LanguageCore.Parser
 
         public override string ToString()
         {
-            string result = $"class";
-            result += ' ';
-            result += $"{this.Name.Content}";
-            if (this.TemplateInfo is not null)
+            StringBuilder result = new();
+            result.Append("class ");
+
+            result.Append(Name.Content);
+            if (TemplateInfo is not null)
             {
-                result += '<';
-                result += string.Join<Token>(", ", this.TemplateInfo.TypeParameters);
-                result += '>';
+                result.Append('<');
+                result.Append(string.Join<Token>(", ", TemplateInfo.TypeParameters));
+                result.Append('>');
             }
-            result += ' ';
-            result += "{...}";
-            return result;
+            result.Append(' ');
+            result.Append("{...}");
+            return result.ToString();
         }
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
@@ -706,13 +694,13 @@ namespace LanguageCore.Parser
         {
             get
             {
-                string result = "";
+                StringBuilder result = new();
                 for (int i = 0; i < Path.Length; i++)
                 {
-                    if (i > 0) result += ".";
-                    result += Path[i].Content;
+                    if (i > 0) result.Append('.');
+                    result.Append(Path[i].Content);
                 }
-                return result;
+                return result.ToString();
             }
         }
         public bool IsUrl => Path.Length == 1 && Uri.TryCreate(Path[0].Content, UriKind.Absolute, out Uri? uri) && uri.Scheme != "file:";

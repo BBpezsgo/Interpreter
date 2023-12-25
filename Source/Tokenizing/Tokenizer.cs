@@ -15,13 +15,8 @@ namespace LanguageCore.Tokenizing
             char prevChar = PreviousChar;
             PreviousChar = currChar;
 
-            if (currChar == '\r' && prevChar != '\n')
-            {
-                breakLine = true;
-                returnLine = true;
-            }
-
-            if (currChar == '\n' && prevChar != '\r')
+            if ((currChar == '\r' && prevChar != '\n') ||
+                currChar == '\n' && prevChar != '\r')
             {
                 breakLine = true;
                 returnLine = true;
@@ -54,7 +49,7 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.TokenType = PreparationTokenType.LiteralString;
                     SavedUnicode = null;
                 }
-                else if (!DigitsHex.Contains(char.ToLowerInvariant(currChar)))
+                else if (!char.IsAsciiHexDigit(currChar))
                 {
                     throw new TokenizerException($"This isn't a hex digit \"{currChar}\"", GetCurrentPosition(offsetTotal));
                 }
@@ -81,7 +76,7 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.TokenType = PreparationTokenType.LiteralCharacter;
                     SavedUnicode = null;
                 }
-                else if (!DigitsHex.Contains(char.ToLowerInvariant(currChar)))
+                else if (!char.IsAsciiHexDigit(currChar))
                 {
                     throw new TokenizerException($"This isn't a hex digit: \"{currChar}\"", GetCurrentPosition(offsetTotal));
                 }
@@ -342,12 +337,6 @@ namespace LanguageCore.Tokenizing
                 CurrentToken.TokenType = PreparationTokenType.Operator;
                 CurrentToken.Content.Append(currChar);
             }
-            else if (Whitespaces.Contains(currChar))
-            {
-                EndToken(offsetTotal);
-                CurrentToken.TokenType = PreparationTokenType.Whitespace;
-                CurrentToken.Content.Append(currChar);
-            }
             else if (currChar is '\r' or '\n')
             {
                 if (CurrentToken.TokenType == PreparationTokenType.CommentMultiline)
@@ -362,6 +351,12 @@ namespace LanguageCore.Tokenizing
                     CurrentToken.Content.Append(currChar);
                     EndToken(offsetTotal, true);
                 }
+            }
+            else if (char.IsWhiteSpace(currChar))
+            {
+                EndToken(offsetTotal);
+                CurrentToken.TokenType = PreparationTokenType.Whitespace;
+                CurrentToken.Content.Append(currChar);
             }
             else if (currChar == '"')
             {
@@ -455,23 +450,17 @@ namespace LanguageCore.Tokenizing
             {
                 if (CurrentToken.ToString().EndsWith('.'))
                 {
-                    CurrentToken.Position.Range.End.Character--;
-                    CurrentToken.Position.Range.End.Line--;
-                    CurrentToken.Position.AbsoluteRange.End--;
-                    CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
-                    CurrentToken.TokenType = PreparationTokenType.LiteralNumber;
-                    Tokens.Add(CurrentToken.Instantiate());
+                    (PreparationToken? number, PreparationToken? op) = CurrentToken.Slice(CurrentToken.Content.Length - 1);
 
-                    CurrentToken.Position.Range.Start.Character = CurrentToken.Position.Range.End.Character + 1;
-                    CurrentToken.Position.Range.Start.Line = CurrentToken.Position.Range.End.Line + 1;
-                    CurrentToken.Position.AbsoluteRange.Start = CurrentToken.Position.AbsoluteRange.End + 1;
+                    if (number is null || op is null)
+                    { throw new InternalException($"I failed at token splitting :(", CurrentToken, null); }
 
-                    CurrentToken.Position.Range.End.Character++;
-                    CurrentToken.Position.Range.End.Line++;
-                    CurrentToken.Position.AbsoluteRange.End++;
-                    CurrentToken.TokenType = PreparationTokenType.Operator;
-                    CurrentToken.Content.Clear();
-                    CurrentToken.Content.Append('.');
+                    number.TokenType = PreparationTokenType.LiteralNumber;
+                    op.TokenType = PreparationTokenType.Operator;
+
+                    Tokens.Add(number.Instantiate());
+                    Tokens.Add(op.Instantiate());
+                    goto Finish;
                 }
             }
 

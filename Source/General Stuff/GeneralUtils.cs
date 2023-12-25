@@ -2,7 +2,7 @@
 
 namespace LanguageCore
 {
-    public interface IDuplicatable<T>
+    public interface IDuplicatable<T> where T : notnull
     {
         public T Duplicate();
     }

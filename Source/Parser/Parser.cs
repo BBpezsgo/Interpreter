@@ -1870,7 +1870,7 @@ namespace LanguageCore.Parser
                     modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                     modifiers.Add(modifier);
 
-                    if (modifier == "this" && parameterIndex != 0)
+                    if (modifier.Equals("this") && parameterIndex != 0)
                     {
                         Errors.Add(new Error($"Modifier \"{modifier}\" only valid on the first parameter", modifier));
                     }
@@ -1982,14 +1982,14 @@ namespace LanguageCore.Parser
 
             if (!ExpectIdentifier(out Token? possibleType)) return false;
 
-            if (possibleType == "macro")
+            if (possibleType.Equals("macro"))
             { return false; }
-            if (possibleType == "return")
+            if (possibleType.Equals("return"))
             { return false; }
 
             type = new TypeInstanceSimple(possibleType);
 
-            if (possibleType.Content == "any")
+            if (possibleType.Content.Equals("any"))
             {
                 possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
                 if ((flags & AllowedType.ExplicitAny) == 0)
@@ -2004,7 +2004,7 @@ namespace LanguageCore.Parser
                 return true;
             }
 
-            if (possibleType.Content == "var")
+            if (possibleType.Content.Equals("var"))
             {
                 possibleType.AnalyzedType = TokenAnalyzedType.Keyword;
                 if ((flags & AllowedType.Implicit) == 0)
@@ -2047,9 +2047,9 @@ namespace LanguageCore.Parser
 
                         if (ExpectOperator(">>", out Token? doubleEnd))
                         {
-                            (Token? newA, Token? newB) = doubleEnd.CutInHalf();
+                            (Token? newA, Token? newB) = doubleEnd.Slice(1);
                             if (newA == null || newB == null)
-                            { throw new InternalException($"I failed at token splitting :("); }
+                            { throw new InternalException($"I failed at token splitting :(", doubleEnd, null); }
                             CurrentTokenIndex--;
                             Tokens[CurrentTokenIndex] = newB;
                             break;

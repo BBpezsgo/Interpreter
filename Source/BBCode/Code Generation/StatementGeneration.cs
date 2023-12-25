@@ -1428,7 +1428,7 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
-            if (prevType.IsStackArray && field.FieldName == "Length")
+            if (prevType.IsStackArray && field.FieldName.Equals("Length"))
             {
                 AddInstruction(Opcode.PUSH_VALUE, prevType.StackArraySize);
                 return;
@@ -1562,7 +1562,7 @@ namespace LanguageCore.BBCode.Generator
             StatementWithValue statement = modifiedStatement.Statement;
             Token modifier = modifiedStatement.Modifier;
 
-            if (modifier == "ref")
+            if (modifier.Equals("ref"))
             {
                 ValueAddress address = GetDataAddress(statement);
 
@@ -1586,7 +1586,7 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
-            if (modifier == "temp")
+            if (modifier.Equals("temp"))
             {
                 GenerateCodeForStatement(statement);
                 return;
@@ -2061,7 +2061,7 @@ namespace LanguageCore.BBCode.Generator
             if (inlinedMacro is Block block)
             { GenerateCodeForStatement(block); }
             else if (inlinedMacro is KeywordCall keywordCall &&
-                keywordCall.Identifier == "return" &&
+                keywordCall.Identifier.Equals("return") &&
                 keywordCall.Parameters.Length == 1)
             { GenerateCodeForStatement(keywordCall.Parameters[0]); }
             else
@@ -2254,7 +2254,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 for (int i = 0; i < functionDefinition.Attributes.Length; i++)
                 {
-                    if (functionDefinition.Attributes[i].Identifier == "External")
+                    if (functionDefinition.Attributes[i].Identifier.Equals("External"))
                     { return; }
                 }
             }

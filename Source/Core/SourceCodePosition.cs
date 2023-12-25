@@ -14,6 +14,7 @@ namespace LanguageCore
     public struct Position : IEquatable<Position>
     {
         public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined), new Range<int>(-1));
+        public static Position Zero => new(new Range<SinglePosition>(SinglePosition.Zero), new Range<int>(0));
 
         public Range<int> AbsoluteRange;
         public Range<SinglePosition> Range;
@@ -136,10 +137,15 @@ namespace LanguageCore
 
         public override readonly int GetHashCode() => HashCode.Combine(AbsoluteRange, Range);
 
-        public readonly (Position Left, Position Right) CutInHalf()
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="ArgumentOutOfRangeException"/>
+        public readonly (Position Left, Position Right) Slice(int at)
         {
             if (Range.Start.Line != Range.End.Line)
-            { throw new NotImplementedException(); }
+            { throw new NotImplementedException($"Position slicing on different lines not implemented"); }
+
+            if (at < 0)
+            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
 
             Position left = default;
             Position right = default;
@@ -151,12 +157,13 @@ namespace LanguageCore
                 int rangeSize = Range.End.Character - Range.Start.Character;
 
                 if (rangeSize < 0)
-                { throw new NotImplementedException(); }
+                { throw new NotImplementedException($"Somehow end is larger than start"); }
 
-                int leftRangeSize = rangeSize / 2;
+                if (rangeSize < at)
+                { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSize})"); }
 
                 leftRange.Start = Range.Start;
-                leftRange.End = new SinglePosition(Range.Start.Line, Range.Start.Character + leftRangeSize);
+                leftRange.End = new SinglePosition(Range.Start.Line, Range.Start.Character + at);
 
                 rightRange.Start = leftRange.End;
                 rightRange.End = Range.End;
@@ -169,12 +176,13 @@ namespace LanguageCore
                 int rangeSize = AbsoluteRange.End - AbsoluteRange.Start;
 
                 if (rangeSize < 0)
-                { throw new NotImplementedException(); }
+                { throw new NotImplementedException($"Somehow end is larger than start"); }
 
-                int leftRangeSize = rangeSize / 2;
+                if (rangeSize < at)
+                { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is larger than the range size ({rangeSize})"); }
 
                 leftRange.Start = AbsoluteRange.Start;
-                leftRange.End = AbsoluteRange.Start + leftRangeSize;
+                leftRange.End = AbsoluteRange.Start + at;
 
                 rightRange.Start = leftRange.End;
                 rightRange.End = AbsoluteRange.End;
@@ -199,9 +207,13 @@ namespace LanguageCore
 
         public readonly bool IsUndefined => Line < 0 || Character < 0;
 
+        /// <summary> <c>(<see cref="int.MaxValue"/>, <see cref="int.MaxValue"/>)</c> </summary>
         public static SinglePosition MaxValue => new(int.MaxValue, int.MaxValue);
+        /// <summary> <c>(0, 0)</c> </summary>
         public static SinglePosition MinValue => new(0, 0);
+        /// <summary> <c>(-1, -1)</c> </summary>
         public static SinglePosition Undefined => new(-1, -1);
+        /// <summary> <c>(0, 0)</c> </summary>
         public static SinglePosition Zero => new(0, 0);
 
         public SinglePosition(int line, int character)

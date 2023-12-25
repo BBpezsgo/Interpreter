@@ -217,7 +217,7 @@ namespace LanguageCore
         readonly StringBuilder Input;
         ActiveInteractiveSession CurrentSession;
         readonly List<InteractiveSession> Sessions;
-        int LastRendererLength;
+        // int LastRendererLength;
         bool ForceClear;
         bool ShouldRender;
 
@@ -242,7 +242,7 @@ namespace LanguageCore
             Sessions = new List<InteractiveSession>();
             CurrentSession = ActiveInteractiveSession.Null;
             LastInput = DateTime.UtcNow.TimeOfDay.TotalSeconds;
-            LastRendererLength = 0;
+            // LastRendererLength = 0;
             ForceClear = false;
             ShouldRender = true;
 
@@ -524,7 +524,7 @@ namespace LanguageCore
             {
                 ForceClear = false;
                 Console.Clear();
-                LastRendererLength = Renderer.Length;
+                // LastRendererLength = Renderer.Length;
             }
             else
             {
@@ -593,11 +593,10 @@ namespace LanguageCore
             }
         }
 
-        void CompileAndColorizeInput(int cursorPosition = -1)
+        void CompileAndColorizeInput(int _ = -1)
         {
             CompilerCache.CompileAsync(Input.ToString());
-            return;
-
+            /*
             try
             {
                 CompilerCache.Compile(Input.ToString());
@@ -636,6 +635,7 @@ namespace LanguageCore
 
                 CurrentSession.Error(output.ToString());
             }
+            */
         }
 
         static string ColorizeSource(string source, IReadOnlyList<Token>? tokens, int cursorPosition = -1)

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace LanguageCore.Runtime
 {
@@ -43,14 +44,15 @@ namespace LanguageCore.Runtime
         {
             get
             {
-                string result = Name;
-                result += "(";
-                for (int j = 0; j < ParameterTypes.Length; j++)
+                StringBuilder result = new();
+                result.Append(Name);
+                result.Append('(');
+                for (int i = 0; i < ParameterTypes.Length; i++)
                 {
-                    if (j > 0) { result += ", "; }
-                    result += ParameterTypes[j].ToString().ToLowerInvariant();
+                    if (i > 0) result.Append(", ");
+                    result.Append(ParameterTypes[i].ToString().ToLowerInvariant());
                 }
-                result += ")";
+                result.Append(')');
                 return result;
             }
         }
@@ -128,7 +130,7 @@ namespace LanguageCore.Runtime
             callback.Invoke(parameters);
         }
     }
-    
+
     unsafe public static class ExternalFunctionGenerator
     {
         #region AddExternalFunction()

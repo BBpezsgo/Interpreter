@@ -316,7 +316,7 @@ namespace LanguageCore.IL.Generator
         void Compile(FunctionCall functionCall, ILGenerator generator)
         {
             if (false &&
-                functionCall.Identifier == "Alloc" &&
+                functionCall.Identifier.Equals("Alloc") &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 0)
             {
@@ -324,7 +324,7 @@ namespace LanguageCore.IL.Generator
             }
 
             if (false &&
-                functionCall.Identifier == "AllocFrom" &&
+                functionCall.Identifier.Equals("AllocFrom") &&
                 functionCall.IsMethodCall == false &&
                 functionCall.Parameters.Length == 1 && (
                     FindStatementType(functionCall.Parameters[0]).BuiltinType == Type.Byte ||

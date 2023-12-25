@@ -97,14 +97,6 @@ namespace LanguageCore.Tokenizing
         public Token Duplicate() => new(TokenType, new string(Content), IsAnonymous, Position)
         { AnalyzedType = AnalyzedType };
 
-        public static bool operator ==(Token? a, string? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-            return a.Equals(b);
-        }
-        public static bool operator !=(Token? a, string? b) => !(a == b);
-
         string GetDebuggerDisplay() => TokenType switch
         {
             TokenType.LiteralString => $"\"{Content.Escape()}\"",
@@ -112,10 +104,18 @@ namespace LanguageCore.Tokenizing
             _ => Content.Escape(),
         };
 
-        public (Token?, Token?) CutInHalf()
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="ArgumentOutOfRangeException"/>
+        public (Token?, Token?) Slice(int at)
         {
             if (string.IsNullOrEmpty(Content))
             { return (null, null); }
+
+            if (at < 0)
+            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
+
+            if (at > Content.Length)
+            { throw new ArgumentOutOfRangeException(nameof(at), at, $"Slice location is less than zero"); }
 
             Token left;
             Token right;
@@ -126,12 +126,10 @@ namespace LanguageCore.Tokenizing
                 return (left, null);
             }
 
-            int leftSize = Content.Length / 2;
+            (Position leftPosition, Position rightPosition) = position.Slice(at);
 
-            (Position leftPosition, Position rightPosition) = position.CutInHalf();
-
-            left = new Token(TokenType, Content[..leftSize], IsAnonymous, leftPosition);
-            right = new Token(TokenType, Content[leftSize..], IsAnonymous, rightPosition);
+            left = new Token(TokenType, Content[..at], IsAnonymous, leftPosition);
+            right = new Token(TokenType, Content[at..], IsAnonymous, rightPosition);
 
             return (left, right);
         }

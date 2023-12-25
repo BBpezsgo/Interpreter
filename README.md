@@ -3,12 +3,6 @@
 [![.Net 7.0](https://img.shields.io/badge/.NET-7.0-5C2D91)](#)
 [![C# preview](https://img.shields.io/badge/C%23-preview-239120.svg)](#)
 
-## Download
-
-[Download win-x64 JIT](https://drive.google.com/uc?export=download&id=1tlonja46cQfgcAPrV-6hxesONnVzdW2o)
-
-[Download win-x64 AOT](https://drive.google.com/uc?export=download&id=1eEvYsDmbwt2s5ND8-DStJG1WFoc7WTXZ) Google says it's a virus ☹
-
 ## [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 
 ## About

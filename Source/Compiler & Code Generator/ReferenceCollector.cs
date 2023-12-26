@@ -12,7 +12,7 @@ namespace LanguageCore.Compiler
     {
         #region Fields
 
-        ICanBeSame? CurrentFunction;
+        ISameCheck? CurrentFunction;
 
         #endregion
 
@@ -674,7 +674,7 @@ namespace LanguageCore.Compiler
         {
             for (int i = 0; i < this.CompiledFunctions.Length; i++)
             {
-                ((IReferenceable<FunctionCall>)this.CompiledFunctions[i]).ClearReferences();
+                this.CompiledFunctions[i].ClearReferences();
                 this.CompiledFunctions[i].TimesUsed = 0;
                 this.CompiledFunctions[i].TimesUsedTotal = 0;
             }
@@ -688,7 +688,7 @@ namespace LanguageCore.Compiler
 
             for (int i = 0; i < this.CompiledOperators.Length; i++)
             {
-                ((IReferenceable<OperatorCall>)this.CompiledOperators[i]).ClearReferences();
+                this.CompiledOperators[i].ClearReferences();
                 this.CompiledOperators[i].TimesUsed = 0;
                 this.CompiledOperators[i].TimesUsedTotal = 0;
             }

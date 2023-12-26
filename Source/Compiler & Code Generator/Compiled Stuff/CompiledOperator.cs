@@ -8,7 +8,8 @@ namespace LanguageCore.Compiler
 
     public class CompiledOperator :
         FunctionDefinition,
-        ICanBeSame,
+        ISameCheck,
+        ISameCheck<CompiledOperator>,
         IAmInContext<CompiledClass>,
         IReferenceable<OperatorCall>,
         IDuplicatable<CompiledOperator>
@@ -22,8 +23,8 @@ namespace LanguageCore.Compiler
 
         public CompiledAttributeCollection CompiledAttributes;
 
-        public IReadOnlyList<(OperatorCall Statement, string? File)> ReferencesOperator => references;
-        readonly List<(OperatorCall Statement, string? File)> references = new();
+        public IReadOnlyList<Reference<OperatorCall>> ReferencesOperator => references;
+        readonly List<Reference<OperatorCall>> references = new();
 
         public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
@@ -53,7 +54,7 @@ namespace LanguageCore.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(OperatorCall referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(OperatorCall referencedBy, string? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledOperator other)
@@ -66,7 +67,7 @@ namespace LanguageCore.Compiler
 
             return true;
         }
-        public bool IsSame(ICanBeSame? other) => other is CompiledOperator other2 && IsSame(other2);
+        public bool IsSame(ISameCheck? other) => other is CompiledOperator other2 && IsSame(other2);
 
         public CompiledOperator Duplicate() => new(this.Type, new List<CompiledType>(this.ParameterTypes).ToArray(), this)
         {

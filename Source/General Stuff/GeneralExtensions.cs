@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
-using System.Numerics;
 using System.Text;
 
 namespace LanguageCore
@@ -52,23 +50,11 @@ namespace LanguageCore
             { literal.Append(v[i].Escape()); }
             return literal.ToString();
         }
-    }
 
-    public static class RangeExtensions
-    {
-        public static T Size<T>(this Range<T> range) where T : INumber<T>
-            => T.Max(range.Start, range.End) - T.Min(range.Start, range.End);
-
-        public static bool Contains<TRange, TValue>(this Range<TRange> range, TValue value)
-            where TRange : IEquatable<TRange>, IComparisonOperators<TRange, TValue, bool>
-            => range.Start <= value && range.End >= value;
-
-        public static bool Overlaps<T>(this Range<T> a, Range<T> b)
-            where T : IEquatable<T>, IComparisonOperators<T, T, bool>
+        public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
         {
-            T maxStart = (a.Start > b.Start) ? a.Start : b.Start;
-            T minEnd = (a.End < b.End) ? a.End : b.End;
-            return maxStart <= minEnd;
+            foreach (KeyValuePair<TKey, TValue> pair in elements)
+            { v.Add(pair.Key, pair.Value); }
         }
     }
 }

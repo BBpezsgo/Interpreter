@@ -9,12 +9,12 @@ namespace LanguageCore.Compiler
 {
     using Tokenizing;
 
-    public struct AttributeValues : IThingWithPosition
+    public struct AttributeValues : IPositioned
     {
         public List<CompiledLiteral> parameters;
         public Token Identifier;
 
-        public readonly Position Position => new Position((IEnumerable<IThingWithPosition>)parameters).Union(Identifier);
+        public readonly Position Position => new Position((IEnumerable<IPositioned>)parameters).Union(Identifier);
 
         public readonly bool TryGetValue<T>(int index, [NotNullWhen(true)] out T? value)
         {
@@ -87,7 +87,7 @@ namespace LanguageCore.Compiler
         Boolean,
     }
 
-    public readonly struct CompiledLiteral : IThingWithPosition
+    public readonly struct CompiledLiteral : IPositioned
     {
         public readonly int ValueInt;
         public readonly float ValueFloat;

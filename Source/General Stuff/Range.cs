@@ -7,35 +7,14 @@ namespace LanguageCore
     public partial struct Range<T> :
         IEquatable<Range<T>>,
         IEquatable<ValueTuple<T, T>>,
-        IEquatable<T>
+        IEquatable<T>,
+        System.Numerics.IEqualityOperators<Range<T>, Range<T>, bool>,
+        System.Numerics.IEqualityOperators<Range<T>, ValueTuple<T, T>, bool>,
+        System.Numerics.IEqualityOperators<Range<T>, T, bool>
         where T : IEquatable<T>
     {
         public T Start;
         public T End;
-
-        public T this[int i]
-        {
-            readonly get => i switch
-            {
-                0 => Start,
-                1 => End,
-                _ => throw new ArgumentOutOfRangeException(nameof(i)),
-            };
-            set
-            {
-                switch (i)
-                {
-                    case 0:
-                        Start = value;
-                        break;
-                    case 1:
-                        End = value;
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(i));
-                }
-            }
-        }
 
         public Range(T both)
         {
@@ -52,8 +31,8 @@ namespace LanguageCore
         public bool Equals(Range<T> other) => Start.Equals(other.Start) && End.Equals(other.End);
         public bool Equals(T start, T end) => Start.Equals(start) && End.Equals(end);
         public bool Equals(T? other) => Start.Equals(other) && End.Equals(other);
-
         public bool Equals(ValueTuple<T, T> other) => Start.Equals(other.Item1) && End.Equals(other.Item2);
+
         public override readonly int GetHashCode() => HashCode.Combine(Start, End);
 
         public override readonly string ToString() => $"({Start}, {End})";
@@ -64,13 +43,11 @@ namespace LanguageCore
         public static bool operator ==(Range<T> left, ValueTuple<T, T> right) => left.Equals(right);
         public static bool operator !=(Range<T> left, ValueTuple<T, T> right) => !left.Equals(right);
 
-        public static bool operator ==(ValueTuple<T, T> left, Range<T> right) => right.Equals(left);
-        public static bool operator !=(ValueTuple<T, T> left, Range<T> right) => !right.Equals(left);
-
-        public static bool operator ==(Range<T> left, T right) => left.Equals(right);
-        public static bool operator !=(Range<T> left, T right) => !left.Equals(right);
+        public static bool operator ==(Range<T> left, T? right) => left.Equals(right);
+        public static bool operator !=(Range<T> left, T? right) => !left.Equals(right);
 
         public static implicit operator ValueTuple<T, T>(Range<T> v) => new(v.Start, v.End);
+
         public static implicit operator Range<T>(ValueTuple<T, T> v) => new(v.Item1, v.Item2);
     }
 }

@@ -841,6 +841,94 @@ namespace LanguageCore.Runtime
             };
         }
 
+        public static bool TryCast(ref DataItem value, RuntimeType? targetType)
+            => targetType.HasValue && DataItem.TryCast(ref value, targetType.Value);
+        public static bool TryCast(ref DataItem value, RuntimeType targetType)
+        {
+            switch (targetType)
+            {
+                case RuntimeType.UInt8:
+                    switch (value.Type)
+                    {
+                        case RuntimeType.UInt8:
+                            return true;
+                        case RuntimeType.SInt32:
+                            if (value.ValueSInt32 >= byte.MinValue && value.ValueSInt32 <= byte.MaxValue)
+                            {
+                                value = new DataItem((byte)value.ValueSInt32);
+                                return true;
+                            }
+                            return false;
+                        case RuntimeType.Single:
+                            return false;
+                        case RuntimeType.UInt16:
+                            if (value.ValueUInt16 >= byte.MinValue && value.ValueUInt16 <= byte.MaxValue)
+                            {
+                                value = new DataItem((byte)value.ValueUInt16);
+                                return true;
+                            }
+                            return false;
+                        default:
+                            return false;
+                    }
+                case RuntimeType.SInt32:
+                    switch (value.Type)
+                    {
+                        case RuntimeType.UInt8:
+                            value = new DataItem((int)value.ValueUInt8);
+                            return true;
+                        case RuntimeType.SInt32:
+                            return true;
+                        case RuntimeType.Single:
+                            return false;
+                        case RuntimeType.UInt16:
+                            value = new DataItem((int)value.ValueUInt16);
+                            return true;
+                        default:
+                            return false;
+                    }
+                case RuntimeType.Single:
+                    switch (value.Type)
+                    {
+                        case RuntimeType.UInt8:
+                            value = new DataItem((float)value.ValueUInt8);
+                            return true;
+                        case RuntimeType.SInt32:
+                            value = new DataItem((float)value.ValueSInt32);
+                            return true;
+                        case RuntimeType.Single:
+                            return true;
+                        case RuntimeType.UInt16:
+                            value = new DataItem((float)value.ValueUInt16);
+                            return true;
+                        default:
+                            return false;
+                    }
+                case RuntimeType.UInt16:
+                    switch (value.Type)
+                    {
+                        case RuntimeType.UInt8:
+                            value = new DataItem((char)value.ValueUInt8);
+                            return true;
+                        case RuntimeType.SInt32:
+                            if (value.ValueSInt32 >= char.MinValue && value.ValueSInt32 <= char.MaxValue)
+                            {
+                                value = new DataItem((char)value.ValueSInt32);
+                                return true;
+                            }
+                            return false;
+                        case RuntimeType.Single:
+                            return false;
+                        case RuntimeType.UInt16:
+                            return true;
+                        default:
+                            return false;
+                    }
+                default:
+                    return false;
+            }
+        }
+
         public static bool operator true(DataItem v) => v.ToBoolean(null);
         public static bool operator false(DataItem v) => !v.ToBoolean(null);
 

@@ -47,7 +47,7 @@ namespace LanguageCore.BBCode.Generator
                     if (CompileLevel == CompileLevel.All) continue;
                     if (CompileLevel == CompileLevel.Exported && function.IsExport) continue;
 
-                    string readableID = function.ReadableID();
+                    string readableID = function.ToReadable();
 
                     PrintCallback?.Invoke($"      Remove function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused function {readableID} is not compiled", function.Identifier, function.FilePath));
@@ -69,7 +69,7 @@ namespace LanguageCore.BBCode.Generator
                     if (CompileLevel == CompileLevel.All) continue;
                     if (CompileLevel == CompileLevel.Exported && @operator.IsExport) continue;
 
-                    string readableID = @operator.ReadableID();
+                    string readableID = @operator.ToReadable();
 
                     PrintCallback?.Invoke($"      Remove operator {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused operator {readableID} is not compiled", @operator.Identifier, @operator.FilePath));
@@ -91,7 +91,7 @@ namespace LanguageCore.BBCode.Generator
                     if (CompileLevel == CompileLevel.All) continue;
                     if (CompileLevel == CompileLevel.Exported && generalFunction.IsExport) continue;
 
-                    string readableID = generalFunction.ReadableID();
+                    string readableID = generalFunction.ToReadable();
 
                     PrintCallback?.Invoke($"      Remove general function {readableID}", LogType.Debug);
                     Informations.Add(new Information($"Unused general function  {readableID} is not compiled", generalFunction.Identifier, generalFunction.FilePath));

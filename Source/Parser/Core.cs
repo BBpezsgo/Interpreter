@@ -100,7 +100,7 @@ namespace LanguageCore.Parser
             for (int i = 0; i < this.Hashes.Length; i++)
             { this.Hashes[i].FilePath = path; }
 
-            foreach (IDefinition item in Statement.StatementExtensions.GetStatements<IDefinition>(this))
+            foreach (IInFile item in Statement.StatementExtensions.GetStatements<IInFile>(this))
             {
                 item.FilePath = path;
             }
@@ -130,7 +130,7 @@ namespace LanguageCore.Parser
                 { NotSetCallback?.Invoke($"Hash.FilePath {this.Hashes[i]} : {this.Hashes[i].FilePath}"); }
             }
 
-            foreach (IDefinition def in Statement.StatementExtensions.GetStatements<IDefinition>(this))
+            foreach (IInFile def in Statement.StatementExtensions.GetStatements<IInFile>(this))
             {
                 if (string.IsNullOrEmpty(def.FilePath))
                 { NotSetCallback?.Invoke($"IDefinition.FilePath {def} is null"); }

@@ -437,7 +437,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 if (!indexer.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Function \"{indexer.ReadableID()}\" cannot be called due to its protection level", statement, CurrentFile));
+                    Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
                     return;
                 }
 
@@ -1336,7 +1336,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-                { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+                { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;
                 typeArguments = compilableFunction.TypeArguments;
@@ -1346,7 +1346,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"Function \"{compiledFunction.ReadableID()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
@@ -1367,7 +1367,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
+            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
@@ -1377,7 +1377,7 @@ namespace LanguageCore.Brainfuck.Generator
             if (!GetGeneralFunction(@class, FindStatementTypes(constructorCall.Parameters), BuiltinFunctionNames.Constructor, out CompiledGeneralFunction? constructor))
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
-                { throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
+                { throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile); }
 
                 constructor = compilableGeneralFunction.Function;
                 typeArguments = compilableGeneralFunction.TypeArguments;
@@ -1509,7 +1509,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     if (!compiledOperator.CanUse(CurrentFile))
                     {
-                        Errors.Add(new Error($"Function \"{compiledOperator.ReadableID()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                        Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                         return;
                     }
 
@@ -1976,9 +1976,9 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (instanceType.IsStruct)
             {
-                instanceType.Struct.References?.Add(new DefinitionReference(instanceTypeSimple, CurrentFile));
+                instanceType.Struct.AddReference(instanceTypeSimple, CurrentFile);
 
-                int address = Stack.PushVirtual(instanceType.Struct.Size);
+                int address = Stack.PushVirtual(instanceType.Struct.SizeOnStack);
 
                 foreach (CompiledField field in instanceType.Struct.Fields)
                 {
@@ -2013,7 +2013,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
             else if (instanceType.IsClass)
             {
-                instanceType.Class.References?.Add(new DefinitionReference(instanceTypeSimple, CurrentFile));
+                instanceType.Class.AddReference(instanceTypeSimple, CurrentFile);
 
                 if (instanceType.Class.TemplateInfo != null)
                 {
@@ -2033,7 +2033,7 @@ namespace LanguageCore.Brainfuck.Generator
                 }
 
                 int pointerAddress = Stack.NextAddress;
-                Allocate(instanceType.Class.Size, newInstance);
+                Allocate(instanceType.Class.SizeOnHeap, newInstance);
 
                 /*
                 int currentOffset = 0;
@@ -2499,7 +2499,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         #endregion
 
-        int Allocate(int size, IThingWithPosition position)
+        int Allocate(int size, IPositioned position)
         {
             if (!TryGetBuiltinFunction("alloc", out CompiledFunction? allocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"alloc\")] not found", position, CurrentFile); }
@@ -2509,7 +2509,7 @@ namespace LanguageCore.Brainfuck.Generator
             return pointerAddress;
         }
 
-        void Free(int pointer, IThingWithPosition position)
+        void Free(int pointer, IPositioned position)
         {
             if (!TryGetBuiltinFunction("free", out CompiledFunction? deallocator))
             { throw new CompilerException($"Function with attribute [Builtin(\"free\")] not found", position, CurrentFile); }
@@ -2569,7 +2569,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         int GenerateCodeForLiteralString(Literal literal)
             => GenerateCodeForLiteralString(literal.Value, literal);
-        int GenerateCodeForLiteralString(string literal, IThingWithPosition position)
+        int GenerateCodeForLiteralString(string literal, IPositioned position)
         {
             using (Code.Block($"Create String \"{literal}\""))
             {
@@ -2611,7 +2611,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -2641,7 +2641,7 @@ namespace LanguageCore.Brainfuck.Generator
                         {
                             File = function.FilePath,
                             Identifier = function.Identifier.Content,
-                            ReadableIdentifier = function.ReadableID(),
+                            ReadableIdentifier = function.ToReadable(),
                             Instructions = (instructionStart, Code.GetFinalCode().Length),
                             IsMacro = false,
                             IsValid = true,
@@ -2677,7 +2677,7 @@ namespace LanguageCore.Brainfuck.Generator
                     {
                         File = function.FilePath,
                         Identifier = function.Identifier.Content,
-                        ReadableIdentifier = function.ReadableID(),
+                        ReadableIdentifier = function.ToReadable(),
                         Instructions = (instructionStart, Code.GetFinalCode().Length),
                         IsMacro = false,
                         IsValid = true,
@@ -2691,16 +2691,16 @@ namespace LanguageCore.Brainfuck.Generator
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.ParameterCount != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             if (function.Block is null)
-            { throw new CompilerException($"Function \"{function.ReadableID()}\" does not have any body definition", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
 
-            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ReadableID(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
 
             progressLabel.Print();
 
@@ -2727,7 +2727,7 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType definedType = function.ParameterTypes[i];
 
                 if (passedType != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
                 foreach (Variable compiledParameter in compiledParameters)
                 {
@@ -2761,7 +2761,7 @@ namespace LanguageCore.Brainfuck.Generator
                             { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                             if (v.Type != definedType)
-                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                             compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
                             continue;
@@ -2811,7 +2811,7 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
                     if (compiledParameter.Type != definedType)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
@@ -2925,7 +2925,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     File = function.FilePath,
                     Identifier = function.Identifier.Content,
-                    ReadableIdentifier = function.ReadableID(),
+                    ReadableIdentifier = function.ToReadable(),
                     Instructions = (instructionStart, Code.GetFinalCode().Length),
                     IsMacro = false,
                     IsValid = true,
@@ -2934,7 +2934,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledOperator function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledOperator function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -2964,7 +2964,7 @@ namespace LanguageCore.Brainfuck.Generator
                         {
                             File = function.FilePath,
                             Identifier = function.Identifier.Content,
-                            ReadableIdentifier = function.ReadableID(),
+                            ReadableIdentifier = function.ToReadable(),
                             Instructions = (instructionStart, Code.GetFinalCode().Length),
                             IsMacro = false,
                             IsValid = true,
@@ -3000,7 +3000,7 @@ namespace LanguageCore.Brainfuck.Generator
                     {
                         File = function.FilePath,
                         Identifier = function.Identifier.Content,
-                        ReadableIdentifier = function.ReadableID(),
+                        ReadableIdentifier = function.ToReadable(),
                         Instructions = (instructionStart, Code.GetFinalCode().Length),
                         IsMacro = false,
                         IsValid = true,
@@ -3014,16 +3014,16 @@ namespace LanguageCore.Brainfuck.Generator
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i] == function)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.ParameterCount != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             if (function.Block is null)
-            { throw new CompilerException($"Function \"{function.ReadableID()}\" does not have any body definition", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Function \"{function.ToReadable()}\" does not have any body definition", callerPosition, CurrentFile); }
 
-            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ReadableID(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
+            using ConsoleProgressLabel progressLabel = new($"Generating macro \"{function.ToReadable(typeArguments)}\"", ConsoleColor.DarkGray, ShowProgress);
 
             progressLabel.Print();
 
@@ -3050,7 +3050,7 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType definedType = function.ParameterTypes[i];
 
                 if (passedType != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
                 foreach (Variable compiledParameter in compiledParameters)
                 {
@@ -3084,7 +3084,7 @@ namespace LanguageCore.Brainfuck.Generator
                             { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                             if (v.Type != definedType)
-                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                             compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
                             continue;
@@ -3134,7 +3134,7 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
                     if (compiledParameter.Type != definedType)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
@@ -3241,7 +3241,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     File = function.FilePath,
                     Identifier = function.Identifier.Content,
-                    ReadableIdentifier = function.ReadableID(),
+                    ReadableIdentifier = function.ToReadable(),
                     Instructions = (instructionStart, Code.GetFinalCode().Length),
                     IsMacro = false,
                     IsValid = true,
@@ -3250,7 +3250,7 @@ namespace LanguageCore.Brainfuck.Generator
             }
         }
 
-        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IThingWithPosition callerPosition)
+        void GenerateCodeForMacro(CompiledGeneralFunction function, StatementWithValue[] parameters, TypeArguments? typeArguments, IPositioned callerPosition)
         {
             int instructionStart = 0;
             if (GenerateDebugInformation)
@@ -3259,11 +3259,11 @@ namespace LanguageCore.Brainfuck.Generator
             for (int i = 0; i < CurrentMacro.Count; i++)
             {
                 if (CurrentMacro[i].Identifier.Content == function.Identifier.Content)
-                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ReadableID()}\" used recursively)", callerPosition, CurrentFile); }
+                { throw new CompilerException($"Recursive macro inlining is not allowed (The macro \"{function.ToReadable()}\" used recursively)", callerPosition, CurrentFile); }
             }
 
             if (function.ParameterCount != parameters.Length)
-            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ReadableID()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to macro \"{function.ToReadable()}\" (required {function.ParameterCount} passed {parameters.Length})", callerPosition, CurrentFile); }
 
             Variable? returnVariable = null;
 
@@ -3288,7 +3288,7 @@ namespace LanguageCore.Brainfuck.Generator
                 CompiledType definedType = function.ParameterTypes[i];
 
                 if (passedType != definedType)
-                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
+                { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {passedType}", passed, CurrentFile); }
 
                 foreach (Variable compiledParameter in compiledParameters)
                 {
@@ -3322,7 +3322,7 @@ namespace LanguageCore.Brainfuck.Generator
                             { throw new CompilerException($"Variable \"{modifiedVariable}\" not found", modifiedVariable, CurrentFile); }
 
                             if (v.Type != definedType)
-                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
+                            { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {v.Type}", passed, CurrentFile); }
 
                             compiledParameters.Push(new Variable(defined.Identifier.Content, v.Address, function, false, false, v.Type, v.Size));
                             continue;
@@ -3371,7 +3371,7 @@ namespace LanguageCore.Brainfuck.Generator
                     { throw new CompilerException($"Parameter \"{defined}\" not found", defined.Identifier, CurrentFile); }
 
                     if (compiledParameter.Type != definedType)
-                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ReadableID()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
+                    { throw new CompilerException($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected {definedType}, passed {compiledParameter.Type}", passed, CurrentFile); }
 
                     using (Code.Block($"SET {defined.Identifier.Content} TO _something_"))
                     {
@@ -3421,7 +3421,7 @@ namespace LanguageCore.Brainfuck.Generator
                 ReturnTagStack.Push(Stack.Push(1));
             }
 
-            GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
+            GenerateCodeForStatement(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body"));
 
             {
                 if (ReturnTagStack.Pop() != Stack.LastAddress)
@@ -3464,7 +3464,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     File = function.FilePath,
                     Identifier = function.Identifier.Content,
-                    ReadableIdentifier = function.ReadableID(),
+                    ReadableIdentifier = function.ToReadable(),
                     Instructions = (instructionStart, Code.GetFinalCode().Length),
                     IsMacro = false,
                     IsValid = true,

@@ -7,11 +7,16 @@ namespace LanguageCore.Compiler
     using Parser;
     using Tokenizing;
 
-    public class CompiledClass : ClassDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>, IDuplicatable<CompiledClass>
+    public class CompiledClass : ClassDefinition,
+        IDuplicatable<CompiledClass>,
+        IReferenceable<TypeInstance>
     {
         public new readonly CompiledField[] Fields;
         public CompiledAttributeCollection CompiledAttributes;
-        public readonly List<DefinitionReference> References;
+
+        public IReadOnlyList<Reference<TypeInstance>> References => references;
+        readonly List<Reference<TypeInstance>> references;
+
         readonly TypeArguments currentTypeArguments;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
 
@@ -29,7 +34,8 @@ namespace LanguageCore.Compiler
                 return result;
             }
         }
-        public int Size
+
+        public int SizeOnHeap
         {
             get
             {
@@ -40,7 +46,7 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledClass(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
+        public CompiledClass(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -51,7 +57,7 @@ namespace LanguageCore.Compiler
             base.Statements.Clear();
             base.Statements.AddRange(definition.Statements);
 
-            this.References = new List<DefinitionReference>();
+            this.references = new List<Reference<TypeInstance>>();
         }
 
         public int SizeWithTypeArguments(IReadOnlyDictionary<string, CompiledType> typeParameters)
@@ -115,14 +121,14 @@ namespace LanguageCore.Compiler
 
         public void ClearTypeArguments() => currentTypeArguments.Clear();
 
-        CompiledType GetType(CompiledType type, IThingWithPosition position)
+        CompiledType GetType(CompiledType type, IPositioned position)
         {
             if (!type.IsGeneric) return type;
             if (!currentTypeArguments.TryGetValue(type.Name, out CompiledType? result))
             { throw new CompilerException($"Type argument \"{type.Name}\" not found", position, FilePath); }
             return result;
         }
-        CompiledType GetType(CompiledType type, IThingWithPosition position, IReadOnlyDictionary<string, CompiledType> typeParameters)
+        CompiledType GetType(CompiledType type, IPositioned position, IReadOnlyDictionary<string, CompiledType> typeParameters)
         {
             if (!type.IsGeneric) return type;
             if (!typeParameters.TryGetValue(type.Name, out CompiledType? result) &&
@@ -183,5 +189,8 @@ namespace LanguageCore.Compiler
             }
             return result.ToString();
         }
+
+        public void AddReference(TypeInstance referencedBy, string? file) => references.Add(new Reference<TypeInstance>(referencedBy, file));
+        public void ClearReferences() => references.Clear();
     }
 }

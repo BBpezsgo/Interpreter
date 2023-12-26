@@ -7,7 +7,7 @@ namespace LanguageCore.Compiler
     using Parser;
     using Runtime;
 
-    public class CompiledEnumMember : EnumMemberDefinition, IHaveKey<string>
+    public class CompiledEnumMember : EnumMemberDefinition
     {
         public DataItem ComputedValue;
         public CompiledType Type => new(ComputedValue.Type);
@@ -17,7 +17,7 @@ namespace LanguageCore.Compiler
         { }
     }
 
-    public class CompiledEnum : EnumDefinition, ITypeDefinition, IHaveKey<string>
+    public class CompiledEnum : EnumDefinition
     {
         public new CompiledEnumMember[] Members;
         public CompiledAttributeCollection CompiledAttributes;
@@ -41,7 +41,7 @@ namespace LanguageCore.Compiler
         public CompiledEnum(EnumDefinition definition) : base(definition.Identifier, definition.Attributes, definition.Members)
         {
             Members = Array.Empty<CompiledEnumMember>();
-            CompiledAttributes = new Dictionary<string, AttributeValues>();
+            CompiledAttributes = new CompiledAttributeCollection();
         }
 
         public bool GetValue(string identifier, out DataItem memberValue)

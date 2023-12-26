@@ -6,6 +6,8 @@ using System.Text;
 
 namespace LanguageCore.Runtime
 {
+    using Parser.Statement;
+
     [Flags]
     public enum ExternalFunctionFlags : byte
     {
@@ -13,12 +15,10 @@ namespace LanguageCore.Runtime
         CheckParamType = 2,
     }
 
-    public abstract class ExternalFunctionBase : Compiler.IHaveKey<string>
+    public abstract class ExternalFunctionBase : IReadableSimple
     {
         public readonly Compiler.Type[] ParameterTypes;
         public readonly string Name;
-
-        public string Key => Name;
 
         public int ParameterCount => ParameterTypes.Length;
         public readonly bool ReturnSomething;
@@ -40,23 +40,6 @@ namespace LanguageCore.Runtime
             this.Flags = flags;
         }
 
-        public object ID
-        {
-            get
-            {
-                StringBuilder result = new();
-                result.Append(Name);
-                result.Append('(');
-                for (int i = 0; i < ParameterTypes.Length; i++)
-                {
-                    if (i > 0) result.Append(", ");
-                    result.Append(ParameterTypes[i].ToString().ToLowerInvariant());
-                }
-                result.Append(')');
-                return result;
-            }
-        }
-
         protected void BeforeCallback(DataItem[] parameters)
         {
             if (CheckParameterLength && parameters.Length != ParameterTypes.Length)
@@ -64,6 +47,20 @@ namespace LanguageCore.Runtime
 
             if (CheckParameterType)
             { ExternalFunctionGenerator.CheckTypes(parameters, ParameterTypes); }
+        }
+
+        public string ToReadable()
+        {
+            StringBuilder result = new();
+            result.Append(Name);
+            result.Append('(');
+            for (int i = 0; i < ParameterTypes.Length; i++)
+            {
+                if (i > 0) result.Append(", ");
+                result.Append(ParameterTypes[i].ToString().ToLowerInvariant());
+            }
+            result.Append(')');
+            return result.ToString();
         }
     }
 

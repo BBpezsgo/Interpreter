@@ -6,16 +6,15 @@ using System.Text;
 
 namespace LanguageCore.Parser
 {
-    using Compiler;
     using Tokenizing;
 
-    public interface IDefinition
+    public interface IInFile
     {
         public string? FilePath { get; set; }
     }
 
     public class ParameterDefinitionCollection :
-        IThingWithPosition,
+        IPositioned,
         IReadOnlyCollection<ParameterDefinition>,
         IEquatable<ParameterDefinitionCollection>
     {
@@ -75,7 +74,7 @@ namespace LanguageCore.Parser
             => new(parameterDefinitions, Token.CreateAnonymous("(", TokenType.Operator), Token.CreateAnonymous(")", TokenType.Operator));
     }
 
-    public class ParameterDefinition : IHaveKey<string>, IThingWithPosition
+    public class ParameterDefinition : IPositioned
     {
         public readonly Token Identifier;
         public readonly TypeInstance Type;
@@ -96,7 +95,7 @@ namespace LanguageCore.Parser
         public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
     }
 
-    public class FieldDefinition : IThingWithPosition
+    public class FieldDefinition : IPositioned
     {
         public readonly Token Identifier;
         public readonly TypeInstance Type;
@@ -121,7 +120,7 @@ namespace LanguageCore.Parser
         public bool IsExport { get; }
     }
 
-    public class EnumMemberDefinition : IHaveKey<string>, IThingWithPosition
+    public class EnumMemberDefinition : IPositioned
     {
         public readonly Token Identifier;
         public readonly Statement.StatementWithValue? Value;
@@ -138,7 +137,7 @@ namespace LanguageCore.Parser
             => new(Identifier, Value);
     }
 
-    public class EnumDefinition : IDefinition, IHaveKey<string>, IThingWithPosition
+    public class EnumDefinition : IInFile, IPositioned
     {
         public string? FilePath { get; set; }
 
@@ -166,7 +165,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class TemplateInfo : IThingWithPosition, IEquatable<TemplateInfo>
+    public class TemplateInfo : IPositioned, IEquatable<TemplateInfo>
     {
         public Token Keyword;
         public Token LeftP;
@@ -235,7 +234,11 @@ namespace LanguageCore.Parser
         public override int GetHashCode() => TypeParameters.GetHashCode();
     }
 
-    public abstract class FunctionThingDefinition : IExportable, IEquatable<FunctionThingDefinition>, IThingWithPosition
+    public abstract class FunctionThingDefinition :
+        IExportable,
+        IEquatable<FunctionThingDefinition>,
+        IPositioned,
+        IReadableSimple
     {
         public ParameterDefinitionCollection Parameters;
         public Token[] Modifiers;
@@ -274,33 +277,33 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
-        public string ReadableID()
+        public string ToReadable()
         {
             StringBuilder result = new();
             result.Append(Identifier.ToString());
-            result.Append("(");
+            result.Append('(');
             for (int j = 0; j < this.Parameters.Count; j++)
             {
                 if (j > 0) result.Append(", ");
                 result.Append(this.Parameters[j].Type.ToString());
             }
-            result.Append(")");
+            result.Append(')');
             return result.ToString();
         }
 
-        public string ReadableID(TypeArguments? typeArguments)
+        public string ToReadable(TypeArguments? typeArguments)
         {
-            if (typeArguments == null) return ReadableID();
+            if (typeArguments == null) return ToReadable();
             StringBuilder result = new();
             result.Append(this.Identifier.ToString());
 
-            result.Append("(");
+            result.Append('(');
             for (int j = 0; j < this.Parameters.Count; j++)
             {
                 if (j > 0) { result.Append(", "); }
                 result.Append(this.Parameters[j].Type.ToString(typeArguments));
             }
-            result.Append(")");
+            result.Append(')');
             return result.ToString();
         }
 
@@ -343,7 +346,10 @@ namespace LanguageCore.Parser
             .Union(Modifiers);
     }
 
-    public class MacroDefinition : IExportable, IEquatable<MacroDefinition>
+    public class MacroDefinition :
+        IExportable,
+        IEquatable<MacroDefinition>,
+        IReadableSimple
     {
         public readonly Token Keyword;
         public readonly Token[] Parameters;
@@ -371,7 +377,7 @@ namespace LanguageCore.Parser
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
-        public string ReadableID()
+        public string ToReadable()
         {
             StringBuilder result = new();
             result.Append(Identifier.ToString());
@@ -437,7 +443,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class AttributeUsage : IHaveKey<string>, IThingWithPosition
+    public class AttributeUsage : IPositioned
     {
         public readonly Token Identifier;
         public readonly Statement.Literal[] Parameters;
@@ -552,7 +558,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class ClassDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
+    public class ClassDefinition : IExportable, IInFile, IPositioned
     {
         public readonly AttributeUsage[] Attributes;
         public readonly Token Name;
@@ -630,7 +636,7 @@ namespace LanguageCore.Parser
         }
     }
 
-    public class StructDefinition : IExportable, IDefinition, IHaveKey<string>, IThingWithPosition
+    public class StructDefinition : IExportable, IInFile, IPositioned
     {
         public readonly AttributeUsage[] Attributes;
         public readonly Token Name;

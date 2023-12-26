@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Tokenizing
 {
-    public readonly struct SimpleToken : IThingWithPosition
+    public readonly struct SimpleToken : IPositioned
     {
         public readonly string Content;
         readonly Position position;

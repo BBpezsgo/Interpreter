@@ -319,9 +319,9 @@ namespace LanguageCore.Compiler
                 else
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Count)
-                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.Void))
-                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
@@ -334,7 +334,7 @@ namespace LanguageCore.Compiler
                         if (passedParameterType.IsClass && definedParameterType == Type.Integer)
                         { continue; }
 
-                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ID}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
+                        throw new CompilerException($"Wrong type of parameter passed to function \"{externalFunction.ToReadable()}\". Parameter index: {i} Required type: {definedParameterType.ToString().ToLowerInvariant()} Passed: {passedParameterType}", function.Parameters[i].Type, function.FilePath);
                     }
 
                     if (function.TemplateInfo != null)
@@ -402,19 +402,19 @@ namespace LanguageCore.Compiler
                 if (ExternalFunctions.TryGetValue(name, out ExternalFunctionBase? externalFunction))
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Count)
-                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ID}'", function.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Wrong number of parameters passed to function '{externalFunction.ToReadable()}'", function.Identifier, function.FilePath); }
                     if (externalFunction.ReturnSomething != (type != Type.Void))
-                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ID}'", function.Type, function.FilePath); }
+                    { throw new CompilerException($"Wrong type defined for function '{externalFunction.ToReadable()}'", function.Type, function.FilePath); }
 
                     for (int i = 0; i < externalFunction.ParameterTypes.Length; i++)
                     {
                         if (LanguageConstants.BuiltinTypeMap3.TryGetValue(function.Parameters[i].Type.ToString(), out Type builtinType))
                         {
                             if (externalFunction.ParameterTypes[i] != builtinType)
-                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                            { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                         }
                         else
-                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ID}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
+                        { throw new CompilerException($"Wrong type of parameter passed to function '{externalFunction.ToReadable()}'. Parameter index: {i} Required type: {externalFunction.ParameterTypes[i].ToString().ToLowerInvariant()} Passed: {function.Parameters[i].Type}", function.Parameters[i].Type, function.FilePath); }
                     }
 
                     return new CompiledOperator(type, externalFunction.ParameterTypes.Select(v => new CompiledType(v)).ToArray(), function)
@@ -539,7 +539,7 @@ namespace LanguageCore.Compiler
             foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
             {
                 if (Functions.Any(function.IsSame))
-                { Errors.Add(new Error($"Function {function.ReadableID()} already defined", function.Identifier, function.FilePath)); continue; }
+                { Errors.Add(new Error($"Function {function.ToReadable()} already defined", function.Identifier, function.FilePath)); continue; }
 
                 Functions.Add(function);
             }
@@ -547,7 +547,7 @@ namespace LanguageCore.Compiler
             foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
             {
                 if (Macros.Any(macro.IsSame))
-                { Errors.Add(new Error($"Macro {macro.ReadableID()} already defined", macro.Identifier, macro.FilePath)); continue; }
+                { Errors.Add(new Error($"Macro {macro.ToReadable()} already defined", macro.Identifier, macro.FilePath)); continue; }
 
                 Macros.Add(macro);
             }
@@ -580,7 +580,7 @@ namespace LanguageCore.Compiler
                 foreach (FunctionDefinition @operator in @class.Operators)
                 {
                     if (Operators.Any(@operator.IsSame))
-                    { Errors.Add(new Error($"Operator {@operator.ReadableID()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
+                    { Errors.Add(new Error($"Operator {@operator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
                     else
                     { Operators.Add(@operator); }
                 }
@@ -799,7 +799,7 @@ namespace LanguageCore.Compiler
                     CompiledOperator compiledFunction = CompileOperator(function);
 
                     if (compiledOperators.Any(compiledFunction.IsSame))
-                    { throw new CompilerException($"Operator '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Operator '{compiledFunction.ToReadable()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledOperators.Add(compiledFunction);
                 }
@@ -850,7 +850,7 @@ namespace LanguageCore.Compiler
                         CompiledGeneralFunction methodInfo = CompileGeneralFunction(method, returnType);
 
                         if (compiledGeneralFunctions.Any(methodInfo.IsSame))
-                        { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
+                        { throw new CompilerException($"Function with name '{methodInfo.ToReadable()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
                         compiledGeneralFunctions.Add(methodInfo);
@@ -875,7 +875,7 @@ namespace LanguageCore.Compiler
                         CompiledFunction methodInfo = CompileFunction(method);
 
                         if (compiledFunctions.Any(methodInfo.IsSame))
-                        { throw new CompilerException($"Function with name '{methodInfo.ReadableID()}' already defined", method.Identifier, compiledClass.FilePath); }
+                        { throw new CompilerException($"Function with name '{methodInfo.ToReadable()}' already defined", method.Identifier, compiledClass.FilePath); }
 
                         methodInfo.Context = compiledClass;
                         compiledFunctions.Add(methodInfo);
@@ -890,7 +890,7 @@ namespace LanguageCore.Compiler
                     CompiledFunction compiledFunction = CompileFunction(function);
 
                     if (compiledFunctions.Any(compiledFunction.IsSame))
-                    { throw new CompilerException($"Function with name '{compiledFunction.ReadableID()}' already defined", function.Identifier, function.FilePath); }
+                    { throw new CompilerException($"Function with name '{compiledFunction.ToReadable()}' already defined", function.Identifier, function.FilePath); }
 
                     compiledFunctions.Add(compiledFunction);
                 }

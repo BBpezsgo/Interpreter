@@ -9,7 +9,7 @@ namespace LanguageCore.Parser
     using Statement;
     using Tokenizing;
 
-    public abstract class TypeInstance : IEquatable<TypeInstance>, IThingWithPosition
+    public abstract class TypeInstance : IEquatable<TypeInstance>, IPositioned
     {
         public abstract Position Position { get; }
 

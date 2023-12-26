@@ -337,7 +337,7 @@ namespace LanguageCore.BBCode.Generator
                     SourcePosition = macro.Identifier.Position,
                     Identifier = macro.Identifier.Content,
                     File = macro.FilePath,
-                    ReadableIdentifier = macro.ReadableID(),
+                    ReadableIdentifier = macro.ToReadable(),
                     Instructions = (instructionsStart, GeneratedCode.Count),
                 });
 
@@ -350,7 +350,7 @@ namespace LanguageCore.BBCode.Generator
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-                { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+                { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compilableFunction = AddCompilable(compilableFunction);
                 compiledFunction = compilableFunction.Function;
@@ -512,12 +512,12 @@ namespace LanguageCore.BBCode.Generator
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
             if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
@@ -532,7 +532,7 @@ namespace LanguageCore.BBCode.Generator
                 return;
             }
 
-            AddComment($"Call {compiledFunction.ReadableID()} {{");
+            AddComment($"Call {compiledFunction.ToReadable()} {{");
 
             Stack<ParameterCleanupItem> parameterCleanup;
 
@@ -828,13 +828,13 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!operatorDefinition.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"The {operatorDefinition.ReadableID()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                    Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
                     AddComment("}");
                     return;
                 }
 
                 if (@operator.ParameterCount != operatorDefinition.ParameterCount)
-                { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ReadableID()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
+                { throw new CompilerException($"Wrong number of parameters passed to operator {operatorDefinition.ToReadable()}: required {operatorDefinition.ParameterCount} passed {@operator.ParameterCount}", @operator, CurrentFile); }
 
                 if (operatorDefinition.IsExternal)
                 {
@@ -1267,13 +1267,13 @@ namespace LanguageCore.BBCode.Generator
 
             if (instanceType.IsStruct)
             {
-                instanceType.Struct.References?.Add(new DefinitionReference(newObjectType, CurrentFile));
+                instanceType.Struct.AddReference(newObjectType, CurrentFile);
 
                 GenerateInitialValue(instanceType);
             }
             else if (instanceType.IsClass)
             {
-                instanceType.Class.References?.Add(new DefinitionReference(newObjectType, CurrentFile));
+                instanceType.Class.AddReference(newObjectType, CurrentFile);
 
                 if (instanceType.Class.TemplateInfo != null)
                 {
@@ -1292,7 +1292,7 @@ namespace LanguageCore.BBCode.Generator
                     { throw new CompilerException($"You should not specify type arguments for class instance \"{instanceType}\"", newObjectType, CurrentFile); }
                 }
 
-                AddInstruction(Opcode.PUSH_VALUE, instanceType.Class.Size);
+                AddInstruction(Opcode.PUSH_VALUE, instanceType.Class.SizeOnHeap);
                 AddInstruction(Opcode.HEAP_ALLOC);
 
                 int currentOffset = 0;
@@ -1337,7 +1337,7 @@ namespace LanguageCore.BBCode.Generator
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.TypeName, CurrentFile));
+            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
@@ -1346,7 +1346,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
+                    throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
                 else
                 {
@@ -2282,7 +2282,7 @@ namespace LanguageCore.BBCode.Generator
             AddInstruction(Opcode.PUSH_VALUE, new DataItem(false));
             TagCount.Last++;
 
-            OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ReadableID()}\" does not have a body"));
+            OnScopeEnter(function.Block ?? throw new CompilerException($"Function \"{function.ToReadable()}\" does not have a body"));
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformations()
             {
@@ -2359,7 +2359,7 @@ namespace LanguageCore.BBCode.Generator
                 SourcePosition = function.Identifier.Position,
                 Identifier = function.Identifier.Content,
                 File = function.FilePath,
-                ReadableIdentifier = function.ReadableID(),
+                ReadableIdentifier = function.ToReadable(),
                 Instructions = (instructionStart, GeneratedCode.Count),
             });
 

@@ -5,13 +5,15 @@ using System.Linq;
 
 namespace LanguageCore
 {
-    public interface IThingWithPosition
+    public interface IPositioned
     {
         public Position Position { get; }
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public struct Position : IEquatable<Position>
+    public struct Position :
+        IEquatable<Position>,
+        System.Numerics.IEqualityOperators<Position, Position, bool>
     {
         public static Position UnknownPosition => new(new Range<SinglePosition>(SinglePosition.Undefined), new Range<int>(-1));
         public static Position Zero => new(new Range<SinglePosition>(SinglePosition.Zero), new Range<int>(0));
@@ -25,16 +27,16 @@ namespace LanguageCore
             AbsoluteRange = absoluteRange;
         }
 
-        public Position(params IThingWithPosition?[] elements)
+        public Position(params IPositioned?[] elements)
         {
-            if (elements.Length == 0) throw new ArgumentException($"Array {nameof(elements)} length is 0");
+            if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
 
             Range = Position.UnknownPosition.Range;
             AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
 
             for (int i = 0; i < elements.Length; i++)
             {
-                IThingWithPosition? element = elements[i];
+                IPositioned? element = elements[i];
                 if (element == null) continue;
                 if (element is Tokenizing.Token token && token.IsAnonymous) continue;
                 Position position = element.Position;
@@ -46,52 +48,26 @@ namespace LanguageCore
             for (int i = 1; i < elements.Length; i++)
             { Union(elements[i]); }
         }
-        public Position(IEnumerable<IThingWithPosition?> elements) : this(elements.ToArray())
+        public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray())
         { }
 
         public Position Union(Position other)
         {
-            if (other.AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return this;
+            if (other.AbsoluteRange == Position.UnknownPosition.AbsoluteRange ||
+                AbsoluteRange == Position.UnknownPosition.AbsoluteRange) return this;
 
-            if (Range.Start.Line > other.Range.Start.Line)
-            {
-                Range.Start.Line = other.Range.Start.Line;
-                Range.Start.Character = other.Range.Start.Character;
-            }
-            else if (Range.Start.Character > other.Range.Start.Character && Range.Start.Line == other.Range.Start.Line)
-            {
-                Range.Start.Character = other.Range.Start.Character;
-            }
-
-            if (Range.End.Line < other.Range.End.Line)
-            {
-                Range.End.Line = other.Range.End.Line;
-                Range.End.Character = other.Range.End.Character;
-            }
-            else if (Range.End.Character < other.Range.End.Character && Range.End.Line == other.Range.End.Line)
-            {
-                Range.End.Character = other.Range.End.Character;
-            }
-
-            if (AbsoluteRange.Start > other.AbsoluteRange.Start)
-            {
-                AbsoluteRange.Start = other.AbsoluteRange.Start;
-            }
-
-            if (AbsoluteRange.End < other.AbsoluteRange.End)
-            {
-                AbsoluteRange.End = other.AbsoluteRange.End;
-            }
+            Range = LanguageCore.Range.Union(Range, other.Range);
+            AbsoluteRange = LanguageCore.Range.Union(AbsoluteRange, other.AbsoluteRange);
 
             return this;
         }
-        public Position Union(IThingWithPosition? other)
+        public Position Union(IPositioned? other)
         {
             if (other == null) return this;
             if (other is Tokenizing.Token token && token.IsAnonymous) return this;
             return Union(other.Position);
         }
-        public Position Union(params IThingWithPosition?[]? elements)
+        public Position Union(params IPositioned?[]? elements)
         {
             if (elements == null) return this;
             if (elements.Length == 0) return this;
@@ -109,7 +85,7 @@ namespace LanguageCore
             return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
         }
 
-        public readonly string? ToStringCool(string prefix = "", string postfix = "")
+        public readonly string? ToStringCool(string? prefix = null, string? postfix = null)
         {
             if (Range.Start.Line < 0)
             { return null; }

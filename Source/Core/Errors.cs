@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Runtime.Serialization;
 using System.Text;
 
 namespace LanguageCore
@@ -89,7 +88,7 @@ namespace LanguageCore
         public CompilerException(string message, Position position, string? file) : base(message, position, file) { }
         public CompilerException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public CompilerException(string message) : base(message, Position.UnknownPosition, null) { }
-        public CompilerException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public CompilerException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     public class NotSupportedException : CompilerException
@@ -97,7 +96,7 @@ namespace LanguageCore
         public NotSupportedException(string message, Position position, string? file) : base(message, position, file) { }
         public NotSupportedException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
         public NotSupportedException(string message) : base(message) { }
-        public NotSupportedException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public NotSupportedException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     public class TokenizerException : LanguageException
@@ -109,8 +108,8 @@ namespace LanguageCore
     {
         public SyntaxException(string message, Position position) : base(message, position, null) { }
         public SyntaxException(string message, Position? position) : base(message, position ?? Position.UnknownPosition, null) { }
-        public SyntaxException(string message, IThingWithPosition? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
-        public SyntaxException(string message, IThingWithPosition? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
+        public SyntaxException(string message, IPositioned? position) : base(message, position?.Position ?? Position.UnknownPosition, null) { }
+        public SyntaxException(string message, IPositioned? position, string? file) : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     public class ProcessRuntimeException : Exception
@@ -293,7 +292,7 @@ namespace LanguageCore
         public InternalException() : base(string.Empty, Position.UnknownPosition, null) { }
         public InternalException(string message) : base(message, Position.UnknownPosition, null) { }
         public InternalException(string message, string? file) : base(message, Position.UnknownPosition, file) { }
-        public InternalException(string message, IThingWithPosition position, string? file) : base(message, position.Position, file) { }
+        public InternalException(string message, IPositioned position, string? file) : base(message, position.Position, file) { }
     }
 
     /// <inheritdoc/>
@@ -346,7 +345,7 @@ namespace LanguageCore
     {
         public Warning(string message, Position position, string? file)
             : base(message, position, file) { }
-        public Warning(string message, IThingWithPosition? position, string? file)
+        public Warning(string message, IPositioned? position, string? file)
             : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
@@ -356,7 +355,7 @@ namespace LanguageCore
         public Error(string message, Position position, string? file = null)
             : base(message, position, file) { }
 
-        public Error(string message, IThingWithPosition? position, string? file = null)
+        public Error(string message, IPositioned? position, string? file = null)
             : base(message, position?.Position ?? Position.UnknownPosition, file) { }
 
         public Error(string message, string file)
@@ -367,13 +366,13 @@ namespace LanguageCore
 
     public class Hint : NotExceptionBut
     {
-        public Hint(string message, IThingWithPosition? position, string? file)
+        public Hint(string message, IPositioned? position, string? file)
             : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 
     public class Information : NotExceptionBut
     {
-        public Information(string message, IThingWithPosition? position, string? file)
+        public Information(string message, IPositioned? position, string? file)
             : base(message, position?.Position ?? Position.UnknownPosition, file) { }
     }
 

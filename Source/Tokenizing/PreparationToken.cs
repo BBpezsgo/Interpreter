@@ -34,7 +34,7 @@ namespace LanguageCore.Tokenizing
     }
 
     sealed class PreparationToken :
-        IThingWithPosition,
+        IPositioned,
         IDuplicatable<PreparationToken>
     {
         Position position;
@@ -42,7 +42,7 @@ namespace LanguageCore.Tokenizing
         public readonly StringBuilder Content;
 
         public ref Position Position => ref position;
-        Position IThingWithPosition.Position => position;
+        Position IPositioned.Position => position;
 
         public PreparationToken(Position position)
         {

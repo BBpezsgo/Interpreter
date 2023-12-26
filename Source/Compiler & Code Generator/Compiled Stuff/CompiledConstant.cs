@@ -2,7 +2,7 @@
 {
     using Runtime;
 
-    public abstract class CompiledConstant : IThingWithPosition
+    public abstract class CompiledConstant : IPositioned
     {
         public readonly DataItem Value;
         public abstract string Identifier { get; }

@@ -588,12 +588,12 @@ namespace LanguageCore.ASM.Generator
         {
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The {compiledFunction.ReadableID()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
             if (functionCall.MethodParameters.Length != compiledFunction.ParameterCount)
-            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ReadableID()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
+            { throw new CompilerException($"Wrong number of parameters passed to function {compiledFunction.ToReadable()}: required {compiledFunction.ParameterCount} passed {functionCall.MethodParameters.Length}", functionCall, CurrentFile); }
 
             if (functionCall.IsMethodCall != compiledFunction.IsMethod)
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
@@ -968,7 +968,7 @@ namespace LanguageCore.ASM.Generator
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compilableFunction))
-                { throw new CompilerException($"Function {functionCall.ReadableID(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
+                { throw new CompilerException($"Function {functionCall.ToReadable(FindStatementType)} not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compilableFunction.Function;
             }
@@ -985,7 +985,7 @@ namespace LanguageCore.ASM.Generator
             if (!instanceType.IsClass)
             { throw new CompilerException($"Unknown type definition {instanceType.GetType().Name}", constructorCall.TypeName, CurrentFile); }
 
-            instanceType.Class.References?.Add(new DefinitionReference(constructorCall.Position.Range, CurrentFile));
+            instanceType.Class.AddReference(constructorCall.TypeName, CurrentFile);
 
             if (!GetClass(constructorCall, out CompiledClass? @class))
             { throw new CompilerException($"Class definition \"{constructorCall.TypeName}\" not found", constructorCall, CurrentFile); }
@@ -994,7 +994,7 @@ namespace LanguageCore.ASM.Generator
             {
                 if (!GetConstructorTemplate(@class, constructorCall, out CompliableTemplate<CompiledGeneralFunction> compilableGeneralFunction))
                 {
-                    throw new CompilerException($"Function {constructorCall.ReadableID(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
+                    throw new CompilerException($"Function {constructorCall.ToReadable(FindStatementType)} not found", constructorCall.Keyword, CurrentFile);
                 }
                 else
                 {

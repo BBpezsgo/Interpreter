@@ -5,8 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Brainfuck.Generator
 {
+    using BBCode.Generator;
     using Compiler;
-    using LanguageCore.BBCode.Generator;
     using Parser;
     using Parser.Statement;
     using Runtime;
@@ -211,7 +211,7 @@ namespace LanguageCore.Brainfuck.Generator
                 InstructionStart = code.GetFinalCode().Length;
             }
 
-            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IThingWithPosition? position)
+            public DebugInfoBlock(CompiledCode code, DebugInformation? debugInfo, IPositioned? position)
                 : this(code, debugInfo, position?.Position ?? Position.UnknownPosition)
             {
 
@@ -324,7 +324,7 @@ namespace LanguageCore.Brainfuck.Generator
             readonly string GetDebuggerDisplay() => $"{Type} {Name} ({Type.SizeOnStack} bytes at {Address})";
         }
 
-        DebugInfoBlock DebugBlock(IThingWithPosition? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
+        DebugInfoBlock DebugBlock(IPositioned? position) => new(Code, GenerateDebugInformation ? DebugInfo : null, position);
 
         protected override bool GetLocalSymbolType(string symbolName, [NotNullWhen(true)] out CompiledType? type)
         {

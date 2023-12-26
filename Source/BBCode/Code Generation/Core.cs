@@ -295,38 +295,38 @@ namespace LanguageCore.BBCode.Generator
 
             foreach (UndefinedOffset<CompiledFunction> item in UndefinedFunctionOffsets)
             {
-                if (item.Function.InstructionOffset == -1)
-                { throw new InternalException($"Function {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
+                if (item.Called.InstructionOffset == -1)
+                { throw new InternalException($"Function {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
 
-                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
                 GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
             foreach (UndefinedOffset<CompiledOperator> item in UndefinedOperatorFunctionOffsets)
             {
-                if (item.Function.InstructionOffset == -1)
-                { throw new InternalException($"Operator {item.Function.ReadableID()} does not have instruction offset", item.CurrentFile); }
+                if (item.Called.InstructionOffset == -1)
+                { throw new InternalException($"Operator {item.Called.ToReadable()} does not have instruction offset", item.CurrentFile); }
 
-                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
                 GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 
             foreach (UndefinedOffset<CompiledGeneralFunction> item in UndefinedGeneralFunctionOffsets)
             {
-                if (item.Function.InstructionOffset == -1)
+                if (item.Called.InstructionOffset == -1)
                 {
-                    throw item.Function.Identifier.Content switch
+                    throw item.Called.Identifier.Content switch
                     {
-                        BuiltinFunctionNames.Cloner => new InternalException($"Cloner for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.Constructor => new InternalException($"Constructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
-                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Function.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.Cloner => new InternalException($"Cloner for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.Constructor => new InternalException($"Constructor for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.Destructor => new InternalException($"Destructor for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerGet => new InternalException($"Index getter for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
+                        BuiltinFunctionNames.IndexerSet => new InternalException($"Index setter for \"{item.Called.Context}\" does not have instruction offset", item.CurrentFile),
                         _ => new NotImplementedException(),
                     };
                 }
 
-                int offset = item.IsAbsoluteAddress ? item.Function.InstructionOffset : item.Function.InstructionOffset - item.InstructionIndex;
+                int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
                 GeneratedCode[item.InstructionIndex].Parameter = offset;
             }
 

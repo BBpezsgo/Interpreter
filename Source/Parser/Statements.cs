@@ -19,11 +19,11 @@ namespace LanguageCore.Parser.Statement
     public static class StatementExtensions
     {
         public static T? GetStatementAt<T>(this ParserResult parserResult, int absolutePosition)
-            where T : IThingWithPosition
+            where T : IPositioned
             => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.AbsoluteRange.Contains(absolutePosition));
 
         public static T? GetStatementAt<T>(this ParserResult parserResult, SinglePosition position)
-            where T : IThingWithPosition
+            where T : IPositioned
             => StatementExtensions.GetStatement<T>(parserResult, statement => statement.Position.Range.Contains(position));
 
         public static Statement? GetStatementAt(this ParserResult parserResult, int absolutePosition)
@@ -141,12 +141,7 @@ namespace LanguageCore.Parser.Statement
             => (result = GetStatement<T>(statement, condition)) != null;
     }
 
-    public interface IReadableID
-    {
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch);
-    }
-
-    public abstract class Statement : IThingWithPosition, IEnumerable<Statement>
+    public abstract class Statement : IPositioned, IEnumerable<Statement>
     {
         public Token? Semicolon;
 
@@ -288,7 +283,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class CompileTag : Statement, IDefinition
+    public class CompileTag : Statement, IInFile
     {
         public readonly Token HashToken;
         public readonly Token HashName;
@@ -372,7 +367,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class VariableDeclaration : Statement, IDefinition
+    public class VariableDeclaration : Statement, IInFile
     {
         public readonly TypeInstance Type;
         public readonly Token VariableName;
@@ -406,7 +401,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class AnyCall : StatementWithValue, IReadableID
+    public class AnyCall : StatementWithValue, IReadable
     {
         public readonly StatementWithValue PrevStatement;
         public readonly Token BracketLeft;
@@ -448,7 +443,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new(2);
             result.Append('(');
@@ -509,7 +504,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class FunctionCall : StatementWithValue, IReadableID
+    public class FunctionCall : StatementWithValue, IReadable
     {
         public readonly Token Identifier;
         public readonly StatementWithValue[] Parameters;
@@ -570,7 +565,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new();
             if (PrevStatement != null)
@@ -607,7 +602,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class KeywordCall : StatementWithValue, IReadableID
+    public class KeywordCall : StatementWithValue, IReadable
     {
         public readonly Token Identifier;
         public readonly StatementWithValue[] Parameters;
@@ -647,7 +642,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new();
             result.Append(Identifier.Content);
@@ -674,7 +669,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class OperatorCall : StatementWithValue, IReadableID
+    public class OperatorCall : StatementWithValue, IReadable
     {
         public readonly Token Operator;
         public readonly StatementWithValue Left;
@@ -751,7 +746,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new(this.Operator.Content);
             result.Append('(');
@@ -784,7 +779,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class ShortOperatorCall : AnyAssignment, IReadableID
+    public class ShortOperatorCall : AnyAssignment, IReadable
     {
         public readonly Token Operator;
         public readonly StatementWithValue Left;
@@ -820,7 +815,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> typeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> typeSearch)
         {
             StringBuilder result = new();
 
@@ -989,7 +984,7 @@ namespace LanguageCore.Parser.Statement
             ValueToken = value;
         }
 
-        public static Literal CreateAnonymous(LiteralType type, string value, IThingWithPosition position)
+        public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position)
             => Literal.CreateAnonymous(type, value, position.Position);
         public static Literal CreateAnonymous(LiteralType type, string value, Position position)
         {
@@ -1360,7 +1355,7 @@ namespace LanguageCore.Parser.Statement
         { yield break; }
     }
 
-    public class ConstructorCall : StatementWithValue, IReadableID
+    public class ConstructorCall : StatementWithValue, IReadable
     {
         public readonly Token Keyword;
         public readonly TypeInstance TypeName;
@@ -1410,7 +1405,7 @@ namespace LanguageCore.Parser.Statement
             return result.ToString();
         }
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new();
             result.Append(TypeName.ToString());
@@ -1439,7 +1434,7 @@ namespace LanguageCore.Parser.Statement
         }
     }
 
-    public class IndexCall : StatementWithValue, IReadableID
+    public class IndexCall : StatementWithValue, IReadable
     {
         public readonly StatementWithValue PrevStatement;
 
@@ -1461,7 +1456,7 @@ namespace LanguageCore.Parser.Statement
         public override string ToString()
             => $"{PrevStatement}{BracketLeft}{Expression}{BracketRight}{Semicolon}";
 
-        public string ReadableID(Func<StatementWithValue, CompiledType> TypeSearch)
+        public string ToReadable(Func<StatementWithValue, CompiledType> TypeSearch)
         {
             StringBuilder result = new(2);
 

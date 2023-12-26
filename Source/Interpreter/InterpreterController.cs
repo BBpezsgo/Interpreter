@@ -246,7 +246,7 @@ namespace LanguageCore.Runtime
                 foreach (System.Reflection.MethodInfo method in methods)
                 {
                     ExternalFunctionSimple newFunction = externalFunctions.AddExternalFunction(method);
-                    OnOutput?.Invoke(this, $" Added function {newFunction.ID}", LogType.Debug);
+                    OnOutput?.Invoke(this, $" Added function {newFunction.ToReadable()}", LogType.Debug);
                     functionsAdded++;
                 }
             }

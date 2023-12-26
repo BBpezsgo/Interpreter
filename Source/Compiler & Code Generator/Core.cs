@@ -79,154 +79,36 @@ namespace LanguageCore.Compiler
     using Runtime;
     using Tokenizing;
 
-    public static class Extensions
-    {
-        public static void AddRange<TKey, TValue>(this Dictionary<TKey, TValue> v, IEnumerable<KeyValuePair<TKey, TValue>> elements) where TKey : notnull
-        {
-            foreach (KeyValuePair<TKey, TValue> pair in elements)
-            { v.Add(pair.Key, pair.Value); }
-        }
-
-        #region KeyValuePair<TKey, TValue>
-
-        public static void Add<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key, TValue value)
-            => self.Add(new KeyValuePair<TKey, TValue>(key, value));
-        public static bool Remove<TKey, TValue>(this List<KeyValuePair<TKey, TValue>> self, TKey key) where TKey : notnull
-        {
-            for (int i = self.Count - 1; i >= 0; i--)
-            {
-                KeyValuePair<TKey, TValue> element = self[i];
-                if (element.Key.Equals(key))
-                {
-                    self.RemoveAt(i);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        #endregion
-    }
-
     readonly struct UndefinedOffset<T>
     {
         public readonly int InstructionIndex;
         public readonly bool IsAbsoluteAddress;
 
         public readonly Statement? Caller;
-        public readonly T Function;
+        public readonly T Called;
 
         public readonly string? CurrentFile;
 
-        public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? statement, T called, string? file)
+        public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Statement? caller, T called, string? file)
         {
-            this.InstructionIndex = callInstructionIndex;
-            this.IsAbsoluteAddress = isAbsoluteAddress;
+            InstructionIndex = callInstructionIndex;
+            IsAbsoluteAddress = isAbsoluteAddress;
 
-            this.Caller = statement;
-            this.CurrentFile = file;
+            Caller = caller;
+            Called = called;
 
-            this.Function = called;
+            CurrentFile = file;
         }
     }
 
-    public static class Utils
+    public readonly struct Reference<T>
     {
-        /// <exception cref="NotImplementedException"/>
-        public static CompiledLiteralType ConvertType(System.Type type)
-        {
-            if (type == typeof(int))
-            { return CompiledLiteralType.Integer; }
-
-            if (type == typeof(float))
-            { return CompiledLiteralType.Float; }
-
-            if (type == typeof(bool))
-            { return CompiledLiteralType.Boolean; }
-
-            if (type == typeof(string))
-            { return CompiledLiteralType.String; }
-
-            throw new NotImplementedException($"Unknown attribute type requested: \"{type.FullName}\"");
-        }
-
-        /// <exception cref="NotImplementedException"/>
-        public static bool TryConvertType(System.Type type, out CompiledLiteralType result)
-        {
-            if (type == typeof(int))
-            {
-                result = CompiledLiteralType.Integer;
-                return true;
-            }
-
-            if (type == typeof(float))
-            {
-                result = CompiledLiteralType.Float;
-                return true;
-            }
-
-            if (type == typeof(bool))
-            {
-                result = CompiledLiteralType.Boolean;
-                return true;
-            }
-
-            if (type == typeof(string))
-            {
-                result = CompiledLiteralType.String;
-                return true;
-            }
-
-            result = default;
-            return false;
-        }
-
-        public static void SetTypeParameters(CompiledType[] typeParameters, TypeArguments typeValues)
-        {
-            for (int i = 0; i < typeParameters.Length; i++)
-            {
-                if (typeParameters[i].IsGeneric)
-                {
-                    if (!typeValues.TryGetValue(typeParameters[i].Name, out CompiledType? eTypeParameter))
-                    { throw new NotImplementedException(); }
-                    typeParameters[i] = eTypeParameter;
-                }
-            }
-        }
-
-        public static Dictionary<TKey, TValue> ConcatDictionary<TKey, TValue>(params IReadOnlyDictionary<TKey, TValue>?[] v) where TKey : notnull
-        {
-            Dictionary<TKey, TValue> result = new();
-            for (int i = 0; i < v.Length; i++)
-            {
-                IReadOnlyDictionary<TKey, TValue>? dict = v[i];
-                if (dict == null) continue;
-                foreach (KeyValuePair<TKey, TValue> pair in dict)
-                {
-                    if (result.ContainsKey(pair.Key))
-                    { result[pair.Key] = pair.Value; }
-                    else
-                    { result.Add(pair.Key, pair.Value); }
-                }
-            }
-            return result;
-        }
-    }
-
-    public readonly struct DefinitionReference
-    {
-        public readonly Range<SinglePosition> Source;
+        public readonly T Source;
         public readonly string? SourceFile;
 
-        public DefinitionReference(Range<SinglePosition> source, string? sourceFile)
+        public Reference(T source, string? sourceFile)
         {
             Source = source;
-            SourceFile = sourceFile;
-        }
-
-        public DefinitionReference(IThingWithPosition source, string? sourceFile)
-        {
-            Source = source.Position.Range;
             SourceFile = sourceFile;
         }
     }
@@ -331,21 +213,28 @@ namespace LanguageCore.Compiler
 
         public override int GetHashCode() => HashCode.Combine(ReturnType, Parameters);
 
-        public static bool operator ==(FunctionType a, FunctionType b)
+        public static bool operator !=(FunctionType? a, FunctionType? b) => !(a == b);
+        public static bool operator ==(FunctionType? a, FunctionType? b)
         {
             if (a is null && b is null) return true;
             if (a is null || b is null) return false;
 
             return a.Equals(b);
         }
-
-        public static bool operator !=(FunctionType a, FunctionType b) => !(a == b);
     }
 
     public delegate bool ComputeValue(StatementWithValue value, RuntimeType? expectedType, out DataItem computedValue);
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
-    public class CompiledType : IEquatable<CompiledType>, IEquatable<TypeInstance>, IEquatable<Type>, IEquatable<RuntimeType>
+    public class CompiledType :
+        IEquatable<CompiledType>,
+        IEquatable<TypeInstance>,
+        IEquatable<Type>,
+        IEquatable<RuntimeType>,
+        System.Numerics.IEqualityOperators<CompiledType?, CompiledType?, bool>,
+        System.Numerics.IEqualityOperators<CompiledType?, TypeInstance?, bool>,
+        System.Numerics.IEqualityOperators<CompiledType?, Type, bool>,
+        System.Numerics.IEqualityOperators<CompiledType?, RuntimeType, bool>
     {
         Type builtinType;
 
@@ -452,14 +341,14 @@ namespace LanguageCore.Compiler
             get
             {
                 if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
-                if (IsStruct) return @struct.Size;
+                if (IsStruct) return @struct.SizeOnStack;
                 if (IsClass)
                 {
                     TypeArguments saved = new(@class.CurrentTypeArguments);
 
                     @class.SetTypeArguments(typeParameters);
 
-                    int size = @class.Size;
+                    int size = @class.SizeOnHeap;
 
                     @class.SetTypeArguments(saved);
 
@@ -479,7 +368,7 @@ namespace LanguageCore.Compiler
             get
             {
                 if (IsGeneric) throw new InternalException($"Can not get the size of a generic type");
-                if (IsStruct) return @struct.Size;
+                if (IsStruct) return @struct.SizeOnStack;
                 if (IsStackArray) return (stackArraySize * new DataItem(stackArrayOf.SizeOnStack)).ValueSInt32;
                 return 1;
             }
@@ -600,41 +489,35 @@ namespace LanguageCore.Compiler
             throw new NotImplementedException();
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledStruct @struct) : this()
         {
-            this.@struct = @struct ?? throw new ArgumentNullException(nameof(@struct));
+            this.@struct = @struct;
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(FunctionType function) : this()
         {
-            this.function = function ?? throw new ArgumentNullException(nameof(function));
+            this.function = function;
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledClass @class) : this()
         {
-            this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
+            this.@class = @class;
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledClass @class, params CompiledType[][] typeParameters) : this()
         {
-            this.@class = @class ?? throw new ArgumentNullException(nameof(@class));
+            this.@class = @class;
             List<CompiledType> typeParameters1 = new();
             for (int i = 0; i < typeParameters.Length; i++)
             { typeParameters1.AddRange(typeParameters[i]); }
             this.typeParameters = typeParameters1.ToArray();
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledEnum @enum) : this()
         {
-            this.@enum = @enum ?? throw new ArgumentNullException(nameof(@enum));
+            this.@enum = @enum;
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledFunction @function) : this()
         {
             this.function = new FunctionType(@function);
@@ -645,7 +528,7 @@ namespace LanguageCore.Compiler
             this.builtinType = type;
         }
 
-        /// <exception cref="InternalException"/>
+        /// <exception cref="NotImplementedException"/>
         public CompiledType(RuntimeType type) : this()
         {
             this.builtinType = type switch
@@ -654,16 +537,13 @@ namespace LanguageCore.Compiler
                 RuntimeType.SInt32 => Type.Integer,
                 RuntimeType.Single => Type.Float,
                 RuntimeType.UInt16 => Type.Char,
+                RuntimeType.Null => throw new NotImplementedException(),
                 _ => throw new UnreachableException(),
             };
         }
 
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="InternalException"/>
         public CompiledType(string type, Func<string, CompiledType>? typeFinder) : this()
         {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
-
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type, out this.builtinType))
             { return; }
 
@@ -672,12 +552,8 @@ namespace LanguageCore.Compiler
             Set(typeFinder.Invoke(type));
         }
 
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="InternalException"/>
         public CompiledType(TypeInstance type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
-
             if (type is TypeInstanceSimple simpleType)
             {
                 Set(new CompiledType(simpleType, typeFinder, constComputer));
@@ -699,12 +575,9 @@ namespace LanguageCore.Compiler
             throw new UnreachableException();
         }
 
-        /// <exception cref="ArgumentNullException"/>
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceSimple type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
-
             if (LanguageConstants.BuiltinTypeMap3.TryGetValue(type.Identifier.Content, out this.builtinType))
             { return; }
 
@@ -741,12 +614,8 @@ namespace LanguageCore.Compiler
             typeParameters = CompiledType.FromArray(type.GenericTypes, typeFinder);
         }
 
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceFunction type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
-
             CompiledType returnType = new(type.FunctionReturnType, typeFinder, constComputer);
             CompiledType[] parameterTypes = CompiledType.FromArray(type.FunctionParameterTypes, typeFinder);
 
@@ -757,7 +626,6 @@ namespace LanguageCore.Compiler
         /// <exception cref="InternalException"/>
         public CompiledType(TypeInstanceStackArray type, Func<string, CompiledType>? typeFinder, ComputeValue? constComputer = null) : this()
         {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
             ArgumentNullException.ThrowIfNull(constComputer, nameof(constComputer));
 
             stackArrayOf = new CompiledType(type.StackArrayOf, typeFinder, constComputer);
@@ -767,11 +635,8 @@ namespace LanguageCore.Compiler
             { throw new CompilerException($"Failed to compute value", type.StackArraySize, null); }
         }
 
-        /// <exception cref="ArgumentNullException"/>
         public CompiledType(CompiledType other)
         {
-            ArgumentNullException.ThrowIfNull(other, nameof(other));
-
             this.builtinType = other.builtinType;
             this.@class = other.@class;
             this.@enum = other.@enum;
@@ -784,45 +649,8 @@ namespace LanguageCore.Compiler
             this.stackArraySizeStatement = other.stackArraySizeStatement;
         }
 
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="InternalException"/>
-        public CompiledType(ITypeDefinition type) : this()
-        {
-            ArgumentNullException.ThrowIfNull(type, nameof(type));
-
-            if (type is CompiledStruct @struct)
-            {
-                this.@struct = @struct;
-                return;
-            }
-
-            if (type is CompiledClass @class)
-            {
-                this.@class = @class;
-                return;
-            }
-
-            if (type is CompiledEnum @enum)
-            {
-                this.@enum = @enum;
-                return;
-            }
-
-            if (type is FunctionType function)
-            {
-                this.function = function;
-                return;
-            }
-
-            throw new InternalException($"Unknown type definition {type.GetType().FullName}");
-        }
-
-        /// <exception cref="ArgumentNullException"/>
-        /// <exception cref="InternalException"/>
         void Set(CompiledType other)
         {
-            ArgumentNullException.ThrowIfNull(other, nameof(other));
-
             this.builtinType = other.builtinType;
             this.@class = other.@class;
             this.@enum = other.@enum;
@@ -978,18 +806,46 @@ namespace LanguageCore.Compiler
 
             return false;
         }
-        public static bool Equals(CompiledType?[]? typesA, TypeInstance?[]? typesB)
-        {
-            if (typesA is null && typesB is null) return true;
-            if (typesA is null || typesB is null) return false;
 
-            if (typesA.Length != typesB.Length) return false;
-            for (int i = 0; i < typesA.Length; i++)
+        public static bool Equals(CompiledType?[]? itemsA, TypeInstance?[]? itemsB)
+        {
+            if (itemsA is null && itemsB is null) return true;
+            if (itemsA is null || itemsB is null) return false;
+
+            if (itemsA.Length != itemsB.Length) return false;
+
+            for (int i = 0; i < itemsA.Length; i++)
             {
-                CompiledType? typeA = typesA[i];
-                TypeInstance? typeB = typesB[i];
-                if (!(typeA?.Equals(typeB) ?? typeB is null)) return false;
+                CompiledType? a = itemsA[i];
+                TypeInstance? b = itemsB[i];
+
+                if (a is null && b is null) continue;
+                if (a is null || b is null) return false;
+
+                if (!a.Equals(b)) return false;
             }
+
+            return true;
+        }
+
+        public static bool Equals(CompiledType?[]? itemsA, CompiledType?[]? itemsB)
+        {
+            if (itemsA is null && itemsB is null) return true;
+            if (itemsA is null || itemsB is null) return false;
+
+            if (itemsA.Length != itemsB.Length) return false;
+
+            for (int i = 0; i < itemsA.Length; i++)
+            {
+                CompiledType? a = itemsA[i];
+                CompiledType? b = itemsB[i];
+
+                if (a is null && b is null) continue;
+                if (a is null || b is null) return false;
+
+                if (!a.Equals(b)) return false;
+            }
+
             return true;
         }
 
@@ -1010,6 +866,7 @@ namespace LanguageCore.Compiler
             return this.RuntimeType == other;
         }
 
+        /// <exception cref="NotImplementedException"/>
         public static bool TryGetTypeParameters(CompiledType[]? definedParameters, CompiledType[]? passedParameters, [NotNullWhen(true)] out TypeArguments? typeParameters)
         {
             typeParameters = null;
@@ -1066,16 +923,7 @@ namespace LanguageCore.Compiler
             return true;
         }
 
-        public static bool Equals(CompiledType[]? a, params CompiledType[]? b)
-        {
-            if (a is null && b is null) return true;
-            if (a is null || b is null) return false;
-            if (a.Length != b.Length) return false;
-            for (int i = 0; i < a.Length; i++)
-            { if (!a[i].Equals(b[i])) return false; }
-            return true;
-        }
-
+        /// <exception cref="NotImplementedException"/>
         public override int GetHashCode()
         {
             if (IsBuiltin) return HashCode.Combine((byte)0, builtinType);
@@ -1097,17 +945,21 @@ namespace LanguageCore.Compiler
         public static CompiledType[] FromArray(TypeInstance[]? types, Func<string, CompiledType>? typeFinder)
         {
             if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+
             CompiledType[] result = new CompiledType[types.Length];
             for (int i = 0; i < types.Length; i++)
             { result[i] = new CompiledType(types[i], typeFinder); }
+
             return result;
         }
         public static CompiledType[] FromArray(CompiledType[]? types, TypeArguments? typeArguments)
         {
             if (types is null || types.Length == 0) return Array.Empty<CompiledType>();
+
             CompiledType[] result = new CompiledType[types.Length];
             for (int i = 0; i < types.Length; i++)
             { result[i] = new CompiledType(types[i], typeArguments); }
+
             return result;
         }
 
@@ -1127,7 +979,7 @@ namespace LanguageCore.Compiler
 
         public bool TryGetFieldOffsets([NotNullWhen(true)] out IReadOnlyDictionary<string, int>? fieldOffsets)
         {
-            if (@class is not null)
+            if (IsClass)
             {
                 TypeArguments saved = new(@class.CurrentTypeArguments);
 
@@ -1140,7 +992,7 @@ namespace LanguageCore.Compiler
                 return true;
             }
 
-            if (@struct is not null)
+            if (IsStruct)
             {
                 fieldOffsets = @struct.FieldOffsets;
                 return true;
@@ -1150,54 +1002,37 @@ namespace LanguageCore.Compiler
             return false;
         }
 
+        /// <exception cref="NotImplementedException"/>
         public bool AllGenericsDefined()
         {
             if (IsGeneric) return false;
 
-            if (this.IsBuiltin) return true;
+            if (IsBuiltin) return true;
 
-            if (this.IsEnum) return true;
+            if (IsEnum) return true;
 
-            if (this.IsStackArray)
-            { return this.StackArrayOf.AllGenericsDefined(); }
+            if (IsStackArray) return StackArrayOf.AllGenericsDefined();
 
-            if (this.IsFunction)
+            if (IsFunction)
             {
-                for (int i = 0; i < this.Function.Parameters.Length; i++)
+                for (int i = 0; i < Function.Parameters.Length; i++)
                 {
-                    if (!this.function.Parameters[i].AllGenericsDefined())
+                    if (!function.Parameters[i].AllGenericsDefined())
                     { return false; }
                 }
-                return this.Function.ReturnType.AllGenericsDefined();
+                return Function.ReturnType.AllGenericsDefined();
             }
 
-            if (this.IsStruct)
-            { return true; }
+            if (IsStruct) return true;
 
-            if (this.IsClass)
+            if (IsClass)
             {
-                if (this.Class.TemplateInfo == null)
-                { return true; }
-                return this.TypeParameters.Length > 0;
+                if (Class.TemplateInfo == null) return true;
+                return TypeParameters.Length > 0;
             }
 
             throw new NotImplementedException();
         }
-    }
-
-    public interface ITypeDefinition : IDefinition
-    {
-
-    }
-
-    public interface IDataStructure
-    {
-        public int Size { get; }
-    }
-
-    public interface IHaveKey<T>
-    {
-        public T Key { get; }
     }
 
     public interface IAmInContext<T>
@@ -1205,8 +1040,15 @@ namespace LanguageCore.Compiler
         public T? Context { get; set; }
     }
 
-    public interface ICanBeSame
+    public interface ISameCheck
     {
-        public bool IsSame(ICanBeSame? other);
+        public bool IsSame(ISameCheck? other);
+    }
+
+    public interface ISameCheck<T> : ISameCheck
+    {
+        public bool IsSame(T other);
+
+        bool ISameCheck.IsSame(ISameCheck? other) => IsSame(other);
     }
 }

@@ -25,7 +25,7 @@ namespace LanguageCore.Tokenizing
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
     public class Token :
-        IThingWithPosition,
+        IPositioned,
         IEquatable<Token>,
         IEquatable<string>,
         IDuplicatable<Token>,

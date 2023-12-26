@@ -9,7 +9,8 @@ namespace LanguageCore.Compiler
 
     public class CompiledGeneralFunction :
         GeneralFunctionDefinition,
-        ICanBeSame,
+        ISameCheck,
+        ISameCheck<CompiledGeneralFunction>,
         IAmInContext<CompiledClass>,
         IReferenceable<KeywordCall>,
         IReferenceable<ConstructorCall>,
@@ -24,8 +25,8 @@ namespace LanguageCore.Compiler
 
         public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
-        public IReadOnlyList<(Statement Statement, string? File)> References => references;
-        readonly List<(Statement Statement, string? File)> references = new();
+        public IReadOnlyList<Reference<Statement>> References => references;
+        readonly List<Reference<Statement>> references = new();
 
         public override bool IsTemplate
         {
@@ -56,8 +57,8 @@ namespace LanguageCore.Compiler
             base.FilePath = functionDefinition.FilePath;
         }
 
-        public void AddReference(KeywordCall referencedBy, string? file) => references.Add((referencedBy, file));
-        public void AddReference(ConstructorCall referencedBy, string? file) => references.Add((referencedBy, file));
+        public void AddReference(KeywordCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
+        public void AddReference(ConstructorCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));
         public void ClearReferences() => references.Clear();
 
         public bool IsSame(CompiledGeneralFunction other)
@@ -70,7 +71,7 @@ namespace LanguageCore.Compiler
 
             return true;
         }
-        public bool IsSame(ICanBeSame? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
+        public bool IsSame(ISameCheck? other) => other is CompiledGeneralFunction other2 && IsSame(other2);
 
         public CompiledGeneralFunction Duplicate() => new(Type, ParameterTypes, this)
         {

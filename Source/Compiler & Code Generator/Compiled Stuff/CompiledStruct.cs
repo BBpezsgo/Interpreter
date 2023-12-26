@@ -2,14 +2,17 @@
 
 namespace LanguageCore.Compiler
 {
-    using LanguageCore.BBCode.Generator;
     using Parser;
 
-    public class CompiledStruct : StructDefinition, ITypeDefinition, IDataStructure, IHaveKey<string>
+    public class CompiledStruct : StructDefinition,
+        IReferenceable<TypeInstance>
     {
         public new readonly CompiledField[] Fields;
         public CompiledAttributeCollection CompiledAttributes;
-        public readonly List<DefinitionReference> References;
+
+        public IReadOnlyList<Reference<TypeInstance>> References => references;
+        readonly List<Reference<TypeInstance>> references;
+
         public IReadOnlyDictionary<string, int> FieldOffsets
         {
             get
@@ -24,7 +27,8 @@ namespace LanguageCore.Compiler
                 return result;
             }
         }
-        public int Size
+
+        public int SizeOnStack
         {
             get
             {
@@ -38,7 +42,7 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledStruct(Dictionary<string, AttributeValues> compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
+        public CompiledStruct(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
@@ -48,7 +52,10 @@ namespace LanguageCore.Compiler
             base.Statements.Clear();
             base.Statements.AddRange(definition.Statements);
 
-            this.References = new List<DefinitionReference>();
+            this.references = new List<Reference<TypeInstance>>();
         }
+
+        public void AddReference(TypeInstance referencedBy, string? file) => references.Add(new Reference<TypeInstance>(referencedBy, file));
+        public void ClearReferences() => references.Clear();
     }
 }

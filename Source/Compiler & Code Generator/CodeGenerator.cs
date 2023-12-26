@@ -419,7 +419,7 @@ namespace LanguageCore.Compiler
         /// Used for exceptions
         /// </param>
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindReplacedType(string builtinName, IThingWithPosition position)
+        protected CompiledType FindReplacedType(string builtinName, IPositioned position)
         {
             string? replacedName = TypeDefinitionReplacer(builtinName);
 
@@ -642,7 +642,13 @@ namespace LanguageCore.Compiler
 
                 if (!CompiledType.TryGetTypeParameters(function.ParameterTypes, parameters, out TypeArguments? typeParameters)) continue;
 
-                MapTypeParameters(constructorCall.TypeName, @class.TemplateInfo!.TypeParameters, typeParameters);
+                TemplateInfo template = (function.TemplateInfo ?? function.Context.TemplateInfo)!;
+
+                LanguageCore.Utils.Map(
+                    template.TypeParameters,
+                    new CompiledType(constructorCall.TypeName, FindType).TypeParameters,
+                    (key, value) => (key.Content, value),
+                    typeParameters);
 
                 compiledGeneralFunction = new CompliableTemplate<CompiledGeneralFunction>(function, typeParameters);
 
@@ -963,7 +969,7 @@ namespace LanguageCore.Compiler
                 if (!function.Type.Equals(type.ReturnType)) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -982,7 +988,7 @@ namespace LanguageCore.Compiler
                 if (!function.Identifier.Equals(name)) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -1001,7 +1007,7 @@ namespace LanguageCore.Compiler
                 if (!function.Identifier.Equals(name.Content)) continue;
 
                 if (compiledFunction is not null)
-                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ReadableID()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ReadableID()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
+                { throw new CompilerException($"Function type could not be inferred. Definition conflicts: {compiledFunction.ToReadable()} (at {compiledFunction.Identifier.Position.ToStringRange()}) ; {function.ToReadable()} (at {function.Identifier.Position.ToStringRange()}) ; (and possibly more)", name, CurrentFile); }
 
                 compiledFunction = function;
             }
@@ -1345,7 +1351,7 @@ namespace LanguageCore.Compiler
         protected CompiledType FindType(Token name) => FindType(name.Content, name);
 
         /// <exception cref="CompilerException"/>
-        protected CompiledType FindType(string name, IThingWithPosition? position) => FindType(name, position?.Position ?? Position.UnknownPosition);
+        protected CompiledType FindType(string name, IPositioned? position) => FindType(name, position?.Position ?? Position.UnknownPosition);
 
         /// <exception cref="CompilerException"/>
         protected CompiledType FindType(string name) => FindType(name, Position.UnknownPosition);
@@ -1609,25 +1615,6 @@ namespace LanguageCore.Compiler
 
         #endregion
 
-        /// <summary>
-        /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
-        /// </summary>
-        /// <exception cref="NotImplementedException"/>
-        void MapTypeParameters(TypeInstance type, Token[] typeParameterNames, TypeArguments typeParameters)
-            => MapTypeParameters(new CompiledType(type, FindType), typeParameterNames, typeParameters);
-
-        /// <summary>
-        /// Collects the type parameters from <paramref name="type"/> with names got from <paramref name="typeParameterNames"/> and puts the result to <paramref name="typeParameters"/>
-        /// </summary>
-        /// <exception cref="NotImplementedException"/>
-        static void MapTypeParameters(CompiledType type, Token[] typeParameterNames, TypeArguments typeParameters)
-        {
-            if (type.TypeParameters.Length != typeParameterNames.Length)
-            { throw new NotImplementedException($"There should be the same number of type parameter values as type parameter names"); }
-
-            LanguageCore.Utils.Map(typeParameterNames, type.TypeParameters, typeParameters);
-        }
-
         protected CompiledVariable CompileVariable(VariableDeclaration newVariable, int memoryOffset)
         {
             if (LanguageConstants.Keywords.Contains(newVariable.VariableName.Content))
@@ -1698,7 +1685,7 @@ namespace LanguageCore.Compiler
             foreach (CompiledField field in @struct.Fields)
             { result.Add(GetInitialValue(field.Type)); }
 
-            if (result.Count != @struct.Size)
+            if (result.Count != @struct.SizeOnStack)
             { throw new NotImplementedException(); }
 
             return result.ToArray();
@@ -1821,7 +1808,7 @@ namespace LanguageCore.Compiler
             if (!GetFunction(functionCall, out CompiledFunction? compiledFunction))
             {
                 if (!GetFunctionTemplate(functionCall, out CompliableTemplate<CompiledFunction> compiledFunctionTemplate))
-                { throw new CompilerException($"Function \"{functionCall.ReadableID(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
+                { throw new CompilerException($"Function \"{functionCall.ToReadable(FindStatementType)}\" not found", functionCall.Identifier, CurrentFile); }
 
                 compiledFunction = compiledFunctionTemplate.Function;
             }
@@ -2124,7 +2111,7 @@ namespace LanguageCore.Compiler
             for (int i = 1; i < result.Count; i++)
             {
                 if (!result[i].Equals(result[0]))
-                { throw new CompilerException($"Macro \"{macro.ReadableID()}\" returns more than one type of value", macro.Block, macro.FilePath); }
+                { throw new CompilerException($"Macro \"{macro.ToReadable()}\" returns more than one type of value", macro.Block, macro.FilePath); }
             }
 
             return result[0];
@@ -2164,8 +2151,10 @@ namespace LanguageCore.Compiler
 
         protected Statement InlineMacro(MacroDefinition macro, params StatementWithValue[] parameters)
         {
-            Dictionary<string, StatementWithValue> _parameters = new();
-            LanguageCore.Utils.Map(macro.Parameters, parameters, _parameters);
+            Dictionary<string, StatementWithValue> _parameters = LanguageCore.Utils.Map(
+                macro.Parameters,
+                parameters,
+                (key, value) => (key.Content, value));
 
             return InlineMacro(macro, _parameters);
         }
@@ -2175,7 +2164,7 @@ namespace LanguageCore.Compiler
             Statement result;
 
             if (macro.Block.Statements.Length == 0)
-            { throw new CompilerException($"Macro \"{macro.ReadableID()}\" has no statements", macro.Block, macro.FilePath); }
+            { throw new CompilerException($"Macro \"{macro.ToReadable()}\" has no statements", macro.Block, macro.FilePath); }
             else if (macro.Block.Statements.Length == 1)
             { result = InlineMacro(macro.Block.Statements[0], parameters); }
             else
@@ -2420,6 +2409,135 @@ namespace LanguageCore.Compiler
             value = leftValue;
             return true;
         }
+        public static bool TryCompute(LiteralStatement literal, RuntimeType? expectedType, out DataItem value)
+        {
+            switch (literal.Type)
+            {
+                case LiteralType.Integer:
+                    value = new DataItem(literal.GetInt());
+                    break;
+                case LiteralType.Float:
+                    value = new DataItem(literal.GetFloat());
+                    break;
+                case LiteralType.Boolean:
+                    value = new DataItem(bool.Parse(literal.Value));
+                    break;
+                case LiteralType.Char:
+                    if (literal.Value.Length != 1)
+                    {
+                        value = DataItem.Null;
+                        return false;
+                    }
+                    value = new DataItem(literal.Value[0]);
+                    break;
+                case LiteralType.String:
+                default:
+                    value = DataItem.Null;
+                    return false;
+            }
+            DataItem.TryCast(ref value, expectedType);
+            return true;
+        }
+        protected bool TryCompute(KeywordCall keywordCall, RuntimeType? expectedType, out DataItem value)
+        {
+            if (keywordCall.FunctionName == "sizeof")
+            {
+                if (keywordCall.Parameters.Length != 1)
+                {
+                    value = DataItem.Null;
+                    return false;
+                }
+
+                StatementWithValue param0 = keywordCall.Parameters[0];
+                CompiledType param0Type = FindStatementType(param0);
+
+                value = new DataItem(param0Type.Size);
+                DataItem.TryCast(ref value, expectedType);
+                return true;
+            }
+
+            value = DataItem.Null;
+            return false;
+        }
+        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, out DataItem value)
+        {
+            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
+            { return TryCompute(functionCall, expectedType, out value); }
+
+            value = DataItem.Null;
+            return false;
+        }
+        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
+        {
+            value = DataItem.Null;
+
+            if (!TryGetMacro(functionCall, out MacroDefinition? macro))
+            { return false; }
+
+            Statement inlined = InlineMacro(macro, functionCall.Parameters);
+
+            if (inlined is StatementWithValue statementWithValue)
+            { return TryCompute(statementWithValue, expectedType, out value); }
+
+            return false;
+        }
+        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, out DataItem value)
+        {
+            if (GetConstant(identifier.Content, out DataItem constantValue))
+            {
+                value = constantValue;
+                DataItem.TryCast(ref value, expectedType);
+                return true;
+            }
+
+            value = DataItem.Null;
+            return false;
+        }
+        protected bool TryCompute(Field field, RuntimeType? expectedType, out DataItem value)
+        {
+            CompiledType prevType = FindStatementType(field.PrevStatement);
+
+            if (prevType.IsStackArray && field.FieldName.Equals("Length"))
+            {
+                value = new DataItem(prevType.StackArraySize);
+                DataItem.TryCast(ref value, expectedType);
+                return true;
+            }
+
+            value = DataItem.Null;
+            return false;
+        }
+
+        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
+        {
+            if (statement is null)
+            {
+                value = DataItem.Null;
+                return false;
+            }
+
+            if (statement is LiteralStatement literal)
+            { return TryCompute(literal, expectedType, out value); }
+
+            if (statement is OperatorCall @operator)
+            { return TryCompute(@operator, expectedType, out value); }
+
+            if (statement is KeywordCall keywordCall)
+            { return TryCompute(keywordCall, expectedType, out value); }
+
+            if (statement is FunctionCall functionCall)
+            { return TryCompute(functionCall, expectedType, out value); }
+
+            if (statement is AnyCall anyCall)
+            { return TryCompute(anyCall, expectedType, out value); }
+
+            if (statement is Identifier identifier)
+            { return TryCompute(identifier, expectedType, out value); }
+
+            value = DataItem.Null;
+            return false;
+        }
+
         public static bool TryComputeSimple(OperatorCall @operator, RuntimeType? expectedType, out DataItem value)
         {
             if (!TryComputeSimple(@operator.Left, expectedType, out DataItem leftValue))
@@ -2473,134 +2591,6 @@ namespace LanguageCore.Compiler
             value = leftValue;
             return true;
         }
-        public static bool TryCompute(LiteralStatement literal, RuntimeType? expectedType, out DataItem value)
-        {
-            switch (literal.Type)
-            {
-                case LiteralType.Integer:
-                    value = new DataItem(literal.GetInt());
-                    break;
-                case LiteralType.Float:
-                    value = new DataItem(literal.GetFloat());
-                    break;
-                case LiteralType.Boolean:
-                    value = new DataItem(bool.Parse(literal.Value));
-                    break;
-                case LiteralType.Char:
-                    if (literal.Value.Length != 1)
-                    {
-                        value = DataItem.Null;
-                        return false;
-                    }
-                    value = new DataItem(literal.Value[0]);
-                    break;
-                case LiteralType.String:
-                default:
-                    value = DataItem.Null;
-                    return false;
-            }
-            Convert(ref value, expectedType);
-            return true;
-        }
-        protected bool TryCompute(KeywordCall keywordCall, RuntimeType? expectedType, out DataItem value)
-        {
-            if (keywordCall.FunctionName == "sizeof")
-            {
-                if (keywordCall.Parameters.Length != 1)
-                {
-                    value = DataItem.Null;
-                    return false;
-                }
-
-                StatementWithValue param0 = keywordCall.Parameters[0];
-                CompiledType param0Type = FindStatementType(param0);
-
-                value = new DataItem(param0Type.Size);
-                Convert(ref value, expectedType);
-                return true;
-            }
-
-            value = DataItem.Null;
-            return false;
-        }
-        protected bool TryCompute(AnyCall anyCall, RuntimeType? expectedType, out DataItem value)
-        {
-            if (anyCall.ToFunctionCall(out FunctionCall? functionCall))
-            { return TryCompute(functionCall, expectedType, out value); }
-
-            value = DataItem.Null;
-            return false;
-        }
-        protected bool TryCompute(FunctionCall functionCall, RuntimeType? expectedType, out DataItem value)
-        {
-            value = DataItem.Null;
-
-            if (!TryGetMacro(functionCall, out MacroDefinition? macro))
-            { return false; }
-
-            Statement inlined = InlineMacro(macro, functionCall.Parameters);
-
-            if (inlined is StatementWithValue statementWithValue)
-            { return TryCompute(statementWithValue, expectedType, out value); }
-
-            return false;
-        }
-        protected bool TryCompute(Identifier identifier, RuntimeType? expectedType, out DataItem value)
-        {
-            if (GetConstant(identifier.Content, out DataItem constantValue))
-            {
-                value = constantValue;
-                Convert(ref value, expectedType);
-                return true;
-            }
-
-            value = DataItem.Null;
-            return false;
-        }
-        protected bool TryCompute(Field field, RuntimeType? expectedType, out DataItem value)
-        {
-            CompiledType prevType = FindStatementType(field.PrevStatement);
-
-            if (prevType.IsStackArray && field.FieldName.Equals("Length"))
-            {
-                value = new DataItem(prevType.StackArraySize);
-                Convert(ref value, expectedType);
-                return true;
-            }
-
-            value = DataItem.Null;
-            return false;
-        }
-
-        protected bool TryCompute(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
-        {
-            if (statement is null)
-            {
-                value = DataItem.Null;
-                return false;
-            }
-
-            if (statement is LiteralStatement literal)
-            { return TryCompute(literal, expectedType, out value); }
-
-            if (statement is OperatorCall @operator)
-            { return TryCompute(@operator, expectedType, out value); }
-
-            if (statement is KeywordCall keywordCall)
-            { return TryCompute(keywordCall, expectedType, out value); }
-
-            if (statement is FunctionCall functionCall)
-            { return TryCompute(functionCall, expectedType, out value); }
-
-            if (statement is AnyCall anyCall)
-            { return TryCompute(anyCall, expectedType, out value); }
-
-            if (statement is Identifier identifier)
-            { return TryCompute(identifier, expectedType, out value); }
-
-            value = DataItem.Null;
-            return false;
-        }
         public static bool TryComputeSimple(StatementWithValue? statement, RuntimeType? expectedType, out DataItem value)
         {
             if (statement is null)
@@ -2619,129 +2609,6 @@ namespace LanguageCore.Compiler
             return false;
         }
         #endregion
-
-        protected static bool Convert(ref DataItem value, RuntimeType? type)
-        {
-            if (!type.HasValue) return false;
-            return Convert(ref value, type.Value);
-        }
-        protected static bool Convert(ref DataItem value, RuntimeType type)
-        {
-            DataItem input = value;
-            bool result = Convert(in input, type, out DataItem output);
-            value = output;
-            return result;
-        }
-
-        protected static bool Convert(in DataItem input, RuntimeType? type, out DataItem value)
-        {
-            value = input;
-
-            if (type == null)
-            { return false; }
-
-            return Convert(in input, type.Value, out value);
-        }
-        protected static bool Convert(in DataItem input, RuntimeType type, out DataItem value)
-        {
-            switch (type)
-            {
-                case RuntimeType.UInt8:
-                    switch (input.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            value = input;
-                            return true;
-                        case RuntimeType.SInt32:
-                            if (input.ValueSInt32 >= byte.MinValue && input.ValueSInt32 <= byte.MaxValue)
-                            {
-                                value = new DataItem((byte)input.ValueSInt32);
-                                return true;
-                            }
-                            value = input;
-                            return false;
-                        case RuntimeType.Single:
-                            value = input;
-                            return false;
-                        case RuntimeType.UInt16:
-                            if (input.ValueUInt16 >= byte.MinValue && input.ValueUInt16 <= byte.MaxValue)
-                            {
-                                value = new DataItem((byte)input.ValueUInt16);
-                                return true;
-                            }
-                            value = input;
-                            return false;
-                        default:
-                            value = input;
-                            return false;
-                    }
-                case RuntimeType.SInt32:
-                    switch (input.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            value = new DataItem((int)input.ValueUInt8);
-                            return true;
-                        case RuntimeType.SInt32:
-                            value = input;
-                            return true;
-                        case RuntimeType.Single:
-                            value = input;
-                            return false;
-                        case RuntimeType.UInt16:
-                            value = new DataItem((int)input.ValueUInt16);
-                            return true;
-                        default:
-                            value = input;
-                            return false;
-                    }
-                case RuntimeType.Single:
-                    switch (input.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            value = new DataItem((float)input.ValueUInt8);
-                            return true;
-                        case RuntimeType.SInt32:
-                            value = new DataItem((float)input.ValueSInt32);
-                            return true;
-                        case RuntimeType.Single:
-                            value = input;
-                            return true;
-                        case RuntimeType.UInt16:
-                            value = new DataItem((float)input.ValueUInt16);
-                            return true;
-                        default:
-                            value = input;
-                            return false;
-                    }
-                case RuntimeType.UInt16:
-                    switch (input.Type)
-                    {
-                        case RuntimeType.UInt8:
-                            value = new DataItem((char)input.ValueUInt8);
-                            return true;
-                        case RuntimeType.SInt32:
-                            if (input.ValueSInt32 >= char.MinValue && input.ValueSInt32 <= char.MaxValue)
-                            {
-                                value = new DataItem((char)input.ValueSInt32);
-                                return true;
-                            }
-                            value = input;
-                            return false;
-                        case RuntimeType.Single:
-                            value = input;
-                            return false;
-                        case RuntimeType.UInt16:
-                            value = input;
-                            return true;
-                        default:
-                            value = input;
-                            return false;
-                    }
-                default:
-                    value = input;
-                    return false;
-            }
-        }
 
         #region Collapse()
 

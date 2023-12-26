@@ -19,37 +19,44 @@ jobs:
       with:
         dotnet-version: 8.0.x
 
+# https://github.com/actions/runner/issues/686#issuecomment-1636899369
+    - name: Allow powershell
+      shell: cmd
+      run: powershell -Command "Set-ExecutionPolicy RemoteSigned -Scope CurrentUser"
+    - name: Check powershell version
+      run: $host.Version
+      
     - name: Prepare build
-      shell: pwsh
+      shell: powershell
       run: |
         mkdir BuildJob
 
     - name: Cloning repositories
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\clone-repos.ps1
 
     - name: Building
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\build.ps1
 
     - name: Cleaning up the projects
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\cleanup-projects.ps1
 
     - name: Compressing
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         ..\compress.ps1
 
     - name: Cleaning up
-      shell: pwsh
+      shell: powershell
       working-directory: ./BuildJob
       run: |
         if (Test-Path -Path ./Published) { Remove-Item -LiteralPath ./Published -Force -Recurse }
@@ -59,17 +66,21 @@ jobs:
 #      with:
 #        path: .\Published\JIT
 
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+        
     - name: Create tag
       uses: EndBug/latest-tag@latest
       with:
         # Default: 'latest'
-        ref: latest
+        ref: ${{ steps.date.outputs.date }}
 
         # Default: ''
         # description: Description for the tag
 
         # Default: false
-        force-branch: true
+        # force-branch: true
 
         # Default: '${{ github.workspace }}'
         # git-directory: 'path/to/repo/dir'
@@ -81,6 +92,6 @@ jobs:
           ./BuildJob/Windows_x64_RuntimeIndependent.zip
           ./BuildJob/Windows_x64_RuntimeDependent.zip
           ./BuildJob/Windows_x64_AOT.zip
-        tag_name: latest
-        name: The Release
+        tag_name: ${{ steps.date.outputs.date }}
+        name: Release ${{ steps.date.outputs.date }}
         fail_on_unmatched_files: true

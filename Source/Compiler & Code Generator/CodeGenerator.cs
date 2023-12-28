@@ -165,8 +165,8 @@ namespace LanguageCore.Compiler
         protected CompiledFunction[] CompiledFunctions;
         protected MacroDefinition[] CompiledMacros;
         protected CompiledOperator[] CompiledOperators;
-        protected CompiledEnum[] CompiledEnums;
         protected CompiledGeneralFunction[] CompiledGeneralFunctions;
+        protected CompiledEnum[] CompiledEnums;
 
         protected readonly Stack<CompiledConstant> CompiledConstants;
         protected readonly Stack<int> ConstantsStack;
@@ -202,6 +202,19 @@ namespace LanguageCore.Compiler
             CompiledGeneralFunctions = Array.Empty<CompiledGeneralFunction>();
             CompiledEnums = Array.Empty<CompiledEnum>();
 
+            CompiledConstants = new Stack<CompiledConstant>();
+            ConstantsStack = new Stack<int>();
+
+            CompiledParameters = new List<CompiledParameter>();
+            CompiledVariables = new List<CompiledVariable>();
+            CompiledGlobalVariables = new List<CompiledVariable>();
+
+            compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
+            compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
+            compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
+
+            TypeArguments = new TypeArguments();
+
             Errors = new List<Error>();
             Warnings = new List<Warning>();
             Hints = new List<Hint>();
@@ -209,18 +222,6 @@ namespace LanguageCore.Compiler
             CurrentFile = null;
             InFunction = false;
 
-            TypeArguments = new TypeArguments();
-
-            CompiledConstants = new Stack<CompiledConstant>();
-            ConstantsStack = new Stack<int>();
-
-            CompiledVariables = new List<CompiledVariable>();
-            CompiledGlobalVariables = new List<CompiledVariable>();
-            CompiledParameters = new List<CompiledParameter>();
-
-            compilableFunctions = new List<CompliableTemplate<CompiledFunction>>();
-            compilableOperators = new List<CompliableTemplate<CompiledOperator>>();
-            compilableGeneralFunctions = new List<CompliableTemplate<CompiledGeneralFunction>>();
         }
 
         protected CodeGenerator(CompilerResult compilerResult) : this()
@@ -1479,7 +1480,7 @@ namespace LanguageCore.Compiler
             if (address.IsReference)
             { throw new NotImplementedException(); }
             int offset = GetDataOffset(field);
-            return new ValueAddress(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
+            return new ValueAddress(address.Address + offset, address.AddressingMode, address.IsReference, address.InHeap);
         }
         protected ValueAddress GetDataAddress(IndexCall indexCall)
         {
@@ -1487,7 +1488,7 @@ namespace LanguageCore.Compiler
             if (address.IsReference)
             { throw new NotImplementedException(); }
             int currentOffset = GetDataOffset(indexCall);
-            return new ValueAddress(address.Address + currentOffset, address.BasepointerRelative, address.IsReference, address.InHeap);
+            return new ValueAddress(address.Address + currentOffset, address.AddressingMode, address.IsReference, address.InHeap);
         }
 
         protected int GetDataOffset(StatementWithValue value)
@@ -1582,13 +1583,13 @@ namespace LanguageCore.Compiler
         {
             ValueAddress address = GetBaseAddress(statement.PrevStatement);
             bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
-            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
+            return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
         }
         protected ValueAddress GetBaseAddress(IndexCall statement)
         {
             ValueAddress address = GetBaseAddress(statement.PrevStatement!);
             bool inHeap = address.InHeap || FindStatementType(statement.PrevStatement).InHEAP;
-            return new ValueAddress(address.Address, address.BasepointerRelative, address.IsReference, inHeap);
+            return new ValueAddress(address.Address, address.AddressingMode, address.IsReference, inHeap);
         }
 
         protected bool IsItInHeap(StatementWithValue value)

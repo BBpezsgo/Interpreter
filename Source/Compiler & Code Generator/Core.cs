@@ -13,15 +13,14 @@ namespace LanguageCore.BBCode.Generator
     public readonly struct ValueAddress
     {
         public readonly int Address;
-        public readonly bool BasepointerRelative;
+        public readonly AddressingMode AddressingMode;
         public readonly bool IsReference;
         public readonly bool InHeap;
-        public AddressingMode AddressingMode => BasepointerRelative ? AddressingMode.BasePointerRelative : AddressingMode.Absolute;
 
-        public ValueAddress(int address, bool basepointerRelative, bool isReference, bool inHeap)
+        public ValueAddress(int address, AddressingMode addressingMode, bool isReference = false, bool inHeap = false)
         {
             Address = address;
-            BasepointerRelative = basepointerRelative;
+            AddressingMode = addressingMode;
             IsReference = isReference;
             InHeap = inHeap;
         }
@@ -29,7 +28,7 @@ namespace LanguageCore.BBCode.Generator
         public ValueAddress(CompiledVariable variable)
         {
             Address = variable.MemoryAddress;
-            BasepointerRelative = true;
+            AddressingMode = AddressingMode.BasePointerRelative;
             IsReference = false;
             InHeap = false;
         }
@@ -37,7 +36,7 @@ namespace LanguageCore.BBCode.Generator
         public ValueAddress(CompiledVariable variable, bool basepointerRelative)
         {
             Address = variable.MemoryAddress;
-            BasepointerRelative = basepointerRelative;
+            AddressingMode = basepointerRelative ? AddressingMode.BasePointerRelative : AddressingMode.Absolute;
             IsReference = false;
             InHeap = false;
         }
@@ -45,22 +44,37 @@ namespace LanguageCore.BBCode.Generator
         public ValueAddress(CompiledParameter parameter, int address)
         {
             Address = address;
-            BasepointerRelative = true;
+            AddressingMode = AddressingMode.BasePointerRelative;
             IsReference = parameter.IsRef;
             InHeap = false;
         }
 
-        public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.BasepointerRelative, address.IsReference, address.InHeap);
+        public static ValueAddress operator +(ValueAddress address, int offset) => new(address.Address + offset, address.AddressingMode, address.IsReference, address.InHeap);
 
         public override string ToString()
         {
             StringBuilder result = new();
             result.Append('(');
             result.Append(Address);
-            if (BasepointerRelative)
-            { result.Append(" (BPR)"); }
-            else
-            { result.Append(" (ABS)"); }
+
+            switch (AddressingMode)
+            {
+                case AddressingMode.Absolute:
+                    result.Append(" (ABS)");
+                    break;
+                case AddressingMode.Runtime:
+                    result.Append(" (RNT)");
+                    break;
+                case AddressingMode.BasePointerRelative:
+                    result.Append(" (BPR)");
+                    break;
+                case AddressingMode.StackRelative:
+                    result.Append(" (SR)");
+                    break;
+                default:
+                    break;
+            }
+
             if (IsReference)
             { result.Append(" | IsRef"); }
             if (InHeap)

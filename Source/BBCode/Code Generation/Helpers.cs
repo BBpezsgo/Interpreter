@@ -302,7 +302,7 @@ namespace LanguageCore.BBCode.Generator
 
         void HeapLoad(ValueAddress pointerAddress, int offset)
         {
-            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
 
             CheckPointerNull();
 
@@ -312,7 +312,7 @@ namespace LanguageCore.BBCode.Generator
         }
         void HeapStore(ValueAddress pointerAddress, int offset)
         {
-            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.BasepointerRelative, pointerAddress.IsReference, false));
+            StackLoad(new ValueAddress(pointerAddress.Address, pointerAddress.AddressingMode, pointerAddress.IsReference));
 
             CheckPointerNull();
 

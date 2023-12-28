@@ -1519,10 +1519,21 @@ namespace LanguageCore.BBCode.Generator
                 {
                     ValueAddress address = GetDataAddress(identifier);
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
-                    if (address.BasepointerRelative)
+
+                    switch (address.AddressingMode)
                     {
-                        AddInstruction(Opcode.GET_BASEPOINTER);
-                        AddInstruction(Opcode.MATH_ADD);
+                        case AddressingMode.Absolute:
+                            break;
+                        case AddressingMode.Runtime:
+                            throw new NotImplementedException();
+                        case AddressingMode.BasePointerRelative:
+                            AddInstruction(Opcode.GET_BASEPOINTER);
+                            AddInstruction(Opcode.MATH_ADD);
+                            break;
+                        case AddressingMode.StackRelative:
+                            throw new UnreachableException();
+                        default:
+                            throw new UnreachableException();
                     }
 
                     GenerateCodeForStatement(index.Expression);
@@ -1577,10 +1588,20 @@ namespace LanguageCore.BBCode.Generator
                 {
                     AddInstruction(Opcode.PUSH_VALUE, address.Address);
 
-                    if (address.BasepointerRelative)
+                    switch (address.AddressingMode)
                     {
-                        AddInstruction(Opcode.GET_BASEPOINTER);
-                        AddInstruction(Opcode.MATH_ADD);
+                        case AddressingMode.Absolute:
+                            break;
+                        case AddressingMode.Runtime:
+                            throw new NotImplementedException();
+                        case AddressingMode.BasePointerRelative:
+                            AddInstruction(Opcode.GET_BASEPOINTER);
+                            AddInstruction(Opcode.MATH_ADD);
+                            break;
+                        case AddressingMode.StackRelative:
+                            throw new UnreachableException();
+                        default:
+                            throw new UnreachableException();
                     }
                 }
                 return;

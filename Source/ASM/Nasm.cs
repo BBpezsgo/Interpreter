@@ -73,7 +73,7 @@ namespace LanguageCore.ASM
             { File.Delete(outputFile); }
 
             string nasm = @$"C:\users\{Environment.UserName}\nasm\nasm.exe";
-            using Process? process = Process.Start(new ProcessStartInfo(nasm, $"-f win32 {inputFile} -o {outputFile}")
+            using Process? process = Process.Start(new ProcessStartInfo(nasm, $"-gcv8 -f win32 {inputFile} -o {outputFile}")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

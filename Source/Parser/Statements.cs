@@ -1005,8 +1005,8 @@ namespace LanguageCore.Parser.Statement
 
         public override string ToString() => Type switch
         {
-            LiteralType.String => $"\"{Value}\"",
-            LiteralType.Char => $"'{Value}'",
+            LiteralType.String => $"\"{Value.Escape()}\"",
+            LiteralType.Char => $"'{Value.Escape()}'",
             _ => Value,
         };
 
@@ -1432,6 +1432,13 @@ namespace LanguageCore.Parser.Statement
                 { yield return substatement; }
             }
         }
+
+        public FunctionCall ToFunctionCall() => new(
+            null,
+            new Token(TokenType.Identifier, BuiltinFunctionNames.Constructor, false, Keyword.Position),
+            BracketLeft,
+            Parameters,
+            BracketRight);
     }
 
     public class IndexCall : StatementWithValue, IReadable

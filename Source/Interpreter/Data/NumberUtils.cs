@@ -556,6 +556,17 @@ namespace LanguageCore.Runtime
             }
         }
 
+        /// <exception cref="OverflowException"/>
+        /// <exception cref="InvalidCastException"/>
+        public readonly int RoundToInt32(IFormatProvider? provider) => type switch
+        {
+            RuntimeType.UInt8 => (int)valueUInt8,
+            RuntimeType.SInt32 => (int)valueSInt32,
+            RuntimeType.UInt16 => (int)valueUInt16,
+            RuntimeType.Single => checked((int)MathF.Round(valueSingle)),
+            _ => throw new InvalidCastException($"Can't cast {type} to {nameof(System.Int32)}"),
+        };
+
         /// <inheritdoc/>
         /// <exception cref="OverflowException"/>
         /// <exception cref="InvalidCastException"/>

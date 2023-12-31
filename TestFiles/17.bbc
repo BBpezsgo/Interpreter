@@ -1,0 +1,8 @@
+int sum;
+
+for (int i; i < 10; i++)
+{
+	sum++;
+}
+
+return sum;

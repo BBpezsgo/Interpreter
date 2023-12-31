@@ -1,4 +1,5 @@
 ﻿global using ExternalFunctionCollection = System.Collections.Generic.Dictionary<string, LanguageCore.Runtime.ExternalFunctionBase>;
+global using ExternalFunctionReadonlyCollection = System.Collections.Generic.IReadOnlyDictionary<string, LanguageCore.Runtime.ExternalFunctionBase>;
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +7,7 @@ using System.Text;
 
 namespace LanguageCore.Runtime
 {
+    using System.Diagnostics.CodeAnalysis;
     using Parser.Statement;
 
     [Flags]
@@ -15,7 +17,7 @@ namespace LanguageCore.Runtime
         CheckParamType = 2,
     }
 
-    public abstract class ExternalFunctionBase : IReadableSimple
+    public abstract class ExternalFunctionBase : ISimpleReadable
     {
         public readonly Compiler.Type[] ParameterTypes;
         public readonly string Name;
@@ -130,6 +132,23 @@ namespace LanguageCore.Runtime
 
     unsafe public static class ExternalFunctionGenerator
     {
+        [RequiresUnreferencedCode("Loading Assembly")]
+        public static void LoadAssembly(this ExternalFunctionCollection externalFunctions, string path)
+            => ExternalFunctionGenerator.LoadAssembly(externalFunctions, System.Reflection.Assembly.LoadFile(path));
+
+        [RequiresUnreferencedCode("Loading Assembly")]
+        public static void LoadAssembly(this ExternalFunctionCollection externalFunctions, System.Reflection.Assembly assembly)
+        {
+            Type[] exportedTypes = assembly.GetExportedTypes();
+
+            foreach (Type type in exportedTypes)
+            {
+                System.Reflection.MethodInfo[] methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
+                foreach (System.Reflection.MethodInfo method in methods)
+                { externalFunctions.AddExternalFunction(method); }
+            }
+        }
+
         #region AddExternalFunction()
 
         /// <exception cref="InternalException"/>

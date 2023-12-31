@@ -272,6 +272,8 @@ namespace LanguageCore.Brainfuck
             Draw();
 
             ConsoleListener.Stop();
+
+            Console.ReadKey();
         }
 
         int StartToken;

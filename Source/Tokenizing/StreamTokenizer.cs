@@ -5,39 +5,39 @@ namespace LanguageCore.Tokenizing
 {
     public class StreamTokenizer : Tokenizer, IDisposable
     {
-        readonly TextReader InputStream;
+        readonly TextReader Stream;
         bool IsDisposed;
 
-        StreamTokenizer(TokenizerSettings settings, TextReader inputStream) : base(settings)
-        { InputStream = inputStream; }
+        StreamTokenizer(TokenizerSettings settings, TextReader stream) : base(settings)
+        { Stream = stream; }
 
         /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
-        public static TokenizerResult Tokenize(string file)
-            => StreamTokenizer.Tokenize(new StreamReader(file), TokenizerSettings.Default);
+        public static TokenizerResult Tokenize(string filePath)
+            => StreamTokenizer.Tokenize(new StreamReader(filePath), TokenizerSettings.Default);
 
         /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
-        public static TokenizerResult Tokenize(string file, TokenizerSettings settings)
-            => StreamTokenizer.Tokenize(new StreamReader(file), settings);
+        public static TokenizerResult Tokenize(string filePath, TokenizerSettings settings)
+            => StreamTokenizer.Tokenize(new StreamReader(filePath), settings);
 
         /// <inheritdoc cref="Tokenize(TextReader, TokenizerSettings)"/>
-        public static TokenizerResult Tokenize(TextReader inputStream)
-            => StreamTokenizer.Tokenize(inputStream, TokenizerSettings.Default);
+        public static TokenizerResult Tokenize(TextReader stream)
+            => StreamTokenizer.Tokenize(stream, TokenizerSettings.Default);
 
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
-        public static TokenizerResult Tokenize(TextReader inputStream, TokenizerSettings settings)
+        public static TokenizerResult Tokenize(TextReader stream, TokenizerSettings settings)
         {
-            using StreamTokenizer tokenizer = new(settings, inputStream);
+            using StreamTokenizer tokenizer = new(settings, stream);
             return tokenizer.TokenizeInternal();
         }
 
         protected override TokenizerResult TokenizeInternal()
         {
             int offsetTotal = 0;
-            while (true)
+            int next;
+
+            while ((next = Stream.Read()) != -1)
             {
-                int next = InputStream.Read();
-                if (next == -1) break;
                 offsetTotal++;
 
                 ProcessCharacter((char)next, offsetTotal, out bool breakLine, out bool returnLine);
@@ -59,7 +59,7 @@ namespace LanguageCore.Tokenizing
             if (IsDisposed) return;
 
             if (disposing)
-            { InputStream.Dispose(); }
+            { Stream.Dispose(); }
 
             IsDisposed = true;
         }

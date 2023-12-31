@@ -1,0 +1,8 @@
+int sum;
+
+for (int i = 10 - 1; (i >= 0 && i != 255); i--)
+{
+	sum++;
+}
+
+return sum;

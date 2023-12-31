@@ -41,9 +41,6 @@ namespace LanguageCore.ASM.Generator
 
     public struct AsmGeneratorResult
     {
-        public Warning[] Warnings;
-        public Error[] Errors;
-
         public string AssemblyCode;
     }
 
@@ -61,15 +58,9 @@ namespace LanguageCore.ASM.Generator
 
         #endregion
 
-        public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings) : base()
+        public CodeGeneratorForAsm(CompilerResult compilerResult, AsmGeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
         {
             this.GeneratorSettings = settings;
-            this.CompiledFunctions = compilerResult.Functions;
-            this.CompiledOperators = compilerResult.Operators;
-            this.CompiledClasses = compilerResult.Classes;
-            this.CompiledStructs = compilerResult.Structs;
-            this.CompiledEnums = compilerResult.Enums;
-            this.CompiledMacros = compilerResult.Macros;
             this.Builder = new AssemblyCode();
 
             this.FunctionLabels = new List<(CompiledFunction Function, string Label)>();
@@ -102,7 +93,24 @@ namespace LanguageCore.ASM.Generator
         protected override void StackLoad(ValueAddress address)
         {
             if (address.IsReference)
-            { throw new NotImplementedException(); }
+            {
+                switch (address.AddressingMode)
+                {
+                    case AddressingMode.Absolute:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{(address.Address + 1) * 4}]");
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        return;
+                    case AddressingMode.Runtime:
+                        throw new NotImplementedException();
+                    case AddressingMode.BasePointerRelative:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, Registers.EAX, $"DWORD[{Registers.EBP}{(address.Address > 0 ? "-" : "+")}{(Math.Abs(address.Address) + 1) * 4}]");
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.PUSH, Registers.EAX);
+                        return;
+                    case AddressingMode.StackRelative:
+                        throw new NotImplementedException();
+                    default: throw new UnreachableException();
+                }
+            }
 
             if (address.InHeap)
             { throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly"); }
@@ -128,7 +136,24 @@ namespace LanguageCore.ASM.Generator
         protected override void StackStore(ValueAddress address)
         {
             if (address.IsReference)
-            { throw new NotImplementedException(); }
+            {
+                switch (address.AddressingMode)
+                {
+                    case AddressingMode.Absolute:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{(address.Address + 1) * 4}]", Registers.EAX);
+                        return;
+                    case AddressingMode.Runtime:
+                        throw new NotImplementedException();
+                    case AddressingMode.BasePointerRelative:
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.POP, Registers.EAX);
+                        Builder.CodeBuilder.AppendInstruction(ASM.Instruction.MOV, $"DWORD[{Registers.EBP}{(address.Address > 0 ? "-" : "+")}{(Math.Abs(address.Address) + 1) * 4}]", Registers.EAX);
+                        return;
+                    case AddressingMode.StackRelative:
+                        throw new NotImplementedException();
+                    default: throw new UnreachableException();
+                }
+            }
 
             if (address.InHeap)
             { throw new NotImplementedException($"HEAP stuff generator isn't implemented for assembly"); }
@@ -343,7 +368,7 @@ namespace LanguageCore.ASM.Generator
             {
                 if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
                 {
-                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
                     return CleanupItem.Null;
                 }
             }
@@ -438,17 +463,8 @@ namespace LanguageCore.ASM.Generator
 
                 GenerateCodeForStatement(value);
 
-                if (parameter.IsRef)
-                {
-                    throw new NotImplementedException();
-                }
-                else
-                {
-                    ValueAddress offset = GetBaseAddress(parameter);
-                    StackStore(offset);
-                }
-
-                throw new NotImplementedException();
+                ValueAddress offset = GetBaseAddress(parameter);
+                StackStore(offset);
             }
             else if (GetVariable(statement.Token.Content, out CompiledVariable? variable))
             {
@@ -519,12 +535,12 @@ namespace LanguageCore.ASM.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                     canDeallocate = false;
                 }
 
@@ -556,12 +572,12 @@ namespace LanguageCore.ASM.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                 }
 
                 GenerateCodeForStatement(passedParameter); // TODO: expectedType = definedParameterType
@@ -590,12 +606,12 @@ namespace LanguageCore.ASM.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                     canDeallocate = false;
                 }
 
@@ -627,7 +643,7 @@ namespace LanguageCore.ASM.Generator
         {
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
@@ -651,10 +667,10 @@ namespace LanguageCore.ASM.Generator
 
                     Builder.CodeBuilder.AppendInstruction(ASM.Instruction.LEA, Registers.EBX, (InstructionOperand)new ValueAddress(0, AddressingMode.BasePointerRelative));
 
-                    Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20, 
+                    Builder.CodeBuilder.Call_stdcall("_WriteFile@20", 20,
                         Registers.EAX,
-                        dataLabel, 
-                        charLiteral.Value.Length, 
+                        dataLabel,
+                        charLiteral.Value.Length,
                         Registers.EBX,
                         0);
                     return;
@@ -706,7 +722,7 @@ namespace LanguageCore.ASM.Generator
             }
 
             if (compiledFunction.IsMacro)
-            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
+            { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
 
             Stack<ParameterCleanupItem> parameterCleanup;
 
@@ -1151,7 +1167,7 @@ namespace LanguageCore.ASM.Generator
 
             if (!constructor.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
                 return;
             }
 
@@ -1521,7 +1537,7 @@ namespace LanguageCore.ASM.Generator
         }
         void GenerateCodeForStatement(TypeCast typeCast)
         {
-            Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
+            AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             GenerateCodeForStatement(typeCast.PrevStatement);
         }
@@ -1620,15 +1636,13 @@ namespace LanguageCore.ASM.Generator
 
         void CompileParameters(ParameterDefinition[] parameters)
         {
-            int paramIndex = 0;
             int paramsSize = 0;
             for (int i = 0; i < parameters.Length; i++)
             {
-                paramIndex++;
                 CompiledType parameterType = new(parameters[i].Type, FindType);
                 parameters[i].Type.SetAnalyzedType(parameterType);
 
-                this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
+                this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
 
                 paramsSize += parameterType.SizeOnStack;
             }
@@ -1743,13 +1757,10 @@ namespace LanguageCore.ASM.Generator
                         "_ExitProcess@4",
                     },
                 }),
-
-                Warnings = Warnings.ToArray(),
-                Errors = Errors.ToArray(),
             };
         }
 
-        public static AsmGeneratorResult Generate(CompilerResult compilerResult, AsmGeneratorSettings generatorSettings, PrintCallback? printCallback = null)
-            => new CodeGeneratorForAsm(compilerResult, generatorSettings).GenerateCode(compilerResult, printCallback);
+        public static AsmGeneratorResult Generate(CompilerResult compilerResult, AsmGeneratorSettings generatorSettings, PrintCallback? printCallback = null, AnalysisCollection? analysisCollection = null)
+            => new CodeGeneratorForAsm(compilerResult, generatorSettings, analysisCollection).GenerateCode(compilerResult, printCallback);
     }
 }

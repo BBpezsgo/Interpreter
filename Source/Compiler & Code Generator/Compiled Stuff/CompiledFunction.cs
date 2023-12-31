@@ -19,7 +19,10 @@ namespace LanguageCore.Compiler
         IReferenceable<KeywordCall>,
         IDuplicatable<CompiledFunction>
     {
+        public new CompiledType Type;
         public readonly CompiledType[] ParameterTypes;
+        public CompiledAttributeCollection CompiledAttributes;
+        readonly List<Reference<Statement>> references;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -28,12 +31,8 @@ namespace LanguageCore.Compiler
 
         public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
-        public CompiledAttributeCollection CompiledAttributes;
-
         public IReadOnlyList<Reference<Statement>> References => references;
-        readonly List<Reference<Statement>> references = new();
 
-        public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
 
         public override bool IsTemplate
@@ -78,14 +77,12 @@ namespace LanguageCore.Compiler
 
         public CompiledClass? Context { get; set; }
 
-        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Attributes, functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.Parameters, functionDefinition.TemplateInfo)
+        public CompiledFunction(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
-            this.CompiledAttributes = new();
-
-            base.Block = functionDefinition.Block;
-            base.FilePath = functionDefinition.FilePath;
+            this.CompiledAttributes = new CompiledAttributeCollection();
+            this.references = new List<Reference<Statement>>();
         }
 
         public void AddReference(FunctionCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));

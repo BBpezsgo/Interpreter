@@ -123,8 +123,8 @@ namespace LanguageCore.Runtime
         }
 
         public delegate void OnOutputEventHandler(Interpreter sender, string message, LogType logType);
-        public delegate void OnStdErrorEventHandler(Interpreter sender, string data);
-        public delegate void OnStdOutEventHandler(Interpreter sender, string data);
+        public delegate void OnStdErrorEventHandler(Interpreter sender, char data);
+        public delegate void OnStdOutEventHandler(Interpreter sender, char data);
         public delegate void OnInputEventHandler(Interpreter sender);
         public delegate void OnExecutedEventHandler(Interpreter sender);
 
@@ -229,32 +229,6 @@ namespace LanguageCore.Runtime
             IsPaused = false;
         }
 
-        [RequiresUnreferencedCode("Importing DLL-s")]
-        public void LoadDLL(ExternalFunctionCollection externalFunctions, string path)
-        {
-#if AOT
-            OnOutput?.Invoke(this, $"Skipping loading DLL \"{path}\" because the compiler compiled in AOT mode", LogType.Warning);
-#else
-            OnOutput?.Invoke(this, $"Load DLL \"{path}\" ...", LogType.Debug);
-            System.Reflection.Assembly dll = System.Reflection.Assembly.LoadFile(path);
-            System.Type[] exportedTypes = dll.GetExportedTypes();
-            int functionsAdded = 0;
-
-            foreach (System.Type type in exportedTypes)
-            {
-                System.Reflection.MethodInfo[] methods = type.GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public);
-                foreach (System.Reflection.MethodInfo method in methods)
-                {
-                    ExternalFunctionSimple newFunction = externalFunctions.AddExternalFunction(method);
-                    OnOutput?.Invoke(this, $" Added function {newFunction.ToReadable()}", LogType.Debug);
-                    functionsAdded++;
-                }
-            }
-
-            OnOutput?.Invoke(this, $"DLL loaded with {functionsAdded} functions", LogType.Debug);
-#endif
-        }
-
         public void GenerateExternalFunctions(ExternalFunctionCollection externalFunctions)
         {
             #region Console
@@ -274,7 +248,7 @@ namespace LanguageCore.Runtime
                 }
             });
 
-            externalFunctions.AddExternalFunction("stdout", (char @char) => OnStdOut?.Invoke(this, @char.ToString()));
+            externalFunctions.AddExternalFunction("stdout", (char @char) => OnStdOut?.Invoke(this, @char));
 
             externalFunctions.AddExternalFunction("console-set",
                 (char @char, int x, int y) =>
@@ -288,7 +262,7 @@ namespace LanguageCore.Runtime
 
             externalFunctions.AddExternalFunction("console-clear", Console.Clear);
 
-            externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char.ToString()));
+            externalFunctions.AddExternalFunction("stderr", (char @char) => OnStdError?.Invoke(this, @char));
 
             externalFunctions.AddExternalFunction("sleep", (int t) => BytecodeInterpreter!.SleepTime(t, null));
 

@@ -115,6 +115,7 @@ namespace LanguageCore.Brainfuck
                 }
                 Console.Write(code[i]);
             }
+            Console.ResetColor();
         }
 
         public static void PrintCodeChar(char code)

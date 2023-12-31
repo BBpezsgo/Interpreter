@@ -179,8 +179,8 @@ namespace ConsoleGUI
 
             Interpreter.OnOutput += (_, p1, p2) => PrintOutput(p1, p2);
 
-            Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(data);
-            Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(data, CharColor.BrightRed);
+            Interpreter.OnStdOut += (sender, data) => ConsolePanel.Write(char.ToString(data));
+            Interpreter.OnStdError += (sender, data) => ConsolePanel.Write(char.ToString(data), CharColor.BrightRed);
 
             Interpreter.OnNeedInput += (sender) =>
             {
@@ -200,8 +200,8 @@ namespace ConsoleGUI
                 {
                     try
                     {
-                        compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), externalFunctions, fileInfo, compilerSettings.BasePath, PrintOutput);
-                        generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                        compiled = LanguageCore.Compiler.Compiler.CompileFile(fileInfo, externalFunctions, compilerSettings, PrintOutput);
+                        generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, LanguageCore.Compiler.GeneratorSettings.Default, PrintOutput);
                     }
                     catch (Exception ex)
                     {
@@ -211,8 +211,8 @@ namespace ConsoleGUI
                 }
                 else
                 {
-                    compiled = LanguageCore.Compiler.Compiler.Compile(LanguageCore.Parser.Parser.ParseFile(fileInfo.FullName), externalFunctions, fileInfo, compilerSettings.BasePath, PrintOutput);
-                    generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, compilerSettings, PrintOutput);
+                    compiled = LanguageCore.Compiler.Compiler.CompileFile(fileInfo, externalFunctions, compilerSettings, PrintOutput);
+                    generatedCode = LanguageCore.BBCode.Generator.CodeGeneratorForMain.Generate(compiled, LanguageCore.Compiler.GeneratorSettings.Default, PrintOutput);
                 }
 
                 Interpreter.CompilerResult = generatedCode;

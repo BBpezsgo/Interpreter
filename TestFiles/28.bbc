@@ -1,0 +1,11 @@
+struct Vector2
+{
+	int x;
+	int y;
+}
+
+Vector2 vec;
+vec.x = 4;
+vec.y = 7;
+
+return vec.y;

@@ -165,9 +165,13 @@ namespace LanguageCore.Tokenizing
 
             if (CurrentToken.TokenType == PreparationTokenType.POTENTIAL_END_MULTILINE_COMMENT && currChar == '/')
             {
-                CurrentToken.Content.Append(currChar);
+                // CurrentToken.Content.Append(currChar);
+                // Remove last character ('*')
+                CurrentToken.Content.Remove(CurrentToken.Content.Length - 1, 1);
+                // Remove first two characters ('/' and '*')
+                CurrentToken.Content.Remove(0, 2);
                 CurrentToken.TokenType = PreparationTokenType.CommentMultiline;
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true);
                 return;
             }
 
@@ -195,7 +199,7 @@ namespace LanguageCore.Tokenizing
             {
                 CurrentToken.Content.Append(currChar);
                 CurrentToken.TokenType = PreparationTokenType.LiteralFloat;
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true /* Include the 'f' in position */ );
             }
             else if (currChar == 'e' && (CurrentToken.TokenType is PreparationTokenType.LiteralNumber or PreparationTokenType.LiteralFloat))
             {
@@ -367,7 +371,7 @@ namespace LanguageCore.Tokenizing
                 }
                 else if (CurrentToken.TokenType == PreparationTokenType.LiteralString)
                 {
-                    EndToken(offsetTotal);
+                    EndToken(offsetTotal, true/* Include the '"' in position */);
                 }
             }
             else if (currChar == '\'')
@@ -379,7 +383,7 @@ namespace LanguageCore.Tokenizing
                 }
                 else if (CurrentToken.TokenType == PreparationTokenType.LiteralCharacter)
                 {
-                    EndToken(offsetTotal);
+                    EndToken(offsetTotal, true /* Include the '\'' in position */);
                 }
             }
             else if (currChar == '\\')

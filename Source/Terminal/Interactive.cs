@@ -8,7 +8,7 @@ using Win32;
 using Win32.LowLevel;
 using Color = System.Drawing.Color;
 
-namespace LanguageCore
+namespace LanguageCore.Interactive
 {
     using BBCode.Generator;
     using Compiler;
@@ -114,7 +114,7 @@ namespace LanguageCore
 
             if (_tokens.Length != 0)
             {
-                _parsed = Parser.Parser.ParseInteractive(_tokens);
+                _parsed = Parser.ParseInteractive(_tokens);
 
                 ExternalFunctionCollection externalFunctions = new();
                 new Interpreter().GenerateExternalFunctions(externalFunctions);
@@ -123,14 +123,13 @@ namespace LanguageCore
                 if (parsed2 is StatementWithValue statementWithValue)
                 { parsed2 = new KeywordCall((Token)"return", new StatementWithValue[] { statementWithValue }); }
 
-                _compiled = Compiler.Compiler.CompileInteractive(
+                _compiled = Compiler.CompileInteractive(
                     parsed2,
                     externalFunctions,
-                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
-                    [UsingDefinition.CreateAnonymous("System")],
-                    null);
+                    new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
+                    [UsingDefinition.CreateAnonymous("System")]);
 
-                _generated = CodeGeneratorForMain.Generate(_compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+                _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
             }
         }
 
@@ -161,7 +160,7 @@ namespace LanguageCore
 
             if (_tokens.Length != 0)
             {
-                _parsed = Parser.Parser.ParseInteractive(_tokens);
+                _parsed = Parser.ParseInteractive(_tokens);
 
                 ExternalFunctionCollection externalFunctions = new();
                 new Interpreter().GenerateExternalFunctions(externalFunctions);
@@ -170,14 +169,13 @@ namespace LanguageCore
                 if (parsed2 is StatementWithValue statementWithValue)
                 { parsed2 = new KeywordCall((Token)"return", new StatementWithValue[] { statementWithValue }); }
 
-                _compiled = Compiler.Compiler.CompileInteractive(
+                _compiled = Compiler.CompileInteractive(
                     parsed2,
                     externalFunctions,
-                    @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\",
-                    [UsingDefinition.CreateAnonymous("System")],
-                    null);
+                    new CompilerSettings() { BasePath = @"D:\Program Files\BBCodeProject\BBCode\StandardLibrary\" },
+                    [UsingDefinition.CreateAnonymous("System")]);
 
-                _generated = CodeGeneratorForMain.Generate(_compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+                _generated = CodeGeneratorForMain.Generate(_compiled, GeneratorSettings.Default);
             }
         }
 
@@ -729,7 +727,7 @@ namespace LanguageCore
                 ExternalFunctionCollection externalFunctions = new();
                 interpreter.GenerateExternalFunctions(externalFunctions);
 
-                BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, CompilerSettings.Default, null, CompileLevel.Minimal);
+                BBCodeGeneratorResult generated = CodeGeneratorForMain.Generate(CompilerCache.Compiled, GeneratorSettings.Default);
 
                 interpreter.CompilerResult = generated;
 
@@ -837,12 +835,12 @@ namespace LanguageCore
 
         void OnInterpreterNeedInput(Interpreter sender) { throw new NotImplementedException(); }
         void OnInterpreterOutput(Interpreter sender, string message, LogType logType) { }
-        void OnInterpreterStandardError(Interpreter sender, string data)
+        void OnInterpreterStandardError(Interpreter sender, char data)
         {
             CurrentSession.InterpreterStandardOutput.ForegroundColor = InteractiveColors.Error;
             CurrentSession.InterpreterStandardOutput.Append(data);
         }
-        void OnInterpreterStandardOut(Interpreter sender, string data)
+        void OnInterpreterStandardOut(Interpreter sender, char data)
         {
             CurrentSession.InterpreterStandardOutput.ForegroundColor = Color.Silver;
             CurrentSession.InterpreterStandardOutput.Append(data);

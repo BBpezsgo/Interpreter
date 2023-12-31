@@ -6,6 +6,7 @@ using System.Linq;
 
 namespace LanguageCore.Compiler
 {
+    using System.Collections.Immutable;
     using BBCode.Generator;
     using ConsoleGUI;
     using Parser;
@@ -13,6 +14,44 @@ namespace LanguageCore.Compiler
     using Runtime;
     using Tokenizing;
     using LiteralStatement = Parser.Statement.Literal;
+
+    public struct GeneratorSettings
+    {
+        public bool GenerateComments;
+        public int RemoveUnusedFunctionsMaxIterations;
+        public bool PrintInstructions;
+        public bool DontOptimize;
+        public bool GenerateDebugInstructions;
+        public bool ExternalFunctionsCache;
+        public bool CheckNullPointers;
+        public CompileLevel CompileLevel;
+
+        public readonly bool OptimizeCode => !DontOptimize;
+
+        public GeneratorSettings(GeneratorSettings other)
+        {
+            GenerateComments = other.GenerateComments;
+            RemoveUnusedFunctionsMaxIterations = other.RemoveUnusedFunctionsMaxIterations;
+            PrintInstructions = other.PrintInstructions;
+            DontOptimize = other.DontOptimize;
+            GenerateDebugInstructions = other.GenerateDebugInstructions;
+            ExternalFunctionsCache = other.ExternalFunctionsCache;
+            CheckNullPointers = other.CheckNullPointers;
+            CompileLevel = other.CompileLevel;
+        }
+
+        public static GeneratorSettings Default => new()
+        {
+            GenerateComments = true,
+            RemoveUnusedFunctionsMaxIterations = 10,
+            PrintInstructions = false,
+            DontOptimize = false,
+            GenerateDebugInstructions = true,
+            ExternalFunctionsCache = true,
+            CheckNullPointers = true,
+            CompileLevel = CompileLevel.Minimal,
+        };
+    }
 
     public abstract class CodeGenerator
     {
@@ -185,12 +224,12 @@ namespace LanguageCore.Compiler
 
         protected readonly TypeArguments TypeArguments;
 
-        protected readonly List<Error> Errors;
-        protected readonly List<Warning> Warnings;
-        protected readonly List<Hint> Hints;
+        protected readonly AnalysisCollection? AnalysisCollection;
 
         protected string? CurrentFile;
         protected bool InFunction;
+
+        protected readonly GeneratorSettings Settings;
 
         protected CodeGenerator()
         {
@@ -215,16 +254,15 @@ namespace LanguageCore.Compiler
 
             TypeArguments = new TypeArguments();
 
-            Errors = new List<Error>();
-            Warnings = new List<Warning>();
-            Hints = new List<Hint>();
+            AnalysisCollection = null;
 
             CurrentFile = null;
             InFunction = false;
 
+            Settings = GeneratorSettings.Default;
         }
 
-        protected CodeGenerator(CompilerResult compilerResult) : this()
+        protected CodeGenerator(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : this()
         {
             CompiledStructs = compilerResult.Structs;
             CompiledClasses = compilerResult.Classes;
@@ -233,6 +271,10 @@ namespace LanguageCore.Compiler
             CompiledOperators = compilerResult.Operators;
             CompiledGeneralFunctions = compilerResult.GeneralFunctions;
             CompiledEnums = compilerResult.Enums;
+
+            AnalysisCollection = analysisCollection;
+
+            Settings = settings;
         }
 
         #region Helper Functions
@@ -308,7 +350,7 @@ namespace LanguageCore.Compiler
                 if (modifiedStatement.Statement is LiteralStatement ||
                     modifiedStatement.Statement is OperatorCall)
                 {
-                    Hints.Add(new Hint($"Unnecessary explicit temp modifier (this kind of statements (\"{modifiedStatement.Statement.GetType().Name}\") are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
+                    AnalysisCollection?.Hints.Add(new Hint($"Unnecessary explicit temp modifier (this kind of statements (\"{modifiedStatement.Statement.GetType().Name}\") are implicitly deallocated)", modifiedStatement.Modifier, CurrentFile));
                 }
 
                 explicitly = true;
@@ -2201,7 +2243,7 @@ namespace LanguageCore.Compiler
         protected static OperatorCall InlineMacro(OperatorCall operatorCall, Dictionary<string, StatementWithValue> parameters)
         {
             StatementWithValue left = InlineMacro(operatorCall.Left, parameters);
-            StatementWithValue right = InlineMacro(operatorCall.Right, parameters);
+            StatementWithValue? right = InlineMacro(operatorCall.Right, parameters);
             return new OperatorCall(operatorCall.Operator, left, right);
         }
 
@@ -2247,74 +2289,110 @@ namespace LanguageCore.Compiler
             return _parameters;
         }
 
-        protected static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters)
+        protected static Statement InlineMacro(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            if (statement is Block block)
-            { return InlineMacro(block, parameters); }
+            Block block => InlineMacro(block, parameters),
+            StatementWithValue statementWithValue => InlineMacro(statementWithValue, parameters),
+            ForLoop forLoop => InlineMacro(forLoop, parameters),
+            _ => statement
+        };
 
-            if (statement is StatementWithValue statementWithValue)
-            { return InlineMacro(statementWithValue, parameters); }
+        protected static ForLoop InlineMacro(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                statement.Keyword,
+                InlineMacro(statement.VariableDeclaration, parameters),
+                InlineMacro(statement.Condition, parameters),
+                InlineMacro(statement.Expression, parameters),
+                InlineMacro(statement.Block, parameters)
+                )
+            {
+                Semicolon = statement.Semicolon,
+            };
 
-            return statement;
-        }
+        protected static AnyAssignment InlineMacro(AnyAssignment statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        {
+            Assignment assignment => new Assignment(assignment.Operator, InlineMacro(assignment.Left, parameters), InlineMacro(assignment.Right, parameters)),
+            ShortOperatorCall shortOperatorCall => new ShortOperatorCall(shortOperatorCall.Operator, InlineMacro(shortOperatorCall.Left, parameters)),
+            CompoundAssignment compoundAssignment => new CompoundAssignment(compoundAssignment.Operator, InlineMacro(compoundAssignment.Left, parameters), InlineMacro(compoundAssignment.Right, parameters)),
+            _ => throw new NotImplementedException()
+        };
+
+        protected static VariableDeclaration InlineMacro(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                statement.Modifiers,
+                statement.Type,
+                statement.VariableName,
+                InlineMacro(statement.InitialValue, parameters)
+                )
+            {
+                Semicolon = statement.Semicolon,
+            };
 
         protected static Pointer InlineMacro(Pointer statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new Pointer(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            => new(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
             };
-        }
 
         protected static AddressGetter InlineMacro(AddressGetter statement, Dictionary<string, StatementWithValue> parameters)
-        {
-            return new AddressGetter(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
+            => new(statement.OperatorToken, InlineMacro(statement.PrevStatement, parameters))
             {
                 SaveValue = statement.SaveValue,
                 Semicolon = statement.Semicolon,
             };
-        }
 
-        protected static StatementWithValue InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters)
+        protected static StatementWithValue InlineMacro(Identifier statement, Dictionary<string, StatementWithValue> parameters)
         {
-            if (statement is Identifier identifier)
-            {
-                if (parameters.TryGetValue(identifier.Content, out StatementWithValue? inlinedStatement))
-                { return inlinedStatement; }
-                return new Identifier(identifier.Token);
-            }
-
-            if (statement is OperatorCall operatorCall)
-            { return InlineMacro(operatorCall, parameters); }
-
-            if (statement is KeywordCall keywordCall)
-            { return InlineMacro(keywordCall, parameters); }
-
-            if (statement is FunctionCall functionCall)
-            { return InlineMacro(functionCall, parameters); }
-
-            if (statement is AnyCall anyCall)
-            { return InlineMacro(anyCall, parameters); }
-
-            if (statement is Pointer pointer)
-            { return InlineMacro(pointer, parameters); }
-
-            if (statement is AddressGetter addressGetter)
-            { return InlineMacro(addressGetter, parameters); }
-
-            if (statement is LiteralStatement literal)
-            {
-                return new LiteralStatement(literal.Type, literal.Value, literal.ValueToken)
-                {
-                    ImaginaryPosition = literal.ImaginaryPosition,
-                    SaveValue = literal.SaveValue,
-                    Semicolon = literal.Semicolon,
-                };
-            }
-
-            throw new NotImplementedException();
+            if (parameters.TryGetValue(statement.Content, out StatementWithValue? inlinedStatement))
+            { return inlinedStatement; }
+            return new Identifier(statement.Token);
         }
+
+        protected static LiteralStatement InlineMacro(LiteralStatement statement, Dictionary<string, StatementWithValue> _)
+            => new(statement.Type, statement.Value, statement.ValueToken)
+            {
+                ImaginaryPosition = statement.ImaginaryPosition,
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+
+        protected static Field InlineMacro(Field statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                InlineMacro(statement.PrevStatement, parameters),
+                statement.FieldName)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+
+        protected static IndexCall InlineMacro(IndexCall statement, Dictionary<string, StatementWithValue> parameters)
+            => new(
+                InlineMacro(statement.PrevStatement, parameters),
+                statement.BracketLeft,
+                InlineMacro(statement.Expression, parameters),
+                statement.BracketRight)
+            {
+                SaveValue = statement.SaveValue,
+                Semicolon = statement.Semicolon,
+            };
+
+        [return: NotNullIfNotNull(nameof(statement))]
+        protected static StatementWithValue? InlineMacro(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
+        {
+            null => null,
+            Identifier identifier => InlineMacro(identifier, parameters),
+            OperatorCall operatorCall => InlineMacro(operatorCall, parameters),
+            KeywordCall keywordCall => InlineMacro(keywordCall, parameters),
+            FunctionCall functionCall => InlineMacro(functionCall, parameters),
+            AnyCall anyCall => InlineMacro(anyCall, parameters),
+            Pointer pointer => InlineMacro(pointer, parameters),
+            AddressGetter addressGetter => InlineMacro(addressGetter, parameters),
+            LiteralStatement literal => InlineMacro(literal, parameters),
+            Field field => InlineMacro(field, parameters),
+            IndexCall indexCall => InlineMacro(indexCall, parameters),
+            _ => throw new NotImplementedException()
+        };
 
         #endregion
 
@@ -2613,59 +2691,38 @@ namespace LanguageCore.Compiler
 
         #region Collapse()
 
-        protected Statement Collapse(Statement statement, Dictionary<string, StatementWithValue> parameters)
+        protected Statement Collapse(Statement statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            if (statement is VariableDeclaration newVariable)
-            { return Collapse(newVariable, parameters); }
-            else if (statement is Block block)
-            { return Collapse(block, parameters); }
-            else if (statement is AnyAssignment setter)
-            { return Collapse(setter.ToAssignment(), parameters); }
-            else if (statement is WhileLoop whileLoop)
-            { return Collapse(whileLoop, parameters); }
-            else if (statement is ForLoop forLoop)
-            { return Collapse(forLoop, parameters); }
-            else if (statement is IfContainer @if)
-            { return Collapse(@if, parameters); }
-            else if (statement is StatementWithValue statementWithValue)
-            { return Collapse(statementWithValue, parameters); }
-            else
-            { throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible"); }
-        }
+            VariableDeclaration newVariable => Collapse(newVariable, parameters),
+            Block block => Collapse(block, parameters),
+            AnyAssignment setter => Collapse(setter.ToAssignment(), parameters),
+            WhileLoop whileLoop => Collapse(whileLoop, parameters),
+            ForLoop forLoop => Collapse(forLoop, parameters),
+            IfContainer @if => Collapse(@if, parameters),
+            StatementWithValue statementWithValue => Collapse(statementWithValue, parameters),
+            _ => throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible")
+        };
 
-        protected StatementWithValue Collapse(StatementWithValue statement, Dictionary<string, StatementWithValue> parameters)
+        [return: NotNullIfNotNull(nameof(statement))]
+        protected StatementWithValue? Collapse(StatementWithValue? statement, Dictionary<string, StatementWithValue> parameters) => statement switch
         {
-            if (statement is FunctionCall functionCall)
-            { return Collapse(functionCall, parameters); }
-            else if (statement is KeywordCall keywordCall)
-            { return Collapse(keywordCall, parameters); }
-            else if (statement is OperatorCall @operator)
-            { return Collapse(@operator, parameters); }
-            else if (statement is LiteralStatement literal)
-            { return literal; }
-            else if (statement is Identifier variable)
-            { return Collapse(variable, parameters); }
-            else if (statement is AddressGetter memoryAddressGetter)
-            { return Collapse(memoryAddressGetter, parameters); }
-            else if (statement is Pointer memoryAddressFinder)
-            { return Collapse(memoryAddressFinder, parameters); }
-            else if (statement is NewInstance newStruct)
-            { return Collapse(newStruct, parameters); }
-            else if (statement is ConstructorCall constructorCall)
-            { return Collapse(constructorCall, parameters); }
-            else if (statement is IndexCall indexStatement)
-            { return Collapse(indexStatement, parameters); }
-            else if (statement is Field field)
-            { return Collapse(field, parameters); }
-            else if (statement is TypeCast @as)
-            { return Collapse(@as, parameters); }
-            else if (statement is ModifiedStatement modifiedStatement)
-            { return Collapse(modifiedStatement, parameters); }
-            else if (statement is AnyCall anyCall)
-            { return Collapse(anyCall, parameters); }
-            else
-            { throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible"); }
-        }
+            null => null,
+            FunctionCall functionCall => Collapse(functionCall, parameters),
+            KeywordCall keywordCall => Collapse(keywordCall, parameters),
+            OperatorCall @operator => Collapse(@operator, parameters),
+            LiteralStatement literal => literal,
+            Identifier variable => Collapse(variable, parameters),
+            AddressGetter memoryAddressGetter => Collapse(memoryAddressGetter, parameters),
+            Pointer memoryAddressFinder => Collapse(memoryAddressFinder, parameters),
+            NewInstance newStruct => Collapse(newStruct, parameters),
+            ConstructorCall constructorCall => Collapse(constructorCall, parameters),
+            IndexCall indexStatement => Collapse(indexStatement, parameters),
+            Field field => Collapse(field, parameters),
+            TypeCast @as => Collapse(@as, parameters),
+            ModifiedStatement modifiedStatement => Collapse(modifiedStatement, parameters),
+            AnyCall anyCall => Collapse(anyCall, parameters),
+            _ => throw new InternalException($"Statement \"{statement.GetType().Name}\" isn't collapsible")
+        };
 
         protected Statement Collapse(Block block, Dictionary<string, StatementWithValue> parameters)
         {
@@ -2682,8 +2739,19 @@ namespace LanguageCore.Compiler
                 Semicolon = block.Semicolon,
             };
         }
-        protected static VariableDeclaration Collapse(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        protected VariableDeclaration Collapse(VariableDeclaration statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            return new VariableDeclaration(
+                statement.Modifiers,
+                statement.Type,
+                statement.VariableName,
+                Collapse(statement.InitialValue, parameters)
+                )
+            {
+                FilePath = statement.FilePath,
+                Semicolon = statement.Semicolon,
+            };
+        }
         protected StatementWithValue Collapse(FunctionCall statement, Dictionary<string, StatementWithValue> parameters)
         {
             if (TryGetMacro(statement, out MacroDefinition? macro))
@@ -2786,8 +2854,24 @@ namespace LanguageCore.Compiler
         }
         protected static WhileLoop Collapse(WhileLoop statement, Dictionary<string, StatementWithValue> parameters)
         { throw new NotImplementedException(); }
-        protected static ForLoop Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
-        { throw new NotImplementedException(); }
+        protected Statement Collapse(ForLoop statement, Dictionary<string, StatementWithValue> parameters)
+        {
+            ForLoop result = new(
+                statement.Keyword,
+                Collapse(statement.VariableDeclaration, parameters),
+                Collapse(statement.Condition, parameters),
+                Collapse(statement.Expression, parameters),
+                statement.Block)
+            {
+                Semicolon = statement.Semicolon,
+            };
+
+            if (TryComputeSimple(statement.Condition, null, out DataItem condition) &&
+                !condition.ToBoolean(null))
+            { return result.VariableDeclaration; }
+
+            return result;
+        }
         protected Statement Collapse(IfContainer statement, Dictionary<string, StatementWithValue> parameters)
         {
             bool prevIsCollapsed = false;

@@ -6,3 +6,147 @@ export float Cos(float v);
 
 [External("sin")]
 export float Sin(float v);
+
+export int Pow(int a, int b)
+{
+    if (b == 0) { return 1; };
+    if (b < 0)
+    { return 1 / Pow(a, Abs(b)); };
+    int answer = 1;
+    for (int i = 1; i <= b; i++)
+    { answer = answer * a; };
+    return answer;
+}
+
+export int Abs(int v)
+{
+    if (v < 0) { return v * -1; };
+    return v;
+}
+  
+export int Min(int a, int b)
+{
+    if (a < b) { return a; };
+    return b;
+}
+
+export int Max(int a, int b)
+{
+    if (a > b) { return a; };
+    return b;
+}
+
+/*
+// https://www.geeksforgeeks.org/c-program-to-find-square-root-of-a-given-number/
+float Sqrt(int number)
+{
+    int start = 0;
+    int end = number;
+    int mid;
+ 
+    // To store the answer
+    float ans;
+ 
+    // To find integral part of square
+    // root of number
+    while (start <= end)
+    {
+ 
+        // Find mid
+        mid = (start + end) / 2;
+ 
+        // If number is perfect square
+        // then break
+        if (mid * mid == number)
+        {
+            ans = mid as float;
+            break;
+        }
+ 
+        // Increment start if integral part lies on right side of the mid
+        if (mid * mid < number)
+        {
+            // first start value should be added to answer
+            ans = start as float;
+            // then start should be changed
+            start = mid + 1;
+        }
+        // Decrement end if integral part lies on the left side of the mid
+        else
+        {
+            end = mid - 1;
+        }
+    }
+ 
+    // To find the fractional part of square root upto 5 decimal
+    float increment = 0.1;
+    for (int i = 0; i < 5; i++)
+    {
+        while (ans * ans <= number)
+        {
+            ans += increment as float;
+        }
+ 
+        // Loop terminates, when ans * ans > number
+        ans = ans - (increment as float);
+        increment = increment / 10;
+    }
+    return ans;
+}
+
+// https://stackoverflow.com/a/1101217
+int Sqrt(int number)
+{
+    int op  = number;
+    int res = 0;
+    int one = 1 << 30; // The second-to-top bit is set: use 1u << 14 for uint16_t type; use 1uL<<30 for uint32_t type
+
+    // "one" starts at the highest power of four <= than the argument.
+    while (one > op)
+    {
+        one = one >> 2;
+    }
+
+    while (one != 0)
+    {
+        if (op >= res + one)
+        {
+            op = op - (res + one);
+            res = res + 2 * one;
+        }
+        res = res >> 1;
+        one = one >> 2;
+    }
+
+    // Do arithmetic rounding to nearest integer
+    if (op > res)
+    {
+        res++;
+    }
+
+    return res;
+}
+*/
+
+// https://en.wikipedia.org/wiki/Integer_square_root
+export int Sqrt(int s)
+{
+    // Zero yields zero
+    // One yields one
+    if (s <= 1) 
+        return s;
+
+    // Initial estimate (must be too high)
+    int x0 = s / 2;
+
+    // Update
+    int x1 = (x0 + s / x0) / 2;
+
+    while (x1 < x0)	// Bound check
+    {
+        x0 = x1;
+        x1 = (x0 + s / x0) / 2;
+    }
+
+    return x0;
+}

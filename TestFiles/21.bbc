@@ -1,0 +1,11 @@
+int j;
+for (int i; i < 10; i++)
+{
+	if (i == 5)
+	{
+		j = i;
+		break;
+		return 69;
+	}
+}
+return j;

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Compiler
@@ -12,8 +11,7 @@ namespace LanguageCore.Compiler
         public DataItem ComputedValue;
         public CompiledType Type => new(ComputedValue.Type);
 
-        public CompiledEnumMember(EnumMemberDefinition definition)
-            : base(definition.Identifier, definition.Value)
+        public CompiledEnumMember(EnumMemberDefinition definition) : base(definition)
         { }
     }
 
@@ -21,6 +19,7 @@ namespace LanguageCore.Compiler
     {
         public new CompiledEnumMember[] Members;
         public CompiledAttributeCollection CompiledAttributes;
+
         public CompiledType? Type
         {
             get
@@ -38,7 +37,7 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledEnum(EnumDefinition definition) : base(definition.Identifier, definition.Attributes, definition.Members)
+        public CompiledEnum(EnumDefinition definition) : base(definition)
         {
             Members = Array.Empty<CompiledEnumMember>();
             CompiledAttributes = new CompiledAttributeCollection();

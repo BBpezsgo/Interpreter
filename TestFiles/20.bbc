@@ -1,0 +1,9 @@
+int i;
+while (1)
+{
+	if (i == 5)
+	{
+		return i;
+	}
+	i++;
+}

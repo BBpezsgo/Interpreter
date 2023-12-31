@@ -11,15 +11,14 @@ namespace LanguageCore.Compiler
         IDuplicatable<CompiledClass>,
         IReferenceable<TypeInstance>
     {
-        public new readonly CompiledField[] Fields;
         public CompiledAttributeCollection CompiledAttributes;
+        public new readonly CompiledField[] Fields;
+        readonly List<Reference<TypeInstance>> references;
+        readonly TypeArguments currentTypeArguments;
 
         public IReadOnlyList<Reference<TypeInstance>> References => references;
-        readonly List<Reference<TypeInstance>> references;
-
-        readonly TypeArguments currentTypeArguments;
         public IReadOnlyDictionary<string, CompiledType> CurrentTypeArguments => currentTypeArguments;
-
+     
         public IReadOnlyDictionary<string, int> FieldOffsets
         {
             get
@@ -46,17 +45,12 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledClass(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Modifiers, definition.Fields, definition.Methods, definition.GeneralMethods, definition.Operators)
+        public CompiledClass(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, ClassDefinition definition) : base(definition)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
             this.TemplateInfo = definition.TemplateInfo;
             this.currentTypeArguments = new TypeArguments();
-
-            base.FilePath = definition.FilePath;
-            base.Statements.Clear();
-            base.Statements.AddRange(definition.Statements);
-
             this.references = new List<Reference<TypeInstance>>();
         }
 

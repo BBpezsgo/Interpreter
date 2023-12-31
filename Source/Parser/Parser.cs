@@ -108,18 +108,18 @@ namespace LanguageCore.Parser
 
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="UnreachableException"/>
         /// <exception cref="InternalException"/>
         /// <exception cref="TokenizerException"/>
         public static ParserResult ParseFile(string filePath)
         {
             TokenizerResult tokens = StreamTokenizer.Tokenize(filePath);
-            return new Parser(tokens.Tokens).ParseInternal();
+            ParserResult result = new Parser(tokens.Tokens).ParseInternal();
+            result.SetFile(filePath);
+            return result;
         }
 
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
-        /// <exception cref="UnreachableException"/>
         public static ParserResult Parse(Token[] tokens)
             => new Parser(tokens).ParseInternal();
 

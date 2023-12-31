@@ -1,0 +1,20 @@
+using System.Math;
+
+struct Vector2
+{
+	int x;
+	int y;
+}
+
+int Magnitude(this Vector2 vec)
+{
+	int a = vec.x * vec.x;
+	int b = vec.y * vec.y;
+	return Sqrt(a + b);
+}
+
+Vector2 vec;
+vec.x = 9;
+vec.y = 12;
+
+return vec.Magnitude();

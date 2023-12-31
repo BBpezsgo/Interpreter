@@ -437,7 +437,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 if (!indexer.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Function \"{indexer.ToReadable()}\" cannot be called due to its protection level", statement, CurrentFile));
                     return;
                 }
 
@@ -675,7 +675,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 using (Code.Block("The if statements"))
                 {
-                    GenerateCodeForStatement(@if.Block);
+                    GenerateCodeForStatement(Block.CreateIfNotBlock(@if.Block));
                 }
 
                 Code.CommentLine($"Pointer: {Code.Pointer}");
@@ -745,7 +745,7 @@ namespace LanguageCore.Brainfuck.Generator
                             if (@if.NextLink is LinkedElse elseBlock)
                             {
                                 using (Code.Block("Block (else)"))
-                                { GenerateCodeForStatement(elseBlock.Block); }
+                                { GenerateCodeForStatement(Block.CreateIfNotBlock(elseBlock.Block)); }
                             }
                             else if (@if.NextLink is LinkedIf elseIf)
                             {
@@ -794,7 +794,7 @@ namespace LanguageCore.Brainfuck.Generator
                 {
                     using (Code.Block("The while statements"))
                     {
-                        GenerateCodeForStatement(@while.Block);
+                        GenerateCodeForStatement(Block.CreateIfNotBlock(@while.Block));
                     }
 
                     using (Code.Block("Compute condition again"))
@@ -856,7 +856,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                 using (Code.Block("The while statements"))
                 {
-                    GenerateCodeForStatement(@for.Block);
+                    GenerateCodeForStatement(Block.CreateIfNotBlock(@for.Block));
                 }
 
                 using (Code.Block("Compute expression"))
@@ -931,7 +931,7 @@ namespace LanguageCore.Brainfuck.Generator
                         CompileSetter(returnVariable, statement.Parameters[0]);
                     }
 
-                    Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                     if (ReturnTagStack.Count <= 0)
                     { throw new CompilerException($"Can't return for some reason :(", statement.Identifier, CurrentFile); }
@@ -957,7 +957,7 @@ namespace LanguageCore.Brainfuck.Generator
                     if (BreakTagStack.Count <= 0)
                     { throw new CompilerException($"Looks like this \"{statement.Identifier}\" statement is not inside a loop. Am i wrong? Of course not! Haha", statement.Identifier, CurrentFile); }
 
-                    Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"This kind of control flow (return and break) is not fully tested. Expect a buggy behavior!", statement.Identifier, CurrentFile));
 
                     Code.SetValue(BreakTagStack[^1], 0);
 
@@ -1029,7 +1029,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                                 if (!deallocator.CanUse(CurrentFile))
                                 {
-                                    Errors.Add(new Error($"Function \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                                    AnalysisCollection?.Errors.Add(new Error($"Function \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
                                     return;
                                 }
 
@@ -1065,7 +1065,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     if (!destructor.CanUse(CurrentFile))
                     {
-                        Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
+                        AnalysisCollection?.Errors.Add(new Error($"Destructor for type \"{deletableType.Class.Name.Content}\" cannot be called due to its protection level", statement.Identifier, CurrentFile));
                         return;
                     }
 
@@ -1110,7 +1110,11 @@ namespace LanguageCore.Brainfuck.Generator
                 case "+=":
                 {
                     if (statement.Left is not Identifier variableIdentifier)
-                    { throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile); }
+                    {
+                        GenerateCodeForStatement(statement.ToAssignment());
+                        return;
+                        // throw new CompilerException($"Only variable supported :(", statement.Left, CurrentFile);
+                    }
 
                     if (!GetVariable(Variables, variableIdentifier.Content, out Variable variable))
                     { throw new CompilerException($"Variable \"{variableIdentifier}\" not found", variableIdentifier, CurrentFile); }
@@ -1346,7 +1350,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledFunction.ToReadable()}\" cannot be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
@@ -1385,7 +1389,7 @@ namespace LanguageCore.Brainfuck.Generator
 
             if (!constructor.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
                 return;
             }
 
@@ -1509,7 +1513,7 @@ namespace LanguageCore.Brainfuck.Generator
 
                     if (!compiledOperator.CanUse(CurrentFile))
                     {
-                        Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
+                        AnalysisCollection?.Errors.Add(new Error($"Function \"{compiledOperator.ToReadable()}\" cannot be called due to its protection level", statement.Operator, CurrentFile));
                         return;
                     }
 
@@ -1601,6 +1605,24 @@ namespace LanguageCore.Brainfuck.Generator
                     }
                     case "*":
                     {
+                        {
+                            if (statement.Left is Identifier identifier1 &&
+                                statement.Right is Identifier identifier2 &&
+                                string.Equals(identifier1.Content, identifier2.Content))
+                            {
+                                int leftAddress_ = Stack.NextAddress;
+                                using (Code.Block("Compute left-side value (right-side is the same)"))
+                                { GenerateCodeForStatement(statement.Left); }
+
+                                using (Code.Block($"Snippet MATH_MUL_SELF({leftAddress_})"))
+                                {
+                                    Code.MATH_MUL_SELF(leftAddress_, leftAddress_ + 1, leftAddress_ + 2);
+                                    Optimizations++;
+                                    break;
+                                }
+                            }
+                        }
+
                         int leftAddress = Stack.NextAddress;
                         using (Code.Block("Compute left-side value"))
                         { GenerateCodeForStatement(statement.Left); }
@@ -1996,7 +2018,7 @@ namespace LanguageCore.Brainfuck.Generator
                             break;
                         case Type.Integer:
                             Code.SetValue(offsettedAddress, (byte)0);
-                            Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, instanceType.Struct.FilePath));
+                            AnalysisCollection?.Warnings.Add(new Warning($"Integers not supported by the brainfuck compiler, so I converted it into byte", field.Identifier, instanceType.Struct.FilePath));
                             break;
                         case Type.Char:
                             Code.SetValue(offsettedAddress, (char)'\0');
@@ -2211,7 +2233,7 @@ namespace LanguageCore.Brainfuck.Generator
         }
         void GenerateCodeForStatement(TypeCast typeCast)
         {
-            Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
+            AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             GenerateCodeForStatement(typeCast.PrevStatement);
         }
@@ -2550,15 +2572,15 @@ namespace LanguageCore.Brainfuck.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
                     return;
                 }
 
-                typeArguments = Utils.ConcatDictionary(typeArguments, deallocator.Context?.CurrentTypeArguments);
+                typeArguments = Utils.ConcatDictionary(typeArguments, destructor.Context?.CurrentTypeArguments);
 
-                GenerateCodeForMacro(deallocator, new StatementWithValue[] { value }, typeArguments, value);
+                GenerateCodeForMacro(destructor, new StatementWithValue[] { value }, typeArguments, value);
 
-                if (deallocator.ReturnSomething)
+                if (destructor.ReturnSomething)
                 { Stack.Pop(); }
 
                 return;

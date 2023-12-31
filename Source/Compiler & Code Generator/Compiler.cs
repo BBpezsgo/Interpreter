@@ -35,8 +35,6 @@ namespace LanguageCore.Compiler
         public readonly CompileTag[] Hashes;
         public readonly CompiledEnum[] Enums;
 
-        public readonly Error[] Errors;
-        public readonly Warning[] Warnings;
         public readonly Statement[] TopLevelStatements;
 
         public readonly FileInfo? File;
@@ -51,8 +49,6 @@ namespace LanguageCore.Compiler
             Array.Empty<CompiledClass>(),
             Array.Empty<CompileTag>(),
             Array.Empty<CompiledEnum>(),
-            Array.Empty<Error>(),
-            Array.Empty<Warning>(),
             Array.Empty<Statement>(),
             null);
 
@@ -66,8 +62,6 @@ namespace LanguageCore.Compiler
             CompiledClass[] classes,
             CompileTag[] hashes,
             CompiledEnum[] enums,
-            Error[] errors,
-            Warning[] warnings,
             Statement[] topLevelStatements,
             FileInfo? file)
         {
@@ -80,8 +74,6 @@ namespace LanguageCore.Compiler
             Classes = classes;
             Hashes = hashes;
             Enums = enums;
-            Errors = errors;
-            Warnings = warnings;
             TopLevelStatements = topLevelStatements;
             File = file;
         }
@@ -89,24 +81,15 @@ namespace LanguageCore.Compiler
 
     public struct CompilerSettings
     {
-        public bool GenerateComments;
-        public int RemoveUnusedFunctionsMaxIterations;
-        public bool PrintInstructions;
-        public bool DontOptimize;
-        public bool GenerateDebugInstructions;
-        public bool ExternalFunctionsCache;
-        public bool CheckNullPointers;
         public string? BasePath;
+
+        public CompilerSettings(CompilerSettings other)
+        {
+            BasePath = other.BasePath;
+        }
 
         public static CompilerSettings Default => new()
         {
-            GenerateComments = true,
-            RemoveUnusedFunctionsMaxIterations = 10,
-            PrintInstructions = false,
-            DontOptimize = false,
-            GenerateDebugInstructions = true,
-            ExternalFunctionsCache = true,
-            CheckNullPointers = true,
             BasePath = null,
         };
     }
@@ -120,9 +103,6 @@ namespace LanguageCore.Compiler
 
     public class Compiler
     {
-        readonly List<Error> Errors;
-        readonly List<Warning> Warnings;
-
         CompiledClass[] CompiledClasses;
         CompiledStruct[] CompiledStructs;
         CompiledOperator[] CompiledOperators;
@@ -141,9 +121,11 @@ namespace LanguageCore.Compiler
 
         readonly List<CompileTag> Hashes;
 
-        readonly string? BasePath;
+        readonly CompilerSettings Settings;
         readonly ExternalFunctionCollection ExternalFunctions;
         readonly PrintCallback? PrintCallback;
+
+        readonly AnalysisCollection? AnalysisCollection;
 
         readonly Dictionary<string, (CompiledType ReturnValue, CompiledType[] Parameters)> BuiltinFunctions = new()
         {
@@ -151,7 +133,7 @@ namespace LanguageCore.Compiler
             { "free", (new CompiledType(Type.Void), [ new CompiledType(Type.Integer) ]) },
         };
 
-        Compiler(ExternalFunctionCollection? externalFunctions, PrintCallback? printCallback, string? basePath)
+        Compiler(ExternalFunctionCollection? externalFunctions, PrintCallback? printCallback, CompilerSettings settings, AnalysisCollection? analysisCollection)
         {
             Functions = new List<FunctionDefinition>();
             Macros = new List<MacroDefinition>();
@@ -162,9 +144,6 @@ namespace LanguageCore.Compiler
             Hashes = new List<CompileTag>();
             GenericParameters = new Stack<Token[]>();
 
-            Warnings = new List<Warning>();
-            Errors = new List<Error>();
-
             CompiledClasses = Array.Empty<CompiledClass>();
             CompiledStructs = Array.Empty<CompiledStruct>();
             CompiledOperators = Array.Empty<CompiledOperator>();
@@ -173,8 +152,9 @@ namespace LanguageCore.Compiler
             CompiledEnums = Array.Empty<CompiledEnum>();
 
             ExternalFunctions = externalFunctions ?? new ExternalFunctionCollection();
-            BasePath = basePath;
+            Settings = settings;
             PrintCallback = printCallback;
+            AnalysisCollection = analysisCollection;
         }
 
         CompiledType GetCustomType(string name)
@@ -315,7 +295,7 @@ namespace LanguageCore.Compiler
             if (attributes.TryGetAttribute<string>("External", out string? externalName, out AttributeValues? attribute))
             {
                 if (!ExternalFunctions.TryGetValue(externalName, out ExternalFunctionBase? externalFunction))
-                { Errors.Add(new Error($"External function \"{externalName}\" not found", attribute.Value, function.FilePath)); }
+                { AnalysisCollection?.Errors.Add(new Error($"External function \"{externalName}\" not found", attribute.Value, function.FilePath)); }
                 else
                 {
                     if (externalFunction.ParameterCount != function.Parameters.Count)
@@ -350,7 +330,7 @@ namespace LanguageCore.Compiler
             if (attributes.TryGetAttribute<string>("Builtin", out string? builtinName, out attribute))
             {
                 if (!BuiltinFunctions.TryGetValue(builtinName, out (CompiledType ReturnValue, CompiledType[] Parameters) builtinFunction))
-                { Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute.Value, function.FilePath)); }
+                { AnalysisCollection?.Errors.Add(new Error($"Builtin function \"{builtinName}\" not found", attribute.Value, function.FilePath)); }
                 else
                 {
                     if (builtinFunction.Parameters.Length != function.Parameters.Count)
@@ -423,7 +403,7 @@ namespace LanguageCore.Compiler
                     };
                 }
 
-                Errors.Add(new Error($"External function \"{name}\" not found", attribute.Value.Identifier, function.FilePath));
+                AnalysisCollection?.Errors.Add(new Error($"External function \"{name}\" not found", attribute.Value.Identifier, function.FilePath));
             }
 
             return new CompiledOperator(
@@ -539,7 +519,7 @@ namespace LanguageCore.Compiler
             foreach (FunctionDefinition function in collectedAST.ParserResult.Functions)
             {
                 if (Functions.Any(function.IsSame))
-                { Errors.Add(new Error($"Function {function.ToReadable()} already defined", function.Identifier, function.FilePath)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Function {function.ToReadable()} already defined", function.Identifier, function.FilePath)); continue; }
 
                 Functions.Add(function);
             }
@@ -547,7 +527,7 @@ namespace LanguageCore.Compiler
             foreach (MacroDefinition macro in collectedAST.ParserResult.Macros)
             {
                 if (Macros.Any(macro.IsSame))
-                { Errors.Add(new Error($"Macro {macro.ToReadable()} already defined", macro.Identifier, macro.FilePath)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Macro {macro.ToReadable()} already defined", macro.Identifier, macro.FilePath)); continue; }
 
                 Macros.Add(macro);
             }
@@ -556,7 +536,7 @@ namespace LanguageCore.Compiler
             foreach (var func in collectedAST.ParserResult.Operators)
             {
                 if (Operators.ContainsSameDefinition(func))
-                { Errors.Add(new Error($"Operator '{func.ReadableID()}' already defined", func.Identifier)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Operator '{func.ReadableID()}' already defined", func.Identifier)); continue; }
 
                 Operators.Add(func);
             }
@@ -565,7 +545,7 @@ namespace LanguageCore.Compiler
             foreach (StructDefinition @struct in collectedAST.ParserResult.Structs)
             {
                 if (IsSymbolExists(@struct.Name.Content, out _))
-                { Errors.Add(new Error($"Symbol {@struct.Name} already defined", @struct.Name, @struct.FilePath)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@struct.Name} already defined", @struct.Name, @struct.FilePath)); continue; }
                 else
                 { Structs.Add(@struct); }
             }
@@ -573,14 +553,14 @@ namespace LanguageCore.Compiler
             foreach (ClassDefinition @class in collectedAST.ParserResult.Classes)
             {
                 if (IsSymbolExists(@class.Name.Content, out _))
-                { Errors.Add(new Error($"Symbol {@class.Name} already defined", @class.Name, @class.FilePath)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@class.Name} already defined", @class.Name, @class.FilePath)); continue; }
                 else
                 { Classes.Add(@class); }
 
                 foreach (FunctionDefinition @operator in @class.Operators)
                 {
                     if (Operators.Any(@operator.IsSame))
-                    { Errors.Add(new Error($"Operator {@operator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
+                    { AnalysisCollection?.Errors.Add(new Error($"Operator {@operator.ToReadable()} already defined", @operator.Identifier, @operator.FilePath)); continue; }
                     else
                     { Operators.Add(@operator); }
                 }
@@ -589,7 +569,7 @@ namespace LanguageCore.Compiler
             foreach (EnumDefinition @enum in collectedAST.ParserResult.Enums)
             {
                 if (IsSymbolExists(@enum.Identifier.Content, out _))
-                { Errors.Add(new Error($"Symbol {@enum.Identifier} already defined", @enum.Identifier, @enum.FilePath)); continue; }
+                { AnalysisCollection?.Errors.Add(new Error($"Symbol {@enum.Identifier} already defined", @enum.Identifier, @enum.FilePath)); continue; }
                 else
                 { Enums.Add(@enum); }
             }
@@ -607,10 +587,7 @@ namespace LanguageCore.Compiler
             CollectorResult collectorResult;
             if (file != null)
             {
-                collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, BasePath);
-
-                this.Warnings.AddRange(collectorResult.Warnings);
-                this.Errors.AddRange(collectorResult.Errors);
+                collectorResult = SourceCodeManager.Collect(parserResult.Usings, file, PrintCallback, Settings.BasePath, AnalysisCollection);
             }
             else
             {
@@ -629,18 +606,13 @@ namespace LanguageCore.Compiler
                 CompiledClasses,
                 Hashes.ToArray(),
                 CompiledEnums,
-                Errors.ToArray(),
-                Warnings.ToArray(),
                 parserResult.TopLevelStatements,
                 file);
         }
 
         CompilerResult CompileInteractiveInternal(Statement statement, UsingDefinition[] usings)
         {
-            CollectorResult collectorResult = SourceCodeManager.Collect(usings, null, PrintCallback, BasePath);
-
-            this.Warnings.AddRange(collectorResult.Warnings);
-            this.Errors.AddRange(collectorResult.Errors);
+            CollectorResult collectorResult = SourceCodeManager.Collect(usings, null, PrintCallback, Settings.BasePath, AnalysisCollection);
 
             CompileInternal(collectorResult);
 
@@ -654,8 +626,6 @@ namespace LanguageCore.Compiler
                 CompiledClasses,
                 Hashes.ToArray(),
                 CompiledEnums,
-                Errors.ToArray(),
-                Warnings.ToArray(),
                 [statement],
                 null);
         }
@@ -674,7 +644,7 @@ namespace LanguageCore.Compiler
                     case "bf":
                     {
                         if (hash.Parameters.Length < 2)
-                        { Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
+                        { AnalysisCollection?.Errors.Add(new Error($"Hash '{hash.HashName}' requires minimum 2 parameter", hash.HashName, hash.FilePath)); break; }
                         string name = hash.Parameters[0].Value;
 
                         if (ExternalFunctions.ContainsKey(name)) break;
@@ -691,11 +661,11 @@ namespace LanguageCore.Compiler
                                 parameterTypes[i] = paramType;
 
                                 if (paramType == Type.Void && i > 0)
-                                { Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
+                                { AnalysisCollection?.Errors.Add(new Error($"Invalid type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath)); goto ExitBreak; }
                             }
                             else
                             {
-                                Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
+                                AnalysisCollection?.Errors.Add(new Error($"Unknown type \"{bfParams[i]}\"", hash.Parameters[i + 1].ValueToken, hash.FilePath));
                                 goto ExitBreak;
                             }
                         }
@@ -723,11 +693,11 @@ namespace LanguageCore.Compiler
                     }
                     break;
                     default:
-                        Warnings.Add(new Warning($"Hash '{hash.HashName}' does not exists, so this is ignored", hash.HashName, hash.FilePath));
+                        AnalysisCollection?.Warnings.Add(new Warning($"Hash \"{hash.HashName}\" does not exists, so this is ignored", hash.HashName, hash.FilePath));
                         break;
                 }
 
-            ExitBreak:
+ExitBreak:
                 continue;
             }
 
@@ -902,33 +872,47 @@ namespace LanguageCore.Compiler
             #endregion
         }
 
-        /// <summary>
-        /// Does some checks and prepares the AST for the <see cref="CodeGeneratorForMain"/>
-        /// </summary>
-        /// <param name="file">
-        /// The source code file
-        /// </param>
         /// <exception cref="EndlessLoopException"/>
         /// <exception cref="SyntaxException"/>
         /// <exception cref="CompilerException"/>
         /// <exception cref="LanguageException"/>
         /// <exception cref="InternalException"/>
         /// <exception cref="NotImplementedException"/>
-        /// <exception cref="System.Exception"/>
+        /// <exception cref="Exception"/>
         public static CompilerResult Compile(
             ParserResult parserResult,
             ExternalFunctionCollection? externalFunctions,
             FileInfo? file,
-            string? basePath,
-            PrintCallback? printCallback = null)
-            => new Compiler(externalFunctions, printCallback, basePath).CompileMainFile(parserResult, file);
+            CompilerSettings settings,
+            PrintCallback? printCallback = null,
+            AnalysisCollection? analysisCollection = null)
+            => new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileMainFile(parserResult, file);
+
+        /// <exception cref="EndlessLoopException"/>
+        /// <exception cref="SyntaxException"/>
+        /// <exception cref="CompilerException"/>
+        /// <exception cref="LanguageException"/>
+        /// <exception cref="InternalException"/>
+        /// <exception cref="NotImplementedException"/>
+        /// <exception cref="Exception"/>
+        public static CompilerResult CompileFile(
+            FileInfo file,
+            ExternalFunctionCollection? externalFunctions,
+            CompilerSettings settings,
+            PrintCallback? printCallback = null,
+            AnalysisCollection? analysisCollection = null)
+        {
+            ParserResult ast = Parser.ParseFile(file.FullName);
+            return new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileMainFile(ast, file);
+        }
 
         public static CompilerResult CompileInteractive(
             Statement statement,
             ExternalFunctionCollection? externalFunctions,
-            string? basePath,
+            CompilerSettings settings,
             UsingDefinition[] usings,
-            PrintCallback? printCallback = null)
-            => new Compiler(externalFunctions, printCallback, basePath).CompileInteractiveInternal(statement, usings);
+            PrintCallback? printCallback = null,
+            AnalysisCollection? analysisCollection = null)
+            => new Compiler(externalFunctions, printCallback, settings, analysisCollection).CompileInteractiveInternal(statement, usings);
     }
 }

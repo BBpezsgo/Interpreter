@@ -1,0 +1,10 @@
+void Func(int v)
+{
+	v += 7;
+}
+
+int a = 3;
+
+Func(a);
+
+return a;

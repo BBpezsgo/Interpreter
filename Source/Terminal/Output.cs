@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Drawing;
 using TheProgram;
 
 namespace LanguageCore
@@ -9,10 +10,10 @@ namespace LanguageCore
     {
         static ProgramArguments arguments;
 
-        public static bool LogDebugs => arguments.LogDebugs;
-        public static bool LogInfos => arguments.LogInfo;
-        public static bool LogSystems => arguments.LogSystem;
-        public static bool LogWarnings => arguments.LogWarnings;
+        public static bool LogDebugs => (arguments.LogFlags & LogType.Debug) != 0;
+        public static bool LogInfos => (arguments.LogFlags & LogType.Normal) != 0;
+        public static bool LogSystems => (arguments.LogFlags & LogType.System) != 0;
+        public static bool LogWarnings => (arguments.LogFlags & LogType.Warning) != 0;
 
         public static void SetProgramArguments(ProgramArguments arguments) => Output.arguments = arguments;
 
@@ -41,11 +42,75 @@ namespace LanguageCore
         public static void LogInfo(string message)
         { if (LogInfos) LogColor(message, ConsoleColor.Blue); }
 
+        public static void LogInfo(Information information)
+        {
+            if (!LogInfos) return;
+
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine(information.ToString());
+            string? arrows = information.GetArrows();
+            if (arrows != null)
+            { Console.WriteLine(arrows); }
+            Console.ResetColor();
+        }
+
+        public static void LogInfo(Hint hint)
+        {
+            if (!LogInfos) return;
+
+            Console.ForegroundColor = ConsoleColor.Blue;
+            Console.WriteLine(hint.ToString());
+            string? arrows = hint.GetArrows();
+            if (arrows != null)
+            { Console.WriteLine(arrows); }
+            Console.ResetColor();
+        }
+
         public static void LogError(string message)
         { LogColor(message, ConsoleColor.Red); }
 
+        public static void LogError(LanguageException exception)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(exception.ToString());
+            string? arrows = exception.GetArrows();
+            if (arrows != null)
+            { Console.WriteLine(arrows); }
+            Console.ResetColor();
+        }
+
+        public static void LogError(Error error)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(error.ToString());
+            string? arrows = error.GetArrows();
+            if (arrows != null)
+            { Console.WriteLine(arrows); }
+            Console.ResetColor();
+        }
+
+        public static void LogError(Exception exception)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(exception.ToString());
+            Console.ResetColor();
+        }
+
         public static void LogWarning(string message)
         { if (LogWarnings) LogColor(message, ConsoleColor.DarkYellow); }
+
+        public static void LogWarning(Warning warning)
+        {
+            if (LogWarnings)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkYellow;
+                Console.WriteLine(warning.ToString());
+                string? arrows = warning.GetArrows();
+                if (arrows != null)
+                { Console.WriteLine(arrows); }
+                Console.ResetColor();
+            }
+        }
 
         public static void LogDebug(string message)
         { if (LogDebugs) LogColor(message, ConsoleColor.DarkGray); }
@@ -57,58 +122,19 @@ namespace LanguageCore
             Console.ResetColor();
         }
 
+        public static void WriteLine() => Console.Out.WriteLine();
+        public static void WriteLine(string data) => Console.Out.WriteLine(data);
         public static void Write(string data) => Console.Out.Write(data);
         public static void WriteError(string data) => Console.Error.Write(data);
     }
 
+    [Flags]
     public enum LogType
     {
-        /// <summary>
-        /// Used by:
-        /// <list type="bullet">
-        /// <item>Tokenizer</item>
-        /// <item>Parser</item>
-        /// <item>Compiler</item>
-        /// <item>Interpreter</item>
-        /// </list>
-        /// </summary>
-        System,
-        /// <summary>
-        /// Used by:
-        /// <list type="bullet">
-        /// <item>The code</item>
-        /// </list>
-        /// </summary>
-        Normal,
-        /// <summary>
-        /// Used by:
-        /// <list type="bullet">
-        /// <item>Tokenizer</item>
-        /// <item>Parser</item>
-        /// <item>Compiler</item>
-        /// <item>Interpreter</item>
-        /// <item>The code</item>
-        /// </list>
-        /// </summary>
-        Warning,
-        /// <summary>
-        /// Used by:
-        /// <list type="bullet">
-        /// <item>Compiler</item>
-        /// <item>Interpreter</item>
-        /// <item>The code</item>
-        /// </list>
-        /// </summary>
-        Error,
-        /// <summary>
-        /// Used by:
-        /// <list type="bullet">
-        /// <item>Tokenizer</item>
-        /// <item>Parser</item>
-        /// <item>Compiler</item>
-        /// <item>Interpreter</item>
-        /// </list>
-        /// </summary>
-        Debug,
+        System = 0b_00001,
+        Normal = 0b_00010,
+        Warning = 0b_00100,
+        Error = 0b_01000,
+        Debug = 0b_10000,
     }
 }

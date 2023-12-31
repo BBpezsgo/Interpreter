@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace LanguageCore.Compiler
@@ -10,13 +9,9 @@ namespace LanguageCore.Compiler
 
     public class ReferenceCollector : CodeGeneratorNonGeneratorBase
     {
-        #region Fields
-
         ISameCheck? CurrentFunction;
 
-        #endregion
-
-        public ReferenceCollector() : base()
+        public ReferenceCollector(CompilerResult compilerResult, AnalysisCollection? analysisCollection) : base(compilerResult, GeneratorSettings.Default, analysisCollection)
         {
             CurrentFunction = null;
         }
@@ -50,28 +45,42 @@ namespace LanguageCore.Compiler
             this.CompiledVariables.Add(GetVariableInfo(newVariable));
         }
 
-        int AnalyzeNewVariables(IEnumerable<Statement>? statements)
+        int AnalyzeNewVariable(Statement statement)
         {
-            if (statements == null) return 0;
-
             int variablesAdded = 0;
-            foreach (Statement st in statements)
+            if (statement is VariableDeclaration newVar)
             {
-                if (st is VariableDeclaration newVar)
+                AnalyzeNewVariable(newVar);
+                variablesAdded++;
+            }
+            else if (statement is ForLoop forLoop)
+            {
+                AnalyzeNewVariable(forLoop.VariableDeclaration);
+                variablesAdded++;
+            }
+            else if (statement is AnyCall anyCall)
+            {
+                if (anyCall.ToFunctionCall(out FunctionCall? functionCall) &&
+                    TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
-                    AnalyzeNewVariable(newVar);
-                    variablesAdded++;
-                }
-                else if (st is ForLoop forLoop)
-                {
-                    AnalyzeNewVariable(forLoop.VariableDeclaration);
-                    variablesAdded++;
+                    Statement inlined = InlineMacro(macro, functionCall.Parameters);
+                    variablesAdded += AnalyzeNewVariable(inlined);
                 }
             }
             return variablesAdded;
         }
 
-        void AnalyzeStatements(IEnumerable<Statement>? statements)
+        int AnalyzeNewVariables(Statement[] statements)
+        {
+            if (statements == null) return 0;
+
+            int variablesAdded = 0;
+            foreach (Statement statement in statements)
+            { variablesAdded += AnalyzeNewVariable(statement); }
+            return variablesAdded;
+        }
+
+        void AnalyzeStatements(Statement[]? statements)
         {
             if (statements == null) return;
 
@@ -320,10 +329,18 @@ namespace LanguageCore.Compiler
                 if (TryGetMacro(functionCall, out MacroDefinition? macro))
                 {
                     Statement inlinedMacro = InlineMacro(macro, functionCall.Parameters);
-                    if (inlinedMacro is Block block)
-                    { AnalyzeStatements(block.Statements); }
-                    else
-                    { AnalyzeStatement(inlinedMacro, expectedType); }
+                    AnalyzeStatement(inlinedMacro, expectedType);
+
+                    if (inlinedMacro is StatementWithBlock blockStatement)
+                    { AnalyzeStatements(blockStatement.Block.Statements); }
+
+                    if (inlinedMacro is StatementWithAnyBlock anyBlockStatement &&
+                        anyBlockStatement.Block is Block block1)
+                    { AnalyzeStatements(block1.Statements); }
+
+                    if (inlinedMacro is Block block2)
+                    { AnalyzeStatements(block2.Statements); }
+
                     return;
                 }
 
@@ -489,7 +506,7 @@ namespace LanguageCore.Compiler
                     AddCompilable(compilableGeneralFunction);
                 }
             }
-            else if (statement is LanguageCore.Parser.Statement.Literal)
+            else if (statement is Literal)
             { }
             else if (statement is TypeCast @as)
             { AnalyzeStatement(@as.PrevStatement); }
@@ -503,7 +520,7 @@ namespace LanguageCore.Compiler
             { AnalyzeStatements(block.Statements); }
             else if (statement is ModifiedStatement modifiedStatement)
             {
-                Warnings.Add(new Warning($"Modifiers not supported", modifiedStatement.Modifier, CurrentFile));
+                AnalysisCollection?.Warnings.Add(new Warning($"Modifiers not supported", modifiedStatement.Modifier, CurrentFile));
                 AnalyzeStatement(modifiedStatement.Statement);
             }
             else if (statement is AnyCall anyCall)
@@ -703,34 +720,10 @@ namespace LanguageCore.Compiler
             SearchForReferences(topLevelStatements);
         }
 
-        public static void CollectReferences(
-            CompilerResult compilerResult,
-            PrintCallback? printCallback = null)
-            => new ReferenceCollector()
-            {
-                CompiledClasses = compilerResult.Classes,
-                CompiledStructs = compilerResult.Structs,
+        public static void CollectReferences(in CompilerResult compilerResult, PrintCallback? printCallback = null, AnalysisCollection? analysisCollection = null)
+            => new ReferenceCollector(compilerResult, analysisCollection).AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
 
-                CompiledFunctions = compilerResult.Functions,
-                CompiledMacros = compilerResult.Macros,
-                CompiledOperators = compilerResult.Operators,
-                CompiledGeneralFunctions = compilerResult.GeneralFunctions,
-
-                CompiledEnums = compilerResult.Enums,
-            }.AnalyzeFunctions(compilerResult.TopLevelStatements, printCallback);
-
-        public static void ClearReferences(CompilerResult compilerResult)
-            => new ReferenceCollector()
-            {
-                CompiledClasses = compilerResult.Classes,
-                CompiledStructs = compilerResult.Structs,
-
-                CompiledFunctions = compilerResult.Functions,
-                CompiledMacros = compilerResult.Macros,
-                CompiledOperators = compilerResult.Operators,
-                CompiledGeneralFunctions = compilerResult.GeneralFunctions,
-
-                CompiledEnums = compilerResult.Enums,
-            }.ClearReferences();
+        public static void ClearReferences(in CompilerResult compilerResult, AnalysisCollection? analysisCollection = null)
+            => new ReferenceCollector(compilerResult, analysisCollection).ClearReferences();
     }
 }

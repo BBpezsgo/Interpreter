@@ -26,7 +26,7 @@
 
                 CurrentColumn++;
                 if (breakLine) CurrentLine++;
-                if (returnLine) CurrentLine = 0;
+                if (returnLine) CurrentColumn = 0;
             }
 
             EndToken(Text.Length);

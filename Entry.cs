@@ -9,11 +9,14 @@ namespace TheProgram
     using LanguageCore.ASM.Generator;
     using LanguageCore.BBCode.Generator;
     using LanguageCore.Brainfuck;
+    using LanguageCore.Brainfuck.Generator;
     using LanguageCore.Compiler;
 #if !AOT
     using LanguageCore.IL.Generator;
 #endif
     using LanguageCore.Parser;
+    using LanguageCore.Runtime;
+    using LanguageCore.Tokenizing;
 
     public static class Entry
     {
@@ -23,7 +26,7 @@ namespace TheProgram
         {
             if (arguments.IsEmpty)
             {
-                new Interactive().Run();
+                new LanguageCore.Interactive.Interactive().Run();
                 return;
             }
 
@@ -38,7 +41,7 @@ namespace TheProgram
 
                         ConsoleGUI.ConsoleGUI gui = new()
                         {
-                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.CompilerSettings, arguments.BytecodeInterpreterSettings, arguments.HandleErrors)
+                            FilledElement = new ConsoleGUI.InterpreterElement(arguments.File.FullName, arguments.CompilerSettings, arguments.BytecodeInterpreterSettings, !arguments.ThrowErrors)
                         };
                         while (!gui.Destroyed)
                         { gui.Tick(); }
@@ -48,8 +51,8 @@ namespace TheProgram
                         Output.LogDebug($"Executing file \"{arguments.File.FullName}\" ...");
                         LanguageCore.Runtime.Interpreter interpreter = new();
 
-                        interpreter.OnStdOut += (sender, data) => Output.Write(data);
-                        interpreter.OnStdError += (sender, data) => Output.WriteError(data);
+                        interpreter.OnStdOut += (sender, data) => Output.Write(char.ToString(data));
+                        interpreter.OnStdError += (sender, data) => Output.WriteError(char.ToString(data));
 
                         interpreter.OnOutput += (_, message, logType) => Output.Log(message, logType);
 
@@ -98,7 +101,7 @@ namespace TheProgram
                             Output.LogDebug($"Load DLLs from \"{dllsFolder.FullName}\" ...");
                             FileInfo[] dlls = dllsFolder.GetFiles("*.dll");
                             foreach (FileInfo dll in dlls)
-                            { interpreter.LoadDLL(externalFunctions, dll.FullName); }
+                            { externalFunctions.LoadAssembly(dll.FullName); }
                         }
                         else
                         {
@@ -107,30 +110,36 @@ namespace TheProgram
 #endif
 
                         BBCodeGeneratorResult generatedCode;
+                        AnalysisCollection analysisCollection = new();
 
-                        if (arguments.HandleErrors)
+                        if (!arguments.ThrowErrors)
                         {
                             try
                             {
-                                CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), externalFunctions, arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
-                                generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
-
-                                generatedCode.ThrowErrors();
-                                generatedCode.Print(Output.Log);
+                                CompilerResult compiled = Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                                generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
+                                analysisCollection.Throw();
+                                analysisCollection.Print();
+                            }
+                            catch (LanguageException ex)
+                            {
+                                analysisCollection.Print();
+                                Output.LogError(ex);
+                                return;
                             }
                             catch (Exception ex)
                             {
-                                Output.LogError(ex.ToString());
+                                analysisCollection.Print();
+                                Output.LogError(ex);
                                 return;
                             }
                         }
                         else
                         {
-                            CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), externalFunctions, arguments.File, arguments.CompilerSettings.BasePath, Output.Log);
-                            generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.CompilerSettings, Output.Log);
-
-                            generatedCode.ThrowErrors();
-                            generatedCode.Print(Output.Log);
+                            CompilerResult compiled = Compiler.CompileFile(arguments.File, externalFunctions, arguments.CompilerSettings, Output.Log, analysisCollection);
+                            generatedCode = CodeGeneratorForMain.Generate(compiled, arguments.GeneratorSettings, Output.Log, analysisCollection);
+                            analysisCollection.Throw();
+                            analysisCollection.Print();
                         }
 
                         interpreter.CompilerResult = generatedCode;
@@ -140,6 +149,7 @@ namespace TheProgram
                         {
                             interpreter.Update();
                         }
+                        Console.ResetColor();
                     }
                     break;
                 }
@@ -147,16 +157,196 @@ namespace TheProgram
                 {
                     BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
-                    EasyBrainfuckCompilerFlags compileOptions;
-                    if (arguments.CompilerSettings.PrintInstructions)
-                    { compileOptions = EasyBrainfuckCompilerFlags.PrintCompiledMinimized; }
+                    EasyBrainfuckCompilerFlags compileOptions =
+                        arguments.GeneratorSettings.PrintInstructions
+                        ? EasyBrainfuckCompilerFlags.PrintFinal
+                        : EasyBrainfuckCompilerFlags.None;
+
+                    BrainfuckGeneratorResult generated;
+                    Token[] tokens;
+
+                    AnalysisCollection analysisCollection = new();
+                    if (arguments.ThrowErrors)
+                    {
+                        tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
+                        ParserResult ast = Parser.Parse(tokens);
+                        ast.SetFile(arguments.File!.FullName);
+                        CompilerResult compiled = Compiler.Compile(ast, null, arguments.File!, CompilerSettings.Default, Output.Log, analysisCollection);
+                        generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
+                        analysisCollection.Throw();
+                        analysisCollection.Print();
+                        Output.LogDebug($"Optimized {generated.Optimizations} statements");
+                    }
                     else
-                    { compileOptions = EasyBrainfuckCompilerFlags.None; }
+                    {
+                        try
+                        {
+                            tokens = StreamTokenizer.Tokenize(arguments.File!.FullName);
+                            ParserResult ast = Parser.Parse(tokens);
+                            ast.SetFile(arguments.File!.FullName);
+                            CompilerResult compiled = Compiler.Compile(ast, null, arguments.File!, CompilerSettings.Default, Output.Log, analysisCollection);
+                            generated = CodeGeneratorForBrainfuck.Generate(compiled, BrainfuckGeneratorSettings.Default, Output.Log, analysisCollection);
+                            analysisCollection.Throw();
+                            analysisCollection.Print();
+                            Output.LogDebug($"Optimized {generated.Optimizations} statements");
+                        }
+                        catch (LanguageException exception)
+                        {
+                            analysisCollection.Print();
+                            Output.LogError(exception);
+                            return;
+                        }
+                        catch (Exception exception)
+                        {
+                            analysisCollection.Print();
+                            Output.LogError(exception);
+                            return;
+                        }
+                    }
+
+                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintCompiled) != 0)
+                    {
+                        Output.WriteLine();
+                        Output.WriteLine($" === COMPILED ===");
+                        BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
+                        Output.WriteLine();
+                    }
+
+                    generated.Code = Minifier.Minify(generated.Code);
+
+                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintCompiledMinimized) != 0)
+                    {
+                        Output.WriteLine();
+                        Output.WriteLine($" === MINIFIED ===");
+                        BrainfuckCode.PrintCode(Simplifier.Simplify(generated.Code));
+                        Output.WriteLine();
+                    }
+
+                    generated.Code = Minifier.Minify(BrainfuckCode.RemoveNoncodes(generated.Code));
+
+                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintFinal) != 0)
+                    {
+                        Output.WriteLine();
+                        Output.WriteLine($" === FINAL ===");
+                        BrainfuckCode.PrintCode(generated.Code);
+                        Output.WriteLine();
+                    }
+
+                    if ((compileOptions & EasyBrainfuckCompilerFlags.WriteToFile) != 0)
+                    {
+                        string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File!.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File!.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
+                        File.WriteAllText(compiledFilePath, generated.Code);
+                    }
+
+                    InterpreterCompact interpreter = new(generated.Code)
+                    {
+                        DebugInfo = generated.DebugInfo,
+                        OriginalCode = tokens,
+                    };
 
                     if (arguments.ConsoleGUI)
-                    { BrainfuckRunner.Run(arguments, BrainfuckRunKind.UI, printFlags, compileOptions); }
+                    {
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
+
+                        Output.WriteLine();
+                        Output.Write("Press any key to start the interpreter");
+                        Console.ReadKey();
+
+                        interpreter.RunWithUI(true, 3);
+                    }
                     else
-                    { BrainfuckRunner.Run(arguments, BrainfuckRunKind.Default, printFlags, compileOptions); }
+                    {
+                        if ((printFlags & BrainfuckPrintFlags.PrintResultLabel) != 0)
+                        {
+                            Output.WriteLine();
+                            Output.WriteLine($" === RESULT ===");
+                            Output.WriteLine();
+                        }
+
+                        if ((printFlags & BrainfuckPrintFlags.PrintExecutionTime) != 0)
+                        {
+                            Stopwatch sw = Stopwatch.StartNew();
+                            interpreter.Run();
+                            Console.ResetColor();
+                            sw.Stop();
+
+                            Output.WriteLine();
+                            Output.WriteLine();
+                            Output.WriteLine($"Execution time: {sw.ElapsedMilliseconds} ms");
+                        }
+                        else
+                        {
+                            interpreter.Run();
+                        }
+
+                        if ((printFlags & BrainfuckPrintFlags.PrintMemory) != 0)
+                        {
+                            Output.WriteLine();
+                            Output.WriteLine();
+                            Output.WriteLine($" === MEMORY ===");
+                            Output.WriteLine();
+
+                            int zerosToShow = 10;
+                            int finalIndex = 0;
+
+                            for (int i = 0; i < interpreter.Memory.Length; i++)
+                            { if (interpreter.Memory[i] != 0) finalIndex = i; }
+
+                            finalIndex = Math.Max(finalIndex, interpreter.MemoryPointer);
+                            finalIndex = Math.Min(interpreter.Memory.Length, finalIndex + zerosToShow);
+
+                            int heapStart = BrainfuckGeneratorSettings.Default.HeapStart;
+                            int heapEnd = heapStart + BrainfuckGeneratorSettings.Default.HeapSize * BasicHeapCodeHelper.BLOCK_SIZE;
+
+                            for (int i = 0; i < finalIndex; i++)
+                            {
+                                byte cell = interpreter.Memory[i];
+
+                                ConsoleColor fg = ConsoleColor.White;
+                                ConsoleColor bg = ConsoleColor.Black;
+
+                                if (cell == 0)
+                                { fg = ConsoleColor.DarkGray; }
+
+                                if (i == heapStart)
+                                {
+                                    bg = ConsoleColor.DarkBlue;
+                                }
+
+                                if (i > heapStart + 2)
+                                {
+                                    int j = (i - heapStart) / BasicHeapCodeHelper.BLOCK_SIZE;
+                                    int k = (i - heapStart) % BasicHeapCodeHelper.BLOCK_SIZE;
+                                    if (k == BasicHeapCodeHelper.OFFSET_DATA)
+                                    { bg = ConsoleColor.DarkGreen; }
+                                }
+
+                                if (i == interpreter.MemoryPointer)
+                                {
+                                    bg = ConsoleColor.DarkRed;
+                                    fg = ConsoleColor.Gray;
+                                }
+
+                                Console.ForegroundColor = fg;
+                                Console.BackgroundColor = bg;
+
+                                Console.Write($" {cell} ");
+                                Console.ResetColor();
+                            }
+
+                            if (interpreter.Memory.Length - finalIndex > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                Console.Write($" ... ");
+                                Console.ResetColor();
+                                Console.WriteLine();
+                                break;
+                            }
+
+                            Console.WriteLine();
+                        }
+                    }
                     break;
                 }
                 case ProgramRunType.IL:
@@ -164,9 +354,14 @@ namespace TheProgram
 #if AOT
                     throw new NotSupportedException($"The compiler compiled in AOT mode so IL generation isn't available");
 #else
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
+                    AnalysisCollection analysisCollection = new();
 
-                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.CompilerSettings, default, null);
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, CompilerSettings.Default, Output.Log, analysisCollection);
+
+                    ILGeneratorResult generated = CodeGeneratorForIL.Generate(compiled, arguments.CompilerSettings, default, Output.Log, analysisCollection);
+
+                    analysisCollection.Throw();
+                    analysisCollection.Print();
 
                     generated.Invoke();
                     break;
@@ -174,9 +369,14 @@ namespace TheProgram
                 }
                 case ProgramRunType.ASM:
                 {
-                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, null);
+                    AnalysisCollection analysisCollection = new();
 
-                    AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, null);
+                    CompilerResult compiled = Compiler.Compile(Parser.ParseFile(arguments.File.FullName), null, arguments.File, CompilerSettings.Default, Output.Log, analysisCollection);
+
+                    AsmGeneratorResult code = CodeGeneratorForAsm.Generate(compiled, default, Output.Log, analysisCollection);
+
+                    analysisCollection.Throw();
+                    analysisCollection.Print();
 
                     string? fileDirectoryPath = arguments.File.DirectoryName;
                     string fileNameNoExt = Path.GetFileNameWithoutExtension(arguments.File.Name);

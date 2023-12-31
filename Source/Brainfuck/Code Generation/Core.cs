@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace LanguageCore.Brainfuck.Generator
 {
+    using System.Linq;
     using BBCode.Generator;
     using Compiler;
     using Parser;
@@ -154,8 +155,6 @@ namespace LanguageCore.Brainfuck.Generator
         public string Code;
         public int Optimizations;
 
-        public Warning[] Warnings;
-        public Error[] Errors;
         public DebugInformation DebugInfo;
     }
 
@@ -175,7 +174,7 @@ namespace LanguageCore.Brainfuck.Generator
             {
                 BrainfuckGeneratorSettings result = new()
                 {
-                    ClearGlobalVariablesBeforeExit = false,
+                    ClearGlobalVariablesBeforeExit = true,
                     StackStart = 0,
                     HeapStart = 64,
                     HeapSize = 8,
@@ -269,7 +268,7 @@ namespace LanguageCore.Brainfuck.Generator
 
         #endregion
 
-        public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback) : base(compilerResult)
+        public CodeGeneratorForBrainfuck(CompilerResult compilerResult, BrainfuckGeneratorSettings settings, PrintCallback? printCallback, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
         {
             this.Variables = new Stack<Variable>();
             this.Code = new CompiledCode();
@@ -350,12 +349,15 @@ namespace LanguageCore.Brainfuck.Generator
         }
 
         static bool GetVariable(IEnumerable<Variable> variables, string name, out Variable variable)
+            => GetVariable(variables.ToArray(), name, out variable);
+
+        static bool GetVariable(Variable[] variables, string name, out Variable variable)
         {
-            foreach (Variable variable_ in variables)
+            for (int i = variables.Length - 1; i >= 0; i--)
             {
-                if (variable_.Name == name)
+                if (variables[i].Name == name)
                 {
-                    variable = variable_;
+                    variable = variables[i];
                     return true;
                 }
             }
@@ -391,8 +393,33 @@ namespace LanguageCore.Brainfuck.Generator
             if (n == 0) return;
             using (Code.Block($"Clean up variables ({n})"))
             {
-                Variables.Pop(n);
-                Stack.Pop(n);
+                for (int i = 0; i < n; i++)
+                {
+                    Variable variable = Variables.Last;
+
+                    if (!variable.HaveToClean)
+                    {
+                        Variables.Pop();
+                        continue;
+                    }
+
+                    if (variable.DeallocateOnClean &&
+                        variable.Type.InHEAP)
+                    {
+                        GenerateDeallocator(
+                            new TypeCast(
+                                new Identifier(
+                                    Tokenizing.Token.CreateAnonymous(variable.Name, Tokenizing.TokenType.Identifier)
+                                    ),
+                                Tokenizing.Token.CreateAnonymous("as"),
+                                TypeInstanceSimple.CreateAnonymous("int", TypeDefinitionReplacer)
+                                )
+                            );
+                    }
+
+                    Variables.Pop();
+                    Stack.Pop();
+                }
             }
         }
 
@@ -612,7 +639,12 @@ namespace LanguageCore.Brainfuck.Generator
         {
             PrintCallback?.Invoke("  Precompiling ...", LogType.Debug);
 
+            CurrentFile = compilerResult.File?.FullName;
+
             int constantCount = CompileConstants(compilerResult.TopLevelStatements);
+
+            Variable returnVariable = new(ReturnVariableName, Stack.PushVirtual(1), null, false, false, new CompiledType(Type.Integer), 1);
+            Variables.Add(returnVariable);
 
             if (GeneratorSettings.ClearGlobalVariablesBeforeExit)
             { VariableCleanupStack.Push(PrecompileVariables(compilerResult.TopLevelStatements)); }
@@ -668,25 +700,26 @@ namespace LanguageCore.Brainfuck.Generator
             if (Code.BranchDepth != 0)
             { throw new InternalException($"Unbalanced branches", CurrentFile); }
 
+            CurrentFile = null;
+
             return new BrainfuckGeneratorResult()
             {
                 Code = Code.ToString(),
                 Optimizations = Optimizations,
                 DebugInfo = DebugInfo,
-
-                Warnings = Warnings.ToArray(),
-                Errors = Errors.ToArray(),
             };
         }
 
         public static BrainfuckGeneratorResult Generate(
             CompilerResult compilerResult,
             BrainfuckGeneratorSettings generatorSettings,
-            PrintCallback? printCallback = null)
+            PrintCallback? printCallback = null,
+            AnalysisCollection? analysisCollection = null)
         => new CodeGeneratorForBrainfuck(
             compilerResult,
             generatorSettings,
-            printCallback
+            printCallback,
+            analysisCollection
         ).GenerateCode(compilerResult);
     }
 }

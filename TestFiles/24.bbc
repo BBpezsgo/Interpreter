@@ -1,0 +1,3 @@
+using System.Math;
+
+return Pow(5, 2);

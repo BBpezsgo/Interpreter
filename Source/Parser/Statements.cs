@@ -145,10 +145,20 @@ namespace LanguageCore.Parser.Statement
     {
         public Token? Semicolon;
 
+        public abstract Position Position { get; }
+
+        public Statement()
+        {
+            Semicolon = null;
+        }
+
+        public Statement(Statement other)
+        {
+            Semicolon = other.Semicolon;
+        }
+
         public override string ToString()
             => $"{GetType().Name}{Semicolon}";
-
-        public abstract Position Position { get; }
 
         public abstract IEnumerator<Statement> GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -162,6 +172,16 @@ namespace LanguageCore.Parser.Statement
     public abstract class StatementWithValue : Statement
     {
         public bool SaveValue = true;
+
+        public StatementWithValue() : base()
+        {
+            SaveValue = true;
+        }
+
+        public StatementWithValue(StatementWithValue other) : base(other)
+        {
+            SaveValue = other.SaveValue;
+        }
     }
 
     public abstract class StatementWithBlock : Statement
@@ -217,6 +237,16 @@ namespace LanguageCore.Parser.Statement
                 foreach (Statement substatement in statement)
                 { yield return substatement; }
             }
+        }
+
+        public static Block CreateIfNotBlock(Statement statement)
+        {
+            if (statement is Block block) return block;
+            return new Block(
+                Token.CreateAnonymous("{", TokenType.Operator, statement.Position.Before()),
+                [statement],
+                Token.CreateAnonymous("}", TokenType.Operator, statement.Position.After())
+                );
         }
     }
 
@@ -378,6 +408,15 @@ namespace LanguageCore.Parser.Statement
 
         public override Position Position
             => new Position(Type, VariableName, InitialValue).Union(Modifiers);
+
+        public VariableDeclaration(VariableDeclaration other) : base(other)
+        {
+            Type = other.Type;
+            VariableName = other.VariableName;
+            InitialValue = other.InitialValue;
+            Modifiers = other.Modifiers;
+            FilePath = other.FilePath;
+        }
 
         public VariableDeclaration(Token[] modifiers, TypeInstance type, Token variableName, StatementWithValue? initialValue)
         {

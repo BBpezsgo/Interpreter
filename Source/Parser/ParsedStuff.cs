@@ -22,7 +22,18 @@ namespace LanguageCore.Parser
         public readonly Token RightParenthesis;
         readonly ParameterDefinition[] Parameters;
 
+        public Position Position => new Position(LeftParenthesis, RightParenthesis).Union(Parameters);
+
+        public int Count => Parameters.Length;
+
         public ParameterDefinition this[int index] => Parameters[index];
+
+        public ParameterDefinitionCollection(ParameterDefinitionCollection other)
+        {
+            this.Parameters = other.Parameters;
+            this.LeftParenthesis = other.LeftParenthesis;
+            this.RightParenthesis = other.RightParenthesis;
+        }
 
         public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, Token leftParenthesis, Token rightParenthesis)
         {
@@ -30,10 +41,6 @@ namespace LanguageCore.Parser
             this.LeftParenthesis = leftParenthesis;
             this.RightParenthesis = rightParenthesis;
         }
-
-        public Position Position => new Position(LeftParenthesis, RightParenthesis).Union(Parameters);
-
-        public int Count => Parameters.Length;
 
         public IEnumerator<ParameterDefinition> GetEnumerator() => ((IEnumerable<ParameterDefinition>)Parameters).GetEnumerator();
         IEnumerator IEnumerable.GetEnumerator() => Parameters.GetEnumerator();
@@ -80,7 +87,15 @@ namespace LanguageCore.Parser
         public readonly TypeInstance Type;
         public readonly Token[] Modifiers;
 
-        public string Key => Identifier.Content;
+        public Position Position
+            => new Position(Identifier, Type).Union(Modifiers);
+
+        public ParameterDefinition(ParameterDefinition other)
+        {
+            Modifiers = other.Modifiers;
+            Type = other.Type;
+            Identifier = other.Identifier;
+        }
 
         public ParameterDefinition(Token[] modifiers, TypeInstance type, Token identifier)
         {
@@ -88,9 +103,6 @@ namespace LanguageCore.Parser
             Type = type;
             Identifier = identifier;
         }
-
-        public Position Position
-            => new Position(Identifier, Type).Union(Modifiers);
 
         public override string ToString() => $"{string.Join<Token>(", ", Modifiers)} {Type} {Identifier}".TrimStart();
     }
@@ -104,6 +116,14 @@ namespace LanguageCore.Parser
 
         public Position Position
             => new(Identifier, Type, ProtectionToken);
+
+        public FieldDefinition(FieldDefinition other)
+        {
+            Identifier = other.Identifier;
+            Type = other.Type;
+            ProtectionToken = other.ProtectionToken;
+            Semicolon = other.Semicolon;
+        }
 
         public FieldDefinition(Token identifier, TypeInstance type, Token? protectionToken)
         {
@@ -125,43 +145,47 @@ namespace LanguageCore.Parser
         public readonly Token Identifier;
         public readonly Statement.StatementWithValue? Value;
 
-        public string Key => Identifier.Content;
+        public Position Position
+            => new(Identifier, Value);
+
+        public EnumMemberDefinition(EnumMemberDefinition other)
+        {
+            Identifier = other.Identifier;
+            Value = other.Value;
+        }
 
         public EnumMemberDefinition(Token identifier, Statement.StatementWithValue? value)
         {
             Identifier = identifier;
             Value = value;
         }
-
-        public Position Position
-            => new(Identifier, Value);
     }
 
     public class EnumDefinition : IInFile, IPositioned
     {
-        public string? FilePath { get; set; }
-
-        public string Key => Identifier.Content;
-
         public readonly Token Identifier;
         public readonly EnumMemberDefinition[] Members;
         public readonly AttributeUsage[] Attributes;
+
+        public string? FilePath { get; set; }
+
+        public Position Position =>
+            new Position(Identifier)
+            .Union(Members);
+
+        public EnumDefinition(EnumDefinition other)
+        {
+            Identifier = other.Identifier;
+            Attributes = other.Attributes;
+            Members = other.Members;
+            FilePath = other.FilePath;
+        }
 
         public EnumDefinition(Token identifier, AttributeUsage[] attributes, EnumMemberDefinition[] members)
         {
             Identifier = identifier;
             Attributes = attributes;
             Members = members;
-        }
-
-        public Position Position
-        {
-            get
-            {
-                Position result = new(Identifier);
-                result.Union(Members);
-                return result;
-            }
         }
     }
 
@@ -173,6 +197,18 @@ namespace LanguageCore.Parser
         public Token RightP;
 
         public string[] TypeParameterNames => TypeParameters.Select(v => v.Content).ToArray();
+
+        public Position Position =>
+            new Position(TypeParameters)
+            .Union(Keyword, LeftP, RightP);
+
+        public TemplateInfo(TemplateInfo other)
+        {
+            Keyword = other.Keyword;
+            LeftP = other.LeftP;
+            TypeParameters = other.TypeParameters;
+            RightP = other.RightP;
+        }
 
         public TemplateInfo(Token keyword, Token leftP, IEnumerable<Token> typeParameters, Token rightP)
         {
@@ -206,16 +242,6 @@ namespace LanguageCore.Parser
             return result;
         }
 
-        public Position Position
-        {
-            get
-            {
-                Position result = new(TypeParameters);
-                result.Union(Keyword, LeftP, RightP);
-                return result;
-            }
-        }
-
         public override bool Equals(object? obj) => obj is TemplateInfo other && this.Equals(other);
         public bool Equals(TemplateInfo? other)
         {
@@ -238,11 +264,14 @@ namespace LanguageCore.Parser
         IExportable,
         IEquatable<FunctionThingDefinition>,
         IPositioned,
-        IReadableSimple
+        ISimpleReadable
     {
-        public ParameterDefinitionCollection Parameters;
         public Token[] Modifiers;
+        public readonly Token Identifier;
+        public ParameterDefinitionCollection Parameters;
         public Statement.Block? Block;
+
+        public readonly TemplateInfo? TemplateInfo;
 
         /// <summary>
         /// The first parameter is labeled as 'this'
@@ -255,9 +284,24 @@ namespace LanguageCore.Parser
 
         public bool IsMacro => Modifiers.Contains("macro");
 
+        public virtual bool IsTemplate => TemplateInfo is not null;
+
         public string? FilePath { get; set; }
 
-        public readonly TemplateInfo? TemplateInfo;
+        public virtual Position Position => new Position(Identifier)
+            .Union(Parameters)
+            .Union(Block)
+            .Union(Modifiers);
+
+        protected FunctionThingDefinition(FunctionThingDefinition other)
+        {
+            Modifiers = other.Modifiers;
+            Identifier = other.Identifier;
+            Parameters = other.Parameters;
+            Block = other.Block;
+            TemplateInfo = other.TemplateInfo;
+            FilePath = other.FilePath;
+        }
 
         protected FunctionThingDefinition(
             IEnumerable<Token> modifiers,
@@ -270,10 +314,6 @@ namespace LanguageCore.Parser
             Parameters = parameters;
             TemplateInfo = templateInfo;
         }
-
-        public virtual bool IsTemplate => TemplateInfo is not null;
-
-        public readonly Token Identifier;
 
         public bool CanUse(string? sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
@@ -339,22 +379,17 @@ namespace LanguageCore.Parser
             FilePath,
             TemplateInfo,
             Identifier);
-
-        public virtual Position Position => new Position(Identifier)
-            .Union(Parameters)
-            .Union(Block)
-            .Union(Modifiers);
     }
 
     public class MacroDefinition :
         IExportable,
         IEquatable<MacroDefinition>,
-        IReadableSimple
+        ISimpleReadable
     {
         public readonly Token Keyword;
-        public readonly Token[] Parameters;
         public readonly Token[] Modifiers;
-
+        public readonly Token Identifier;
+        public readonly Token[] Parameters;
         public readonly Statement.Block Block;
 
         public int ParameterCount => Parameters.Length;
@@ -362,6 +397,16 @@ namespace LanguageCore.Parser
         public bool IsExport => Modifiers.Contains("export");
 
         public string? FilePath { get; set; }
+
+        public MacroDefinition(MacroDefinition other)
+        {
+            Keyword = other.Keyword;
+            Modifiers = other.Modifiers;
+            Identifier = other.Identifier;
+            Parameters = other.Parameters;
+            Block = other.Block;
+            FilePath = other.FilePath;
+        }
 
         public MacroDefinition(IEnumerable<Token> modifiers, Token keyword, Token identifier, IEnumerable<Token> parameters, Statement.Block block)
         {
@@ -372,8 +417,6 @@ namespace LanguageCore.Parser
             Block = block;
             Modifiers = modifiers.ToArray();
         }
-
-        public readonly Token Identifier;
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == null || sourceFile == FilePath;
 
@@ -448,22 +491,27 @@ namespace LanguageCore.Parser
         public readonly Token Identifier;
         public readonly Statement.Literal[] Parameters;
 
-        public string Key => Identifier.Content;
+        public Position Position => new Position(Parameters).Union(Identifier);
 
         public AttributeUsage(Token identifier, Statement.Literal[] parameters)
         {
             Identifier = identifier;
             Parameters = parameters;
         }
-
-        public Position Position => new Position(Parameters).Union(Identifier);
     }
 
     public class FunctionDefinition : FunctionThingDefinition
     {
         public readonly AttributeUsage[] Attributes;
-
         public readonly TypeInstance Type;
+
+        public override Position Position => base.Position.Union(Type);
+
+        public FunctionDefinition(FunctionDefinition other) : base(other)
+        {
+            Attributes = other.Attributes;
+            Type = other.Type;
+        }
 
         public FunctionDefinition(
             IEnumerable<AttributeUsage> attributes,
@@ -521,12 +569,15 @@ namespace LanguageCore.Parser
             }
             return null;
         }
-
-        public override Position Position => base.Position.Union(Type);
     }
 
     public class GeneralFunctionDefinition : FunctionThingDefinition
     {
+        public GeneralFunctionDefinition(GeneralFunctionDefinition other) : base(other)
+        {
+
+        }
+
         public GeneralFunctionDefinition(
             Token identifier,
             IEnumerable<Token> modifiers,
@@ -570,8 +621,6 @@ namespace LanguageCore.Parser
         public Token[] Modifiers;
         public TemplateInfo? TemplateInfo;
 
-        public string Key => Name.Content;
-
         public IReadOnlyList<FunctionDefinition> Methods => methods;
         public IReadOnlyList<GeneralFunctionDefinition> GeneralMethods => generalMethods;
         public IReadOnlyList<FunctionDefinition> Operators => operators;
@@ -581,6 +630,22 @@ namespace LanguageCore.Parser
         readonly FunctionDefinition[] methods;
         readonly GeneralFunctionDefinition[] generalMethods;
         readonly FunctionDefinition[] operators;
+
+        public ClassDefinition(ClassDefinition other)
+        {
+            Attributes = other.Attributes;
+            Name = other.Name;
+            BracketStart = other.BracketStart;
+            BracketEnd = other.BracketEnd;
+            Statements = other.Statements;
+            FilePath = other.FilePath;
+            Fields = other.Fields;
+            Modifiers = other.Modifiers;
+            TemplateInfo = other.TemplateInfo;
+            methods = other.methods;
+            generalMethods = other.generalMethods;
+            operators = other.operators;
+        }
 
         public ClassDefinition(
             Token name,
@@ -648,12 +713,25 @@ namespace LanguageCore.Parser
         public string? FilePath { get; set; }
         public readonly FieldDefinition[] Fields;
 
-        public string Key => Name.Content;
-
         public bool IsExport => Modifiers.Contains("export");
 
         public IReadOnlyCollection<FunctionDefinition> Methods => methods;
         readonly FunctionDefinition[] methods;
+
+        public virtual Position Position => new(Name, BracketStart, BracketEnd);
+
+        public StructDefinition(StructDefinition other)
+        {
+            Attributes = other.Attributes;
+            Name = other.Name;
+            BracketStart = other.BracketStart;
+            BracketEnd = other.BracketEnd;
+            Statements = other.Statements;
+            Modifiers = other.Modifiers;
+            FilePath = other.FilePath;
+            Fields = other.Fields;
+            methods = other.methods;
+        }
 
         public StructDefinition(
             Token name,
@@ -674,17 +752,9 @@ namespace LanguageCore.Parser
             this.Modifiers = modifiers.ToArray();
         }
 
-        public override string ToString()
-        {
-            return $"struct {this.Name.Content} " + "{...}";
-        }
+        public override string ToString() => $"struct {this.Name.Content} {{...}}";
 
         public bool CanUse(string sourceFile) => IsExport || sourceFile == FilePath;
-
-        public virtual Position Position =>
-            new Position(Name)
-            .Union(BracketStart)
-            .Union(BracketEnd);
     }
 
     public class UsingDefinition

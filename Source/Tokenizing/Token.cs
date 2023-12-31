@@ -59,6 +59,7 @@ namespace LanguageCore.Tokenizing
             TokenType.LiteralString => $"\"{Content}\"",
             TokenType.LiteralCharacter => $"\'{Content}\'",
             TokenType.Comment => $"//{Content}",
+            TokenType.CommentMultiline => $"/*{Content}*/",
             _ => Content,
         };
 

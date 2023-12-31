@@ -14,11 +14,10 @@ namespace LanguageCore.Brainfuck
     public delegate void OutputCallback(byte data);
     public delegate byte InputCallback();
 
-    public abstract class InterpreterBase<TCode>
+    public abstract class InterpreterBase
     {
         public const int MEMORY_SIZE = 1024;
 
-        protected TCode[] Code;
         public byte[] Memory;
 
         protected OutputCallback OnOutput;
@@ -30,8 +29,6 @@ namespace LanguageCore.Brainfuck
         public int CodePointer => codePointer;
         public int MemoryPointer => memoryPointer;
 
-        public bool OutOfCode => codePointer >= Code.Length || codePointer < 0;
-
         protected bool isPaused;
 
         public bool IsPaused => isPaused;
@@ -41,26 +38,8 @@ namespace LanguageCore.Brainfuck
         public static void OnDefaultOutput(byte data) => Console.Write(CharCode.GetChar(data));
         public static byte OnDefaultInput() => CharCode.GetByte(Console.ReadKey(true).KeyChar);
 
-        public InterpreterBase(Func<string, TCode[]> parser, Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(onOutput, onInput)
-        {
-            using System.Net.Http.HttpClient client = new();
-            client.GetStringAsync(uri).ContinueWith((code) =>
-            {
-                this.Code = parser.Invoke(code.Result);
-            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
-        }
-
-        public InterpreterBase(Func<string, TCode[]> parser, FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(parser, File.ReadAllText(file.FullName), onOutput, onInput) { }
-
-        public InterpreterBase(Func<string, TCode[]> parser, string? code, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(onOutput, onInput)
-            => this.Code = parser.Invoke(code ?? throw new ArgumentNullException(nameof(code)));
-
         public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null)
         {
-            Code = Array.Empty<TCode>();
             Memory = new byte[MEMORY_SIZE];
 
             OnOutput = onOutput ?? OnDefaultOutput;
@@ -72,15 +51,7 @@ namespace LanguageCore.Brainfuck
         }
 
         /// <exception cref="BrainfuckRuntimeException"/>
-        public bool Step()
-        {
-            if (OutOfCode) return false;
-
-            Evaluate(Code[codePointer]);
-
-            codePointer++;
-            return !OutOfCode;
-        }
+        public abstract bool Step();
 
         public void Run()
         { while (Step()) ; }
@@ -105,6 +76,46 @@ namespace LanguageCore.Brainfuck
             this.codePointer = 0;
             this.memoryPointer = 0;
             Array.Clear(this.Memory);
+        }
+    }
+
+    public abstract class InterpreterBase<TCode> : InterpreterBase
+    {
+        protected TCode[] Code;
+
+        public bool OutOfCode => codePointer >= Code.Length || codePointer < 0;
+
+        public InterpreterBase(Func<string, TCode[]> parser, Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
+            : this(onOutput, onInput)
+        {
+            using System.Net.Http.HttpClient client = new();
+            client.GetStringAsync(uri).ContinueWith((code) =>
+            {
+                this.Code = parser.Invoke(code.Result);
+            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
+        }
+
+        public InterpreterBase(Func<string, TCode[]> parser, FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
+            : this(parser, File.ReadAllText(file.FullName), onOutput, onInput) { }
+
+        public InterpreterBase(Func<string, TCode[]> parser, string? code, OutputCallback? onOutput = null, InputCallback? onInput = null)
+            : this(onOutput, onInput)
+            => this.Code = parser.Invoke(code ?? throw new ArgumentNullException(nameof(code)));
+
+        public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null) : base(onOutput, onInput)
+        {
+            Code = Array.Empty<TCode>();
+        }
+
+        /// <exception cref="BrainfuckRuntimeException"/>
+        public override bool Step()
+        {
+            if (OutOfCode) return false;
+
+            Evaluate(Code[codePointer]);
+
+            codePointer++;
+            return !OutOfCode;
         }
 
         protected abstract void Evaluate(TCode instruction);

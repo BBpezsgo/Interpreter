@@ -6,6 +6,7 @@
 using System.Console;
 using System.String;
 using System.Memory;
+using System.Math;
 
 [Define("boolean")]
 enum bool
@@ -95,35 +96,6 @@ export String ToString(this int number)
 
 [External("sleep")]
 export void Sleep(int ms);
-
-export int Pow(int a, int b)
-{
-    if (b == 0) { return 1; };
-    if (b < 0)
-    { return 1 / Pow(a, Abs(b)); };
-    int answer = 1;
-    for (int i = 1; i <= b; i++)
-    { answer = answer * a; };
-    return answer;
-}
-
-export int Abs(int v)
-{
-    if (v < 0) { return v * -1; };
-    return v;
-}
-  
-export int Min(int a, int b)
-{
-    if (a < b) { return a; };
-    return b;
-}
-
-export int Max(int a, int b)
-{
-    if (a > b) { return a; };
-    return b;
-}
 
 export int ParseInt(temp String v)
 {

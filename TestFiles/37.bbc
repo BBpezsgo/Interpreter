@@ -1,0 +1,6 @@
+using System;
+
+temp String a = "a";
+temp String b = "b";
+
+Print(a + b);

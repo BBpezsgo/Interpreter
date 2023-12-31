@@ -52,6 +52,8 @@ namespace LanguageCore.Brainfuck
             this.v.Append(value, repeatCount);
             BrainfuckCode.PrintCode(new string(value, repeatCount));
         }
+
+        public override string ToString() => v.ToString();
     }
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -881,7 +883,9 @@ namespace LanguageCore.Brainfuck
         public readonly int Start;
         public readonly int Size;
 
-        int OffsettedStart => Start + BLOCK_SIZE;
+        public int OffsettedStart => GetOffsettedStart(Start);
+
+        public static int GetOffsettedStart(int start) => start + BLOCK_SIZE;
 
         public const int BLOCK_SIZE = 3;
         public const int OFFSET_ADDRESS_CARRY = 0;

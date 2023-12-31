@@ -25,38 +25,31 @@ namespace LanguageCore.Compiler
     {
         public readonly CollectedAST[] CollectedASTs;
 
-        public readonly Warning[] Warnings;
-        public readonly Error[] Errors;
-
-        public CollectorResult(IEnumerable<CollectedAST> collectedASTs, Warning[] warnings, Error[] errors)
+        public CollectorResult(IEnumerable<CollectedAST> collectedASTs)
         {
             CollectedASTs = collectedASTs.ToArray();
-            Warnings = warnings;
-            Errors = errors;
         }
 
-        public static CollectorResult Empty => new([], [], []);
+        public static CollectorResult Empty => new([]);
     }
 
     public class SourceCodeManager
     {
         readonly List<string> AlreadyCompiledCodes;
-        readonly List<Warning> Warnings;
-        readonly List<Error> Errors;
-        PrintCallback? Print;
+        readonly AnalysisCollection? AnalysisCollection;
+        readonly PrintCallback? Print;
 
-        public SourceCodeManager()
+        public SourceCodeManager(AnalysisCollection? analysisCollection, PrintCallback? printCallback)
         {
             AlreadyCompiledCodes = new List<string>();
-            Warnings = new List<Warning>();
-            Errors = new List<Error>();
-            Print = null;
+            AnalysisCollection = analysisCollection;
+            Print = printCallback;
         }
 
         (string? Text, string? Path) LoadSourceCode(
-    UsingDefinition @using,
-    FileInfo? file,
-    string? basePath)
+            UsingDefinition @using,
+            FileInfo? file,
+            string? basePath)
         {
             if (@using.IsUrl)
             {
@@ -152,7 +145,7 @@ namespace LanguageCore.Compiler
 
                 if (path == null)
                 {
-                    Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file?.FullName));
+                    AnalysisCollection?.Errors.Add(new Error($"File \"{path}\" not found", new Position(@using.Path), file?.FullName));
                     return (null, path);
                 }
 
@@ -186,7 +179,7 @@ namespace LanguageCore.Compiler
             {
 
                 TokenizerResult tokenizerResult = StringTokenizer.Tokenize(content);
-                Warnings.AddRange(tokenizerResult.Warnings);
+                AnalysisCollection?.Warnings.AddRange(tokenizerResult.Warnings);
 
                 System.DateTime parseStarted = System.DateTime.Now;
                 Print?.Invoke("  Parsing ...", LogType.Debug);
@@ -224,21 +217,19 @@ namespace LanguageCore.Compiler
             foreach (UsingDefinition usingItem in usings)
             {
                 collectedASTs.AddRange(ProcessFile(usingItem, file, basePath));
-                if (Errors.Count > 0)
-                { throw Errors[0].ToException(); }
             }
 
-            return new CollectorResult(collectedASTs, Warnings.ToArray(), Errors.ToArray());
+            return new CollectorResult(collectedASTs);
         }
 
         public static CollectorResult Collect(
             UsingDefinition[] usings,
             FileInfo? file,
             PrintCallback? printCallback = null,
-            string? basePath = null)
+            string? basePath = null,
+            AnalysisCollection? analysisCollection = null)
         {
-            SourceCodeManager sourceCodeManager = new()
-            { Print = printCallback, };
+            SourceCodeManager sourceCodeManager = new(analysisCollection, printCallback);
             if (file != null) sourceCodeManager.AlreadyCompiledCodes.Add(file.FullName);
             return sourceCodeManager.Entry(
                 usings,

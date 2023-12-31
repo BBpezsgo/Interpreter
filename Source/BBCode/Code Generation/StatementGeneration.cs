@@ -45,9 +45,6 @@ namespace LanguageCore.BBCode.Generator
             if (GetConstant(newVariable.VariableName.Content, out _))
             { throw new CompilerException($"Symbol name \"{newVariable.VariableName}\" conflicts with an another symbol name", newVariable.VariableName, newVariable.FilePath); }
 
-            if (InMacro.Last)
-            { throw new NotImplementedException(); }
-
             if (!GetVariable(newVariable.VariableName.Content, out CompiledVariable? compiledVariable))
             { throw new InternalException($"Variable \"{newVariable.VariableName.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", CurrentFile); }
 
@@ -174,7 +171,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!valueType.IsClass)
                 {
-                    Warnings.Add(new Warning($"The 'delete' keyword-function is only working on type class or int so I skip this shit", keywordCall.Parameters[0], CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"The 'delete' keyword-function is only working on type class or int so I skip this shit", keywordCall.Parameters[0], CurrentFile));
                     return;
                 }
 
@@ -194,7 +191,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Destructor for type '{valueType.Class.Name.Content}' function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{valueType.Class.Name.Content}' function cannot be called due to its protection level", keywordCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -227,7 +224,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!paramType.IsClass)
                 {
-                    Warnings.Add(new Warning($"The 'clone' function is only working on type class so I skip this shit", keywordCall.Parameters[0], CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"The 'clone' function is only working on type class so I skip this shit", keywordCall.Parameters[0], CurrentFile));
                     return;
                 }
 
@@ -236,7 +233,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!cloner.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Cloner for type \"{paramType.Class.Name.Content}\" function could not be called due to its protection level.", keywordCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Cloner for type \"{paramType.Class.Name.Content}\" function could not be called due to its protection level.", keywordCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -389,12 +386,12 @@ namespace LanguageCore.BBCode.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                     canDeallocate = false;
                 }
 
@@ -434,12 +431,12 @@ namespace LanguageCore.BBCode.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                     canDeallocate = false;
                 }
 
@@ -471,12 +468,12 @@ namespace LanguageCore.BBCode.Generator
                 if (StatementCanBeDeallocated(passedParameter, out bool explicitDeallocate))
                 {
                     if (explicitDeallocate && !canDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value: parameter definition does not have a \"{"temp"}\" modifier", passedParameter, CurrentFile)); }
                 }
                 else
                 {
                     if (explicitDeallocate)
-                    { Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Can not deallocate this value", passedParameter, CurrentFile)); }
                     canDeallocate = false;
                 }
 
@@ -512,7 +509,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (!compiledFunction.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The {compiledFunction.ToReadable()} function could not be called due to its protection level", functionCall.Identifier, CurrentFile));
                 return;
             }
 
@@ -523,12 +520,19 @@ namespace LanguageCore.BBCode.Generator
             { throw new CompilerException($"You called the {(compiledFunction.IsMethod ? "method" : "function")} \"{functionCall.FunctionName}\" as {(functionCall.IsMethodCall ? "method" : "function")}", functionCall, CurrentFile); }
 
             if (compiledFunction.IsMacro)
-            { Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
+            { AnalysisCollection?.Warnings.Add(new Warning($"I can not inline macros because of lack of intelligence so I will treat this macro as a normal function.", functionCall, CurrentFile)); }
 
             if (compiledFunction.BuiltinFunctionName == "alloc")
             {
                 GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.Integer));
                 AddInstruction(Opcode.HEAP_ALLOC);
+                return;
+            }
+
+            if (compiledFunction.BuiltinFunctionName == "free")
+            {
+                GenerateCodeForStatement(functionCall.Parameters[0], new CompiledType(Type.Integer));
+                AddInstruction(Opcode.HEAP_DEALLOC);
                 return;
             }
 
@@ -548,7 +552,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (!ExternalFunctions.TryGetValue(compiledFunction.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
                 {
-                    Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"External function \"{compiledFunction.ExternalFunctionName}\" not found", functionCall.Identifier, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -810,10 +814,10 @@ namespace LanguageCore.BBCode.Generator
         }
         void GenerateCodeForStatement(OperatorCall @operator)
         {
-            if (OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
+            if (Settings.OptimizeCode && TryCompute(@operator, null, out DataItem predictedValue))
             {
                 AddInstruction(Opcode.PUSH_VALUE, predictedValue);
-                Informations.Add(new Information($"Predicted value: {predictedValue}", @operator, CurrentFile));
+                AnalysisCollection?.Informations.Add(new Information($"Predicted value: {predictedValue}", @operator, CurrentFile));
                 return;
             }
 
@@ -828,7 +832,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!operatorDefinition.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"The {operatorDefinition.ToReadable()} operator cannot be called due to its protection level", @operator.Operator, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -840,7 +844,7 @@ namespace LanguageCore.BBCode.Generator
                 {
                     if (!ExternalFunctions.TryGetValue(operatorDefinition.ExternalFunctionName, out ExternalFunctionBase? externalFunction))
                     {
-                        Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
+                        AnalysisCollection?.Errors.Add(new Error($"External function \"{operatorDefinition.ExternalFunctionName}\" not found", @operator.Operator, CurrentFile));
                         AddComment("}");
                         return;
                     }
@@ -1113,7 +1117,7 @@ namespace LanguageCore.BBCode.Generator
             if (conditionIsComputed && !(bool)computedCondition && TrimUnreachableCode)
             {
                 AddComment("Unreachable code not compiled");
-                Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
+                AnalysisCollection?.Informations.Add(new Information($"Unreachable code not compiled", whileLoop.Block, CurrentFile));
                 return;
             }
 
@@ -1146,9 +1150,9 @@ namespace LanguageCore.BBCode.Generator
             if (conditionIsComputed)
             {
                 if (!(bool)computedCondition)
-                { Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Bruh", whileLoop.Keyword, CurrentFile)); }
                 else if (BreakInstructions.Last.Count == 0)
-                { Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }
+                { AnalysisCollection?.Warnings.Add(new Warning($"Potential infinity loop", whileLoop.Keyword, CurrentFile)); }
             }
 
             BreakInstructions.Pop();
@@ -1359,7 +1363,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (!constructor.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
                 AddComment("}");
                 return;
             }
@@ -1483,7 +1487,7 @@ namespace LanguageCore.BBCode.Generator
                 if (TryCompute(index.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
                 {
                     if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
-                    { Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", index.Expression, CurrentFile)); }
 
                     if (GetParameter(identifier.Content, out CompiledParameter? param))
                     {
@@ -1628,7 +1632,7 @@ namespace LanguageCore.BBCode.Generator
 
             if (!targetType.IsFunction && type == targetType)
             {
-                Hints.Add(new Hint($"Redundant type conversion", @as.Keyword, CurrentFile));
+                AnalysisCollection?.Hints.Add(new Hint($"Redundant type conversion", @as.Keyword, CurrentFile));
                 return;
             }
 
@@ -1798,7 +1802,7 @@ namespace LanguageCore.BBCode.Generator
                 }
                 else
                 {
-                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, parameter.RealIndex);
+                    AddInstruction(Opcode.STORE_VALUE, AddressingMode.BasePointerRelative, parameter.MemoryAddress);
                 }
             }
             else if (GetVariable(statementToSet.Content, out CompiledVariable? variable))
@@ -1883,7 +1887,7 @@ namespace LanguageCore.BBCode.Generator
                 if (TryCompute(statementToSet.Expression, RuntimeType.SInt32, out DataItem computedIndexData))
                 {
                     if (computedIndexData.ValueSInt32 < 0 || computedIndexData.ValueSInt32 >= prevType.StackArraySize)
-                    { Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
+                    { AnalysisCollection?.Warnings.Add(new Warning($"Index out of range", statementToSet.Expression, CurrentFile)); }
 
                     GenerateCodeForStatement(value);
 
@@ -2015,7 +2019,7 @@ namespace LanguageCore.BBCode.Generator
                 {
                     string literalValue = literal.Value;
                     if (literalValue.Length != destination.StackArraySize)
-                    { throw new CompilerException($"Can not set \"{literalValue}\" (size of {literalValue.Length}) value to stack array {destination} (size of {destination.StackArraySize}) variable.", value, CurrentFile); }
+                    { throw new CompilerException($"Can not set \"{literalValue}\" (length of {literalValue.Length}) value to stack array {destination} (length of {destination.StackArraySize}) variable.", value, CurrentFile); }
                     return;
                 }
             }
@@ -2050,7 +2054,7 @@ namespace LanguageCore.BBCode.Generator
 
                 if (!destructor.CanUse(CurrentFile))
                 {
-                    Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
+                    AnalysisCollection?.Errors.Add(new Error($"Destructor for type '{deallocateableType.Class.Name.Content}' function cannot be called due to its protection level", null, CurrentFile));
                     AddComment("}");
                     return;
                 }
@@ -2148,7 +2152,7 @@ namespace LanguageCore.BBCode.Generator
             {
                 if (CompiledVariables[i].VariableName.Content == newVariable.VariableName.Content)
                 {
-                    Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
+                    AnalysisCollection?.Warnings.Add(new Warning($"Variable \"{CompiledVariables[i].VariableName}\" already defined", CompiledVariables[i].VariableName, CurrentFile));
                     return CleanupItem.Null;
                 }
             }
@@ -2499,15 +2503,13 @@ namespace LanguageCore.BBCode.Generator
 
         void CompileParameters(ParameterDefinition[] parameters)
         {
-            int paramIndex = 0;
             int paramsSize = 0;
             for (int i = 0; i < parameters.Length; i++)
             {
-                paramIndex++;
                 CompiledType parameterType = new(parameters[i].Type, FindType);
                 parameters[i].Type.SetAnalyzedType(parameterType);
 
-                this.CompiledParameters.Add(new CompiledParameter(paramIndex, paramsSize, parameterType, parameters[i]));
+                this.CompiledParameters.Add(new CompiledParameter(i, -(paramsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer), parameterType, parameters[i]));
 
                 paramsSize += parameterType.SizeOnStack;
             }

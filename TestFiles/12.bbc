@@ -1,0 +1,6 @@
+int Func()
+{
+	return 5;
+}
+
+return Func();

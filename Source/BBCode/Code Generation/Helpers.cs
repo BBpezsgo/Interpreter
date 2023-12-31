@@ -287,7 +287,7 @@ namespace LanguageCore.BBCode.Generator
 
         void CheckPointerNull(bool preservePointer = true, string exceptionMessage = "null pointer")
         {
-            if (!CheckNullPointers) return;
+            if (!Settings.CheckNullPointers) return;
             AddComment($"Check for pointer zero {{");
             if (preservePointer)
             { AddInstruction(Opcode.LOAD_VALUE, AddressingMode.StackRelative, -1); }

@@ -15,18 +15,18 @@ namespace LanguageCore.Compiler
         IDuplicatable<CompiledOperator>
     {
         public CompiledType[] ParameterTypes;
+        public new CompiledType Type;
+        public CompiledAttributeCollection CompiledAttributes;
+        readonly List<Reference<OperatorCall>> references;
+        public CompiledClass? Context { get; set; }
 
         public int TimesUsed;
         public int TimesUsedTotal;
 
         public int InstructionOffset = -1;
 
-        public CompiledAttributeCollection CompiledAttributes;
-
         public IReadOnlyList<Reference<OperatorCall>> ReferencesOperator => references;
-        readonly List<Reference<OperatorCall>> references = new();
 
-        public new CompiledType Type;
         public TypeInstance TypeToken => base.Type;
 
         public override bool IsTemplate
@@ -42,16 +42,13 @@ namespace LanguageCore.Compiler
         public bool IsExternal => CompiledAttributes.ContainsKey("External");
         public string ExternalFunctionName => CompiledAttributes.TryGetAttribute("External", out string? name) ? name : string.Empty;
 
-        public CompiledClass? Context { get; set; }
-
-        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition.Attributes, functionDefinition.Modifiers, functionDefinition.Type, functionDefinition.Identifier, functionDefinition.Parameters, functionDefinition.TemplateInfo)
+        public CompiledOperator(CompiledType type, CompiledType[] parameterTypes, FunctionDefinition functionDefinition) : base(functionDefinition)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
             this.CompiledAttributes = new();
-
-            base.Block = functionDefinition.Block;
-            base.FilePath = functionDefinition.FilePath;
+            this.references = new List<Reference<OperatorCall>>();
+            this.Context = null;
         }
 
         public void AddReference(OperatorCall referencedBy, string? file) => references.Add(new Reference<OperatorCall>(referencedBy, file));

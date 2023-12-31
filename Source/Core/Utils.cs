@@ -10,7 +10,7 @@ namespace LanguageCore
         public string ToReadable(Func<Parser.Statement.StatementWithValue, CompiledType> typeSearch);
     }
 
-    public interface IReadableSimple : IReadable
+    public interface ISimpleReadable : IReadable
     {
         public string ToReadable();
         string IReadable.ToReadable(Func<Parser.Statement.StatementWithValue, CompiledType> typeSearch) => ToReadable();

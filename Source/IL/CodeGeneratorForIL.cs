@@ -36,14 +36,10 @@ namespace LanguageCore.IL.Generator
     [RequiresDynamicCode("Generating IL code")]
     public class CodeGeneratorForIL : CodeGeneratorNonGeneratorBase
     {
-        #region Fields
-
         readonly ILGeneratorSettings GeneratorSettings;
         readonly string AssemblyName = "Bruh";
 
-        #endregion
-
-        public CodeGeneratorForIL(CompilerResult compilerResult, ILGeneratorSettings settings) : base(compilerResult)
+        public CodeGeneratorForIL(CompilerResult compilerResult, ILGeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, LanguageCore.Compiler.GeneratorSettings.Default, analysisCollection)
         {
             this.GeneratorSettings = settings;
         }
@@ -395,7 +391,7 @@ namespace LanguageCore.IL.Generator
 
             if (!constructor.CanUse(CurrentFile))
             {
-                Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
+                AnalysisCollection?.Errors.Add(new Error($"The \"{constructorCall.TypeName}\" constructor cannot be called due to its protection level", constructorCall.Keyword, CurrentFile));
                 return;
             }
 
@@ -539,7 +535,7 @@ namespace LanguageCore.IL.Generator
         }
         void Compile(TypeCast typeCast, ILGenerator generator)
         {
-            Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
+            AnalysisCollection?.Warnings.Add(new Warning($"Type-cast is not supported. I will ignore it and compile just the value", new Position(typeCast.Keyword, typeCast.Type), CurrentFile));
 
             Compile(typeCast.PrevStatement, generator);
         }
@@ -587,9 +583,6 @@ namespace LanguageCore.IL.Generator
             return new ILGeneratorResult()
             {
                 Assembly = assembly,
-
-                Warnings = this.Warnings.ToArray(),
-                Errors = this.Errors.ToArray(),
             };
         }
 
@@ -597,8 +590,9 @@ namespace LanguageCore.IL.Generator
             CompilerResult compilerResult,
             CompilerSettings settings,
             ILGeneratorSettings generatorSettings,
-            PrintCallback? printCallback = null)
-            => new CodeGeneratorForIL(compilerResult, generatorSettings)
+            PrintCallback? printCallback = null,
+            AnalysisCollection? analysisCollection = null)
+            => new CodeGeneratorForIL(compilerResult, generatorSettings, analysisCollection)
             .GenerateCode(
                 compilerResult,
                 settings,

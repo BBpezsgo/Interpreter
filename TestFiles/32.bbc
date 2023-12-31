@@ -1,0 +1,10 @@
+void Func(ref int v)
+{
+	v += 7;
+}
+
+int a = 3;
+
+Func(ref a);
+
+return a;

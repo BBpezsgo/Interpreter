@@ -5,6 +5,8 @@
     public class CompiledField : FieldDefinition
     {
         public new CompiledType Type;
+        public CompiledClass? Class;
+
         public Protection Protection
         {
             get
@@ -19,9 +21,7 @@
             }
         }
 
-        public CompiledClass? Class;
-
-        public CompiledField(CompiledType type, CompiledClass? context, FieldDefinition definition) : base(definition.Identifier, definition.Type, definition.ProtectionToken)
+        public CompiledField(CompiledType type, CompiledClass? context, FieldDefinition definition) : base(definition)
         {
             Type = type;
             Class = context;

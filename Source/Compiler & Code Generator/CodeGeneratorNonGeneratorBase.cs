@@ -9,7 +9,7 @@ namespace LanguageCore.Compiler
         public CodeGeneratorNonGeneratorBase() : base()
         { }
 
-        public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult) : base(compilerResult)
+        public CodeGeneratorNonGeneratorBase(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, settings, analysisCollection)
         { }
 
         protected override ValueAddress GetBaseAddress(CompiledParameter parameter) => throw new NotImplementedException();

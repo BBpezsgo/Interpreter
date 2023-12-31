@@ -323,6 +323,12 @@ namespace LanguageCore
             this.StackTrace = new System.Diagnostics.StackTrace(0, true);
         }
 
+        public string? GetArrows()
+        {
+            if (File == null) return null;
+            return LanguageException.GetArrows(Position, System.IO.File.ReadAllText(File));
+        }
+
         public override string ToString()
         {
             StringBuilder result = new(Message);

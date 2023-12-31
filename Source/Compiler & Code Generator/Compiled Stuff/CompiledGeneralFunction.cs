@@ -17,6 +17,9 @@ namespace LanguageCore.Compiler
         IDuplicatable<CompiledGeneralFunction>
     {
         public CompiledType[] ParameterTypes;
+        readonly List<Reference<Statement>> references;
+        CompiledClass? context;
+        public CompiledType Type;
 
         public int TimesUsed;
         public int TimesUsedTotal;
@@ -26,7 +29,6 @@ namespace LanguageCore.Compiler
         public bool ReturnSomething => this.Type.BuiltinType != LanguageCore.Compiler.Type.Void;
 
         public IReadOnlyList<Reference<Statement>> References => references;
-        readonly List<Reference<Statement>> references = new();
 
         public override bool IsTemplate
         {
@@ -38,23 +40,18 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledType Type;
-
-        CompiledClass? context;
         public CompiledClass? Context
         {
             get => context;
             set => context = value;
         }
 
-        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition.Identifier, functionDefinition.Modifiers, functionDefinition.Parameters)
+        public CompiledGeneralFunction(CompiledType type, CompiledType[] parameterTypes, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
         {
             this.Type = type;
             this.ParameterTypes = parameterTypes;
-
-            base.Block = functionDefinition.Block;
-
-            base.FilePath = functionDefinition.FilePath;
+            this.references = new List<Reference<Statement>>();
+            this.context = null;
         }
 
         public void AddReference(KeywordCall referencedBy, string? file) => references.Add(new Reference<Statement>(referencedBy, file));

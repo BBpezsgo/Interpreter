@@ -21,6 +21,7 @@ namespace TheProgram
                 "--hide-system",
                 // "--dont-optimize",
                 "--console-gui",
+                // "--print-instructions",
                 "--brainfuck",
                 // "--il",
                 // "--asm",

@@ -1,6 +1,5 @@
-﻿namespace LanguageCore.BBCode.Generator
+﻿namespace LanguageCore.Compiler
 {
-    using Compiler;
     using Parser.Statement;
 
     public class CompiledVariable : VariableDeclaration
@@ -10,15 +9,11 @@
         public readonly int MemoryAddress;
         public bool IsInitialized;
 
-        public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration)
-            : base(declaration.Modifiers, declaration.Type, declaration.VariableName, declaration.InitialValue)
+        public CompiledVariable(int memoryOffset, CompiledType type, VariableDeclaration declaration) : base(declaration)
         {
             this.Type = type;
 
             this.MemoryAddress = memoryOffset;
-
-            base.FilePath = declaration.FilePath;
-
             this.IsInitialized = false;
         }
     }

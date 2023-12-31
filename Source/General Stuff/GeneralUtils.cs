@@ -5,9 +5,12 @@ using System.Text;
 
 namespace LanguageCore
 {
-    public interface IDuplicatable<T> where T : notnull
+    public interface IDuplicatable<T> : ICloneable
+        where T : notnull
     {
         public T Duplicate();
+
+        object ICloneable.Clone() => Duplicate();
     }
 
     public static partial class Utils

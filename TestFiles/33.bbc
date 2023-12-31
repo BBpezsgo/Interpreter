@@ -1,0 +1,16 @@
+using System.Memory;
+
+void Func(int v)
+{
+	*v = (*v as int) + 7;
+}
+
+int a = Alloc(1);
+*a = 3;
+
+Func(a);
+
+int result = *a as int;
+Dealloc(a);
+
+return result;

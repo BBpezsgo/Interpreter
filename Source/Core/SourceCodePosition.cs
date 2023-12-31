@@ -106,6 +106,8 @@ namespace LanguageCore
             return this.ToStringRange();
         }
 
+        public readonly Position Before() => new(new Range<SinglePosition>(new SinglePosition(this.Range.Start.Line, this.Range.Start.Character - 1), new SinglePosition(this.Range.Start.Line, this.Range.Start.Character)), new Range<int>(this.AbsoluteRange.Start - 1, this.AbsoluteRange.Start));
+
         public readonly Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
 
         public override bool Equals(object? obj) => obj is Position position && Equals(position);

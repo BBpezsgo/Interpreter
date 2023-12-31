@@ -5,7 +5,6 @@ using System.Diagnostics;
 namespace LanguageCore.BBCode.Generator
 {
     using Compiler;
-    using Parser.Statement;
     using Runtime;
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
@@ -36,33 +35,6 @@ namespace LanguageCore.BBCode.Generator
     {
         public Instruction[] Code;
         public DebugInformation DebugInfo;
-
-        public Hint[] Hints;
-        public Information[] Informations;
-        public Warning[] Warnings;
-        public Error[] Errors;
-
-        /// <exception cref="LanguageException"/>
-        public readonly void ThrowErrors()
-        {
-            if (Errors.Length <= 0) return;
-            throw Errors[0].ToException();
-        }
-
-        public readonly void Print(PrintCallback callback)
-        {
-            for (int i = 0; i < Errors.Length; i++)
-            { callback.Invoke(Errors[i].ToString(), LogType.Error); }
-
-            for (int i = 0; i < Warnings.Length; i++)
-            { callback.Invoke(Warnings[i].ToString(), LogType.Warning); }
-
-            for (int i = 0; i < Informations.Length; i++)
-            { callback.Invoke(Informations[i].ToString(), LogType.Normal); }
-
-            for (int i = 0; i < Hints.Length; i++)
-            { callback.Invoke(Hints[i].ToString(), LogType.Normal); }
-        }
     }
 
     public partial class CodeGeneratorForMain : CodeGenerator
@@ -97,7 +69,7 @@ namespace LanguageCore.BBCode.Generator
 
         #region Fields
 
-        readonly ExternalFunctionCollection ExternalFunctions;
+        readonly ExternalFunctionReadonlyCollection ExternalFunctions;
         readonly Dictionary<string, int> ExternalFunctionsCache;
 
         readonly Stack<CleanupItem[]> CleanupStack;
@@ -113,25 +85,20 @@ namespace LanguageCore.BBCode.Generator
         readonly List<UndefinedOffset<CompiledOperator>> UndefinedOperatorFunctionOffsets;
         readonly List<UndefinedOffset<CompiledGeneralFunction>> UndefinedGeneralFunctionOffsets;
 
-        readonly bool OptimizeCode;
-        readonly bool CheckNullPointers;
         readonly bool TrimUnreachableCode = true;
 
         bool CanReturn;
 
-        readonly List<Information> Informations;
         readonly DebugInformation GeneratedDebugInfo;
         readonly Stack<ScopeInformations> CurrentScopeDebug = new();
 
         #endregion
 
-        public CodeGeneratorForMain(CompilerSettings settings) : base()
+        public CodeGeneratorForMain(CompilerResult compilerResult, GeneratorSettings settings, AnalysisCollection? analysisCollection) : base(compilerResult, settings, analysisCollection)
         {
-            this.ExternalFunctions = new ExternalFunctionCollection();
-            this.CheckNullPointers = settings.CheckNullPointers;
+            this.ExternalFunctions = compilerResult.ExternalFunctions;
             this.GeneratedCode = new List<Instruction>();
             this.ExternalFunctionsCache = new Dictionary<string, int>();
-            this.OptimizeCode = !settings.DontOptimize;
             this.GeneratedDebugInfo = new DebugInformation();
             this.CleanupStack = new Stack<CleanupItem[]>();
             this.ReturnInstructions = new Stack<List<int>>();
@@ -142,32 +109,18 @@ namespace LanguageCore.BBCode.Generator
             this.InMacro = new Stack<bool>();
 
             this.TagCount = new Stack<int>();
-
-            this.Informations = new List<Information>();
         }
 
         BBCodeGeneratorResult GenerateCode(
             CompilerResult compilerResult,
-            CompilerSettings settings,
-            PrintCallback? printCallback = null,
-            CompileLevel level = CompileLevel.Minimal)
+            GeneratorSettings settings,
+            PrintCallback? printCallback = null)
         {
-            base.CompiledClasses = compilerResult.Classes;
-            base.CompiledStructs = compilerResult.Structs;
-            this.ExternalFunctions.AddRange(compilerResult.ExternalFunctions);
-            base.CompiledEnums = compilerResult.Enums;
-            base.CompiledMacros = compilerResult.Macros;
-
-            (
-                this.CompiledFunctions,
-                this.CompiledOperators,
-                this.CompiledGeneralFunctions
-            ) = UnusedFunctionManager.RemoveUnusedFunctions(
-                    compilerResult,
-                    settings.RemoveUnusedFunctionsMaxIterations,
-                    printCallback,
-                    level
-                    );
+            UnusedFunctionManager.RemoveUnusedFunctions(
+                ref compilerResult,
+                settings.RemoveUnusedFunctionsMaxIterations,
+                printCallback,
+                settings.CompileLevel);
 
             List<string> usedExternalFunctions = new();
 
@@ -229,7 +182,7 @@ namespace LanguageCore.BBCode.Generator
 
             CurrentFile = compilerResult.File?.FullName;
             if (CurrentFile == null)
-            { Warnings.Add(new Warning($"{nameof(CurrentFile)} is null", null, null)); }
+            { AnalysisCollection?.Warnings.Add(new Warning($"{nameof(CurrentFile)} is null", null, null)); }
             GenerateCodeForTopLevelStatements(compilerResult.TopLevelStatements);
 
             if (ExternalFunctionsCache.Count > 0)
@@ -334,19 +287,14 @@ namespace LanguageCore.BBCode.Generator
             {
                 Code = GeneratedCode.ToArray(),
                 DebugInfo = GeneratedDebugInfo,
-
-                Hints = Hints.ToArray(),
-                Informations = Informations.ToArray(),
-                Warnings = Warnings.ToArray(),
-                Errors = Errors.ToArray(),
             };
         }
 
         public static BBCodeGeneratorResult Generate(
             CompilerResult compilerResult,
-            CompilerSettings settings,
+            GeneratorSettings settings,
             PrintCallback? printCallback = null,
-            CompileLevel level = CompileLevel.Minimal)
-            => new CodeGeneratorForMain(settings).GenerateCode(compilerResult, settings, printCallback, level);
+            AnalysisCollection? analysisCollection = null)
+            => new CodeGeneratorForMain(compilerResult, settings, analysisCollection).GenerateCode(compilerResult, settings, printCallback);
     }
 }

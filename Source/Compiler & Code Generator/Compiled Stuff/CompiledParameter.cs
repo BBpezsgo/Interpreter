@@ -2,7 +2,7 @@
 
 namespace LanguageCore.BBCode.Generator
 {
-    using LanguageCore.Compiler;
+    using Compiler;
     using Parser;
 
     [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
@@ -10,24 +10,24 @@ namespace LanguageCore.BBCode.Generator
     {
         public new CompiledType Type;
 
-        public readonly int CurrentParamsSize;
         public readonly int Index;
-        public readonly int RealIndex;
-        public bool IsRef => Modifiers.Contains("ref");
+        public readonly int MemoryAddress;
 
-        public CompiledParameter(int index, int currentParamsSize, CompiledType type, ParameterDefinition definition) : base(definition.Modifiers, definition.Type, definition.Identifier)
+        public bool IsAnonymous => Index == -1;
+        public bool IsRef => Modifiers.Contains("ref");
+        public TypeInstance TypeToken => base.Type;
+
+        public CompiledParameter(int index, int memoryAddress, CompiledType type, ParameterDefinition definition) : base(definition)
         {
             this.Index = index;
-            this.CurrentParamsSize = currentParamsSize;
             this.Type = type;
-            this.RealIndex = -(currentParamsSize + 1 + CodeGeneratorForMain.TagsBeforeBasePointer);
+            this.MemoryAddress = memoryAddress;
         }
 
         public CompiledParameter(CompiledType type, ParameterDefinition definition)
             : this(-1, -1, type, definition)
-        {
-        }
+        { }
 
-        public override string ToString() => $"{(IsRef ? "ref " : string.Empty)}{Type} {Identifier} {{ Index: {Index} RealIndex: {RealIndex} }}";
+        public override string ToString() => $"{(IsRef ? "ref " : string.Empty)}{Type} {Identifier} {{ Index: {Index} RealIndex: {MemoryAddress} }}";
     }
 }

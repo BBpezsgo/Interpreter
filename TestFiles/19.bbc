@@ -1,0 +1,11 @@
+int i;
+while (1)
+{
+	if (i == 5)
+	{
+		break;
+		return 69;
+	}
+	i++;
+}
+return i;

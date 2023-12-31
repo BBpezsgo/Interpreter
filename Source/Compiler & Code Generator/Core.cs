@@ -7,6 +7,7 @@ using System.Text;
 
 namespace LanguageCore.BBCode.Generator
 {
+    using Compiler;
     using Runtime;
 
     [DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]

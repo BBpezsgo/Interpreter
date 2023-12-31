@@ -9,9 +9,9 @@ namespace LanguageCore.Compiler
     {
         public new readonly CompiledField[] Fields;
         public CompiledAttributeCollection CompiledAttributes;
+        readonly List<Reference<TypeInstance>> references;
 
         public IReadOnlyList<Reference<TypeInstance>> References => references;
-        readonly List<Reference<TypeInstance>> references;
 
         public IReadOnlyDictionary<string, int> FieldOffsets
         {
@@ -42,16 +42,10 @@ namespace LanguageCore.Compiler
             }
         }
 
-        public CompiledStruct(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition.Name, definition.BracketStart, definition.BracketEnd, definition.Attributes, definition.Fields, definition.Methods, definition.Modifiers)
+        public CompiledStruct(CompiledAttributeCollection compiledAttributes, CompiledField[] fields, StructDefinition definition) : base(definition)
         {
             this.CompiledAttributes = compiledAttributes;
             this.Fields = fields;
-
-            base.FilePath = definition.FilePath;
-
-            base.Statements.Clear();
-            base.Statements.AddRange(definition.Statements);
-
             this.references = new List<Reference<TypeInstance>>();
         }
 

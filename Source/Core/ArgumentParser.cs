@@ -15,14 +15,12 @@ namespace TheProgram
         public System.IO.FileInfo? File;
 
         public LanguageCore.Compiler.CompilerSettings CompilerSettings;
+        public LanguageCore.Compiler.GeneratorSettings GeneratorSettings;
         public BytecodeInterpreterSettings BytecodeInterpreterSettings;
-        public bool ThrowErrors;
-        public readonly bool HandleErrors => !ThrowErrors;
 
-        public bool LogDebugs;
-        public bool LogSystem;
-        public bool LogWarnings;
-        public bool LogInfo;
+        public bool ThrowErrors;
+
+        public LogType LogFlags;
 
         public ProgramRunType RunType;
 
@@ -33,12 +31,10 @@ namespace TheProgram
         public static ProgramArguments Default => new()
         {
             ThrowErrors = false,
-            LogDebugs = true,
-            LogSystem = true,
-            LogWarnings = true,
-            LogInfo = true,
+            LogFlags = LogType.System | LogType.Debug | LogType.Normal | LogType.Warning | LogType.Error,
             RunType = ProgramRunType.Normal,
             CompilerSettings = LanguageCore.Compiler.CompilerSettings.Default,
+            GeneratorSettings = LanguageCore.Compiler.GeneratorSettings.Default,
             BytecodeInterpreterSettings = BytecodeInterpreterSettings.Default,
             ConsoleGUI = false,
             DoNotPause = false,
@@ -189,7 +185,7 @@ namespace TheProgram
                 {
                     if (ExpectArg(args, ref i, out _, "--no-nullcheck", "-nn"))
                     {
-                        result.CompilerSettings.CheckNullPointers = false;
+                        result.GeneratorSettings.CheckNullPointers = false;
                         continue;
                     }
 
@@ -256,43 +252,43 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out _, "--hide-debug", "-hd"))
                     {
-                        result.LogDebugs = false;
+                        result.LogFlags &= ~LogType.Debug;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--hide-system", "-hs"))
                     {
-                        result.LogSystem = false;
+                        result.LogFlags &= ~LogType.System;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--hide-warning", "--hide-warnings", "-hw"))
                     {
-                        result.LogWarnings = false;
+                        result.LogFlags &= ~LogType.Warning;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--hide-info", "-hi"))
                     {
-                        result.LogInfo = false;
+                        result.LogFlags &= ~LogType.Normal;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--dont-optimize", "-do"))
                     {
-                        result.CompilerSettings.DontOptimize = true;
+                        result.GeneratorSettings.DontOptimize = true;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--no-debug-info", "-ndi"))
                     {
-                        result.CompilerSettings.GenerateDebugInstructions = false;
+                        result.GeneratorSettings.GenerateDebugInstructions = false;
                         continue;
                     }
 
                     if (ExpectArg(args, ref i, out _, "--remove-unused-functions", "-ruf"))
                     {
-                        if (!ExpectParam(args, ref i, out result.CompilerSettings.RemoveUnusedFunctionsMaxIterations))
+                        if (!ExpectParam(args, ref i, out result.GeneratorSettings.RemoveUnusedFunctionsMaxIterations))
                         { throw new ArgumentException("Expected byte value after argument '-c-remove-unused-functions'"); }
 
                         continue;
@@ -308,7 +304,7 @@ namespace TheProgram
 
                     if (ExpectArg(args, ref i, out _, "--print-instructions", "-pi"))
                     {
-                        result.CompilerSettings.PrintInstructions = true;
+                        result.GeneratorSettings.PrintInstructions = true;
                         continue;
                     }
            

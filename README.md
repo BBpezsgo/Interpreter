@@ -64,48 +64,6 @@ using "../StandardLibrary/System";
 PrintLine("hello, world");
 ```
 
-## Default external functions
-
-### "stdin"
-Reads a key from the console. This will block the code execution until a key is pressed.
-- Parameters: none
-- Return value: `char`
-
-### "stdout"
-Writes a character to the standard output.
-- Parameters: `char` character
-- Return value: `void`
-
-### "stderr"
-Writes a character to the standard error.
-- Parameters: none
-- Return value: `void`
-
-### "console-set"
-Sets a character on the console.
-- Parameters: `char` character, `int` x, `int` y
-- Return value: `void`
-
-### "console-clear"
-Clears the console.
-- Parameters: none
-- Return value: `void`
-
-### "sleep"
-Pauses the code execution for `t` millisecs.
-- Parameters: `int` t
-- Return value: `void`
-
-### "sin"
-Returns the sine of `v` angle.
-- Parameters: `float` v
-- Return value: `float`
-
-### "cos"
-Returns the cosine of `v` angle.
-- Parameters: `float` v
-- Return value: `float`
-
 ## api-ms-win-crt-string-l1-1-0.dll Missing Error
 This can be fixed by install [this](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170).
 

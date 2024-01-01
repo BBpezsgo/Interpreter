@@ -1,16 +1,5 @@
-﻿using System;
-
-namespace LanguageCore.Brainfuck
+﻿namespace LanguageCore.Brainfuck
 {
-    [Flags]
-    public enum BrainfuckPrintFlags : int
-    {
-        None = 0b_0000,
-        PrintResultLabel = 0b_0001,
-        PrintExecutionTime = 0b_0010,
-        PrintMemory = 0b_0100,
-    }
-
     /*
     public static class BrainfuckRunner
     {

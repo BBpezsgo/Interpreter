@@ -11,134 +11,21 @@ namespace LanguageCore.Brainfuck
 {
     using Runtime;
 
-    public delegate void OutputCallback(byte data);
-    public delegate byte InputCallback();
-
-    public abstract class InterpreterBase
-    {
-        public const int MEMORY_SIZE = 1024;
-
-        public byte[] Memory;
-
-        protected OutputCallback OnOutput;
-        protected InputCallback OnInput;
-
-        protected int codePointer;
-        protected int memoryPointer;
-
-        public int CodePointer => codePointer;
-        public int MemoryPointer => memoryPointer;
-
-        protected bool isPaused;
-
-        public bool IsPaused => isPaused;
-
-        public RuntimeContext CurrentContext => new(memoryPointer, codePointer);
-
-        public static void OnDefaultOutput(byte data) => Console.Write(CharCode.GetChar(data));
-        public static byte OnDefaultInput() => CharCode.GetByte(Console.ReadKey(true).KeyChar);
-
-        public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null)
-        {
-            Memory = new byte[MEMORY_SIZE];
-
-            OnOutput = onOutput ?? OnDefaultOutput;
-            OnInput = onInput ?? OnDefaultInput;
-
-            codePointer = 0;
-            memoryPointer = 0;
-            isPaused = false;
-        }
-
-        /// <exception cref="BrainfuckRuntimeException"/>
-        public abstract bool Step();
-
-        public void Run()
-        { while (Step()) ; }
-
-        public void Run(int limit)
-        {
-            int i = 0;
-            while (true)
-            {
-                if (!Step()) break;
-                i++;
-                if (i >= limit)
-                {
-                    i = 0;
-                    Thread.Sleep(10);
-                }
-            }
-        }
-
-        public void Reset()
-        {
-            this.codePointer = 0;
-            this.memoryPointer = 0;
-            Array.Clear(this.Memory);
-        }
-    }
-
-    public abstract class InterpreterBase<TCode> : InterpreterBase
-    {
-        protected TCode[] Code;
-
-        public bool OutOfCode => codePointer >= Code.Length || codePointer < 0;
-
-        public InterpreterBase(Func<string, TCode[]> parser, Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(onOutput, onInput)
-        {
-            using System.Net.Http.HttpClient client = new();
-            client.GetStringAsync(uri).ContinueWith((code) =>
-            {
-                this.Code = parser.Invoke(code.Result);
-            }, System.Threading.Tasks.TaskScheduler.Default).Wait();
-        }
-
-        public InterpreterBase(Func<string, TCode[]> parser, FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(parser, File.ReadAllText(file.FullName), onOutput, onInput) { }
-
-        public InterpreterBase(Func<string, TCode[]> parser, string? code, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : this(onOutput, onInput)
-            => this.Code = parser.Invoke(code ?? throw new ArgumentNullException(nameof(code)));
-
-        public InterpreterBase(OutputCallback? onOutput = null, InputCallback? onInput = null) : base(onOutput, onInput)
-        {
-            Code = Array.Empty<TCode>();
-        }
-
-        /// <exception cref="BrainfuckRuntimeException"/>
-        public override bool Step()
-        {
-            if (OutOfCode) return false;
-
-            Evaluate(Code[codePointer]);
-
-            codePointer++;
-            return !OutOfCode;
-        }
-
-        protected abstract void Evaluate(TCode instruction);
-    }
-
     public class Interpreter : InterpreterBase<byte>
     {
         public DebugInformation? DebugInfo;
         public Tokenizing.Token[]? OriginalCode;
 
         public Interpreter(Uri uri, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : base((code) => CompactCode.OpCode(ParseCode(code)), uri, onOutput, onInput)
-        { }
+            : base(uri, onOutput, onInput) { }
 
         public Interpreter(FileInfo file, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : base((code) => CompactCode.OpCode(ParseCode(code)), file, onOutput, onInput)
-        { }
+            : base(file, onOutput, onInput) { }
 
-        public Interpreter(string? code, OutputCallback? onOutput = null, InputCallback? onInput = null)
-            : base((code) => CompactCode.OpCode(ParseCode(code)), code, onOutput, onInput)
-        { }
+        public Interpreter(string code, OutputCallback? onOutput = null, InputCallback? onInput = null)
+            : base(code, onOutput, onInput) { }
 
-        static char[] ParseCode(string code)
+        protected override byte[] ParseCode(string code)
         {
             List<char> Code = new(code.Length);
             for (int i = 0; i < code.Length; i++)
@@ -148,7 +35,7 @@ namespace LanguageCore.Brainfuck
 
                 Code.Add(code[i]);
             }
-            return Code.ToArray();
+            return CompactCode.ToOpCode(Code.ToArray());
         }
 
         public static void Run(string code)
@@ -156,6 +43,7 @@ namespace LanguageCore.Brainfuck
             InterpreterBase<byte> interpreter = new Interpreter(code);
             interpreter.Run();
         }
+
         public static void Run(string code, int limit)
         {
             InterpreterBase<byte> interpreter = new Interpreter(code);
@@ -450,7 +338,7 @@ namespace LanguageCore.Brainfuck
             for (int i = start; i <= end; i++)
             {
                 byte bg = (i == codePointer) ? CharColor.Silver : CharColor.Black;
-                byte fg = CompactCode.OpCode(Code[i]) switch
+                byte fg = CompactCode.FromOpCode(Code[i]) switch
                 {
                     '>' or '<' => CharColor.BrightRed,
                     '+' or '-' => CharColor.BrightBlue,
@@ -458,7 +346,7 @@ namespace LanguageCore.Brainfuck
                     '.' or ',' => CharColor.BrightMagenta,
                     _ => CharColor.Silver,
                 };
-                renderer[x, y] = new ConsoleChar(CompactCode.OpCode(Code[i]), fg, bg);
+                renderer[x, y] = new ConsoleChar(CompactCode.FromOpCode(Code[i]), fg, bg);
 
                 if (x++ >= width)
                 { return; }

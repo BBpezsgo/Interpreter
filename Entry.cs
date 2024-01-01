@@ -157,10 +157,10 @@ namespace TheProgram
                 {
                     BrainfuckPrintFlags printFlags = BrainfuckPrintFlags.PrintMemory;
 
-                    EasyBrainfuckCompilerFlags compileOptions =
+                    BrainfuckCompilerFlags compileOptions =
                         arguments.GeneratorSettings.PrintInstructions
-                        ? EasyBrainfuckCompilerFlags.PrintFinal
-                        : EasyBrainfuckCompilerFlags.None;
+                        ? BrainfuckCompilerFlags.PrintFinal
+                        : BrainfuckCompilerFlags.None;
 
                     BrainfuckGeneratorResult generated;
                     Token[] tokens;
@@ -204,7 +204,7 @@ namespace TheProgram
                         }
                     }
 
-                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintCompiled) != 0)
+                    if ((compileOptions & BrainfuckCompilerFlags.PrintCompiled) != 0)
                     {
                         Output.WriteLine();
                         Output.WriteLine($" === COMPILED ===");
@@ -214,7 +214,7 @@ namespace TheProgram
 
                     generated.Code = Minifier.Minify(generated.Code);
 
-                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintCompiledMinimized) != 0)
+                    if ((compileOptions & BrainfuckCompilerFlags.PrintCompiledMinimized) != 0)
                     {
                         Output.WriteLine();
                         Output.WriteLine($" === MINIFIED ===");
@@ -224,7 +224,7 @@ namespace TheProgram
 
                     generated.Code = Minifier.Minify(BrainfuckCode.RemoveNoncodes(generated.Code));
 
-                    if ((compileOptions & EasyBrainfuckCompilerFlags.PrintFinal) != 0)
+                    if ((compileOptions & BrainfuckCompilerFlags.PrintFinal) != 0)
                     {
                         Output.WriteLine();
                         Output.WriteLine($" === FINAL ===");
@@ -232,7 +232,7 @@ namespace TheProgram
                         Output.WriteLine();
                     }
 
-                    if ((compileOptions & EasyBrainfuckCompilerFlags.WriteToFile) != 0)
+                    if ((compileOptions & BrainfuckCompilerFlags.WriteToFile) != 0)
                     {
                         string compiledFilePath = Path.Combine(Path.GetDirectoryName(arguments.File!.FullName) ?? throw new InternalException($"Failed to get directory name of file \"{arguments.File!.FullName}\""), Path.GetFileNameWithoutExtension(arguments.File!.FullName) + ".bf");
                         File.WriteAllText(compiledFilePath, generated.Code);

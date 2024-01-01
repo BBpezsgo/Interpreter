@@ -17,18 +17,15 @@ namespace LanguageCore.Brainfuck
         public Tokenizing.Token[]? OriginalCode;
 
         public InterpreterCompact(Uri url, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
-            : base((code) => CompactCode.Generate(ParseCode(code)), url, OnOutput, OnInput)
-        { }
+            : base(url, OnOutput, OnInput) { }
 
         public InterpreterCompact(FileInfo file, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
-            : base((code) => CompactCode.Generate(ParseCode(code)), file, OnOutput, OnInput)
-        { }
+            : base(file, OnOutput, OnInput) { }
 
-        public InterpreterCompact(string? code, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
-            : base((code) => CompactCode.Generate(ParseCode(code)), code, OnOutput, OnInput)
-        { }
+        public InterpreterCompact(string code, OutputCallback? OnOutput = null, InputCallback? OnInput = null)
+            : base(code, OnOutput, OnInput) { }
 
-        static char[] ParseCode(string code)
+        protected override CompactCodeSegment[] ParseCode(string code)
         {
             List<char> Code = new(code.Length);
             for (int i = 0; i < code.Length; i++)
@@ -38,7 +35,7 @@ namespace LanguageCore.Brainfuck
 
                 Code.Add(code[i]);
             }
-            return Code.ToArray();
+            return CompactCode.Generate(Code.ToArray());
         }
 
         public static void Run(string code)
@@ -46,6 +43,7 @@ namespace LanguageCore.Brainfuck
             InterpreterBase<CompactCodeSegment> interpreter = new InterpreterCompact(code);
             interpreter.Run();
         }
+
         public static void Run(string code, int limit)
         {
             InterpreterBase<CompactCodeSegment> interpreter = new InterpreterCompact(code);
@@ -53,6 +51,7 @@ namespace LanguageCore.Brainfuck
         }
 
         /// <exception cref="BrainfuckRuntimeException"/>
+        /// <exception cref="NotImplementedException"/>
         protected override void Evaluate(CompactCodeSegment instruction)
         {
             switch (instruction.OpCode)

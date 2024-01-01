@@ -20,11 +20,11 @@ namespace LanguageCore.Brainfuck
         public CompactCodeSegment(ushort count, char opCode)
         {
             Count = count;
-            OpCode = CompactCode.OpCode(opCode);
+            OpCode = CompactCode.ToOpCode(opCode);
         }
 
-        public override string? ToString() => new(CompactCode.OpCode(OpCode), Count);
-        private string GetDebuggerDisplay() => $"{CompactCode.OpCode(OpCode)} x{Count}";
+        public override string? ToString() => new(CompactCode.FromOpCode(OpCode), Count);
+        private string GetDebuggerDisplay() => $"{CompactCode.FromOpCode(OpCode)} x{Count}";
     }
 
     public readonly struct OpCodes
@@ -47,7 +47,7 @@ namespace LanguageCore.Brainfuck
 
     public static class CompactCode
     {
-        public static byte OpCode(char c) => c switch
+        public static byte ToOpCode(char c) => c switch
         {
             '>' => OpCodes.POINTER_R,
             '<' => OpCodes.POINTER_L,
@@ -60,7 +60,8 @@ namespace LanguageCore.Brainfuck
             '$' => OpCodes.DEBUG,
             _ => 0,
         };
-        public static char OpCode(byte c) => c switch
+
+        public static char FromOpCode(byte c) => c switch
         {
             OpCodes.POINTER_R => '>',
             OpCodes.POINTER_L => '<',
@@ -74,38 +75,41 @@ namespace LanguageCore.Brainfuck
             _ => '\0',
         };
 
-        public static byte[] OpCode(string c)
+        public static byte[] ToOpCode(string c)
         {
             byte[] result = new byte[c.Length];
             for (int i = 0; i < c.Length; i++)
-            { result[i] = CompactCode.OpCode(c[i]); }
+            { result[i] = CompactCode.ToOpCode(c[i]); }
             return result;
         }
-        public static byte[] OpCode(char[] c)
+
+        public static byte[] ToOpCode(char[] c)
         {
             byte[] result = new byte[c.Length];
             for (int i = 0; i < c.Length; i++)
-            { result[i] = CompactCode.OpCode(c[i]); }
+            { result[i] = CompactCode.ToOpCode(c[i]); }
             return result;
         }
-        public static char[] OpCode(byte[] c)
+
+        public static char[] FromOpCode(byte[] c)
         {
             char[] result = new char[c.Length];
             for (int i = 0; i < c.Length; i++)
-            { result[i] = CompactCode.OpCode(c[i]); }
+            { result[i] = CompactCode.FromOpCode(c[i]); }
             return result;
         }
 
         static readonly char[] Duplicatable = new char[] { '>', '<', '+', '-' };
 
         public static CompactCodeSegment[] Generate(char[] code) => CompactCode.Generate(new string(code));
+      
         public static CompactCodeSegment[] Generate(string code)
         {
             List<(byte OpCode, int Count)> result = new();
 
             for (int i = 0; i < code.Length; i++)
             {
-                byte c = OpCode(code[i]);
+                byte c = ToOpCode(code[i]);
 
                 if (i < code.Length - 3 && code.Substring(i, 3) == "[-]")
                 {
@@ -116,7 +120,7 @@ namespace LanguageCore.Brainfuck
                 {
                     result.Add((c, 1));
                 }
-                else if (result[^1].OpCode == c && Duplicatable.Contains(OpCode(c)))
+                else if (result[^1].OpCode == c && Duplicatable.Contains(FromOpCode(c)))
                 {
                     result[^1] = (c, result[^1].Count + 1);
                 }

@@ -43,8 +43,12 @@ I found a [youtuber](https://www.youtube.com/c/uliwitness) who made a great [tut
 
 **Modes:**
 > Use only one of these!
-- `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter. ⚠ **Expect buggy behavior and missing features!**
-- `--asm` Generates an assembly file, assemble it with nasm and execute the result exe file. ⚠ **Expect buggy behavior and missing features!**
+- `--brainfuck|-bf` Compiles and executes the code with a brainfuck interpreter.
+> [!WARNING]
+> Expect buggy behavior and missing features!
+- `--asm` Generates an assembly file, assemble it with nasm and execute the result exe file.
+> [!WARNING]
+> Expect buggy behavior and missing features!
 - The default mode is custom bytecodes that the interpreter can execute (this will automatically execute after the compiling)
 
 **Other:**
